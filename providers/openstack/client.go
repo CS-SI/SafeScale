@@ -360,5 +360,31 @@ func (client *Client) initDefaultSecurityGroup() error {
 
 //Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	panic("Build method not implemented")
+	IdentityEndpoint, _ := params["IdentityEndpoint"].(string)
+	Username, _ := params["Username"].(string)
+	Password, _ := params["Password"].(string)
+	TenantName, _ := params["TenantName"].(string)
+	Region, _ := params["Region"].(string)
+	FloatingIPPool, _ := params["FloatingIPPool"].(string)
+	return AuthenticatedClient(
+		AuthOptions{
+			IdentityEndpoint: IdentityEndpoint,
+			Username:         Username,
+			Password:         Password,
+			TenantName:       TenantName,
+			Region:           Region,
+			FloatingIPPool:   FloatingIPPool,
+		},
+		CfgOptions{
+			ProviderNetwork:         "public",
+			UseFloatingIP:           true,
+			UseLayer3Networking:     true,
+			AutoVMNetworkInterfaces: true,
+			VolumeSpeeds: map[string]VolumeSpeed.Enum{
+				"standard":   VolumeSpeed.COLD,
+				"performant": VolumeSpeed.HDD,
+			},
+			DNSList: []string{"185.23.94.244", "185.23.94.244"},
+		},
+	)
 }

@@ -16,7 +16,7 @@ import (
 //DefaultUser Default VM user
 const DefaultUser = "gpac"
 
-//TimeoutError defines a Timeout erroe
+//TimeoutError defines a Timeout error
 type TimeoutError struct {
 	Message string
 }

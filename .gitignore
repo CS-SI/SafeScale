@@ -16,7 +16,7 @@
 .vscode
 
 #remove client tests
-*_test.go
+providers/aws/*_test.go
 #remove secrets
 *.secrets
 
