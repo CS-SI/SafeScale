@@ -1,4 +1,4 @@
-package broker
+package commands
 
 import (
 	"github.com/SafeScale/providers"

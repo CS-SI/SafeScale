@@ -1,4 +1,4 @@
-package broker
+package commands
 
 // broker nas create nas1 vm1 --path="/shared/data"
 // broker nas delete nas1

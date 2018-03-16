@@ -1,8 +1,7 @@
-package broker
+package commands
 
 import (
 	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
 )
 
 // broker ssh connect vm2
@@ -17,13 +16,13 @@ type SSHAPI interface {
 	Scp(from string, to string)
 }
 
-//NewSSHService creates a SSH service
-func NewSSHService(api api.ClientAPI) *SSHService {
-	return &SSHService{
-		provider: providers.FromClient(api),
-		vm:       NewVMService(api),
-	}
-}
+// //NewSSHService creates a SSH service
+// func NewSSHService(api api.ClientAPI) *SSHService {
+// 	return &SSHService{
+// 		provider: providers.FromClient(api),
+// 		vm:       NewVMService(api),
+// 	}
+// }
 
 //SSHService SSH service
 type SSHService struct {

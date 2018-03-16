@@ -11,9 +11,10 @@ message Tenant{
 message TenantList{
     repeated Tenant Tenants = 1;
 }
+
 service TenantService{
-    rpc List (Empty) returns (TenantList){}
-    rpc Reload (Empty) returns (Empty){}
+    rpc ListTenant (Empty) returns (TenantList){}
+    rpc ReloadTenant (Empty) returns (Empty){}
 }
 
 message Image{
@@ -26,6 +27,7 @@ message Reference{
     string ID = 2;
     string Name = 3;
 }
+
 message TenantName{
     string Name = 1;
 }
@@ -33,9 +35,11 @@ message TenantName{
 message ImageList{
     repeated  Image Images= 1;
 }
+
 service ImageService{
-    rpc List(Reference) returns (ImageList){}
+    rpc ListImage(Reference) returns (ImageList){}
 }
+
 // broker network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
 // broker network list
 // broker network delete net1
@@ -59,7 +63,7 @@ message Network{
     string ID = 1;
     string Name = 2;
     string CIDR = 3;
-    string GatewayID = 4;
+    // string GatewayID = 4;
 }
 
 
@@ -67,10 +71,10 @@ message NetworkList{
     repeated Network Networks = 1;
 }
 service NetworkService{
-    rpc Create(NetworkDefinition) returns (Network){}
-    rpc List(TenantName) returns (NetworkList){}
-    rpc Inspect(Reference) returns (Network) {}
-    rpc Delete(Reference) returns (Empty){}
+    rpc CreateNetwork(NetworkDefinition) returns (Network){}
+    rpc ListNetwork(TenantName) returns (NetworkList){}
+    rpc InspectNetwork(Reference) returns (Network) {}
+    rpc DeleteNetwork(Reference) returns (Empty){}
 }
 
 // broker vm create vm1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
@@ -119,6 +123,7 @@ message VM{
 message VMList{
     repeated VM VMs= 1;
 }
+
 message SshConfig{
     string User = 1;
     string Host = 2;
@@ -129,13 +134,12 @@ message SshConfig{
 }
 
 service VMService{
-    rpc Create(VMDefinition) returns (VM){}
-    rpc Inspect(Reference) returns (VM){}
-    rpc List(TenantName) returns (VMList){}
-    rpc Delete(Reference) returns (Empty){}
-    rpc Ssh(Reference) returns (SshConfig){}
+    rpc CreateVM(VMDefinition) returns (VM){}
+    rpc InspectVM(Reference) returns (VM){}
+    rpc ListVM(TenantName) returns (VMList){}
+    rpc DeleteVM(Reference) returns (Empty){}
+    rpc SshVM(Reference) returns (SshConfig){}
 }
-
 
 // broker volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
 // broker volume attach v1 vm1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
@@ -177,12 +181,12 @@ message VolumeAttachment{
 }
 
 service VolumeService{
-    rpc Create(VolumeDefinition) returns (Volume) {}
-    rpc Attach(VolumeAttachment) returns (Empty) {}
-    rpc Detach(Reference) returns (Empty){}
-    rpc Delete(Reference) returns (Empty){}
-    rpc List(Empty) returns (VolumeList) {} 
-    rpc Inspect(Reference) returns (Volume){}
+    rpc CreateVolume(VolumeDefinition) returns (Volume) {}
+    rpc AttachVolume(VolumeAttachment) returns (Empty) {}
+    rpc DetachVolume(Reference) returns (Empty){}
+    rpc DeleteVolume(Reference) returns (Empty){}
+    rpc ListVolume(Empty) returns (VolumeList) {} 
+    rpc InspectVolume(Reference) returns (Volume){}
 }
 
 // broker container create c1
@@ -204,14 +208,10 @@ message ContainerMountingPoint{
 
 }
 
-
-
 service ContainerService{
-    rpc Create(Container) returns (Empty){}
-    rpc Mount(ContainerMountingPoint) returns (Empty){}
-    rpc UMount(ContainerMountingPoint) returns (Empty){}
-    rpc Delete(Container) returns (Empty){}
-    rpc List(Empty) returns (Empty){}
-
-
+    rpc ContainerCreate(Container) returns (Empty){}
+    rpc ContainerMount(ContainerMountingPoint) returns (Empty){}
+    rpc ContainerUMount(ContainerMountingPoint) returns (Empty){}
+    rpc ContainerDelete(Container) returns (Empty){}
+    rpc ContainerList(Empty) returns (Empty){}
 }

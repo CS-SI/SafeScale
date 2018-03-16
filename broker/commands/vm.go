@@ -1,4 +1,4 @@
-package broker
+package commands
 
 import (
 	"fmt"
@@ -20,13 +20,13 @@ type VMAPI interface {
 	Delete(ref string) error
 }
 
-//NewVMService creates a VM service
-func NewVMService(api api.ClientAPI) VMAPI {
-	return &VMService{
-		provider: providers.FromClient(api),
-		network:  NewNetworkService(api),
-	}
-}
+// //NewVMService creates a VM service
+// func NewVMService(api api.ClientAPI) VMAPI {
+// 	return &VMService{
+// 		provider: providers.FromClient(api),
+// 		network:  NewNetworkService(api),
+// 	}
+// }
 
 //VMService vm service
 type VMService struct {
@@ -57,7 +57,7 @@ func (srv *VMService) Create(name string, net string, cpu int, ram float32, disk
 		ImageID:    img.ID,
 		Name:       net,
 		TemplateID: tpls[0].ID,
-		IsGateway:  false,
+		// IsGateway:  false,
 		PublicIP:   public,
 		NetworkIDs: []string{n.ID},
 	}

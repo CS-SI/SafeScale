@@ -1,4 +1,4 @@
-package broker
+package commands
 
 // broker volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
 // broker volume attach v1 vm1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
