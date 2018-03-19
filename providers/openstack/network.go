@@ -106,7 +106,7 @@ func (client *Client) GetNetwork(id string) (*api.Network, error) {
 		return nil, fmt.Errorf("Bad configuration, each network should have exactly one subnet")
 	}
 	sn := sns[0]
-	gwID, _ := client.getGateway(id)
+	// gwID, _ := client.getGateway(id)
 	// if err != nil {
 	// 	return nil, fmt.Errorf("Bad configuration, no gateway associated to this network")
 	// }
@@ -116,7 +116,7 @@ func (client *Client) GetNetwork(id string) (*api.Network, error) {
 		Name:      network.Name,
 		CIDR:      sn.Mask,
 		IPVersion: sn.IPVersion,
-		GatewayID: gwID,
+		// GatewayID: gwID,
 	}, nil
 }
 
@@ -149,16 +149,16 @@ func (client *Client) ListNetworks() ([]api.Network, error) {
 				continue
 			}
 			sn := sns[0]
-			gwID, err := client.getGateway(n.ID)
-			if err != nil {
-				return false, fmt.Errorf("Error getting network: %s", errorString(err))
-			}
+			// gwID, err := client.getGateway(n.ID)
+			// if err != nil {
+			// 	return false, fmt.Errorf("Error getting network: %s", errorString(err))
+			// }
 			netList = append(netList, api.Network{
 				ID:        n.ID,
 				Name:      n.Name,
 				CIDR:      sn.Mask,
 				IPVersion: sn.IPVersion,
-				GatewayID: gwID,
+				// GatewayID: gwID,
 			})
 		}
 		return true, nil
@@ -171,7 +171,12 @@ func (client *Client) ListNetworks() ([]api.Network, error) {
 
 //DeleteNetwork deletes the network identified by id
 func (client *Client) DeleteNetwork(id string) error {
-	client.DeleteGateway(id)
+	net, err := client.GetNetwork(id)
+	if err != nil {
+		return fmt.Errorf("Error deleting networks: %s", errorString(err))
+	}
+
+	client.DeleteGateway(net.ID)
 	sns, err := client.ListSubnets(id)
 	if err != nil {
 		return fmt.Errorf("Error deleting network: %s", errorString(err))
@@ -198,7 +203,7 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	vmReq := api.VMRequest{
 		ImageID:    req.ImageID,
 		KeyPair:    req.KeyPair,
-		Name:       "gateway_" + net.Name,
+		Name:       "gw_" + net.Name,
 		TemplateID: req.TemplateID,
 		NetworkIDs: []string{req.NetworkID},
 		PublicIP:   true,
@@ -222,6 +227,7 @@ func (client *Client) DeleteGateway(networkID string) error {
 		return fmt.Errorf("Error deleting gateway: %s", errorString(err))
 	}
 	client.DeleteVM(srv.ID)
+	// Loop waiting for effective deletion of the VM
 	for err = nil; err != nil; _, err = client.GetVM(srv.ID) {
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -357,9 +363,22 @@ func (client *Client) DeleteSubnet(id string) error {
 			return fmt.Errorf("Error deleting subnets: %s", errorString(err))
 		}
 	}
+	deleted := false
+	var errmsg string
+	for i := 0; i < 10; i++ {
+		// if err := subnets.Delete(client.Network, id).ExtractErr(); err != nil {
+		fmt.Println(fmt.Sprintf("Deleting subnet attempt #%d", i+1))
+		err := subnets.Delete(client.Network, id).ExtractErr()
+		if err == nil {
+			deleted = true
+			break
+		}
+		errmsg = errorString(err)
+		time.Sleep(1 * time.Second)
+	}
 
-	if err := subnets.Delete(client.Network, id).ExtractErr(); err != nil {
-		return fmt.Errorf("Error deleting subnets: %s", errorString(err))
+	if !deleted {
+		return fmt.Errorf("Error deleting subnets: %s", errmsg)
 	}
 
 	return nil

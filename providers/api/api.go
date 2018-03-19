@@ -171,8 +171,8 @@ type Network struct {
 	IPVersion IPVersion.Enum `json:"ip_version,omitempty"`
 	//Mask mask in CIDR notation
 	CIDR string `json:"mask,omitempty"`
-	//Gateway network gateway
-	GatewayID string
+	// //Gateway network gateway
+	// GatewayID string
 }
 
 /*
@@ -198,8 +198,6 @@ type NetworkRequest struct {
 	IPVersion IPVersion.Enum `json:"ip_version,omitempty"`
 	//CIDR mask
 	CIDR string `json:"cidr,omitempty"`
-	//gwDefinition gateway of this netwok
-	GWRequest VMRequest
 }
 
 //Object object to put in a container

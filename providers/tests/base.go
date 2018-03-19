@@ -117,7 +117,15 @@ func (tester *ClientTester) ListKeyPairs(t *testing.T) {
 }
 
 //CreateNetwork creates a test network
-func (tester *ClientTester) CreateNetwork(t *testing.T, name string) *api.Network {
+func (tester *ClientTester) CreateNetwork(t *testing.T, name string) (*api.Network, *api.KeyPair) {
+
+	network, err := tester.Service.CreateNetwork(api.NetworkRequest{
+		Name:      name,
+		IPVersion: IPVersion.IPv4,
+		CIDR:      "192.168.1.0/24",
+	})
+	assert.NoError(t, err)
+
 	tpls, err := tester.Service.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
@@ -126,19 +134,19 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string) *api.Networ
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 16.04")
 	assert.Nil(t, err)
-	gwRequest := api.VMRequest{
+	keypair, err := tester.Service.CreateKeyPair("kp_" + network.Name)
+	assert.Nil(t, err)
+
+	gwRequest := api.GWRequest{
 		ImageID:    img.ID,
-		Name:       "test_gw",
+		NetworkID:  network.ID,
+		KeyPair:    keypair,
 		TemplateID: tpls[0].ID,
 	}
-	network, err := tester.Service.CreateNetwork(api.NetworkRequest{
-		Name:      name,
-		IPVersion: IPVersion.IPv4,
-		CIDR:      "192.168.1.0/24",
-		GWRequest: gwRequest,
-	})
-	assert.NoError(t, err)
-	return network
+	err = tester.Service.CreateGateway(gwRequest)
+	assert.Nil(t, err)
+
+	return network, keypair
 }
 
 //CreateVM creates a test VM
@@ -171,20 +179,23 @@ func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 16.04")
 	assert.Nil(t, err)
-	vmRequest := api.GWRequest{
+	gwRequest := api.GWRequest{
 		ImageID:    img.ID,
 		TemplateID: tpls[0].ID,
 		NetworkID:  networkID,
 	}
-	return tester.Service.CreateGateway(vmRequest)
+	return tester.Service.CreateGateway(gwRequest)
 }
 
 //Networks test
 func (tester *ClientTester) Networks(t *testing.T) {
-	network1 := tester.CreateNetwork(t, "test_network_1")
-	defer tester.Service.DeleteNetwork(network1.ID)
+	fmt.Println("Creating test_network1")
+	network1, kp1 := tester.CreateNetwork(t, "test_network_1")
+	fmt.Println("test_network1 created")
+	// defer tester.Service.DeleteNetwork(network1.ID)
+	// defer tester.Service.DeleteKeyPair(kp1.ID)
 
-	vm, err := tester.Service.GetVM(network1.GatewayID)
+	vm, err := tester.Service.GetVMByName("gw_" + network1.Name)
 	assert.Nil(t, err)
 	assert.True(t, vm.AccessIPv4 != "" || vm.AccessIPv6 != "")
 	assert.NotEmpty(t, vm.PrivateKey)
@@ -203,9 +214,12 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	content := strings.Trim(string(out), "\n")
 	assert.Equal(t, api.DefaultUser, content)
 
-	network2 := tester.CreateNetwork(t, "test_network_2")
+	fmt.Println("Creating test_network2")
+	network2, kp2 := tester.CreateNetwork(t, "test_network_2")
+	fmt.Println("test_network2 created ")
 
-	defer tester.Service.DeleteNetwork(network2.ID)
+	// defer tester.Service.DeleteNetwork(network2.ID)
+	defer tester.Service.DeleteKeyPair(kp2.ID)
 
 	nets, err := tester.Service.ListNetworks()
 	assert.Nil(t, err)
@@ -225,7 +239,6 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	n1, err := tester.Service.GetNetwork(network1.ID)
 	assert.Nil(t, err)
 	assert.Equal(t, n1.CIDR, network1.CIDR)
-	assert.Equal(t, n1.GatewayID, network1.GatewayID)
 	assert.Equal(t, n1.ID, network1.ID)
 	assert.Equal(t, n1.IPVersion, network1.IPVersion)
 	assert.Equal(t, n1.Name, network1.Name)
@@ -241,11 +254,27 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	// assert.Equal(t, network2.Name, network2.Name)
 	// assert.Empty(t, network.Subnets)
 	// assert.Empty(t, network2.Subnets)
+
+	fmt.Println("Deleting test_network1")
+	err = tester.Service.DeleteNetwork(network1.ID)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("Error deleting network: %s", err))
+	}
+	fmt.Println("Deleting test_network2")
+	err = tester.Service.DeleteNetwork(network2.ID)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("Error deleting network: %s", err))
+	}
+	fmt.Println("Deleting keypair1")
+	tester.Service.DeleteKeyPair(kp1.ID)
+	fmt.Println("Deleting keypair2")
+	tester.Service.DeleteKeyPair(kp2.ID)
 }
 
 //VMs test
 func (tester *ClientTester) VMs(t *testing.T) {
-	network := tester.CreateNetwork(t, "test_network")
+	// TODO: handle kp delete
+	network, _ := tester.CreateNetwork(t, "test_network")
 
 	vm, err := tester.CreateVM(t, "vm1", network.ID, true)
 
@@ -293,7 +322,7 @@ func (tester *ClientTester) VMs(t *testing.T) {
 	assert.Equal(t, 3, len(vms))
 	found := 0
 	for _, v := range vms {
-		if v.ID == network.GatewayID {
+		if v.ID == network.ID {
 			found++
 		} else if v.ID == vm.ID {
 			found++
@@ -330,10 +359,10 @@ func (tester *ClientTester) VMs(t *testing.T) {
 
 //StartStopVM test
 func (tester *ClientTester) StartStopVM(t *testing.T) {
-
-	net := tester.CreateNetwork(t, "test_network")
+	// TODO: handle kp delete
+	net, _ := tester.CreateNetwork(t, "test_network")
 	defer tester.Service.DeleteNetwork(net.ID)
-	vm, err := tester.Service.GetVM(net.GatewayID)
+	vm, err := tester.Service.GetVM(net.ID)
 	assert.NoError(t, err)
 	{
 		err := tester.Service.StopVM(vm.ID)
@@ -401,9 +430,10 @@ func (tester *ClientTester) Volume(t *testing.T) {
 
 //VolumeAttachment test
 func (tester *ClientTester) VolumeAttachment(t *testing.T) {
-	net := tester.CreateNetwork(t, "test_network")
+	// TODO: handle kp delete
+	net, _ := tester.CreateNetwork(t, "test_network")
 	defer tester.Service.DeleteNetwork(net.ID)
-	vm, err := tester.Service.GetVM(net.GatewayID)
+	vm, err := tester.Service.GetVM(net.ID)
 	assert.NoError(t, err)
 
 	v, err := tester.Service.CreateVolume(api.VolumeRequest{
