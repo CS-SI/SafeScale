@@ -37,7 +37,7 @@ func main() {
 
 	// Image
 	imageService := pb.NewImageServiceClient(conn)
-	r, err := imageService.ListImage(ctx, &pb.Reference{})
+	r, err := imageService.List(ctx, &pb.Reference{})
 	if err != nil {
 		log.Fatalf("could not get image list: %v", err)
 	}
@@ -48,7 +48,7 @@ func main() {
 
 	// Tenant
 	tenantService := pb.NewTenantServiceClient(conn)
-	tenants, err := tenantService.ListTenant(ctx, &pb.Empty{})
+	tenants, err := tenantService.List(ctx, &pb.Empty{})
 	if err != nil {
 		log.Fatalf("could not get tenant list: %v", err)
 	}
@@ -59,7 +59,7 @@ func main() {
 
 	// Network
 	networkService := pb.NewNetworkServiceClient(conn)
-	networks, err := networkService.ListNetwork(ctx, &pb.TenantName{Name: "TestOvh"})
+	networks, err := networkService.List(ctx, &pb.TenantName{Name: "TestOvh"})
 	// networks, err := networkService.ListNetwork(ctx, &pb.TenantName{Name: "TestCloudwatt"})
 	if err != nil {
 		log.Fatalf("could not get network list: %v", err)

@@ -66,28 +66,31 @@ broker nas inspect nas1
 */
 
 // server is used to implement SafeScale.broker.
-type server struct{}
+type tenantServiceServer struct{}
 
 // Tenant
-func (s *server) ListTenant(ctx context.Context, in *pb.Empty) (*pb.TenantList, error) {
+func (s *tenantServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.TenantList, error) {
+	// func (s *server) ListTenant(ctx context.Context, in *pb.Empty) (*pb.TenantList, error) {
 	// TODO To be implemented
-	fmt.Println("List tenant called")
+	log.Println("List tenant called")
 	return &pb.TenantList{[]*pb.Tenant{
 			{Name: "Tenant_name_1", Provider: "Tenant_provider_1"},
 			{Name: "Tenant_name_2", Provider: "Tenant_provider_2"}}},
 		nil
 }
 
-func (s *server) ReloadTenant(ctx context.Context, in *pb.Empty) (*pb.Empty, error) {
+func (s *tenantServiceServer) Reload(ctx context.Context, in *pb.Empty) (*pb.Empty, error) {
 	// TODO To be implemented
-	fmt.Println("Realod called")
+	log.Println("Realod called")
 	return &pb.Empty{}, nil
 }
 
+type imageServiceServer struct{}
+
 // Image
-func (s *server) ListImage(ctx context.Context, in *pb.Reference) (*pb.ImageList, error) {
+func (s *imageServiceServer) List(ctx context.Context, in *pb.Reference) (*pb.ImageList, error) {
 	// TODO To be implemented
-	fmt.Println("List image called")
+	log.Println("List image called")
 	return &pb.ImageList{[]*pb.Image{
 			{ID: "Image id 1", Name: "Image Name 1"},
 			{Name: "Image name 2", ID: "Image id 2"}}},
@@ -95,13 +98,11 @@ func (s *server) ListImage(ctx context.Context, in *pb.Reference) (*pb.ImageList
 }
 
 // Network
-// rpc CreateNetwork(NetworkDefinition) returns (Network){}
-// rpc ListNetwork(TenantName) returns (NetworkList){}
-// rpc InspectNetwork(Reference) returns (Network) {}
-// rpc DeleteNetwork(Reference) returns (Empty){}
-func (s *server) CreateNetwork(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
+type networkServiceServer struct{}
+
+func (s *networkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
 	// TODO To be implemented
-	fmt.Println("Create Network called")
+	log.Println("Create Network called")
 	return &pb.Network{
 		ID:   "myNetworkid",
 		Name: "myNetworkName",
@@ -109,7 +110,7 @@ func (s *server) CreateNetwork(ctx context.Context, in *pb.NetworkDefinition) (*
 	}, nil
 }
 
-func (s *server) ListNetwork(ctx context.Context, in *pb.TenantName) (*pb.NetworkList, error) {
+func (s *networkServiceServer) List(ctx context.Context, in *pb.TenantName) (*pb.NetworkList, error) {
 	log.Printf("List Network called with tenant: %s", in.GetName())
 
 	// TODO Move serviceFactory initialisation to higher level (server initialisation ?)
@@ -143,9 +144,9 @@ func (s *server) ListNetwork(ctx context.Context, in *pb.TenantName) (*pb.Networ
 	return rv, nil
 }
 
-func (s *server) InspectNetwork(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
+func (s *networkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
 	// TODO To be implemented
-	fmt.Println("Inspect Network called")
+	log.Println("Inspect Network called")
 	return &pb.Network{
 		ID:   "myNetworkid",
 		Name: "myNetworkName",
@@ -153,9 +154,9 @@ func (s *server) InspectNetwork(ctx context.Context, in *pb.Reference) (*pb.Netw
 	}, nil
 }
 
-func (s *server) DeleteNetwork(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
+func (s *networkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
 	// TODO To be implemented
-	fmt.Println("Delete Network called")
+	log.Println("Delete Network called")
 	return &pb.Empty{}, nil
 }
 
@@ -166,9 +167,9 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
-	pb.RegisterTenantServiceServer(s, &server{})
-	pb.RegisterImageServiceServer(s, &server{})
-	pb.RegisterNetworkServiceServer(s, &server{})
+	pb.RegisterTenantServiceServer(s, &tenantServiceServer{})
+	pb.RegisterImageServiceServer(s, &imageServiceServer{})
+	pb.RegisterNetworkServiceServer(s, &networkServiceServer{})
 	// pb.RegisterContainerServiceServer(s, &server{})
 	// pb.RegisterVMServiceServer(s, &server{})
 	// pb.RegisterVolumeServiceServer(s, &server{})

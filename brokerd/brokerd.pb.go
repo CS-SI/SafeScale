@@ -852,8 +852,8 @@ const _ = grpc.SupportPackageIsVersion4
 // Client API for TenantService service
 
 type TenantServiceClient interface {
-	ListTenant(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TenantList, error)
-	ReloadTenant(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	List(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TenantList, error)
+	Reload(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type tenantServiceClient struct {
@@ -864,18 +864,18 @@ func NewTenantServiceClient(cc *grpc.ClientConn) TenantServiceClient {
 	return &tenantServiceClient{cc}
 }
 
-func (c *tenantServiceClient) ListTenant(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TenantList, error) {
+func (c *tenantServiceClient) List(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TenantList, error) {
 	out := new(TenantList)
-	err := grpc.Invoke(ctx, "/TenantService/ListTenant", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/TenantService/List", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *tenantServiceClient) ReloadTenant(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+func (c *tenantServiceClient) Reload(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/TenantService/ReloadTenant", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/TenantService/Reload", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -885,46 +885,46 @@ func (c *tenantServiceClient) ReloadTenant(ctx context.Context, in *Empty, opts 
 // Server API for TenantService service
 
 type TenantServiceServer interface {
-	ListTenant(context.Context, *Empty) (*TenantList, error)
-	ReloadTenant(context.Context, *Empty) (*Empty, error)
+	List(context.Context, *Empty) (*TenantList, error)
+	Reload(context.Context, *Empty) (*Empty, error)
 }
 
 func RegisterTenantServiceServer(s *grpc.Server, srv TenantServiceServer) {
 	s.RegisterService(&_TenantService_serviceDesc, srv)
 }
 
-func _TenantService_ListTenant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TenantService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TenantServiceServer).ListTenant(ctx, in)
+		return srv.(TenantServiceServer).List(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/TenantService/ListTenant",
+		FullMethod: "/TenantService/List",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TenantServiceServer).ListTenant(ctx, req.(*Empty))
+		return srv.(TenantServiceServer).List(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TenantService_ReloadTenant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TenantService_Reload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TenantServiceServer).ReloadTenant(ctx, in)
+		return srv.(TenantServiceServer).Reload(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/TenantService/ReloadTenant",
+		FullMethod: "/TenantService/Reload",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TenantServiceServer).ReloadTenant(ctx, req.(*Empty))
+		return srv.(TenantServiceServer).Reload(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -934,12 +934,12 @@ var _TenantService_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*TenantServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "ListTenant",
-			Handler:    _TenantService_ListTenant_Handler,
+			MethodName: "List",
+			Handler:    _TenantService_List_Handler,
 		},
 		{
-			MethodName: "ReloadTenant",
-			Handler:    _TenantService_ReloadTenant_Handler,
+			MethodName: "Reload",
+			Handler:    _TenantService_Reload_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -949,7 +949,7 @@ var _TenantService_serviceDesc = grpc.ServiceDesc{
 // Client API for ImageService service
 
 type ImageServiceClient interface {
-	ListImage(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*ImageList, error)
+	List(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*ImageList, error)
 }
 
 type imageServiceClient struct {
@@ -960,9 +960,9 @@ func NewImageServiceClient(cc *grpc.ClientConn) ImageServiceClient {
 	return &imageServiceClient{cc}
 }
 
-func (c *imageServiceClient) ListImage(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*ImageList, error) {
+func (c *imageServiceClient) List(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*ImageList, error) {
 	out := new(ImageList)
-	err := grpc.Invoke(ctx, "/ImageService/ListImage", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/ImageService/List", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -972,27 +972,27 @@ func (c *imageServiceClient) ListImage(ctx context.Context, in *Reference, opts 
 // Server API for ImageService service
 
 type ImageServiceServer interface {
-	ListImage(context.Context, *Reference) (*ImageList, error)
+	List(context.Context, *Reference) (*ImageList, error)
 }
 
 func RegisterImageServiceServer(s *grpc.Server, srv ImageServiceServer) {
 	s.RegisterService(&_ImageService_serviceDesc, srv)
 }
 
-func _ImageService_ListImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ImageService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Reference)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ImageServiceServer).ListImage(ctx, in)
+		return srv.(ImageServiceServer).List(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ImageService/ListImage",
+		FullMethod: "/ImageService/List",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ImageServiceServer).ListImage(ctx, req.(*Reference))
+		return srv.(ImageServiceServer).List(ctx, req.(*Reference))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1002,8 +1002,8 @@ var _ImageService_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*ImageServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "ListImage",
-			Handler:    _ImageService_ListImage_Handler,
+			MethodName: "List",
+			Handler:    _ImageService_List_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -1013,10 +1013,10 @@ var _ImageService_serviceDesc = grpc.ServiceDesc{
 // Client API for NetworkService service
 
 type NetworkServiceClient interface {
-	CreateNetwork(ctx context.Context, in *NetworkDefinition, opts ...grpc.CallOption) (*Network, error)
-	ListNetwork(ctx context.Context, in *TenantName, opts ...grpc.CallOption) (*NetworkList, error)
-	InspectNetwork(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Network, error)
-	DeleteNetwork(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error)
+	Create(ctx context.Context, in *NetworkDefinition, opts ...grpc.CallOption) (*Network, error)
+	List(ctx context.Context, in *TenantName, opts ...grpc.CallOption) (*NetworkList, error)
+	Inspect(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Network, error)
+	Delete(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type networkServiceClient struct {
@@ -1027,36 +1027,36 @@ func NewNetworkServiceClient(cc *grpc.ClientConn) NetworkServiceClient {
 	return &networkServiceClient{cc}
 }
 
-func (c *networkServiceClient) CreateNetwork(ctx context.Context, in *NetworkDefinition, opts ...grpc.CallOption) (*Network, error) {
+func (c *networkServiceClient) Create(ctx context.Context, in *NetworkDefinition, opts ...grpc.CallOption) (*Network, error) {
 	out := new(Network)
-	err := grpc.Invoke(ctx, "/NetworkService/CreateNetwork", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/NetworkService/Create", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *networkServiceClient) ListNetwork(ctx context.Context, in *TenantName, opts ...grpc.CallOption) (*NetworkList, error) {
+func (c *networkServiceClient) List(ctx context.Context, in *TenantName, opts ...grpc.CallOption) (*NetworkList, error) {
 	out := new(NetworkList)
-	err := grpc.Invoke(ctx, "/NetworkService/ListNetwork", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/NetworkService/List", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *networkServiceClient) InspectNetwork(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Network, error) {
+func (c *networkServiceClient) Inspect(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Network, error) {
 	out := new(Network)
-	err := grpc.Invoke(ctx, "/NetworkService/InspectNetwork", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/NetworkService/Inspect", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *networkServiceClient) DeleteNetwork(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error) {
+func (c *networkServiceClient) Delete(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/NetworkService/DeleteNetwork", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/NetworkService/Delete", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1066,84 +1066,84 @@ func (c *networkServiceClient) DeleteNetwork(ctx context.Context, in *Reference,
 // Server API for NetworkService service
 
 type NetworkServiceServer interface {
-	CreateNetwork(context.Context, *NetworkDefinition) (*Network, error)
-	ListNetwork(context.Context, *TenantName) (*NetworkList, error)
-	InspectNetwork(context.Context, *Reference) (*Network, error)
-	DeleteNetwork(context.Context, *Reference) (*Empty, error)
+	Create(context.Context, *NetworkDefinition) (*Network, error)
+	List(context.Context, *TenantName) (*NetworkList, error)
+	Inspect(context.Context, *Reference) (*Network, error)
+	Delete(context.Context, *Reference) (*Empty, error)
 }
 
 func RegisterNetworkServiceServer(s *grpc.Server, srv NetworkServiceServer) {
 	s.RegisterService(&_NetworkService_serviceDesc, srv)
 }
 
-func _NetworkService_CreateNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _NetworkService_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(NetworkDefinition)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NetworkServiceServer).CreateNetwork(ctx, in)
+		return srv.(NetworkServiceServer).Create(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/NetworkService/CreateNetwork",
+		FullMethod: "/NetworkService/Create",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NetworkServiceServer).CreateNetwork(ctx, req.(*NetworkDefinition))
+		return srv.(NetworkServiceServer).Create(ctx, req.(*NetworkDefinition))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _NetworkService_ListNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _NetworkService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(TenantName)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NetworkServiceServer).ListNetwork(ctx, in)
+		return srv.(NetworkServiceServer).List(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/NetworkService/ListNetwork",
+		FullMethod: "/NetworkService/List",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NetworkServiceServer).ListNetwork(ctx, req.(*TenantName))
+		return srv.(NetworkServiceServer).List(ctx, req.(*TenantName))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _NetworkService_InspectNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _NetworkService_Inspect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Reference)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NetworkServiceServer).InspectNetwork(ctx, in)
+		return srv.(NetworkServiceServer).Inspect(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/NetworkService/InspectNetwork",
+		FullMethod: "/NetworkService/Inspect",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NetworkServiceServer).InspectNetwork(ctx, req.(*Reference))
+		return srv.(NetworkServiceServer).Inspect(ctx, req.(*Reference))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _NetworkService_DeleteNetwork_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _NetworkService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Reference)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NetworkServiceServer).DeleteNetwork(ctx, in)
+		return srv.(NetworkServiceServer).Delete(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/NetworkService/DeleteNetwork",
+		FullMethod: "/NetworkService/Delete",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NetworkServiceServer).DeleteNetwork(ctx, req.(*Reference))
+		return srv.(NetworkServiceServer).Delete(ctx, req.(*Reference))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1153,20 +1153,20 @@ var _NetworkService_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*NetworkServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateNetwork",
-			Handler:    _NetworkService_CreateNetwork_Handler,
+			MethodName: "Create",
+			Handler:    _NetworkService_Create_Handler,
 		},
 		{
-			MethodName: "ListNetwork",
-			Handler:    _NetworkService_ListNetwork_Handler,
+			MethodName: "List",
+			Handler:    _NetworkService_List_Handler,
 		},
 		{
-			MethodName: "InspectNetwork",
-			Handler:    _NetworkService_InspectNetwork_Handler,
+			MethodName: "Inspect",
+			Handler:    _NetworkService_Inspect_Handler,
 		},
 		{
-			MethodName: "DeleteNetwork",
-			Handler:    _NetworkService_DeleteNetwork_Handler,
+			MethodName: "Delete",
+			Handler:    _NetworkService_Delete_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -1176,11 +1176,11 @@ var _NetworkService_serviceDesc = grpc.ServiceDesc{
 // Client API for VMService service
 
 type VMServiceClient interface {
-	CreateVM(ctx context.Context, in *VMDefinition, opts ...grpc.CallOption) (*VM, error)
-	InspectVM(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*VM, error)
-	ListVM(ctx context.Context, in *TenantName, opts ...grpc.CallOption) (*VMList, error)
-	DeleteVM(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error)
-	SshVM(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*SshConfig, error)
+	Create(ctx context.Context, in *VMDefinition, opts ...grpc.CallOption) (*VM, error)
+	Inspect(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*VM, error)
+	List(ctx context.Context, in *TenantName, opts ...grpc.CallOption) (*VMList, error)
+	Delete(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error)
+	Ssh(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*SshConfig, error)
 }
 
 type vMServiceClient struct {
@@ -1191,45 +1191,45 @@ func NewVMServiceClient(cc *grpc.ClientConn) VMServiceClient {
 	return &vMServiceClient{cc}
 }
 
-func (c *vMServiceClient) CreateVM(ctx context.Context, in *VMDefinition, opts ...grpc.CallOption) (*VM, error) {
+func (c *vMServiceClient) Create(ctx context.Context, in *VMDefinition, opts ...grpc.CallOption) (*VM, error) {
 	out := new(VM)
-	err := grpc.Invoke(ctx, "/VMService/CreateVM", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VMService/Create", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *vMServiceClient) InspectVM(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*VM, error) {
+func (c *vMServiceClient) Inspect(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*VM, error) {
 	out := new(VM)
-	err := grpc.Invoke(ctx, "/VMService/InspectVM", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VMService/Inspect", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *vMServiceClient) ListVM(ctx context.Context, in *TenantName, opts ...grpc.CallOption) (*VMList, error) {
+func (c *vMServiceClient) List(ctx context.Context, in *TenantName, opts ...grpc.CallOption) (*VMList, error) {
 	out := new(VMList)
-	err := grpc.Invoke(ctx, "/VMService/ListVM", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VMService/List", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *vMServiceClient) DeleteVM(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error) {
+func (c *vMServiceClient) Delete(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/VMService/DeleteVM", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VMService/Delete", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *vMServiceClient) SshVM(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*SshConfig, error) {
+func (c *vMServiceClient) Ssh(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*SshConfig, error) {
 	out := new(SshConfig)
-	err := grpc.Invoke(ctx, "/VMService/SshVM", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VMService/Ssh", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1239,103 +1239,103 @@ func (c *vMServiceClient) SshVM(ctx context.Context, in *Reference, opts ...grpc
 // Server API for VMService service
 
 type VMServiceServer interface {
-	CreateVM(context.Context, *VMDefinition) (*VM, error)
-	InspectVM(context.Context, *Reference) (*VM, error)
-	ListVM(context.Context, *TenantName) (*VMList, error)
-	DeleteVM(context.Context, *Reference) (*Empty, error)
-	SshVM(context.Context, *Reference) (*SshConfig, error)
+	Create(context.Context, *VMDefinition) (*VM, error)
+	Inspect(context.Context, *Reference) (*VM, error)
+	List(context.Context, *TenantName) (*VMList, error)
+	Delete(context.Context, *Reference) (*Empty, error)
+	Ssh(context.Context, *Reference) (*SshConfig, error)
 }
 
 func RegisterVMServiceServer(s *grpc.Server, srv VMServiceServer) {
 	s.RegisterService(&_VMService_serviceDesc, srv)
 }
 
-func _VMService_CreateVM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VMService_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VMDefinition)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServiceServer).CreateVM(ctx, in)
+		return srv.(VMServiceServer).Create(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VMService/CreateVM",
+		FullMethod: "/VMService/Create",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServiceServer).CreateVM(ctx, req.(*VMDefinition))
+		return srv.(VMServiceServer).Create(ctx, req.(*VMDefinition))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VMService_InspectVM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VMService_Inspect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Reference)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServiceServer).InspectVM(ctx, in)
+		return srv.(VMServiceServer).Inspect(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VMService/InspectVM",
+		FullMethod: "/VMService/Inspect",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServiceServer).InspectVM(ctx, req.(*Reference))
+		return srv.(VMServiceServer).Inspect(ctx, req.(*Reference))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VMService_ListVM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VMService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(TenantName)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServiceServer).ListVM(ctx, in)
+		return srv.(VMServiceServer).List(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VMService/ListVM",
+		FullMethod: "/VMService/List",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServiceServer).ListVM(ctx, req.(*TenantName))
+		return srv.(VMServiceServer).List(ctx, req.(*TenantName))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VMService_DeleteVM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VMService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Reference)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServiceServer).DeleteVM(ctx, in)
+		return srv.(VMServiceServer).Delete(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VMService/DeleteVM",
+		FullMethod: "/VMService/Delete",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServiceServer).DeleteVM(ctx, req.(*Reference))
+		return srv.(VMServiceServer).Delete(ctx, req.(*Reference))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VMService_SshVM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VMService_Ssh_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Reference)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMServiceServer).SshVM(ctx, in)
+		return srv.(VMServiceServer).Ssh(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VMService/SshVM",
+		FullMethod: "/VMService/Ssh",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServiceServer).SshVM(ctx, req.(*Reference))
+		return srv.(VMServiceServer).Ssh(ctx, req.(*Reference))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1345,24 +1345,24 @@ var _VMService_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*VMServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateVM",
-			Handler:    _VMService_CreateVM_Handler,
+			MethodName: "Create",
+			Handler:    _VMService_Create_Handler,
 		},
 		{
-			MethodName: "InspectVM",
-			Handler:    _VMService_InspectVM_Handler,
+			MethodName: "Inspect",
+			Handler:    _VMService_Inspect_Handler,
 		},
 		{
-			MethodName: "ListVM",
-			Handler:    _VMService_ListVM_Handler,
+			MethodName: "List",
+			Handler:    _VMService_List_Handler,
 		},
 		{
-			MethodName: "DeleteVM",
-			Handler:    _VMService_DeleteVM_Handler,
+			MethodName: "Delete",
+			Handler:    _VMService_Delete_Handler,
 		},
 		{
-			MethodName: "SshVM",
-			Handler:    _VMService_SshVM_Handler,
+			MethodName: "Ssh",
+			Handler:    _VMService_Ssh_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -1372,12 +1372,12 @@ var _VMService_serviceDesc = grpc.ServiceDesc{
 // Client API for VolumeService service
 
 type VolumeServiceClient interface {
-	CreateVolume(ctx context.Context, in *VolumeDefinition, opts ...grpc.CallOption) (*Volume, error)
-	AttachVolume(ctx context.Context, in *VolumeAttachment, opts ...grpc.CallOption) (*Empty, error)
-	DetachVolume(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error)
-	DeleteVolume(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error)
-	ListVolume(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*VolumeList, error)
-	InspectVolume(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Volume, error)
+	Create(ctx context.Context, in *VolumeDefinition, opts ...grpc.CallOption) (*Volume, error)
+	Attach(ctx context.Context, in *VolumeAttachment, opts ...grpc.CallOption) (*Empty, error)
+	Detach(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error)
+	Delete(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error)
+	List(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*VolumeList, error)
+	Inspect(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Volume, error)
 }
 
 type volumeServiceClient struct {
@@ -1388,54 +1388,54 @@ func NewVolumeServiceClient(cc *grpc.ClientConn) VolumeServiceClient {
 	return &volumeServiceClient{cc}
 }
 
-func (c *volumeServiceClient) CreateVolume(ctx context.Context, in *VolumeDefinition, opts ...grpc.CallOption) (*Volume, error) {
+func (c *volumeServiceClient) Create(ctx context.Context, in *VolumeDefinition, opts ...grpc.CallOption) (*Volume, error) {
 	out := new(Volume)
-	err := grpc.Invoke(ctx, "/VolumeService/CreateVolume", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VolumeService/Create", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *volumeServiceClient) AttachVolume(ctx context.Context, in *VolumeAttachment, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volumeServiceClient) Attach(ctx context.Context, in *VolumeAttachment, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/VolumeService/AttachVolume", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VolumeService/Attach", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *volumeServiceClient) DetachVolume(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volumeServiceClient) Detach(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/VolumeService/DetachVolume", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VolumeService/Detach", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *volumeServiceClient) DeleteVolume(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volumeServiceClient) Delete(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/VolumeService/DeleteVolume", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VolumeService/Delete", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *volumeServiceClient) ListVolume(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*VolumeList, error) {
+func (c *volumeServiceClient) List(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*VolumeList, error) {
 	out := new(VolumeList)
-	err := grpc.Invoke(ctx, "/VolumeService/ListVolume", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VolumeService/List", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *volumeServiceClient) InspectVolume(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Volume, error) {
+func (c *volumeServiceClient) Inspect(ctx context.Context, in *Reference, opts ...grpc.CallOption) (*Volume, error) {
 	out := new(Volume)
-	err := grpc.Invoke(ctx, "/VolumeService/InspectVolume", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/VolumeService/Inspect", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1445,122 +1445,122 @@ func (c *volumeServiceClient) InspectVolume(ctx context.Context, in *Reference, 
 // Server API for VolumeService service
 
 type VolumeServiceServer interface {
-	CreateVolume(context.Context, *VolumeDefinition) (*Volume, error)
-	AttachVolume(context.Context, *VolumeAttachment) (*Empty, error)
-	DetachVolume(context.Context, *Reference) (*Empty, error)
-	DeleteVolume(context.Context, *Reference) (*Empty, error)
-	ListVolume(context.Context, *Empty) (*VolumeList, error)
-	InspectVolume(context.Context, *Reference) (*Volume, error)
+	Create(context.Context, *VolumeDefinition) (*Volume, error)
+	Attach(context.Context, *VolumeAttachment) (*Empty, error)
+	Detach(context.Context, *Reference) (*Empty, error)
+	Delete(context.Context, *Reference) (*Empty, error)
+	List(context.Context, *Empty) (*VolumeList, error)
+	Inspect(context.Context, *Reference) (*Volume, error)
 }
 
 func RegisterVolumeServiceServer(s *grpc.Server, srv VolumeServiceServer) {
 	s.RegisterService(&_VolumeService_serviceDesc, srv)
 }
 
-func _VolumeService_CreateVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VolumeService_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VolumeDefinition)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VolumeServiceServer).CreateVolume(ctx, in)
+		return srv.(VolumeServiceServer).Create(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VolumeService/CreateVolume",
+		FullMethod: "/VolumeService/Create",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolumeServiceServer).CreateVolume(ctx, req.(*VolumeDefinition))
+		return srv.(VolumeServiceServer).Create(ctx, req.(*VolumeDefinition))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VolumeService_AttachVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VolumeService_Attach_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VolumeAttachment)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VolumeServiceServer).AttachVolume(ctx, in)
+		return srv.(VolumeServiceServer).Attach(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VolumeService/AttachVolume",
+		FullMethod: "/VolumeService/Attach",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolumeServiceServer).AttachVolume(ctx, req.(*VolumeAttachment))
+		return srv.(VolumeServiceServer).Attach(ctx, req.(*VolumeAttachment))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VolumeService_DetachVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VolumeService_Detach_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Reference)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VolumeServiceServer).DetachVolume(ctx, in)
+		return srv.(VolumeServiceServer).Detach(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VolumeService/DetachVolume",
+		FullMethod: "/VolumeService/Detach",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolumeServiceServer).DetachVolume(ctx, req.(*Reference))
+		return srv.(VolumeServiceServer).Detach(ctx, req.(*Reference))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VolumeService_DeleteVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VolumeService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Reference)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VolumeServiceServer).DeleteVolume(ctx, in)
+		return srv.(VolumeServiceServer).Delete(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VolumeService/DeleteVolume",
+		FullMethod: "/VolumeService/Delete",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolumeServiceServer).DeleteVolume(ctx, req.(*Reference))
+		return srv.(VolumeServiceServer).Delete(ctx, req.(*Reference))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VolumeService_ListVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VolumeService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VolumeServiceServer).ListVolume(ctx, in)
+		return srv.(VolumeServiceServer).List(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VolumeService/ListVolume",
+		FullMethod: "/VolumeService/List",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolumeServiceServer).ListVolume(ctx, req.(*Empty))
+		return srv.(VolumeServiceServer).List(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _VolumeService_InspectVolume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VolumeService_Inspect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Reference)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VolumeServiceServer).InspectVolume(ctx, in)
+		return srv.(VolumeServiceServer).Inspect(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/VolumeService/InspectVolume",
+		FullMethod: "/VolumeService/Inspect",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolumeServiceServer).InspectVolume(ctx, req.(*Reference))
+		return srv.(VolumeServiceServer).Inspect(ctx, req.(*Reference))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1570,28 +1570,28 @@ var _VolumeService_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*VolumeServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateVolume",
-			Handler:    _VolumeService_CreateVolume_Handler,
+			MethodName: "Create",
+			Handler:    _VolumeService_Create_Handler,
 		},
 		{
-			MethodName: "AttachVolume",
-			Handler:    _VolumeService_AttachVolume_Handler,
+			MethodName: "Attach",
+			Handler:    _VolumeService_Attach_Handler,
 		},
 		{
-			MethodName: "DetachVolume",
-			Handler:    _VolumeService_DetachVolume_Handler,
+			MethodName: "Detach",
+			Handler:    _VolumeService_Detach_Handler,
 		},
 		{
-			MethodName: "DeleteVolume",
-			Handler:    _VolumeService_DeleteVolume_Handler,
+			MethodName: "Delete",
+			Handler:    _VolumeService_Delete_Handler,
 		},
 		{
-			MethodName: "ListVolume",
-			Handler:    _VolumeService_ListVolume_Handler,
+			MethodName: "List",
+			Handler:    _VolumeService_List_Handler,
 		},
 		{
-			MethodName: "InspectVolume",
-			Handler:    _VolumeService_InspectVolume_Handler,
+			MethodName: "Inspect",
+			Handler:    _VolumeService_Inspect_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -1601,11 +1601,11 @@ var _VolumeService_serviceDesc = grpc.ServiceDesc{
 // Client API for ContainerService service
 
 type ContainerServiceClient interface {
-	ContainerCreate(ctx context.Context, in *Container, opts ...grpc.CallOption) (*Empty, error)
-	ContainerMount(ctx context.Context, in *ContainerMountingPoint, opts ...grpc.CallOption) (*Empty, error)
-	ContainerUMount(ctx context.Context, in *ContainerMountingPoint, opts ...grpc.CallOption) (*Empty, error)
-	ContainerDelete(ctx context.Context, in *Container, opts ...grpc.CallOption) (*Empty, error)
-	ContainerList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	Create(ctx context.Context, in *Container, opts ...grpc.CallOption) (*Empty, error)
+	Mount(ctx context.Context, in *ContainerMountingPoint, opts ...grpc.CallOption) (*Empty, error)
+	UMount(ctx context.Context, in *ContainerMountingPoint, opts ...grpc.CallOption) (*Empty, error)
+	Delete(ctx context.Context, in *Container, opts ...grpc.CallOption) (*Empty, error)
+	List(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type containerServiceClient struct {
@@ -1616,45 +1616,45 @@ func NewContainerServiceClient(cc *grpc.ClientConn) ContainerServiceClient {
 	return &containerServiceClient{cc}
 }
 
-func (c *containerServiceClient) ContainerCreate(ctx context.Context, in *Container, opts ...grpc.CallOption) (*Empty, error) {
+func (c *containerServiceClient) Create(ctx context.Context, in *Container, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/ContainerService/ContainerCreate", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/ContainerService/Create", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *containerServiceClient) ContainerMount(ctx context.Context, in *ContainerMountingPoint, opts ...grpc.CallOption) (*Empty, error) {
+func (c *containerServiceClient) Mount(ctx context.Context, in *ContainerMountingPoint, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/ContainerService/ContainerMount", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/ContainerService/Mount", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *containerServiceClient) ContainerUMount(ctx context.Context, in *ContainerMountingPoint, opts ...grpc.CallOption) (*Empty, error) {
+func (c *containerServiceClient) UMount(ctx context.Context, in *ContainerMountingPoint, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/ContainerService/ContainerUMount", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/ContainerService/UMount", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *containerServiceClient) ContainerDelete(ctx context.Context, in *Container, opts ...grpc.CallOption) (*Empty, error) {
+func (c *containerServiceClient) Delete(ctx context.Context, in *Container, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/ContainerService/ContainerDelete", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/ContainerService/Delete", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *containerServiceClient) ContainerList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+func (c *containerServiceClient) List(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := grpc.Invoke(ctx, "/ContainerService/ContainerList", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/ContainerService/List", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1664,103 +1664,103 @@ func (c *containerServiceClient) ContainerList(ctx context.Context, in *Empty, o
 // Server API for ContainerService service
 
 type ContainerServiceServer interface {
-	ContainerCreate(context.Context, *Container) (*Empty, error)
-	ContainerMount(context.Context, *ContainerMountingPoint) (*Empty, error)
-	ContainerUMount(context.Context, *ContainerMountingPoint) (*Empty, error)
-	ContainerDelete(context.Context, *Container) (*Empty, error)
-	ContainerList(context.Context, *Empty) (*Empty, error)
+	Create(context.Context, *Container) (*Empty, error)
+	Mount(context.Context, *ContainerMountingPoint) (*Empty, error)
+	UMount(context.Context, *ContainerMountingPoint) (*Empty, error)
+	Delete(context.Context, *Container) (*Empty, error)
+	List(context.Context, *Empty) (*Empty, error)
 }
 
 func RegisterContainerServiceServer(s *grpc.Server, srv ContainerServiceServer) {
 	s.RegisterService(&_ContainerService_serviceDesc, srv)
 }
 
-func _ContainerService_ContainerCreate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ContainerService_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Container)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ContainerServiceServer).ContainerCreate(ctx, in)
+		return srv.(ContainerServiceServer).Create(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ContainerService/ContainerCreate",
+		FullMethod: "/ContainerService/Create",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ContainerServiceServer).ContainerCreate(ctx, req.(*Container))
+		return srv.(ContainerServiceServer).Create(ctx, req.(*Container))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ContainerService_ContainerMount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ContainerService_Mount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ContainerMountingPoint)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ContainerServiceServer).ContainerMount(ctx, in)
+		return srv.(ContainerServiceServer).Mount(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ContainerService/ContainerMount",
+		FullMethod: "/ContainerService/Mount",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ContainerServiceServer).ContainerMount(ctx, req.(*ContainerMountingPoint))
+		return srv.(ContainerServiceServer).Mount(ctx, req.(*ContainerMountingPoint))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ContainerService_ContainerUMount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ContainerService_UMount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ContainerMountingPoint)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ContainerServiceServer).ContainerUMount(ctx, in)
+		return srv.(ContainerServiceServer).UMount(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ContainerService/ContainerUMount",
+		FullMethod: "/ContainerService/UMount",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ContainerServiceServer).ContainerUMount(ctx, req.(*ContainerMountingPoint))
+		return srv.(ContainerServiceServer).UMount(ctx, req.(*ContainerMountingPoint))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ContainerService_ContainerDelete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ContainerService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Container)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ContainerServiceServer).ContainerDelete(ctx, in)
+		return srv.(ContainerServiceServer).Delete(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ContainerService/ContainerDelete",
+		FullMethod: "/ContainerService/Delete",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ContainerServiceServer).ContainerDelete(ctx, req.(*Container))
+		return srv.(ContainerServiceServer).Delete(ctx, req.(*Container))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ContainerService_ContainerList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ContainerService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ContainerServiceServer).ContainerList(ctx, in)
+		return srv.(ContainerServiceServer).List(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ContainerService/ContainerList",
+		FullMethod: "/ContainerService/List",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ContainerServiceServer).ContainerList(ctx, req.(*Empty))
+		return srv.(ContainerServiceServer).List(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1770,24 +1770,24 @@ var _ContainerService_serviceDesc = grpc.ServiceDesc{
 	HandlerType: (*ContainerServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "ContainerCreate",
-			Handler:    _ContainerService_ContainerCreate_Handler,
+			MethodName: "Create",
+			Handler:    _ContainerService_Create_Handler,
 		},
 		{
-			MethodName: "ContainerMount",
-			Handler:    _ContainerService_ContainerMount_Handler,
+			MethodName: "Mount",
+			Handler:    _ContainerService_Mount_Handler,
 		},
 		{
-			MethodName: "ContainerUMount",
-			Handler:    _ContainerService_ContainerUMount_Handler,
+			MethodName: "UMount",
+			Handler:    _ContainerService_UMount_Handler,
 		},
 		{
-			MethodName: "ContainerDelete",
-			Handler:    _ContainerService_ContainerDelete_Handler,
+			MethodName: "Delete",
+			Handler:    _ContainerService_Delete_Handler,
 		},
 		{
-			MethodName: "ContainerList",
-			Handler:    _ContainerService_ContainerList_Handler,
+			MethodName: "List",
+			Handler:    _ContainerService_List_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -1797,82 +1797,78 @@ var _ContainerService_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("brokerd.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 1229 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x57, 0xcd, 0x6e, 0xdb, 0x46,
-	0x10, 0x16, 0x49, 0xf1, 0x6f, 0x24, 0xb9, 0xca, 0x02, 0x4d, 0x05, 0xa1, 0x70, 0x95, 0x6d, 0xd2,
-	0xba, 0x49, 0xc0, 0x00, 0x4a, 0x8b, 0xf6, 0x6a, 0x88, 0x4e, 0xa2, 0x26, 0xb4, 0x89, 0x95, 0xa5,
-	0x3b, 0x2d, 0xaf, 0x6d, 0xc2, 0x16, 0xa9, 0x92, 0x6b, 0x05, 0xc9, 0xa9, 0x45, 0x4f, 0x3d, 0xf4,
-	0x1d, 0xfa, 0x10, 0x3d, 0xf7, 0x11, 0xfa, 0x30, 0x7d, 0x82, 0x62, 0xff, 0x28, 0xda, 0x52, 0x0a,
-	0x37, 0x27, 0x79, 0x7e, 0x76, 0xe6, 0x9b, 0x6f, 0x66, 0x67, 0x69, 0xe8, 0x9c, 0x14, 0xf9, 0x25,
-	0x2d, 0x4e, 0x83, 0x65, 0x91, 0xb3, 0x1c, 0xbb, 0x60, 0x1f, 0x2c, 0x96, 0xec, 0x1d, 0xfe, 0x01,
-	0x9c, 0x63, 0x9a, 0x25, 0x19, 0x43, 0x08, 0x9a, 0x87, 0xc9, 0x82, 0xf6, 0x8c, 0x81, 0xb1, 0xe7,
-	0x93, 0x66, 0x96, 0x2c, 0x28, 0xea, 0x83, 0x17, 0x17, 0xf9, 0x2a, 0x3d, 0xa5, 0x45, 0xcf, 0x14,
-	0x7a, 0x6f, 0xa9, 0x64, 0xfc, 0x0c, 0x40, 0x9e, 0x7c, 0x93, 0x96, 0x0c, 0x3d, 0x00, 0x57, 0x4a,
-	0x65, 0xcf, 0x18, 0x58, 0x7b, 0xad, 0xa1, 0x1b, 0x48, 0x99, 0xb8, 0x4c, 0xea, 0xf1, 0x13, 0xb0,
-	0xc7, 0x8b, 0xe4, 0x9c, 0xa2, 0x1d, 0x30, 0xc7, 0xa1, 0xca, 0x63, 0xa6, 0x61, 0x95, 0xd9, 0x5c,
-	0x67, 0xc6, 0xaf, 0xc1, 0x27, 0xf4, 0x8c, 0x16, 0x34, 0x9b, 0x0b, 0x18, 0x32, 0x58, 0x75, 0xcc,
-	0x63, 0x4a, 0x56, 0xc1, 0xcc, 0x8d, 0x60, 0x56, 0x2d, 0xd8, 0x40, 0x43, 0xe5, 0x96, 0x6d, 0x85,
-	0xe2, 0x27, 0xe0, 0x0b, 0x6c, 0xa2, 0x96, 0x5d, 0x70, 0x84, 0xa0, 0x4b, 0x71, 0x02, 0x21, 0x12,
-	0x27, 0x15, 0x5a, 0xfc, 0x8b, 0x01, 0xf7, 0x0e, 0x29, 0x7b, 0x9b, 0x17, 0x97, 0x21, 0x3d, 0x4b,
-	0xb3, 0x94, 0xa5, 0x79, 0x86, 0xee, 0x6b, 0x26, 0x55, 0x60, 0x87, 0xdd, 0xe4, 0xb5, 0x56, 0x1d,
-	0xd7, 0x8d, 0xc6, 0x21, 0xd1, 0x20, 0xe7, 0xe3, 0x90, 0xa0, 0xa7, 0xe0, 0xbe, 0x4c, 0x18, 0x7d,
-	0x9b, 0xbc, 0xeb, 0x35, 0x07, 0xc6, 0x5e, 0x6b, 0x88, 0x02, 0x25, 0xaf, 0x93, 0x10, 0xf7, 0x5c,
-	0xaa, 0xf0, 0x6f, 0x06, 0xdc, 0xdb, 0x30, 0xa3, 0x2e, 0x58, 0xa3, 0x78, 0x2a, 0x00, 0xd8, 0xc4,
-	0x9a, 0xc7, 0x53, 0xae, 0x21, 0xfb, 0x91, 0x48, 0x6e, 0x12, 0xab, 0xd8, 0x8f, 0x78, 0xee, 0x30,
-	0x2d, 0x2f, 0x45, 0x6e, 0x93, 0x34, 0x4f, 0xd3, 0xf2, 0x12, 0x61, 0x68, 0x8f, 0xe2, 0xe9, 0x8b,
-	0x82, 0xfe, 0x74, 0x4d, 0xb3, 0xb9, 0x04, 0x60, 0x92, 0xf6, 0xbc, 0xa6, 0x43, 0x3d, 0x70, 0x05,
-	0x0d, 0xe3, 0xb0, 0x67, 0x0b, 0xd8, 0x6e, 0x2a, 0x45, 0xbc, 0x0f, 0xae, 0xa2, 0xe3, 0x2e, 0xad,
-	0xdd, 0x56, 0x3c, 0x7e, 0x0e, 0x2d, 0x15, 0x42, 0x74, 0xe0, 0x21, 0x78, 0x4a, 0xd4, 0x3d, 0xf0,
-	0x02, 0xa5, 0x20, 0x5e, 0xa6, 0x2c, 0xf8, 0x67, 0x13, 0xda, 0xb3, 0xe8, 0x23, 0x5b, 0xd0, 0xab,
-	0x40, 0x2b, 0x20, 0xae, 0x8a, 0x8b, 0x3e, 0x07, 0x7f, 0x14, 0x4f, 0x0f, 0xaf, 0x17, 0x27, 0xb4,
-	0x10, 0x4c, 0xd8, 0xc4, 0x9f, 0x6b, 0xc5, 0x06, 0x55, 0xf6, 0x16, 0xaa, 0x14, 0xe9, 0xce, 0x26,
-	0xe9, 0x6e, 0x8d, 0xf4, 0x2e, 0x58, 0x2f, 0xe3, 0x69, 0xcf, 0x1b, 0x18, 0x7b, 0x1e, 0xb1, 0xce,
-	0xe3, 0x69, 0x9d, 0x62, 0xff, 0x06, 0xc5, 0xbc, 0xb2, 0xf8, 0xfa, 0xe4, 0x2a, 0x9d, 0xf7, 0x40,
-	0xb8, 0x3b, 0x4b, 0x21, 0xe1, 0xbf, 0x0d, 0x30, 0x67, 0xd1, 0x9d, 0x68, 0x57, 0xb3, 0x61, 0x6d,
-	0xcc, 0x46, 0x73, 0x13, 0xa6, 0x5d, 0x83, 0xc9, 0x63, 0xc7, 0xa2, 0x16, 0x1e, 0x3b, 0x46, 0xbb,
-	0x60, 0x4f, 0x58, 0xc2, 0xa8, 0x00, 0xbe, 0x33, 0xf4, 0x82, 0x59, 0x24, 0x64, 0x62, 0x97, 0xfc,
-	0x07, 0xed, 0x02, 0xc4, 0x45, 0xba, 0x4a, 0x18, 0x7d, 0x4d, 0xdf, 0xa9, 0x3a, 0x60, 0x59, 0x69,
-	0x38, 0xbd, 0x6a, 0x70, 0xc7, 0xa1, 0xa8, 0xc6, 0x27, 0xfe, 0xb9, 0x56, 0xe0, 0x2f, 0xc0, 0x99,
-	0x45, 0x62, 0x06, 0x3e, 0x05, 0x6b, 0x16, 0xe9, 0xf6, 0x5b, 0xc1, 0x2c, 0x22, 0xd6, 0x2a, 0x2a,
-	0xf1, 0xef, 0x06, 0xf8, 0x93, 0xf2, 0x62, 0x94, 0x67, 0x67, 0xe9, 0x39, 0x07, 0x3c, 0x2d, 0x69,
-	0xa1, 0xef, 0xf2, 0x75, 0x49, 0x0b, 0xae, 0x7b, 0x95, 0x97, 0x4c, 0x17, 0x7f, 0x91, 0x8b, 0x2b,
-	0x5d, 0x07, 0x65, 0x6d, 0x80, 0x42, 0xd0, 0x8c, 0xf3, 0x82, 0xa9, 0x76, 0x37, 0x97, 0x79, 0xc1,
-	0x87, 0x50, 0xdf, 0x36, 0xc1, 0x47, 0x6b, 0x08, 0x41, 0x95, 0x78, 0x7d, 0x11, 0x57, 0xd0, 0x9d,
-	0xe5, 0x57, 0xd7, 0x0b, 0xfa, 0x91, 0x73, 0x88, 0xc1, 0x9e, 0x2c, 0x29, 0x3d, 0x15, 0xa0, 0x76,
-	0x86, 0xed, 0x40, 0x46, 0x13, 0x3a, 0x62, 0x97, 0xfc, 0x87, 0x9f, 0x9b, 0xa4, 0xef, 0xa9, 0x46,
-	0x57, 0xa6, 0xef, 0x29, 0x3e, 0x05, 0x47, 0x7a, 0xde, 0xa9, 0xf9, 0x1f, 0x9b, 0xe5, 0x19, 0x80,
-	0xf4, 0xd4, 0x4b, 0x7e, 0x25, 0xa4, 0xf5, 0x92, 0x97, 0x56, 0xa2, 0xf5, 0xf8, 0x0f, 0x43, 0xf3,
-	0xb1, 0xcf, 0x58, 0x32, 0xbf, 0x58, 0xd0, 0x8c, 0x7d, 0x90, 0x0f, 0xac, 0x6b, 0x10, 0x58, 0x39,
-	0xc1, 0xd5, 0xce, 0x27, 0x8e, 0x8c, 0x88, 0xfa, 0x7c, 0xc0, 0x05, 0xec, 0x9b, 0x76, 0x73, 0x15,
-	0xf1, 0x51, 0x8a, 0xf2, 0xeb, 0x8c, 0xc5, 0x09, 0xbb, 0x10, 0xb0, 0x7d, 0xe2, 0x2f, 0xb4, 0x82,
-	0x67, 0x7d, 0x91, 0x17, 0x8b, 0x84, 0xa9, 0x7d, 0xe5, 0x9c, 0x09, 0x09, 0x7f, 0x0f, 0xfe, 0x28,
-	0xcf, 0x58, 0x92, 0x66, 0xb4, 0xf8, 0x3f, 0xad, 0xc2, 0x67, 0x70, 0xbf, 0x3a, 0x28, 0xf2, 0xa6,
-	0xd9, 0x79, 0x9c, 0xa7, 0x19, 0x13, 0x2b, 0x43, 0x5b, 0x54, 0x20, 0x7f, 0x5e, 0xe5, 0x90, 0x25,
-	0x98, 0x5b, 0x4b, 0xe0, 0x83, 0xc7, 0xd1, 0xab, 0x65, 0xb8, 0x4c, 0xd8, 0xc5, 0xe3, 0x1f, 0xc1,
-	0x55, 0x77, 0x0a, 0xb5, 0xc0, 0x9d, 0x1c, 0x1f, 0xc5, 0xf1, 0x41, 0xd8, 0x6d, 0xa0, 0x36, 0x78,
-	0x93, 0xe3, 0x7d, 0x72, 0x3c, 0x3e, 0x7c, 0xd9, 0x35, 0xa4, 0x69, 0x9f, 0x1c, 0x1f, 0x84, 0x5d,
-	0x53, 0x9a, 0x8e, 0xe2, 0x98, 0x9b, 0x2c, 0xe4, 0x83, 0x7d, 0x40, 0xc8, 0x11, 0xe9, 0x36, 0x1f,
-	0x7f, 0x03, 0xad, 0x5a, 0xab, 0x91, 0x07, 0xcd, 0xd1, 0xd1, 0x1b, 0x1e, 0xcc, 0x05, 0xeb, 0x55,
-	0x18, 0x76, 0x0d, 0xfe, 0xc7, 0x24, 0x0c, 0xbb, 0xe6, 0x70, 0x06, 0x1d, 0x49, 0xc5, 0x84, 0x16,
-	0xab, 0x74, 0x4e, 0xd1, 0x97, 0x00, 0xbc, 0xed, 0xea, 0xfb, 0xc0, 0x09, 0xc4, 0x17, 0x43, 0xbf,
-	0x15, 0xac, 0x9f, 0x7d, 0xdc, 0x40, 0x03, 0x68, 0x13, 0x7a, 0x95, 0x27, 0xa7, 0xb7, 0xdc, 0xd4,
-	0x2f, 0x6e, 0x0c, 0xbf, 0x83, 0xb6, 0xd8, 0x6a, 0x3a, 0xec, 0x23, 0xf0, 0xf9, 0x59, 0xf9, 0x2d,
-	0x50, 0xe3, 0xa3, 0x0f, 0x41, 0xf5, 0x06, 0xe3, 0xc6, 0xf0, 0x2f, 0x03, 0x76, 0xd4, 0x86, 0xd6,
-	0x27, 0x9f, 0x41, 0x67, 0x54, 0xd0, 0x84, 0x51, 0xfd, 0xdc, 0xa0, 0x60, 0xe3, 0x1d, 0xee, 0x57,
-	0x2f, 0x05, 0x6e, 0xa0, 0xc7, 0xd0, 0xe2, 0xd1, 0xb4, 0xbb, 0x86, 0xce, 0x3b, 0xdb, 0x6f, 0x07,
-	0xb5, 0x17, 0x07, 0x37, 0xd0, 0x1e, 0xec, 0x8c, 0xb3, 0x72, 0x49, 0xe7, 0x95, 0x7b, 0x1d, 0x5b,
-	0x3d, 0xea, 0x23, 0xe8, 0x84, 0xf4, 0x8a, 0xae, 0x61, 0xd4, 0x1d, 0xd7, 0x75, 0xff, 0x69, 0x80,
-	0x3f, 0x8b, 0x34, 0xf6, 0x01, 0x78, 0x12, 0xfb, 0x2c, 0x42, 0x9d, 0xa0, 0xfe, 0x6c, 0xf5, 0xf9,
-	0x72, 0xc3, 0x0d, 0xb4, 0x0b, 0xbe, 0x02, 0x30, 0x8b, 0x6e, 0x84, 0x54, 0xf6, 0x01, 0x38, 0x1c,
-	0xea, 0x2c, 0xba, 0x59, 0x87, 0x1b, 0xc8, 0x85, 0x29, 0x3c, 0x3c, 0x09, 0xec, 0x56, 0x80, 0x0a,
-	0x13, 0x7a, 0x00, 0xf6, 0xa4, 0xbc, 0xb8, 0x65, 0xae, 0xed, 0x35, 0xdc, 0x18, 0xfe, 0x6a, 0x42,
-	0x47, 0x8d, 0x8c, 0x82, 0xfe, 0x14, 0xda, 0x0a, 0xba, 0xbc, 0x92, 0xf7, 0x82, 0xdb, 0x1b, 0xaf,
-	0xaf, 0x17, 0x01, 0x6e, 0xa0, 0x27, 0xd0, 0x96, 0x57, 0xff, 0x96, 0xf7, 0x7a, 0x1f, 0xd4, 0xf0,
-	0x3c, 0x84, 0x76, 0x48, 0x6b, 0xce, 0xdb, 0x51, 0x0b, 0x2f, 0x51, 0xd7, 0x7f, 0x79, 0xa9, 0x71,
-	0x55, 0x3e, 0xeb, 0x71, 0x5d, 0x2f, 0x30, 0xdc, 0x40, 0x5f, 0x41, 0x47, 0x93, 0xbc, 0x19, 0x6b,
-	0x5d, 0xc5, 0xf0, 0x1f, 0x03, 0xba, 0xd5, 0x95, 0xd6, 0x44, 0x7c, 0x0d, 0x9f, 0x54, 0x3a, 0xc9,
-	0x08, 0x82, 0xa0, 0xd2, 0xd4, 0xa0, 0x3c, 0x87, 0x9d, 0x9b, 0x9b, 0x02, 0x7d, 0x16, 0x6c, 0x5f,
-	0x1d, 0xb5, 0x43, 0xdf, 0xd6, 0xa2, 0x4f, 0xef, 0x7c, 0xaa, 0x8e, 0x49, 0x92, 0xf4, 0x01, 0x4c,
-	0x0f, 0xa0, 0x53, 0xa9, 0xc5, 0x36, 0xdf, 0xb8, 0xa9, 0x27, 0x8e, 0xf8, 0xe7, 0xe0, 0xf9, 0xbf,
-	0x01, 0x00, 0x00, 0xff, 0xff, 0x38, 0xfe, 0x04, 0x2c, 0x2d, 0x0c, 0x00, 0x00,
+	// 1163 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x56, 0xcd, 0x72, 0xe2, 0xc6,
+	0x13, 0x47, 0x12, 0x92, 0x50, 0x83, 0x5d, 0xec, 0x54, 0xfd, 0xf7, 0x4f, 0x51, 0x1b, 0x96, 0x4c,
+	0x3e, 0xca, 0x59, 0xa7, 0xb4, 0x29, 0xf6, 0x90, 0x5c, 0x29, 0xe4, 0xf5, 0xb2, 0xbb, 0xb2, 0x55,
+	0x83, 0xe1, 0x2e, 0xc3, 0x18, 0x54, 0x36, 0x12, 0x91, 0x06, 0xb6, 0xbc, 0xa7, 0xe4, 0x98, 0x43,
+	0xde, 0x21, 0x95, 0x63, 0xde, 0x23, 0xd7, 0xbc, 0x42, 0x5e, 0x25, 0x35, 0xa3, 0x19, 0x21, 0x1b,
+	0x52, 0xeb, 0xf8, 0x24, 0xba, 0x7b, 0xa6, 0xfb, 0xd7, 0xbf, 0xfe, 0x18, 0xe0, 0xe0, 0x32, 0x4d,
+	0xae, 0x69, 0x3a, 0x73, 0x57, 0x69, 0xc2, 0x12, 0x6c, 0x83, 0x79, 0xb2, 0x5c, 0xb1, 0x5b, 0xfc,
+	0x03, 0x58, 0x17, 0x34, 0x0e, 0x63, 0x86, 0x10, 0x54, 0xcf, 0xc2, 0x25, 0x6d, 0x69, 0x5d, 0xed,
+	0xc8, 0x21, 0xd5, 0x38, 0x5c, 0x52, 0xd4, 0x86, 0x5a, 0x90, 0x26, 0x9b, 0x68, 0x46, 0xd3, 0x96,
+	0x2e, 0xf4, 0xb5, 0x95, 0x94, 0xf1, 0x4b, 0x80, 0xfc, 0xe6, 0xfb, 0x28, 0x63, 0xe8, 0x73, 0xb0,
+	0x73, 0x29, 0x6b, 0x69, 0x5d, 0xe3, 0xa8, 0xde, 0xb3, 0xdd, 0x5c, 0x26, 0x36, 0xcb, 0xf5, 0xf8,
+	0x18, 0xcc, 0xe1, 0x32, 0x9c, 0x53, 0x74, 0x08, 0xfa, 0xd0, 0x93, 0x71, 0xf4, 0xc8, 0x2b, 0x22,
+	0xeb, 0xdb, 0xc8, 0xf8, 0x1d, 0x38, 0x84, 0x5e, 0xd1, 0x94, 0xc6, 0x53, 0x01, 0x23, 0x77, 0x56,
+	0x5c, 0xab, 0x31, 0x29, 0x4b, 0x67, 0xfa, 0x8e, 0x33, 0xa3, 0xe4, 0xac, 0xab, 0xa0, 0x72, 0xcb,
+	0xbe, 0x44, 0xf1, 0x31, 0x38, 0x02, 0x9b, 0xc8, 0xa5, 0x03, 0x96, 0x10, 0x54, 0x2a, 0x96, 0x2b,
+	0x44, 0x62, 0x45, 0x42, 0x8b, 0x7f, 0xd6, 0xe0, 0xc9, 0x19, 0x65, 0x1f, 0x92, 0xf4, 0xda, 0xa3,
+	0x57, 0x51, 0x1c, 0xb1, 0x28, 0x89, 0xd1, 0x53, 0xc5, 0xa4, 0x74, 0x6c, 0xb1, 0xbb, 0xbc, 0x96,
+	0xb2, 0xe3, 0xba, 0xc1, 0xd0, 0x23, 0x0a, 0xe4, 0x74, 0xe8, 0x11, 0xf4, 0x2d, 0xd8, 0xa7, 0x21,
+	0xa3, 0x1f, 0xc2, 0xdb, 0x56, 0xb5, 0xab, 0x1d, 0xd5, 0x7b, 0xc8, 0x95, 0xf2, 0x36, 0x08, 0xb1,
+	0xe7, 0xb9, 0x0a, 0xff, 0xa2, 0xc1, 0x93, 0x1d, 0x33, 0x6a, 0x82, 0x31, 0x08, 0xc6, 0x02, 0x80,
+	0x49, 0x8c, 0x69, 0x30, 0xe6, 0x1a, 0xd2, 0xf7, 0x45, 0x70, 0x9d, 0x18, 0x69, 0xdf, 0xe7, 0xb1,
+	0xbd, 0x28, 0xbb, 0x16, 0xb1, 0x75, 0x52, 0x9d, 0x45, 0xd9, 0x35, 0xc2, 0xd0, 0x18, 0x04, 0xe3,
+	0xd7, 0x29, 0xfd, 0x71, 0x4d, 0xe3, 0x69, 0x0e, 0x40, 0x27, 0x8d, 0x69, 0x49, 0x87, 0x5a, 0x60,
+	0x0b, 0x1a, 0x86, 0x5e, 0xcb, 0x14, 0xb0, 0xed, 0x28, 0x17, 0x71, 0x1f, 0x6c, 0x49, 0xc7, 0x43,
+	0x4a, 0xbb, 0x2f, 0x79, 0xfc, 0x0a, 0xea, 0xd2, 0x85, 0xa8, 0xc0, 0x97, 0x50, 0x93, 0xa2, 0xaa,
+	0x41, 0xcd, 0x95, 0x0a, 0x52, 0x8b, 0xa5, 0x05, 0xff, 0xa4, 0x43, 0x63, 0xe2, 0x3f, 0xb2, 0x04,
+	0xad, 0x02, 0xb4, 0x04, 0x62, 0x4b, 0xbf, 0xe8, 0x19, 0x38, 0x83, 0x60, 0x7c, 0xb6, 0x5e, 0x5e,
+	0xd2, 0x54, 0x30, 0x61, 0x12, 0x67, 0xaa, 0x14, 0x3b, 0x54, 0x99, 0x7b, 0xa8, 0x92, 0xa4, 0x5b,
+	0xbb, 0xa4, 0xdb, 0x25, 0xd2, 0x9b, 0x60, 0x9c, 0x06, 0xe3, 0x56, 0xad, 0xab, 0x1d, 0xd5, 0x88,
+	0x31, 0x0f, 0xc6, 0x65, 0x8a, 0x9d, 0x3b, 0x14, 0xf3, 0xcc, 0x82, 0xf5, 0xe5, 0x4d, 0x34, 0x6d,
+	0x81, 0x38, 0x6e, 0xad, 0x84, 0x84, 0xff, 0xd2, 0x40, 0x9f, 0xf8, 0x0f, 0xa2, 0x5d, 0xf6, 0x86,
+	0xb1, 0xd3, 0x1b, 0xd5, 0x5d, 0x98, 0x66, 0x09, 0x26, 0xf7, 0x1d, 0x88, 0x5c, 0xb8, 0xef, 0x00,
+	0x75, 0xc0, 0x1c, 0xb1, 0x90, 0x51, 0x01, 0xfc, 0xb0, 0x57, 0x73, 0x27, 0xbe, 0x90, 0x89, 0x99,
+	0xf1, 0x0f, 0xea, 0x00, 0x04, 0x69, 0xb4, 0x09, 0x19, 0x7d, 0x47, 0x6f, 0x65, 0x1e, 0xb0, 0x2a,
+	0x34, 0x9c, 0x5e, 0xd9, 0xb8, 0x43, 0x4f, 0x64, 0xe3, 0x10, 0x67, 0xae, 0x14, 0xf8, 0x39, 0x58,
+	0x13, 0x5f, 0xf4, 0xc0, 0xff, 0xc0, 0x98, 0xf8, 0xaa, 0xfc, 0x86, 0x3b, 0xf1, 0x89, 0xb1, 0xf1,
+	0x33, 0xfc, 0xab, 0x06, 0xce, 0x28, 0x5b, 0x0c, 0x92, 0xf8, 0x2a, 0x9a, 0x73, 0xc0, 0xe3, 0x8c,
+	0xa6, 0x6a, 0x96, 0xd7, 0x19, 0x4d, 0xb9, 0xee, 0x4d, 0x92, 0x31, 0x95, 0xfc, 0x22, 0x11, 0x23,
+	0x5d, 0x06, 0x65, 0xec, 0x80, 0x42, 0x50, 0x0d, 0x92, 0x94, 0xc9, 0x72, 0x57, 0x57, 0x49, 0xca,
+	0x9b, 0x50, 0x4d, 0x9b, 0xe0, 0xa3, 0xde, 0x03, 0xb7, 0x08, 0xbc, 0x1d, 0xc4, 0x0d, 0x34, 0x27,
+	0xc9, 0xcd, 0x7a, 0x49, 0x1f, 0xd9, 0x87, 0x18, 0xcc, 0xd1, 0x8a, 0xd2, 0x99, 0x00, 0x75, 0xd8,
+	0x6b, 0xb8, 0xb9, 0x37, 0xa1, 0x23, 0x66, 0xc6, 0x3f, 0xfc, 0xde, 0x28, 0xfa, 0x48, 0x15, 0xba,
+	0x2c, 0xfa, 0x48, 0xf1, 0x0c, 0xac, 0xfc, 0xe4, 0x83, 0x8a, 0xff, 0xd8, 0x28, 0x2f, 0x01, 0xf2,
+	0x93, 0x6a, 0xc9, 0x6f, 0x84, 0xb4, 0x5d, 0xf2, 0xb9, 0x95, 0x28, 0x3d, 0xfe, 0x4d, 0x53, 0x7c,
+	0xf4, 0x19, 0x0b, 0xa7, 0x8b, 0x25, 0x8d, 0xd9, 0xbf, 0xf2, 0x81, 0x55, 0x0e, 0x02, 0x2b, 0x27,
+	0xb8, 0xd8, 0xf9, 0xc4, 0xca, 0x3d, 0xa2, 0x36, 0x6f, 0x70, 0x01, 0xfb, 0xae, 0x5d, 0xdf, 0xf8,
+	0xbc, 0x95, 0xfc, 0x64, 0x1d, 0xb3, 0x20, 0x64, 0x0b, 0x01, 0xdb, 0x21, 0xce, 0x52, 0x29, 0x78,
+	0xd4, 0xd7, 0x49, 0xba, 0x0c, 0x99, 0xdc, 0x57, 0xd6, 0x95, 0x90, 0xf0, 0xf7, 0xe0, 0x0c, 0x92,
+	0x98, 0x85, 0x51, 0x4c, 0xd3, 0xff, 0x52, 0x2a, 0x7c, 0x05, 0x4f, 0x8b, 0x8b, 0x22, 0x6e, 0x14,
+	0xcf, 0x83, 0x24, 0x8a, 0x99, 0x58, 0x19, 0xca, 0x22, 0x1d, 0x39, 0xd3, 0x22, 0x46, 0x9e, 0x82,
+	0xbe, 0x37, 0x05, 0xde, 0x78, 0x1c, 0xbd, 0x5c, 0x86, 0xab, 0x90, 0x2d, 0x5e, 0xbc, 0x05, 0x5b,
+	0xce, 0x14, 0xaa, 0x83, 0x3d, 0xba, 0x38, 0x0f, 0x82, 0x13, 0xaf, 0x59, 0x41, 0x0d, 0xa8, 0x8d,
+	0x2e, 0xfa, 0xe4, 0x62, 0x78, 0x76, 0xda, 0xd4, 0x72, 0x53, 0x9f, 0x5c, 0x9c, 0x78, 0x4d, 0x3d,
+	0x37, 0x9d, 0x07, 0x01, 0x37, 0x19, 0xc8, 0x01, 0xf3, 0x84, 0x90, 0x73, 0xd2, 0xac, 0xbe, 0xf8,
+	0x06, 0xea, 0xa5, 0x52, 0xa3, 0x1a, 0x54, 0x07, 0xe7, 0xef, 0xb9, 0x33, 0x1b, 0x8c, 0x37, 0x9e,
+	0xd7, 0xd4, 0xf8, 0x8f, 0x91, 0xe7, 0x35, 0xf5, 0xde, 0x5b, 0x38, 0xc8, 0xa9, 0x18, 0xd1, 0x74,
+	0x13, 0x4d, 0x29, 0xfa, 0x0c, 0xaa, 0xa2, 0xec, 0x96, 0x2b, 0xfe, 0x2b, 0xb4, 0xeb, 0xee, 0xf6,
+	0xc1, 0xc7, 0x15, 0xd4, 0x06, 0x8b, 0xd0, 0x9b, 0x24, 0x9c, 0x15, 0x07, 0xe4, 0x17, 0x57, 0x7a,
+	0xdf, 0x41, 0x43, 0x6c, 0x32, 0xe5, 0xaa, 0x2b, 0x5d, 0x95, 0xd2, 0x6f, 0x83, 0x5b, 0x3c, 0xb9,
+	0xb8, 0xd2, 0xfb, 0x5d, 0x83, 0x43, 0xb9, 0x90, 0xd5, 0xa5, 0x23, 0xb0, 0x06, 0x29, 0xe5, 0x34,
+	0x20, 0x77, 0xe7, 0xbd, 0x6d, 0x17, 0x2f, 0x02, 0xae, 0xa0, 0x2f, 0xa4, 0x7b, 0x85, 0x90, 0x97,
+	0xae, 0xdd, 0x70, 0x4b, 0x4f, 0x0a, 0xae, 0xf0, 0xee, 0x1d, 0xc6, 0xd9, 0x8a, 0x4e, 0xef, 0xc2,
+	0x28, 0xfb, 0xe9, 0x80, 0xe5, 0xd1, 0x1b, 0xca, 0xe8, 0x9d, 0x13, 0xdb, 0xb4, 0xfe, 0xd0, 0xc0,
+	0x99, 0xf8, 0x0a, 0x5f, 0xa7, 0xc0, 0x77, 0xe0, 0x96, 0xdf, 0xa1, 0x36, 0xdf, 0x56, 0xb8, 0x82,
+	0x9e, 0xed, 0x0f, 0x28, 0xad, 0x9d, 0x7d, 0x98, 0x6d, 0x37, 0xdf, 0x7e, 0x9f, 0xc6, 0x82, 0x9e,
+	0x83, 0x31, 0xca, 0x16, 0xf7, 0x18, 0x2d, 0x16, 0x14, 0xae, 0xf4, 0xfe, 0xd6, 0xe0, 0x40, 0xd6,
+	0x5e, 0x02, 0xfe, 0xba, 0x00, 0xfc, 0xc4, 0xbd, 0xbf, 0xb4, 0xda, 0x6a, 0x96, 0x71, 0x05, 0x7d,
+	0x05, 0x56, 0x3e, 0xbd, 0xc5, 0xb9, 0xed, 0x30, 0x97, 0x10, 0x08, 0x84, 0xe2, 0xd8, 0x7e, 0x84,
+	0x9f, 0xca, 0x60, 0xb7, 0xbf, 0xb6, 0xbb, 0x06, 0x57, 0x50, 0x77, 0x3f, 0x7d, 0x5b, 0x9c, 0xbd,
+	0x3f, 0x35, 0x68, 0x16, 0x73, 0xb7, 0x5b, 0x15, 0x70, 0x0b, 0x63, 0x29, 0xea, 0x0b, 0x30, 0xc5,
+	0xf0, 0xa2, 0xff, 0xbb, 0xfb, 0xa7, 0xb9, 0x74, 0xf6, 0x18, 0xac, 0xf1, 0x83, 0x0f, 0x97, 0xd3,
+	0xdd, 0x17, 0xb8, 0x75, 0x2f, 0xdd, 0xc2, 0x72, 0x69, 0x89, 0x3f, 0xe5, 0xaf, 0xfe, 0x09, 0x00,
+	0x00, 0xff, 0xff, 0x98, 0x9a, 0x33, 0xa9, 0xa5, 0x0b, 0x00, 0x00,
 }
