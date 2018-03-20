@@ -15,7 +15,7 @@ import (
 
 //NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string) (*api.Network, error)
+	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int32, ram float32, disk int, os string) (*api.Network, error)
 	List() ([]api.Network, error)
 	Get(ref string) (*api.Network, error)
 	Delete(ref string) error

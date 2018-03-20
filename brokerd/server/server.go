@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 
+	"github.com/SafeScale/providers/api/IPVersion"
+
 	"github.com/SafeScale/broker/commands"
 	pb "github.com/SafeScale/brokerd"
 	"github.com/SafeScale/providers"
@@ -103,10 +105,29 @@ type networkServiceServer struct{}
 func (s *networkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
 	// TODO To be implemented
 	log.Println("Create Network called")
+
+	// TODO Move serviceFactory initialisation to higher level (server initialisation ?)
+	serviceFactory := providers.NewFactory()
+	serviceFactory.RegisterClient("ovh", &ovh.Client{})
+	serviceFactory.Load()
+
+	clientAPI, ok := serviceFactory.Services[in.GetName()]
+	if !ok {
+		return nil, fmt.Errorf("Unknown tenant: %s", in.GetName())
+	}
+
+	networkAPI := commands.NewNetworkService(clientAPI)
+	network, err := networkAPI.Create(in.GetName(), in.GetCIDR(), IPVersion.IPv4,
+		in.Gateway.GetCPU(), in.GetGateway().GetRAM(), in.GetGateway().GetDisk(), in.GetGateway().GetImageID())
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.Network{
-		ID:   "myNetworkid",
-		Name: "myNetworkName",
-		CIDR: "myNetworkCIDR",
+		ID:   network.ID,
+		Name: network.Name,
+		CIDR: network.CIDR,
 	}, nil
 }
 
@@ -140,13 +161,13 @@ func (s *networkServiceServer) List(ctx context.Context, in *pb.TenantName) (*pb
 		})
 	}
 	rv := &pb.NetworkList{Networks: pbnetworks}
-	log.Printf("End ListNetwork for tenant: %s", in.GetName())
+	log.Printf("End List Network for tenant: %s", in.GetName())
 	return rv, nil
 }
 
 func (s *networkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
 	// TODO To be implemented
-	log.Println("Inspect Network called")
+	log.Printf("Inspect Network called for network %s")
 	return &pb.Network{
 		ID:   "myNetworkid",
 		Name: "myNetworkName",
@@ -162,11 +183,14 @@ func (s *networkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*p
 
 // *** MAIN ***
 func main() {
+	log.Println("Starting server")
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
+
+	log.Println("Registering services")
 	pb.RegisterTenantServiceServer(s, &tenantServiceServer{})
 	pb.RegisterImageServiceServer(s, &imageServiceServer{})
 	pb.RegisterNetworkServiceServer(s, &networkServiceServer{})
@@ -176,7 +200,7 @@ func main() {
 
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
-	fmt.Println("Ready to serve :-)")
+	log.Println("Ready to serve :-)")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
