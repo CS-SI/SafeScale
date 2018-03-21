@@ -42,21 +42,22 @@ func main() {
 	app.EnableBashCompletion = true
 	app.Commands = []cli.Command{
 		{
-			Name:  "network",
-			Usage: "network COMMAND",
+			Name:      "network",
+			Usage:     "network COMMAND",
+			ArgsUsage: "<tenant_name>",
 			Subcommands: []cli.Command{
 				{
 					Name:  "list",
 					Usage: "list TENANT_NAME",
 					Action: func(c *cli.Context) error {
 						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <tenant_name>")
 							cli.ShowSubcommandHelp(c)
 							return fmt.Errorf("Tenant name required")
 						}
 
 						// Network
 						networkService := pb.NewNetworkServiceClient(conn)
-						// networks, err := networkService.List(ctx, &pb.TenantName{Name: "TestOvh"})
 						networks, err := networkService.List(ctx, &pb.TenantName{Name: c.Args().First()})
 						if err != nil {
 							log.Fatalf("could not get network list: %v", err)
@@ -70,10 +71,62 @@ func main() {
 					},
 				},
 				{
-					Name:  "create",
-					Usage: "create a network",
+					Name:      "create",
+					Usage:     "create a network",
+					ArgsUsage: "<network_name>",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "cidr",
+							Value: "192.168.0.0/24",
+							Usage: "cidr of the network",
+						},
+						cli.IntFlag{
+							Name:  "cpu",
+							Value: 1,
+							Usage: "Number of CPU for the gateway",
+						},
+						cli.Float64Flag{
+							Name:  "ram",
+							Value: 1,
+							Usage: "RAM for the gateway",
+						},
+						cli.IntFlag{
+							Name:  "disk",
+							Value: 100,
+							Usage: "Disk space for the gateway",
+						},
+						cli.StringFlag{
+							Name:  "os",
+							Value: "Ubuntu 16.04",
+							Usage: "Image name for the gateway",
+						}},
 					Action: func(c *cli.Context) error {
-						fmt.Println("create network: ", c.Args().First())
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <network_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Network name reqired")
+						}
+						fmt.Println("create network: ", c.Args().First(), c.String("cidr"), c.Int("ram"))
+						// Network
+						networkService := pb.NewNetworkServiceClient(conn)
+						netdef := &pb.NetworkDefinition{
+							CIDR:   c.String("cidr"),
+							Name:   c.Args().Get(0),
+							Tenant: "TestOvh",
+							Gateway: &pb.GatewayDefinition{
+								CPU:  int32(c.Int("cpu")),
+								Disk: int32(c.Int("disk")),
+								RAM:  float32(c.Float64("ram")),
+								// CPUFrequency: ??,
+								ImageID: c.String("os"),
+							},
+						}
+						network, err := networkService.Create(ctx, netdef)
+						if err != nil {
+							log.Fatalf("could not get network list: %v", err)
+						}
+						fmt.Printf("Network: %s", network)
+
 						return nil
 					},
 				},

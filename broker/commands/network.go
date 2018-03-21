@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
@@ -15,7 +16,7 @@ import (
 
 //NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int32, ram float32, disk int, os string) (*api.Network, error)
+	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string) (*api.Network, error)
 	List() ([]api.Network, error)
 	Get(ref string) (*api.Network, error)
 	Delete(ref string) error
@@ -36,8 +37,11 @@ func NewNetworkService(api api.ClientAPI) NetworkAPI {
 
 //Create creates a network
 func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string) (*api.Network, error) {
-	_, err := srv.Get(net)
-	if err != nil {
+	_net, err := srv.Get(net)
+	if _net != nil {
+		return nil, fmt.Errorf("Network %s already exists", net)
+	}
+	if err != nil && !strings.Contains(err.Error(), "does not exists") {
 		return nil, fmt.Errorf("Network %s already exists", net)
 	}
 	tpls, err := srv.provider.SelectTemplatesBySize(api.SizingRequirements{
@@ -56,7 +60,7 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 	network, err := srv.provider.CreateNetwork(api.NetworkRequest{
 		Name:      net,
-		IPVersion: srv.ipVersion,
+		IPVersion: ipVersion,
 		CIDR:      cidr,
 		GWRequest: gwRequest,
 	})
@@ -73,7 +77,7 @@ func (srv *NetworkService) List() ([]api.Network, error) {
 
 //Get returns the network identified by ref, ref can be the name or the id
 func (srv *NetworkService) Get(ref string) (*api.Network, error) {
-	nets, err := srv.provider.ListNetworks()
+	nets, err := srv.List()
 	if err != nil {
 		return nil, err
 	}

@@ -111,16 +111,19 @@ func (s *networkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 	serviceFactory.RegisterClient("ovh", &ovh.Client{})
 	serviceFactory.Load()
 
-	clientAPI, ok := serviceFactory.Services[in.GetName()]
+	clientAPI, ok := serviceFactory.Services[in.GetTenant()]
 	if !ok {
-		return nil, fmt.Errorf("Unknown tenant: %s", in.GetName())
+		errmsg := fmt.Sprintf("Unknown tenant: %s", in.GetTenant())
+		log.Fatalln(errmsg)
+		return nil, fmt.Errorf(errmsg)
 	}
 
 	networkAPI := commands.NewNetworkService(clientAPI)
 	network, err := networkAPI.Create(in.GetName(), in.GetCIDR(), IPVersion.IPv4,
-		in.Gateway.GetCPU(), in.GetGateway().GetRAM(), in.GetGateway().GetDisk(), in.GetGateway().GetImageID())
+		int(in.Gateway.GetCPU()), in.GetGateway().GetRAM(), int(in.GetGateway().GetDisk()), in.GetGateway().GetImageID())
 
 	if err != nil {
+		log.Fatalln(err)
 		return nil, err
 	}
 

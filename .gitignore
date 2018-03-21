@@ -23,3 +23,7 @@ providers/aws/*_test.go
 
 #remove tenants configuration
 *.toml
+
+#ignore binary files from build
+brokerd/client/broker
+brokerd/server/brokerd

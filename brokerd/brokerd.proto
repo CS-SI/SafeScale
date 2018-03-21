@@ -55,7 +55,7 @@ message NetworkDefinition{
 message GatewayDefinition{
     int32 CPU = 1;
     float RAM = 2;
-    float Disk = 3;
+    int32 Disk = 3;
     float CPUFrequency = 4;
     string ImageID = 5;
 }
