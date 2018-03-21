@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
 
 	"github.com/SafeScale/broker/commands"
@@ -67,6 +68,16 @@ broker nas inspect nas1
 
 */
 
+type tenant struct {
+	name   string
+	client api.ClientAPI
+}
+
+var (
+	currentTenant  *tenant
+	serviceFactory *providers.ServiceFactory
+)
+
 // server is used to implement SafeScale.broker.
 type tenantServiceServer struct{}
 
@@ -75,15 +86,46 @@ func (s *tenantServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.Tenan
 	// func (s *server) ListTenant(ctx context.Context, in *pb.Empty) (*pb.TenantList, error) {
 	// TODO To be implemented
 	log.Println("List tenant called")
-	return &pb.TenantList{[]*pb.Tenant{
-			{Name: "Tenant_name_1", Provider: "Tenant_provider_1"},
-			{Name: "Tenant_name_2", Provider: "Tenant_provider_2"}}},
-		nil
+
+	var tl []*pb.Tenant
+	for name := range serviceFactory.Services {
+		tl = append(tl, &pb.Tenant{
+			Name:     name,
+			Provider: "myprovider",
+		})
+	}
+
+	return &pb.TenantList{Tenants: tl}, nil
 }
 
 func (s *tenantServiceServer) Reload(ctx context.Context, in *pb.Empty) (*pb.Empty, error) {
 	// TODO To be implemented
 	log.Println("Realod called")
+	return &pb.Empty{}, nil
+}
+
+func (s *tenantServiceServer) Get(ctx context.Context, in *pb.Empty) (*pb.TenantName, error) {
+	log.Println("Tenant Get called")
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+	return &pb.TenantName{Name: currentTenant.name}, nil
+}
+
+func (s *tenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*pb.Empty, error) {
+	log.Println("Tenant Set called")
+
+	if currentTenant != nil && currentTenant.name == in.GetName() {
+		log.Printf("Tenant '%s' is already selected", in.GetName())
+		return &pb.Empty{}, nil
+	}
+
+	clientAPI, ok := serviceFactory.Services[in.GetName()]
+	if !ok {
+		return nil, fmt.Errorf("Unknown tenant '%s'", in.GetName())
+	}
+	currentTenant = &tenant{name: in.GetName(), client: clientAPI}
+	log.Printf("Current tenant is now '%s'", in.GetName())
 	return &pb.Empty{}, nil
 }
 
@@ -93,7 +135,7 @@ type imageServiceServer struct{}
 func (s *imageServiceServer) List(ctx context.Context, in *pb.Reference) (*pb.ImageList, error) {
 	// TODO To be implemented
 	log.Println("List image called")
-	return &pb.ImageList{[]*pb.Image{
+	return &pb.ImageList{Images: []*pb.Image{
 			{ID: "Image id 1", Name: "Image Name 1"},
 			{Name: "Image name 2", ID: "Image id 2"}}},
 		nil
@@ -103,22 +145,13 @@ func (s *imageServiceServer) List(ctx context.Context, in *pb.Reference) (*pb.Im
 type networkServiceServer struct{}
 
 func (s *networkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
-	// TODO To be implemented
 	log.Println("Create Network called")
 
-	// TODO Move serviceFactory initialisation to higher level (server initialisation ?)
-	serviceFactory := providers.NewFactory()
-	serviceFactory.RegisterClient("ovh", &ovh.Client{})
-	serviceFactory.Load()
-
-	clientAPI, ok := serviceFactory.Services[in.GetTenant()]
-	if !ok {
-		errmsg := fmt.Sprintf("Unknown tenant: %s", in.GetTenant())
-		log.Fatalln(errmsg)
-		return nil, fmt.Errorf(errmsg)
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
 	}
 
-	networkAPI := commands.NewNetworkService(clientAPI)
+	networkAPI := commands.NewNetworkService(currentTenant.client)
 	network, err := networkAPI.Create(in.GetName(), in.GetCIDR(), IPVersion.IPv4,
 		int(in.Gateway.GetCPU()), in.GetGateway().GetRAM(), int(in.GetGateway().GetDisk()), in.GetGateway().GetImageID())
 
@@ -134,20 +167,14 @@ func (s *networkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 	}, nil
 }
 
-func (s *networkServiceServer) List(ctx context.Context, in *pb.TenantName) (*pb.NetworkList, error) {
-	log.Printf("List Network called with tenant: %s", in.GetName())
+func (s *networkServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.NetworkList, error) {
+	log.Printf("List Network called")
 
-	// TODO Move serviceFactory initialisation to higher level (server initialisation ?)
-	serviceFactory := providers.NewFactory()
-	serviceFactory.RegisterClient("ovh", &ovh.Client{})
-	serviceFactory.Load()
-
-	clientAPI, ok := serviceFactory.Services[in.GetName()]
-	if !ok {
-		return nil, fmt.Errorf("Unknown tenant: %s", in.GetName())
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
 	}
 
-	networkAPI := commands.NewNetworkService(clientAPI)
+	networkAPI := commands.NewNetworkService(currentTenant.client)
 	networks, err := networkAPI.List()
 	if err != nil {
 		return nil, err
@@ -164,24 +191,18 @@ func (s *networkServiceServer) List(ctx context.Context, in *pb.TenantName) (*pb
 		})
 	}
 	rv := &pb.NetworkList{Networks: pbnetworks}
-	log.Printf("End List Network for tenant: %s", in.GetName())
+	log.Printf("End List Network")
 	return rv, nil
 }
 
 func (s *networkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
 	log.Printf("Inspect Network called for network %s", in.GetName())
 
-	// TODO Move serviceFactory initialisation to higher level (server initialisation ?)
-	serviceFactory := providers.NewFactory()
-	serviceFactory.RegisterClient("ovh", &ovh.Client{})
-	serviceFactory.Load()
-
-	clientAPI, ok := serviceFactory.Services[in.GetTenantID()]
-	if !ok {
-		return nil, fmt.Errorf("Unknown tenant: %s", in.GetTenantID())
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
 	}
 
-	networkAPI := commands.NewNetworkService(clientAPI)
+	networkAPI := commands.NewNetworkService(currentTenant.client)
 	network, err := networkAPI.Get(in.GetName())
 	if err != nil {
 		return nil, err
@@ -198,17 +219,11 @@ func (s *networkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 func (s *networkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
 	log.Printf("Delete Network called for nerwork '%s'", in.GetName())
 
-	// TODO Move serviceFactory initialisation to higher level (server initialisation ?)
-	serviceFactory := providers.NewFactory()
-	serviceFactory.RegisterClient("ovh", &ovh.Client{})
-	serviceFactory.Load()
-
-	clientAPI, ok := serviceFactory.Services[in.GetTenantID()]
-	if !ok {
-		return nil, fmt.Errorf("Unknown tenant: %s", in.GetTenantID())
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
 	}
 
-	networkAPI := commands.NewNetworkService(clientAPI)
+	networkAPI := commands.NewNetworkService(currentTenant.client)
 	err := networkAPI.Delete(in.GetName())
 	if err != nil {
 		return nil, err
@@ -234,6 +249,11 @@ func main() {
 	// pb.RegisterContainerServiceServer(s, &server{})
 	// pb.RegisterVMServiceServer(s, &server{})
 	// pb.RegisterVolumeServiceServer(s, &server{})
+
+	log.Println("Initializing service factory")
+	serviceFactory = providers.NewFactory()
+	serviceFactory.RegisterClient("ovh", &ovh.Client{})
+	serviceFactory.Load()
 
 	// Register reflection service on gRPC server.
 	reflection.Register(s)

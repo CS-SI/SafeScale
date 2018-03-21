@@ -47,19 +47,14 @@ func main() {
 			Subcommands: []cli.Command{
 				{
 					Name:  "list",
-					Usage: "list TENANT_NAME",
+					Usage: "list",
 					Action: func(c *cli.Context) error {
-						if c.NArg() != 1 {
-							fmt.Println("Missing mandatory argument <tenant_name>")
-							cli.ShowSubcommandHelp(c)
-							return fmt.Errorf("Tenant name required")
-						}
-
-						// Network
 						networkService := pb.NewNetworkServiceClient(conn)
-						networks, err := networkService.List(ctx, &pb.TenantName{Name: c.Args().First()})
+						networks, err := networkService.List(ctx, &pb.Empty{})
 						if err != nil {
-							log.Fatalf("could not get network list: %v", err)
+							msg := fmt.Sprintf("could not get network list: %v", err)
+							fmt.Println(msg)
+							log.Fatalf(msg)
 						}
 						for i, network := range networks.GetNetworks() {
 							// log.Printf("Network %d: %s", i, network)
@@ -149,7 +144,7 @@ func main() {
 							cli.ShowSubcommandHelp(c)
 							return fmt.Errorf("Network name reqired")
 						}
-						fmt.Println("create network: ", c.Args().First(), c.String("cidr"), c.Int("ram"))
+						fmt.Println("create network: ", c.Args().First())
 						// Network
 						networkService := pb.NewNetworkServiceClient(conn)
 						netdef := &pb.NetworkDefinition{
@@ -175,6 +170,63 @@ func main() {
 				},
 			},
 		},
+		{
+			Name:  "tenant",
+			Usage: "tenant COMMAND",
+			Subcommands: []cli.Command{
+				{
+					Name:  "list",
+					Usage: "List available tenants",
+					Action: func(c *cli.Context) error {
+						tenantService := pb.NewTenantServiceClient(conn)
+						tenants, err := tenantService.List(ctx, &pb.Empty{})
+						if err != nil {
+							log.Fatalf("could not get tenant list: %v", err)
+						}
+						for i, tenant := range tenants.GetTenants() {
+							// log.Printf("Network %d: %s", i, network)
+							fmt.Printf("Tenant %d: %s", i, tenant)
+						}
+
+						return nil
+					},
+				},
+				{
+					Name:  "get",
+					Usage: "Get current tenant",
+					Action: func(c *cli.Context) error {
+						tenantService := pb.NewTenantServiceClient(conn)
+						tenant, err := tenantService.Get(ctx, &pb.Empty{})
+						if err != nil {
+							fmt.Printf("could not get current tenant: %v", err)
+						}
+						fmt.Println(tenant.GetName())
+
+						return nil
+					},
+				},
+				{
+					Name:      "set",
+					Usage:     "Set tenant to work with",
+					ArgsUsage: "<tenant_name>",
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <tenant_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Tenant name required")
+						}
+
+						tenantService := pb.NewTenantServiceClient(conn)
+						_, err := tenantService.Set(ctx, &pb.TenantName{Name: c.Args().First()})
+						if err != nil {
+							log.Fatalf("could not get current tenant: %v", err)
+						}
+						fmt.Printf("Tenant '%s' set", c.Args().First())
+
+						return nil
+					},
+				},
+			}},
 	}
 	_ = app.Run(os.Args)
 	// if err != nil {
