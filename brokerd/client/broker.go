@@ -92,6 +92,28 @@ func main() {
 					},
 				},
 				{
+					Name:      "inspect",
+					Usage:     "inspect NETWORK",
+					ArgsUsage: "<network_name>",
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <network_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Network name required")
+						}
+
+						// Network
+						networkService := pb.NewNetworkServiceClient(conn)
+						network, err := networkService.Inspect(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
+						if err != nil {
+							log.Fatalf("could not delete network %s: %v", c.Args().First(), err)
+						}
+						fmt.Printf("Network infos: %s", network)
+
+						return nil
+					},
+				},
+				{
 					Name:      "create",
 					Usage:     "create a network",
 					ArgsUsage: "<network_name>",

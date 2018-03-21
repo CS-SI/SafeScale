@@ -169,12 +169,29 @@ func (s *networkServiceServer) List(ctx context.Context, in *pb.TenantName) (*pb
 }
 
 func (s *networkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
-	// TODO To be implemented
-	log.Printf("Inspect Network called for network %s")
+	log.Printf("Inspect Network called for network %s", in.GetName())
+
+	// TODO Move serviceFactory initialisation to higher level (server initialisation ?)
+	serviceFactory := providers.NewFactory()
+	serviceFactory.RegisterClient("ovh", &ovh.Client{})
+	serviceFactory.Load()
+
+	clientAPI, ok := serviceFactory.Services[in.GetTenantID()]
+	if !ok {
+		return nil, fmt.Errorf("Unknown tenant: %s", in.GetTenantID())
+	}
+
+	networkAPI := commands.NewNetworkService(clientAPI)
+	network, err := networkAPI.Get(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("End Inspect Network: '%s'", in.GetName())
 	return &pb.Network{
-		ID:   "myNetworkid",
-		Name: "myNetworkName",
-		CIDR: "myNetworkCIDR",
+		ID:   network.ID,
+		Name: network.Name,
+		CIDR: network.CIDR,
 	}, nil
 }
 
