@@ -42,9 +42,8 @@ func main() {
 	app.EnableBashCompletion = true
 	app.Commands = []cli.Command{
 		{
-			Name:      "network",
-			Usage:     "network COMMAND",
-			ArgsUsage: "<tenant_name>",
+			Name:  "network",
+			Usage: "network COMMAND",
 			Subcommands: []cli.Command{
 				{
 					Name:  "list",
@@ -66,6 +65,28 @@ func main() {
 							// log.Printf("Network %d: %s", i, network)
 							fmt.Printf("Network %d: %s", i, network)
 						}
+
+						return nil
+					},
+				},
+				{
+					Name:      "delete",
+					Usage:     "delete NETWORK",
+					ArgsUsage: "<network_name>",
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <network_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Network name required")
+						}
+
+						// Network
+						networkService := pb.NewNetworkServiceClient(conn)
+						_, err := networkService.Delete(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
+						if err != nil {
+							log.Fatalf("could not delete network %s: %v", c.Args().First(), err)
+						}
+						fmt.Printf("Network %s deleted", c.Args().First())
 
 						return nil
 					},

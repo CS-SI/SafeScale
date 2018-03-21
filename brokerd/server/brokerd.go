@@ -179,8 +179,25 @@ func (s *networkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 }
 
 func (s *networkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
-	// TODO To be implemented
-	log.Println("Delete Network called")
+	log.Printf("Delete Network called for nerwork '%s'", in.GetName())
+
+	// TODO Move serviceFactory initialisation to higher level (server initialisation ?)
+	serviceFactory := providers.NewFactory()
+	serviceFactory.RegisterClient("ovh", &ovh.Client{})
+	serviceFactory.Load()
+
+	clientAPI, ok := serviceFactory.Services[in.GetTenantID()]
+	if !ok {
+		return nil, fmt.Errorf("Unknown tenant: %s", in.GetTenantID())
+	}
+
+	networkAPI := commands.NewNetworkService(clientAPI)
+	err := networkAPI.Delete(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("Network '%s' deleted", in.GetName())
 	return &pb.Empty{}, nil
 }
 
