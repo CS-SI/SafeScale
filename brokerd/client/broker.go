@@ -52,9 +52,7 @@ func main() {
 						networkService := pb.NewNetworkServiceClient(conn)
 						networks, err := networkService.List(ctx, &pb.Empty{})
 						if err != nil {
-							msg := fmt.Sprintf("could not get network list: %v", err)
-							fmt.Println(msg)
-							log.Fatalf(msg)
+							return fmt.Errorf("could not get network list: %v", err)
 						}
 						for i, network := range networks.GetNetworks() {
 							// log.Printf("Network %d: %s", i, network)
@@ -79,7 +77,7 @@ func main() {
 						networkService := pb.NewNetworkServiceClient(conn)
 						_, err := networkService.Delete(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
 						if err != nil {
-							log.Fatalf("could not delete network %s: %v", c.Args().First(), err)
+							return fmt.Errorf("could not delete network %s: %v", c.Args().First(), err)
 						}
 						fmt.Printf("Network %s deleted", c.Args().First())
 
@@ -101,7 +99,7 @@ func main() {
 						networkService := pb.NewNetworkServiceClient(conn)
 						network, err := networkService.Inspect(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
 						if err != nil {
-							log.Fatalf("could not delete network %s: %v", c.Args().First(), err)
+							return fmt.Errorf("could not inspect network %s: %v", c.Args().First(), err)
 						}
 						fmt.Printf("Network infos: %s", network)
 
@@ -161,7 +159,7 @@ func main() {
 						}
 						network, err := networkService.Create(ctx, netdef)
 						if err != nil {
-							log.Fatalf("could not get network list: %v", err)
+							return fmt.Errorf("Could not get network list: %v", err)
 						}
 						fmt.Printf("Network: %s", network)
 
@@ -181,10 +179,9 @@ func main() {
 						tenantService := pb.NewTenantServiceClient(conn)
 						tenants, err := tenantService.List(ctx, &pb.Empty{})
 						if err != nil {
-							log.Fatalf("could not get tenant list: %v", err)
+							return fmt.Errorf("Could not get tenant list: %v", err)
 						}
 						for i, tenant := range tenants.GetTenants() {
-							// log.Printf("Network %d: %s", i, network)
 							fmt.Printf("Tenant %d: %s", i, tenant)
 						}
 
@@ -198,7 +195,7 @@ func main() {
 						tenantService := pb.NewTenantServiceClient(conn)
 						tenant, err := tenantService.Get(ctx, &pb.Empty{})
 						if err != nil {
-							fmt.Printf("could not get current tenant: %v", err)
+							return fmt.Errorf("Could not get current tenant: %v", err)
 						}
 						fmt.Println(tenant.GetName())
 

@@ -85,8 +85,6 @@ type tenantServiceServer struct{}
 
 // Tenant
 func (s *tenantServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.TenantList, error) {
-	// func (s *server) ListTenant(ctx context.Context, in *pb.Empty) (*pb.TenantList, error) {
-	// TODO To be implemented
 	log.Println("List tenant called")
 
 	var tl []*pb.Tenant
@@ -158,7 +156,7 @@ func (s *networkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 		int(in.Gateway.GetCPU()), in.GetGateway().GetRAM(), int(in.GetGateway().GetDisk()), in.GetGateway().GetImageID())
 
 	if err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 		return nil, err
 	}
 
