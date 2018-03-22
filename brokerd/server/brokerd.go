@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 
+	"github.com/SafeScale/system"
+
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
 
@@ -233,6 +235,140 @@ func (s *networkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*p
 	return &pb.Empty{}, nil
 }
 
+// VM
+type vmServiceServer struct{}
+
+func (s *vmServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.VMList, error) {
+	log.Printf("List VM called")
+
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	vmAPI := commands.NewVMService(currentTenant.client)
+	vms, err := vmAPI.List()
+	if err != nil {
+		return nil, err
+	}
+
+	var pbvm []*pb.VM
+
+	// Map api.VM to pb.VM
+	for _, vm := range vms {
+		pbvm = append(pbvm, &pb.VM{
+			CPU:        int32(vm.Size.Cores),
+			Disk:       float32(vm.Size.DiskSize),
+			GatewayID:  vm.GatewayID,
+			ID:         vm.ID,
+			IP:         vm.GetAccessIP(),
+			Name:       vm.Name,
+			PrivateKey: vm.PrivateKey,
+			RAM:        vm.Size.RAMSize,
+			State:      pb.VMState(vm.State),
+		})
+	}
+	rv := &pb.VMList{VMs: pbvm}
+	log.Printf("End List VM")
+	return rv, nil
+}
+
+func (s *vmServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.VM, error) {
+	log.Printf("Create VM called")
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	vmService := commands.NewVMService(currentTenant.client)
+	vm, err := vmService.Create(in.GetName(), in.GetNetwork(),
+		int(in.GetCPUNumber()), in.GetRAM(), int(in.GetDisk()), in.GetImageID(), in.GetPublic())
+
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	log.Printf("VM '%s' created", in.GetName())
+	return &pb.VM{
+		CPU:        int32(vm.Size.Cores),
+		Disk:       float32(vm.Size.DiskSize),
+		GatewayID:  vm.GatewayID,
+		ID:         vm.ID,
+		IP:         vm.GetAccessIP(),
+		Name:       vm.Name,
+		PrivateKey: vm.PrivateKey,
+		RAM:        vm.Size.RAMSize,
+		State:      pb.VMState(vm.State),
+	}, nil
+}
+
+func (s *vmServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM, error) {
+	log.Printf("Inspect VM called")
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	vmService := commands.NewVMService(currentTenant.client)
+	vm, err := vmService.Get(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("End Inspect VM: '%s'", in.GetName())
+	return &pb.VM{
+		CPU:        int32(vm.Size.Cores),
+		Disk:       float32(vm.Size.DiskSize),
+		GatewayID:  vm.GatewayID,
+		ID:         vm.ID,
+		IP:         vm.GetAccessIP(),
+		Name:       vm.Name,
+		PrivateKey: vm.PrivateKey,
+		RAM:        vm.Size.RAMSize,
+		State:      pb.VMState(vm.State),
+	}, nil
+}
+
+func (s *vmServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
+	log.Printf("Delete VM called")
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+	vmService := commands.NewVMService(currentTenant.client)
+	err := vmService.Delete(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("VM '%s' deleted", in.GetName())
+	return &pb.Empty{}, nil
+}
+
+func (s *vmServiceServer) Ssh(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
+	log.Printf("Ssh VM called")
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+	vmService := commands.NewVMService(currentTenant.client)
+	sshConfig, err := vmService.Ssh(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Got Ssh config for VM '%s'", in.GetName())
+	return toPBSshconfig(sshConfig), nil
+}
+
+func toPBSshconfig(from *system.SSHConfig) *pb.SshConfig {
+	var gw *pb.SshConfig
+	if from.GatewayConfig != nil {
+		gw = toPBSshconfig(from.GatewayConfig)
+	}
+	return &pb.SshConfig{
+		Gateway:    gw,
+		Host:       from.Host,
+		Port:       int32(from.Port),
+		PrivateKey: from.PrivateKey,
+		User:       from.User,
+	}
+}
+
 // *** MAIN ***
 func main() {
 	log.Println("Starting server")
@@ -246,8 +382,8 @@ func main() {
 	pb.RegisterTenantServiceServer(s, &tenantServiceServer{})
 	pb.RegisterImageServiceServer(s, &imageServiceServer{})
 	pb.RegisterNetworkServiceServer(s, &networkServiceServer{})
+	pb.RegisterVMServiceServer(s, &vmServiceServer{})
 	// pb.RegisterContainerServiceServer(s, &server{})
-	// pb.RegisterVMServiceServer(s, &server{})
 	// pb.RegisterVolumeServiceServer(s, &server{})
 
 	log.Println("Initializing service factory")

@@ -86,7 +86,7 @@ func (srv *NetworkService) Get(ref string) (*api.Network, error) {
 			return &n, nil
 		}
 	}
-	return nil, fmt.Errorf("Network %s does not exists", ref)
+	return nil, fmt.Errorf("Network '%s' does not exists", ref)
 }
 
 //Delete deletes network referenced by ref

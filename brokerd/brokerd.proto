@@ -138,7 +138,7 @@ message SshConfig{
 service VMService{
     rpc Create(VMDefinition) returns (VM){}
     rpc Inspect(Reference) returns (VM){}
-    rpc List(TenantName) returns (VMList){}
+    rpc List(Empty) returns (VMList){}
     rpc Delete(Reference) returns (Empty){}
     rpc Ssh(Reference) returns (SshConfig){}
 }

@@ -2,9 +2,11 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
+	"github.com/SafeScale/system"
 )
 
 // broker vm create vm1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
@@ -16,17 +18,18 @@ import (
 type VMAPI interface {
 	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.VM, error)
 	List() ([]api.VM, error)
-	Inspect(ref string) (*api.VM, error)
+	Get(ref string) (*api.VM, error)
 	Delete(ref string) error
+	Ssh(ref string) (*system.SSHConfig, error)
 }
 
-// //NewVMService creates a VM service
-// func NewVMService(api api.ClientAPI) VMAPI {
-// 	return &VMService{
-// 		provider: providers.FromClient(api),
-// 		network:  NewNetworkService(api),
-// 	}
-// }
+//NewVMService creates a VM service
+func NewVMService(api api.ClientAPI) VMAPI {
+	return &VMService{
+		provider: providers.FromClient(api),
+		network:  NewNetworkService(api),
+	}
+}
 
 //VMService vm service
 type VMService struct {
@@ -36,10 +39,11 @@ type VMService struct {
 
 //Create creates a network
 func (srv *VMService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.VM, error) {
-	_, err := srv.Get(net)
-	if err != nil {
-		return nil, fmt.Errorf("VM %s already exists", net)
+	_vm, err := srv.Get(name)
+	if _vm != nil || (err != nil && !strings.Contains(err.Error(), "does not exists")) {
+		return nil, fmt.Errorf("VM '%s' already exists", name)
 	}
+
 	n, err := srv.network.Get(net)
 	if err != nil {
 		return nil, err
@@ -53,15 +57,15 @@ func (srv *VMService) Create(name string, net string, cpu int, ram float32, disk
 	if err != nil {
 		return nil, err
 	}
-	gwRequest := api.VMRequest{
+	vmRequest := api.VMRequest{
 		ImageID:    img.ID,
-		Name:       net,
+		Name:       name,
 		TemplateID: tpls[0].ID,
 		// IsGateway:  false,
 		PublicIP:   public,
 		NetworkIDs: []string{n.ID},
 	}
-	vm, err := srv.provider.CreateVM(gwRequest)
+	vm, err := srv.provider.CreateVM(vmRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -85,14 +89,24 @@ func (srv *VMService) Get(ref string) (*api.VM, error) {
 			return &vm, nil
 		}
 	}
-	return nil, fmt.Errorf("Network %s does not exists", ref)
+	return nil, fmt.Errorf("VM %s does not exists", ref)
 }
 
 //Delete deletes network referenced by ref
 func (srv *VMService) Delete(ref string) error {
 	vm, err := srv.Get(ref)
 	if err != nil {
-		return fmt.Errorf("Network %s does not exists", ref)
+		return fmt.Errorf("VM '%s' does not exists", ref)
 	}
 	return srv.provider.DeleteVM(vm.ID)
+}
+
+// Ssh returns ssh parameters to access the vm referenced by ref
+func (srv *VMService) Ssh(ref string) (*system.SSHConfig, error) {
+	vm, err := srv.Get(ref)
+	if err != nil {
+		return nil, fmt.Errorf("VM '%s' does not exists", ref)
+	}
+
+	return srv.provider.GetSSHConfig(vm.ID)
 }
