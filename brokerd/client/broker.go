@@ -22,15 +22,12 @@ func getConnection() *grpc.ClientConn {
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
-	defer conn.Close()
 	return conn
 }
 
-func getContext() context.Context {
+func getContext() (context.Context, context.CancelFunc) {
 	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	return ctx
+	return context.WithTimeout(context.Background(), time.Second*10)
 }
 
 func main() {
@@ -55,8 +52,12 @@ func main() {
 					Name:  "list",
 					Usage: "list",
 					Action: func(c *cli.Context) error {
-						networkService := pb.NewNetworkServiceClient(getConnection())
-						networks, err := networkService.List(getContext(), &pb.Empty{})
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						networkService := pb.NewNetworkServiceClient(conn)
+						networks, err := networkService.List(ctx, &pb.Empty{})
 						if err != nil {
 							return fmt.Errorf("could not get network list: %v", err)
 						}
@@ -80,8 +81,12 @@ func main() {
 						}
 
 						// Network
-						networkService := pb.NewNetworkServiceClient(getConnection())
-						_, err := networkService.Delete(getContext(), &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						networkService := pb.NewNetworkServiceClient(conn)
+						_, err := networkService.Delete(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
 						if err != nil {
 							return fmt.Errorf("could not delete network %s: %v", c.Args().First(), err)
 						}
@@ -102,8 +107,12 @@ func main() {
 						}
 
 						// Network
-						networkService := pb.NewNetworkServiceClient(getConnection())
-						network, err := networkService.Inspect(getContext(), &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						networkService := pb.NewNetworkServiceClient(conn)
+						network, err := networkService.Inspect(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
 						if err != nil {
 							return fmt.Errorf("could not inspect network %s: %v", c.Args().First(), err)
 						}
@@ -150,7 +159,11 @@ func main() {
 						}
 						fmt.Println("create network: ", c.Args().First())
 						// Network
-						networkService := pb.NewNetworkServiceClient(getConnection())
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						networkService := pb.NewNetworkServiceClient(conn)
 						netdef := &pb.NetworkDefinition{
 							CIDR:   c.String("cidr"),
 							Name:   c.Args().Get(0),
@@ -163,7 +176,7 @@ func main() {
 								ImageID: c.String("os"),
 							},
 						}
-						network, err := networkService.Create(getContext(), netdef)
+						network, err := networkService.Create(ctx, netdef)
 						if err != nil {
 							return fmt.Errorf("Could not get network list: %v", err)
 						}
@@ -182,8 +195,12 @@ func main() {
 					Name:  "list",
 					Usage: "List available tenants",
 					Action: func(c *cli.Context) error {
-						tenantService := pb.NewTenantServiceClient(getConnection())
-						tenants, err := tenantService.List(getContext(), &pb.Empty{})
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						tenantService := pb.NewTenantServiceClient(conn)
+						tenants, err := tenantService.List(ctx, &pb.Empty{})
 						if err != nil {
 							return fmt.Errorf("Could not get tenant list: %v", err)
 						}
@@ -198,8 +215,12 @@ func main() {
 					Name:  "get",
 					Usage: "Get current tenant",
 					Action: func(c *cli.Context) error {
-						tenantService := pb.NewTenantServiceClient(getConnection())
-						tenant, err := tenantService.Get(getContext(), &pb.Empty{})
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						tenantService := pb.NewTenantServiceClient(conn)
+						tenant, err := tenantService.Get(ctx, &pb.Empty{})
 						if err != nil {
 							return fmt.Errorf("Could not get current tenant: %v", err)
 						}
@@ -218,9 +239,12 @@ func main() {
 							cli.ShowSubcommandHelp(c)
 							return fmt.Errorf("Tenant name required")
 						}
-
-						tenantService := pb.NewTenantServiceClient(getConnection())
-						_, err := tenantService.Set(getContext(), &pb.TenantName{Name: c.Args().First()})
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						tenantService := pb.NewTenantServiceClient(conn)
+						_, err := tenantService.Set(ctx, &pb.TenantName{Name: c.Args().First()})
 						if err != nil {
 							return fmt.Errorf("Could not get current tenant: %v", err)
 						}
@@ -237,8 +261,12 @@ func main() {
 					Name:  "list",
 					Usage: "List available VMs",
 					Action: func(c *cli.Context) error {
-						service := pb.NewVMServiceClient(getConnection())
-						resp, err := service.List(getContext(), &pb.Empty{})
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVMServiceClient(conn)
+						resp, err := service.List(ctx, &pb.Empty{})
 						if err != nil {
 							return fmt.Errorf("Could not get vm list: %v", err)
 						}
@@ -259,8 +287,12 @@ func main() {
 							cli.ShowSubcommandHelp(c)
 							return fmt.Errorf("VM name or ID required")
 						}
-						service := pb.NewVMServiceClient(getConnection())
-						resp, err := service.Inspect(getContext(), &pb.Reference{Name: c.Args().First()})
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVMServiceClient(conn)
+						resp, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
 						if err != nil {
 							return fmt.Errorf("Could not inspect vm '%s': %v", c.Args().First(), err)
 						}
@@ -314,9 +346,12 @@ func main() {
 							cli.ShowSubcommandHelp(c)
 							return fmt.Errorf("VM name required")
 						}
-
-						service := pb.NewVMServiceClient(getConnection())
-						resp, err := service.Create(getContext(), &pb.VMDefinition{
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVMServiceClient(conn)
+						resp, err := service.Create(ctx, &pb.VMDefinition{
 							Name:      c.Args().First(),
 							CPUNumber: int32(c.Int("cpu")),
 							Disk:      float32(c.Float64("disk")),
@@ -344,8 +379,12 @@ func main() {
 							cli.ShowSubcommandHelp(c)
 							return fmt.Errorf("VM name or ID required")
 						}
-						service := pb.NewVMServiceClient(getConnection())
-						_, err := service.Delete(getContext(), &pb.Reference{Name: c.Args().First()})
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVMServiceClient(conn)
+						_, err := service.Delete(ctx, &pb.Reference{Name: c.Args().First()})
 						if err != nil {
 							return fmt.Errorf("Could not delete vm '%s': %v", c.Args().First(), err)
 						}
@@ -362,8 +401,12 @@ func main() {
 							cli.ShowSubcommandHelp(c)
 							return fmt.Errorf("VM name or ID required")
 						}
-						service := pb.NewVMServiceClient(getConnection())
-						resp, err := service.Ssh(getContext(), &pb.Reference{Name: c.Args().First()})
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVMServiceClient(conn)
+						resp, err := service.Ssh(ctx, &pb.Reference{Name: c.Args().First()})
 						if err != nil {
 							return fmt.Errorf("Could not get ssh config for vm '%s': %v", c.Args().First(), err)
 						}
