@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 
+	"github.com/SafeScale/providers/api/VolumeSpeed"
+
 	"github.com/SafeScale/system"
 
 	"github.com/SafeScale/providers/api"
@@ -402,7 +404,19 @@ func toPbVolume(in api.Volume) *pb.Volume {
 }
 
 func (s *volumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
-	return nil, fmt.Errorf("Not implemented")
+	log.Printf("Create Volume called")
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := commands.NewVolumeService(currentTenant.client)
+	vol, err := service.Create(in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("Volume '%s' created: %s", in.GetName(), vol)
+	return toPbVolume(*vol), nil
 }
 
 func (s *volumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*pb.Empty, error) {

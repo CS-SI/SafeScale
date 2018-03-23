@@ -5,6 +5,7 @@ import (
 
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
+	"github.com/SafeScale/providers/api/VolumeSpeed"
 )
 
 // broker volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
@@ -19,6 +20,7 @@ type VolumeAPI interface {
 	Delete(ref string) error
 	Get(ref string) (*api.Volume, error)
 	List() ([]api.Volume, error)
+	Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error)
 }
 
 //NewVolumeService creates a Volume service
@@ -59,4 +61,17 @@ func (srv *VolumeService) Get(ref string) (*api.Volume, error) {
 		}
 	}
 	return nil, fmt.Errorf("Volume '%s' does not exists", ref)
+}
+
+// Create a volume
+func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error) {
+	volume, err := srv.provider.CreateVolume(api.VolumeRequest{
+		Name:  name,
+		Size:  size,
+		Speed: speed,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return volume, nil
 }

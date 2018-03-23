@@ -153,7 +153,7 @@ service VMService{
 enum VolumeSpeed{
     COLD = 0;
     HDD = 1;
-    SDD = 2;
+    SSD = 2;
 }
 
 message VolumeDefinition{

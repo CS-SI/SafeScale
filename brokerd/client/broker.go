@@ -439,8 +439,9 @@ func main() {
 						return nil
 					},
 				}, {
-					Name:  "inspect",
-					Usage: "Inspect volume",
+					Name:      "inspect",
+					Usage:     "Inspect volume",
+					ArgsUsage: "<Volume_name|Volume_ID>",
 					Action: func(c *cli.Context) error {
 						if c.NArg() != 1 {
 							fmt.Println("Missing mandatory argument <Volume_name|Volume_ID>")
@@ -461,8 +462,9 @@ func main() {
 						return nil
 					},
 				}, {
-					Name:  "delete",
-					Usage: "Delete volume",
+					Name:      "delete",
+					Usage:     "Delete volume",
+					ArgsUsage: "<Volume_name|Volume_ID>",
 					Action: func(c *cli.Context) error {
 						if c.NArg() != 1 {
 							fmt.Println("Missing mandatory argument <Volume_name|Volume_ID>")
@@ -479,6 +481,54 @@ func main() {
 							return fmt.Errorf("Could not get volume '%s': %v", c.Args().First(), err)
 						}
 						fmt.Println(fmt.Sprintf("Volume '%s' deleted", c.Args().First()))
+
+						return nil
+					},
+				}, {
+					Name:      "create",
+					Usage:     "Create a volume",
+					ArgsUsage: "<Volume_name>",
+					Flags: []cli.Flag{
+						cli.IntFlag{
+							Name:  "size",
+							Value: 10,
+							Usage: "Size of the volume (in Go)",
+						},
+						cli.StringFlag{
+							Name:  "speed",
+							Value: "HDD",
+							// Improvement: get allowed values from brokerd.pb.go
+							Usage: "Allowed values: SSD, HDD, COLD",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <Volume_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Volume name required")
+						}
+						speed := c.String("speed")
+						if _, ok := pb.VolumeSpeed_value[speed]; !ok {
+							msg := fmt.Sprintf("Invalid volume speed '%s'", speed)
+							fmt.Println(msg)
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf(msg)
+						}
+
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVolumeServiceClient(conn)
+						volume, err := service.Create(ctx, &pb.VolumeDefinition{
+							Name:  c.Args().First(),
+							Size:  int32(c.Int("size")),
+							Speed: pb.VolumeSpeed(pb.VolumeSpeed_value[speed]),
+						})
+						if err != nil {
+							return fmt.Errorf("Could not create volume '%s': %v", c.Args().First(), err)
+						}
+						fmt.Println(fmt.Sprintf("Volume '%s' created: %s", c.Args().First(), volume))
 
 						return nil
 					},
