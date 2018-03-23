@@ -415,6 +415,73 @@ func main() {
 						fmt.Printf("Ssh config for VM '%s': %s", c.Args().First(), resp)
 						return nil
 					},
+				}}}, {
+			Name:  "volume",
+			Usage: "volume COMMAND",
+			Subcommands: []cli.Command{
+				{
+					Name:  "list",
+					Usage: "List available volumes",
+					Action: func(c *cli.Context) error {
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVolumeServiceClient(conn)
+						resp, err := service.List(ctx, &pb.Empty{})
+						if err != nil {
+							return fmt.Errorf("Could not get volume list: %v", err)
+						}
+						for i, volume := range resp.GetVolumes() {
+							fmt.Println(fmt.Sprintf("Volume %d: %s", i, volume))
+						}
+
+						return nil
+					},
+				}, {
+					Name:  "inspect",
+					Usage: "Inspect volume",
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <Volume_name|Volume_ID>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Volume name or ID required")
+						}
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVolumeServiceClient(conn)
+						volume, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
+						if err != nil {
+							return fmt.Errorf("Could not get volume '%s': %v", c.Args().First(), err)
+						}
+						fmt.Println(fmt.Sprintf("Volume: %s", volume))
+
+						return nil
+					},
+				}, {
+					Name:  "delete",
+					Usage: "Delete volume",
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <Volume_name|Volume_ID>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Volume name or ID required")
+						}
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVolumeServiceClient(conn)
+						_, err := service.Delete(ctx, &pb.Reference{Name: c.Args().First()})
+						if err != nil {
+							return fmt.Errorf("Could not get volume '%s': %v", c.Args().First(), err)
+						}
+						fmt.Println(fmt.Sprintf("Volume '%s' deleted", c.Args().First()))
+
+						return nil
+					},
 				}}},
 	}
 	err := app.Run(os.Args)

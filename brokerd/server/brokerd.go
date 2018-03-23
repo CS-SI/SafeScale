@@ -368,6 +368,79 @@ func toPBSshconfig(from *system.SSHConfig) *pb.SshConfig {
 	}
 }
 
+// VM
+type volumeServiceServer struct{}
+
+func (s *volumeServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.VolumeList, error) {
+	log.Printf("Volume List called")
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+	service := commands.NewVolumeService(currentTenant.client)
+	volumes, err := service.List()
+	if err != nil {
+		return nil, err
+	}
+	var pbvolumes []*pb.Volume
+
+	// Map api.Volume to pb.Volume
+	for _, volume := range volumes {
+		pbvolumes = append(pbvolumes, toPbVolume(volume))
+	}
+	rv := &pb.VolumeList{Volumes: pbvolumes}
+	log.Printf("End Volume List")
+	return rv, nil
+}
+
+func toPbVolume(in api.Volume) *pb.Volume {
+	return &pb.Volume{
+		ID:    in.ID,
+		Name:  in.Name,
+		Size:  int32(in.Size),
+		Speed: pb.VolumeSpeed(in.Speed),
+	}
+}
+
+func (s *volumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
+	return nil, fmt.Errorf("Not implemented")
+}
+
+func (s *volumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*pb.Empty, error) {
+	return nil, fmt.Errorf("Not implemented")
+}
+func (s *volumeServiceServer) Detach(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
+	return nil, fmt.Errorf("Not implemented")
+}
+func (s *volumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
+	log.Printf("Volume delete called")
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+	service := commands.NewVolumeService(currentTenant.client)
+	err := service.Delete(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("End Volume delete")
+	return &pb.Empty{}, nil
+}
+
+func (s *volumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Volume, error) {
+	log.Printf("Inspect Volume called")
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := commands.NewVolumeService(currentTenant.client)
+	vol, err := service.Get(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("End Inspect volume: '%s'", in.GetName())
+	return toPbVolume(*vol), nil
+}
+
 // *** MAIN ***
 func main() {
 	log.Println("Starting server")
@@ -382,8 +455,8 @@ func main() {
 	pb.RegisterImageServiceServer(s, &imageServiceServer{})
 	pb.RegisterNetworkServiceServer(s, &networkServiceServer{})
 	pb.RegisterVMServiceServer(s, &vmServiceServer{})
+	pb.RegisterVolumeServiceServer(s, &volumeServiceServer{})
 	// pb.RegisterContainerServiceServer(s, &server{})
-	// pb.RegisterVolumeServiceServer(s, &server{})
 
 	log.Println("Initializing service factory")
 	serviceFactory = providers.NewFactory()
