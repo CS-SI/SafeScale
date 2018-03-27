@@ -9,13 +9,13 @@ import (
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VolumeSpeed"
 	"github.com/SafeScale/providers/api/VolumeState"
-	"github.com/rackspace/gophercloud/openstack/objectstorage/v1/objects"
+	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects"
 
-	"github.com/rackspace/gophercloud/openstack/objectstorage/v1/containers"
+	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers"
 
-	"github.com/rackspace/gophercloud/openstack/blockstorage/v1/volumes"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/extensions/volumeattach"
-	"github.com/rackspace/gophercloud/pagination"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
+	"github.com/gophercloud/gophercloud/pagination"
 )
 
 //toVM converts a Volume status returned by the OpenStack driver into VolumeState enum
@@ -209,7 +209,7 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 //CreateContainer creates an object container
 func (client *Client) CreateContainer(name string) error {
 	opts := containers.CreateOpts{
-	//		Metadata: meta,
+		//		Metadata: meta,
 	}
 	_, err := containers.Create(client.Container, name, opts).Extract()
 	if err != nil {
@@ -280,11 +280,12 @@ func (client *Client) PutObject(container string, obj api.Object) error {
 	opts := objects.CreateOpts{
 		Metadata:    obj.Metadata,
 		ContentType: obj.ContentType,
+		Content:     obj.Content,
 	}
 	if ti != obj.DeleteAt {
 		opts.DeleteAt = int(obj.DeleteAt.Unix())
 	}
-	_, err := objects.Create(client.Container, container, obj.Name, obj.Content, opts).Extract()
+	_, err := objects.Create(client.Container, container, obj.Name, opts).Extract()
 	if err != nil {
 		return fmt.Errorf("Error creating object %s in container %s : %s", obj.Name, container, errorString(err))
 	}
@@ -418,7 +419,7 @@ func (client *Client) CopyObject(containerSrc, objectSrc, objectDst string) erro
 
 	result := objects.Copy(client.Container, containerSrc, objectSrc, opts)
 
-	_, err := result.ExtractHeader()
+	_, err := result.Extract()
 	if err != nil {
 		return fmt.Errorf("Error copying object %s into %s from container %s : %s", objectSrc, objectDst, containerSrc, errorString(err))
 	}

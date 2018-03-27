@@ -8,10 +8,11 @@ import (
 
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/networks"
-	"github.com/rackspace/gophercloud/openstack/networking/v2/subnets"
-	"github.com/rackspace/gophercloud/pagination"
+	gc "github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
+	"github.com/gophercloud/gophercloud/pagination"
 )
 
 //RouterRequest represents a router request
@@ -66,9 +67,10 @@ func (client *Client) removeGateway(netID string) error {
 //CreateNetwork creates a network named name
 func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
 	// We specify a name and that it should forward packets
+	state := true
 	opts := networks.CreateOpts{
 		Name:         req.Name,
-		AdminStateUp: networks.Up,
+		AdminStateUp: &state,
 	}
 
 	// Execute the operation and get back a networks.Network struct
@@ -235,20 +237,28 @@ func (client *Client) DeleteGateway(networkID string) error {
 
 }
 
-func toGopherIPversion(v IPVersion.Enum) int {
+func toGopherIPversion(v IPVersion.Enum) gc.IPVersion {
 	if v == IPVersion.IPv4 {
-		return subnets.IPv4
+		return gc.IPv4
 	} else if v == IPVersion.IPv6 {
-		return subnets.IPv6
+		return gc.IPv6
 	}
 	return -1
 }
 
-func fromGopherIPversion(v int) IPVersion.Enum {
+func fromGopherIPversion(v gc.IPVersion) IPVersion.Enum {
+	if v == gc.IPv4 {
+		return IPVersion.IPv4
+	} else if v == gc.IPv6 {
+		return IPVersion.IPv6
+	}
+	return -1
+}
+func fromIntIPversion(v int) IPVersion.Enum {
 	if v == 4 {
-		return subnets.IPv4
+		return IPVersion.IPv4
 	} else if v == 6 {
-		return subnets.IPv6
+		return IPVersion.IPv6
 	}
 	return -1
 }
@@ -268,7 +278,6 @@ func (client *Client) CreateSubnet(name string, networkID string, cidr string, i
 		IPVersion:  toGopherIPversion(ipVersion),
 		Name:       name,
 		EnableDHCP: &dhcp,
-		NoGateway:  !client.Cfg.UseLayer3Networking,
 	}
 
 	// Execute the operation and get back a subnets.Subnet struct
@@ -297,7 +306,7 @@ func (client *Client) CreateSubnet(name string, networkID string, cidr string, i
 	return &Subnet{
 		ID:        subnet.ID,
 		Name:      subnet.Name,
-		IPVersion: fromGopherIPversion(subnet.IPVersion),
+		IPVersion: fromIntIPversion(subnet.IPVersion),
 		Mask:      subnet.CIDR,
 		NetworkID: subnet.NetworkID,
 	}, nil
@@ -313,7 +322,7 @@ func (client *Client) GetSubnet(id string) (*Subnet, error) {
 	return &Subnet{
 		ID:        subnet.ID,
 		Name:      subnet.Name,
-		IPVersion: fromGopherIPversion(subnet.IPVersion),
+		IPVersion: fromIntIPversion(subnet.IPVersion),
 		Mask:      subnet.CIDR,
 		NetworkID: subnet.NetworkID,
 	}, nil
@@ -335,7 +344,7 @@ func (client *Client) ListSubnets(netID string) ([]Subnet, error) {
 			subnetList = append(subnetList, Subnet{
 				ID:        subnet.ID,
 				Name:      subnet.Name,
-				IPVersion: fromGopherIPversion(subnet.IPVersion),
+				IPVersion: fromIntIPversion(subnet.IPVersion),
 				Mask:      subnet.CIDR,
 				NetworkID: subnet.NetworkID,
 			})
@@ -363,22 +372,16 @@ func (client *Client) DeleteSubnet(id string) error {
 			return fmt.Errorf("Error deleting subnets: %s", errorString(err))
 		}
 	}
-	deleted := false
-	var errmsg string
+	var err error
 	for i := 0; i < 10; i++ {
-		// if err := subnets.Delete(client.Network, id).ExtractErr(); err != nil {
-		fmt.Println(fmt.Sprintf("Deleting subnet attempt #%d", i+1))
-		err := subnets.Delete(client.Network, id).ExtractErr()
-		if err == nil {
-			deleted = true
+		if err = subnets.Delete(client.Network, id).ExtractErr(); err == nil {
 			break
 		}
-		errmsg = errorString(err)
 		time.Sleep(1 * time.Second)
 	}
 
-	if !deleted {
-		return fmt.Errorf("Error deleting subnets: %s", errmsg)
+	if err != nil {
+		return fmt.Errorf("Error deleting subnets: %s", errorString(err))
 	}
 
 	return nil
@@ -390,9 +393,10 @@ func (client *Client) CreateRouter(req RouterRequest) (*Router, error) {
 	gi := routers.GatewayInfo{
 		NetworkID: req.NetworkID,
 	}
+	state := true
 	opts := routers.CreateOpts{
 		Name:         req.Name,
-		AdminStateUp: networks.Up,
+		AdminStateUp: &state,
 		GatewayInfo:  &gi,
 	}
 	router, err := routers.Create(client.Network, opts).Extract()
@@ -458,7 +462,7 @@ func (client *Client) DeleteRouter(id string) error {
 
 //AddSubnetToRouter attaches subnet to router
 func (client *Client) AddSubnetToRouter(routerID string, subnetID string) error {
-	_, err := routers.AddInterface(client.Network, routerID, routers.InterfaceOpts{
+	_, err := routers.AddInterface(client.Network, routerID, routers.AddInterfaceOpts{
 		SubnetID: subnetID,
 	}).Extract()
 	if err != nil {
@@ -469,7 +473,7 @@ func (client *Client) AddSubnetToRouter(routerID string, subnetID string) error 
 
 //RemoveSubnetFromRouter detachesa subnet from router interface
 func (client *Client) RemoveSubnetFromRouter(routerID string, subnetID string) error {
-	_, err := routers.RemoveInterface(client.Network, routerID, routers.InterfaceOpts{
+	_, err := routers.RemoveInterface(client.Network, routerID, routers.RemoveInterfaceOpts{
 		SubnetID: subnetID,
 	}).Extract()
 	if err != nil {

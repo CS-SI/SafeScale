@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/rackspace/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 
 	"github.com/GeertJohan/go.rice"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VolumeSpeed"
 
-	gc "github.com/rackspace/gophercloud"
-	"github.com/rackspace/gophercloud/openstack"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/extensions/secgroups"
-	"github.com/rackspace/gophercloud/pagination"
+	gc "github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
+	"github.com/gophercloud/gophercloud/pagination"
 )
 
 //go:generate rice embed-go
@@ -57,7 +57,7 @@ type AuthOptions struct {
 	// NOTE: The reauth function will try to re-authenticate endlessly if left unchecked.
 	// The way to limit the number of attempts is to provide a custom HTTP client to the provider client
 	// and provide a transport that implements the RoundTripper interface and stores the number of failed retries.
-	// For an example of this, see here: https://github.com/rackspace/rack/blob/1.0.0/auth/clients.go#L311
+	// For an example of this, see here: https://github.com/gophercloud/rack/blob/1.0.0/auth/clients.go#L311
 	AllowReauth bool
 
 	// TokenID allows users to authenticate (possibly as another user) with an
@@ -99,7 +99,7 @@ func errorString(err error) string {
 	switch e := err.(type) {
 	default:
 		return e.Error()
-	case *gc.UnexpectedResponseCodeError:
+	case *gc.ErrUnexpectedResponseCode:
 		return fmt.Sprintf("code : %d reason ; %s", e.Actual, string(e.Body[:]))
 	}
 }
@@ -114,7 +114,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Username:         opts.Username,
 		UserID:           opts.UserID,
 		Password:         opts.Password,
-		APIKey:           opts.APIKey,
 		DomainID:         opts.DomainID,
 		DomainName:       opts.DomainName,
 		TenantID:         opts.TenantID,

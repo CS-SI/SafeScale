@@ -121,7 +121,8 @@ func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 	if err != nil {
 		return nil, err
 	}
-	for !isTunnelReady(freePort) {
+
+	for nbiter := 0; !isTunnelReady(freePort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
 	}
 	return &sshTunnel{
@@ -144,10 +145,7 @@ func (c *SSHCommand) closeTunnels() error {
 		err = t.Close()
 	}
 	//Tunnels are imbricated only last error is significant
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // Wait waits for the command to exit and waits for any copying to stdin or copying from stdout or stderr to complete.

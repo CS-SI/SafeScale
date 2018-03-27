@@ -64,7 +64,7 @@ func (tester *ClientTester) ListVMTemplates(t *testing.T) {
 func (tester *ClientTester) CreateKeyPair(t *testing.T) {
 	kp, err := tester.Service.CreateKeyPair("kp")
 	assert.Nil(t, err)
-	defer tester.Service.DeleteKeyPair("kp")
+	defer tester.Service.DeleteKeyPair(kp.ID)
 	assert.NotEqual(t, kp.ID, "")
 	assert.NotEqual(t, kp.Name, "")
 	assert.NotEqual(t, kp.PrivateKey, "")
@@ -117,7 +117,7 @@ func (tester *ClientTester) ListKeyPairs(t *testing.T) {
 }
 
 //CreateNetwork creates a test network
-func (tester *ClientTester) CreateNetwork(t *testing.T, name string) (*api.Network, *api.KeyPair) {
+func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool) (*api.Network, *api.KeyPair) {
 
 	network, err := tester.Service.CreateNetwork(api.NetworkRequest{
 		Name:      name,
@@ -143,8 +143,11 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string) (*api.Netwo
 		KeyPair:    keypair,
 		TemplateID: tpls[0].ID,
 	}
-	err = tester.Service.CreateGateway(gwRequest)
-	assert.Nil(t, err)
+
+	if withGW {
+		err = tester.Service.CreateGateway(gwRequest)
+		assert.Nil(t, err)
+	}
 
 	return network, keypair
 }
@@ -190,10 +193,10 @@ func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
 //Networks test
 func (tester *ClientTester) Networks(t *testing.T) {
 	fmt.Println("Creating test_network1")
-	network1, kp1 := tester.CreateNetwork(t, "test_network_1")
+	network1, kp1 := tester.CreateNetwork(t, "test_network_1", true)
 	fmt.Println("test_network1 created")
-	// defer tester.Service.DeleteNetwork(network1.ID)
-	// defer tester.Service.DeleteKeyPair(kp1.ID)
+	defer tester.Service.DeleteKeyPair(kp1.ID)
+	defer tester.Service.DeleteNetwork(network1.ID)
 
 	vm, err := tester.Service.GetVMByName("gw_" + network1.Name)
 	assert.Nil(t, err)
@@ -206,7 +209,7 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	assert.Nil(t, err)
 
 	//Waits sshd deamon is up
-	time.Sleep(30 * time.Second)
+	ssh.WaitServerReady(time.Minute)
 	cmd, err := ssh.Command("whoami")
 	assert.Nil(t, err)
 	out, err := cmd.Output()
@@ -215,11 +218,11 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	assert.Equal(t, api.DefaultUser, content)
 
 	fmt.Println("Creating test_network2")
-	network2, kp2 := tester.CreateNetwork(t, "test_network_2")
+	network2, kp2 := tester.CreateNetwork(t, "test_network_2", false)
 	fmt.Println("test_network2 created ")
 
-	// defer tester.Service.DeleteNetwork(network2.ID)
 	defer tester.Service.DeleteKeyPair(kp2.ID)
+	defer tester.Service.DeleteNetwork(network2.ID)
 
 	nets, err := tester.Service.ListNetworks()
 	assert.Nil(t, err)
@@ -242,45 +245,24 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	assert.Equal(t, n1.ID, network1.ID)
 	assert.Equal(t, n1.IPVersion, network1.IPVersion)
 	assert.Equal(t, n1.Name, network1.Name)
-
-	//network := tester.CreateNetwork(t, "test_network_1")
-
-	// network, err := tester.Service.CreateNetwork("test_network")
-	// assert.Nil(t, err)
-	// defer tester.Service.DeleteNetwork(network.ID)
-	// network2, err := tester.Service.GetNetwork(network.ID)
-	// assert.Nil(t, err)
-	// assert.Equal(t, network2.ID, network.ID)
-	// assert.Equal(t, network2.Name, network2.Name)
-	// assert.Empty(t, network.Subnets)
-	// assert.Empty(t, network2.Subnets)
-
-	fmt.Println("Deleting test_network1")
-	err = tester.Service.DeleteNetwork(network1.ID)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("Error deleting network: %s", err))
-	}
-	fmt.Println("Deleting test_network2")
-	err = tester.Service.DeleteNetwork(network2.ID)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("Error deleting network: %s", err))
-	}
-	fmt.Println("Deleting keypair1")
-	tester.Service.DeleteKeyPair(kp1.ID)
-	fmt.Println("Deleting keypair2")
-	tester.Service.DeleteKeyPair(kp2.ID)
 }
 
 //VMs test
 func (tester *ClientTester) VMs(t *testing.T) {
 	// TODO: handle kp delete
-	network, _ := tester.CreateNetwork(t, "test_network")
+	network, kp := tester.CreateNetwork(t, "test_network", false)
+	defer tester.Service.DeleteNetwork(network.ID)
+	defer tester.Service.DeleteKeyPair(kp.ID)
 
 	vm, err := tester.CreateVM(t, "vm1", network.ID, true)
+	defer tester.Service.DeleteVM(vm.ID)
 
 	assert.NoError(t, err)
-	time.Sleep(30 * time.Second)
+	// time.Sleep(30 * time.Second)
+
 	ssh, err := tester.Service.GetSSHConfig(vm.ID)
+	err = ssh.WaitServerReady(time.Minute)
+	assert.NoError(t, err)
 	cmd, err := ssh.Command("whoami")
 	assert.Nil(t, err)
 	out, err := cmd.Output()
@@ -305,10 +287,13 @@ func (tester *ClientTester) VMs(t *testing.T) {
 	err = tester.CreateGW(t, network.ID)
 	assert.NoError(t, err)
 	vm2, err := tester.CreateVM(t, "vm2", network.ID, false)
+	defer tester.Service.DeleteVM(vm2.ID)
 	assert.NoError(t, err)
 
-	time.Sleep(30 * time.Second)
+	// time.Sleep(30 * time.Second)
 	ssh2, err := tester.Service.GetSSHConfig(vm2.ID)
+	err = ssh2.WaitServerReady(2 * time.Minute)
+	assert.NoError(t, err)
 	cmd2, err := ssh2.Command("whoami")
 	assert.NoError(t, err)
 	out2, err := cmd2.Output()
@@ -322,7 +307,7 @@ func (tester *ClientTester) VMs(t *testing.T) {
 	assert.Equal(t, 3, len(vms))
 	found := 0
 	for _, v := range vms {
-		if v.ID == network.ID {
+		if v.Name == "gw_"+network.Name {
 			found++
 		} else if v.ID == vm.ID {
 			found++
@@ -352,17 +337,15 @@ func (tester *ClientTester) VMs(t *testing.T) {
 	for _, addr := range v.PrivateIPsV6 {
 		fmt.Println(addr)
 	}
-	tester.Service.DeleteVM(vm.ID)
-	tester.Service.DeleteVM(vm2.ID)
-	tester.Service.DeleteNetwork(network.ID)
 }
 
 //StartStopVM test
 func (tester *ClientTester) StartStopVM(t *testing.T) {
 	// TODO: handle kp delete
-	net, _ := tester.CreateNetwork(t, "test_network")
+	net, kp := tester.CreateNetwork(t, "test_network", true)
+	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
-	vm, err := tester.Service.GetVM(net.ID)
+	vm, err := tester.Service.GetVMByName("gw_" + net.Name)
 	assert.NoError(t, err)
 	{
 		err := tester.Service.StopVM(vm.ID)
@@ -395,20 +378,20 @@ func (tester *ClientTester) Volume(t *testing.T) {
 		Speed: VolumeSpeed.HDD,
 	})
 	assert.Nil(t, err)
+	defer tester.Service.DeleteVolume(v.ID)
 	assert.Equal(t, "test_volume", v.Name)
 	assert.Equal(t, 500, v.Size)
 	assert.Equal(t, VolumeSpeed.HDD, v.Speed)
 
 	tester.Service.WaitVolumeState(v.ID, VolumeState.AVAILABLE, 40*time.Second)
-	defer tester.Service.DeleteVolume(v.ID)
 	v2, err := tester.Service.CreateVolume(api.VolumeRequest{
 		Name:  "test_volume",
 		Size:  500,
 		Speed: VolumeSpeed.HDD,
 	})
 	assert.Nil(t, err)
-	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
 	defer tester.Service.DeleteVolume(v2.ID)
+	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
 	lst, err := tester.Service.ListVolumes()
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(lst))
@@ -431,9 +414,10 @@ func (tester *ClientTester) Volume(t *testing.T) {
 //VolumeAttachment test
 func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	// TODO: handle kp delete
-	net, _ := tester.CreateNetwork(t, "test_network")
+	net, kp := tester.CreateNetwork(t, "test_network", true)
+	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
-	vm, err := tester.Service.GetVM(net.ID)
+	vm, err := tester.Service.GetVMByName("gw_" + net.Name)
 	assert.NoError(t, err)
 
 	v, err := tester.Service.CreateVolume(api.VolumeRequest{

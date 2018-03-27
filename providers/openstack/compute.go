@@ -19,13 +19,13 @@ import (
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
 	"github.com/SafeScale/providers/api/VMState"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/extensions/floatingip"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/extensions/keypairs"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/extensions/startstop"
-	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
-	"github.com/rackspace/gophercloud/openstack/imageservice/v2/images"
-	"github.com/rackspace/gophercloud/pagination"
-	"github.com/rackspace/gophercloud/rackspace/compute/v2/flavors"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
+	"github.com/gophercloud/gophercloud/pagination"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -511,7 +511,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 
 	//Create the floating IP
-	ip, err := floatingip.Create(client.Compute, floatingip.CreateOpts{
+	ip, err := floatingips.Create(client.Compute, floatingips.CreateOpts{
 		Pool: client.Opts.FloatingIPPool,
 	}).Extract()
 	if err != nil {
@@ -520,12 +520,11 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 
 	//Associate floating IP to VM
-	err = floatingip.AssociateInstance(client.Compute, floatingip.AssociateOpts{
+	err = floatingips.AssociateInstance(client.Compute, vm.ID, floatingips.AssociateOpts{
 		FloatingIP: ip.IP,
-		ServerID:   vm.ID,
 	}).ExtractErr()
 	if err != nil {
-		floatingip.Delete(client.Compute, ip.ID)
+		floatingips.Delete(client.Compute, ip.ID)
 		servers.Delete(client.Compute, vm.ID)
 		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
 	}
@@ -576,11 +575,11 @@ func (client *Client) ListVMs() ([]api.VM, error) {
 
 //getFloatingIP returns the floating IP associated with the VM identified by vmID
 //By convention only one floating IP is allocated to a VM
-func (client *Client) getFloatingIP(vmID string) (*floatingip.FloatingIP, error) {
-	pager := floatingip.List(client.Compute)
-	var fips []floatingip.FloatingIP
+func (client *Client) getFloatingIP(vmID string) (*floatingips.FloatingIP, error) {
+	pager := floatingips.List(client.Compute)
+	var fips []floatingips.FloatingIP
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		list, err := floatingip.ExtractFloatingIPs(page)
+		list, err := floatingips.ExtractFloatingIPs(page)
 		if err != nil {
 			return false, err
 		}
@@ -612,14 +611,13 @@ func (client *Client) DeleteVM(id string) error {
 		fip, err := client.getFloatingIP(id)
 		if err == nil {
 			if fip != nil {
-				err = floatingip.DisassociateInstance(client.Compute, floatingip.AssociateOpts{
-					ServerID:   id,
+				err = floatingips.DisassociateInstance(client.Compute, id, floatingips.DisassociateOpts{
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
 					return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
 				}
-				err = floatingip.Delete(client.Compute, fip.ID).ExtractErr()
+				err = floatingips.Delete(client.Compute, fip.ID).ExtractErr()
 				if err != nil {
 					return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
 				}
