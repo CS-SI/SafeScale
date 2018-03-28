@@ -307,15 +307,14 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 		sshConfig.Port,
 	)
 
-	sudo := ""
+	sudoOpt := ""
 	if withSudo {
 		// tty option is required for some command like ls
-		options = options + " -t"
-		sudo = " sudo"
+		sudoOpt = " -t sudo"
 	}
 
 	if cmdString != "" {
-		sshCmdString = sshCmdString + fmt.Sprintf("%s bash <<'ENDSSH'\n%s\nENDSSH", sudo, cmdString)
+		sshCmdString = sshCmdString + fmt.Sprintf("%s bash <<'ENDSSH'\n%s\nENDSSH", sudoOpt, cmdString)
 	}
 	return sshCmdString, f, nil
 

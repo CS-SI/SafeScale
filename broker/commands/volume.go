@@ -106,6 +106,7 @@ func (srv *VolumeService) Attach(volumename string, vmname string, path string, 
 		return err
 	}
 
+	// TODO Put all rice-box stuff in a dedicated method to return only formatted cmd to use in ssh cmd
 	box, err := rice.FindBox("broker_scripts")
 	if err != nil {
 		// TODO Use more explicit error
@@ -186,6 +187,63 @@ func (srv *VolumeService) Detach(volumename string, vmname string) error {
 		return fmt.Errorf("No VM found with name or id '%s'", vmname)
 	}
 
-	err = srv.provider.DeleteVolumeAttachment(vm.ID, vol.ID)
-	return err
+	volatt, err := srv.provider.GetVolumeAttachment(vm.ID, vol.ID)
+	if err != nil {
+		return fmt.Errorf("Error getting volume attachment: %s", err)
+	}
+
+	// Use script to:
+	//  - umount volume
+	//  - remove mount directory
+	//  - update fstab (remove line with device)
+	// TODO Put all rice-box stuff in a dedicated method to return only formatted cmd to use in ssh cmd
+	box, err := rice.FindBox("broker_scripts")
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+	umountBlockDeviceStr, err := box.String("umount_block_device.sh")
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+	tpl, err := template.New("umount_device").Parse(umountBlockDeviceStr)
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+
+	data := struct {
+		Device string
+	}{
+		Device: volatt.Device,
+	}
+	var umountdeviceCMD bytes.Buffer
+	if err = tpl.Execute(&umountdeviceCMD, data); err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+
+	tplcmd := umountdeviceCMD.String()
+	fmt.Println(tplcmd)
+
+	// retrieve ssh config to perform some commands
+	ssh, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+
+	cmd, err := ssh.SudoCommand(tplcmd)
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	// Finaly delete the attachment
+	return srv.provider.DeleteVolumeAttachment(vm.ID, vol.ID)
 }

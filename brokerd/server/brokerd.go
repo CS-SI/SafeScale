@@ -348,7 +348,7 @@ func (s *vmServiceServer) Ssh(ctx context.Context, in *pb.Reference) (*pb.SshCon
 		return nil, fmt.Errorf("No tenant set")
 	}
 	vmService := commands.NewVMService(currentTenant.client)
-	sshConfig, err := vmService.Ssh(in.GetName())
+	sshConfig, err := vmService.SSH(in.GetName())
 	if err != nil {
 		return nil, err
 	}

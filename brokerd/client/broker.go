@@ -425,7 +425,7 @@ func main() {
 					Action: func(c *cli.Context) error {
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVolumeServiceClient(conn)
 						resp, err := service.List(ctx, &pb.Empty{})
@@ -450,7 +450,7 @@ func main() {
 						}
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVolumeServiceClient(conn)
 						volume, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
@@ -473,7 +473,7 @@ func main() {
 						}
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVolumeServiceClient(conn)
 						_, err := service.Delete(ctx, &pb.Reference{Name: c.Args().First()})
@@ -517,7 +517,7 @@ func main() {
 
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVolumeServiceClient(conn)
 						volume, err := service.Create(ctx, &pb.VolumeDefinition{
@@ -557,7 +557,7 @@ func main() {
 
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVolumeServiceClient(conn)
 						_, err := service.Attach(ctx, &pb.VolumeAttachment{
@@ -586,7 +586,7 @@ func main() {
 
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVolumeServiceClient(conn)
 

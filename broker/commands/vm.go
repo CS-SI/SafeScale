@@ -20,7 +20,7 @@ type VMAPI interface {
 	List() ([]api.VM, error)
 	Get(ref string) (*api.VM, error)
 	Delete(ref string) error
-	Ssh(ref string) (*system.SSHConfig, error)
+	SSH(ref string) (*system.SSHConfig, error)
 }
 
 //NewVMService creates a VM service
@@ -101,8 +101,8 @@ func (srv *VMService) Delete(ref string) error {
 	return srv.provider.DeleteVM(vm.ID)
 }
 
-// Ssh returns ssh parameters to access the vm referenced by ref
-func (srv *VMService) Ssh(ref string) (*system.SSHConfig, error) {
+// SSH returns ssh parameters to access the vm referenced by ref
+func (srv *VMService) SSH(ref string) (*system.SSHConfig, error) {
 	vm, err := srv.Get(ref)
 	if err != nil {
 		return nil, fmt.Errorf("VM '%s' does not exists", ref)
