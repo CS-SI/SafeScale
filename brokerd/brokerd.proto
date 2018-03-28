@@ -182,10 +182,15 @@ message VolumeAttachment{
     string Format = 5;
 }
 
+message VolumeDetachment{
+    Reference Volume = 1;
+    Reference VM = 2;
+}
+
 service VolumeService{
     rpc Create(VolumeDefinition) returns (Volume) {}
     rpc Attach(VolumeAttachment) returns (Empty) {}
-    rpc Detach(Reference) returns (Empty){}
+    rpc Detach(VolumeDetachment) returns (Empty){}
     rpc Delete(Reference) returns (Empty){}
     rpc List(Empty) returns (VolumeList) {} 
     rpc Inspect(Reference) returns (Volume){}

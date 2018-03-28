@@ -420,10 +420,40 @@ func (s *volumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 }
 
 func (s *volumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*pb.Empty, error) {
-	return nil, fmt.Errorf("Not implemented")
+	log.Println("Attach volume called")
+
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := commands.NewVolumeService(currentTenant.client)
+	err := service.Attach(in.GetVolume().GetName(), in.GetVM().GetName(), in.GetMountPath(), in.GetFormat())
+
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	return &pb.Empty{}, nil
 }
-func (s *volumeServiceServer) Detach(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
-	return nil, fmt.Errorf("Not implemented")
+
+func (s *volumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachment) (*pb.Empty, error) {
+	log.Println("Detach volume called")
+
+	if currentTenant == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := commands.NewVolumeService(currentTenant.client)
+	err := service.Detach(in.GetVolume().GetName(), in.GetVM().GetName())
+
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	log.Println(fmt.Sprintf("Volume '%s' detached from '%s'", in.GetVolume().GetName(), in.GetVM().GetName()))
+	return &pb.Empty{}, nil
 }
 func (s *volumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
 	log.Printf("Volume delete called")
@@ -435,7 +465,7 @@ func (s *volumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("End Volume delete")
+	log.Printf("Volume '%s' deleted", in.GetName())
 	return &pb.Empty{}, nil
 }
 

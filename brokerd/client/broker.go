@@ -532,6 +532,75 @@ func main() {
 
 						return nil
 					},
+				}, {
+					Name:      "attach",
+					Usage:     "Attach a volume to a VM",
+					ArgsUsage: "<Volume_name|Volume_ID>, <VM_name|VM_ID>",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "path",
+							Value: "/shared/",
+							Usage: "Mount point of the volume",
+						},
+						cli.StringFlag{
+							Name:  "format",
+							Value: "ext4",
+							Usage: "Filesystem format",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 2 {
+							fmt.Println("Missing mandatory argument <Volume_name> and/or <VM_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Volume and VM name required")
+						}
+
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVolumeServiceClient(conn)
+						_, err := service.Attach(ctx, &pb.VolumeAttachment{
+							Format:    c.String("format"),
+							MountPath: c.String("path"),
+							VM:        &pb.Reference{Name: c.Args().Get(1)},
+							Volume:    &pb.Reference{Name: c.Args().Get(0)},
+						})
+						if err != nil {
+							return fmt.Errorf("Could not attach volume '%s' to VM '%s': %v", c.Args().Get(0), c.Args().Get(1), err)
+						}
+						fmt.Println(fmt.Sprintf("Volume '%s' attached to vm '%s'", c.Args().Get(0), c.Args().Get(1)))
+
+						return nil
+					},
+				}, {
+					Name:      "detach",
+					Usage:     "Detach a volume from a VM",
+					ArgsUsage: "<Volume_name|Volume_ID> <VM_name|VM_ID>",
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 2 {
+							fmt.Println("Missing mandatory argument <Volume_name> and/or <VM_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Volume and VM name required")
+						}
+
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext()
+						defer cancel()
+						service := pb.NewVolumeServiceClient(conn)
+
+						_, err := service.Detach(ctx, &pb.VolumeDetachment{
+							Volume: &pb.Reference{Name: c.Args().Get(0)},
+							VM:     &pb.Reference{Name: c.Args().Get(1)}})
+
+						if err != nil {
+							return fmt.Errorf("Could not detach volume '%s' from VM '%s': %v", c.Args().Get(0), c.Args().Get(1), err)
+						}
+						fmt.Println(fmt.Sprintf("Volume '%s' detached from VM '%s'", c.Args().Get(0), c.Args().Get(1)))
+
+						return nil
+					},
 				}}},
 	}
 	err := app.Run(os.Args)

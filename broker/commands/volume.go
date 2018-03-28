@@ -21,6 +21,8 @@ type VolumeAPI interface {
 	Get(ref string) (*api.Volume, error)
 	List() ([]api.Volume, error)
 	Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error)
+	Attach(volume string, vm string, path string, format string) error
+	Detach(volume string, vm string) error
 }
 
 //NewVolumeService creates a Volume service
@@ -74,4 +76,51 @@ func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) 
 		return nil, err
 	}
 	return volume, nil
+}
+
+// Attach a volume to a VM
+func (srv *VolumeService) Attach(volumename string, vmname string, path string, format string) error {
+	// Get volume ID
+	volume, err := srv.Get(volumename)
+	if err != nil {
+		return fmt.Errorf("No volume found with name or id '%s'", volumename)
+	}
+
+	// Get VM ID
+	vmService := NewVMService(srv.provider)
+	vm, err := vmService.Get(vmname)
+	if err != nil {
+		return fmt.Errorf("No VM found with name or id '%s'", vmname)
+	}
+
+	volatt, err := srv.provider.CreateVolumeAttachment(api.VolumeAttachmentRequest{
+		Name:     fmt.Sprintf("%s-%s", volume.Name, vm.Name),
+		ServerID: vm.ID,
+		VolumeID: volume.ID,
+	})
+	if err != nil {
+		return err
+	}
+	// TODO: finish implementation ie format filessytem and add mount point
+	_ = volatt
+
+	return nil
+}
+
+//Detach detach the volume identified by ref, ref can be the name or the id
+func (srv *VolumeService) Detach(volumename string, vmname string) error {
+	vol, err := srv.Get(volumename)
+	if err != nil {
+		return fmt.Errorf("No volume found with name or id '%s'", volumename)
+	}
+
+	// Get VM ID
+	vmService := NewVMService(srv.provider)
+	vm, err := vmService.Get(vmname)
+	if err != nil {
+		return fmt.Errorf("No VM found with name or id '%s'", vmname)
+	}
+
+	err = srv.provider.DeleteVolumeAttachment(vm.ID, vol.ID)
+	return err
 }
