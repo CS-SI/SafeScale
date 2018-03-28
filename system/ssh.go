@@ -299,31 +299,6 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 	//defer os.Remove(f.Name())
 	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes"
 
-	if cmdString != "" {
-		var sshCmdString string
-		if withSudo {
-			options = options + " -t"
-			sshCmdString = fmt.Sprintf("ssh -i %s  %s@%s %s -p %d sudo bash <<'ENDSSH'\n%s\nENDSSH",
-				f.Name(),
-				sshConfig.User,
-				sshConfig.Host,
-				options,
-				sshConfig.Port,
-				cmdString,
-			)
-		} else {
-
-			sshCmdString = fmt.Sprintf("ssh -i %s  %s@%s %s -p %d bash <<'ENDSSH'\n%s\nENDSSH",
-				f.Name(),
-				sshConfig.User,
-				sshConfig.Host,
-				options,
-				sshConfig.Port,
-				cmdString,
-			)
-		}
-		return sshCmdString, f, nil
-	}
 	sshCmdString := fmt.Sprintf("ssh -i %s  %s@%s %s -p %d",
 		f.Name(),
 		sshConfig.User,
@@ -331,6 +306,17 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 		options,
 		sshConfig.Port,
 	)
+
+	sudo := ""
+	if withSudo {
+		// tty option is required for some command like ls
+		options = options + " -t"
+		sudo = " sudo"
+	}
+
+	if cmdString != "" {
+		sshCmdString = sshCmdString + fmt.Sprintf("%s bash <<'ENDSSH'\n%s\nENDSSH", sudo, cmdString)
+	}
 	return sshCmdString, f, nil
 
 }
@@ -377,30 +363,20 @@ func createUploadCmd(sshConfig *SSHConfig, remotePath, localPath string) (string
 
 // Command returns the Cmd struct to execute cmdString remotely
 func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
-	tunnels, sshConfig, err := ssh.createTunnels()
-	if err != nil {
-		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
-	}
-	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
-	}
-	fmt.Println(sshCmdString)
-	cmd := exec.Command("bash", "-c", sshCmdString)
-	sshCommand := SSHCommand{
-		cmd:     cmd,
-		tunnels: tunnels,
-		keyFile: keyFile,
-	}
-	return &sshCommand, nil
+	return ssh.command(cmdString, false)
 }
 
+// SudoCommand returns the Cmd struct to execute cmdString remotely. Command is executed with sudo
 func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
+	return ssh.command(cmdString, true)
+}
+
+func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, error) {
 	tunnels, sshConfig, err := ssh.createTunnels()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
-	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, true)
+	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, withSudo)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
