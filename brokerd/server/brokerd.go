@@ -455,6 +455,7 @@ func (s *volumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachmen
 	log.Println(fmt.Sprintf("Volume '%s' detached from '%s'", in.GetVolume().GetName(), in.GetVM().GetName()))
 	return &pb.Empty{}, nil
 }
+
 func (s *volumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
 	log.Printf("Volume delete called")
 	if currentTenant == nil {

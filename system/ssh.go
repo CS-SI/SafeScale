@@ -291,7 +291,7 @@ func (ssh *SSHConfig) createTunnels() ([]*sshTunnel, *SSHConfig, error) {
 	return tunnels, &sshConfig, nil
 }
 
-func createSSHCmd(sshConfig *SSHConfig, cmdString string) (string, *os.File, error) {
+func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string, *os.File, error) {
 	f, err := createKeyFile(sshConfig.PrivateKey)
 	if err != nil {
 		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
@@ -300,14 +300,28 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string) (string, *os.File, err
 	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes"
 
 	if cmdString != "" {
-		sshCmdString := fmt.Sprintf("ssh -i %s  %s@%s %s -p %d bash <<'ENDSSH'\n%s\nENDSSH",
-			f.Name(),
-			sshConfig.User,
-			sshConfig.Host,
-			options,
-			sshConfig.Port,
-			cmdString,
-		)
+		var sshCmdString string
+		if withSudo {
+			options = options + " -t"
+			sshCmdString = fmt.Sprintf("ssh -i %s  %s@%s %s -p %d sudo bash <<'ENDSSH'\n%s\nENDSSH",
+				f.Name(),
+				sshConfig.User,
+				sshConfig.Host,
+				options,
+				sshConfig.Port,
+				cmdString,
+			)
+		} else {
+
+			sshCmdString = fmt.Sprintf("ssh -i %s  %s@%s %s -p %d bash <<'ENDSSH'\n%s\nENDSSH",
+				f.Name(),
+				sshConfig.User,
+				sshConfig.Host,
+				options,
+				sshConfig.Port,
+				cmdString,
+			)
+		}
 		return sshCmdString, f, nil
 	}
 	sshCmdString := fmt.Sprintf("ssh -i %s  %s@%s %s -p %d",
@@ -367,7 +381,26 @@ func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
-	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString)
+	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
+	}
+	fmt.Println(sshCmdString)
+	cmd := exec.Command("bash", "-c", sshCmdString)
+	sshCommand := SSHCommand{
+		cmd:     cmd,
+		tunnels: tunnels,
+		keyFile: keyFile,
+	}
+	return &sshCommand, nil
+}
+
+func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
+	tunnels, sshConfig, err := ssh.createTunnels()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
+	}
+	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, true)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -454,7 +487,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
-	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString)
+	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
 	if err != nil {
 		for _, t := range tunnels {
 			t.Close()
@@ -495,7 +528,7 @@ func (ssh *SSHConfig) CommandContext(ctx context.Context, cmdString string) (*SS
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
-	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString)
+	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}

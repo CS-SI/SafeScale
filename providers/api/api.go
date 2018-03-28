@@ -16,6 +16,9 @@ import (
 //DefaultUser Default VM user
 const DefaultUser = "gpac"
 
+//DefaultMountPoint Default mount point for volumes
+const DefaultMountPoint = "/shared/"
+
 //TimeoutError defines a Timeout error
 type TimeoutError struct {
 	Message string

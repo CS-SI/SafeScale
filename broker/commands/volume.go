@@ -1,8 +1,11 @@
 package commands
 
 import (
+	"bytes"
 	"fmt"
+	"text/template"
 
+	rice "github.com/GeertJohan/go.rice"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VolumeSpeed"
@@ -99,10 +102,72 @@ func (srv *VolumeService) Attach(volumename string, vmname string, path string, 
 		VolumeID: volume.ID,
 	})
 	if err != nil {
+		// TODO Use more explicit error
 		return err
 	}
-	// TODO: finish implementation ie format filessytem and add mount point
-	_ = volatt
+
+	box, err := rice.FindBox("broker_scripts")
+	if err != nil {
+		// TODO Use more explicit error
+		srv.Detach(volumename, vmname)
+		return err
+	}
+	mountBlockDeviceStr, err := box.String("mount_block_device.sh")
+	if err != nil {
+		// TODO Use more explicit error
+		srv.Detach(volumename, vmname)
+		return err
+	}
+	tpl, err := template.New("mount_device").Parse(mountBlockDeviceStr)
+	if err != nil {
+		// TODO Use more explicit error
+		srv.Detach(volumename, vmname)
+		return err
+	}
+
+	// Create mount point
+	mountPoint := path
+	if path == api.DefaultMountPoint {
+		mountPoint = api.DefaultMountPoint + volume.Name
+	}
+	data := struct {
+		Device     string
+		Fsformat   string
+		MountPoint string
+	}{
+		Device:     volatt.Device,
+		Fsformat:   format,
+		MountPoint: mountPoint,
+	}
+	var mountdeviceCMD bytes.Buffer
+	if err = tpl.Execute(&mountdeviceCMD, data); err != nil {
+		// TODO Use more explicit error
+		srv.Detach(volumename, vmname)
+		return err
+	}
+
+	tplcmd := mountdeviceCMD.String()
+	fmt.Println(tplcmd)
+
+	// retrieve ssh config to perform some commands
+	ssh, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		// TODO Use more explicit error
+		srv.Detach(volumename, vmname)
+		return err
+	}
+
+	cmd, err := ssh.SudoCommand(tplcmd)
+	if err != nil {
+		// TODO Use more explicit error
+		srv.Detach(volumename, vmname)
+		return err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		srv.Detach(volumename, vmname)
+		return err
+	}
 
 	return nil
 }
