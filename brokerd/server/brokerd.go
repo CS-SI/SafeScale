@@ -102,16 +102,31 @@ func (s *tenantServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.Tenan
 
 func (s *tenantServiceServer) Reload(ctx context.Context, in *pb.Empty) (*pb.Empty, error) {
 	// TODO To be implemented
-	log.Println("Realod called")
+	log.Println("Reload called")
 	return &pb.Empty{}, nil
 }
 
 func (s *tenantServiceServer) Get(ctx context.Context, in *pb.Empty) (*pb.TenantName, error) {
 	log.Println("Tenant Get called")
-	if currentTenant == nil {
+	tenant := getCurrentTenant()
+	if tenant == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
-	return &pb.TenantName{Name: currentTenant.name}, nil
+	return &pb.TenantName{Name: tenant.name}, nil
+}
+
+func getCurrentTenant() *tenant {
+	if currentTenant == nil {
+		if len(serviceFactory.Services) != 1 {
+			return nil
+		}
+		// Set unqiue tenant as selected
+		log.Println("Unique tenant set")
+		for name, service := range serviceFactory.Services {
+			currentTenant = &tenant{name: name, client: service}
+		}
+	}
+	return currentTenant
 }
 
 func (s *tenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*pb.Empty, error) {
@@ -149,7 +164,7 @@ type networkServiceServer struct{}
 func (s *networkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
 	log.Println("Create Network called")
 
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -173,7 +188,7 @@ func (s *networkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 func (s *networkServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.NetworkList, error) {
 	log.Printf("List Network called")
 
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -201,7 +216,7 @@ func (s *networkServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.Netw
 func (s *networkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
 	log.Printf("Inspect Network called for network %s", in.GetName())
 
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -222,7 +237,7 @@ func (s *networkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 func (s *networkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
 	log.Printf("Delete Network called for nerwork '%s'", in.GetName())
 
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -242,7 +257,7 @@ type vmServiceServer struct{}
 func (s *vmServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.VMList, error) {
 	log.Printf("List VM called")
 
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -275,7 +290,7 @@ func (s *vmServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.VMList, e
 
 func (s *vmServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.VM, error) {
 	log.Printf("Create VM called")
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -304,7 +319,7 @@ func (s *vmServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.
 
 func (s *vmServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM, error) {
 	log.Printf("Inspect VM called")
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -330,7 +345,7 @@ func (s *vmServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM
 
 func (s *vmServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
 	log.Printf("Delete VM called")
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 	vmService := commands.NewVMService(currentTenant.client)
@@ -344,7 +359,7 @@ func (s *vmServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Emp
 
 func (s *vmServiceServer) Ssh(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
 	log.Printf("Ssh VM called")
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 	vmService := commands.NewVMService(currentTenant.client)
@@ -375,7 +390,7 @@ type volumeServiceServer struct{}
 
 func (s *volumeServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.VolumeList, error) {
 	log.Printf("Volume List called")
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 	service := commands.NewVolumeService(currentTenant.client)
@@ -405,7 +420,7 @@ func toPbVolume(in api.Volume) *pb.Volume {
 
 func (s *volumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
 	log.Printf("Create Volume called")
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -422,7 +437,7 @@ func (s *volumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 func (s *volumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*pb.Empty, error) {
 	log.Println("Attach volume called")
 
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -440,7 +455,7 @@ func (s *volumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachmen
 func (s *volumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachment) (*pb.Empty, error) {
 	log.Println("Detach volume called")
 
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -458,7 +473,7 @@ func (s *volumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachmen
 
 func (s *volumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
 	log.Printf("Volume delete called")
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 	service := commands.NewVolumeService(currentTenant.client)
@@ -472,7 +487,7 @@ func (s *volumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb
 
 func (s *volumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Volume, error) {
 	log.Printf("Inspect Volume called")
-	if currentTenant == nil {
+	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
@@ -512,6 +527,6 @@ func main() {
 	reflection.Register(s)
 	log.Println("Ready to serve :-)")
 	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Fatalf("Failed to serve: %v", err)
 	}
 }
