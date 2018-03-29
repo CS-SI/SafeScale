@@ -167,9 +167,8 @@ func main() {
 						defer cancel()
 						networkService := pb.NewNetworkServiceClient(conn)
 						netdef := &pb.NetworkDefinition{
-							CIDR:   c.String("cidr"),
-							Name:   c.Args().Get(0),
-							Tenant: "TestOvh",
+							CIDR: c.String("cidr"),
+							Name: c.Args().Get(0),
 							Gateway: &pb.GatewayDefinition{
 								CPU:  int32(c.Int("cpu")),
 								Disk: int32(c.Int("disk")),
@@ -356,8 +355,7 @@ func main() {
 						resp, err := service.Create(ctx, &pb.VMDefinition{
 							Name:      c.Args().First(),
 							CPUNumber: int32(c.Int("cpu")),
-							Disk:      float32(c.Float64("disk")),
-							GPU:       c.Bool("gpu"),
+							Disk:      int32(c.Float64("disk")),
 							ImageID:   c.String("os"),
 							Network:   c.String("net"),
 							Public:    c.BoolT("public"),

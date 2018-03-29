@@ -258,7 +258,7 @@ func (s *vmServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.VMList, e
 	for _, vm := range vms {
 		pbvm = append(pbvm, &pb.VM{
 			CPU:        int32(vm.Size.Cores),
-			Disk:       float32(vm.Size.DiskSize),
+			Disk:       int32(vm.Size.DiskSize),
 			GatewayID:  vm.GatewayID,
 			ID:         vm.ID,
 			IP:         vm.GetAccessIP(),
@@ -291,7 +291,7 @@ func (s *vmServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.
 	log.Printf("VM '%s' created", in.GetName())
 	return &pb.VM{
 		CPU:        int32(vm.Size.Cores),
-		Disk:       float32(vm.Size.DiskSize),
+		Disk:       int32(vm.Size.DiskSize),
 		GatewayID:  vm.GatewayID,
 		ID:         vm.ID,
 		IP:         vm.GetAccessIP(),
@@ -317,7 +317,7 @@ func (s *vmServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM
 	log.Printf("End Inspect VM: '%s'", in.GetName())
 	return &pb.VM{
 		CPU:        int32(vm.Size.Cores),
-		Disk:       float32(vm.Size.DiskSize),
+		Disk:       int32(vm.Size.DiskSize),
 		GatewayID:  vm.GatewayID,
 		ID:         vm.ID,
 		IP:         vm.GetAccessIP(),

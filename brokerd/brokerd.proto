@@ -48,7 +48,6 @@ service ImageService{
 // broker network inspect net1
 
 message NetworkDefinition{
-    string Tenant = 1;
     string Name = 2;
     string CIDR = 3;
     GatewayDefinition Gateway = 4;
@@ -58,7 +57,6 @@ message GatewayDefinition{
     int32 CPU = 1;
     float RAM = 2;
     int32 Disk = 3;
-    float CPUFrequency = 4;
     string ImageID = 5;
 }
 message Network{
@@ -85,14 +83,11 @@ service NetworkService{
 // broker vm create vm2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
 
 message VMDefinition{
-    string Tenant = 1;
     string Name = 2;
     string Network = 3;
     int32 CPUNumber = 4;
-    float CPUFrequency = 5;
     float RAM = 6;
-    float Disk = 7;
-    bool GPU = 8;
+    int32 Disk = 7;
     string ImageID = 9;
     bool Public = 10;
 }
@@ -115,7 +110,7 @@ message VM{
     string Name = 2;
     int32 CPU = 3;
     float RAM = 4;
-    float Disk = 5;
+    int32 Disk = 5;
     string IP = 6;
     VMState State = 8;
     string PrivateKey = 9;
@@ -157,7 +152,6 @@ enum VolumeSpeed{
 }
 
 message VolumeDefinition{
-    string Tenant = 1;
     string Name = 2;
     VolumeSpeed Speed = 3;
     int32 Size = 4;
@@ -175,7 +169,6 @@ message VolumeList{
 }
 
 message VolumeAttachment{
-    string Tenant = 1;
     Reference Volume = 2;
     Reference VM = 3;
     string MountPath = 4;
