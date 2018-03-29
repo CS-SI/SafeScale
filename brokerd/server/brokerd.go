@@ -160,6 +160,7 @@ func (s *networkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 		return nil, err
 	}
 
+	log.Println("Network created")
 	return &pb.Network{
 		ID:   network.ID,
 		Name: network.Name,
