@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -61,12 +62,10 @@ func main() {
 						networkService := pb.NewNetworkServiceClient(conn)
 						networks, err := networkService.List(ctx, &pb.Empty{})
 						if err != nil {
-							return fmt.Errorf("could not get network list: %v", err)
+							return fmt.Errorf("Could not get network list: %v", err)
 						}
-						for i, network := range networks.GetNetworks() {
-							// log.Printf("Network %d: %s", i, network)
-							fmt.Printf("Network %d: %s", i, network)
-						}
+						out, _ := json.Marshal(networks.GetNetworks())
+						fmt.Println(string(out))
 
 						return nil
 					},
@@ -90,9 +89,9 @@ func main() {
 						networkService := pb.NewNetworkServiceClient(conn)
 						_, err := networkService.Delete(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
 						if err != nil {
-							return fmt.Errorf("could not delete network %s: %v", c.Args().First(), err)
+							return fmt.Errorf("Could not delete network %s: %v", c.Args().First(), err)
 						}
-						fmt.Printf("Network %s deleted", c.Args().First())
+						fmt.Println(fmt.Sprintf("Network '%s' deleted", c.Args().First()))
 
 						return nil
 					},
@@ -116,9 +115,10 @@ func main() {
 						networkService := pb.NewNetworkServiceClient(conn)
 						network, err := networkService.Inspect(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
 						if err != nil {
-							return fmt.Errorf("could not inspect network %s: %v", c.Args().First(), err)
+							return fmt.Errorf("Could not inspect network %s: %v", c.Args().First(), err)
 						}
-						fmt.Printf("Network infos: %s", network)
+						out, _ := json.Marshal(network)
+						fmt.Println(string(out))
 
 						return nil
 					},
@@ -159,7 +159,6 @@ func main() {
 							cli.ShowSubcommandHelp(c)
 							return fmt.Errorf("Network name reqired")
 						}
-						fmt.Println("create network: ", c.Args().First())
 						// Network
 						conn := getConnection()
 						defer conn.Close()
@@ -181,7 +180,8 @@ func main() {
 						if err != nil {
 							return fmt.Errorf("Could not get network list: %v", err)
 						}
-						fmt.Printf("Network: %s", network)
+						out, _ := json.Marshal(network)
+						fmt.Println(string(out))
 
 						return nil
 					},
@@ -205,9 +205,8 @@ func main() {
 						if err != nil {
 							return fmt.Errorf("Could not get tenant list: %v", err)
 						}
-						for i, tenant := range tenants.GetTenants() {
-							fmt.Printf("Tenant %d: %s", i, tenant)
-						}
+						out, _ := json.Marshal(tenants.GetTenants())
+						fmt.Println(string(out))
 
 						return nil
 					},
@@ -225,7 +224,8 @@ func main() {
 						if err != nil {
 							return fmt.Errorf("Could not get current tenant: %v", err)
 						}
-						fmt.Println(tenant.GetName())
+						out, _ := json.Marshal(tenant)
+						fmt.Println(string(out))
 
 						return nil
 					},
@@ -267,13 +267,12 @@ func main() {
 						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVMServiceClient(conn)
-						resp, err := service.List(ctx, &pb.Empty{})
+						vms, err := service.List(ctx, &pb.Empty{})
 						if err != nil {
 							return fmt.Errorf("Could not get vm list: %v", err)
 						}
-						for i, vm := range resp.GetVMs() {
-							fmt.Println(fmt.Sprintf("VM %d: %s", i, vm))
-						}
+						out, _ := json.Marshal(vms.GetVMs())
+						fmt.Println(string(out))
 
 						return nil
 					},
@@ -298,7 +297,8 @@ func main() {
 							return fmt.Errorf("Could not inspect vm '%s': %v", c.Args().First(), err)
 						}
 
-						fmt.Printf("VM infos: %s", resp)
+						out, _ := json.Marshal(resp)
+						fmt.Println(string(out))
 
 						return nil
 					},
@@ -365,7 +365,8 @@ func main() {
 							return fmt.Errorf("Could not create vm '%s': %v", c.Args().First(), err)
 						}
 
-						fmt.Printf("VM infos: %s", resp)
+						out, _ := json.Marshal(resp)
+						fmt.Println(string(out))
 
 						return nil
 					},
@@ -410,7 +411,8 @@ func main() {
 						if err != nil {
 							return fmt.Errorf("Could not get ssh config for vm '%s': %v", c.Args().First(), err)
 						}
-						fmt.Printf("Ssh config for VM '%s': %s", c.Args().First(), resp)
+						out, _ := json.Marshal(resp)
+						fmt.Println(string(out))
 						return nil
 					},
 				}}}, {
@@ -430,9 +432,9 @@ func main() {
 						if err != nil {
 							return fmt.Errorf("Could not get volume list: %v", err)
 						}
-						for i, volume := range resp.GetVolumes() {
-							fmt.Println(fmt.Sprintf("Volume %d: %s", i, volume))
-						}
+
+						out, _ := json.Marshal(resp.GetVolumes())
+						fmt.Println(string(out))
 
 						return nil
 					},
@@ -455,7 +457,9 @@ func main() {
 						if err != nil {
 							return fmt.Errorf("Could not get volume '%s': %v", c.Args().First(), err)
 						}
-						fmt.Println(fmt.Sprintf("Volume: %s", volume))
+
+						out, _ := json.Marshal(volume)
+						fmt.Println(string(out))
 
 						return nil
 					},
@@ -526,7 +530,8 @@ func main() {
 						if err != nil {
 							return fmt.Errorf("Could not create volume '%s': %v", c.Args().First(), err)
 						}
-						fmt.Println(fmt.Sprintf("Volume '%s' created: %s", c.Args().First(), volume))
+						out, _ := json.Marshal(volume)
+						fmt.Println(string(out))
 
 						return nil
 					},
