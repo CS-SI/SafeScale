@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	address = "localhost:50051"
+	address           = "localhost:50051"
+	timeoutCtxDefault = 10 * time.Second
+	timeoutCtxVM      = 2 * time.Minute
 )
 
 func getConnection() *grpc.ClientConn {
@@ -25,9 +27,9 @@ func getConnection() *grpc.ClientConn {
 	return conn
 }
 
-func getContext() (context.Context, context.CancelFunc) {
+func getContext(timeout time.Duration) (context.Context, context.CancelFunc) {
 	// Contact the server and print out its response.
-	return context.WithTimeout(context.Background(), time.Second*10)
+	return context.WithTimeout(context.Background(), timeout)
 }
 
 func main() {
@@ -54,7 +56,7 @@ func main() {
 					Action: func(c *cli.Context) error {
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						networkService := pb.NewNetworkServiceClient(conn)
 						networks, err := networkService.List(ctx, &pb.Empty{})
@@ -83,7 +85,7 @@ func main() {
 						// Network
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						networkService := pb.NewNetworkServiceClient(conn)
 						_, err := networkService.Delete(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
@@ -109,7 +111,7 @@ func main() {
 						// Network
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						networkService := pb.NewNetworkServiceClient(conn)
 						network, err := networkService.Inspect(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
@@ -161,7 +163,7 @@ func main() {
 						// Network
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxVM)
 						defer cancel()
 						networkService := pb.NewNetworkServiceClient(conn)
 						netdef := &pb.NetworkDefinition{
@@ -197,7 +199,7 @@ func main() {
 					Action: func(c *cli.Context) error {
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						tenantService := pb.NewTenantServiceClient(conn)
 						tenants, err := tenantService.List(ctx, &pb.Empty{})
@@ -217,7 +219,7 @@ func main() {
 					Action: func(c *cli.Context) error {
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						tenantService := pb.NewTenantServiceClient(conn)
 						tenant, err := tenantService.Get(ctx, &pb.Empty{})
@@ -241,7 +243,7 @@ func main() {
 						}
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						tenantService := pb.NewTenantServiceClient(conn)
 						_, err := tenantService.Set(ctx, &pb.TenantName{Name: c.Args().First()})
@@ -263,7 +265,7 @@ func main() {
 					Action: func(c *cli.Context) error {
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVMServiceClient(conn)
 						resp, err := service.List(ctx, &pb.Empty{})
@@ -289,7 +291,7 @@ func main() {
 						}
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVMServiceClient(conn)
 						resp, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
@@ -348,7 +350,7 @@ func main() {
 						}
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxVM)
 						defer cancel()
 						service := pb.NewVMServiceClient(conn)
 						resp, err := service.Create(ctx, &pb.VMDefinition{
@@ -381,7 +383,7 @@ func main() {
 						}
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVMServiceClient(conn)
 						_, err := service.Delete(ctx, &pb.Reference{Name: c.Args().First()})
@@ -403,7 +405,7 @@ func main() {
 						}
 						conn := getConnection()
 						defer conn.Close()
-						ctx, cancel := getContext()
+						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVMServiceClient(conn)
 						resp, err := service.Ssh(ctx, &pb.Reference{Name: c.Args().First()})
