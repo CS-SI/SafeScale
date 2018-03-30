@@ -524,6 +524,22 @@ func (s *sshServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 	}, nil
 }
 
+func (s *sshServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.Empty, error) {
+	log.Printf("Ssh copy called")
+	if getCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := commands.NewSSHService(currentTenant.client)
+	err := service.Copy(in.GetSource(), in.GetDestination())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("End ssh copy")
+	return &pb.Empty{}, nil
+}
+
 // *** MAIN ***
 func main() {
 	log.Println("Starting server")

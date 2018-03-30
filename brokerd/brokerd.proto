@@ -220,12 +220,18 @@ message SshCommand{
     Reference VM = 1;
     string Command = 2;
 }
+message SshCopyCommand{
+    string Source = 1;
+    string Destination = 2;
+}
 
 message SshResponse{
     string output = 1;
     string err = 2;
     int32 status = 3;
 }
+
 service SshService{
     rpc Run(SshCommand) returns (SshResponse){}
+    rpc Copy(SshCopyCommand) returns (Empty){}
 }

@@ -646,6 +646,34 @@ func main() {
 
 						return nil
 					},
+				}, {
+					Name:      "copy",
+					Usage:     "Copy a local file/directory to a VM or copy from VM to local",
+					ArgsUsage: "from to  Ex: /my/local/file.txt vm1:/remote/path/",
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 2 {
+							fmt.Println("2 arguments (from and to) are required")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("2 arguments (from and to) are required")
+						}
+
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext(timeoutCtxVM)
+						defer cancel()
+						service := pb.NewSshServiceClient(conn)
+
+						_, err := service.Copy(ctx, &pb.SshCopyCommand{
+							Source:      c.Args().Get(0),
+							Destination: c.Args().Get(1),
+						})
+						if err != nil {
+							return fmt.Errorf("Could not copy %s to %s: %v", c.Args().Get(0), c.Args().Get(1), err)
+						}
+						fmt.Println(fmt.Sprintf("Copy of '%s' to '%s' done", c.Args().Get(0), c.Args().Get(1)))
+
+						return nil
+					},
 				}}},
 	}
 	err := app.Run(os.Args)

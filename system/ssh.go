@@ -328,7 +328,7 @@ func createDownloadCmd(sshConfig *SSHConfig, remotePath, localPath string) (stri
 	//defer os.Remove(f.Name())
 	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes"
 
-	sshCmdString := fmt.Sprintf("ssh -i %s -p %d %s %s@%s:%s %s",
+	sshCmdString := fmt.Sprintf("scp -i %s -P %d %s %s@%s:%s %s",
 		f.Name(),
 		sshConfig.Port,
 		options,
@@ -348,13 +348,13 @@ func createUploadCmd(sshConfig *SSHConfig, remotePath, localPath string) (string
 	//defer os.Remove(f.Name())
 	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes"
 
-	sshCmdString := fmt.Sprintf("ssh -i %s -p %d %s %s %s@%s:%s",
+	sshCmdString := fmt.Sprintf("scp -i %s -P %d %s %s %s@%s:%s",
 		f.Name(),
 		sshConfig.Port,
 		options,
+		localPath,
 		sshConfig.User,
 		sshConfig.Host,
-		localPath,
 		remotePath,
 	)
 	return sshCmdString, f, nil
