@@ -215,3 +215,17 @@ service ContainerService{
     rpc Delete(Container) returns (Empty){}
     rpc List(Empty) returns (Empty){}
 }
+
+message SshCommand{
+    Reference VM = 1;
+    string Command = 2;
+}
+
+message SshResponse{
+    string output = 1;
+    string err = 2;
+    int32 status = 3;
+}
+service SshService{
+    rpc Run(SshCommand) returns (SshResponse){}
+}

@@ -385,7 +385,7 @@ func toPBSshconfig(from *system.SSHConfig) *pb.SshConfig {
 	}
 }
 
-// VM
+// Volume
 type volumeServiceServer struct{}
 
 func (s *volumeServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.VolumeList, error) {
@@ -501,6 +501,29 @@ func (s *volumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 	return toPbVolume(*vol), nil
 }
 
+// SSH
+type sshServiceServer struct{}
+
+func (s *sshServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
+	log.Printf("Ssh run called")
+	if getCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := commands.NewSSHService(currentTenant.client)
+	out, err := service.Run(in.GetVM().GetName(), in.GetCommand())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("End ssh run")
+	return &pb.SshResponse{
+		Status: 0,
+		Output: out,
+		Err:    "",
+	}, nil
+}
+
 // *** MAIN ***
 func main() {
 	log.Println("Starting server")
@@ -516,6 +539,7 @@ func main() {
 	pb.RegisterNetworkServiceServer(s, &networkServiceServer{})
 	pb.RegisterVMServiceServer(s, &vmServiceServer{})
 	pb.RegisterVolumeServiceServer(s, &volumeServiceServer{})
+	pb.RegisterSshServiceServer(s, &sshServiceServer{})
 	// pb.RegisterContainerServiceServer(s, &server{})
 
 	log.Println("Initializing service factory")

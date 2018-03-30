@@ -604,6 +604,48 @@ func main() {
 
 						return nil
 					},
+				}}}, {
+			Name:  "ssh",
+			Usage: "shh COMMAND",
+			Subcommands: []cli.Command{
+				{
+					Name:      "run",
+					Usage:     "Run a command on the VM",
+					ArgsUsage: "<VM_name|VM_ID>",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "c",
+							Usage: "Command to execute",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <VM_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("VM name required")
+						}
+
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext(timeoutCtxDefault)
+						defer cancel()
+						service := pb.NewSshServiceClient(conn)
+
+						resp, err := service.Run(ctx, &pb.SshCommand{
+							VM:      &pb.Reference{Name: c.Args().Get(0)},
+							Command: c.String("c"),
+						})
+
+						// TODO output result to stdout
+						if err != nil {
+							return fmt.Errorf("Could not execute ssh command: %v", err)
+						}
+						fmt.Print(fmt.Sprintf(resp.GetOutput()))
+						fmt.Fprint(os.Stderr, fmt.Sprintf(resp.GetErr()))
+						// fmt.Println(fmt.Sprintf(string(resp.GetStatus())))
+
+						return nil
+					},
 				}}},
 	}
 	err := app.Run(os.Args)
