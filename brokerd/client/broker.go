@@ -390,7 +390,7 @@ func main() {
 						if err != nil {
 							return fmt.Errorf("Could not delete vm '%s': %v", c.Args().First(), err)
 						}
-						fmt.Printf("VM '%s' deleted", c.Args().First())
+						fmt.Println(fmt.Sprintf("VM '%s' deleted", c.Args().First()))
 						return nil
 					},
 				}, {

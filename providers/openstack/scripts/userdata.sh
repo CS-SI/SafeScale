@@ -6,6 +6,9 @@ echo "{{.User}} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 mkdir /home/{{.User}}/.ssh
 echo "{{.Key}}" > /home/{{.User}}/.ssh/authorized_keys
 
+# Create flag file to deactivate Welcome message on ssh
+touch /home/{{.User}}/.hushlogin
+
 echo "{{.ConfIF}}"
 
 # Network interfaces configuration
