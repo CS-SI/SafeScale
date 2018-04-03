@@ -299,12 +299,12 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 	//defer os.Remove(f.Name())
 	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes"
 
-	sshCmdString := fmt.Sprintf("ssh -i %s  %s@%s %s -p %d",
+	sshCmdString := fmt.Sprintf("ssh -i %s %s -p %d %s@%s",
 		f.Name(),
-		sshConfig.User,
-		sshConfig.Host,
 		options,
 		sshConfig.Port,
+		sshConfig.User,
+		sshConfig.Host,
 	)
 
 	sudoOpt := ""
@@ -489,8 +489,56 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 	} else {
 		args = []string{"-c", sshCmdString}
 	}
+	fmt.Println("ARGS ", args)
 	return syscall.Exec(bash, args, nil)
 
+}
+
+// Enter Enter to interactive shell
+func (ssh *SSHConfig) Enter() error {
+	tunnels, sshConfig, err := ssh.createTunnels()
+	if err != nil {
+		for _, t := range tunnels {
+			t.Close()
+		}
+		return fmt.Errorf("Unable to create command : %s", err.Error())
+	}
+	sshCmdString, keyFile, err := createSSHCmd(sshConfig, "", false)
+	if err != nil {
+		for _, t := range tunnels {
+			t.Close()
+		}
+		if keyFile != nil {
+			os.Remove(keyFile.Name())
+		}
+		return fmt.Errorf("Unable to create command : %s", err.Error())
+	}
+	if err != nil {
+		for _, t := range tunnels {
+			t.Close()
+		}
+		if keyFile != nil {
+			os.Remove(keyFile.Name())
+		}
+		return fmt.Errorf("Unable to create command : %s", err.Error())
+	}
+
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		for _, t := range tunnels {
+			t.Close()
+		}
+		if keyFile != nil {
+			os.Remove(keyFile.Name())
+		}
+		return fmt.Errorf("Unable to create command : %s", err.Error())
+	}
+
+	proc := exec.Command(bash, "-c", sshCmdString)
+	proc.Stdout = os.Stdout
+	proc.Stdin = os.Stdin
+	proc.Stderr = os.Stderr
+	return proc.Run()
 }
 
 // CommandContext is like Command but includes a context.

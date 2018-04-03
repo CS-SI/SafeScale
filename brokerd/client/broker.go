@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	conv "github.com/SafeScale/broker/commands"
 	pb "github.com/SafeScale/brokerd"
 	cli "github.com/urfave/cli"
 	context "golang.org/x/net/context"
@@ -673,6 +674,33 @@ func main() {
 						fmt.Println(fmt.Sprintf("Copy of '%s' to '%s' done", c.Args().Get(0), c.Args().Get(1)))
 
 						return nil
+					},
+				}, {
+					Name:      "connect",
+					Usage:     "Connect to the VM with interactive shell",
+					ArgsUsage: "<VM_name|VM_ID>",
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <VM_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("VM name required")
+						}
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext(timeoutCtxVM)
+						defer cancel()
+						service := pb.NewVMServiceClient(conn)
+
+						sshConfig, err := service.Ssh(ctx, &pb.Reference{
+							Name: c.Args().Get(0),
+						})
+						if err != nil {
+							return fmt.Errorf("Could not connect to %s: %v", c.Args().Get(0), err)
+						}
+
+						sshCfg := conv.ToAPISshConfig(sshConfig)
+
+						return sshCfg.Enter()
 					},
 				}}},
 	}
