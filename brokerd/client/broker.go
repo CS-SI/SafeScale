@@ -607,7 +607,7 @@ func main() {
 					},
 				}}}, {
 			Name:  "ssh",
-			Usage: "shh COMMAND",
+			Usage: "ssh COMMAND",
 			Subcommands: []cli.Command{
 				{
 					Name:      "run",
@@ -701,6 +701,52 @@ func main() {
 						sshCfg := conv.ToAPISshConfig(sshConfig)
 
 						return sshCfg.Enter()
+					},
+				}}}, {
+			Name:  "container",
+			Usage: "container COMMAND",
+			Subcommands: []cli.Command{
+				{
+					Name:  "list",
+					Usage: "List containers",
+					Action: func(c *cli.Context) error {
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext(timeoutCtxDefault)
+						defer cancel()
+						service := pb.NewContainerServiceClient(conn)
+
+						resp, err := service.List(ctx, &pb.Empty{})
+						if err != nil {
+							return fmt.Errorf("Could not list containers: %v", err)
+						}
+
+						out, _ := json.Marshal(resp)
+						fmt.Println(string(out))
+						return nil
+					},
+				}, {
+					Name:      "create",
+					Usage:     "Creates a container",
+					ArgsUsage: "<Container_name>",
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <Container_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Container name required")
+						}
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext(timeoutCtxDefault)
+						defer cancel()
+						service := pb.NewContainerServiceClient(conn)
+
+						_, err := service.Create(ctx, &pb.Container{Name: c.Args().Get(0)})
+						if err != nil {
+							return fmt.Errorf("Could not create container '%s': %v", c.Args().Get(0), err)
+						}
+
+						return nil
 					},
 				}}},
 	}

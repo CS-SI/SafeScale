@@ -7,8 +7,6 @@ import (
 
 	"github.com/SafeScale/providers/api/VolumeSpeed"
 
-	"github.com/SafeScale/system"
-
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
 
@@ -368,21 +366,7 @@ func (s *vmServiceServer) Ssh(ctx context.Context, in *pb.Reference) (*pb.SshCon
 		return nil, err
 	}
 	log.Printf("Got Ssh config for VM '%s'", in.GetName())
-	return toPBSshconfig(sshConfig), nil
-}
-
-func toPBSshconfig(from *system.SSHConfig) *pb.SshConfig {
-	var gw *pb.SshConfig
-	if from.GatewayConfig != nil {
-		gw = toPBSshconfig(from.GatewayConfig)
-	}
-	return &pb.SshConfig{
-		Gateway:    gw,
-		Host:       from.Host,
-		Port:       int32(from.Port),
-		PrivateKey: from.PrivateKey,
-		User:       from.User,
-	}
+	return commands.ToPBSshconfig(sshConfig), nil
 }
 
 // Volume
@@ -402,20 +386,11 @@ func (s *volumeServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.Volum
 
 	// Map api.Volume to pb.Volume
 	for _, volume := range volumes {
-		pbvolumes = append(pbvolumes, toPbVolume(volume))
+		pbvolumes = append(pbvolumes, commands.ToPbVolume(volume))
 	}
 	rv := &pb.VolumeList{Volumes: pbvolumes}
 	log.Printf("End Volume List")
 	return rv, nil
-}
-
-func toPbVolume(in api.Volume) *pb.Volume {
-	return &pb.Volume{
-		ID:    in.ID,
-		Name:  in.Name,
-		Size:  int32(in.Size),
-		Speed: pb.VolumeSpeed(in.Speed),
-	}
 }
 
 func (s *volumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
@@ -431,7 +406,7 @@ func (s *volumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 	}
 
 	log.Printf("Volume '%s' created: %s", in.GetName(), vol)
-	return toPbVolume(*vol), nil
+	return commands.ToPbVolume(*vol), nil
 }
 
 func (s *volumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*pb.Empty, error) {
@@ -498,7 +473,7 @@ func (s *volumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 	}
 
 	log.Printf("End Inspect volume: '%s'", in.GetName())
-	return toPbVolume(*vol), nil
+	return commands.ToPbVolume(*vol), nil
 }
 
 // SSH
@@ -540,6 +515,41 @@ func (s *sshServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb
 	return &pb.Empty{}, nil
 }
 
+// container
+type containerServiceServer struct{}
+
+func (s *containerServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.ContainerList, error) {
+	log.Printf("Container list called")
+	if getCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := commands.NewContainerService(currentTenant.client)
+	containers, err := service.List()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("End container list")
+	return commands.ToPBContainerList(containers), nil
+}
+
+func (s *containerServiceServer) Create(ctx context.Context, in *pb.Container) (*pb.Empty, error) {
+	log.Printf("Container create called")
+	if getCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := commands.NewContainerService(currentTenant.client)
+	err := service.Create(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("End container list")
+	return &pb.Empty{}, nil
+}
+
 // *** MAIN ***
 func main() {
 	log.Println("Starting server")
@@ -556,7 +566,7 @@ func main() {
 	pb.RegisterVMServiceServer(s, &vmServiceServer{})
 	pb.RegisterVolumeServiceServer(s, &volumeServiceServer{})
 	pb.RegisterSshServiceServer(s, &sshServiceServer{})
-	// pb.RegisterContainerServiceServer(s, &server{})
+	pb.RegisterContainerServiceServer(s, &containerServiceServer{})
 
 	log.Println("Initializing service factory")
 	serviceFactory = providers.NewFactory()

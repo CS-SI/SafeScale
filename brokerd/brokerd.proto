@@ -197,7 +197,6 @@ service VolumeService{
 // broker container inspect C1
 
 message Container{
-    string Tenant = 1;
     string Name = 2;
 }
 
@@ -208,12 +207,15 @@ message ContainerMountingPoint{
 
 }
 
+message ContainerList{
+    repeated Container Containers = 1;
+}
 service ContainerService{
     rpc Create(Container) returns (Empty){}
-    rpc Mount(ContainerMountingPoint) returns (Empty){}
-    rpc UMount(ContainerMountingPoint) returns (Empty){}
-    rpc Delete(Container) returns (Empty){}
-    rpc List(Empty) returns (Empty){}
+    // rpc Mount(ContainerMountingPoint) returns (Empty){}
+    // rpc UMount(ContainerMountingPoint) returns (Empty){}
+    // rpc Delete(Container) returns (Empty){}
+    rpc List(Empty) returns (ContainerList){}
 }
 
 message SshCommand{
