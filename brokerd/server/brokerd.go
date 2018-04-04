@@ -535,7 +535,7 @@ func (s *containerServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.Co
 }
 
 func (s *containerServiceServer) Create(ctx context.Context, in *pb.Container) (*pb.Empty, error) {
-	log.Printf("Container create called")
+	log.Printf("Crete container called")
 	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
@@ -551,7 +551,7 @@ func (s *containerServiceServer) Create(ctx context.Context, in *pb.Container) (
 }
 
 func (s *containerServiceServer) Delete(ctx context.Context, in *pb.Container) (*pb.Empty, error) {
-	log.Printf("Container delete called")
+	log.Printf("Delete container called")
 	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
@@ -564,6 +564,22 @@ func (s *containerServiceServer) Delete(ctx context.Context, in *pb.Container) (
 
 	log.Println("End delete container")
 	return &pb.Empty{}, nil
+}
+
+func (s *containerServiceServer) Inspect(ctx context.Context, in *pb.Container) (*pb.ContainerMountingPoint, error) {
+	log.Printf("Inspect container called")
+	if getCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := commands.NewContainerService(currentTenant.client)
+	resp, err := service.Inspect(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("End inspect container")
+	return commands.ToPBContainerMountPoint(resp), nil
 }
 
 // *** MAIN ***

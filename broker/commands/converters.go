@@ -57,3 +57,14 @@ func ToPBContainerList(in []string) *pb.ContainerList {
 		Containers: containers,
 	}
 }
+
+//ToPBContainerMountPoint convert a ContainerInfo into a ContainerMountingPoint
+func ToPBContainerMountPoint(in *api.ContainerInfo) *pb.ContainerMountingPoint {
+	return &pb.ContainerMountingPoint{
+		Container: in.Name,
+		Path:      in.MountPoint,
+		VM: &pb.Reference{
+			Name: in.VM,
+		},
+	}
+}

@@ -248,6 +248,22 @@ func (client *Client) GetContainerMetadata(name string) (map[string]string, erro
 
 }
 
+//GetContainer get container info
+func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
+	meta, err := containers.Get(client.Container, name).ExtractMetadata()
+	_ = meta
+	if err != nil {
+		return nil, fmt.Errorf("Error getting container %s: %s", name, errorString(err))
+	}
+	return &api.ContainerInfo{
+		Name:       name,
+		VM:         "TODO VM",
+		MountPoint: "TODO mountpoint",
+		NbItems:    -1,
+	}, nil
+
+}
+
 //ListContainers list object containers
 func (client *Client) ListContainers() ([]string, error) {
 	opts := &containers.ListOpts{Full: true}

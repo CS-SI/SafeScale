@@ -200,22 +200,23 @@ message Container{
     string Name = 2;
 }
 
+message ContainerList{
+    repeated Container Containers = 1;
+}
+
 message ContainerMountingPoint{
     string Container = 1;
     Reference VM = 2;
     string Path = 3;
-
 }
 
-message ContainerList{
-    repeated Container Containers = 1;
-}
 service ContainerService{
     rpc Create(Container) returns (Empty){}
     // rpc Mount(ContainerMountingPoint) returns (Empty){}
     // rpc UMount(ContainerMountingPoint) returns (Empty){}
     rpc Delete(Container) returns (Empty){}
     rpc List(Empty) returns (ContainerList){}
+    rpc Inspect(Container) returns (ContainerMountingPoint){}
 }
 
 message SshCommand{

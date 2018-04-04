@@ -149,6 +149,14 @@ type Image struct {
 	Name string `json:"name,omitempty"`
 }
 
+//ContainerInfo represents a container description
+type ContainerInfo struct {
+	Name       string `json:"name,omitempty"`
+	VM         string `json:"vm,omitempty"`
+	MountPoint string `json:"mountPoint,omitempty"`
+	NbItems    int    `json:"nbitems,omitempty"`
+}
+
 /*
 //RouterRequest represents a router request
 type RouterRequest struct {
@@ -327,6 +335,8 @@ type ClientAPI interface {
 	DeleteContainer(name string) error
 	//ListContainers list object containers
 	ListContainers() ([]string, error)
+	//Getcontainer returns info of the container
+	GetContainer(name string) (*ContainerInfo, error)
 
 	//PutObject put an object into an object container
 	PutObject(container string, obj Object) error
