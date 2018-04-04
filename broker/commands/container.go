@@ -16,6 +16,7 @@ import (
 type ContainerAPI interface {
 	List() ([]string, error)
 	Create(string) error
+	Delete(string) error
 }
 
 //NewContainerService creates a Container service
@@ -38,4 +39,9 @@ func (srv *ContainerService) List() ([]string, error) {
 //Create creates a container
 func (srv *ContainerService) Create(name string) error {
 	return srv.provider.CreateContainer(name)
+}
+
+//Delete deletes a container
+func (srv *ContainerService) Delete(name string) error {
+	return srv.provider.DeleteContainer(name)
 }

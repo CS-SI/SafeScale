@@ -214,7 +214,7 @@ service ContainerService{
     rpc Create(Container) returns (Empty){}
     // rpc Mount(ContainerMountingPoint) returns (Empty){}
     // rpc UMount(ContainerMountingPoint) returns (Empty){}
-    // rpc Delete(Container) returns (Empty){}
+    rpc Delete(Container) returns (Empty){}
     rpc List(Empty) returns (ContainerList){}
 }
 

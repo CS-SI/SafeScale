@@ -546,7 +546,23 @@ func (s *containerServiceServer) Create(ctx context.Context, in *pb.Container) (
 		return nil, err
 	}
 
-	log.Println("End container list")
+	log.Println("End container container")
+	return &pb.Empty{}, nil
+}
+
+func (s *containerServiceServer) Delete(ctx context.Context, in *pb.Container) (*pb.Empty, error) {
+	log.Printf("Container delete called")
+	if getCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := commands.NewContainerService(currentTenant.client)
+	err := service.Delete(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("End delete container")
 	return &pb.Empty{}, nil
 }
 

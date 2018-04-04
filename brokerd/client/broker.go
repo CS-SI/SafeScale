@@ -748,6 +748,29 @@ func main() {
 
 						return nil
 					},
+				}, {
+					Name:      "delete",
+					Usage:     "Delete a container",
+					ArgsUsage: "<Container_name>",
+					Action: func(c *cli.Context) error {
+						if c.NArg() != 1 {
+							fmt.Println("Missing mandatory argument <Container_name>")
+							cli.ShowSubcommandHelp(c)
+							return fmt.Errorf("Container name required")
+						}
+						conn := getConnection()
+						defer conn.Close()
+						ctx, cancel := getContext(timeoutCtxDefault)
+						defer cancel()
+						service := pb.NewContainerServiceClient(conn)
+
+						_, err := service.Delete(ctx, &pb.Container{Name: c.Args().Get(0)})
+						if err != nil {
+							return fmt.Errorf("Could not delete container '%s': %v", c.Args().Get(0), err)
+						}
+
+						return nil
+					},
 				}}},
 	}
 	err := app.Run(os.Args)
