@@ -1,12 +1,12 @@
-package commands
+package brokerd
 
 import (
-	pb "github.com/SafeScale/brokerd"
+	pb "github.com/SafeScale/broker"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/system"
 )
 
-// ToPBSshconfig converts a system.SSHConfig into a pb.SshConfig
+// ToPBSshconfig converts a system.SSHConfig into a SshConfig
 func ToPBSshconfig(from *system.SSHConfig) *pb.SshConfig {
 	var gw *pb.SshConfig
 	if from.GatewayConfig != nil {
@@ -21,7 +21,7 @@ func ToPBSshconfig(from *system.SSHConfig) *pb.SshConfig {
 	}
 }
 
-// ToAPISshConfig converts a pb.SshConfig into a system.SSHConfig
+// ToAPISshConfig converts a SshConfig into a system.SSHConfig
 func ToAPISshConfig(from *pb.SshConfig) *system.SSHConfig {
 	var gw *system.SSHConfig
 	if from.Gateway != nil {
@@ -36,7 +36,7 @@ func ToAPISshConfig(from *pb.SshConfig) *system.SSHConfig {
 	}
 }
 
-//ToPbVolume converts an api.Volume to a *pb.Volume
+//ToPbVolume converts an api.Volume to a *Volume
 func ToPbVolume(in api.Volume) *pb.Volume {
 	return &pb.Volume{
 		ID:    in.ID,
@@ -46,7 +46,7 @@ func ToPbVolume(in api.Volume) *pb.Volume {
 	}
 }
 
-//ToPBContainerList convert a list of string into a *pb.ContainerLsit
+//ToPBContainerList convert a list of string into a *ContainerLsit
 func ToPBContainerList(in []string) *pb.ContainerList {
 
 	var containers []*pb.Container

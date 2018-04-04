@@ -1,22 +1,26 @@
 syntax = "proto3";
-message Empty{
 
-}
+import "github.com/golang/protobuf/ptypes/empty/empty.proto";
+// import "google/protobuf/empty.proto";
+// import "github.com/golang/protobuf/ptypes/empty";
+// message Empty{
+
+// }
 
 message Tenant{
     string Name = 1;
     string Provider = 2;
 }
 
-message TenantList{
+message TenantList{ 
     repeated Tenant Tenants = 1;
 }
 
 service TenantService{
-    rpc List (Empty) returns (TenantList){}
-    rpc Reload (Empty) returns (Empty){}
-    rpc Set (TenantName) returns (Empty){}
-    rpc Get (Empty) returns (TenantName){}
+    rpc List (google.protobuf.Empty) returns (TenantList){}
+    rpc Reload (google.protobuf.Empty) returns (google.protobuf.Empty){}
+    rpc Set (TenantName) returns (google.protobuf.Empty){}
+    rpc Get (google.protobuf.Empty) returns (TenantName){}
 }
 
 message Image{
@@ -72,9 +76,9 @@ message NetworkList{
 }
 service NetworkService{
     rpc Create(NetworkDefinition) returns (Network){}
-    rpc List(Empty) returns (NetworkList){}
+    rpc List(google.protobuf.Empty) returns (NetworkList){}
     rpc Inspect(Reference) returns (Network) {}
-    rpc Delete(Reference) returns (Empty){}
+    rpc Delete(Reference) returns (google.protobuf.Empty){}
 }
 
 // broker vm create vm1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
@@ -133,8 +137,8 @@ message SshConfig{
 service VMService{
     rpc Create(VMDefinition) returns (VM){}
     rpc Inspect(Reference) returns (VM){}
-    rpc List(Empty) returns (VMList){}
-    rpc Delete(Reference) returns (Empty){}
+    rpc List(google.protobuf.Empty) returns (VMList){}
+    rpc Delete(Reference) returns (google.protobuf.Empty){}
     rpc Ssh(Reference) returns (SshConfig){}
 }
 
@@ -182,10 +186,10 @@ message VolumeDetachment{
 
 service VolumeService{
     rpc Create(VolumeDefinition) returns (Volume) {}
-    rpc Attach(VolumeAttachment) returns (Empty) {}
-    rpc Detach(VolumeDetachment) returns (Empty){}
-    rpc Delete(Reference) returns (Empty){}
-    rpc List(Empty) returns (VolumeList) {} 
+    rpc Attach(VolumeAttachment) returns (google.protobuf.Empty) {}
+    rpc Detach(VolumeDetachment) returns (google.protobuf.Empty){}
+    rpc Delete(Reference) returns (google.protobuf.Empty){}
+    rpc List(google.protobuf.Empty) returns (VolumeList) {} 
     rpc Inspect(Reference) returns (Volume){}
 }
 
@@ -211,11 +215,11 @@ message ContainerMountingPoint{
 }
 
 service ContainerService{
-    rpc Create(Container) returns (Empty){}
+    rpc Create(Container) returns (google.protobuf.Empty){}
     // rpc Mount(ContainerMountingPoint) returns (Empty){}
     // rpc UMount(ContainerMountingPoint) returns (Empty){}
-    rpc Delete(Container) returns (Empty){}
-    rpc List(Empty) returns (ContainerList){}
+    rpc Delete(Container) returns (google.protobuf.Empty){}
+    rpc List(google.protobuf.Empty) returns (ContainerList){}
     rpc Inspect(Container) returns (ContainerMountingPoint){}
 }
 
@@ -236,5 +240,5 @@ message SshResponse{
 
 service SshService{
     rpc Run(SshCommand) returns (SshResponse){}
-    rpc Copy(SshCopyCommand) returns (Empty){}
+    rpc Copy(SshCopyCommand) returns (google.protobuf.Empty){}
 }

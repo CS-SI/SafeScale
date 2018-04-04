@@ -10,10 +10,12 @@ import (
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
 
-	"github.com/SafeScale/broker/commands"
-	pb "github.com/SafeScale/brokerd"
+	pb "github.com/SafeScale/broker"
+	"github.com/SafeScale/broker/server/commands"
+	conv "github.com/SafeScale/broker/utils"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/ovh"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -84,7 +86,7 @@ var (
 type tenantServiceServer struct{}
 
 // Tenant
-func (s *tenantServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.TenantList, error) {
+func (s *tenantServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
 	log.Println("List tenant called")
 
 	var tl []*pb.Tenant
@@ -98,13 +100,13 @@ func (s *tenantServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.Tenan
 	return &pb.TenantList{Tenants: tl}, nil
 }
 
-func (s *tenantServiceServer) Reload(ctx context.Context, in *pb.Empty) (*pb.Empty, error) {
+func (s *tenantServiceServer) Reload(ctx context.Context, in *google_protobuf.Empty) (*google_protobuf.Empty, error) {
 	// TODO To be implemented
 	log.Println("Reload called")
-	return &pb.Empty{}, nil
+	return &google_protobuf.Empty{}, nil
 }
 
-func (s *tenantServiceServer) Get(ctx context.Context, in *pb.Empty) (*pb.TenantName, error) {
+func (s *tenantServiceServer) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
 	log.Println("Tenant Get called")
 	tenant := getCurrentTenant()
 	if tenant == nil {
@@ -127,12 +129,12 @@ func getCurrentTenant() *tenant {
 	return currentTenant
 }
 
-func (s *tenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*pb.Empty, error) {
+func (s *tenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
 	log.Println("Tenant Set called")
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		log.Printf("Tenant '%s' is already selected", in.GetName())
-		return &pb.Empty{}, nil
+		return &google_protobuf.Empty{}, nil
 	}
 
 	clientAPI, ok := serviceFactory.Services[in.GetName()]
@@ -141,7 +143,7 @@ func (s *tenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*pb.E
 	}
 	currentTenant = &tenant{name: in.GetName(), client: clientAPI}
 	log.Printf("Current tenant is now '%s'", in.GetName())
-	return &pb.Empty{}, nil
+	return &google_protobuf.Empty{}, nil
 }
 
 type imageServiceServer struct{}
@@ -183,7 +185,7 @@ func (s *networkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 	}, nil
 }
 
-func (s *networkServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.NetworkList, error) {
+func (s *networkServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.NetworkList, error) {
 	log.Printf("List Network called")
 
 	if getCurrentTenant() == nil {
@@ -232,7 +234,7 @@ func (s *networkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 	}, nil
 }
 
-func (s *networkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
+func (s *networkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Delete Network called for nerwork '%s'", in.GetName())
 
 	if getCurrentTenant() == nil {
@@ -246,13 +248,13 @@ func (s *networkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*p
 	}
 
 	log.Printf("Network '%s' deleted", in.GetName())
-	return &pb.Empty{}, nil
+	return &google_protobuf.Empty{}, nil
 }
 
 // VM
 type vmServiceServer struct{}
 
-func (s *vmServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.VMList, error) {
+func (s *vmServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.VMList, error) {
 	log.Printf("List VM called")
 
 	if getCurrentTenant() == nil {
@@ -341,7 +343,7 @@ func (s *vmServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM
 	}, nil
 }
 
-func (s *vmServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
+func (s *vmServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Delete VM called")
 	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
@@ -352,7 +354,7 @@ func (s *vmServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Emp
 		return nil, err
 	}
 	log.Printf("VM '%s' deleted", in.GetName())
-	return &pb.Empty{}, nil
+	return &google_protobuf.Empty{}, nil
 }
 
 func (s *vmServiceServer) Ssh(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
@@ -366,13 +368,13 @@ func (s *vmServiceServer) Ssh(ctx context.Context, in *pb.Reference) (*pb.SshCon
 		return nil, err
 	}
 	log.Printf("Got Ssh config for VM '%s'", in.GetName())
-	return commands.ToPBSshconfig(sshConfig), nil
+	return conv.ToPBSshconfig(sshConfig), nil
 }
 
 // Volume
 type volumeServiceServer struct{}
 
-func (s *volumeServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.VolumeList, error) {
+func (s *volumeServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.VolumeList, error) {
 	log.Printf("Volume List called")
 	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
@@ -386,7 +388,7 @@ func (s *volumeServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.Volum
 
 	// Map api.Volume to pb.Volume
 	for _, volume := range volumes {
-		pbvolumes = append(pbvolumes, commands.ToPbVolume(volume))
+		pbvolumes = append(pbvolumes, conv.ToPbVolume(volume))
 	}
 	rv := &pb.VolumeList{Volumes: pbvolumes}
 	log.Printf("End Volume List")
@@ -406,10 +408,10 @@ func (s *volumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 	}
 
 	log.Printf("Volume '%s' created: %s", in.GetName(), vol)
-	return commands.ToPbVolume(*vol), nil
+	return conv.ToPbVolume(*vol), nil
 }
 
-func (s *volumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*pb.Empty, error) {
+func (s *volumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*google_protobuf.Empty, error) {
 	log.Println("Attach volume called")
 
 	if getCurrentTenant() == nil {
@@ -424,10 +426,10 @@ func (s *volumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachmen
 		return nil, err
 	}
 
-	return &pb.Empty{}, nil
+	return &google_protobuf.Empty{}, nil
 }
 
-func (s *volumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachment) (*pb.Empty, error) {
+func (s *volumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachment) (*google_protobuf.Empty, error) {
 	log.Println("Detach volume called")
 
 	if getCurrentTenant() == nil {
@@ -443,10 +445,10 @@ func (s *volumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachmen
 	}
 
 	log.Println(fmt.Sprintf("Volume '%s' detached from '%s'", in.GetVolume().GetName(), in.GetVM().GetName()))
-	return &pb.Empty{}, nil
+	return &google_protobuf.Empty{}, nil
 }
 
-func (s *volumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb.Empty, error) {
+func (s *volumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Volume delete called")
 	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
@@ -457,7 +459,7 @@ func (s *volumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*pb
 		return nil, err
 	}
 	log.Printf("Volume '%s' deleted", in.GetName())
-	return &pb.Empty{}, nil
+	return &google_protobuf.Empty{}, nil
 }
 
 func (s *volumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Volume, error) {
@@ -473,7 +475,7 @@ func (s *volumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 	}
 
 	log.Printf("End Inspect volume: '%s'", in.GetName())
-	return commands.ToPbVolume(*vol), nil
+	return conv.ToPbVolume(*vol), nil
 }
 
 // SSH
@@ -499,7 +501,7 @@ func (s *sshServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 	}, nil
 }
 
-func (s *sshServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.Empty, error) {
+func (s *sshServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*google_protobuf.Empty, error) {
 	log.Printf("Ssh copy called")
 	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
@@ -512,13 +514,13 @@ func (s *sshServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb
 	}
 
 	log.Println("End ssh copy")
-	return &pb.Empty{}, nil
+	return &google_protobuf.Empty{}, nil
 }
 
 // container
 type containerServiceServer struct{}
 
-func (s *containerServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.ContainerList, error) {
+func (s *containerServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.ContainerList, error) {
 	log.Printf("Container list called")
 	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
@@ -531,10 +533,10 @@ func (s *containerServiceServer) List(ctx context.Context, in *pb.Empty) (*pb.Co
 	}
 
 	log.Println("End container list")
-	return commands.ToPBContainerList(containers), nil
+	return conv.ToPBContainerList(containers), nil
 }
 
-func (s *containerServiceServer) Create(ctx context.Context, in *pb.Container) (*pb.Empty, error) {
+func (s *containerServiceServer) Create(ctx context.Context, in *pb.Container) (*google_protobuf.Empty, error) {
 	log.Printf("Crete container called")
 	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
@@ -547,10 +549,10 @@ func (s *containerServiceServer) Create(ctx context.Context, in *pb.Container) (
 	}
 
 	log.Println("End container container")
-	return &pb.Empty{}, nil
+	return &google_protobuf.Empty{}, nil
 }
 
-func (s *containerServiceServer) Delete(ctx context.Context, in *pb.Container) (*pb.Empty, error) {
+func (s *containerServiceServer) Delete(ctx context.Context, in *pb.Container) (*google_protobuf.Empty, error) {
 	log.Printf("Delete container called")
 	if getCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
@@ -563,7 +565,7 @@ func (s *containerServiceServer) Delete(ctx context.Context, in *pb.Container) (
 	}
 
 	log.Println("End delete container")
-	return &pb.Empty{}, nil
+	return &google_protobuf.Empty{}, nil
 }
 
 func (s *containerServiceServer) Inspect(ctx context.Context, in *pb.Container) (*pb.ContainerMountingPoint, error) {
@@ -579,7 +581,7 @@ func (s *containerServiceServer) Inspect(ctx context.Context, in *pb.Container) 
 	}
 
 	log.Println("End inspect container")
-	return commands.ToPBContainerMountPoint(resp), nil
+	return conv.ToPBContainerMountPoint(resp), nil
 }
 
 // *** MAIN ***

@@ -13,7 +13,7 @@ import (
 // broker ssh copy /file/test.txt vm1://tmp
 // broker ssh copy vm1:/file/test.txt /tmp
 
-const protocol_separator = ":"
+const protocolSeparator = ":"
 
 //SSHAPI defines ssh management API
 type SSHAPI interface {
@@ -62,7 +62,7 @@ func (srv *SSHService) Run(vmName, cmd string) (string, error) {
 }
 
 func extractVMName(in string) (string, error) {
-	parts := strings.Split(in, protocol_separator)
+	parts := strings.Split(in, protocolSeparator)
 	if len(parts) == 1 {
 		return "", nil
 	}
@@ -80,7 +80,7 @@ func extractVMName(in string) (string, error) {
 }
 
 func extractPath(in string) (string, error) {
-	parts := strings.Split(in, protocol_separator)
+	parts := strings.Split(in, protocolSeparator)
 	if len(parts) == 1 {
 		return in, nil
 	}

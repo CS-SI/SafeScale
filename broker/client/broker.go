@@ -7,8 +7,9 @@ import (
 	"os"
 	"time"
 
-	conv "github.com/SafeScale/broker/commands"
-	pb "github.com/SafeScale/brokerd"
+	pb "github.com/SafeScale/broker"
+	conv "github.com/SafeScale/broker/utils"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	cli "github.com/urfave/cli"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -61,7 +62,7 @@ func main() {
 						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						networkService := pb.NewNetworkServiceClient(conn)
-						networks, err := networkService.List(ctx, &pb.Empty{})
+						networks, err := networkService.List(ctx, &google_protobuf.Empty{})
 						if err != nil {
 							return fmt.Errorf("Could not get network list: %v", err)
 						}
@@ -202,7 +203,7 @@ func main() {
 						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						tenantService := pb.NewTenantServiceClient(conn)
-						tenants, err := tenantService.List(ctx, &pb.Empty{})
+						tenants, err := tenantService.List(ctx, &google_protobuf.Empty{})
 						if err != nil {
 							return fmt.Errorf("Could not get tenant list: %v", err)
 						}
@@ -221,7 +222,7 @@ func main() {
 						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						tenantService := pb.NewTenantServiceClient(conn)
-						tenant, err := tenantService.Get(ctx, &pb.Empty{})
+						tenant, err := tenantService.Get(ctx, &google_protobuf.Empty{})
 						if err != nil {
 							return fmt.Errorf("Could not get current tenant: %v", err)
 						}
@@ -268,7 +269,7 @@ func main() {
 						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVMServiceClient(conn)
-						vms, err := service.List(ctx, &pb.Empty{})
+						vms, err := service.List(ctx, &google_protobuf.Empty{})
 						if err != nil {
 							return fmt.Errorf("Could not get vm list: %v", err)
 						}
@@ -429,7 +430,7 @@ func main() {
 						ctx, cancel := getContext(timeoutCtxDefault)
 						defer cancel()
 						service := pb.NewVolumeServiceClient(conn)
-						resp, err := service.List(ctx, &pb.Empty{})
+						resp, err := service.List(ctx, &google_protobuf.Empty{})
 						if err != nil {
 							return fmt.Errorf("Could not get volume list: %v", err)
 						}
@@ -716,7 +717,7 @@ func main() {
 						defer cancel()
 						service := pb.NewContainerServiceClient(conn)
 
-						resp, err := service.List(ctx, &pb.Empty{})
+						resp, err := service.List(ctx, &google_protobuf.Empty{})
 						if err != nil {
 							return fmt.Errorf("Could not list containers: %v", err)
 						}
