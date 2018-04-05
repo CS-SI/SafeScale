@@ -1,11 +1,16 @@
 package commands
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"strings"
+
+	pb "github.com/SafeScale/broker"
 
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // broker ssh connect vm2
@@ -154,4 +159,45 @@ func (srv *SSHService) Copy(from, to string) error {
 		return ssh.Upload(remotePath, localPath)
 	}
 	return ssh.Download(remotePath, localPath)
+}
+
+//SSHServiceServer SSH service server grpc
+type SSHServiceServer struct{}
+
+//Run executes an ssh command an a VM
+func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
+	log.Printf("Ssh run called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := NewSSHService(currentTenant.client)
+	out, err := service.Run(in.GetVM().GetName(), in.GetCommand())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("End ssh run")
+	return &pb.SshResponse{
+		Status: 0,
+		Output: out,
+		Err:    "",
+	}, nil
+}
+
+//Copy copy file from/to a VM
+func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*google_protobuf.Empty, error) {
+	log.Printf("Ssh copy called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := NewSSHService(currentTenant.client)
+	err := service.Copy(in.GetSource(), in.GetDestination())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("End ssh copy")
+	return &google_protobuf.Empty{}, nil
 }

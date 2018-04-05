@@ -1,12 +1,16 @@
 package commands
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"strings"
 
+	pb "github.com/SafeScale/broker"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // broker network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
@@ -117,4 +121,101 @@ func (srv *NetworkService) Delete(ref string) error {
 		return fmt.Errorf("Network %s does not exists", ref)
 	}
 	return srv.provider.DeleteNetwork(n.ID)
+}
+
+//NetworkServiceServer network service server grpc
+type NetworkServiceServer struct{}
+
+//Create a new network
+func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
+	log.Println("Create Network called")
+
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	networkAPI := NewNetworkService(currentTenant.client)
+	network, err := networkAPI.Create(in.GetName(), in.GetCIDR(), IPVersion.IPv4,
+		int(in.Gateway.GetCPU()), in.GetGateway().GetRAM(), int(in.GetGateway().GetDisk()), in.GetGateway().GetImageID())
+
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	log.Println("Network created")
+	return &pb.Network{
+		ID:   network.ID,
+		Name: network.Name,
+		CIDR: network.CIDR,
+	}, nil
+}
+
+//List existing networks
+func (s *NetworkServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.NetworkList, error) {
+	log.Printf("List Network called")
+
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	networkAPI := NewNetworkService(currentTenant.client)
+	networks, err := networkAPI.List()
+	if err != nil {
+		return nil, err
+	}
+
+	var pbnetworks []*pb.Network
+
+	// Map api.Network to pb.Network
+	for _, network := range networks {
+		pbnetworks = append(pbnetworks, &pb.Network{
+			ID:   network.ID,
+			Name: network.Name,
+			CIDR: network.CIDR,
+		})
+	}
+	rv := &pb.NetworkList{Networks: pbnetworks}
+	log.Printf("End List Network")
+	return rv, nil
+}
+
+//Inspect returns infos on a network
+func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
+	log.Printf("Inspect Network called for network %s", in.GetName())
+
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	networkAPI := NewNetworkService(currentTenant.client)
+	network, err := networkAPI.Get(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("End Inspect Network: '%s'", in.GetName())
+	return &pb.Network{
+		ID:   network.ID,
+		Name: network.Name,
+		CIDR: network.CIDR,
+	}, nil
+}
+
+//Delete a network
+func (s *NetworkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
+	log.Printf("Delete Network called for nerwork '%s'", in.GetName())
+
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	networkAPI := NewNetworkService(currentTenant.client)
+	err := networkAPI.Delete(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("Network '%s' deleted", in.GetName())
+	return &google_protobuf.Empty{}, nil
 }

@@ -1,12 +1,17 @@
 package commands
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"strings"
 
+	pb "github.com/SafeScale/broker"
+	conv "github.com/SafeScale/broker/utils"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/system"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // broker vm create vm1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
@@ -109,4 +114,129 @@ func (srv *VMService) SSH(ref string) (*system.SSHConfig, error) {
 	}
 
 	return srv.provider.GetSSHConfig(vm.ID)
+}
+
+//VMServiceServer VM service server grpc
+type VMServiceServer struct{}
+
+//List available VMs
+func (s *VMServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.VMList, error) {
+	log.Printf("List VM called")
+
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	vmAPI := NewVMService(currentTenant.client)
+	vms, err := vmAPI.List()
+	if err != nil {
+		return nil, err
+	}
+
+	var pbvm []*pb.VM
+
+	// Map api.VM to pb.VM
+	for _, vm := range vms {
+		pbvm = append(pbvm, &pb.VM{
+			CPU:        int32(vm.Size.Cores),
+			Disk:       int32(vm.Size.DiskSize),
+			GatewayID:  vm.GatewayID,
+			ID:         vm.ID,
+			IP:         vm.GetAccessIP(),
+			Name:       vm.Name,
+			PrivateKey: vm.PrivateKey,
+			RAM:        vm.Size.RAMSize,
+			State:      pb.VMState(vm.State),
+		})
+	}
+	rv := &pb.VMList{VMs: pbvm}
+	log.Printf("End List VM")
+	return rv, nil
+}
+
+//Create a new VM
+func (s *VMServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.VM, error) {
+	log.Printf("Create VM called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	vmService := NewVMService(currentTenant.client)
+	vm, err := vmService.Create(in.GetName(), in.GetNetwork(),
+		int(in.GetCPUNumber()), in.GetRAM(), int(in.GetDisk()), in.GetImageID(), in.GetPublic())
+
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	log.Printf("VM '%s' created", in.GetName())
+	return &pb.VM{
+		CPU:        int32(vm.Size.Cores),
+		Disk:       int32(vm.Size.DiskSize),
+		GatewayID:  vm.GatewayID,
+		ID:         vm.ID,
+		IP:         vm.GetAccessIP(),
+		Name:       vm.Name,
+		PrivateKey: vm.PrivateKey,
+		RAM:        vm.Size.RAMSize,
+		State:      pb.VMState(vm.State),
+	}, nil
+}
+
+//Inspect a VM
+func (s *VMServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM, error) {
+	log.Printf("Inspect VM called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	vmService := NewVMService(currentTenant.client)
+	vm, err := vmService.Get(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("End Inspect VM: '%s'", in.GetName())
+	return &pb.VM{
+		CPU:        int32(vm.Size.Cores),
+		Disk:       int32(vm.Size.DiskSize),
+		GatewayID:  vm.GatewayID,
+		ID:         vm.ID,
+		IP:         vm.GetAccessIP(),
+		Name:       vm.Name,
+		PrivateKey: vm.PrivateKey,
+		RAM:        vm.Size.RAMSize,
+		State:      pb.VMState(vm.State),
+	}, nil
+}
+
+//Delete a VM
+func (s *VMServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
+	log.Printf("Delete VM called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+	vmService := NewVMService(currentTenant.client)
+	err := vmService.Delete(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("VM '%s' deleted", in.GetName())
+	return &google_protobuf.Empty{}, nil
+}
+
+//SSH returns ssh parameters to access a VM
+func (s *VMServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
+	log.Printf("Ssh VM called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+	vmService := NewVMService(currentTenant.client)
+	sshConfig, err := vmService.SSH(in.GetName())
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Got Ssh config for VM '%s'", in.GetName())
+	return conv.ToPBSshconfig(sshConfig), nil
 }

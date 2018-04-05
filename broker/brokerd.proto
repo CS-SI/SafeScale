@@ -139,7 +139,7 @@ service VMService{
     rpc Inspect(Reference) returns (VM){}
     rpc List(google.protobuf.Empty) returns (VMList){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
-    rpc Ssh(Reference) returns (SshConfig){}
+    rpc SSH(Reference) returns (SshConfig){}
 }
 
 // broker volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
