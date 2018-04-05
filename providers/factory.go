@@ -30,6 +30,7 @@ func (f *ServiceFactory) RegisterClient(name string, client api.ClientAPI) {
 func (f *ServiceFactory) Load() error {
 	v := viper.New()
 	v.AddConfigPath("/etc/safescale")
+	v.AddConfigPath("$HOME/.config/safescale")
 	v.AddConfigPath("$HOME/.safescale")
 	v.AddConfigPath(".")
 	v.SetConfigName("tenants")

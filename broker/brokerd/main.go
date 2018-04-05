@@ -11,7 +11,7 @@ import (
 	"github.com/SafeScale/providers/api/IPVersion"
 
 	pb "github.com/SafeScale/broker"
-	"github.com/SafeScale/broker/server/commands"
+	"github.com/SafeScale/broker/brokerd/commands"
 	conv "github.com/SafeScale/broker/utils"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/ovh"
