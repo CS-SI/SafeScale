@@ -179,7 +179,7 @@ var vmSsh = cli.Command{
 		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVMServiceClient(conn)
-		resp, err := service.Ssh(ctx, &pb.Reference{Name: c.Args().First()})
+		resp, err := service.SSH(ctx, &pb.Reference{Name: c.Args().First()})
 		if err != nil {
 			return fmt.Errorf("Could not get ssh config for vm '%s': %v", c.Args().First(), err)
 		}

@@ -107,7 +107,7 @@ var sshConnect = cli.Command{
 		defer cancel()
 		service := pb.NewVMServiceClient(conn)
 
-		sshConfig, err := service.Ssh(ctx, &pb.Reference{
+		sshConfig, err := service.SSH(ctx, &pb.Reference{
 			Name: c.Args().Get(0),
 		})
 		if err != nil {

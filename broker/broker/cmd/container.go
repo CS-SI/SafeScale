@@ -19,6 +19,8 @@ var ContainerCmd = cli.Command{
 		containerCreate,
 		containerDelete,
 		containerInspect,
+		containerMount,
+		containerUmount,
 	},
 }
 
@@ -116,6 +118,74 @@ var containerInspect = cli.Command{
 
 		out, _ := json.Marshal(resp)
 		fmt.Println(string(out))
+		return nil
+	},
+}
+
+var containerMount = cli.Command{
+	Name:      "mount",
+	Usage:     "Mount a container on the filesytem of a VM",
+	ArgsUsage: "<Container_name> <VM_name>",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "path",
+			Value: "/container/",
+			Usage: "Mount point of the container",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 2 {
+			fmt.Println("Missing mandatory argument <Container_name> and/or <VM_name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("Container and VM name required")
+		}
+		conn := utils.GetConnection()
+		defer conn.Close()
+		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		defer cancel()
+		service := pb.NewContainerServiceClient(conn)
+
+		_, err := service.Mount(ctx, &pb.ContainerMountingPoint{
+			Container: c.Args().Get(0),
+			VM: &pb.Reference{
+				Name: c.Args().Get(1),
+			},
+			Path: c.String("path"),
+		})
+		if err != nil {
+			return fmt.Errorf("Could not mount container '%s': %v", c.Args().Get(0), err)
+		}
+		fmt.Printf("Container '%s' mounted on '%s' on VM '%s'", c.Args().Get(0), c.String("path"), c.Args().Get(1))
+		return nil
+	},
+}
+
+var containerUmount = cli.Command{
+	Name:      "umount",
+	Usage:     "UMount a container from the filesytem of a VM",
+	ArgsUsage: "<Container_name> <VM_name>",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 2 {
+			fmt.Println("Missing mandatory argument <Container_name> and/or <VM_name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("Container and VM name required")
+		}
+		conn := utils.GetConnection()
+		defer conn.Close()
+		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		defer cancel()
+		service := pb.NewContainerServiceClient(conn)
+
+		_, err := service.UMount(ctx, &pb.ContainerMountingPoint{
+			Container: c.Args().Get(0),
+			VM: &pb.Reference{
+				Name: c.Args().Get(1),
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("Could not umount container '%s': %v", c.Args().Get(0), err)
+		}
+		fmt.Printf("Container '%s' umounted from VM '%s'", c.Args().Get(0), c.Args().Get(1))
 		return nil
 	},
 }

@@ -25,5 +25,5 @@ providers/aws/*_test.go
 *.toml
 
 #ignore binary files from build
-brokerd/client/broker
-brokerd/server/brokerd
+broker/broker/broker
+broker/brokerd/brokerd

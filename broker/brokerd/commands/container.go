@@ -131,3 +131,13 @@ func (s *ContainerServiceServer) Inspect(ctx context.Context, in *pb.Container) 
 	log.Println("End inspect container")
 	return conv.ToPBContainerMountPoint(resp), nil
 }
+
+//Mount a container on the filesystem of the VM
+func (s *ContainerServiceServer) Mount(ctx context.Context, in *pb.ContainerMountingPoint) (*google_protobuf.Empty, error) {
+	return nil, fmt.Errorf("Not implemented yet")
+}
+
+//UMount a container from the filesystem of the VM
+func (s *ContainerServiceServer) UMount(ctx context.Context, in *pb.ContainerMountingPoint) (*google_protobuf.Empty, error) {
+	return nil, fmt.Errorf("Not implemented yet")
+}
