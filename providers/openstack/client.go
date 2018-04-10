@@ -387,3 +387,15 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 		},
 	)
 }
+
+func (client *Client) GetAuthOpts() (api.Config, error) {
+	cfg := api.ConfigMap{}
+
+	cfg.Set("TenantName", client.Opts.TenantName)
+	cfg.Set("Login", client.Opts.Username)
+	cfg.Set("Password", client.Opts.Password)
+	cfg.Set("AuthUrl", client.Opts.IdentityEndpoint)
+	cfg.Set("Region", client.Opts.Region)
+
+	return cfg, nil
+}

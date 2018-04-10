@@ -6,6 +6,7 @@ import (
 
 	pb "github.com/SafeScale/broker"
 	utils "github.com/SafeScale/broker/utils"
+	"github.com/SafeScale/providers/api"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
@@ -155,7 +156,7 @@ var volumeAttach = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: "/shared/",
+			Value: api.DefaultVolumeMountPoint,
 			Usage: "Mount point of the volume",
 		},
 		cli.StringFlag{

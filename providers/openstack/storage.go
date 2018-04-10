@@ -215,6 +215,7 @@ func (client *Client) CreateContainer(name string) error {
 	if err != nil {
 		return fmt.Errorf("Error creating container %s: %s", name, errorString(err))
 	}
+
 	return nil
 }
 
@@ -252,6 +253,7 @@ func (client *Client) GetContainerMetadata(name string) (map[string]string, erro
 func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
 	meta, err := containers.Get(client.Container, name).ExtractMetadata()
 	_ = meta
+
 	if err != nil {
 		return nil, fmt.Errorf("Error getting container %s: %s", name, errorString(err))
 	}

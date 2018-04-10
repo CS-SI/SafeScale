@@ -6,6 +6,7 @@ import (
 
 	pb "github.com/SafeScale/broker"
 	utils "github.com/SafeScale/broker/utils"
+	"github.com/SafeScale/providers/api"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
@@ -129,7 +130,7 @@ var containerMount = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: "/container/",
+			Value: api.DefaultContainerMountPoint,
 			Usage: "Mount point of the container",
 		},
 	},
@@ -141,7 +142,7 @@ var containerMount = cli.Command{
 		}
 		conn := utils.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewContainerServiceClient(conn)
 

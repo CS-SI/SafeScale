@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
 
 	conv "github.com/SafeScale/broker/utils"
 
@@ -27,6 +28,7 @@ type ContainerAPI interface {
 	Create(string) error
 	Delete(string) error
 	Inspect(string) (*api.ContainerInfo, error)
+	Mount(string, string, string) error
 }
 
 //NewContainerService creates a Container service
@@ -59,6 +61,75 @@ func (srv *ContainerService) Delete(name string) error {
 //Inspect a container
 func (srv *ContainerService) Inspect(name string) (*api.ContainerInfo, error) {
 	return srv.provider.GetContainer(name)
+}
+
+//Mount a container on a VM on the given mount point
+func (srv *ContainerService) Mount(containerName, vmName, path string) error {
+	// Check container existence
+	_, err := srv.Inspect(containerName)
+	if err != nil {
+		return err
+	}
+
+	// Get VM ID
+	vmService := NewVMService(srv.provider)
+	vm, err := vmService.Get(vmName)
+	if err != nil {
+		return fmt.Errorf("No VM found with name or id '%s'", vmName)
+	}
+
+	// Create mount point
+	mountPoint := path
+	if path == api.DefaultContainerMountPoint {
+		mountPoint = api.DefaultContainerMountPoint + containerName
+	}
+	cfg, _ := srv.provider.GetAuthOpts()
+	authurl, _ := cfg.Config("AuthUrl")
+	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
+	tenant, _ := cfg.Config("TenantName")
+	login, _ := cfg.Config("Login")
+	password, _ := cfg.Config("Password")
+	region, _ := cfg.Config("Region")
+	data := struct {
+		Container  string
+		Tenant     string
+		Login      string
+		Password   string
+		AuthURL    string
+		Region     string
+		MountPoint string
+	}{
+		Container:  containerName,
+		Tenant:     tenant,
+		Login:      login,
+		Password:   password,
+		AuthURL:    authurl,
+		Region:     region,
+		MountPoint: mountPoint,
+	}
+	scriptCmd, err := getBoxContent("mount_object_storage.sh", data)
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+	// retrieve ssh config to perform some commands
+	ssh, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+
+	cmd, err := ssh.SudoCommand(scriptCmd)
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 //ContainerServiceServer is the container service grpc server
@@ -134,7 +205,19 @@ func (s *ContainerServiceServer) Inspect(ctx context.Context, in *pb.Container) 
 
 //Mount a container on the filesystem of the VM
 func (s *ContainerServiceServer) Mount(ctx context.Context, in *pb.ContainerMountingPoint) (*google_protobuf.Empty, error) {
-	return nil, fmt.Errorf("Not implemented yet")
+	log.Printf("Mount container called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := NewContainerService(currentTenant.client)
+	err := service.Mount(in.GetContainer(), in.GetVM().GetName(), in.GetPath())
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("End Mount container")
+	return &google_protobuf.Empty{}, nil
 }
 
 //UMount a container from the filesystem of the VM

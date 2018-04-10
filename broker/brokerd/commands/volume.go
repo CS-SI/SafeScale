@@ -110,8 +110,8 @@ func (srv *VolumeService) Attach(volumename string, vmname string, path string, 
 
 	// Create mount point
 	mountPoint := path
-	if path == api.DefaultMountPoint {
-		mountPoint = api.DefaultMountPoint + volume.Name
+	if path == api.DefaultVolumeMountPoint {
+		mountPoint = api.DefaultVolumeMountPoint + volume.Name
 	}
 	data := struct {
 		Device     string

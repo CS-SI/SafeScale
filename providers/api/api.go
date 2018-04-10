@@ -16,8 +16,11 @@ import (
 //DefaultUser Default VM user
 const DefaultUser = "gpac"
 
-//DefaultMountPoint Default mount point for volumes
-const DefaultMountPoint = "/shared/"
+//DefaultVolumeMountPoint Default mount point for volumes
+const DefaultVolumeMountPoint = "/shared/"
+
+//DefaultContainerMountPoint Default mount point for containers
+const DefaultContainerMountPoint = "/containers/"
 
 //TimeoutError defines a Timeout error
 type TimeoutError struct {
@@ -350,6 +353,34 @@ type ClientAPI interface {
 	ListObjects(container string, filter ObjectFilter) ([]string, error)
 	//CopyObject copies an object
 	CopyObject(containerSrc, objectSrc, objectDst string) error
-	//DeleteObject deleta an object from a container
+	//DeleteObject delete an object from a container
 	DeleteObject(container, object string) error
+
+	//GetAuthOpts returns authentification options as a Config
+	GetAuthOpts() (Config, error)
+}
+
+// Config represents key/value configuration.
+type Config interface {
+	// Config gets a string configuration value and a
+	// bool indicating whether the value was present or not.
+	Config(name string) (string, bool)
+	// Set sets the configuration name to specified value
+	Set(name string, value string)
+}
+
+// ConfigMap is a map[string]string that implements
+// the Config method.
+type ConfigMap map[string]string
+
+// Config gets a string configuration value and a
+// bool indicating whether the value was present or not.
+func (c ConfigMap) Config(name string) (string, bool) {
+	val, ok := c[name]
+	return val, ok
+}
+
+// Set sets name configuration to value
+func (c ConfigMap) Set(name string, value string) {
+	c[name] = value
 }
