@@ -25,14 +25,14 @@ func init() {
 	}
 	file5 := &embedded.EmbeddedFile{
 		Filename:    "umount_object_storage.sh",
-		FileModTime: time.Unix(1523376519, 0),
+		FileModTime: time.Unix(1523454311, 0),
 		Content:     string("#!/usr/bin/env bash\n\n/usr/local/bin/umount-{{.Container}}\necho \"umount : $?\" > /tmp/umount.log\n\nrm /etc/s3ql/auth.{{.Container}}\necho \"rm auth : $?\" >> /tmp/umount.log\nrm /usr/local/bin/mount-{{.Container}}\necho \"rm mount : $?\" >> /tmp/umount.log\nrm /usr/local/bin/umount-{{.Container}}\necho \"rm umount : $?\" >> /tmp/umount.log\n"),
 	}
 
 	// define dirs
 	dir1 := &embedded.EmbeddedDir{
 		Filename:   "",
-		DirModTime: time.Unix(1523374396, 0),
+		DirModTime: time.Unix(1523454311, 0),
 		ChildFiles: []*embedded.EmbeddedFile{
 			file2, // "mount_block_device.sh"
 			file3, // "mount_object_storage.sh"
@@ -48,7 +48,7 @@ func init() {
 	// register embeddedBox
 	embedded.RegisterEmbeddedBox(`broker_scripts`, &embedded.EmbeddedBox{
 		Name: `broker_scripts`,
-		Time: time.Unix(1523374396, 0),
+		Time: time.Unix(1523454311, 0),
 		Dirs: map[string]*embedded.EmbeddedDir{
 			"": dir1,
 		},

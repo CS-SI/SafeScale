@@ -1,6 +1,7 @@
 package ovh
 
 import (
+	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/openstack"
 
@@ -96,4 +97,8 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 		Region:            Region,
 		ProjectName:       ProjectName,
 	})
+}
+
+func init() {
+	providers.Register("ovh", &Client{})
 }

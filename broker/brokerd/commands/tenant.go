@@ -8,7 +8,8 @@ import (
 	pb "github.com/SafeScale/broker"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/ovh"
+	_ "github.com/SafeScale/providers/cloudwatt" // Imported to initialise tenants
+	_ "github.com/SafeScale/providers/ovh"       // Imported to initialise tenants
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -19,17 +20,17 @@ type Tenant struct {
 }
 
 var (
-	currentTenant  *Tenant
-	serviceFactory *providers.ServiceFactory
+	currentTenant *Tenant
+	// serviceFactory *providers.ServiceFactory
 )
 
-//InitServiceFactory initialise the service factory
-func InitServiceFactory() {
-	serviceFactory = providers.NewFactory()
-	serviceFactory.RegisterClient("ovh", &ovh.Client{})
-	serviceFactory.Load()
+// //InitServiceFactory initialise the service factory
+// func InitServiceFactory() {
+// 	// serviceFactory = providers.NewFactory()
+// 	// serviceFactory.RegisterClient("ovh", &ovh.Client{})
+// 	// serviceFactory.Load()
 
-}
+// }
 
 //TenantServiceServer server is used to implement SafeScale.broker.
 type TenantServiceServer struct{}
@@ -39,7 +40,7 @@ func (s *TenantServiceServer) List(ctx context.Context, in *google_protobuf.Empt
 	log.Println("List tenant called")
 
 	var tl []*pb.Tenant
-	for name := range serviceFactory.Services {
+	for name := range providers.Services() {
 		tl = append(tl, &pb.Tenant{
 			Name:     name,
 			Provider: "myprovider",
@@ -69,12 +70,12 @@ func (s *TenantServiceServer) Get(ctx context.Context, in *google_protobuf.Empty
 //GetCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
 func GetCurrentTenant() *Tenant {
 	if currentTenant == nil {
-		if len(serviceFactory.Services) != 1 {
+		if len(providers.Services()) != 1 {
 			return nil
 		}
 		// Set unqiue tenant as selected
 		log.Println("Unique tenant set")
-		for name, service := range serviceFactory.Services {
+		for name, service := range providers.Services() {
 			currentTenant = &Tenant{name: name, client: service}
 		}
 	}
@@ -90,8 +91,8 @@ func (s *TenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*goog
 		return &google_protobuf.Empty{}, nil
 	}
 
-	clientAPI, ok := serviceFactory.Services[in.GetName()]
-	if !ok {
+	clientAPI, err := providers.GetService(in.GetName())
+	if err != nil {
 		return nil, fmt.Errorf("Unknown tenant '%s'", in.GetName())
 	}
 	currentTenant = &Tenant{name: in.GetName(), client: clientAPI}

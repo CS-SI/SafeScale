@@ -78,8 +78,8 @@ func main() {
 	pb.RegisterSshServiceServer(s, &commands.SSHServiceServer{})
 	pb.RegisterContainerServiceServer(s, &commands.ContainerServiceServer{})
 
-	log.Println("Initializing service factory")
-	commands.InitServiceFactory()
+	// log.Println("Initializing service factory")
+	// commands.InitServiceFactory()
 
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
