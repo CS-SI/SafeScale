@@ -333,7 +333,8 @@ type userData struct {
 	GatewayIP string
 }
 
-func (client *Client) prepareUserData(request api.VMRequest, isGateway bool, kp *api.KeyPair, gw *api.VM) ([]byte, error) {
+//PrepareUserData prepares the initial configuration script
+func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp *api.KeyPair, gw *api.VM) ([]byte, error) {
 	dataBuffer := bytes.NewBufferString("")
 	var ResolveConf string
 	var err error
@@ -464,7 +465,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		return nil, err
 	}
 
-	userData, err := client.prepareUserData(request, isGateway, kp, gw)
+	userData, err := client.PrepareUserData(request, isGateway, kp, gw)
 	//fmt.Println(string(userData))
 	//Create VM
 	srvOpts := servers.CreateOpts{
