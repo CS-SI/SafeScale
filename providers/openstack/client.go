@@ -388,6 +388,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	)
 }
 
+// GetAuthOpts
 func (client *Client) GetAuthOpts() (api.Config, error) {
 	cfg := api.ConfigMap{}
 

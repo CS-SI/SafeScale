@@ -29,6 +29,7 @@ type ContainerAPI interface {
 	Delete(string) error
 	Inspect(string) (*api.ContainerInfo, error)
 	Mount(string, string, string) error
+	UMount(string, string) error
 }
 
 //NewContainerService creates a Container service
@@ -83,6 +84,7 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 	if path == api.DefaultContainerMountPoint {
 		mountPoint = api.DefaultContainerMountPoint + containerName
 	}
+
 	cfg, _ := srv.provider.GetAuthOpts()
 	authurl, _ := cfg.Config("AuthUrl")
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
@@ -90,6 +92,7 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 	login, _ := cfg.Config("Login")
 	password, _ := cfg.Config("Password")
 	region, _ := cfg.Config("Region")
+
 	data := struct {
 		Container  string
 		Tenant     string
@@ -126,6 +129,53 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 	}
 	_, err = cmd.Output()
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//UMount a container
+func (srv *ContainerService) UMount(containerName, vmName string) error {
+	// Check container existence
+	_, err := srv.Inspect(containerName)
+	if err != nil {
+		return err
+	}
+
+	// Get VM ID
+	vmService := NewVMService(srv.provider)
+	vm, err := vmService.Get(vmName)
+	if err != nil {
+		return fmt.Errorf("No VM found with name or id '%s'", vmName)
+	}
+
+	data := struct {
+		Container string
+	}{
+		Container: containerName,
+	}
+
+	scriptCmd, err := getBoxContent("umount_object_storage.sh", data)
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+	// retrieve ssh config to perform some commands
+	ssh, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+
+	cmd, err := ssh.SudoCommand(scriptCmd)
+	if err != nil {
+		// TODO Use more explicit error
+		return err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		fmt.Printf("%v", err)
 		return err
 	}
 
@@ -212,15 +262,21 @@ func (s *ContainerServiceServer) Mount(ctx context.Context, in *pb.ContainerMoun
 
 	service := NewContainerService(currentTenant.client)
 	err := service.Mount(in.GetContainer(), in.GetVM().GetName(), in.GetPath())
-	if err != nil {
-		return nil, err
-	}
 
 	log.Println("End Mount container")
-	return &google_protobuf.Empty{}, nil
+	return &google_protobuf.Empty{}, err
 }
 
 //UMount a container from the filesystem of the VM
 func (s *ContainerServiceServer) UMount(ctx context.Context, in *pb.ContainerMountingPoint) (*google_protobuf.Empty, error) {
-	return nil, fmt.Errorf("Not implemented yet")
+	log.Printf("UMount container called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	service := NewContainerService(currentTenant.client)
+	err := service.UMount(in.GetContainer(), in.GetVM().GetName())
+
+	log.Println("End UMount container")
+	return &google_protobuf.Empty{}, err
 }

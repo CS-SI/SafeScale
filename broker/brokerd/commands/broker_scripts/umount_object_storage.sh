@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
-echo "{{.Password}}" |sudo umount.s3ql {{.MountPoint}}
+/usr/local/bin/umount-{{.Container}}
+echo "umount : $?" > /tmp/umount.log
 
 rm /etc/s3ql/auth.{{.Container}}
-rm /usr/loca/bin/mount-{{.Container}}
-rm /usr/loca/bin/umount-{{.Container}}
+echo "rm auth : $?" >> /tmp/umount.log
+rm /usr/local/bin/mount-{{.Container}}
+echo "rm mount : $?" >> /tmp/umount.log
+rm /usr/local/bin/umount-{{.Container}}
+echo "rm umount : $?" >> /tmp/umount.log
