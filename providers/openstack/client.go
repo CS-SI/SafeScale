@@ -174,7 +174,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	clt := Client{
 		Opts:              &opts,
 		Cfg:               &cfg,
-		pClient:           pClient,
+		Provider:          pClient,
 		Compute:           compute,
 		Network:           network,
 		Volume:            blocstorage,
@@ -200,7 +200,7 @@ const defaultSecurityGroup string = "30ad3142-a5ec-44b5-9560-618bde3de1ef"
 type Client struct {
 	Opts        *AuthOptions
 	Cfg         *CfgOptions
-	pClient     *gc.ProviderClient
+	Provider    *gc.ProviderClient
 	Compute     *gc.ServiceClient
 	Network     *gc.ServiceClient
 	Volume      *gc.ServiceClient
