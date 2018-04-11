@@ -71,7 +71,7 @@ type VM struct {
 	GatewayID    string       `json:"gateway_id,omitempty"`
 }
 
-//GetAccessIP compues access IP of the VM
+//GetAccessIP computes access IP of the VM
 func (vm *VM) GetAccessIP() string {
 	ip := vm.AccessIPv4
 	if ip == "" {
@@ -111,7 +111,7 @@ type GWRequest struct {
 	KeyPair *KeyPair `json:"key_pair,omitempty"`
 }
 
-//Volume represents an block volume
+//Volume represents a block volume
 type Volume struct {
 	ID    string           `json:"id,omitempty"`
 	Name  string           `json:"name,omitempty"`
@@ -127,7 +127,7 @@ type VolumeRequest struct {
 	Speed VolumeSpeed.Enum `json:"speed,omitempty"`
 }
 
-//VolumeAttachment represents an volume attachment
+//VolumeAttachment represents a volume attachment
 type VolumeAttachment struct {
 	ID       string `json:"id,omitempty"`
 	Name     string `json:"name,omitempty"`
@@ -136,7 +136,7 @@ type VolumeAttachment struct {
 	Device   string `json:"device,omitempty"`
 }
 
-//VolumeAttachmentRequest represents an volume attachment request
+//VolumeAttachmentRequest represents a volume attachment request
 type VolumeAttachmentRequest struct {
 	Name     string `json:"name,omitempty"`
 	VolumeID string `json:"volume,omitempty"`
