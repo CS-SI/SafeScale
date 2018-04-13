@@ -13,14 +13,19 @@ import (
 	"github.com/SafeScale/providers/api/VolumeState"
 )
 
-//DefaultUser Default VM user
-const DefaultUser = "gpac"
+const (
+	//DefaultUser Default VM user
+	DefaultUser = "gpac"
 
-//DefaultVolumeMountPoint Default mount point for volumes
-const DefaultVolumeMountPoint = "/shared/"
+	//DefaultVolumeMountPoint Default mount point for volumes
+	DefaultVolumeMountPoint = "/shared/"
 
-//DefaultContainerMountPoint Default mount point for containers
-const DefaultContainerMountPoint = "/containers/"
+	//DefaultContainerMountPoint Default mount point for containers
+	DefaultContainerMountPoint = "/containers/"
+
+	// DefaultNasExposedPath Default path to be exported by nfs server
+	DefaultNasExposedPath = "/shared/data"
+)
 
 //TimeoutError defines a Timeout error
 type TimeoutError struct {

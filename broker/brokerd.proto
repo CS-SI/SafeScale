@@ -201,7 +201,7 @@ service VolumeService{
 // broker container inspect C1
 
 message Container{
-    string Name = 2;
+    string Name = 1;
 }
 
 message ContainerList{
@@ -241,4 +241,19 @@ message SshResponse{
 service SshService{
     rpc Run(SshCommand) returns (SshResponse){}
     rpc Copy(SshCopyCommand) returns (google.protobuf.Empty){}
+}
+
+message NasName{
+    string Name = 1;
+}
+
+message NasDefinition{
+    NasName Nas = 1;
+    Reference VM = 2;
+    string path = 3;
+
+}
+
+service NasService{
+    rpc Create(NasDefinition) returns (google.protobuf.Empty){}
 }
