@@ -16,6 +16,7 @@ import (
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/cloudwatt"
 	"github.com/SafeScale/providers/ovh"
+	"github.com/SafeScale/providers/flexibleengine"
 
 	"github.com/SafeScale/providers"
 )
@@ -29,9 +30,11 @@ const cmdCPUFreq string = "lscpu | grep 'CPU MHz' | tr -d '[:space:]' | cut -d: 
 const cmdCPUModelName string = "lscpu | grep 'Model name' | cut -d: -f2 | sed -e 's/^[[:space:]]*//'"
 const cmdTotalRAM string = "cat /proc/meminfo | grep MemTotal | cut -d: -f2 | sed -e 's/^[[:space:]]*//' | cut -d' ' -f1"
 const cmdRAMFreq string = "sudo dmidecode -t memory | grep Speed | head -1 | cut -d' ' -f2"
-const cmdGPU string = "echo $(lspci | grep VGA | grep -i nvidia)"
 
-var cmd = fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s",
+const cmdGPU string = "lspci | grep -E -i 'VGA|3D' | grep -i nvidia | sed 's/.*controller: //g'"
+
+/*var cmd = fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s",*/
+var cmd = fmt.Sprintf("echo $(%s),$(%s),$(%s),$(%s),$(%s),$(%s),$(%s),$(%s),$(%s)",
 	cmdNumberOfCPU,
 	cmdNumberOfCorePerSocket,
 	cmdNumberOfSocket,
@@ -57,12 +60,14 @@ type CPUInfo struct {
 	RAMSize        float64 `json:"ram_size,omitempty"`
 	RAMFreq        float64 `json:"ram_freq,omitempty"`
 	GPU            bool    `json:"gpu,omitempty"`
+	GPUModel       string  `json:"gpu_model,omitempty"`
 }
 
 func parseOutput(output []byte) (*CPUInfo, error) {
 	str := string(output)
 
-	tokens := strings.Split(str, "\n")
+	//	tokens := strings.Split(str, "\n")
+	tokens := strings.Split(str, ",")
 	if len(tokens) < 9 {
 		return nil, fmt.Errorf("Parsing error")
 	}
@@ -98,15 +103,15 @@ func parseOutput(output []byte) (*CPUInfo, error) {
 	if err != nil {
 		info.RAMFreq = 0
 	}
-	info.GPU = len(strings.TrimSpace(tokens[8])) > 0
+	info.GPUModel = strings.TrimSpace(tokens[8])
+	info.GPU = len(info.GPUModel) > 0
 
 	return &info, nil
-
 }
 
 func scanImages(tenant string, service *providers.Service, c chan error) {
 	images, err := service.ListImages()
-	fmt.Println(tenant, len(images))
+	fmt.Println(tenant, "images: ", len(images))
 	if err != nil {
 		c <- err
 		return
@@ -132,17 +137,17 @@ type getCPUInfoResult struct {
 }
 
 func getCPUInfo(service *providers.Service, tpl api.VMTemplate, img *api.Image, key *api.KeyPair, networkID string) (*CPUInfo, error) {
-
 	fmt.Println("Creating VM")
 	vm, err := service.CreateVM(api.VMRequest{
-		Name:       tpl.Name + "-scan",
+		Name:       "scanhost",
 		PublicIP:   true,
 		ImageID:    img.ID,
 		TemplateID: tpl.ID,
 		KeyPair:    key,
+		NetworkIDs: []string{networkID},
 	})
 	if err != nil {
-		fmt.Println("Error Creatting VM", err)
+		fmt.Println("Error Creating VM", err)
 		return nil, err
 	}
 	defer service.DeleteVM(vm.ID)
@@ -168,11 +173,11 @@ func getCPUInfo(service *providers.Service, tpl api.VMTemplate, img *api.Image, 
 		return nil, err
 	}
 	return parseOutput(out)
-
 }
+
 func scanTemplates(tenant string, service *providers.Service, c chan error) {
 	tpls, err := service.ListTemplates()
-	fmt.Println(tenant, len(tpls))
+	fmt.Println(tenant, "Templates:", len(tpls))
 	if err != nil {
 		c <- err
 		return
@@ -186,6 +191,7 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 		return
 	}
 	defer service.DeleteKeyPair("key-scan")
+
 	net, err := service.CreateNetwork(api.NetworkRequest{
 		CIDR:      "192.168.0.0/24",
 		IPVersion: IPVersion.IPv4,
@@ -195,16 +201,18 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 		c <- err
 		return
 	}
+
 	img, err := service.SearchImage("Ubuntu 16.04")
 	if err != nil {
 		c <- err
 		return
 	}
 	defer service.DeleteNetwork(net.ID)
+
 	for _, tpl := range tpls {
 		upperName := strings.ToUpper(tpl.Name)
-		fmt.Println("scanning :", tpl.Name)
 		if strings.Contains(upperName, "WIN") || strings.Contains(upperName, "FLEX") {
+			fmt.Println("ignoring :", tpl.Name)
 			continue
 		}
 		fmt.Println("scanning :", tpl.Name)
@@ -216,6 +224,7 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 			info = append(info, ci)
 		}
 	}
+
 	fmt.Println("ALL INFO", info)
 	type TplList struct {
 		Templates []*CPUInfo `json:"templates,omitempty"`
@@ -230,6 +239,8 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 	f := fmt.Sprintf("%s/templates.json", tenant)
 	ioutil.WriteFile(f, content, 0666)
 	c <- nil
+
+	return
 }
 
 func scanService(tenant string, service *providers.Service, c chan error) {
@@ -241,8 +252,9 @@ func scanService(tenant string, service *providers.Service, c chan error) {
 	go scanTemplates(tenant, service, cTpl)
 	errI := <-cImage
 	errT := <-cTpl
-	c <- fmt.Errorf("Errors during scan: %v, %v", errI, errT)
-
+	if errI != nil or errT != nil {
+		c <- fmt.Errorf("Errors during Service %s scan: %v, %v", tenant, errI, errT)
+	}
 }
 
 //Run runs the scan
@@ -251,7 +263,12 @@ func Run() {
 	sf := providers.NewFactory()
 	sf.RegisterClient("ovh", &ovh.Client{})
 	sf.RegisterClient("cloudwatt", &cloudwatt.Client{})
-	sf.Load()
+	sf.RegisterClient("flexibleengine", &flexibleengine.Client{})
+	err := sf.Load()
+	if err != nil {
+		fmt.Printf("Error during Service Factory Load: %s", err.Error())
+		return
+	}
 	channels := []chan error{}
 	for name, service := range sf.Services {
 		c := make(chan error)
@@ -261,9 +278,8 @@ func Run() {
 	for _, c := range channels {
 		err := <-c
 		if err != nil {
-			fmt.Printf("Error during scan %s", err.Error())
+			fmt.Printf("Error during scan: %s ", err.Error())
 		}
-
 	}
 }
 func main() {
