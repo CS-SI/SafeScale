@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/SafeScale/providers/api/IPVersion"
-
-	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/cloudwatt"
 	"github.com/SafeScale/providers/ovh"
+
+	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/flexibleengine"
 
 	"github.com/SafeScale/providers"
@@ -31,9 +31,8 @@ const cmdCPUModelName string = "lscpu | grep 'Model name' | cut -d: -f2 | sed -e
 const cmdTotalRAM string = "cat /proc/meminfo | grep MemTotal | cut -d: -f2 | sed -e 's/^[[:space:]]*//' | cut -d' ' -f1"
 const cmdRAMFreq string = "sudo dmidecode -t memory | grep Speed | head -1 | cut -d' ' -f2"
 
-const cmdGPU string = "lspci | grep -E -i 'VGA|3D' | grep -i nvidia | sed 's/.*controller: //g'"
+const cmdGPU string = "lspci | egrep -i 'VGA|3D' | grep -i nvidia | cut -d: -f3 | sed 's/.*controller://g'"
 
-/*var cmd = fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s",*/
 var cmd = fmt.Sprintf("echo $(%s),$(%s),$(%s),$(%s),$(%s),$(%s),$(%s),$(%s),$(%s)",
 	cmdNumberOfCPU,
 	cmdNumberOfCorePerSocket,
@@ -111,7 +110,7 @@ func parseOutput(output []byte) (*CPUInfo, error) {
 
 func scanImages(tenant string, service *providers.Service, c chan error) {
 	images, err := service.ListImages()
-	fmt.Println(tenant, "images: ", len(images))
+	fmt.Println(tenant, "images:", len(images))
 	if err != nil {
 		c <- err
 		return
@@ -153,7 +152,7 @@ func getCPUInfo(service *providers.Service, tpl api.VMTemplate, img *api.Image, 
 	defer service.DeleteVM(vm.ID)
 
 	ssh, err := service.GetSSHConfig(vm.ID)
-	fmt.Println("Reading SSH Config")
+	//fmt.Println("Reading SSH Config")
 	if err != nil {
 		fmt.Println("Error Reading SSHConfig", err)
 		return nil, err
@@ -161,14 +160,15 @@ func getCPUInfo(service *providers.Service, tpl api.VMTemplate, img *api.Image, 
 	ssh.WaitServerReady(30 * time.Second)
 	c, err := ssh.Command(cmd)
 
-	//cmd, err := ssh.Command("whoami")
-	fmt.Println(">>> CMD", cmd)
+	//cmd, err := ssh.Command(cmd)
+	//fmt.Println(">>> CMD", cmd)
+	_, err = ssh.Command(cmd)
 	if err != nil {
 		fmt.Println("Error scanning VM", err)
 		return nil, err
 	}
 	out, err := c.CombinedOutput()
-	fmt.Println("parse: ", string(out), err)
+	//fmt.Println("parse: ", string(out), err)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,6 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 		c <- err
 		return
 	}
-	defer service.DeleteKeyPair("key-scan")
 
 	net, err := service.CreateNetwork(api.NetworkRequest{
 		CIDR:      "192.168.0.0/24",
@@ -199,23 +198,27 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 	})
 	if err != nil {
 		c <- err
+		service.DeleteKeyPair("key-scan")
 		return
 	}
 
 	img, err := service.SearchImage("Ubuntu 16.04")
 	if err != nil {
 		c <- err
+		service.DeleteKeyPair("key-scan")
 		return
 	}
-	defer service.DeleteNetwork(net.ID)
 
 	for _, tpl := range tpls {
+		if tpl.Name != "c1.large" {
+			continue
+		}
 		upperName := strings.ToUpper(tpl.Name)
 		if strings.Contains(upperName, "WIN") || strings.Contains(upperName, "FLEX") {
 			fmt.Println("ignoring :", tpl.Name)
 			continue
 		}
-		fmt.Println("scanning :", tpl.Name)
+		fmt.Printf("scanning : %s (%s)\n", tpl.Name, tenant)
 		ci, err := getCPUInfo(service, tpl, img, kp, net.ID)
 		fmt.Println("INFO", ci)
 		if err == nil {
@@ -232,6 +235,10 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 	content, err := json.Marshal(TplList{
 		Templates: info,
 	})
+
+	service.DeleteNetwork(net.ID)
+	service.DeleteKeyPair("key-scan")
+
 	if err != nil {
 		c <- err
 		return
@@ -239,8 +246,6 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 	f := fmt.Sprintf("%s/templates.json", tenant)
 	ioutil.WriteFile(f, content, 0666)
 	c <- nil
-
-	return
 }
 
 func scanService(tenant string, service *providers.Service, c chan error) {
@@ -252,8 +257,10 @@ func scanService(tenant string, service *providers.Service, c chan error) {
 	go scanTemplates(tenant, service, cTpl)
 	errI := <-cImage
 	errT := <-cTpl
-	if errI != nil or errT != nil {
+	if errI != nil || errT != nil {
 		c <- fmt.Errorf("Errors during Service %s scan: %v, %v", tenant, errI, errT)
+	} else {
+		c <- nil
 	}
 }
 
@@ -282,6 +289,7 @@ func Run() {
 		}
 	}
 }
+
 func main() {
 	Run()
 }
