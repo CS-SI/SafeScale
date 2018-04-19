@@ -21,8 +21,8 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/SafeScale/providers/api/VMState"
 
-	"github.com/SafeScale/aws/s3"
 	"github.com/SafeScale/providers/api"
+	"github.com/SafeScale/providers/aws/s3"
 	"github.com/SafeScale/system"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -532,6 +532,14 @@ func (c *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
 	}, nil
 }
 
+func pStr(s *string) string {
+	if s == nil {
+		var s string
+		return s
+	}
+	return *s
+}
+
 //GetKeyPair returns the key pair identified by id
 func (c *Client) GetKeyPair(id string) (*api.KeyPair, error) {
 	out, err := c.EC2.DescribeKeyPairs(&ec2.DescribeKeyPairsInput{
@@ -606,7 +614,7 @@ func (c *Client) removeNetwork(netID string) error {
 	return c.DeleteObject("gpac.aws.networks", netID)
 }
 
-//CreateNetwork creates a network named name
+//CreateNetwork creates a network
 func (c *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
 	vpcOut, err := c.EC2.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: aws.String(req.CIDR),
@@ -766,6 +774,16 @@ func (c *Client) DeleteNetwork(id string) error {
 		VpcId: aws.String(id),
 	})
 	return err
+}
+
+//CreateGateway exists only to comply with api.ClientAPI interface
+func (c *Client) CreateGateway(req api.GWRequest) error {
+	return fmt.Errorf("aws.CreateGateway() isn't available by design")
+}
+
+//DeleteGateway exists only to comply with api.ClientAPI interface
+func (c *Client) DeleteGateway(networkID string) error {
+	return fmt.Errorf("aws.DeleteGateway() isn't available by design")
 }
 
 func (c *Client) getSubnets(vpcIDs []string) ([]*ec2.Subnet, error) {
