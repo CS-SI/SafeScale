@@ -2,18 +2,26 @@ package flexibleengine
 
 import (
 	"fmt"
+	"net/url"
+	"text/template"
 
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VolumeSpeed"
 	"github.com/SafeScale/providers/openstack"
 
+	// GopherCloud for OpenStack support
 	gc "github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
 	tokens3 "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
-	secgroups "github.com/gophercloud/gophercloud/openstack/network/v2/extensions/security/groups"
-	secrules "github.com/gophercloud/gophercloud/openstack/network/v2/extensions/security/groups"
+	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
+	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
+
+	// official AWS API
+	"github.com/aws/aws-sdk-go/aws"
+	awscreds "github.com/aws/aws-sdk-go/aws/credentials"
+	awssession "github.com/aws/aws-sdk-go/aws/session"
 )
 
 //go:generate rice embed-go
@@ -45,6 +53,11 @@ type AuthOptions struct {
 	VPCName string
 	// CIDR if the VPC
 	VPCCIDR string
+
+	// Identifier for S3 object storage use
+	S3AccessKeyID string
+	// Password of the previous identifier
+	S3AccessKeyPassword string
 }
 
 //CfgOptions configuration options
@@ -81,13 +94,58 @@ func errorString(err error) string {
 	}
 }
 
-//NetworkGWContainer container where Gateway configuratiion are stored
-const NetworkGWContainer string = "__network_gws__"
+//NetworkGWContainerName contains the name of the Object Storage Bucket in to put Gateway definitions (not needed in FlexibleEngine ?)
+//const NetworkGWContainerName string = "0.%s.network-gws"
+//VMContainerName contains the name of the Object Storage Bucket in to put VMs definitions
+//const VMContainerName string = "0.%s.vms"
+//NetworkGWContainerName contains the name of the Object Storage Bucket in to put Gateway definitions (not needed in FlexibleEngine ?)
+const NetworkGWContainerName string = "0.network-gws"
+
+//VMContainerName contains the name of the Object Storage Bucket in to put VMs definitions
+const VMContainerName string = "0.vms"
 
 const defaultUser = "cloud"
 
-//const authURL = "https://iam.%s.prod-cloud-ocb.orange-business.com/v3/auth/tokens"
 const authURL = "https://iam.%s.prod-cloud-ocb.orange-business.com"
+
+//VPL:BEGIN
+// aws provider isn't finished yet, copying the necessary here meanwhile...
+
+//AuthOpts AWS credentials
+type awsAuthOpts struct {
+	// AWS Access key ID
+	AccessKeyID string
+
+	// AWS Secret Access Key
+	SecretAccessKey string
+	// The region to send requests to. This parameter is required and must
+	// be configured globally or on a per-client basis unless otherwise
+	// noted. A full list of regions is found in the "Regions and Endpoints"
+	// document.
+	//
+	// @see http://docs.aws.amazon.com/general/latest/gr/rande.html
+	//   AWS Regions and Endpoints
+	Region string
+	//Config *Config
+}
+
+// Retrieve returns nil if it successfully retrieved the value.
+// Error is returned if the value were not obtainable, or empty.
+func (o awsAuthOpts) Retrieve() (awscreds.Value, error) {
+	return awscreds.Value{
+		AccessKeyID:     o.AccessKeyID,
+		SecretAccessKey: o.SecretAccessKey,
+		ProviderName:    "internal",
+	}, nil
+}
+
+// IsExpired returns if the credentials are no longer valid, and need
+// to be retrieved.
+func (o awsAuthOpts) IsExpired() bool {
+	return false
+}
+
+//VPL:END
 
 //AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
@@ -134,6 +192,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, fmt.Errorf("%s", errorString(err))
 	}
 
+	// Need to get Endpoint URL for ObjectStorage, thzt will be used with AWS S3 protocol
 	objectStorage, err := gcos.NewObjectStorageV1(provider, gc.EndpointOpts{
 		Type:   "object",
 		Region: opts.Region,
@@ -141,23 +200,36 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s", errorString(err))
 	}
+	// Fix URL of ObjectStorage for FlexibleEngine...
+	u, _ := url.Parse(objectStorage.Endpoint)
+	endpoint := u.Scheme + "://" + u.Hostname() + "/"
+	// FlexibleEngine uses a protocol compatible with S3, so we need to get aws.Session instance
+	authOpts := awsAuthOpts{
+		AccessKeyID:     opts.S3AccessKeyID,
+		SecretAccessKey: opts.S3AccessKeyPassword,
+		Region:          opts.Region,
+	}
+	awsSession, err := awssession.NewSession(&aws.Config{
+		Region:      aws.String(opts.Region),
+		Credentials: awscreds.NewCredentials(authOpts),
+		Endpoint:    &endpoint,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	box, err := rice.FindBox("../openstack/scripts")
 	if err != nil {
 		return nil, err
 	}
-	/*
-		userDataStr, err := box.String("userdata.sh")
-		if err != nil {
-			return nil, err
-		}
-
-		tpl, err := template.New("user_data").Parse(userDataStr)
-		if err != nil {
-			return nil, err
-		}
-	*/
-
+	userDataStr, err := box.String("userdata.sh")
+	if err != nil {
+		return nil, err
+	}
+	tpl, err := template.New("user_data").Parse(userDataStr)
+	if err != nil {
+		return nil, err
+	}
 	openstackClient := openstack.Client{
 		Opts: &openstack.AuthOptions{
 			IdentityEndpoint: opts.IdentityEndpoint,
@@ -172,18 +244,19 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 			UseLayer3Networking: true,
 			VolumeSpeeds:        cfg.VolumeSpeeds,
 		},
-		Provider:  provider,
-		Compute:   compute,
-		Network:   network,
-		Volume:    blockStorage,
-		Container: objectStorage,
-		ScriptBox: box,
-		//UserDataTpl:       tpl,
+		Provider: provider,
+		Compute:  compute,
+		Network:  network,
+		Volume:   blockStorage,
+		//Container:   objectStorage,
+		ScriptBox:   box,
+		UserDataTpl: tpl,
 	}
 	clt := Client{
-		Opts:   &opts,
-		Cfg:    &cfg,
-		Client: &openstackClient,
+		Opts:      &opts,
+		Cfg:       &cfg,
+		Client:    &openstackClient,
+		S3Session: awsSession,
 	}
 
 	// Initializes the VPC
@@ -198,8 +271,14 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, err
 	}
 
-	clt.CreateContainer("__network_gws__")
-	clt.CreateContainer("__vms__")
+	err = clt.CreateContainer(NetworkGWContainerName)
+	if err != nil {
+		fmt.Printf("Failed to create Object Container %s: %s\n", NetworkGWContainerName, errorString(err))
+	}
+	err = clt.CreateContainer(VMContainerName)
+	if err != nil {
+		fmt.Printf("Failed to create Object Container %s: %s\n", VMContainerName, err)
+	}
 	return &clt, nil
 }
 
@@ -213,8 +292,15 @@ type Client struct {
 	Cfg  *CfgOptions
 	*openstack.Client
 
+	// "AWS Session" for object storage use (compatible S3)
+	S3Session *awssession.Session
+
+	// Instance of the VPC
+	vpc *VPC
 	// Contains the name of the default security group for the VPC
 	defaultSecurityGroup string
+	// Instance of the default security group
+	SecurityGroup *secgroups.SecGroup
 }
 
 //Build build a new Client from configuration parameter
@@ -226,22 +312,26 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	VPCName, _ := params["VPCName"].(string)
 	VPCCIDR, _ := params["VPCCIDR"].(string)
 	Region, _ := params["Region"].(string)
+	S3AccessKeyID, _ := params["S3AccessKeyID"].(string)
+	S3AccessKeyPassword, _ := params["S3AccessKeyPassword"].(string)
 	return AuthenticatedClient(AuthOptions{
-		Username:    Username,
-		Password:    Password,
-		DomainName:  DomainName,
-		ProjectID:   ProjectID,
-		Region:      Region,
-		AllowReauth: true,
-		VPCName:     VPCName,
-		VPCCIDR:     VPCCIDR,
+		Username:            Username,
+		Password:            Password,
+		DomainName:          DomainName,
+		ProjectID:           ProjectID,
+		Region:              Region,
+		AllowReauth:         true,
+		VPCName:             VPCName,
+		VPCCIDR:             VPCCIDR,
+		S3AccessKeyID:       S3AccessKeyID,
+		S3AccessKeyPassword: S3AccessKeyPassword,
 	}, CfgOptions{
 		UseFloatingIP:       true,
-		UseLayer3Networking: true,
+		UseLayer3Networking: false,
 		VolumeSpeeds: map[string]VolumeSpeed.Enum{
-			"classic":    VolumeSpeed.COLD,
-			"high-speed": VolumeSpeed.HDD,
-			"ssd":        VolumeSpeed.SSD,
+			"SATA": VolumeSpeed.COLD,
+			"SAS":  VolumeSpeed.HDD,
+			"SSD":  VolumeSpeed.SSD,
 		},
 	})
 }
@@ -260,25 +350,31 @@ const defaultSecurityGroup string = "30ad3142-a5ec-44b5-9560-618bde3de1ef"
 
 //getDefaultSecurityGroup returns the default security group for the client, in the form
 // sg-<VPCName>, if it exists.
-func (client *Client) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
-	var sgList []secgroups.SecurityGroup
-	err := secgroups.List(client.Network).EachPage(func(page pagination.Page) (bool, error) {
-		list, err := secgroups.ExtractSecurityGroups(page)
+func (client *Client) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
+	var sgList []secgroups.SecGroup
+	opts := secgroups.ListOpts{
+		Name: client.defaultSecurityGroup,
+	}
+	err := secgroups.List(client.Network, opts).EachPage(func(page pagination.Page) (bool, error) {
+		list, err := secgroups.ExtractGroups(page)
 		if err != nil {
 			return false, err
 		}
-		for _, e := range list {
-			if e.Name == client.defaultSecurityGroup {
-				sgList = append(sgList, e)
+		for _, g := range list {
+			if g.Name == client.defaultSecurityGroup {
+				sgList = append(sgList, g)
 			}
 		}
 		return true, nil
 	})
+	if err != nil {
+		return nil, fmt.Errorf("Error listing routers: %s", errorString(err))
+	}
 	if len(sgList) == 0 {
-		return nil, err
+		return nil, nil
 	}
 	if len(sgList) > 1 {
-		return nil, fmt.Errorf("Configuration error: More than one default security groups exists")
+		return nil, fmt.Errorf("Configuration error: multiple Security Groups named '%s' exist", client.defaultSecurityGroup)
 	}
 
 	return &sgList[0], nil
@@ -288,52 +384,56 @@ func (client *Client) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error
 func (client *Client) createTCPRules(groupID string) error {
 	// Inbound == ingress == coming from Outside
 	ruleOpts := secrules.CreateOpts{
-		Direction:    "ingress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType4,
-		SecGroupID:   groupID,
-		Protocol:     "tcp",
+		Direction:      secrules.DirIngress,
+		PortRangeMin:   1,
+		PortRangeMax:   65535,
+		EtherType:      secrules.EtherType4,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolTCP,
+		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err := secgroups.CreateRule(client.Network, ruleOpts).Extract()
+	_, err := secrules.Create(client.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
-	ruleOpts = secgroups.CreateRuleOpts{
-		Direction:    "ingress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType6,
-		SecGroupID:   groupID,
-		Protocol:     "tcp",
+	ruleOpts = secrules.CreateOpts{
+		Direction:      secrules.DirIngress,
+		PortRangeMin:   1,
+		PortRangeMax:   65535,
+		EtherType:      secrules.EtherType6,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolTCP,
+		RemoteIPPrefix: "::/0",
 	}
-	_, err = secgroups.CreateRule(client.Compute, ruleOpts).Extract()
+	_, err = secrules.Create(client.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
 
 	// Outbound = egress == going to Outside
-	ruleOpts := secrules.CreateOpts{
-		Direction:    "egress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType4,
-		SecGroupID:   groupID,
-		Protocol:     "tcp",
+	ruleOpts = secrules.CreateOpts{
+		Direction:      secrules.DirEgress,
+		PortRangeMin:   1,
+		PortRangeMax:   65535,
+		EtherType:      secrules.EtherType4,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolTCP,
+		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err := secgroups.CreateRule(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
-	ruleOpts = secgroups.CreateRuleOpts{
-		Direction:    "egress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType6,
-		SecGroupID:   groupID,
-		Protocol:     "tcp",
+	ruleOpts = secrules.CreateOpts{
+		Direction:      secrules.DirEgress,
+		PortRangeMin:   1,
+		PortRangeMax:   65535,
+		EtherType:      secrules.EtherType6,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolTCP,
+		RemoteIPPrefix: "::/0",
 	}
-	_, err = secgroups.CreateRule(client.Compute, ruleOpts).Extract()
+	_, err = secrules.Create(client.Network, ruleOpts).Extract()
 	return err
 }
 
@@ -341,52 +441,56 @@ func (client *Client) createTCPRules(groupID string) error {
 func (client *Client) createUDPRules(groupID string) error {
 	// Inbound == ingress == coming from Outside
 	ruleOpts := secrules.CreateOpts{
-		Direction:    "ingress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType4,
-		SecGroupID:   groupID,
-		Protocol:     "udp",
+		Direction:      secrules.DirIngress,
+		PortRangeMin:   1,
+		PortRangeMax:   65535,
+		EtherType:      secrules.EtherType4,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolUDP,
+		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err := secgroups.CreateRule(client.Network, ruleOpts).Extract()
+	_, err := secrules.Create(client.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
-	ruleOpts = secgroups.CreateRuleOpts{
-		Direction:    "ingress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType6,
-		SecGroupID:   groupID,
-		Protocol:     "udp",
+	ruleOpts = secrules.CreateOpts{
+		Direction:      secrules.DirIngress,
+		PortRangeMin:   1,
+		PortRangeMax:   65535,
+		EtherType:      secrules.EtherType6,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolUDP,
+		RemoteIPPrefix: "::/0",
 	}
-	_, err = secgroups.CreateRule(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
 
 	// Outbound = egress == going to Outside
-	ruleOpts := secrules.CreateOpts{
-		Direction:    "egress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType4,
-		SecGroupID:   groupID,
-		Protocol:     "udp",
+	ruleOpts = secrules.CreateOpts{
+		Direction:      secrules.DirEgress,
+		PortRangeMin:   1,
+		PortRangeMax:   65535,
+		EtherType:      secrules.EtherType4,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolUDP,
+		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err := secgroups.CreateRule(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
-	ruleOpts = secgroups.CreateRuleOpts{
-		Direction:    "egress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType6,
-		SecGroupID:   groupID,
-		Protocol:     "udp",
+	ruleOpts = secrules.CreateOpts{
+		Direction:      secrules.DirEgress,
+		PortRangeMin:   1,
+		PortRangeMax:   65535,
+		EtherType:      secrules.EtherType6,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolUDP,
+		RemoteIPPrefix: "::/0",
 	}
-	_, err = secgroups.CreateRule(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.Network, ruleOpts).Extract()
 	return err
 }
 
@@ -394,52 +498,54 @@ func (client *Client) createUDPRules(groupID string) error {
 func (client *Client) createICMPRules(groupID string) error {
 	// Inbound == ingress == coming from Outside
 	ruleOpts := secrules.CreateOpts{
-		Direction:    "ingress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType4,
-		SecGroupID:   groupID,
-		Protocol:     "icmp",
+		Direction: secrules.DirIngress,
+		EtherType:      secrules.EtherType4,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolICMP,
+		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err := secgroups.CreateRule(client.Network, ruleOpts).Extract()
+	_, err := secrules.Create(client.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
-	ruleOpts = secgroups.CreateRuleOpts{
-		Direction:    "ingress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType6,
-		SecGroupID:   groupID,
-		Protocol:     "icmp",
+	ruleOpts = secrules.CreateOpts{
+		Direction: secrules.DirIngress,
+		//		PortRangeMin:   0,
+		//		PortRangeMax:   18,
+		EtherType:      secrules.EtherType6,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolICMP,
+		RemoteIPPrefix: "::/0",
 	}
-	_, err = secgroups.CreateRule(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
 
 	// Outbound = egress == going to Outside
-	ruleOpts := secrules.CreateOpts{
-		Direction:    "egress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType4,
-		SecGroupID:   groupID,
-		Protocol:     "icmp",
+	ruleOpts = secrules.CreateOpts{
+		Direction: secrules.DirEgress,
+		//		PortRangeMin:   0,
+		//		PortRangeMax:   18,
+		EtherType:      secrules.EtherType4,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolICMP,
+		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err := secgroups.CreateRule(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
-	ruleOpts = secgroups.CreateRuleOpts{
-		Direction:    "egress",
-		PortRangeMin: 1,
-		PortRangeMax: 65535,
-		EtherType:    secrules.EtherType6,
-		SecGroupID:   groupID,
-		Protocol:     "icmp",
+	ruleOpts = secrules.CreateOpts{
+		Direction: secrules.DirEgress,
+		//		PortRangeMin:   0,
+		//		PortRangeMax:   18,
+		EtherType:      secrules.EtherType6,
+		SecGroupID:     groupID,
+		Protocol:       secrules.ProtocolICMP,
+		RemoteIPPrefix: "::/0",
 	}
-	_, err = secgroups.CreateRule(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.Network, ruleOpts).Extract()
 	return err
 }
 
@@ -454,17 +560,16 @@ func (client *Client) initDefaultSecurityGroup() error {
 		return err
 	}
 	if sg != nil {
-		client.Client.SecurityGroup = sg
+		client.SecurityGroup = sg
 		return nil
 	}
 	opts := secgroups.CreateOpts{
 		Name:        client.defaultSecurityGroup,
-		Description: "Default security group",
+		Description: "Default security group for VPC " + client.Opts.VPCName,
 	}
-
 	group, err := secgroups.Create(client.Network, opts).Extract()
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to create Security Group '%s': %s", client.defaultSecurityGroup, errorString(err))
 	}
 	err = client.createTCPRules(group.ID)
 	if err != nil {
@@ -481,29 +586,50 @@ func (client *Client) initDefaultSecurityGroup() error {
 		secgroups.Delete(client.Network, group.ID)
 		return err
 	}
-	//client.SecurityGroup = group
+	client.SecurityGroup = group
 	return nil
 }
 
 //initVPC initializes the VPC if it doesn't exist
 func (client *Client) initVPC() error {
 	// Tries to get VPC information
-	vpc, err := client.FindVPC(client.Opts.VPCName)
+	vpcID, err := client.findVPCID()
 	if err != nil {
 		return err
 	}
-	if vpc != nil {
-		return nil
+	if vpcID != nil {
+		client.vpc, err = client.GetVPC(*vpcID)
+		return err
 	}
 
-	vpc, err = client.CreateVPC(VPCRequest{
+	vpc, err := client.CreateVPC(VPCRequest{
 		Name: client.Opts.VPCName,
 		CIDR: client.Opts.VPCCIDR,
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to initialize VPC '%s'!", client.Opts.VPCName)
+		return fmt.Errorf("Failed to initialize VPC '%s': %s", client.Opts.VPCName, errorString(err))
 	}
-
-	//client.vpc = vpc
+	client.vpc = vpc
 	return nil
+}
+
+//findVPC returns the ID about the VPC
+func (client *Client) findVPCID() (*string, error) {
+	var router *openstack.Router
+	found := false
+	routers, err := client.Client.ListRouter()
+	if err != nil {
+		return nil, fmt.Errorf("Error listing routers: %s", errorString(err))
+	}
+	for _, r := range routers {
+		if r.Name == client.Opts.VPCName {
+			found = true
+			router = &r
+			break
+		}
+	}
+	if found {
+		return &router.ID, nil
+	}
+	return nil, nil
 }

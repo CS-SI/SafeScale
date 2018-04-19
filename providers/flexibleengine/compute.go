@@ -2,62 +2,229 @@ package flexibleengine
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/gob"
 	"fmt"
 	"time"
 
-	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
 	"github.com/SafeScale/providers/api/VMState"
-	"github.com/SafeScale/providers/api/VolumeSpeed"
+	"github.com/SafeScale/system"
 	uuid "github.com/satori/go.uuid"
 
-	ex_bfv "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
+	"github.com/gophercloud/gophercloud"
+	nics "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
+	exbfv "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
+	"github.com/gophercloud/gophercloud/pagination"
 )
 
-//VMRequest - FlexibleEngine needs some supplementary fields when requesting a VM
-type VMRequest struct {
-	*api.VMRequest
+type blockDevice struct {
+	// SourceType must be one of: "volume", "snapshot", "image", or "blank".
+	SourceType exbfv.SourceType `json:"source_type" required:"true"`
 
-	// Enable or disable the router mode of the VM in Flexible Engine
-	RouterMode bool
+	// UUID is the unique identifier for the existing volume, snapshot, or
+	// image (see above).
+	UUID string `json:"uuid,omitempty"`
+
+	// BootIndex is the boot index. It defaults to 0.
+	BootIndex string `json:"boot_index,omitempty"`
+
+	// DeleteOnTermination specifies whether or not to delete the attached volume
+	// when the server is deleted. Defaults to `false`.
+	DeleteOnTermination bool `json:"delete_on_termination"`
+
+	// DestinationType is the type that gets created. Possible values are "volume"
+	// and "local".
+	DestinationType exbfv.DestinationType `json:"destination_type,omitempty"`
+
+	// GuestFormat specifies the format of the block device.
+	GuestFormat string `json:"guest_format,omitempty"`
+
+	// VolumeSize is the size of the volume to create (in gigabytes). This can be
+	// omitted for existing volumes.
+	VolumeSize int `json:"volume_size,omitempty"`
+
+	// Type of volume
+	VolumeType string `json:"volume_type,omitempty"`
 }
 
-//VM - FlexibleEngine VM represents a virtual machine properties
-type VM struct {
-	*api.VM
-	RouterMode bool `json:"router_mode,omitempty"`
+// CreateOptsExt is a structure that extends the server `CreateOpts` structure
+// by allowing for a block device mapping.
+type bootdiskCreateOptsExt struct {
+	servers.CreateOptsBuilder
+	BlockDevice []blockDevice `json:"block_device_mapping_v2,omitempty"`
 }
 
-//createVM -
-func (client *Client) createVM(request VMRequest, isGateway bool) (*VM, error) {
-	//Eventual network gateway
-	var gw *api.VM
-	/*	//If the VM is not public it has to be created on a network owning a Gateway
-		if !request.PublicIP {
-			gwServer, err := client.readGateway(request.NetworkIDs[0])
-			if err != nil {
-				return nil, fmt.Errorf("No public VM cannot be created on a network without gateway")
+// ToServerCreateMap adds the block device mapping option to the base server
+// creation options.
+func (opts bootdiskCreateOptsExt) ToServerCreateMap() (map[string]interface{}, error) {
+	base, err := opts.CreateOptsBuilder.ToServerCreateMap()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(opts.BlockDevice) == 0 {
+		err := gophercloud.ErrMissingInput{}
+		err.Argument = "bootfromvolume.CreateOptsExt.BlockDevice"
+		return nil, err
+	}
+
+	serverMap := base["server"].(map[string]interface{})
+
+	blkDevices := make([]map[string]interface{}, len(opts.BlockDevice))
+
+	for i, bd := range opts.BlockDevice {
+		b, err := gophercloud.BuildRequestBody(bd, "")
+		if err != nil {
+			return nil, err
+		}
+		blkDevices[i] = b
+	}
+	serverMap["block_device_mapping_v2"] = blkDevices
+
+	return base, nil
+}
+
+type serverCreateOpts struct {
+	// Name is the name to assign to the newly launched server.
+	Name string `json:"name" required:"true"`
+
+	// ImageRef [optional; required if ImageName is not provided] is the ID or
+	// full URL to the image that contains the server's OS and initial state.
+	// Also optional if using the boot-from-volume extension.
+	ImageRef string `json:"imageRef,omitempty"`
+
+	// ImageName [optional; required if ImageRef is not provided] is the name of
+	// the image that contains the server's OS and initial state.
+	// Also optional if using the boot-from-volume extension.
+	ImageName string `json:"-,omitempty"`
+
+	// FlavorRef [optional; required if FlavorName is not provided] is the ID or
+	// full URL to the flavor that describes the server's specs.
+	FlavorRef string `json:"flavorRef"`
+
+	// FlavorName [optional; required if FlavorRef is not provided] is the name of
+	// the flavor that describes the server's specs.
+	FlavorName string `json:"-"`
+
+	// SecurityGroups lists the names of the security groups to which this server
+	// should belong.
+	SecurityGroups []string `json:"-"`
+
+	// UserData contains configuration information or scripts to use upon launch.
+	// Create will base64-encode it for you, if it isn't already.
+	UserData []byte `json:"-"`
+
+	// AvailabilityZone in which to launch the server.
+	AvailabilityZone string `json:"availability_zone,omitempty"`
+
+	// Networks dictates how this server will be attached to available networks.
+	// By default, the server will be attached to all isolated networks for the
+	// tenant.
+	Networks []servers.Network `json:"-"`
+
+	// Metadata contains key-value pairs (up to 255 bytes each) to attach to the
+	// server.
+	Metadata map[string]string `json:"metadata,omitempty"`
+
+	// Personality includes files to inject into the server at launch.
+	// Create will base64-encode file contents for you.
+	Personality servers.Personality `json:"personality,omitempty"`
+
+	// ConfigDrive enables metadata injection through a configuration drive.
+	ConfigDrive *bool `json:"config_drive,omitempty"`
+
+	// AdminPass sets the root user password. If not set, a randomly-generated
+	// password will be created and returned in the response.
+	AdminPass string `json:"adminPass,omitempty"`
+
+	// AccessIPv4 specifies an IPv4 address for the instance.
+	AccessIPv4 string `json:"accessIPv4,omitempty"`
+
+	// AccessIPv6 pecifies an IPv6 address for the instance.
+	AccessIPv6 string `json:"accessIPv6,omitempty"`
+
+	// ServiceClient will allow calls to be made to retrieve an image or
+	// flavor ID by name.
+	ServiceClient *gophercloud.ServiceClient `json:"-"`
+}
+
+// ToServerCreateMap assembles a request body based on the contents of a
+// CreateOpts.
+func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
+	sc := opts.ServiceClient
+	opts.ServiceClient = nil
+	b, err := gophercloud.BuildRequestBody(opts, "")
+	if err != nil {
+		return nil, err
+	}
+
+	if opts.UserData != nil {
+		var userData string
+		if _, err := base64.StdEncoding.DecodeString(string(opts.UserData)); err != nil {
+			userData = base64.StdEncoding.EncodeToString(opts.UserData)
+		} else {
+			userData = string(opts.UserData)
+		}
+		b["user_data"] = &userData
+	}
+
+	if len(opts.SecurityGroups) > 0 {
+		securityGroups := make([]map[string]interface{}, len(opts.SecurityGroups))
+		for i, groupName := range opts.SecurityGroups {
+			securityGroups[i] = map[string]interface{}{"name": groupName}
+		}
+		b["security_groups"] = securityGroups
+	}
+
+	if len(opts.Networks) > 0 {
+		networks := make([]map[string]interface{}, len(opts.Networks))
+		for i, net := range opts.Networks {
+			networks[i] = make(map[string]interface{})
+			if net.UUID != "" {
+				networks[i]["uuid"] = net.UUID
 			}
-			gw, err = client.readVMDefinition(gwServer.ID)
-			if err != nil {
-				return nil, fmt.Errorf("Bad state, Gateway for network %s is not accessible", request.NetworkIDs[0])
+			if net.Port != "" {
+				networks[i]["port"] = net.Port
+			}
+			if net.FixedIP != "" {
+				networks[i]["fixed_ip"] = net.FixedIP
 			}
 		}
-	*/
+		b["networks"] = networks
+	}
 
+	// If FlavorRef isn't provided, use FlavorName to ascertain the flavor ID.
+	if opts.FlavorRef == "" {
+		if opts.FlavorName == "" {
+			err := servers.ErrNeitherFlavorIDNorFlavorNameProvided{}
+			err.Argument = "FlavorRef/FlavorName"
+			return nil, err
+		}
+		if sc == nil {
+			err := servers.ErrNoClientProvidedForIDByName{}
+			err.Argument = "ServiceClient"
+			return nil, err
+		}
+		flavorID, err := flavors.IDFromName(sc, opts.FlavorName)
+		if err != nil {
+			return nil, err
+		}
+		b["flavorRef"] = flavorID
+	}
+
+	return map[string]interface{}{"server": b}, nil
+}
+
+//CreateVM creates a new VM
+func (client *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 	var nets []servers.Network
-	//If floating IPs are not used and VM is public
-	//then add provider network to VM networks
-	//if !client.Cfg.UseFloatingIP && request.PublicIP {
-	//	nets = append(nets, servers.Network{
-	//		UUID: client.ProviderNetworkID,
-	//	})
-	//}
 	//Add private networks
 	for _, n := range request.NetworkIDs {
 		nets = append(nets, servers.Network{
@@ -79,125 +246,190 @@ func (client *Client) createVM(request VMRequest, isGateway bool) (*VM, error) {
 		defer client.DeleteKeyPair(kp.ID)
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
-	userData, err := client.PrepareUserData(*request.VMRequest, isGateway, kp, gw)
+	userData, err := client.PrepareUserData(request, false, kp, nil)
 	//fmt.Println(string(userData))
 
-	// Configure block device for system disk
-	volreq := api.VolumeRequest{
-		Size:  100,
-		Name:  request.Name,
-		Speed: VolumeSpeed.SSD,
-	}
-	bootvol, err := client.ExCreateVolume(volreq, request.ImageID)
+	// Determine system disk size based on vcpus count
+	template, err := client.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating Boot Volume: %s", errorString(err))
+		return nil, fmt.Errorf("Failed to get image: %s", errorString(err))
 	}
-	bootDiskOpts := ex_bfv.BlockDevice{
-		SourceType: ex_bfv.SourceVolume,
-		//DestinationType:     "volume",
-		BootIndex:           0,
+
+	var diskSize int
+	if template.VMSize.DiskSize > 0 {
+		diskSize = template.VMSize.DiskSize
+	} else if template.VMSize.Cores < 16 {
+		diskSize = 100
+	} else if template.VMSize.Cores < 32 {
+		diskSize = 200
+	} else {
+		diskSize = 400
+	}
+
+	// Defines boot disk
+	bootdiskOpts := blockDevice{
+		SourceType:          exbfv.SourceImage,
+		DestinationType:     exbfv.DestinationVolume,
+		BootIndex:           "0",
 		DeleteOnTermination: true,
-		UUID:                bootvol.ID,
+		UUID:                request.ImageID,
+		VolumeType:          "SSD",
+		VolumeSize:          diskSize,
 	}
-	// Create VM options
-	srvOpts := servers.CreateOpts{
+	// Defines server
+	srvOpts := serverCreateOpts{
 		Name:           request.Name,
 		SecurityGroups: []string{client.SecurityGroup.Name},
 		Networks:       nets,
 		FlavorRef:      request.TemplateID,
-		ImageRef:       request.ImageID,
 		UserData:       userData,
 	}
-	// Create VM "Extension bootfromvolume" options
-	exSrvOpts := ex_bfv.CreateOptsExt{
+	// Defines VM "Extension bootfromvolume" options
+	bdOpts := bootdiskCreateOptsExt{
 		CreateOptsBuilder: srvOpts,
-		BlockDevice:       []ex_bfv.BlockDevice{bootDiskOpts},
+		BlockDevice:       []blockDevice{bootdiskOpts},
 	}
-	// Create VM
-	server, err := ex_bfv.Create(client.Compute, keypairs.CreateOptsExt{
-		CreateOptsBuilder: exSrvOpts,
+	// Defines Key name to use to login in the VM
+	kpOpts := keypairs.CreateOptsExt{
+		CreateOptsBuilder: bdOpts,
 		KeyName:           kp.ID,
-	}).Extract()
+	}
+	b, err := kpOpts.ToServerCreateMap()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to build query to create VM '%s': %s", request.Name, errorString(err))
+	}
+	r := servers.CreateResult{}
+	_, r.Err = client.Compute.Post(client.Compute.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 202},
+	})
+	server, err := r.Extract()
 	if err != nil {
 		if server != nil {
 			servers.Delete(client.Compute, server.ID)
-			client.DeleteVolume(bootvol.ID)
 		}
 		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
 	}
+
 	// Wait that VM is started
-	service := providers.Service{
-		ClientAPI: client,
-	}
-	vm, err := service.WaitVMState(server.ID, VMState.STARTED, 120*time.Second)
+	vm, err := client.waitVMReady(server.ID, 120*time.Second)
 	if err != nil {
+		client.DeleteVM(server.ID)
 		return nil, fmt.Errorf("Timeout creating VM: %s", errorString(err))
 	}
 
-	exvm := VM{
-		VM:         vm,
-		RouterMode: request.RouterMode,
-	}
+	// Fixes the size of bootdisk, FlexibleEngine is used to not give one...
+	vm.Size.DiskSize = diskSize
+	vm.PrivateKey = kp.PrivateKey
 
-	//Add gateway ID to VM definition (VPL: not sure if it's needed with FlexibleEngine...)
-	/*	var gwID string
-		if gw != nil {
-			gwID = gw.ID
-		}
-		vm.GatewayID = gwID*/
-	exvm.VM.PrivateKey = kp.PrivateKey
 	//if Floating IP are not used or no public address is requested
-	if /*!client.Cfg.UseFloatingIP || */ !request.PublicIP {
-		err = client.saveVMDefinition(exvm)
+	if request.PublicIP {
+		fip, err := client.attachFloatingIP(vm)
 		if err != nil {
-			client.DeleteVM(exvm.VM.ID)
-			client.DeleteVolume(bootvol.ID)
+			client.DeleteVM(vm.ID)
 			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
 		}
-		return &exvm, nil
+		err = client.enableVMRouterMode(vm)
+		if err != nil {
+			client.DeleteVM(vm.ID)
+			client.DeleteFloatingIP(fip.ID)
+			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+		}
 	}
 
-	/* VPL: Probablement à revoir... */
-	//Create the floating IP
-	ip, err := floatingips.Create(client.Compute, floatingips.CreateOpts{
-		//Pool: client.Opts.FloatingIPPool,
-	}).Extract()
+	// Saving definition right now, without waiting for Public IP association
+	err = client.saveVMDefinition(*vm)
 	if err != nil {
-		servers.Delete(client.Compute, exvm.VM.ID)
+		client.DeleteVM(vm.ID)
 		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
 	}
 
-	//Associate floating IP to VM
-	err = floatingips.AssociateInstance(client.Compute, exvm.VM.ID, floatingips.AssociateOpts{
-		FloatingIP: ip.IP,
-	}).ExtractErr()
+	return vm, nil
+}
+
+//WaitVMState waits a vm achieve state
+func (client *Client) waitVMReady(vmID string, timeout time.Duration) (*api.VM, error) {
+	cout := make(chan int)
+	next := make(chan bool)
+	vmc := make(chan *servers.Server)
+
+	go pollVMReady(client, vmID, cout, next, vmc)
+	for {
+		select {
+		case res := <-cout:
+			if res == 0 {
+				return nil, fmt.Errorf("Error querying VM state")
+			}
+			if res == 1 {
+				server := <-vmc
+				return client.toVM(server), nil
+			}
+			if res == 2 {
+				next <- true
+			}
+			if res == 3 {
+				return nil, fmt.Errorf("VM in Error state")
+			}
+		case <-time.After(timeout):
+			next <- false
+			return nil, &api.TimeoutError{Message: "Timeout waiting VM state"}
+		}
+	}
+}
+
+//pollVMReady polls until the VM is ready or time outs
+func pollVMReady(client *Client, vmID string, cout chan int, next chan bool, vmc chan *servers.Server) {
+	for {
+		server, err := servers.Get(client.Compute, vmID).Extract()
+		if err != nil {
+			fmt.Println(err)
+			cout <- 0
+			return
+		}
+		if server.Status == "ACTIVE" {
+			cout <- 1
+			vmc <- server
+			return
+		}
+		if server.Status == "ERROR" {
+			cout <- 3
+			return
+		}
+		cout <- 2
+		if !<-next {
+			return
+		}
+	}
+}
+
+//GetVM returns the VM identified by id
+func (client *Client) GetVM(id string) (*api.VM, error) {
+	server, err := servers.Get(client.Compute, id).Extract()
 	if err != nil {
-		floatingips.Delete(client.Compute, ip.ID)
-		servers.Delete(client.Compute, exvm.VM.ID)
-		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+		return nil, fmt.Errorf("Error getting VM: %s", errorString(err))
 	}
+	vm := client.toVM(server)
+	return vm, nil
+}
 
-	// Enable router mode if needed
-	if request.RouterMode {
-		client.enableRouterMode(&exvm)
-	}
+//ListVMs lists available VMs
+func (client *Client) ListVMs() ([]api.VM, error) {
+	pager := servers.List(client.Compute, servers.ListOpts{})
+	var vms []api.VM
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		list, err := servers.ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
 
-	if IPVersion.IPv4.Is(ip.IP) {
-		exvm.VM.AccessIPv4 = ip.IP
-	} else if IPVersion.IPv6.Is(ip.IP) {
-		exvm.VM.AccessIPv6 = ip.IP
+		for _, srv := range list {
+			vms = append(vms, *client.toVM(&srv))
+		}
+		return true, nil
+	})
+	if len(vms) == 0 && err != nil {
+		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
 	}
-	err = client.saveVMDefinition(exvm)
-	if err != nil {
-		client.DeleteVM(exvm.VM.ID)
-		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
-	}
-
-	return &exvm, nil
+	return vms, nil
 }
 
 //DeleteVM deletes the VM identified by id
@@ -207,103 +439,388 @@ func (client *Client) DeleteVM(id string) error {
 	if err != nil {
 		return err
 	}
-	// Deletes the VM
-	err = client.Client.DeleteVM(id)
-	// In FlexibleEngine, volume are not always automatically remove, so take care of it
+
+	client.readVMDefinition(id)
+	if client.Cfg.UseFloatingIP {
+		fip, err := client.getFloatingIPOfVM(id)
+		if err == nil {
+			if fip != nil {
+				err = floatingips.DisassociateInstance(client.Compute, id, floatingips.DisassociateOpts{
+					FloatingIP: fip.IP,
+				}).ExtractErr()
+				if err != nil {
+					return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+				}
+				err = floatingips.Delete(client.Compute, fip.ID).ExtractErr()
+				if err != nil {
+					return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+				}
+			}
+		}
+	}
+	err = servers.Delete(client.Compute, id).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+	}
+
+	// In FlexibleEngine, volumes may not be always automatically removed, so take care of them
 	for _, va := range volumeAttachments {
 		volume, err := client.GetVolume(va.VolumeID)
 		if err != nil {
 			continue
 		}
-		err = client.DeleteVolume(volume.ID)
-		if err != nil {
-			return err
-		}
+		client.DeleteVolume(volume.ID)
 	}
-	return nil
+
+	client.removeVMDefinition(id)
+
+	// FlexibleEngine may take time to remove VM, preventing for example DeleteNetwork to work if called to soon
+	// So we wait VM is effectively removed before returning
+	return client.waitVMRemoved(id, 120*time.Second)
 }
 
-/*
- * Gathers system disk size from the volume, FlexibleEngine template doesn't
- * contain this information
- * :param node: Node object
- * :return: int: size in GB of the system disk
- *          error: nil on success, error on failure
- */
-func (client *Client) getSystemDiskSize(vm *VM) (int, error) {
-	volumeAttachments, err := client.ListVolumeAttachments(vm.VM.ID)
-	if err != nil {
-		return 0, err
+//waitVMDeleted waits
+func (client *Client) waitVMRemoved(vmID string, timeout time.Duration) error {
+	cout := make(chan int)
+	next := make(chan bool)
+
+	go pollVMRemoved(client, vmID, cout, next)
+	for {
+		select {
+		case res := <-cout:
+			if res == 0 {
+				return fmt.Errorf("Error querying VM state")
+			}
+			if res == 1 {
+				return nil
+			}
+			if res == 2 {
+				next <- true
+			}
+		case <-time.After(timeout):
+			next <- false
+			return &api.TimeoutError{Message: "Wait VM removed timeout"}
+		}
 	}
-	volumeAttachment := volumeAttachments[0]
-	volume, err := client.GetVolume(volumeAttachment.VolumeID)
-	if err != nil {
-		return 0, err
-	}
-	return volume.Size, nil
 }
 
-/**
- * Disables the source/destination check on NIC corresponding to the private_ip of the node.
- * This allows the NIC to serve as router/gateway.
- * :param node_id:
- * :param private_ip:
- * :return:
- */
-func (client *Client) enableRouterMode(vm *VM) error {
-	/* VPL: Python code to port in GO
-	port_id, err := client.getPortIDFromIP(vm.ID, vm.PrivateIPsV4)
+//pollVMDeleted is used to verify if a VM has been removed
+func pollVMRemoved(client *Client, vmID string, cout chan int, next chan bool) {
+	for {
+		r := servers.GetResult{}
+		httpResp, err := client.Compute.Get(client.Compute.ServiceURL("servers", vmID), &r.Body, &gophercloud.RequestOpts{
+			OkCodes: []int{200, 203, 404},
+		})
 		if err != nil {
-			return err
+			cout <- 0
+			return
 		}
-		data := {
-			"port": {
-				"allowed_address_pairs": [
-					{
-						"ip_address": "1.1.1.1/0"
-					}
-				]
+		if httpResp.StatusCode == 404 {
+			cout <- 1
+			return
+		}
+		cout <- 2
+		if !<-next {
+			return
+		}
+	}
+}
+
+//GetSSHConfig creates SSHConfig to connect a VM by its ID
+func (client *Client) GetSSHConfig(id string) (*system.SSHConfig, error) {
+	vm, err := client.GetVM(id)
+	if err != nil {
+		return nil, err
+	}
+	return client.getSSHConfig(vm)
+}
+
+func (client *Client) getSSHConfig(vm *api.VM) (*system.SSHConfig, error) {
+	ip := vm.GetAccessIP()
+	sshConfig := system.SSHConfig{
+		PrivateKey: vm.PrivateKey,
+		Port:       22,
+		Host:       ip,
+		User:       api.DefaultUser,
+	}
+	if vm.GatewayID != "" {
+		gw, err := client.GetVM(vm.GatewayID)
+		if err != nil {
+			return nil, err
+		}
+		ip := gw.GetAccessIP()
+		GatewayConfig := system.SSHConfig{
+			PrivateKey: gw.PrivateKey,
+			Port:       22,
+			User:       api.DefaultUser,
+			Host:       ip,
+		}
+		sshConfig.GatewayConfig = &GatewayConfig
+	}
+
+	return &sshConfig, nil
+}
+
+//getFloatingIP returns the floating IP associated with the VM identified by vmID
+//By convention only one floating IP is allocated to a VM
+func (client *Client) getFloatingIPOfVM(vmID string) (*floatingips.FloatingIP, error) {
+	pager := floatingips.List(client.Compute)
+	var fips []floatingips.FloatingIP
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		list, err := floatingips.ExtractFloatingIPs(page)
+		if err != nil {
+			return false, err
+		}
+
+		for _, fip := range list {
+			if fip.InstanceID == vmID {
+				fips = append(fips, fip)
 			}
 		}
-		cnx = self._open_connection_on_network_endpoint()
-		resp = cnx.request(method="PUT", action="/v2.0/ports/%s" % port_id, data=data)
-		if resp and resp.success():
-			logger.info("Router mode enabled on node %s", node_id)
-			return
-		logger.error("Failed to enable router mode on node %s", node_id)
-	*/
+		return true, nil
+	})
+	if len(fips) == 0 {
+		if err != nil {
+			return nil, fmt.Errorf("No floating IP found for VM %s: %s", vmID, errorString(err))
+		}
+		return nil, fmt.Errorf("No floating IP found for VM %s", vmID)
+
+	}
+	if len(fips) > 1 {
+		return nil, fmt.Errorf("Configuration error, more than one Floating IP associated to VM %s", vmID)
+	}
+	return &fips[0], nil
+}
+
+//attachFloatingIP creates a Floating IP and attaches it to a VM
+func (client *Client) attachFloatingIP(vm *api.VM) (*FloatingIP, error) {
+	fip, err := client.CreateFloatingIP()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to attach Floating IP on VM '%s': %s", vm.Name, errorString(err))
+	}
+
+	err = client.AssociateFloatingIP(vm, fip.ID)
+	if err != nil {
+		client.DeleteFloatingIP(fip.ID)
+		return nil, fmt.Errorf("Failed to attach Floating IP to VM '%s': %s", vm.Name, errorString(err))
+	}
+
+	updateAccessIPsOfVM(vm, fip.PublicIPAddress)
+
+	return fip, nil
+}
+
+//updateAccessIPsOfVM updates the IP address(es) to use to access the VM
+func updateAccessIPsOfVM(vm *api.VM, ip string) {
+	if IPVersion.IPv4.Is(ip) {
+		vm.AccessIPv4 = ip
+	} else if IPVersion.IPv6.Is(ip) {
+		vm.AccessIPv6 = ip
+	}
+}
+
+//EnableVMRouterMode enables the VM to act as a router/gateway.
+func (client *Client) enableVMRouterMode(vm *api.VM) error {
+	portID, err := client.getOpenstackPortID(vm)
+	if err != nil {
+		return fmt.Errorf("Failed to enable Router Mode on VM '%s': %s", vm.Name, errorString(err))
+	}
+
+	pairs := []ports.AddressPair{
+		{
+			IPAddress: "1.1.1.1/0",
+		},
+	}
+	opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
+	_, err = ports.Update(client.Network, *portID, opts).Extract()
+	if err != nil {
+		return fmt.Errorf("Failed to enable Router Mode on VM '%s': %s", vm.Name, errorString(err))
+	}
 	return nil
 }
 
-func (client *Client) saveVMDefinition(vm VM) error {
+//DisableVMRouterMode disables the VM to act as a router/gateway.
+func (client *Client) disableVMRouterMode(vm *api.VM) error {
+	portID, err := client.getOpenstackPortID(vm)
+	if err != nil {
+		return fmt.Errorf("Failed to disable Router Mode on VM '%s': %s", vm.Name)
+	}
+
+	opts := ports.UpdateOpts{AllowedAddressPairs: nil}
+	_, err = ports.Update(client.Network, *portID, opts).Extract()
+	if err != nil {
+		return fmt.Errorf("Failed to disable Router Mode on VM '%s': %s", vm.Name, errorString(err))
+	}
+	return nil
+}
+
+//saveVMDefinition saves the VM definition in Object Storage
+func (client *Client) saveVMDefinition(vm api.VM) error {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(vm)
 	if err != nil {
 		return err
 	}
-	return client.PutObject("__vms__", api.Object{
+	return client.PutObject(VMContainerName, api.Object{
 		Name:    vm.ID,
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
 }
 
+//removeVMDefinition removes the VM definition from Object Storage
 func (client *Client) removeVMDefinition(vmID string) error {
-	return client.DeleteObject("__vms__", vmID)
+	return client.DeleteObject(VMContainerName, vmID)
 }
 
-func (client *Client) readVMDefinition(vmID string) (*VM, error) {
-	o, err := client.GetObject("__vms__", vmID, nil)
+//readVMDefinition gets the VM definition from Object Storage
+func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
+	o, err := client.GetObject(VMContainerName, vmID, nil)
 	if err != nil {
 		return nil, err
 	}
 	var buffer bytes.Buffer
 	buffer.ReadFrom(o.Content)
 	enc := gob.NewDecoder(&buffer)
-	var vm VM
+	var vm api.VM
 	err = enc.Decode(&vm)
 	if err != nil {
 		return nil, err
 	}
 	return &vm, nil
+}
+
+//listInterfaces returns a pager of the interfaces attached to VM identified by 'serverID'
+func (client *Client) listInterfaces(vmID string) pagination.Pager {
+	url := client.Compute.ServiceURL("servers", vmID, "os-interface")
+	return pagination.NewPager(client.Compute, url, func(r pagination.PageResult) pagination.Page {
+		return nics.InterfacePage{pagination.SinglePageBase(r)}
+	})
+}
+
+//getOpenstackPortID returns the port ID corresponding to the first private IP address of the VM
+// returns nil,nil if not found
+func (client *Client) getOpenstackPortID(vm *api.VM) (*string, error) {
+	ip := vm.PrivateIPsV4[0]
+	found := false
+	nic := nics.Interface{}
+	pager := client.listInterfaces(vm.ID)
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		list, err := nics.ExtractInterfaces(page)
+		if err != nil {
+			return false, err
+		}
+		for _, i := range list {
+			for _, iip := range i.FixedIPs {
+				if iip.IPAddress == ip {
+					found = true
+					nic = i
+					return false, nil
+				}
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Error browsing Openstack Interfaces of VM '%s': %s", vm.Name, errorString(err))
+	}
+	if found {
+		return &nic.PortID, nil
+	}
+	return nil, nil
+}
+
+//toVMSize converts flavor attributes returned by OpenStack driver into api.VM
+func (client *Client) toVMSize(flavor map[string]interface{}) api.VMSize {
+	if i, ok := flavor["id"]; ok {
+		fid := i.(string)
+		tpl, _ := client.GetTemplate(fid)
+		return tpl.VMSize
+	}
+	if _, ok := flavor["vcpus"]; ok {
+		return api.VMSize{
+			Cores:    flavor["vcpus"].(int),
+			DiskSize: flavor["disk"].(int),
+			RAMSize:  flavor["ram"].(float32) / 1000.0,
+		}
+	}
+	return api.VMSize{}
+}
+
+//toVMState converts VM status returned by FlexibleEngine driver into VMState enum
+func toVMState(status string) VMState.Enum {
+	switch status {
+	case "BUILD", "build", "BUILDING", "building":
+		return VMState.STARTING
+	case "ACTIVE", "active":
+		return VMState.STARTED
+	case "RESCUED", "rescued":
+		return VMState.STOPPING
+	case "STOPPED", "stopped", "SHUTOFF", "shutoff":
+		return VMState.STOPPED
+	default:
+		return VMState.ERROR
+	}
+}
+
+//convertAdresses converts adresses returned by the FlexibleEngine driver and arranges them by version in a map
+//func (client *Client) convertAdresses(addresses map[string]interface{}) (map[IPVersion.Enum][]string, string, string) {
+func (client *Client) convertAdresses(addresses map[string]interface{}) map[IPVersion.Enum][]string {
+	addrs := make(map[IPVersion.Enum][]string)
+	//	var AccessIPv4 string
+	//	var AccessIPv6 string
+	for _, obj := range addresses {
+		for _, networkAddresses := range obj.([]interface{}) {
+			address := networkAddresses.(map[string]interface{})
+			version := address["version"].(float64)
+			fixedIP := address["addr"].(string)
+			/*			if n == ProviderInternetGW {
+						switch version {
+						case 4:
+							AccessIPv4 = fixedIP
+						case 6:
+							AccessIPv6 = fixedIP
+						}
+					} else {*/
+			switch version {
+			case 4:
+				addrs[IPVersion.IPv4] = append(addrs[IPVersion.IPv4], fixedIP)
+			case 6:
+				addrs[IPVersion.IPv6] = append(addrs[IPVersion.IPv4], fixedIP)
+			}
+			//}
+		}
+	}
+	//return addrs, AccessIPv4, AccessIPv6
+	return addrs
+}
+
+//toVM converts a FlexibleEngine (almost OpenStack...) server into api VM
+func (client *Client) toVM(server *servers.Server) *api.VM {
+	//	adresses, ipv4, ipv6 := client.convertAdresses(server.Addresses)
+	adresses := client.convertAdresses(server.Addresses)
+
+	vm := api.VM{
+		ID:           server.ID,
+		Name:         server.Name,
+		PrivateIPsV4: adresses[IPVersion.IPv4],
+		PrivateIPsV6: adresses[IPVersion.IPv6],
+		AccessIPv4:   server.AccessIPv4,
+		AccessIPv6:   server.AccessIPv6,
+		Size:         client.toVMSize(server.Flavor),
+		State:        toVMState(server.Status),
+	}
+	vmDef, err := client.readVMDefinition(server.ID)
+	if err == nil {
+		vm.GatewayID = vmDef.GatewayID
+		vm.PrivateKey = vmDef.PrivateKey
+		//Floating IP management
+		if vm.AccessIPv4 == "" {
+			vm.AccessIPv4 = vmDef.AccessIPv4
+		}
+		if vm.AccessIPv6 == "" {
+			vm.AccessIPv6 = vmDef.AccessIPv6
+		}
+	}
+	return &vm
 }
