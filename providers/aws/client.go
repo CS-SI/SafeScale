@@ -21,15 +21,17 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/SafeScale/providers/api/VMState"
 
+	"github.com/SafeScale/aws/s3"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/system"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
-	"github.com/aws/aws-sdk-go/service/s3"
+	awss3 "github.com/aws/aws-sdk-go/service/s3"
 )
 
 // //Config AWS configurations
@@ -1486,248 +1488,50 @@ func (c *Client) DeleteVolumeAttachment(serverID, id string) error {
 
 //CreateContainer creates an object container
 func (c *Client) CreateContainer(name string) error {
-	svc := s3.New(c.Session)
-	input := &s3.CreateBucketInput{
-		Bucket: aws.String(name),
-		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			LocationConstraint: aws.String(c.AuthOpts.Region),
-		},
-	}
-
-	_, err := svc.CreateBucket(input)
-	return err
+	return s3.CreateContainer(awss3.New(c.Session), name)
 }
 
 //DeleteContainer deletes an object container
 func (c *Client) DeleteContainer(name string) error {
-	svc := s3.New(c.Session)
-	input := &s3.DeleteBucketInput{
-		Bucket: aws.String(name),
-	}
-	_, err := svc.DeleteBucket(input)
-	return err
+	return s3.DeleteContainer(awss3.New(c.Session), name)
 }
 
 //ListContainers list object containers
 func (c *Client) ListContainers() ([]string, error) {
-	svc := s3.New(c.Session)
-	input := &s3.ListBucketsInput{}
-
-	result, err := svc.ListBuckets(input)
-	if err != nil {
-		return nil, err
-	}
-	buckets := []string{}
-	for _, b := range result.Buckets {
-		buckets = append(buckets, *b.Name)
-	}
-	return buckets, nil
-}
-
-func createTagging(m map[string]string) string {
-	tags := []string{}
-	for k, v := range m {
-		tags = append(tags, fmt.Sprintf("%s=%s", k, v))
-	}
-	return strings.Join(tags, "&")
+	return s3.ListContainers(awss3.New(c.Session))
 }
 
 //PutObject put an object into an object container
 func (c *Client) PutObject(container string, obj api.Object) error {
-	svc := s3.New(c.Session)
-
-	//Manage object life cycle
-	expires := obj.DeleteAt != time.Time{}
-	if expires {
-		_, err := svc.PutBucketLifecycle(&s3.PutBucketLifecycleInput{
-			Bucket: aws.String(container),
-			LifecycleConfiguration: &s3.LifecycleConfiguration{
-				Rules: []*s3.Rule{
-					&s3.Rule{
-						Expiration: &s3.LifecycleExpiration{
-							Date: &obj.DeleteAt,
-						},
-						Prefix: aws.String(obj.Name),
-						Status: aws.String("Enabled"),
-					},
-				},
-			},
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	if obj.Metadata == nil {
-		obj.Metadata = map[string]string{}
-	}
-	dateBytes, _ := time.Now().MarshalText()
-	obj.Metadata["__date__"] = string(dateBytes)
-	dateBytes, _ = obj.DeleteAt.MarshalText()
-	obj.Metadata["__delete_at__"] = string(dateBytes)
-	input := &s3.PutObjectInput{
-		Body:        aws.ReadSeekCloser(obj.Content),
-		Bucket:      aws.String(container),
-		Key:         aws.String(obj.Name),
-		ContentType: aws.String(obj.ContentType),
-		Tagging:     aws.String(createTagging(obj.Metadata)),
-	}
-
-	_, err := svc.PutObject(input)
-
-	return err
+	return s3.PutObject(awss3.New(c.Session), container, obj)
 }
 
 //UpdateObjectMetadata update an object into  object container
 func (c *Client) UpdateObjectMetadata(container string, obj api.Object) error {
-	//meta, err := c.GetObjectMetadata(container, obj.Name
-	svc := s3.New(c.Session)
-	tags := []*s3.Tag{}
-	for k, v := range obj.Metadata {
-		tags = append(tags, &s3.Tag{
-			Key:   aws.String(k),
-			Value: aws.String(v),
-		})
-	}
-	input := &s3.PutObjectTaggingInput{
-		Bucket: aws.String(container),
-		Key:    aws.String(obj.Name),
-		Tagging: &s3.Tagging{
-			TagSet: tags,
-		},
-	}
-	_, err := svc.PutObjectTagging(input)
-	return err
-}
-
-func pStr(s *string) string {
-	if s == nil {
-		var s string
-		return s
-	}
-	return *s
-}
-func pTime(p *time.Time) time.Time {
-	if p == nil {
-		return time.Time{}
-	}
-	return *p
-}
-func pInt64(p *int64) int64 {
-	if p == nil {
-		var v int64
-		return v
-	}
-	return *p
+	return s3.UpdateObjectMetadata(awss3.New(c.Session), container, obj)
 }
 
 //GetObject get  object content from an object container
 func (c *Client) GetObject(container string, name string, ranges []api.Range) (*api.Object, error) {
-	svc := s3.New(c.Session)
-	var rList []string
-	for _, r := range ranges {
-		rList = append(rList, r.String())
-	}
-	sRanges := strings.Join(rList, ",")
-	out, err := svc.GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(container),
-		Key:    aws.String(name),
-		Range:  aws.String(sRanges),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	obj, err := c.GetObjectMetadata(container, name)
-	if err != nil {
-		return nil, err
-	}
-	return &api.Object{
-		Content:       aws.ReadSeekCloser(out.Body),
-		ContentLength: pInt64(out.ContentLength),
-		ContentType:   pStr(out.ContentType),
-		LastModified:  pTime(out.LastModified),
-		Name:          name,
-		Metadata:      obj.Metadata,
-		Date:          obj.Date,
-		DeleteAt:      obj.DeleteAt,
-	}, nil
+	return s3.GetObject(awss3.New(c.Session), container, name, ranges)
 }
 
 //GetObjectMetadata get  object metadata from an object container
 func (c *Client) GetObjectMetadata(container string, name string) (*api.Object, error) {
-	svc := s3.New(c.Session)
-	tagging, err := svc.GetObjectTagging(&s3.GetObjectTaggingInput{
-		Bucket: aws.String(container),
-		Key:    aws.String(name),
-	})
-	meta := map[string]string{}
-	date := time.Time{}
-	deleteAt := time.Time{}
-	if err != nil {
-		for _, t := range tagging.TagSet {
-			if *t.Key == "__date__" {
-				buffer := bytes.Buffer{}
-				buffer.WriteString(*t.Value)
-				date.UnmarshalText(buffer.Bytes())
-			} else if *t.Key == "__delete_at__" {
-				buffer := bytes.Buffer{}
-				buffer.WriteString(*t.Value)
-				deleteAt.UnmarshalText(buffer.Bytes())
-			}
-			meta[*t.Key] = *t.Value
-		}
-	}
-	return &api.Object{
-		Name:     name,
-		Metadata: meta,
-		Date:     date,
-		DeleteAt: deleteAt,
-	}, nil
+	return s3.GetObjectMetadata(awss3.New(c.Session), container, name)
 }
 
 //ListObjects list objects of a container
 func (c *Client) ListObjects(container string, filter api.ObjectFilter) ([]string, error) {
-	svc := s3.New(c.Session)
-	var objs []string
-
-	prefix := strings.Join([]string{filter.Path, filter.Prefix}, "/")
-	err := svc.ListObjectsV2Pages(&s3.ListObjectsV2Input{
-		Bucket: aws.String(container),
-		Prefix: aws.String(prefix),
-	},
-		func(out *s3.ListObjectsV2Output, last bool) bool {
-			for _, o := range out.Contents {
-				objs = append(objs, *o.Key)
-			}
-			return last
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	return objs, err
-
+	return s3.ListObjects(awss3.New(c.Session), container, filter)
 }
 
 //CopyObject copies an object
 func (c *Client) CopyObject(containerSrc, objectSrc, objectDst string) error {
-	svc := s3.New(c.Session)
-	src := strings.Join([]string{containerSrc, objectDst}, "/")
-	_, err := svc.CopyObject(&s3.CopyObjectInput{
-		Bucket:     aws.String(containerSrc),
-		Key:        aws.String(objectSrc),
-		CopySource: aws.String(src),
-	})
-	return err
+	return s3.CopyObject(awss3.New(c.Session), containerSrc, objectSrc, objectDst)
 }
 
 //DeleteObject deleta an object from a container
 func (c *Client) DeleteObject(container, object string) error {
-	svc := s3.New(c.Session)
-	_, err := svc.DeleteObject(&s3.DeleteObjectInput{
-		Bucket: aws.String(container),
-		Key:    aws.String(object),
-	})
-	return err
+	return s3.DeleteObject(awss3.New(c.Session), container, object)
 }
