@@ -25,6 +25,7 @@ const cmdNumberOfCPU string = "lscpu | grep 'CPU(s):' | grep -v 'NUMA' | tr -d '
 const cmdNumberOfCorePerSocket string = "lscpu | grep 'Core(s) per socket' | tr -d '[:space:]' | cut -d: -f2"
 const cmdNumberOfSocket string = "lscpu | grep 'Socket(s)' | tr -d '[:space:]' | cut -d: -f2"
 const cmdArch string = "lscpu | grep 'Architecture' | tr -d '[:space:]' | cut -d: -f2"
+const cmdHypervisor string = "lscpu | grep 'Hypervisor' | tr -d '[:space:]' | cut -d: -f2"
 
 const cmdCPUFreq string = "lscpu | grep 'CPU MHz' | tr -d '[:space:]' | cut -d: -f2"
 const cmdCPUModelName string = "lscpu | grep 'Model name' | cut -d: -f2 | sed -e 's/^[[:space:]]*//'"
@@ -33,12 +34,13 @@ const cmdRAMFreq string = "sudo dmidecode -t memory | grep Speed | head -1 | cut
 
 const cmdGPU string = "lspci | egrep -i 'VGA|3D' | grep -i nvidia | cut -d: -f3 | sed 's/.*controller://g'"
 
-var cmd = fmt.Sprintf("echo $(%s),$(%s),$(%s),$(%s),$(%s),$(%s),$(%s),$(%s),$(%s)",
+var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)",
 	cmdNumberOfCPU,
 	cmdNumberOfCorePerSocket,
 	cmdNumberOfSocket,
 	cmdCPUFreq,
 	cmdArch,
+	cmdHypervisor,
 	cmdCPUModelName,
 	cmdTotalRAM,
 	cmdRAMFreq,
@@ -55,6 +57,7 @@ type CPUInfo struct {
 	NumberOfSocket int     `json:"number_of_socket,omitempty"`
 	CPUFrequency   float64 `json:"cpu_frequency,omitempty"`
 	CPUArch        string  `json:"cpu_arch,omitempty"`
+	Hypervisor     string  `json:"hypervisor,omitempty"`
 	CPUModel       string  `json:"cpu_model,omitempty"`
 	RAMSize        float64 `json:"ram_size,omitempty"`
 	RAMFreq        float64 `json:"ram_freq,omitempty"`
@@ -63,46 +66,47 @@ type CPUInfo struct {
 }
 
 func parseOutput(output []byte) (*CPUInfo, error) {
-	str := string(output)
+	str := strings.TrimSpace(string(output))
 
 	//	tokens := strings.Split(str, "\n")
-	tokens := strings.Split(str, ",")
+	tokens := strings.Split(str, "î")
 	if len(tokens) < 9 {
-		return nil, fmt.Errorf("Parsing error")
+		return nil, fmt.Errorf("parsing error: '%s'", str)
 	}
 	info := CPUInfo{}
 	var err error
 	info.NumberOfCPU, err = strconv.Atoi(tokens[0])
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error")
+		return nil, fmt.Errorf("Parsing error: NumberOfCPU='%s' (from '%s')", tokens[0], str)
 	}
 	info.NumberOfCore, err = strconv.Atoi(tokens[1])
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error")
+		return nil, fmt.Errorf("Parsing error: NumberOfCore='%s' (from '%s')", tokens[1], str)
 	}
 	info.NumberOfSocket, err = strconv.Atoi(tokens[2])
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error")
+		return nil, fmt.Errorf("Parsing error: NumberOfSocket='%s' (from '%s')", tokens[2], str)
 	}
 	info.NumberOfCore = info.NumberOfCore * info.NumberOfSocket
 	info.CPUFrequency, err = strconv.ParseFloat(tokens[3], 64)
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error")
+		return nil, fmt.Errorf("Parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
 	}
 	info.CPUFrequency = math.Ceil(info.CPUFrequency/100) / 10
 
 	info.CPUArch = tokens[4]
-	info.CPUModel = tokens[5]
-	info.RAMSize, err = strconv.ParseFloat(tokens[6], 64)
+	info.Hypervisor = tokens[5]
+	info.CPUModel = tokens[6]
+	info.RAMSize, err = strconv.ParseFloat(tokens[7], 64)
 	if err != nil {
-		return nil, fmt.Errorf("Parsing error")
+		return nil, fmt.Errorf("Parsing error: RAMSize='%s' (from '%s')", tokens[7], str)
 	}
 	info.RAMSize = math.Ceil(info.RAMSize / 1024 / 1024)
-	info.RAMFreq, err = strconv.ParseFloat(tokens[7], 64)
+	info.RAMFreq, err = strconv.ParseFloat(tokens[8], 64)
 	if err != nil {
 		info.RAMFreq = 0
 	}
-	info.GPUModel = strings.TrimSpace(tokens[8])
+	info.GPUModel = strings.TrimSpace(tokens[9])
 	info.GPU = len(info.GPUModel) > 0
 
 	return &info, nil
@@ -135,8 +139,8 @@ type getCPUInfoResult struct {
 	CPUInfo *CPUInfo
 }
 
-func getCPUInfo(service *providers.Service, tpl api.VMTemplate, img *api.Image, key *api.KeyPair, networkID string) (*CPUInfo, error) {
-	fmt.Println("Creating VM")
+func getCPUInfo(tenant string, service *providers.Service, tpl api.VMTemplate, img *api.Image, key *api.KeyPair, networkID string) (*CPUInfo, error) {
+	//fmt.Printf("[%s] VM %s: creating\n", tenant, tpl.Name)
 	vm, err := service.CreateVM(api.VMRequest{
 		Name:       "scanhost",
 		PublicIP:   true,
@@ -146,7 +150,7 @@ func getCPUInfo(service *providers.Service, tpl api.VMTemplate, img *api.Image, 
 		NetworkIDs: []string{networkID},
 	})
 	if err != nil {
-		fmt.Println("Error Creating VM", err)
+		//fmt.Printf("[%s] VM %s: error creation: %s\n", tenant, tpl.Name, err.Error())
 		return nil, err
 	}
 	defer service.DeleteVM(vm.ID)
@@ -154,17 +158,17 @@ func getCPUInfo(service *providers.Service, tpl api.VMTemplate, img *api.Image, 
 	ssh, err := service.GetSSHConfig(vm.ID)
 	//fmt.Println("Reading SSH Config")
 	if err != nil {
-		fmt.Println("Error Reading SSHConfig", err)
+		fmt.Printf("[%s] VM %s: error reading SSHConfig: %s\n", tenant, tpl.Name, err.Error())
 		return nil, err
 	}
-	ssh.WaitServerReady(30 * time.Second)
+	ssh.WaitServerReady(60 * time.Second)
 	c, err := ssh.Command(cmd)
 
 	//cmd, err := ssh.Command(cmd)
 	//fmt.Println(">>> CMD", cmd)
 	_, err = ssh.Command(cmd)
 	if err != nil {
-		fmt.Println("Error scanning VM", err)
+		fmt.Printf("[%s] VM %s: error scanning: %s\n", tenant, tpl.Name, err.Error())
 		return nil, err
 	}
 	out, err := c.CombinedOutput()
@@ -177,7 +181,8 @@ func getCPUInfo(service *providers.Service, tpl api.VMTemplate, img *api.Image, 
 
 func scanTemplates(tenant string, service *providers.Service, c chan error) {
 	tpls, err := service.ListTemplates()
-	fmt.Println(tenant, "Templates:", len(tpls))
+	total := len(tpls)
+	fmt.Println(tenant, "Templates:", total)
 	if err != nil {
 		c <- err
 		return
@@ -209,26 +214,35 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 		return
 	}
 
+	ignored := 0
+	succeeded := 0
 	for _, tpl := range tpls {
-		if tpl.Name != "c1.large" {
-			continue
-		}
 		upperName := strings.ToUpper(tpl.Name)
 		if strings.Contains(upperName, "WIN") || strings.Contains(upperName, "FLEX") {
-			fmt.Println("ignoring :", tpl.Name)
+			fmt.Printf("[%s] ignoring: %s\n", tenant, tpl.Name)
+			ignored++
 			continue
 		}
-		fmt.Printf("scanning : %s (%s)\n", tpl.Name, tenant)
-		ci, err := getCPUInfo(service, tpl, img, kp, net.ID)
-		fmt.Println("INFO", ci)
+		fmt.Printf("[%s] scanning template %s\n", tenant, tpl.Name)
+		ci, err := getCPUInfo(tenant, service, tpl, img, kp, net.ID)
 		if err == nil {
 			ci.TemplateName = tpl.Name
 			ci.TemplateID = tpl.ID
 			info = append(info, ci)
+			succeeded++
+			fmt.Printf("[%s] scanning template %s: success: %v\n", tenant, tpl.Name, ci)
+		} else {
+			errStr := err.Error()
+			if errStr == "exit status 255" {
+				errStr = "SSH failed"
+			}
+			fmt.Printf("[%s] scanning template %s failure: %s\n", tenant, tpl.Name, errStr)
 		}
 	}
 
-	fmt.Println("ALL INFO", info)
+	fmt.Printf("[%s] ALL RESULTS: %v\n", tenant, info)
+	fmt.Printf("[%s] total %d templaces scanned, %d succeeded, %d ignored, %d failed\n",
+		tenant, total, succeeded, ignored, total-succeeded-ignored)
 	type TplList struct {
 		Templates []*CPUInfo `json:"templates,omitempty"`
 	}
@@ -258,7 +272,7 @@ func scanService(tenant string, service *providers.Service, c chan error) {
 	errI := <-cImage
 	errT := <-cTpl
 	if errI != nil || errT != nil {
-		c <- fmt.Errorf("Errors during Service %s scan: %v, %v", tenant, errI, errT)
+		c <- fmt.Errorf("[%s] Errors during scan: %v, %v", tenant, errI, errT)
 	} else {
 		c <- nil
 	}
@@ -288,6 +302,7 @@ func Run() {
 			fmt.Printf("Error during scan: %s ", err.Error())
 		}
 	}
+	fmt.Println("\nScanning done.")
 }
 
 func main() {
