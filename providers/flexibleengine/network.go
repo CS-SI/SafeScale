@@ -1,8 +1,10 @@
 package flexibleengine
 
 import (
+	"bytes"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
@@ -212,8 +214,14 @@ func (client *Client) ListNetworks() ([]api.Network, error) {
 
 //DeleteNetwork consists to delete subnet in FlexibleEngine VPC
 func (client *Client) DeleteNetwork(id string) error {
-	err := client.deleteSubnet(id)
-	return err
+	vmID, err := client.readGateway(id)
+	if err == nil && vmID != "" {
+		err = client.DeleteGateway(vmID)
+		if err != nil {
+			return fmt.Errorf("Failed to delete gateway VM: %s", errorString(err))
+		}
+	}
+	return client.deleteSubnet(id)
 }
 
 type subnetRequest struct {
@@ -479,12 +487,65 @@ func (client *Client) RemoveSubnetFromRouter(routerID string, subnetID string) e
 	return fmt.Errorf("flexibleengine.RemoveSubnetFromRouter() isn't available by design")
 }
 
-//CreateGateway exists only to invalidate code from openstack.
-func (client *Client) CreateGateway(req api.GWRequest) error {
-	return fmt.Errorf("flexibleengine.CreateGateway() isn't available by design")
+//writeGateway writes in Object Storage the ID of the VM acting as gateway for the network identified by netID
+func (client *Client) writeGateway(netID string, vmID string) error {
+	err := client.PutObject(NetworkGWContainerName, api.Object{
+		Name:    netID,
+		Content: strings.NewReader(vmID),
+	})
+	return err
 }
 
-//DeleteGateway exists only to invalidate code from openstack.
+//readGateway reads inn Object Storage the ID of the VM acting as gateway for the network identified by netID
+func (client *Client) readGateway(netID string) (string, error) {
+	o, err := client.GetObject(NetworkGWContainerName, netID, nil)
+	if err != nil {
+		return "", err
+	}
+	var buffer bytes.Buffer
+	buffer.ReadFrom(o.Content)
+	return buffer.String(), nil
+}
+
+//removeGateway deletes from Object Storage the gateway data for the network identified by netID
+func (client *Client) removeGateway(netID string) error {
+	return client.DeleteObject(NetworkGWContainerName, netID)
+}
+
+//CreateGateway creates a gateway for a network.
+// By current implementation, only one gateway can exist by Network because the object is intended
+// to contain only one vmID
+func (client *Client) CreateGateway(req api.GWRequest) error {
+	net, err := client.GetNetwork(req.NetworkID)
+	if err != nil {
+		return fmt.Errorf("Network %s not found: %s", req.NetworkID, errorString(err))
+	}
+	vmReq := api.VMRequest{
+		ImageID:    req.ImageID,
+		KeyPair:    req.KeyPair,
+		Name:       "gw-" + net.Name,
+		TemplateID: req.TemplateID,
+		NetworkIDs: []string{req.NetworkID},
+		PublicIP:   true,
+	}
+	vm, err := client.createVM(vmReq, true)
+	if err != nil {
+		return fmt.Errorf("Error creating gateway : %s", errorString(err))
+	}
+	err = client.writeGateway(req.NetworkID, vm.ID)
+	if err != nil {
+		client.DeleteVM(vm.ID)
+		return fmt.Errorf("Error creating gateway : %s", errorString(err))
+	}
+	return nil
+}
+
+//DeleteGateway deletes the gateway associated with network identified by ID
 func (client *Client) DeleteGateway(networkID string) error {
-	return fmt.Errorf("flexibleengine.DeleteGateway() isn't available by design")
+	vmID, err := client.readGateway(networkID)
+	if err != nil {
+		return fmt.Errorf("Error deleting gateway: %s", errorString(err))
+	}
+	client.DeleteVM(vmID)
+	return client.removeGateway(networkID)
 }

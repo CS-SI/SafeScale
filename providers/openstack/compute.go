@@ -388,16 +388,16 @@ func (client *Client) saveVMDefinition(vm api.VM) error {
 	if err != nil {
 		return err
 	}
-	return client.PutObject("__vms__", api.Object{
+	return client.PutObject(VMContainerName, api.Object{
 		Name:    vm.ID,
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
 }
 func (client *Client) removeVMDefinition(vmID string) error {
-	return client.DeleteObject("__vms__", vmID)
+	return client.DeleteObject(VMContainerName, vmID)
 }
 func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
-	o, err := client.GetObject("__vms__", vmID, nil)
+	o, err := client.GetObject(VMContainerName, vmID, nil)
 	if err != nil {
 		return nil, err
 	}

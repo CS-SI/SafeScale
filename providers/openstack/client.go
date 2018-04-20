@@ -104,8 +104,11 @@ func errorString(err error) string {
 	}
 }
 
-//NetworkGWContainer container where Gateway configuratiion are stored
-const NetworkGWContainer string = "__network_gws__"
+//NetworkGWContainerName container where Gateway configuratiion are stored
+const NetworkGWContainerName string = "0.network-gws"
+
+//VMContainerName container where VM configuration are stored
+const VMContainerName string = "0.vms"
 
 //AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
@@ -188,8 +191,8 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	clt.CreateContainer("__network_gws__")
-	clt.CreateContainer("__vms__")
+	clt.CreateContainer(NetworkGWContainerName)
+	clt.CreateContainer(VMContainerName)
 	return &clt, nil
 }
 

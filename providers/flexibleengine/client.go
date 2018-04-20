@@ -10,10 +10,11 @@ import (
 	"github.com/SafeScale/providers/api/VolumeSpeed"
 	"github.com/SafeScale/providers/openstack"
 
-	// GopherCloud for OpenStack support
+	// OpenStack API from GopherCloud
 	gc "github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
-	tokens3 "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -152,20 +153,45 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	provider, err := gcos.NewClient(fmt.Sprintf(authURL, opts.Region))
-	authOptions := tokens3.AuthOptions{
+	authOptions := tokens.AuthOptions{
 		IdentityEndpoint: fmt.Sprintf(authURL, opts.Region),
 		Username:         opts.Username,
 		Password:         opts.Password,
 		DomainName:       opts.DomainName,
 		AllowReauth:      opts.AllowReauth,
-		//TokenID string `json:"-"`
-		Scope: tokens3.Scope{
-			ProjectID: opts.ProjectID,
+		Scope: tokens.Scope{
+			ProjectName: opts.Region,
+			DomainName:  opts.DomainName,
 		},
 	}
 	err = gcos.AuthenticateV3(provider, &authOptions, gc.EndpointOpts{})
 	if err != nil {
 		return nil, fmt.Errorf("%s", errorString(err))
+	}
+
+	//Identity API
+	identity, err := gcos.NewIdentityV3(provider, gc.EndpointOpts{})
+	if err != nil {
+		return nil, fmt.Errorf("%s", errorString(err))
+	}
+
+	// Recover Project ID of region
+	listOpts := projects.ListOpts{
+		Enabled: gc.Enabled,
+		Name:    opts.Region,
+	}
+	allPages, err := projects.List(identity, listOpts).AllPages()
+	if err != nil {
+		return nil, fmt.Errorf("failed to query project ID corresponding to region '%s': %s", opts.Region, errorString(err))
+	}
+	allProjects, err := projects.ExtractProjects(allPages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load project ID corresponding to region '%s': %s", opts.Region, errorString(err))
+	}
+	if len(allProjects) > 0 {
+		opts.ProjectID = allProjects[0].ID
+	} else {
+		return nil, fmt.Errorf("failed to found project ID corresponding to region '%s': %s", opts.Region, errorString(err))
 	}
 
 	//Compute API
@@ -256,6 +282,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Opts:      &opts,
 		Cfg:       &cfg,
 		Client:    &openstackClient,
+		Identity:  identity,
 		S3Session: awsSession,
 	}
 
@@ -291,6 +318,7 @@ type Client struct {
 	Opts *AuthOptions
 	Cfg  *CfgOptions
 	*openstack.Client
+	Identity *gc.ServiceClient
 
 	// "AWS Session" for object storage use (compatible S3)
 	S3Session *awssession.Session
@@ -498,7 +526,7 @@ func (client *Client) createUDPRules(groupID string) error {
 func (client *Client) createICMPRules(groupID string) error {
 	// Inbound == ingress == coming from Outside
 	ruleOpts := secrules.CreateOpts{
-		Direction: secrules.DirIngress,
+		Direction:      secrules.DirIngress,
 		EtherType:      secrules.EtherType4,
 		SecGroupID:     groupID,
 		Protocol:       secrules.ProtocolICMP,

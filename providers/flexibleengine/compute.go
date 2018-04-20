@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/gob"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/SafeScale/providers/api"
@@ -224,6 +225,15 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 
 //CreateVM creates a new VM
 func (client *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
+	return client.createVM(request, false)
+}
+
+//createVM creates a new VM and configure it as gateway for the network if isGateway is true
+func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, error) {
+	if isGateway && !request.PublicIP {
+		return nil, fmt.Errorf("Can't create a gateway without public IP")
+	}
+
 	var nets []servers.Network
 	//Add private networks
 	for _, n := range request.NetworkIDs {
@@ -241,7 +251,7 @@ func (client *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 		name := fmt.Sprintf("%s_%s", request.Name, id)
 		kp, err = client.CreateKeyPair(name)
 		if err != nil {
-			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+			return nil, fmt.Errorf("Error creating key pair for VM '%s': %s", request.Name, errorString(err))
 		}
 		defer client.DeleteKeyPair(kp.ID)
 	}
@@ -299,7 +309,8 @@ func (client *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 		return nil, fmt.Errorf("Failed to build query to create VM '%s': %s", request.Name, errorString(err))
 	}
 	r := servers.CreateResult{}
-	_, r.Err = client.Compute.Post(client.Compute.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
+	var httpResp *http.Response
+	httpResp, r.Err = client.Compute.Post(client.Compute.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
 		OkCodes: []int{200, 202},
 	})
 	server, err := r.Extract()
@@ -307,14 +318,14 @@ func (client *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 		if server != nil {
 			servers.Delete(client.Compute, server.ID)
 		}
-		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+		return nil, fmt.Errorf("Query to create VM '%s' failed: %s (HTTP return code: %d)", request.Name, errorString(err), httpResp.StatusCode)
 	}
 
 	// Wait that VM is started
 	vm, err := client.waitVMReady(server.ID, 120*time.Second)
 	if err != nil {
 		client.DeleteVM(server.ID)
-		return nil, fmt.Errorf("Timeout creating VM: %s", errorString(err))
+		return nil, fmt.Errorf("Timeout waiting VM '%s' ready: %s", request.Name, errorString(err))
 	}
 
 	// Fixes the size of bootdisk, FlexibleEngine is used to not give one...
@@ -326,13 +337,15 @@ func (client *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 		fip, err := client.attachFloatingIP(vm)
 		if err != nil {
 			client.DeleteVM(vm.ID)
-			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+			return nil, fmt.Errorf("Error attaching public IP for VM '%s': %s", request.Name, errorString(err))
 		}
-		err = client.enableVMRouterMode(vm)
-		if err != nil {
-			client.DeleteVM(vm.ID)
-			client.DeleteFloatingIP(fip.ID)
-			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+		if isGateway {
+			err = client.enableVMRouterMode(vm)
+			if err != nil {
+				client.DeleteVM(vm.ID)
+				client.DeleteFloatingIP(fip.ID)
+				return nil, fmt.Errorf("Error enabling gateway mode of VM '%s': %s", request.Name, errorString(err))
+			}
 		}
 	}
 
@@ -643,7 +656,7 @@ func (client *Client) enableVMRouterMode(vm *api.VM) error {
 func (client *Client) disableVMRouterMode(vm *api.VM) error {
 	portID, err := client.getOpenstackPortID(vm)
 	if err != nil {
-		return fmt.Errorf("Failed to disable Router Mode on VM '%s': %s", vm.Name)
+		return fmt.Errorf("Failed to disable Router Mode on VM '%s': %s", vm.Name, errorString(err))
 	}
 
 	opts := ports.UpdateOpts{AllowedAddressPairs: nil}

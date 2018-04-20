@@ -8,7 +8,7 @@ import (
 	"github.com/SafeScale/providers/openstack"
 )
 
-//ProviderNetwork name of ovh external network
+//ProviderNetwork name of CloudWatt external network
 const ProviderNetwork string = "Ext-Net"
 
 /*AuthOptions fields are the union of those recognized by each identity implementation and
