@@ -15,7 +15,7 @@ var NasCmd = cli.Command{
 	Usage: "nas COMMAND",
 	Subcommands: []cli.Command{
 		nasCreate,
-		// nasDelete,
+		nasDelete,
 		// nasMount,
 		// nasUmount,
 		// nasList,
@@ -56,6 +56,34 @@ var nasCreate = cli.Command{
 		// TODO output result to stdout
 		if err != nil {
 			return fmt.Errorf("Could not create nas: %v", err)
+		}
+
+		return nil
+	},
+}
+
+var nasDelete = cli.Command{
+	Name:      "delete",
+	Usage:     "Delete a nfs server on a VM and expose a directory",
+	ArgsUsage: "<Nas_name>",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <Nas_name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("Nas name required")
+		}
+
+		conn := utils.GetConnection()
+		defer conn.Close()
+		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		defer cancel()
+		service := pb.NewNasServiceClient(conn)
+
+		_, err := service.Delete(ctx, &pb.NasName{Name: c.Args().Get(0)})
+
+		// TODO output result to stdout
+		if err != nil {
+			return fmt.Errorf("Could not delete nas: %v", err)
 		}
 
 		return nil

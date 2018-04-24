@@ -68,3 +68,15 @@ func ToPBContainerMountPoint(in *api.ContainerInfo) *pb.ContainerMountingPoint {
 		},
 	}
 }
+
+// ToPBNas convert a Nas from api to protocolbuffer format
+func ToPBNas(in *api.Nas) *pb.NasDefinition {
+	return &pb.NasDefinition{
+		Nas: &pb.NasName{
+			Name: in.Name},
+		VM: &pb.Reference{
+			Name: in.VMID},
+		Path:     in.Path,
+		IsServer: in.IsServer,
+	}
+}

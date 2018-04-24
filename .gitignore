@@ -28,4 +28,5 @@ providers/aws/*_test.go
 broker/broker/broker
 broker/brokerd/brokerd
 *.pb.go
+*_pb2.py
 rice-box.go

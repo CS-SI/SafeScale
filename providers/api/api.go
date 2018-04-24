@@ -27,6 +27,15 @@ const (
 	DefaultNasExposedPath = "/shared/data"
 )
 
+const (
+	// NetworkContainerName is the tecnical name of the container used to store networks info
+	NetworkContainerName = "0.network-gws"
+	// VMContainerName is the tecnical name of the container used to store VMs info
+	VMContainerName = "0.vm"
+	// NasContainerName is the tecnical name of the container used to store nas info
+	NasContainerName = "0.nas"
+)
+
 //TimeoutError defines a Timeout error
 type TimeoutError struct {
 	Message string
@@ -149,6 +158,14 @@ type VolumeAttachmentRequest struct {
 	Name     string `json:"name,omitempty"`
 	VolumeID string `json:"volume,omitempty"`
 	ServerID string `json:"vm,omitempty"`
+}
+
+// Nas represents a nas definition
+type Nas struct {
+	Name     string `json:"name,omitempty"`
+	VMID     string `json:"vm,omitempty"`
+	Path     string `json:"path,omitempty"`
+	IsServer bool   `json:"isServer,omitempty"`
 }
 
 //Image representes an OS image
