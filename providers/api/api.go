@@ -25,6 +25,9 @@ const (
 
 	// DefaultNasExposedPath Default path to be exported by nfs server
 	DefaultNasExposedPath = "/shared/data"
+
+	// DefaultNasMountPath Default path to be mounted to access a nfs directory
+	DefaultNasMountPath = "/data"
 )
 
 const (

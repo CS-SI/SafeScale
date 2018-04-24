@@ -28,6 +28,7 @@ type NasAPI interface {
 	Create(name, vm, path string) (*api.Nas, error)
 	Delete(name string) (*api.Nas, error)
 	List() ([]api.Nas, error)
+	Mount(name, vm, path string) (*api.Nas, error)
 }
 
 //NewNasService creates a NAS service
@@ -52,7 +53,7 @@ func sanitize(in string) (string, error) {
 	return sanitized, nil
 }
 
-//Create a container
+//Create a nas
 func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 
 	vm, err := srv.vmService.Get(vmName)
@@ -120,7 +121,7 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 	}{
 		ExportedPath: nas.Path,
 	}
-	scriptCmd, err := getBoxContent("delete_nas.sh", data)
+	scriptCmd, err := getBoxContent("nfs_unexport_repository.sh", data)
 	if err != nil {
 		// TODO Use more explicit error
 		return nil, err
@@ -169,6 +170,70 @@ func (srv *NasService) List() ([]api.Nas, error) {
 
 	return nass, nil
 
+}
+
+//Mount a directory exported by a nas on a local directory of a vm
+func (srv *NasService) Mount(name, vmName, path string) (*api.Nas, error) {
+	nas, err := srv.readNasDefinition(name)
+	if err != nil {
+		return nil, providers.ResourceNotFoundError("Nas", name)
+	}
+
+	vm, err := srv.vmService.Get(vmName)
+	if err != nil {
+		return nil, providers.ResourceNotFoundError("VM", vmName)
+	}
+
+	nfsServer, err := srv.vmService.Get(nas.ServerID)
+	if err != nil {
+		return nil, providers.ResourceNotFoundError("VM", nas.ServerID)
+	}
+
+	// Sanitize path
+	mountPath, err := sanitize(path)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid path to be mounted: '%s' : '%s'", path, err)
+	}
+
+	data := struct {
+		NFSServer    string
+		ExportedPath string
+		MountPath    string
+	}{
+		NFSServer:    nfsServer.GetAccessIP(),
+		ExportedPath: nas.Path,
+		MountPath:    mountPath,
+	}
+	scriptCmd, err := getBoxContent("mount_nfs_directory.sh", data)
+	if err != nil {
+		// TODO Use more explicit error
+		return nil, err
+	}
+	// retrieve ssh config to perform some commands
+	ssh, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		// TODO Use more explicit error
+		return nil, err
+	}
+
+	cmd, err := ssh.SudoCommand(scriptCmd)
+	if err != nil {
+		// TODO Use more explicit error
+		return nil, err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	client := &api.Nas{
+		Name:     name,
+		ServerID: vm.ID,
+		Path:     mountPath,
+		IsServer: false,
+	}
+	// err = srv.saveNASDefinition(*nas)
+	return client, err
 }
 
 func (srv *NasService) saveNASDefinition(nas api.Nas) error {
@@ -267,4 +332,22 @@ func (s *NasServiceServer) List(ctx context.Context, in *google_protobuf.Empty) 
 	rv := &pb.NasList{NasList: pbnass}
 	log.Printf("End List Nas")
 	return rv, nil
+}
+
+//Mount mount exported directory from nas on a local directory of the given vm
+func (s *NasServiceServer) Mount(ctx context.Context, in *pb.NasDefinition) (*pb.NasDefinition, error) {
+	log.Printf("Mount NAS called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	nasService := NewNasService(currentTenant.client)
+	nas, err := nasService.Mount(in.GetNas().GetName(), in.GetVM().GetName(), in.GetPath())
+
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	log.Printf("End mount Nas")
+	return convert.ToPBNas(nas), err
 }

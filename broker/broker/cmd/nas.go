@@ -18,7 +18,7 @@ var NasCmd = cli.Command{
 	Subcommands: []cli.Command{
 		nasCreate,
 		nasDelete,
-		// nasMount,
+		nasMount,
 		// nasUmount,
 		nasList,
 		// nasInspect,
@@ -45,7 +45,7 @@ var nasCreate = cli.Command{
 
 		conn := utils.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
@@ -109,6 +109,45 @@ var nasList = cli.Command{
 		}
 		out, _ := json.Marshal(nass.GetNasList())
 		fmt.Println(string(out))
+
+		return nil
+	},
+}
+
+var nasMount = cli.Command{
+	Name:      "mount",
+	Usage:     "Mount an exported nfs directory on a VM",
+	ArgsUsage: "<Nas_name> <VM_name|VM_ID>",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "path",
+			Value: api.DefaultNasMountPath,
+			Usage: "Path to be mounted",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 2 {
+			fmt.Println("Missing mandatory argument <Nas_name> and/or <VM_name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("Nas and VM name required")
+		}
+
+		conn := utils.GetConnection()
+		defer conn.Close()
+		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		defer cancel()
+		service := pb.NewNasServiceClient(conn)
+
+		_, err := service.Mount(ctx, &pb.NasDefinition{
+			Nas:  &pb.NasName{Name: c.Args().Get(0)},
+			VM:   &pb.Reference{Name: c.Args().Get(1)},
+			Path: c.String("path"),
+		})
+
+		// TODO output result to stdout
+		if err != nil {
+			return fmt.Errorf("Could not mount nfs directory: %v", err)
+		}
 
 		return nil
 	},

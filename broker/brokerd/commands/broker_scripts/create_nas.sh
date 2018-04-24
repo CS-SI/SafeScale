@@ -5,6 +5,7 @@ apt-get update && apt-get install -qqy nfs-common nfs-kernel-server && apt-get c
 
 echo "Create exported dir if necessary"
 mkdir -p {{.ExportedPath}}
+chmod a+rw {{.ExportedPath}}
 
 echo "Export diretory"
 echo "{{.ExportedPath}} *(rw,fsid=1,sync,no_root_squash)" >>/etc/exports
