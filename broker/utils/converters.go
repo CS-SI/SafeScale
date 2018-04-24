@@ -75,7 +75,7 @@ func ToPBNas(in *api.Nas) *pb.NasDefinition {
 		Nas: &pb.NasName{
 			Name: in.Name},
 		VM: &pb.Reference{
-			Name: in.VMID},
+			ID: in.ServerID},
 		Path:     in.Path,
 		IsServer: in.IsServer,
 	}

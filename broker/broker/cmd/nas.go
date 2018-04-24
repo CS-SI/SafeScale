@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	pb "github.com/SafeScale/broker"
 	utils "github.com/SafeScale/broker/utils"
 	"github.com/SafeScale/providers/api"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
 
@@ -18,7 +20,7 @@ var NasCmd = cli.Command{
 		nasDelete,
 		// nasMount,
 		// nasUmount,
-		// nasList,
+		nasList,
 		// nasInspect,
 	},
 }
@@ -85,6 +87,28 @@ var nasDelete = cli.Command{
 		if err != nil {
 			return fmt.Errorf("Could not delete nas: %v", err)
 		}
+
+		return nil
+	},
+}
+
+var nasList = cli.Command{
+	Name:  "list",
+	Usage: "List all created nas",
+	Action: func(c *cli.Context) error {
+		conn := utils.GetConnection()
+		defer conn.Close()
+		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		defer cancel()
+		service := pb.NewNasServiceClient(conn)
+
+		nass, err := service.List(ctx, &google_protobuf.Empty{})
+
+		if err != nil {
+			return fmt.Errorf("Could not get nas list: %v", err)
+		}
+		out, _ := json.Marshal(nass.GetNasList())
+		fmt.Println(string(out))
 
 		return nil
 	},

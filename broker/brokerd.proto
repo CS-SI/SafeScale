@@ -243,6 +243,7 @@ service SshService{
     rpc Copy(SshCopyCommand) returns (google.protobuf.Empty){}
 }
 
+// broker nas create nas1 vm1 --path="/shared/data"
 //broker nas delete nas1
 //broker nas mount nas1 vm2 --path="/data"
 //broker nas umount nas1 vm2
@@ -260,7 +261,12 @@ message NasDefinition{
     bool isServer =4;
 }
 
+message NasList{
+    repeated NasDefinition nasList = 1;
+}
+
 service NasService{
     rpc Create(NasDefinition) returns (NasDefinition){}
     rpc Delete(NasName) returns (NasDefinition){}
+    rpc List(google.protobuf.Empty) returns (NasList){}
 }

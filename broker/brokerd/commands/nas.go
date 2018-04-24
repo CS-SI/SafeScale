@@ -10,6 +10,7 @@ import (
 
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 
 	pb "github.com/SafeScale/broker"
 	convert "github.com/SafeScale/broker/utils"
@@ -26,6 +27,7 @@ import (
 type NasAPI interface {
 	Create(name, vm, path string) (*api.Nas, error)
 	Delete(name string) (*api.Nas, error)
+	List() ([]api.Nas, error)
 }
 
 //NewNasService creates a NAS service
@@ -93,7 +95,7 @@ func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 
 	nas := &api.Nas{
 		Name:     name,
-		VMID:     vm.ID,
+		ServerID: vm.ID,
 		Path:     exportedPath,
 		IsServer: true,
 	}
@@ -108,9 +110,9 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 		return nil, providers.ResourceNotFoundError("Nas", name)
 	}
 
-	vm, err := srv.vmService.Get(nas.VMID)
+	vm, err := srv.vmService.Get(nas.ServerID)
 	if err != nil {
-		return nil, fmt.Errorf("No VM found with name or id '%s'", nas.VMID)
+		return nil, fmt.Errorf("No VM found with name or id '%s'", nas.ServerID)
 	}
 
 	data := struct {
@@ -142,6 +144,30 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 
 	err = srv.removeNASDefinition(name)
 	return nas, err
+
+}
+
+//List return the list of all created nas
+func (srv *NasService) List() ([]api.Nas, error) {
+	names, err := srv.provider.ListObjects(api.NasContainerName, api.ObjectFilter{
+		Path:   "",
+		Prefix: "",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var nass []api.Nas
+
+	for _, name := range names {
+		nas, err := srv.readNasDefinition(name)
+		if err != nil {
+			return nil, providers.ResourceNotFoundError("Nas", name)
+		}
+		nass = append(nass, *nas)
+	}
+
+	return nass, nil
 
 }
 
@@ -195,6 +221,7 @@ func (s *NasServiceServer) Create(ctx context.Context, in *pb.NasDefinition) (*p
 		log.Println(err)
 		return nil, err
 	}
+	log.Printf("End Create Nas")
 	return convert.ToPBNas(nas), err
 }
 
@@ -212,5 +239,32 @@ func (s *NasServiceServer) Delete(ctx context.Context, in *pb.NasName) (*pb.NasD
 		log.Println(err)
 		return nil, err
 	}
+	log.Printf("End Delete Nas")
 	return convert.ToPBNas(nas), err
+}
+
+//List return the list of all available nas
+func (s *NasServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.NasList, error) {
+	log.Printf("List NAS called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	nasService := NewNasService(currentTenant.client)
+	nass, err := nasService.List()
+
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+
+	var pbnass []*pb.NasDefinition
+
+	// Map api.Network to pb.Network
+	for _, nas := range nass {
+		pbnass = append(pbnass, convert.ToPBNas(&nas))
+	}
+	rv := &pb.NasList{NasList: pbnass}
+	log.Printf("End List Nas")
+	return rv, nil
 }

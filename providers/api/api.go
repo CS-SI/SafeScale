@@ -163,7 +163,7 @@ type VolumeAttachmentRequest struct {
 // Nas represents a nas definition
 type Nas struct {
 	Name     string `json:"name,omitempty"`
-	VMID     string `json:"vm,omitempty"`
+	ServerID string `json:"vm,omitempty"`
 	Path     string `json:"path,omitempty"`
 	IsServer bool   `json:"isServer,omitempty"`
 }
