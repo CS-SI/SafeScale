@@ -19,7 +19,7 @@ var NasCmd = cli.Command{
 		nasCreate,
 		nasDelete,
 		nasMount,
-		// nasUmount,
+		nasUmount,
 		nasList,
 		// nasInspect,
 	},
@@ -147,6 +147,36 @@ var nasMount = cli.Command{
 		// TODO output result to stdout
 		if err != nil {
 			return fmt.Errorf("Could not mount nfs directory: %v", err)
+		}
+
+		return nil
+	},
+}
+var nasUmount = cli.Command{
+	Name:      "umount",
+	Usage:     "UMount an exported nfs directory on a VM",
+	ArgsUsage: "<Nas_name> <VM_name|VM_ID>",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 2 {
+			fmt.Println("Missing mandatory argument <Nas_name> and/or <VM_name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("Nas and VM name required")
+		}
+
+		conn := utils.GetConnection()
+		defer conn.Close()
+		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		defer cancel()
+		service := pb.NewNasServiceClient(conn)
+
+		_, err := service.UMount(ctx, &pb.NasDefinition{
+			Nas: &pb.NasName{Name: c.Args().Get(0)},
+			VM:  &pb.Reference{Name: c.Args().Get(1)},
+		})
+
+		// TODO output result to stdout
+		if err != nil {
+			return fmt.Errorf("Could not umount nfs directory: %v", err)
 		}
 
 		return nil

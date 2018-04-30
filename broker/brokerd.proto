@@ -270,4 +270,5 @@ service NasService{
     rpc Delete(NasName) returns (NasDefinition){}
     rpc List(google.protobuf.Empty) returns (NasList){}
     rpc Mount(NasDefinition) returns (NasDefinition){}
+    rpc UMount(NasDefinition) returns (NasDefinition){}
 }
