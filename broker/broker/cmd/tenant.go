@@ -80,7 +80,7 @@ var tenantSet = cli.Command{
 		if err != nil {
 			return fmt.Errorf("Could not get current tenant: %v", err)
 		}
-		fmt.Printf("Tenant '%s' set", c.Args().First())
+		fmt.Printf("Tenant '%s' set\n", c.Args().First())
 
 		return nil
 	},

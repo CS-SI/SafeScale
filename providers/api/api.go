@@ -13,14 +13,31 @@ import (
 	"github.com/SafeScale/providers/api/VolumeState"
 )
 
-//DefaultUser Default VM user
-const DefaultUser = "gpac"
+const (
+	//DefaultUser Default VM user
+	DefaultUser = "gpac"
 
-//DefaultVolumeMountPoint Default mount point for volumes
-const DefaultVolumeMountPoint = "/shared/"
+	//DefaultVolumeMountPoint Default mount point for volumes
+	DefaultVolumeMountPoint = "/shared/"
 
-//DefaultContainerMountPoint Default mount point for containers
-const DefaultContainerMountPoint = "/containers/"
+	//DefaultContainerMountPoint Default mount point for containers
+	DefaultContainerMountPoint = "/containers/"
+
+	// DefaultNasExposedPath Default path to be exported by nfs server
+	DefaultNasExposedPath = "/shared/data"
+
+	// DefaultNasMountPath Default path to be mounted to access a nfs directory
+	DefaultNasMountPath = "/data"
+)
+
+const (
+	// NetworkContainerName is the tecnical name of the container used to store networks info
+	NetworkContainerName = "0.network-gws"
+	// VMContainerName is the tecnical name of the container used to store VMs info
+	VMContainerName = "0.vm"
+	// NasContainerName is the tecnical name of the container used to store nas info
+	NasContainerName = "0.nas"
+)
 
 //TimeoutError defines a Timeout error
 type TimeoutError struct {
@@ -144,6 +161,14 @@ type VolumeAttachmentRequest struct {
 	Name     string `json:"name,omitempty"`
 	VolumeID string `json:"volume,omitempty"`
 	ServerID string `json:"vm,omitempty"`
+}
+
+// Nas represents a nas definition
+type Nas struct {
+	Name     string `json:"name,omitempty"`
+	ServerID string `json:"vm,omitempty"`
+	Path     string `json:"path,omitempty"`
+	IsServer bool   `json:"isServer,omitempty"`
 }
 
 //Image representes an OS image

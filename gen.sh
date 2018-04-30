@@ -10,11 +10,11 @@ rice embed-go
 echo " - brokerd"
 cd ${SCDIR}/broker/brokerd/commands
 rice embed-go
-  
+
 echo "Generating protocol buffer"
 cd ${SCDIR}/broker
 ${SCDIR}/broker/gen.sh
-   
+
 echo "Generating executables"
 echo " - brokerd"
 cd ${SCDIR}/broker/brokerd

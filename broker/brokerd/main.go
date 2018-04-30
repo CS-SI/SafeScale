@@ -77,6 +77,7 @@ func main() {
 	pb.RegisterVolumeServiceServer(s, &commands.VolumeServiceServer{})
 	pb.RegisterSshServiceServer(s, &commands.SSHServiceServer{})
 	pb.RegisterContainerServiceServer(s, &commands.ContainerServiceServer{})
+	pb.RegisterNasServiceServer(s, &commands.NasServiceServer{})
 
 	// log.Println("Initializing service factory")
 	// commands.InitServiceFactory()

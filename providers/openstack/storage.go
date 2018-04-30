@@ -415,7 +415,7 @@ func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]
 	pager := objects.List(client.Container, container, opts)
 	var objectList []string
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		objectNames, err := containers.ExtractNames(page)
+		objectNames, err := objects.ExtractNames(page)
 		if err != nil {
 			return false, err
 		}

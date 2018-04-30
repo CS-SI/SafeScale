@@ -201,7 +201,7 @@ service VolumeService{
 // broker container inspect C1
 
 message Container{
-    string Name = 2;
+    string Name = 1;
 }
 
 message ContainerList{
@@ -241,4 +241,35 @@ message SshResponse{
 service SshService{
     rpc Run(SshCommand) returns (SshResponse){}
     rpc Copy(SshCopyCommand) returns (google.protobuf.Empty){}
+}
+
+// broker nas create nas1 vm1 --path="/shared/data"
+//broker nas delete nas1
+//broker nas mount nas1 vm2 --path="/data"
+//broker nas umount nas1 vm2
+//broker nas list
+//broker nas inspect nas1
+
+message NasName{
+    string Name = 1;
+}
+
+message NasDefinition{
+    NasName Nas = 1;
+    Reference VM = 2;
+    string path = 3;
+    bool isServer =4;
+}
+
+message NasList{
+    repeated NasDefinition nasList = 1;
+}
+
+service NasService{
+    rpc Create(NasDefinition) returns (NasDefinition){}
+    rpc Delete(NasName) returns (NasDefinition){}
+    rpc List(google.protobuf.Empty) returns (NasList){}
+    rpc Mount(NasDefinition) returns (NasDefinition){}
+    rpc UMount(NasDefinition) returns (NasDefinition){}
+    rpc Inspect(NasName) returns (NasList){}
 }

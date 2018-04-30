@@ -43,7 +43,7 @@ type Subnet struct {
 }
 
 func (client *Client) saveGateway(netID string, vmID string) error {
-	err := client.PutObject("__network_gws__", api.Object{
+	err := client.PutObject(api.NetworkContainerName, api.Object{
 		Name:    netID,
 		Content: strings.NewReader(vmID),
 	})
@@ -51,7 +51,7 @@ func (client *Client) saveGateway(netID string, vmID string) error {
 }
 
 func (client *Client) getGateway(netID string) (string, error) {
-	o, err := client.GetObject("__network_gws__", netID, nil)
+	o, err := client.GetObject(api.NetworkContainerName, netID, nil)
 	if err != nil {
 		return "", err
 	}
@@ -61,7 +61,7 @@ func (client *Client) getGateway(netID string) (string, error) {
 }
 
 func (client *Client) removeGateway(netID string) error {
-	return client.DeleteObject("__network_gws__", netID)
+	return client.DeleteObject(api.NetworkContainerName, netID)
 }
 
 //CreateNetwork creates a network named name
