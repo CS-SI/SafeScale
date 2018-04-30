@@ -27,3 +27,5 @@ providers/aws/*_test.go
 #ignore binary files from build
 broker/broker/broker
 broker/brokerd/brokerd
+*.pb.go
+rice-box.go
