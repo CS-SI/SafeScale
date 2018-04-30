@@ -99,9 +99,9 @@ var vmCreate = cli.Command{
 			Value: "Ubuntu 16.04",
 			Usage: "Image name for the VM",
 		},
-		cli.BoolTFlag{
-			Name:  "public",
-			Usage: "Public IP",
+		cli.BoolFlag{
+			Name:  "private",
+			Usage: "Create with no public IP",
 		},
 		cli.BoolFlag{
 			Name:   "gpu",
@@ -126,7 +126,7 @@ var vmCreate = cli.Command{
 			Disk:      int32(c.Float64("disk")),
 			ImageID:   c.String("os"),
 			Network:   c.String("net"),
-			Public:    c.BoolT("public"),
+			Public:    !c.Bool("private"),
 			RAM:       float32(c.Float64("ram")),
 		})
 		if err != nil {

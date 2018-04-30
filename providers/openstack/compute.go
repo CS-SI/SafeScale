@@ -423,7 +423,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	if !request.PublicIP {
 		gwServer, err := client.readGateway(request.NetworkIDs[0])
 		if err != nil {
-			return nil, fmt.Errorf("No public VM cannot be created on a network without gateway")
+			return nil, fmt.Errorf("No private VM can be created on a network without gateway")
 		}
 		gw, err = client.readVMDefinition(gwServer.ID)
 		if err != nil {
