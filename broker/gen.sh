@@ -1,1 +1,1 @@
-protoc -I. -I/home/saime/go/src --go_out=plugins=grpc:. brokerd.proto
+protoc -I. -I${GOPATH:-~/go}/src --go_out=plugins=grpc:. brokerd.proto
