@@ -30,6 +30,7 @@ type NasAPI interface {
 	List() ([]api.Nas, error)
 	Mount(name, vm, path string) (*api.Nas, error)
 	UMount(name, vm string) (*api.Nas, error)
+	Inspect(name string) ([]api.Nas, error)
 }
 
 //NewNasService creates a NAS service
@@ -296,6 +297,34 @@ func (srv *NasService) UMount(name, vmName string) (*api.Nas, error) {
 	return client, err
 }
 
+//Inspect return the detail the nas whose nas is given and all clients connected to
+func (srv *NasService) Inspect(name string) ([]api.Nas, error) {
+	names, err := srv.provider.ListObjects(api.NasContainerName, api.ObjectFilter{
+		Path:   "",
+		Prefix: name,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var nass []api.Nas
+
+	for _, name := range names {
+		nas, err := srv.readNasDefinition(name)
+		if err != nil {
+			return nil, providers.ResourceNotFoundError("Nas", name)
+		}
+		if nas.IsServer {
+			nass = append([]api.Nas{*nas}, nass...)
+		} else {
+			nass = append(nass, *nas)
+		}
+	}
+
+	return nass, nil
+
+}
+
 func (srv *NasService) saveNASDefinition(nas api.Nas) error {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
@@ -462,4 +491,29 @@ func (s *NasServiceServer) UMount(ctx context.Context, in *pb.NasDefinition) (*p
 	}
 	log.Printf("End umount Nas")
 	return convert.ToPBNas(nas), err
+}
+
+//Inspect shows the detail of a nfs server and all connected clients
+func (s *NasServiceServer) Inspect(ctx context.Context, in *pb.NasName) (*pb.NasList, error) {
+	log.Printf("Inspect NAS called")
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	nasService := NewNasService(currentTenant.client)
+	nass, err := nasService.Inspect(in.GetName())
+
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	var pbnass []*pb.NasDefinition
+
+	// Map api.Network to pb.Network
+	for _, nas := range nass {
+		pbnass = append(pbnass, convert.ToPBNas(&nas))
+	}
+	rv := &pb.NasList{NasList: pbnass}
+	log.Printf("End Inspect Nas")
+	return rv, nil
 }

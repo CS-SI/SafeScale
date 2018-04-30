@@ -21,7 +21,7 @@ var NasCmd = cli.Command{
 		nasMount,
 		nasUmount,
 		nasList,
-		// nasInspect,
+		nasInspect,
 	},
 }
 
@@ -144,7 +144,6 @@ var nasMount = cli.Command{
 			Path: c.String("path"),
 		})
 
-		// TODO output result to stdout
 		if err != nil {
 			return fmt.Errorf("Could not mount nfs directory: %v", err)
 		}
@@ -174,10 +173,38 @@ var nasUmount = cli.Command{
 			VM:  &pb.Reference{Name: c.Args().Get(1)},
 		})
 
-		// TODO output result to stdout
 		if err != nil {
 			return fmt.Errorf("Could not umount nfs directory: %v", err)
 		}
+
+		return nil
+	},
+}
+var nasInspect = cli.Command{
+	Name:      "inspect",
+	Usage:     "List the nfs server and all clients connected to it",
+	ArgsUsage: "<Nas_name>",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <Nas_name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("Nas name required")
+		}
+
+		conn := utils.GetConnection()
+		defer conn.Close()
+		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		defer cancel()
+		service := pb.NewNasServiceClient(conn)
+
+		nass, err := service.Inspect(ctx, &pb.NasName{
+			Name: c.Args().Get(0),
+		})
+		if err != nil {
+			return fmt.Errorf("Could not inspect nas: %v", err)
+		}
+		out, _ := json.Marshal(nass.GetNasList())
+		fmt.Println(string(out))
 
 		return nil
 	},
