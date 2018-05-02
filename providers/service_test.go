@@ -53,9 +53,9 @@ func TestLoad(t *testing.T) {
 	providers.Register("cloudwatt", &cloudwatt.Client{})
 	ovh, err := providers.GetService("TestOvh")
 	assert.NoError(t, err)
-	_, err = providers.GetService("TestCloudwatt")
-	assert.NoError(t, err)
 	imgs, err := ovh.ListImages()
 	assert.NoError(t, err)
 	assert.True(t, len(imgs) > 3)
+	_, err = providers.GetService("TestCloudwatt")
+	assert.NoError(t, err)
 }
