@@ -215,6 +215,7 @@ func (client *Client) CreateContainer(name string) error {
 	if err != nil {
 		return fmt.Errorf("Error creating container %s: %s", name, errorString(err))
 	}
+
 	return nil
 }
 
@@ -245,6 +246,23 @@ func (client *Client) GetContainerMetadata(name string) (map[string]string, erro
 		return nil, fmt.Errorf("Error getting container %s: %s", name, errorString(err))
 	}
 	return meta, nil
+
+}
+
+//GetContainer get container info
+func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
+	meta, err := containers.Get(client.Container, name).ExtractMetadata()
+	_ = meta
+
+	if err != nil {
+		return nil, fmt.Errorf("Error getting container %s: %s", name, errorString(err))
+	}
+	return &api.ContainerInfo{
+		Name:       name,
+		VM:         "TODO VM",
+		MountPoint: "TODO mountpoint",
+		NbItems:    -1,
+	}, nil
 
 }
 
@@ -397,7 +415,7 @@ func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]
 	pager := objects.List(client.Container, container, opts)
 	var objectList []string
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		objectNames, err := containers.ExtractNames(page)
+		objectNames, err := objects.ExtractNames(page)
 		if err != nil {
 			return false, err
 		}

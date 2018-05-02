@@ -104,12 +104,6 @@ func errorString(err error) string {
 	}
 }
 
-//NetworkGWContainerName container where Gateway configuratiion are stored
-const NetworkGWContainerName string = "0.network-gws"
-
-//VMContainerName container where VM configuration are stored
-const VMContainerName string = "0.vms"
-
 //AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	gcOpts := gc.AuthOptions{
@@ -191,8 +185,9 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	clt.CreateContainer(NetworkGWContainerName)
-	clt.CreateContainer(VMContainerName)
+	clt.CreateContainer(api.NetworkContainerName)
+	clt.CreateContainer(api.VMContainerName)
+	clt.CreateContainer(api.NasContainerName)
 	return &clt, nil
 }
 
@@ -389,4 +384,17 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 			DNSList: []string{"185.23.94.244", "185.23.94.244"},
 		},
 	)
+}
+
+// GetAuthOpts
+func (client *Client) GetAuthOpts() (api.Config, error) {
+	cfg := api.ConfigMap{}
+
+	cfg.Set("TenantName", client.Opts.TenantName)
+	cfg.Set("Login", client.Opts.Username)
+	cfg.Set("Password", client.Opts.Password)
+	cfg.Set("AuthUrl", client.Opts.IdentityEndpoint)
+	cfg.Set("Region", client.Opts.Region)
+
+	return cfg, nil
 }

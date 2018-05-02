@@ -33,11 +33,8 @@ func getTester() *tests.ClientTester {
 
 func getClient() *flexibleengine.Client {
 	if client == nil {
-		sf := providers.NewFactory()
-		sf.RegisterClient("flexibleengine", &flexibleengine.Client{})
-		sf.Load()
 
-		service := sf.Services["TestFlexibleEngine"]
+		service, _ := providers.GetService("flexibleengine")
 		client = service.ClientAPI.(*flexibleengine.Client)
 
 	}

@@ -1,6 +1,7 @@
 package ovh
 
 import (
+	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/openstack"
 
@@ -28,6 +29,8 @@ type AuthOptions struct {
 	OpenstackPassword string
 	//Name of the data center (GRA3, BHS3 ...)
 	Region string
+	//Project Name
+	ProjectName string
 }
 
 // func parseOpenRC(openrc string) (*openstack.AuthOptions, error) {
@@ -45,10 +48,11 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
 		IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
 		//UserID:           opts.OpenstackID,
-		Username: opts.OpenstackID,
-		Password: opts.OpenstackPassword,
-		TenantID: opts.ApplicationKey,
-		Region:   opts.Region,
+		Username:   opts.OpenstackID,
+		Password:   opts.OpenstackPassword,
+		TenantID:   opts.ApplicationKey,
+		TenantName: opts.ProjectName,
+		Region:     opts.Region,
 	},
 		openstack.CfgOptions{
 			ProviderNetwork:         ProviderNetwork,
@@ -85,10 +89,16 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	OpenstackID, _ := params["OpenstackID"].(string)
 	OpenstackPassword, _ := params["OpenstackPassword"].(string)
 	Region, _ := params["Region"].(string)
+	ProjectName, _ := params["ProjectName"].(string)
 	return AuthenticatedClient(AuthOptions{
 		ApplicationKey:    ApplicationKey,
 		OpenstackID:       OpenstackID,
 		OpenstackPassword: OpenstackPassword,
 		Region:            Region,
+		ProjectName:       ProjectName,
 	})
+}
+
+func init() {
+	providers.Register("ovh", &Client{})
 }

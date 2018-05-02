@@ -12,13 +12,14 @@ import (
 	"time"
 
 	"github.com/SafeScale/providers/api/IPVersion"
-	"github.com/SafeScale/providers/cloudwatt"
-	"github.com/SafeScale/providers/ovh"
 
 	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/flexibleengine"
+
+	"github.com/SafeScale/providers/api"
 
 	"github.com/SafeScale/providers"
+	_ "github.com/SafeScale/providers/cloudwatt" // Imported to initialise tenants
+	_ "github.com/SafeScale/providers/ovh"       // Imported to initialise tenants
 )
 
 const cmdNumberOfCPU string = "lscpu | grep 'CPU(s):' | grep -v 'NUMA' | tr -d '[:space:]' | cut -d: -f2"
@@ -281,17 +282,8 @@ func scanService(tenant string, service *providers.Service, c chan error) {
 //Run runs the scan
 func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	sf := providers.NewFactory()
-	sf.RegisterClient("ovh", &ovh.Client{})
-	sf.RegisterClient("cloudwatt", &cloudwatt.Client{})
-	sf.RegisterClient("flexibleengine", &flexibleengine.Client{})
-	err := sf.Load()
-	if err != nil {
-		fmt.Printf("Error during Service Factory Load: %s", err.Error())
-		return
-	}
 	channels := []chan error{}
-	for name, service := range sf.Services {
+	for name, service := range providers.Services() {
 		c := make(chan error)
 		go scanService(name, service, c)
 		channels = append(channels, c)

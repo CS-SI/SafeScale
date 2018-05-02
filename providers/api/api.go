@@ -13,11 +13,31 @@ import (
 	"github.com/SafeScale/providers/api/VolumeState"
 )
 
-//DefaultUser Default VM user
-const DefaultUser = "gpac"
+const (
+	//DefaultUser Default VM user
+	DefaultUser = "gpac"
 
-//DefaultMountPoint Default mount point for volumes
-const DefaultMountPoint = "/shared/"
+	//DefaultVolumeMountPoint Default mount point for volumes
+	DefaultVolumeMountPoint = "/shared/"
+
+	//DefaultContainerMountPoint Default mount point for containers
+	DefaultContainerMountPoint = "/containers/"
+
+	// DefaultNasExposedPath Default path to be exported by nfs server
+	DefaultNasExposedPath = "/shared/data"
+
+	// DefaultNasMountPath Default path to be mounted to access a nfs directory
+	DefaultNasMountPath = "/data"
+)
+
+const (
+	// NetworkContainerName is the tecnical name of the container used to store networks info
+	NetworkContainerName = "0.nw-gw"
+	// VMContainerName is the tecnical name of the container used to store VMs info
+	VMContainerName = "0.vm"
+	// NasContainerName is the tecnical name of the container used to store nas info
+	NasContainerName = "0.nas"
+)
 
 //TimeoutError defines a Timeout error
 type TimeoutError struct {
@@ -143,10 +163,26 @@ type VolumeAttachmentRequest struct {
 	ServerID string `json:"vm,omitempty"`
 }
 
+// Nas represents a nas definition
+type Nas struct {
+	Name     string `json:"name,omitempty"`
+	ServerID string `json:"vm,omitempty"`
+	Path     string `json:"path,omitempty"`
+	IsServer bool   `json:"isServer,omitempty"`
+}
+
 //Image representes an OS image
 type Image struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
+}
+
+//ContainerInfo represents a container description
+type ContainerInfo struct {
+	Name       string `json:"name,omitempty"`
+	VM         string `json:"vm,omitempty"`
+	MountPoint string `json:"mountPoint,omitempty"`
+	NbItems    int    `json:"nbitems,omitempty"`
 }
 
 /*
@@ -327,6 +363,8 @@ type ClientAPI interface {
 	DeleteContainer(name string) error
 	//ListContainers list object containers
 	ListContainers() ([]string, error)
+	//Getcontainer returns info of the container
+	GetContainer(name string) (*ContainerInfo, error)
 
 	//PutObject put an object into an object container
 	PutObject(container string, obj Object) error
@@ -340,6 +378,34 @@ type ClientAPI interface {
 	ListObjects(container string, filter ObjectFilter) ([]string, error)
 	//CopyObject copies an object
 	CopyObject(containerSrc, objectSrc, objectDst string) error
-	//DeleteObject deleta an object from a container
+	//DeleteObject delete an object from a container
 	DeleteObject(container, object string) error
+
+	//GetAuthOpts returns authentification options as a Config
+	GetAuthOpts() (Config, error)
+}
+
+// Config represents key/value configuration.
+type Config interface {
+	// Config gets a string configuration value and a
+	// bool indicating whether the value was present or not.
+	Config(name string) (string, bool)
+	// Set sets the configuration name to specified value
+	Set(name string, value string)
+}
+
+// ConfigMap is a map[string]string that implements
+// the Config method.
+type ConfigMap map[string]string
+
+// Config gets a string configuration value and a
+// bool indicating whether the value was present or not.
+func (c ConfigMap) Config(name string) (string, bool) {
+	val, ok := c[name]
+	return val, ok
+}
+
+// Set sets name configuration to value
+func (c ConfigMap) Set(name string, value string) {
+	c[name] = value
 }

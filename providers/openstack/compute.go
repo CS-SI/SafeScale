@@ -388,16 +388,16 @@ func (client *Client) saveVMDefinition(vm api.VM) error {
 	if err != nil {
 		return err
 	}
-	return client.PutObject(VMContainerName, api.Object{
+	return client.PutObject(api.VMContainerName, api.Object{
 		Name:    vm.ID,
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
 }
 func (client *Client) removeVMDefinition(vmID string) error {
-	return client.DeleteObject(VMContainerName, vmID)
+	return client.DeleteObject(api.VMContainerName, vmID)
 }
 func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
-	o, err := client.GetObject(VMContainerName, vmID, nil)
+	o, err := client.GetObject(api.VMContainerName, vmID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +424,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	if !request.PublicIP {
 		gwServer, err := client.readGateway(request.NetworkIDs[0])
 		if err != nil {
-			return nil, fmt.Errorf("No public VM cannot be created on a network without gateway")
+			return nil, fmt.Errorf("No private VM can be created on a network without gateway")
 		}
 		gw, err = client.readVMDefinition(gwServer.ID)
 		if err != nil {

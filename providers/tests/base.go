@@ -16,6 +16,9 @@ import (
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VolumeSpeed"
 	"github.com/SafeScale/providers/api/VolumeState"
+	_ "github.com/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
+	_ "github.com/SafeScale/providers/flexibleengine" // Imported to initialise tenants
+	_ "github.com/SafeScale/providers/ovh"            // Imported to initialise tenants
 	"github.com/stretchr/testify/assert"
 )
 

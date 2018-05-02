@@ -49,14 +49,12 @@ func TestViper(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	f := providers.NewFactory()
-	f.RegisterClient("ovh", &ovh.Client{})
-	f.RegisterClient("cloudwatt", &cloudwatt.Client{})
-	assert.NoError(t, f.Load())
-	ovh, ok := f.Services["TestOvh"]
-	assert.True(t, ok)
-	_, ok = f.Services["TestCloudwatt"]
-	assert.True(t, ok)
+	providers.Register("ovh", &ovh.Client{})
+	providers.Register("cloudwatt", &cloudwatt.Client{})
+	ovh, err := providers.GetService("TestOvh")
+	assert.NoError(t, err)
+	_, err = providers.GetService("TestCloudwatt")
+	assert.NoError(t, err)
 	imgs, err := ovh.ListImages()
 	assert.NoError(t, err)
 	assert.True(t, len(imgs) > 3)

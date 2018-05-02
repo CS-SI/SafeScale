@@ -5,7 +5,6 @@ import (
 
 	"github.com/SafeScale/providers"
 
-	"github.com/SafeScale/providers/ovh"
 	"github.com/SafeScale/providers/tests"
 )
 
@@ -13,14 +12,10 @@ var tester *tests.ClientTester
 
 func getClient() *tests.ClientTester {
 	if tester == nil {
-		sf := providers.NewFactory()
-		sf.RegisterClient("ovh", &ovh.Client{})
-		sf.Load()
-
+		service, _ := providers.GetService("TestOvh")
 		tester = &tests.ClientTester{
-			Service: *sf.Services["TestOvh"],
+			Service: *service,
 		}
-
 	}
 	return tester
 

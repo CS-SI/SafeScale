@@ -3,6 +3,7 @@ package cloudwatt
 import (
 	"fmt"
 
+	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VolumeSpeed"
 	"github.com/SafeScale/providers/openstack"
@@ -79,4 +80,8 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 		TenantName: TenantName,
 		Region:     Region,
 	})
+}
+
+func init() {
+	providers.Register("cloudwatt", &Client{})
 }

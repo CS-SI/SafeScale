@@ -9,8 +9,8 @@ mountpoint=`grep -e "^{{.Device}}" /etc/fstab |awk '{print $2;}'`
 #Remove line in fstab
 sed -i '\#^{{.Device}}#d' /etc/fstab
 
-#Remove mount directory*
-if [ "${mountpoint}" != "/" ]
-then
-	rm -rf ${mountpoint}
-fi
+# #Remove mount directory*
+# if [[ "${mountpoint}" =~ /[^/*].* ]]
+# then
+# 	rm -rf ${mountpoint}
+# fi
