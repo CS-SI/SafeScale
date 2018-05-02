@@ -8,8 +8,9 @@ import (
 	pb "github.com/SafeScale/broker"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
-	_ "github.com/SafeScale/providers/cloudwatt" // Imported to initialise tenants
-	_ "github.com/SafeScale/providers/ovh"       // Imported to initialise tenants
+	_ "github.com/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
+	_ "github.com/SafeScale/providers/flexibleengine" // Imported to initialise tenants
+	_ "github.com/SafeScale/providers/ovh"            // Imported to initialise tenants
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
