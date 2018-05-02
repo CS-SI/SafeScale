@@ -73,6 +73,8 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 
 	keypair, err := srv.provider.CreateKeyPair("kp_" + network.Name)
+	defer srv.provider.DeleteKeyPair(keypair.ID)
+
 	if err != nil {
 		srv.provider.DeleteNetwork(network.ID)
 		return nil, err
@@ -87,7 +89,6 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 
 	err = srv.provider.CreateGateway(gwRequest)
 	if err != nil {
-		srv.provider.DeleteKeyPair(keypair.ID)
 		srv.provider.DeleteNetwork(network.ID)
 		return nil, err
 	}
