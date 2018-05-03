@@ -7,6 +7,7 @@ import (
 
 	pb "github.com/SafeScale/broker"
 	conv "github.com/SafeScale/broker/utils"
+	utils "github.com/SafeScale/broker/utils"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VolumeSpeed"
@@ -292,31 +293,43 @@ func (s *VolumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachmen
 //Delete a volume
 func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Volume delete called")
+
+	ref := utils.GetReference(in)
+	if ref == "" {
+		return nil, fmt.Errorf("Neither name nor id given as reference")
+	}
+
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 	service := NewVolumeService(currentTenant.client)
-	err := service.Delete(in.GetName())
+	err := service.Delete(ref)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Volume '%s' deleted", in.GetName())
+	log.Printf("Volume '%s' deleted", ref)
 	return &google_protobuf.Empty{}, nil
 }
 
 //Inspect a volume
 func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Volume, error) {
 	log.Printf("Inspect Volume called")
+
+	ref := utils.GetReference(in)
+	if ref == "" {
+		return nil, fmt.Errorf("Neither name nor id given as reference")
+	}
+
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
 	service := NewVolumeService(currentTenant.client)
-	vol, err := service.Get(in.GetName())
+	vol, err := service.Get(ref)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("End Inspect volume: '%s'", in.GetName())
+	log.Printf("End Inspect volume: '%s'", ref)
 	return conv.ToPbVolume(*vol), nil
 }

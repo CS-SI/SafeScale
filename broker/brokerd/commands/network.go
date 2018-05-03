@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	pb "github.com/SafeScale/broker"
+	utils "github.com/SafeScale/broker/utils"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
@@ -183,19 +184,24 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *google_protobuf.Emp
 
 //Inspect returns infos on a network
 func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
-	log.Printf("Inspect Network called for network %s", in.GetName())
+	log.Printf("Inspect Network called")
+
+	ref := utils.GetReference(in)
+	if ref == "" {
+		return nil, fmt.Errorf("Neither name nor id given as reference")
+	}
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
 	networkAPI := NewNetworkService(currentTenant.client)
-	network, err := networkAPI.Get(in.GetName())
+	network, err := networkAPI.Get(ref)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("End Inspect Network: '%s'", in.GetName())
+	log.Printf("End Inspect Network: '%s'", ref)
 	return &pb.Network{
 		ID:   network.ID,
 		Name: network.Name,
@@ -205,18 +211,23 @@ func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 
 //Delete a network
 func (s *NetworkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Delete Network called for nerwork '%s'", in.GetName())
+	log.Printf("Delete Network called")
+
+	ref := utils.GetReference(in)
+	if ref == "" {
+		return nil, fmt.Errorf("Neither name nor id given as reference")
+	}
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
 	networkAPI := NewNetworkService(currentTenant.client)
-	err := networkAPI.Delete(in.GetName())
+	err := networkAPI.Delete(ref)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("Network '%s' deleted", in.GetName())
+	log.Printf("Network '%s' deleted", ref)
 	return &google_protobuf.Empty{}, nil
 }
