@@ -83,10 +83,10 @@ func loadConfig() error {
 
 func getTenantsFromCfg() []interface{} {
 	v := viper.New()
-	v.AddConfigPath("/etc/safescale")
-	v.AddConfigPath("$HOME/.config/safescale")
-	v.AddConfigPath("$HOME/.safescale")
 	v.AddConfigPath(".")
+	v.AddConfigPath("$HOME/.safescale")
+	v.AddConfigPath("$HOME/.config/safescale")
+	v.AddConfigPath("/etc/safescale")
 	v.SetConfigName("tenants")
 
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file

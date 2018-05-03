@@ -2,6 +2,8 @@ package providers_test
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/SafeScale/providers/cloudwatt"
@@ -30,6 +32,8 @@ func TestParameters(t *testing.T) {
 }
 
 func TestViper(t *testing.T) {
+	createTenantFile()
+	defer deleteTenantFile()
 	viper.AddConfigPath(".")
 	viper.SetConfigName("tenants")
 	err := viper.ReadInConfig() // Find and read the config file
@@ -48,7 +52,7 @@ func TestViper(t *testing.T) {
 	}
 }
 
-func TestLoad(t *testing.T) {
+func TestGetService(t *testing.T) {
 	providers.Register("ovh", &ovh.Client{})
 	providers.Register("cloudwatt", &cloudwatt.Client{})
 	ovh, err := providers.GetService("TestOvh")
@@ -58,4 +62,65 @@ func TestLoad(t *testing.T) {
 	assert.True(t, len(imgs) > 3)
 	_, err = providers.GetService("TestCloudwatt")
 	assert.NoError(t, err)
+}
+func TestGetServiceErr(t *testing.T) {
+	createTenantFile()
+	defer deleteTenantFile()
+	providers.Register("ovh", &ovh.Client{})
+	providers.Register("cloudwatt", &cloudwatt.Client{})
+	_, err := providers.GetService("TestOhvehache")
+	assert.Error(t, err)
+	_, err = providers.GetService("UnknownService")
+	assert.Error(t, err)
+}
+
+func TestTenants(t *testing.T) {
+	createTenantFile()
+	defer deleteTenantFile()
+
+	foundOhVeHache := false
+	foundCloudWhat := false
+	for tenant, client := range providers.Tenants() {
+		fmt.Printf("Tenant: '%s'\tClient: '%s'\n", tenant, client)
+		if tenant == "TestOhvehache" {
+			foundOhVeHache = true
+		}
+		if tenant == "TestCloudWhat" {
+			foundCloudWhat = true
+		}
+	}
+	assert.True(t, foundOhVeHache)
+	assert.True(t, foundCloudWhat)
+}
+
+func createTenantFile() {
+	filename, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0777)
+	if err != nil {
+		panic(err)
+	}
+
+	defer file.Close()
+
+	// write some text line-by-line to file
+	_, err = file.WriteString("[[tenants]]\nclient = \"hovehache\"\nname = \"TestOhvehache\"\n")
+	if err != nil {
+		return
+	}
+	_, err = file.WriteString("[[tenants]]\nclient = \"cloudwhat\"\nname = \"TestCloudWhat\"\n")
+	if err != nil {
+		return
+	}
+
+	// save changes
+	file.Sync()
+}
+
+func deleteTenantFile() {
+	path, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	os.Remove(path)
 }
