@@ -1,7 +1,6 @@
-#all: providers brokerd broker cluster
-all: providers cluster
+all: providers system broker cluster
 
-.PHONY: clean providers brokerd broker cluster clean
+.PHONY: clean providers broker cluster clean
 
 providers:
 	@(cd providers && $(MAKE))
@@ -13,7 +12,8 @@ cluster:
 	@(cd cluster && $(MAKE))
 
 clean:
-	@(cd providers && $(MAKE))
-	@(cd broker && $(MAKE))
-	@(cd cluster && $(MAKE))
+	@(cd providers && $(MAKE) $@)
+	@(cd broker && $(MAKE) $@)
+	@(cd cluster && $(MAKE) $@)
+	@(cd system && $(MAKE) $@)
 
