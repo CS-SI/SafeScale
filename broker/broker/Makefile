@@ -2,8 +2,8 @@ all:	broker
 
 .PHONY:	clean
 
-broker:	main.go cmd/*.go ../utils/*.go ../broker.pb.go
-	@go build
+broker:	main.go cmd/*.go ../utils/*.go ../brokerd.pb.go
+	go build
 
 clean:
 	@rm -f broker
