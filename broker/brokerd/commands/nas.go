@@ -58,6 +58,15 @@ func sanitize(in string) (string, error) {
 //Create a nas
 func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 
+	// Check if a nas already exist with the same name
+	nas, err := srv.findNas(name)
+	if nas != nil {
+		return nil, fmt.Errorf("NAS '%s' already exists", name)
+	}
+	if _, ok := err.(providers.ResourceNotFound); !ok {
+		return nil, err
+	}
+
 	vm, err := srv.vmService.Get(vmName)
 	if err != nil {
 		return nil, fmt.Errorf("No VM found with name or id '%s'", vmName)
@@ -96,7 +105,7 @@ func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 		return nil, err
 	}
 
-	nas := &api.Nas{
+	nas = &api.Nas{
 		Name:     name,
 		ServerID: vm.ID,
 		Path:     exportedPath,

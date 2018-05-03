@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	pb "github.com/SafeScale/broker"
 	conv "github.com/SafeScale/broker/utils"
@@ -73,7 +74,13 @@ func (srv *VolumeService) Get(ref string) (*api.Volume, error) {
 
 // Create a volume
 func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error) {
-	volume, err := srv.provider.CreateVolume(api.VolumeRequest{
+	// Check if a volume already exist with the same name
+	volume, err := srv.Get(name)
+	if volume != nil || (err != nil && !strings.Contains(err.Error(), "does not exists")) {
+		return nil, fmt.Errorf("Volume '%s' already exists", name)
+	}
+
+	volume, err = srv.provider.CreateVolume(api.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,

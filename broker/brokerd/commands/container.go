@@ -51,6 +51,10 @@ func (srv *ContainerService) List() ([]string, error) {
 
 //Create a container
 func (srv *ContainerService) Create(name string) error {
+	container, _ := srv.provider.GetContainer(name)
+	if container != nil {
+		return providers.ResourceAlreadyExistsError("Container", name)
+	}
 	return srv.provider.CreateContainer(name)
 }
 

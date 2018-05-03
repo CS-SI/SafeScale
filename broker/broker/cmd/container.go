@@ -114,7 +114,7 @@ var containerInspect = cli.Command{
 
 		resp, err := service.Inspect(ctx, &pb.Container{Name: c.Args().Get(0)})
 		if err != nil {
-			return fmt.Errorf("Could not delete container '%s': %v", c.Args().Get(0), err)
+			return fmt.Errorf("Could not inspect container '%s': %v", c.Args().Get(0), err)
 		}
 
 		out, _ := json.Marshal(resp)
