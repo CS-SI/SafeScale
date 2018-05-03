@@ -51,13 +51,6 @@ func (s *TenantServiceServer) List(ctx context.Context, in *google_protobuf.Empt
 	return &pb.TenantList{Tenants: tl}, nil
 }
 
-//Reload reloads tenants from configuration file
-func (s *TenantServiceServer) Reload(ctx context.Context, in *google_protobuf.Empty) (*google_protobuf.Empty, error) {
-	// TODO To be implemented
-	log.Println("Reload called")
-	return &google_protobuf.Empty{}, nil
-}
-
 //Get returns the name of the current tenant used
 func (s *TenantServiceServer) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
 	log.Println("Tenant Get called")
