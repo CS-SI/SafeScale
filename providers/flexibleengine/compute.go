@@ -6,7 +6,10 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/pengux/check"
 
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
@@ -231,7 +234,12 @@ func (client *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 //createVM creates a new VM and configure it as gateway for the network if isGateway is true
 func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, error) {
 	if isGateway && !request.PublicIP {
-		return nil, fmt.Errorf("Can't create a gateway without public IP")
+		return nil, fmt.Errorf("can't create a gateway without public IP")
+	}
+
+	// Validating name of the VM
+	if ok, err := validateVMName(request); !ok {
+		return nil, fmt.Errorf("name '%s' is invalid for a FlexibleEngine VM: %s", request.Name, errorString(err))
 	}
 
 	var nets []servers.Network
@@ -357,6 +365,28 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 
 	return vm, nil
+}
+
+//validateVMName validates the name of a VM based on known FlexibleEngine requirements
+func validateVMName(req api.VMRequest) (bool, error) {
+	s := check.Struct{
+		"Name": check.Composite{
+			check.NonEmpty{},
+			check.Regex{`^[a-zA-Z0-9_-]+$`},
+			check.MaxChar{64},
+		},
+	}
+
+	e := s.Validate(req)
+	if e.HasErrors() {
+		errors, _ := e.GetErrorsByKey("Name")
+		var errs []string
+		for _, msg := range errors {
+			errs = append(errs, msg.Error())
+		}
+		return false, fmt.Errorf(strings.Join(errs, " + "))
+	}
+	return true, nil
 }
 
 //WaitVMState waits a vm achieve state
