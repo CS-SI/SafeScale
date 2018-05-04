@@ -114,29 +114,8 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 		Region:     region,
 		MountPoint: mountPoint,
 	}
-	scriptCmd, err := getBoxContent("mount_object_storage.sh", data)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
 
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-	_, err = cmd.Output()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return exec("mount_object_storage.sh", data, vm.ID, srv.provider)
 }
 
 //UMount a container
@@ -160,30 +139,7 @@ func (srv *ContainerService) UMount(containerName, vmName string) error {
 		Container: containerName,
 	}
 
-	scriptCmd, err := getBoxContent("umount_object_storage.sh", data)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-	_, err = cmd.Output()
-	if err != nil {
-		fmt.Printf("%v", err)
-		return err
-	}
-
-	return nil
+	return exec("umount_object_storage.sh", data, vm.ID, srv.provider)
 }
 
 //ContainerServiceServer is the container service grpc server

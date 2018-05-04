@@ -130,28 +130,7 @@ func (srv *VolumeService) Attach(volumename string, vmname string, path string, 
 		Fsformat:   format,
 		MountPoint: mountPoint,
 	}
-	scriptCmd, err := getBoxContent("mount_block_device.sh", data)
-	if err != nil {
-		// TODO Use more explicit error
-		srv.Detach(volumename, vmname)
-		return err
-	}
-
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
-	if err != nil {
-		// TODO Use more explicit error
-		srv.Detach(volumename, vmname)
-		return err
-	}
-
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		// TODO Use more explicit error
-		srv.Detach(volumename, vmname)
-		return err
-	}
-	_, err = cmd.Output()
+	err = exec("mount_block_device.sh", data, vm.ID, srv.provider)
 	if err != nil {
 		srv.Detach(volumename, vmname)
 		return err
@@ -183,31 +162,12 @@ func (srv *VolumeService) Detach(volumename string, vmname string) error {
 	//  - umount volume
 	//  - remove mount directory
 	//  - update fstab (remove line with device)
-	// TODO Put all rice-box stuff in a dedicated method to return only formatted cmd to use in ssh cmd
 	data := struct {
 		Device string
 	}{
 		Device: volatt.Device,
 	}
-	scriptCmd, err := getBoxContent("umount_block_device.sh", data)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-	_, err = cmd.Output()
+	err = exec("umount_block_device.sh", data, vm.ID, srv.provider)
 	if err != nil {
 		return err
 	}
