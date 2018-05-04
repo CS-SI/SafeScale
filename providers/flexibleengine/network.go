@@ -14,6 +14,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/pengux/check"
 )
 
 //VPCRequest defines a request to create a VPC
@@ -166,9 +167,13 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		return nil, fmt.Errorf("Network '%s' already exists", req.Name)
 	}
 
+	if ok, err := validateNetworkName(req); !ok {
+		return nil, fmt.Errorf("network name '%s' invalid: %s", req.Name, err)
+	}
+
 	subnet, err = client.createSubnet(req.Name, req.CIDR)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating network named '%s': %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("error creating Network '%s': %s", req.Name, errorString(err))
 	}
 
 	return &api.Network{
@@ -177,6 +182,28 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		CIDR:      subnet.CIDR,
 		IPVersion: fromIntIPVersion(subnet.IPVersion),
 	}, nil
+}
+
+//validateNetworkName validates the name of a Network based on known FlexibleEngine requirements
+func validateNetworkName(req api.NetworkRequest) (bool, error) {
+	s := check.Struct{
+		"Name": check.Composite{
+			check.NonEmpty{},
+			check.Regex{`^[a-zA-Z0-9_-]+$`},
+			check.MaxChar{64},
+		},
+	}
+
+	e := s.Validate(req)
+	if e.HasErrors() {
+		errors, _ := e.GetErrorsByKey("Name")
+		var errs []string
+		for _, msg := range errors {
+			errs = append(errs, msg.Error())
+		}
+		return false, fmt.Errorf(strings.Join(errs, "; "))
+	}
+	return true, nil
 }
 
 //GetNetwork returns the network identified by id
