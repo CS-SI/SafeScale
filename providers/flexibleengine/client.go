@@ -6,6 +6,7 @@ import (
 	"text/template"
 
 	rice "github.com/GeertJohan/go.rice"
+	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VolumeSpeed"
 	"github.com/SafeScale/providers/openstack"
@@ -660,4 +661,8 @@ func (client *Client) findVPCID() (*string, error) {
 		return &router.ID, nil
 	}
 	return nil, nil
+}
+
+func init() {
+	providers.Register("flexibleengine", &Client{})
 }
