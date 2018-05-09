@@ -278,15 +278,33 @@ func convertNumberToIPv4(n uint32) net.IP {
 	return IP
 }
 
+//cidrIntersects tells if the 2 CIDR passed as parameter intersect
+func cidrIntersects(n1, n2 *net.IPNet) bool {
+	return n2.Contains(n1.IP) || n1.Contains(n2.IP)
+}
+
 //createSubnet creates a subnet using native FlexibleEngine API
 func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, error) {
-	net, _, err := net.ParseCIDR(cidr)
+	// Validates CIDR regarding the existing subnets
+	subnets, err := client.listSubnets()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to choose gateway IP address for the subnet: %s", errorString(err))
+		return nil, err
 	}
-	n, err := convertIPv4ToNumber(net.To4())
+	network, networkDesc, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to choose gateway IP address for the subnet: %s", errorString(err))
+		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", name, cidr, errorString(err))
+	}
+	for _, s := range *subnets {
+		_, sDesc, _ := net.ParseCIDR(s.CIDR)
+		if cidrIntersects(networkDesc, sDesc) {
+			return nil, fmt.Errorf("can't create subnet '%s (%s)', would intersect with '%s (%s)'", name, cidr, s.Name, s.CIDR)
+		}
+	}
+
+	// Calculate IP address for gateway
+	n, err := convertIPv4ToNumber(network.To4())
+	if err != nil {
+		return nil, fmt.Errorf("failed to choose gateway IP address for the subnet: %s", errorString(err))
 	}
 	gw := convertNumberToIPv4(n + 1)
 
@@ -306,7 +324,7 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 	}
 	b, err := gc.BuildRequestBody(req, "subnet")
 	if err != nil {
-		return nil, fmt.Errorf("Error preparing Subnet %s creation: %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("error preparing Subnet %s creation: %s", req.Name, errorString(err))
 	}
 
 	resp := subnetCreateResult{}
@@ -318,11 +336,11 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 	}
 	_, err = client.Provider.Request("POST", url, &opts)
 	if err != nil {
-		return nil, fmt.Errorf("Error requesting Subnet %s creation: %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("error requesting Subnet %s creation: %s", req.Name, errorString(err))
 	}
 	subnet, err := resp.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating Subnet %s: %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("error creating Subnet %s: %s", req.Name, errorString(err))
 	}
 
 	return subnet, nil
