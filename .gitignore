@@ -35,3 +35,5 @@ rice-box.go
 
 #ignore results from scanner
 scanner/Test*
+
+scanner/scanner
