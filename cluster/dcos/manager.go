@@ -2,10 +2,10 @@ package dcos
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/SafeScale/providers"
 	providerapi "github.com/SafeScale/providers/api"
-	"github.com/davecgh/go-spew/spew"
 
 	clusterapi "github.com/SafeScale/cluster/api"
 	"github.com/SafeScale/cluster/api/ClusterState"
@@ -45,7 +45,6 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 	if err != nil {
 		return nil, fmt.Errorf("Failed to find image for CentOS 7.3")
 	}
-	spew.Dump(image)
 
 	// Figures out the best template for Bootstrap node
 	tmplBootstrap, err := svc.SelectTemplatesBySize(providerapi.SizingRequirements{
@@ -68,7 +67,7 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 	}
 
 	// Create a KeyPair for the cluster
-	name := "key-pair-cluster-" + req.Name
+	name := "cluster_" + req.Name + "_key"
 	svc.DeleteKeyPair(name)
 	kp, err := svc.CreateKeyPair(name)
 	if err != nil {
@@ -90,11 +89,6 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 		},
 		Manager: m,
 	}
-	err = cluster.SaveDefinition()
-	if err != nil {
-		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
-		goto cleanKeypair
-	}
 
 	// Creates network
 	network, err = svc.CreateNetwork(providerapi.NetworkRequest{
@@ -106,9 +100,29 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 		goto cleanKeypair
 	}
 	cluster.definition.NetworkID = network.ID
+	//sleep 3s to wait Network in READY state for now, has to be smarter... Probably in service.CreateNetwork()
+	fmt.Println("Sleeping 3s...")
+	time.Sleep(3 * time.Second)
+	fmt.Println("Waking up...")
+
+	// Creates bootstrap/upgrade server
+	_, err = cluster.AddNode(NodeType.Bootstrap, providerapi.VMRequest{
+		TemplateID: tmplBootstrap[0].ID,
+		ImageID:    image.ID,
+	})
+	if err != nil {
+		err = fmt.Errorf("failed to create DCOS bootstrap server: %s", err.Error())
+		goto cleanNetwork
+	}
+
+	err = cluster.SaveDefinition()
+	if err != nil {
+		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
+		goto cleanBootstrap
+	}
 
 	switch req.Complexity {
-	case Complexity.Simple:
+	case Complexity.Dev:
 		masterCount = 1
 	case Complexity.HighAvailability:
 		masterCount = 3
@@ -128,50 +142,65 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 		}
 	}
 
-	// Creates bootstrap/upgrade server
-	_, err = cluster.AddNode(NodeType.Bootstrap, providerapi.VMRequest{
-		TemplateID: tmplBootstrap[0].ID,
-		ImageID:    image.ID,
-	})
+	err = cluster.configure()
 	if err != nil {
-		err = fmt.Errorf("failed to create DCOS bootstrap server: %s", err.Error())
+		err = fmt.Errorf("failed to configure bootstrap and masters servers: %s", err.Error())
 		goto cleanMasters
 	}
 
-	// Cluster created successfully, saving again to Object Storage
+	// Cluster created and configured successfully, saving again to Object Storage
 	cluster.definition.Common.State = ClusterState.Created
 	err = cluster.SaveDefinition()
 	if err != nil {
-		goto cleanAll
+		goto cleanMasters
 	}
 
 	// Initialize the cluster
 	err = cluster.Initialize()
 	if err != nil {
-		goto cleanAll
+		goto cleanMasters
 	}
 
 	return cluster, nil
 
-cleanAll:
-	svc.DeleteVM(cluster.definition.BootstrapID)
 cleanMasters:
-	for _, id := range cluster.definition.MasterIDs {
-		svc.DeleteVM(id)
-	}
-	svc.DeleteNetwork(cluster.definition.NetworkID)
+	//	for _, id := range cluster.definition.MasterIDs {
+	//		svc.DeleteVM(id)
+	//	}
+cleanBootstrap:
+	//	svc.DeleteVM(cluster.definition.BootstrapID)
+cleanNetwork:
+	//	svc.DeleteNetwork(cluster.definition.NetworkID)
 cleanKeypair:
-	svc.DeleteKeyPair(kp.ID)
+	//	svc.DeleteKeyPair(kp.ID)
 	cluster.RemoveDefinition()
 	return nil, err
 }
 
 // DeleteCluster deletes the infrastructure of the cluster named 'name'
 func (m *Manager) DeleteCluster(name string) error {
-	cluster, err := m.GetCluster(name)
+	clusterAPI, err := m.GetCluster(name)
 	if err != nil {
 		return fmt.Errorf("failed to find a cluster named '%s': %s", name, err.Error())
 	}
+	cluster, ok := clusterAPI.(Cluster)
+	if !ok {
+		return fmt.Errorf("Cluster struct found doesn't correspond to instance of dcos.Cluster")
+	}
+
+	svc := m.GetService()
+
+	for _, a := range cluster.definition.PrivateAgentIDs {
+		svc.DeleteVM(a)
+	}
+	for _, a := range cluster.definition.PublicAgentIDs {
+		svc.DeleteVM(a)
+	}
+	for _, m := range cluster.definition.Common.MasterIDs {
+		svc.DeleteVM(m)
+	}
+	svc.DeleteVM(cluster.definition.Common.BootstrapID)
+	svc.DeleteNetwork(cluster.definition.NetworkID)
 
 	// Cleanup Object Storage data
 	return cluster.RemoveDefinition()
