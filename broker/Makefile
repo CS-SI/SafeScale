@@ -1,20 +1,20 @@
-GOPATH?="~/go"
+GOPATH?=$(HOME)/go
 
-all:	sdk brokerd broker
+all:	brokerd broker
 
-.PHONY:	broker brokerd clean
+.PHONY:	sdk broker brokerd clean
 
-sdk:	brokerd.proto
-	protoc -I. -I$(GOPATH)/src --go_out=plugins=grpc:. brokerd.proto
-	protoc -I. -I$(GOPATH)/src --python_out=plugins=grpc:. brokerd.proto
+sdk:	broker.proto
+	@protoc -I. -I$(GOPATH)/src --go_out=plugins=grpc:. broker.proto
+	@protoc -I. -I$(GOPATH)/src --python_out=plugins=grpc:. broker.proto
 
-brokerd:
+brokerd:	sdk
 	@(cd brokerd && $(MAKE) $@)
 
-broker:
+broker:	sdk
 	@(cd broker && $(MAKE) $@)
 
 clean:
 	@(cd broker && $(MAKE) $@)
 	@(cd brokerd && $(MAKE) $@)
-	@rm -f brokerd_pb2.py brokerd.pb.go
+	@(rm -f broker_pb2.py broker.pb.go)
