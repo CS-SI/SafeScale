@@ -101,9 +101,9 @@ fi
 {{ if .AddGateway }}
 echo "AddGateway"
 
-GW=$(ip route show | grep default | cut -d ' ' -f3)
-if [ -z $GW ]
-then
+#GW=$(ip route show | grep default | cut -d ' ' -f3)
+#if [ -z $GW ]
+#then
 
 cat <<-EOF > /etc/resolv.conf.gw
 {{.ResolveConf}}
@@ -130,6 +130,6 @@ EOF
 systemctl enable gateway
 systemctl start gateway
 
-fi
+#fi
 
 {{ end }}
