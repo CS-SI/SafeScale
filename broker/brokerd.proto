@@ -18,7 +18,6 @@ message TenantList{
 
 service TenantService{
     rpc List (google.protobuf.Empty) returns (TenantList){}
-    rpc Reload (google.protobuf.Empty) returns (google.protobuf.Empty){}
     rpc Set (TenantName) returns (google.protobuf.Empty){}
     rpc Get (google.protobuf.Empty) returns (TenantName){}
 }

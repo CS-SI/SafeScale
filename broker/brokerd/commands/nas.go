@@ -58,6 +58,15 @@ func sanitize(in string) (string, error) {
 //Create a nas
 func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 
+	// Check if a nas already exist with the same name
+	nas, err := srv.findNas(name)
+	if nas != nil {
+		return nil, fmt.Errorf("NAS '%s' already exists", name)
+	}
+	if _, ok := err.(providers.ResourceNotFound); !ok {
+		return nil, err
+	}
+
 	vm, err := srv.vmService.Get(vmName)
 	if err != nil {
 		return nil, fmt.Errorf("No VM found with name or id '%s'", vmName)
@@ -74,29 +83,12 @@ func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 	}{
 		ExportedPath: exportedPath,
 	}
-	scriptCmd, err := getBoxContent("create_nas.sh", data)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-	_, err = cmd.Output()
+	err = exec("create_nas.sh", data, vm.ID, srv.provider)
 	if err != nil {
 		return nil, err
 	}
 
-	nas := &api.Nas{
+	nas = &api.Nas{
 		Name:     name,
 		ServerID: vm.ID,
 		Path:     exportedPath,
@@ -124,24 +116,7 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 	}{
 		ExportedPath: nas.Path,
 	}
-	scriptCmd, err := getBoxContent("nfs_unexport_repository.sh", data)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-	_, err = cmd.Output()
+	err = exec("nfs_unexport_repository.sh", data, vm.ID, srv.provider)
 	if err != nil {
 		return nil, err
 	}
@@ -209,24 +184,7 @@ func (srv *NasService) Mount(name, vmName, path string) (*api.Nas, error) {
 		ExportedPath: nas.Path,
 		MountPath:    mountPath,
 	}
-	scriptCmd, err := getBoxContent("mount_nfs_directory.sh", data)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-	_, err = cmd.Output()
+	err = exec("mount_nfs_directory.sh", data, vm.ID, srv.provider)
 	if err != nil {
 		return nil, err
 	}
@@ -265,24 +223,7 @@ func (srv *NasService) UMount(name, vmName string) (*api.Nas, error) {
 		NFSServer:    nfsServer.GetAccessIP(),
 		ExportedPath: nas.Path,
 	}
-	scriptCmd, err := getBoxContent("umount_nfs_directory.sh", data)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		// TODO Use more explicit error
-		return nil, err
-	}
-	_, err = cmd.Output()
+	err = exec("umount_nfs_directory.sh", data, vm.ID, srv.provider)
 	if err != nil {
 		return nil, err
 	}

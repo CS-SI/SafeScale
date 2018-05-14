@@ -3,8 +3,10 @@ package brokerd
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
 
+	pb "github.com/SafeScale/broker"
 	"google.golang.org/grpc"
 )
 
@@ -30,4 +32,18 @@ func GetConnection() *grpc.ClientConn {
 func GetContext(timeout time.Duration) (context.Context, context.CancelFunc) {
 	// Contact the server and print out its response.
 	return context.WithTimeout(context.Background(), timeout)
+}
+
+//GetReference return a reference from the name or id given in the pb.Reference
+func GetReference(in *pb.Reference) string {
+	var ref string
+	name := in.GetName()
+	if strings.TrimSpace(name) != "" {
+		ref = name
+	}
+	id := in.GetID()
+	if strings.TrimSpace(id) != "" {
+		ref = id
+	}
+	return ref
 }

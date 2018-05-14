@@ -8,6 +8,7 @@ import (
 
 	pb "github.com/SafeScale/broker"
 	conv "github.com/SafeScale/broker/utils"
+	utils "github.com/SafeScale/broker/utils"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/system"
@@ -187,12 +188,18 @@ func (s *VMServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.
 //Inspect a VM
 func (s *VMServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM, error) {
 	log.Printf("Inspect VM called")
+
+	ref := utils.GetReference(in)
+	if ref == "" {
+		return nil, fmt.Errorf("Neither name nor id given as reference")
+	}
+
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
 	vmService := NewVMService(currentTenant.client)
-	vm, err := vmService.Get(in.GetName())
+	vm, err := vmService.Get(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -214,29 +221,41 @@ func (s *VMServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM
 //Delete a VM
 func (s *VMServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Delete VM called")
+
+	ref := utils.GetReference(in)
+	if ref == "" {
+		return nil, fmt.Errorf("Neither name nor id given as reference")
+	}
+
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 	vmService := NewVMService(currentTenant.client)
-	err := vmService.Delete(in.GetName())
+	err := vmService.Delete(ref)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("VM '%s' deleted", in.GetName())
+	log.Printf("VM '%s' deleted", ref)
 	return &google_protobuf.Empty{}, nil
 }
 
 //SSH returns ssh parameters to access a VM
 func (s *VMServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
 	log.Printf("Ssh VM called")
+
+	ref := utils.GetReference(in)
+	if ref == "" {
+		return nil, fmt.Errorf("Neither name nor id given as reference")
+	}
+
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 	vmService := NewVMService(currentTenant.client)
-	sshConfig, err := vmService.SSH(in.GetName())
+	sshConfig, err := vmService.SSH(ref)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Got Ssh config for VM '%s'", in.GetName())
+	log.Printf("Got Ssh config for VM '%s'", ref)
 	return conv.ToPBSshconfig(sshConfig), nil
 }

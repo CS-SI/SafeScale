@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	pb "github.com/SafeScale/broker"
 	conv "github.com/SafeScale/broker/utils"
+	utils "github.com/SafeScale/broker/utils"
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VolumeSpeed"
@@ -72,7 +74,13 @@ func (srv *VolumeService) Get(ref string) (*api.Volume, error) {
 
 // Create a volume
 func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error) {
-	volume, err := srv.provider.CreateVolume(api.VolumeRequest{
+	// Check if a volume already exist with the same name
+	volume, err := srv.Get(name)
+	if volume != nil || (err != nil && !strings.Contains(err.Error(), "does not exists")) {
+		return nil, fmt.Errorf("Volume '%s' already exists", name)
+	}
+
+	volume, err = srv.provider.CreateVolume(api.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
@@ -122,28 +130,7 @@ func (srv *VolumeService) Attach(volumename string, vmname string, path string, 
 		Fsformat:   format,
 		MountPoint: mountPoint,
 	}
-	scriptCmd, err := getBoxContent("mount_block_device.sh", data)
-	if err != nil {
-		// TODO Use more explicit error
-		srv.Detach(volumename, vmname)
-		return err
-	}
-
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
-	if err != nil {
-		// TODO Use more explicit error
-		srv.Detach(volumename, vmname)
-		return err
-	}
-
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		// TODO Use more explicit error
-		srv.Detach(volumename, vmname)
-		return err
-	}
-	_, err = cmd.Output()
+	err = exec("mount_block_device.sh", data, vm.ID, srv.provider)
 	if err != nil {
 		srv.Detach(volumename, vmname)
 		return err
@@ -175,31 +162,12 @@ func (srv *VolumeService) Detach(volumename string, vmname string) error {
 	//  - umount volume
 	//  - remove mount directory
 	//  - update fstab (remove line with device)
-	// TODO Put all rice-box stuff in a dedicated method to return only formatted cmd to use in ssh cmd
 	data := struct {
 		Device string
 	}{
 		Device: volatt.Device,
 	}
-	scriptCmd, err := getBoxContent("umount_block_device.sh", data)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-
-	cmd, err := ssh.SudoCommand(scriptCmd)
-	if err != nil {
-		// TODO Use more explicit error
-		return err
-	}
-	_, err = cmd.Output()
+	err = exec("umount_block_device.sh", data, vm.ID, srv.provider)
 	if err != nil {
 		return err
 	}
@@ -292,31 +260,43 @@ func (s *VolumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachmen
 //Delete a volume
 func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Volume delete called")
+
+	ref := utils.GetReference(in)
+	if ref == "" {
+		return nil, fmt.Errorf("Neither name nor id given as reference")
+	}
+
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 	service := NewVolumeService(currentTenant.client)
-	err := service.Delete(in.GetName())
+	err := service.Delete(ref)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Volume '%s' deleted", in.GetName())
+	log.Printf("Volume '%s' deleted", ref)
 	return &google_protobuf.Empty{}, nil
 }
 
 //Inspect a volume
 func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Volume, error) {
 	log.Printf("Inspect Volume called")
+
+	ref := utils.GetReference(in)
+	if ref == "" {
+		return nil, fmt.Errorf("Neither name nor id given as reference")
+	}
+
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
 	service := NewVolumeService(currentTenant.client)
-	vol, err := service.Get(in.GetName())
+	vol, err := service.Get(ref)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("End Inspect volume: '%s'", in.GetName())
+	log.Printf("End Inspect volume: '%s'", ref)
 	return conv.ToPbVolume(*vol), nil
 }

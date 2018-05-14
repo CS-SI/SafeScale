@@ -34,7 +34,7 @@ func ResourceNotFoundError(resource string, name string) ResourceNotFound {
 	}
 }
 func (e ResourceNotFound) Error() string {
-	return fmt.Sprintf("Unable to find %s %s", e.ResourceType, e.Name)
+	return fmt.Sprintf("Unable to find %s '%s'", e.ResourceType, e.Name)
 }
 
 //ResourceAlreadyExists resource already exists error

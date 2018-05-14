@@ -41,21 +41,14 @@ func (s *TenantServiceServer) List(ctx context.Context, in *google_protobuf.Empt
 	log.Println("List tenant called")
 
 	var tl []*pb.Tenant
-	for name := range providers.Services() {
+	for tenantName, providerName := range providers.Tenants() {
 		tl = append(tl, &pb.Tenant{
-			Name:     name,
-			Provider: "myprovider",
+			Name:     tenantName,
+			Provider: providerName,
 		})
 	}
 
 	return &pb.TenantList{Tenants: tl}, nil
-}
-
-//Reload reloads tenants from configuration file
-func (s *TenantServiceServer) Reload(ctx context.Context, in *google_protobuf.Empty) (*google_protobuf.Empty, error) {
-	// TODO To be implemented
-	log.Println("Reload called")
-	return &google_protobuf.Empty{}, nil
 }
 
 //Get returns the name of the current tenant used
@@ -71,12 +64,16 @@ func (s *TenantServiceServer) Get(ctx context.Context, in *google_protobuf.Empty
 //GetCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
 func GetCurrentTenant() *Tenant {
 	if currentTenant == nil {
-		if len(providers.Services()) != 1 {
+		if len(providers.Tenants()) != 1 {
 			return nil
 		}
 		// Set unqiue tenant as selected
 		log.Println("Unique tenant set")
-		for name, service := range providers.Services() {
+		for name := range providers.Tenants() {
+			service, err := providers.GetService(name)
+			if err != nil {
+				return nil
+			}
 			currentTenant = &Tenant{name: name, client: service}
 		}
 	}
@@ -94,7 +91,7 @@ func (s *TenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*goog
 
 	clientAPI, err := providers.GetService(in.GetName())
 	if err != nil {
-		return nil, fmt.Errorf("Unknown tenant '%s'", in.GetName())
+		return nil, fmt.Errorf("Unable to set tenant '%s': %s", in.GetName(), err.Error())
 	}
 	currentTenant = &Tenant{name: in.GetName(), client: clientAPI}
 	log.Printf("Current tenant is now '%s'", in.GetName())
