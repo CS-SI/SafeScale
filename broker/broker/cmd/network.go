@@ -6,7 +6,6 @@ import (
 
 	pb "github.com/SafeScale/broker"
 	utils "github.com/SafeScale/broker/utils"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
 
@@ -24,14 +23,21 @@ var NetworkCmd = cli.Command{
 
 var networkList = cli.Command{
 	Name:  "list",
-	Usage: "list",
+	Usage: "List existing Networks (created by SafeScale)",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "all",
+			Usage: "List all Networks on tenant (not only those created by SafeScale)",
+		}},
 	Action: func(c *cli.Context) error {
 		conn := utils.GetConnection()
 		defer conn.Close()
 		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		networkService := pb.NewNetworkServiceClient(conn)
-		networks, err := networkService.List(ctx, &google_protobuf.Empty{})
+		networks, err := networkService.List(ctx, &pb.NWListRequest{
+			All: c.Bool("all"),
+		})
 		if err != nil {
 			return fmt.Errorf("Could not get network list: %v", err)
 		}

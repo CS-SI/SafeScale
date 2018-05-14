@@ -311,6 +311,8 @@ type ClientAPI interface {
 	GetNetwork(id string) (*Network, error)
 	//ListNetworks lists available networks
 	ListNetworks() ([]Network, error)
+	//ListSafeScaleNetworks lists available networks
+	ListSafeScaleNetworks() ([]Network, error)
 	//DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
 	//CreateGateway creates a public Gateway for a private network

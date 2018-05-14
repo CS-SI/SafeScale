@@ -73,9 +73,13 @@ message Network{
 message NetworkList{
     repeated Network Networks = 1;
 }
+
+message NWListRequest{
+    bool All =1;
+}
 service NetworkService{
     rpc Create(NetworkDefinition) returns (Network){}
-    rpc List(google.protobuf.Empty) returns (NetworkList){}
+    rpc List(NWListRequest) returns (NetworkList){}
     rpc Inspect(Reference) returns (Network) {}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
 }
