@@ -16,14 +16,14 @@ import (
 )
 
 // broker vm create vm1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
-// broker vm list
+// broker vm list --all=false
 // broker vm inspect vm1
 // broker vm create vm2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
 
 //VMAPI defines API to manipulate VMs
 type VMAPI interface {
 	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.VM, error)
-	List() ([]api.VM, error)
+	List(all bool) ([]api.VM, error)
 	Get(ref string) (*api.VM, error)
 	Delete(ref string) error
 	SSH(ref string) (*system.SSHConfig, error)
@@ -80,8 +80,11 @@ func (srv *VMService) Create(name string, net string, cpu int, ram float32, disk
 }
 
 //List returns the network list
-func (srv *VMService) List() ([]api.VM, error) {
-	return srv.provider.ListVMs()
+func (srv *VMService) List(all bool) ([]api.VM, error) {
+	if all {
+		return srv.provider.ListVMs()
+	}
+	return srv.provider.ListSafeScaleVMs()
 }
 
 //Get returns the network identified by ref, ref can be the name or the id
@@ -121,7 +124,7 @@ func (srv *VMService) SSH(ref string) (*system.SSHConfig, error) {
 type VMServiceServer struct{}
 
 //List available VMs
-func (s *VMServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.VMList, error) {
+func (s *VMServiceServer) List(ctx context.Context, in *pb.VMListRequest) (*pb.VMList, error) {
 	log.Printf("List VM called")
 
 	if GetCurrentTenant() == nil {
@@ -129,7 +132,8 @@ func (s *VMServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (
 	}
 
 	vmAPI := NewVMService(currentTenant.client)
-	vms, err := vmAPI.List()
+
+	vms, err := vmAPI.List(in.GetAll())
 	if err != nil {
 		return nil, err
 	}

@@ -133,10 +133,14 @@ message SshConfig{
 
 }
 
+message VMListRequest{
+    bool All = 1;
+}
+
 service VMService{
     rpc Create(VMDefinition) returns (VM){}
     rpc Inspect(Reference) returns (VM){}
-    rpc List(google.protobuf.Empty) returns (VMList){}
+    rpc List(VMListRequest) returns (VMList){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
     rpc SSH(Reference) returns (SshConfig){}
 }

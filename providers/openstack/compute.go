@@ -574,6 +574,29 @@ func (client *Client) ListVMs() ([]api.VM, error) {
 	return vms, nil
 }
 
+//ListSafeScaleVMs lists available VMs created by SafeScale (ie registered in object storage)
+func (client *Client) ListSafeScaleVMs() ([]api.VM, error) {
+	names, err := client.ListObjects(api.VMContainerName, api.ObjectFilter{})
+	if err != nil {
+		return nil, err
+	}
+
+	var vms []api.VM
+
+	for _, name := range names {
+		vm, err := client.readVMDefinition(name)
+		if err != nil {
+			return nil, providers.ResourceNotFoundError("VM", name)
+		}
+		vms = append(vms, *vm)
+	}
+
+	if len(vms) == 0 && err != nil {
+		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
+	}
+	return vms, nil
+}
+
 //getFloatingIP returns the floating IP associated with the VM identified by vmID
 //By convention only one floating IP is allocated to a VM
 func (client *Client) getFloatingIP(vmID string) (*floatingips.FloatingIP, error) {
