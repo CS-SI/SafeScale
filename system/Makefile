@@ -9,6 +9,6 @@ nfs:
 	@(cd nfs && $(MAKE) $@)
 
 clean:
-	@(cd nfs && $(MAKE))
+	@(cd nfs && $(MAKE) $@)
 	@rm -f rice-box.go
 

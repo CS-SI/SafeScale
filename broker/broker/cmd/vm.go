@@ -6,7 +6,6 @@ import (
 
 	pb "github.com/SafeScale/broker"
 	utils "github.com/SafeScale/broker/utils"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
 
@@ -25,14 +24,21 @@ var VMCmd = cli.Command{
 
 var vmList = cli.Command{
 	Name:  "list",
-	Usage: "List available VMs",
+	Usage: "List available VMs (created by SafeScale)",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "all",
+			Usage: "List all VMs on tenant (not only those created by SafeScale)",
+		}},
 	Action: func(c *cli.Context) error {
 		conn := utils.GetConnection()
 		defer conn.Close()
 		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVMServiceClient(conn)
-		vms, err := service.List(ctx, &google_protobuf.Empty{})
+		vms, err := service.List(ctx, &pb.VMListRequest{
+			All: c.Bool("all"),
+		})
 		if err != nil {
 			return fmt.Errorf("Could not get vm list: %v", err)
 		}

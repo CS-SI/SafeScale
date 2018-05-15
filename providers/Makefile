@@ -1,16 +1,29 @@
-all: openstack
+DIRECTORIES_ = $(sort $(dir $(wildcard */)))
+DIRECTORIES = $(filter-out tests/, $(DIRECTORIES_))
 
-.PHONY: api openstack clean
+all:	api aws cloudwatt flexibleengine openstack ovh
+
+.PHONY:	api aws cloudwatt flexibleengine openstack ovh clean
 
 api:
-	@(cd api && go generate)
+	@(cd $@ && $(MAKE))
 
-openstack: 
-	@(cd openstack && go generate)
+aws:	api
+	@(cd $@ && $(MAKE))
+
+cloudwatt:	api openstack
+	@(cd $@ && $(MAKE))
+
+flexibleengine:	api openstack
+	@(cd $@ && $(MAKE))
+
+openstack:	api
+	@(cd $@ && $(MAKE))
+
+ovh:	api openstack
+	@(cd $@ && $(MAKE))
 
 clean:
-	$(cd openstack && $(MAKE) $@)
-	$(cd brokerd && $(MAKE) $@)
-	$(cd broker && $(MAKE) $@)
-	$(cd cluster && $(MAKE) $@)
+	@(for d in $(DIRECTORIES); do (cd $$d; $(MAKE) $@); done)
+
 

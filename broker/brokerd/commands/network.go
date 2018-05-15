@@ -22,7 +22,7 @@ import (
 //NetworkAPI defines API to manage networks
 type NetworkAPI interface {
 	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string) (*api.Network, error)
-	List() ([]api.Network, error)
+	List(all bool) ([]api.Network, error)
 	Get(ref string) (*api.Network, error)
 	Delete(ref string) error
 }
@@ -98,13 +98,17 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 }
 
 //List returns the network list
-func (srv *NetworkService) List() ([]api.Network, error) {
-	return srv.provider.ListNetworks()
+func (srv *NetworkService) List(all bool) ([]api.Network, error) {
+
+	if all {
+		return srv.provider.ListNetworks()
+	}
+	return srv.provider.ListSafeScaleNetworks()
 }
 
 //Get returns the network identified by ref, ref can be the name or the id
 func (srv *NetworkService) Get(ref string) (*api.Network, error) {
-	nets, err := srv.List()
+	nets, err := srv.List(true)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +158,7 @@ func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 }
 
 //List existing networks
-func (s *NetworkServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.NetworkList, error) {
+func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (*pb.NetworkList, error) {
 	log.Printf("List Network called")
 
 	if GetCurrentTenant() == nil {
@@ -162,7 +166,8 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *google_protobuf.Emp
 	}
 
 	networkAPI := NewNetworkService(currentTenant.client)
-	networks, err := networkAPI.List()
+
+	networks, err := networkAPI.List(in.GetAll())
 	if err != nil {
 		return nil, err
 	}

@@ -32,6 +32,7 @@ broker/brokerd/brokerd
 *.pb.go
 *_pb2.py
 rice-box.go
+*_string.go
 
 #ignore results of scanner
 scanner/Test*

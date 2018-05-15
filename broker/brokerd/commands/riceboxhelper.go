@@ -9,6 +9,8 @@ import (
 	"github.com/SafeScale/providers"
 )
 
+//go:generate rice embed-go
+
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
 func getBoxContent(script string, data interface{}) (string, error) {
 
