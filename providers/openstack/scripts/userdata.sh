@@ -1,83 +1,122 @@
 #!/bin/bash
 
-adduser {{.User}} -gecos "" --disabled-password
-echo "{{.User}} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# Redirects outputs to /var/tmp/user_data.log
+exec 1<&-
+exec 2<&-
+exec 1<>/var/tmp/user_data.log
+exec 2>&1
 
-mkdir /home/{{.User}}/.ssh
-echo "{{.Key}}" > /home/{{.User}}/.ssh/authorized_keys
+create_user() {
+    useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+    echo "{{.User}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
-# Create flag file to deactivate Welcome message on ssh
-touch /home/{{.User}}/.hushlogin
+    # Sets ssh conf
+    mkdir /home/{{.User}}/.ssh
+    echo "{{.Key}}" >>/home/{{.User}}/.ssh/authorized_keys
+    chmod 0700 /home/{{.User}}/.ssh
+    chmod -R 0600 /home/{{.User}}/.ssh/*
 
-echo "{{.ConfIF}}"
+    # Create flag file to deactivate Welcome message on ssh
+    touch /home/{{.User}}/.hushlogin
 
-# Network interfaces configuration
-{{ if .ConfIF }}
-rm -f /etc/network/interfaces.d/50-cloud-init.cfg
-mkdir -p /etc/network/interfaces.d
-# Configure all network interfaces in dhcp
-for IF in $(ls /sys/class/net)
-do
-   if [ $IF != "lo" ]
-   then
-        echo "auto ${IF}" >> /etc/network/interfaces.d/50-cloud-init.cfg
-        echo "iface ${IF} inet dhcp" >> /etc/network/interfaces.d/50-cloud-init.cfg
-   fi
-done
+    # Ensures ownership
+    chown -R gpac:gpac /home/{{.User}}
+}
 
-systemctl restart networking
-# Restart networkk interfaces except lo
-# for IF in $(ls /sys/class/net)
-# do
-#     if [ $IF != "lo" ]
-#     then
+configure_network_debian() {
+    rm -f /etc/network/interfaces.d/50-cloud-init.cfg
+    mkdir -p /etc/network/interfaces.d
+    # Configure all network interfaces in dhcp
+    for IF in $(ls /sys/class/net); do
+        if [ $IF != "lo" ]; then
+            echo "auto ${IF}" >> /etc/network/interfaces.d/50-cloud-init.cfg
+            echo "iface ${IF} inet dhcp" >> /etc/network/interfaces.d/50-cloud-init.cfg
+        fi
+        done
+
+    systemctl restart networking
+# Restart network interfaces except lo
+#    for IF in $(ls /sys/class/net); do
+#     if [ $IF != "lo" ]; then
 #         IF_UP = $(ip a |grep ${IF} | grep 'state UP' | wc -l)
-#         if [ ${IF_UP} = "1" ]
-#         then
+#         if [ ${IF_UP} = "1" ]; then
 #             ifconfig ${IF} down
 #         fi
 #         ifconfig ${IF} up
 #     fi
 # done
-{{ end }}
+}
 
+configure_network_netplan() {
+    mv -f /etc/netplan /etc/netplan.orig
+    mkdir -p /etc/netplan
+    cat <<EOF >/etc/netplan/50-cloud-init.yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    ens3:
+      dhcp4: true
+    ens4:
+      dhcp4: true
+EOF
+    netplan generate
+    netplan apply
+}
 
+configure_network_redhat() {
+    rm -f /etc/sysconfig/network-scripts/ifcfg-eth0
+#    mkdir -p /etc/network/interfaces.d
+    # Configure all network interfaces in dhcp
+    for IF in $(ls /sys/class/net); do
+        if [ $IF != "lo" ]; then
+            cat <<EOF >/etc/sysconfig/network-scripts/ifcfg-$IF
+EOF
+        fi
+        done
 
-# Acitvates IP forwarding
-{{ if .IsGateway }}
+    systemctl restart networking
+# Restart network interfaces except lo
+#    for IF in $(ls /sys/class/net); do
+#     if [ $IF != "lo" ]; then
+#         IF_UP = $(ip a |grep ${IF} | grep 'state UP' | wc -l)
+#         if [ ${IF_UP} = "1" ]; then
+#             ifconfig ${IF} down
+#         fi
+#         ifconfig ${IF} up
+#     fi
+# done
+}
 
-PUBLIC_IP=$(curl ipinfo.io/ip)
-PUBLIC_IF=$(netstat -ie | grep -B1 ${PUBLIC_IP} | head -n1 | awk '{print $1}')
+configure_as_gateway() {
+    PUBLIC_IP=$(curl ipinfo.io/ip)
+    PUBLIC_IF=$(netstat -ie | grep -B1 ${PUBLIC_IP} | head -n1 | awk '{print $1}')
 
-PRIVATE_IP=''
-for IF in $(ls /sys/class/net)
-do
-   if [ ${IF} != "lo" ] && [ ${IF} != ${PUBLIC_IF} ]
-   then
-        PRIVATE_IP=$(ip a |grep ${IF} | grep inet | awk '{print $2}' | cut -d '/' -f1)
-   fi
-done
+    PRIVATE_IP=''
+    for IF in $(ls /sys/class/net); do
+        if [ ${IF} != "lo" ] && [ ${IF} != ${PUBLIC_IF} ]; then
+            PRIVATE_IP=$(ip a |grep ${IF} | grep inet | awk '{print $2}' | cut -d '/' -f1)
+        fi
+    done
 
-if [ -z ${PRIVATE_IP} ]
-then
-    exit 1
-fi
-PRIVATE_IF=$(netstat -ie | grep -B1 ${PRIVATE_IP} | head -n1 | awk '{print $1}')
+    if [ -z ${PRIVATE_IP} ]; then
+        exit 1
+    fi
+    PRIVATE_IF=$(netstat -ie | grep -B1 ${PRIVATE_IP} | head -n1 | awk '{print $1}')
 
-if [ ! -z $PUBLIC_IF ] && [ ! -z $PRIVATE_IF ]
-then
-sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf
-sysctl -p /etc/sysctl.conf
+    if [ ! -z $PUBLIC_IF ] && [ ! -z $PRIVATE_IF ]; then
+        sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf
+        sysctl -p /etc/sysctl.conf
 
-cat <<- EOF > /sbin/routing
+        cat <<- EOF >/sbin/routing
 #!/bin/sh -
 echo "activate routing"
 iptables -t nat -A POSTROUTING -o ${PUBLIC_IF} -j MASQUERADE
 iptables -A FORWARD -i ${PRIVATE_IF} -o ${PUBLIC_IF} -j ACCEPT
 iptables -A FORWARD -i ${PUBLIC_IF} -o ${PRIVATE_IF} -m state --state RELATED,ESTABLISHED -j ACCEPT
 EOF
-chmod u+x /sbin/routing
-cat <<- EOF > /etc/systemd/system/routing.service
+        chmod u+x /sbin/routing
+        cat <<- EOF >/etc/systemd/system/routing.service
 [Unit]
 Description=activate routing from ${PRIVATE_IF} to ${PUBLIC_IF}
 After=network.target
@@ -91,32 +130,29 @@ ExecStart=/sbin/routing
 WantedBy=multi-user.target
 EOF
 
-systemctl enable routing
-systemctl start routing
-fi
+        systemctl enable routing
+        systemctl start routing
+    fi
+}
 
-{{ end }}
+configure_gateway() {
+    echo "AddGateway"
 
-# Acitvates IP forwarding
-{{ if .AddGateway }}
-echo "AddGateway"
+    GW=$(ip route show | grep default | cut -d ' ' -f3)
+    if [ -z $GW ]; then
 
-GW=$(ip route show | grep default | cut -d ' ' -f3)
-if [ -z $GW ]
-then
-
-cat <<-EOF > /etc/resolv.conf.gw
+        cat <<-EOF > /etc/resolv.conf.gw
 {{.ResolveConf}}
 EOF
 
-cat <<- EOF > /sbin/gateway
+        cat <<- EOF > /sbin/gateway
 #!/bin/sh -
 echo "configure default gateway"
 /sbin/route add default gw {{.GatewayIP}}
 cp /etc/resolv.conf.gw /etc/resolv.conf
 EOF
-chmod u+x /sbin/gateway
-cat <<- EOF > /etc/systemd/system/gateway.service
+        chmod u+x /sbin/gateway
+        cat <<- EOF > /etc/systemd/system/gateway.service
 Description=create default gateway
 After=network.target
 
@@ -127,9 +163,58 @@ ExecStart=/sbin/gateway
 WantedBy=multi-user.target
 EOF
 
-systemctl enable gateway
-systemctl start gateway
+        systemctl enable gateway
+        systemctl start gateway
+    fi
+}
 
-fi
+LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
+VERSION_ID=$(cat /etc/os-release | grep "^VERSION_ID=" | cut -d= -f2 | sed 's/"//g')
 
-{{ end }}
+case $LINUX_KIND in
+    debian)
+        create_user
+        {{if .ConfIF}}
+        configure_network_debian
+        {{end}}
+        {{if .IsGateway}}
+        configure_as_gateway
+        {{end}}
+        {{if .AddGateway}}
+        configure_gateway
+        {{end}}
+        ;;
+
+    ubuntu)
+        create_user
+        {{if .ConfIF}}
+        if [[ "$VERSION_ID" = "17.10" || "$VERSION_ID" = "18.04" ]]; then
+            configure_network_netplan
+        else
+            configure_network_debian
+        fi
+        {{end}}
+        {{if .IsGateway}}
+        configure_as_gateway
+        {{end}}
+        {{if .AddGateway}}
+        configure_gateway
+        {{end}}
+        ;;
+
+    redhat|centos)
+        create_user
+        {{if .IsGateway}}
+        configure_as_gateway
+        {{end}}
+        {{if .AddGateway}}
+        configure_gateway
+        {{end}}
+        ;;
+    *)
+        echo "Unsupported Linux distribution '$LINUX_KIND'!"
+        exit 1
+        ;;
+esac
+
+exit 0
