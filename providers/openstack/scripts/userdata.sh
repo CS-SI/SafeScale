@@ -138,21 +138,18 @@ EOF
 configure_gateway() {
     echo "AddGateway"
 
-    GW=$(ip route show | grep default | cut -d ' ' -f3)
-    if [ -z $GW ]; then
-
-        cat <<-EOF > /etc/resolv.conf.gw
+    cat <<-EOF > /etc/resolv.conf.gw
 {{.ResolveConf}}
 EOF
 
-        cat <<- EOF > /sbin/gateway
+    cat <<- EOF > /sbin/gateway
 #!/bin/sh -
 echo "configure default gateway"
 /sbin/route add default gw {{.GatewayIP}}
 cp /etc/resolv.conf.gw /etc/resolv.conf
 EOF
-        chmod u+x /sbin/gateway
-        cat <<- EOF > /etc/systemd/system/gateway.service
+    chmod u+x /sbin/gateway
+    cat <<- EOF > /etc/systemd/system/gateway.service
 Description=create default gateway
 After=network.target
 
@@ -163,9 +160,8 @@ ExecStart=/sbin/gateway
 WantedBy=multi-user.target
 EOF
 
-        systemctl enable gateway
-        systemctl start gateway
-    fi
+    systemctl enable gateway
+    systemctl start gateway
 }
 
 LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
