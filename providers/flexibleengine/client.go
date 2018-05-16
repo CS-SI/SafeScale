@@ -268,7 +268,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		},
 		Cfg: &openstack.CfgOptions{
 			UseFloatingIP:       true,
-			UseLayer3Networking: true,
+			UseLayer3Networking: false,
 			VolumeSpeeds:        cfg.VolumeSpeeds,
 		},
 		Provider: provider,
@@ -309,10 +309,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	}
 	return &clt, nil
 }
-
-/* VPL: Not used ?
-const defaultRouter string = "d46886b1-cb8e-4e98-9b18-b60bf847dd09"
-*/
 
 //Client is the implementation of the flexibleengine driver regarding to the api.ClientAPI
 type Client struct {
@@ -355,6 +351,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 		S3AccessKeyID:       S3AccessKeyID,
 		S3AccessKeyPassword: S3AccessKeyPassword,
 	}, CfgOptions{
+		DNSList:             []string{"100.125.0.41", "100.126.0.41"},
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
 		VolumeSpeeds: map[string]VolumeSpeed.Enum{
@@ -371,11 +368,6 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
  *      default Security Group bound to a VPC, to prevent side effect if
  *      a default Security Group is changed
  */
-
-/*
- * Pourquoi un ID plutôt qu'un nom ?
-const defaultSecurityGroup string = "30ad3142-a5ec-44b5-9560-618bde3de1ef"
-*/
 
 //getDefaultSecurityGroup returns the default security group for the client, in the form
 // sg-<VPCName>, if it exists.

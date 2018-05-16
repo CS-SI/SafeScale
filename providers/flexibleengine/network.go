@@ -585,6 +585,15 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	return nil
 }
 
+//GetGateway returns the name of the gateway of a network
+func (client *Client) GetGateway(networkID string) (string, error) {
+	vmID, err := client.readGateway(networkID)
+	if err != nil {
+		return "", err
+	}
+	return vmID, nil
+}
+
 //DeleteGateway deletes the gateway associated with network identified by ID
 func (client *Client) DeleteGateway(networkID string) error {
 	vmID, err := client.readGateway(networkID)
