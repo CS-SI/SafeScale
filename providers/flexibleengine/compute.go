@@ -234,6 +234,20 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		return nil, fmt.Errorf("Can't create a gateway without public IP")
 	}
 
+	//Eventual network gateway
+	var gw *api.VM
+	// If the VM is not public it has to be created on a network owning a Gateway
+	if !request.PublicIP {
+		gwServer, err := client.loadGateway(request.NetworkIDs[0])
+		if err != nil {
+			return nil, fmt.Errorf("No private VM can be created on a network without gateway")
+		}
+		gw, err = client.readVMDefinition(gwServer.ID)
+		if err != nil {
+			return nil, fmt.Errorf("Bad state, Gateway for network %s is not accessible", request.NetworkIDs[0])
+		}
+	}
+
 	var nets []servers.Network
 	//Add private networks
 	for _, n := range request.NetworkIDs {
@@ -256,8 +270,8 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		defer client.DeleteKeyPair(kp.ID)
 	}
 
-	userData, err := client.PrepareUserData(request, false, kp, nil)
-	//fmt.Println(string(userData))
+	userData, err := client.PrepareUserData(request, isGateway, kp, gw)
+	fmt.Println(string(userData))
 
 	// Determine system disk size based on vcpus count
 	template, err := client.GetTemplate(request.TemplateID)
@@ -331,6 +345,12 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	// Fixes the size of bootdisk, FlexibleEngine is used to not give one...
 	vm.Size.DiskSize = diskSize
 	vm.PrivateKey = kp.PrivateKey
+	//Add gateway ID to VM definition
+	var gwID string
+	if gw != nil {
+		gwID = gw.ID
+	}
+	vm.GatewayID = gwID
 
 	//if Floating IP are not used or no public address is requested
 	if request.PublicIP {
@@ -357,6 +377,18 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 
 	return vm, nil
+}
+
+func (client *Client) loadGateway(networkID string) (*servers.Server, error) {
+	gwID, err := client.GetGateway(networkID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find Gateway %s", errorString(err))
+	}
+	gw, err := servers.Get(client.Compute, gwID).Extract()
+	if err != nil {
+		return nil, fmt.Errorf("unable to find Gateway %s", errorString(err))
+	}
+	return gw, nil
 }
 
 //WaitVMState waits a vm achieve state
