@@ -1,13 +1,15 @@
-all:	brokerd
+GO?=go
 
 .PHONY:	brokerd commands clean
 
+all:	brokerd
+
 brokerd: commands main.go commands/*.go ../utils/*.go ../broker.pb.go
-	@go build
+	@$(GO) build
 
 commands:
 	@(cd commands && $(MAKE))
 
 clean:
 	@(cd commands && $(MAKE) $@)
-	@rm -f brokerd
+	@$(RM) brokerd

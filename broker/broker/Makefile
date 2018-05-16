@@ -1,9 +1,11 @@
-all:	broker
+GO?=go
 
 .PHONY:	broker clean
 
+all:	broker
+
 broker:	main.go cmd/*.go ../utils/*.go ../broker.pb.go
-	@go build
+	@$(GO) build
 
 clean:
-	@rm -f broker
+	@$(RM) broker

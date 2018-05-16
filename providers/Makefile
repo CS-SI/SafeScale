@@ -1,9 +1,9 @@
 DIRECTORIES_ = $(sort $(dir $(wildcard */)))
 DIRECTORIES = $(filter-out tests/, $(DIRECTORIES_))
 
-all:	api aws cloudwatt flexibleengine openstack ovh
-
 .PHONY:	api aws cloudwatt flexibleengine openstack ovh clean
+
+all:	api aws cloudwatt flexibleengine openstack ovh
 
 api:
 	@(cd $@ && $(MAKE))

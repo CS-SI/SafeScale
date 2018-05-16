@@ -1,11 +1,13 @@
+GO?=go
+
 all: build
 
-build: *.go scripts/*
-	@(cd SecurityFlavor && go generate)
-	@go generate
+build: *.go scripts/* SecurityFlavor/*.go
+	@(cd SecurityFlavor && $(GO) generate)
+	@$(GO) generate
 
 .PHONY: nfs clean
 
 clean:
-	@rm -f rice-box.go SecurityFlavor/enum_string.go
+	@$(RM) rice-box.go SecurityFlavor/enum_string.go
 

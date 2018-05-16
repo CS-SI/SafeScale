@@ -1,7 +1,8 @@
-#all: providers brokerd broker cluster
-all: providers broker system
+GO?=go
 
-.PHONY: clean providers brokerd broker system clean
+.PHONY: clean providers brokerd broker system clean deps
+
+all: providers broker system
 
 providers:
 	@(cd providers && $(MAKE))
@@ -15,4 +16,13 @@ system:
 clean:
 	@(cd providers && $(MAKE) $@)
 	@(cd broker && $(MAKE) $@)
+
+
+# DEPENDENCIES HANDLING
+STRINGER := golang.org/x/tools/cmd/stringer
+RICE := github.com/GeertJohan/go.rice
+
+deps: DEPS := $(STRINGER) $(RICE)
+
+deps: ; @$(GO) get $(DEPS)
 

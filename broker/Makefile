@@ -17,4 +17,4 @@ broker:	sdk
 clean:
 	@(cd broker && $(MAKE) $@)
 	@(cd brokerd && $(MAKE) $@)
-	@(rm -f broker_pb2.py broker.pb.go)
+	@($(RM) broker_pb2.py broker.pb.go)
