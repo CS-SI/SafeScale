@@ -79,7 +79,7 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 
 	// Saving cluster parameters, with status 'Creating'
 	cluster := &Cluster{
-		definition: ClusterDefinition{
+		definition: &ClusterDefinition{
 			Common: clusterapi.Cluster{
 				Name:       req.Name,
 				State:      ClusterState.Creating,
@@ -183,24 +183,10 @@ func (m *Manager) DeleteCluster(name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to find a cluster named '%s': %s", name, err.Error())
 	}
-	cluster, ok := clusterAPI.(Cluster)
+	cluster, ok := clusterAPI.(*Cluster)
 	if !ok {
 		return fmt.Errorf("Cluster struct found doesn't correspond to instance of dcos.Cluster")
 	}
-
-	svc := m.GetService()
-
-	for _, a := range cluster.definition.PrivateAgentIDs {
-		svc.DeleteVM(a)
-	}
-	for _, a := range cluster.definition.PublicAgentIDs {
-		svc.DeleteVM(a)
-	}
-	for _, m := range cluster.definition.Common.MasterIDs {
-		svc.DeleteVM(m)
-	}
-	svc.DeleteVM(cluster.definition.Common.BootstrapID)
-	svc.DeleteNetwork(cluster.definition.NetworkID)
 
 	// Cleanup Object Storage data
 	return cluster.RemoveDefinition()
@@ -209,7 +195,7 @@ func (m *Manager) DeleteCluster(name string) error {
 //GetCluster returns the Cluster object corresponding to the cluster named 'name'
 func (m *Manager) GetCluster(name string) (clusterapi.ClusterAPI, error) {
 	cluster := &Cluster{
-		definition: ClusterDefinition{
+		definition: &ClusterDefinition{
 			Common: clusterapi.Cluster{
 				Name: name,
 			},

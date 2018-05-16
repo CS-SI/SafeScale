@@ -4,13 +4,21 @@ package Complexity
 
 import "strconv"
 
-const _Enum_name = "SimpleHighAvailabilityHighVolume"
-
-var _Enum_index = [...]uint8{0, 6, 22, 32}
+const (
+	_Enum_name_0 = "Dev"
+	_Enum_name_1 = "HighAvailability"
+	_Enum_name_2 = "HighVolume"
+)
 
 func (i Enum) String() string {
-	if i < 0 || i >= Enum(len(_Enum_index)-1) {
+	switch {
+	case i == 1:
+		return _Enum_name_0
+	case i == 3:
+		return _Enum_name_1
+	case i == 5:
+		return _Enum_name_2
+	default:
 		return "Enum(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
-	return _Enum_name[_Enum_index[i]:_Enum_index[i+1]]
 }

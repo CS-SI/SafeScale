@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"html/template"
+	"os/exec"
+	"strconv"
+	"syscall"
+	"text/template"
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
@@ -17,6 +20,14 @@ import (
 )
 
 //go:generate rice embed-go
+
+var (
+	// templateBox is the rice box to use in this package
+	templateBox *rice.Box
+
+	//installCommonsContent contains the script to install/configure common components
+	installCommonsContent *string
+)
 
 //ClusterDefinition defines the values we want to keep in Object Storage
 type ClusterDefinition struct {
@@ -54,13 +65,10 @@ type Cluster struct {
 	Manager *Manager
 
 	//Definition contains data defining the cluster
-	definition ClusterDefinition
+	definition *ClusterDefinition
 
 	//LastStateCollect contains the date of the last state collection
 	lastStateCollection time.Time
-
-	//templateBox contains the rice box if needed
-	templateBox *rice.Box
 }
 
 //getService returns a pointer to the infrastructure service of the cluster
@@ -71,6 +79,50 @@ func (c *Cluster) getService() *providers.Service {
 //GetName returns the name of the cluster
 func (c *Cluster) GetName() string {
 	return c.definition.Common.Name
+}
+
+//getTemplateBox
+func getTemplateBox() (*rice.Box, error) {
+	if templateBox == nil {
+		b, err := rice.FindBox("../dcos/scripts")
+		if err != nil {
+			return nil, err
+		}
+		templateBox = b
+	}
+	return templateBox, nil
+}
+
+//getInstallCommons returns the string corresponding to the script dcos_install_node_commons.sh
+// which installs common components (docker in particular)
+func getInstallCommons() (*string, error) {
+	if installCommonsContent == nil {
+		// find the rice.Box
+		b, err := getTemplateBox()
+		if err != nil {
+			return nil, err
+		}
+
+		// get file contents as string
+		tmplString, err := b.String("dcos_install_node_commons.sh")
+		if err != nil {
+			return nil, fmt.Errorf("error loading script template: %s", err.Error())
+		}
+
+		// parse then execute the template
+		tmplPrepared, err := template.New("install_commons").Parse(tmplString)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+		}
+		dataBuffer := bytes.NewBufferString("")
+		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{})
+		if err != nil {
+			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
+		}
+		result := dataBuffer.String()
+		installCommonsContent = &result
+	}
+	return installCommonsContent, nil
 }
 
 //Start starts the cluster named 'name'
@@ -113,52 +165,38 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 func (c *Cluster) AddNode(nodeType NodeType.Enum, req providerapi.VMRequest) (*clusterapi.Node, error) {
 	switch nodeType {
 	case NodeType.Bootstrap:
+		if c.definition.Common.State != ClusterState.Creating {
+			return nil, fmt.Errorf("The DCOS flavor of Cluster doesn't allow to add bootstrap node after initial setup")
+		}
 		return c.addBootstrapNode(req)
 	case NodeType.Master:
 		if c.definition.Common.State != ClusterState.Creating {
 			return nil, fmt.Errorf("The DCOS flavor of Cluster doesn't allow to add master node after initial setup")
 		}
-		node, err := c.addAgentNode(req, nodeType)
-		if err != nil {
-			return nil, err
-		}
-		err = c.initializeAgentNode(node.ID, nodeType)
-		if err != nil {
-			return nil, err
-		}
-		return node, nil
+		return c.addMasterNode(req)
+	case NodeType.PublicAgent:
+		fallthrough
 	case NodeType.PrivateAgent:
-		node, err := c.addAgentNode(req, nodeType)
-		if err != nil {
-			return nil, err
+		if c.definition.Common.State == ClusterState.Creating {
+			return nil, fmt.Errorf("The DCOS flavor of Cluster needs to be in state 'Created' at least to allow agent node addition.")
 		}
-		err = c.initializeAgentNode(node.ID, nodeType)
-		if err != nil {
-			return nil, err
-		}
-		return node, nil
+		return c.addAgentNode(req, nodeType)
 	}
-	return nil, fmt.Errorf("unknown node type")
+	return nil, fmt.Errorf("unknown node type '%s'", nodeType)
 }
 
 //addBootstrapNode
 func (c *Cluster) addBootstrapNode(req providerapi.VMRequest) (*clusterapi.Node, error) {
 	svc := c.getService()
 
-	req.Name = c.definition.Common.Name + ".dcos.bootstrap"
+	req.Name = c.definition.Common.Name + "_dcos_bootstrap"
 	req.NetworkIDs = []string{c.definition.NetworkID}
 	req.PublicIP = true
 	req.KeyPair = c.definition.Common.Keypair
+
 	bootstrapVM, err := svc.CreateVM(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create bootstrap server: %s", err.Error())
-	}
-
-	// Prepares Bootstrap server
-	err = c.configureBootstrap(bootstrapVM)
-	if err != nil {
-		svc.DeleteVM(bootstrapVM.ID)
-		return nil, fmt.Errorf("failed to prepare bootstrap server: %s", err.Error())
+		return nil, fmt.Errorf("failed to create Bootstrap server: %s", err.Error())
 	}
 
 	c.definition.BootstrapID = bootstrapVM.ID
@@ -169,6 +207,7 @@ func (c *Cluster) addBootstrapNode(req providerapi.VMRequest) (*clusterapi.Node,
 	if err != nil {
 		// Removes the ID we just added to the cluster struct
 		c.definition.BootstrapID = ""
+		c.definition.BootstrapIP = ""
 		svc.DeleteVM(bootstrapVM.ID)
 		return nil, fmt.Errorf("failed to update cluster definition: %s", err.Error())
 	}
@@ -181,18 +220,13 @@ func (c *Cluster) addMasterNode(req providerapi.VMRequest) (*clusterapi.Node, er
 	svc := c.getService()
 
 	i := len(c.definition.MasterIDs) + 1
-	req.Name = c.definition.Common.Name + ".dcos.master-" + string(i)
+	req.Name = c.definition.Common.Name + "_dcos_master-" + strconv.Itoa(i)
 	req.NetworkIDs = []string{c.definition.NetworkID}
 	req.PublicIP = false
 	req.KeyPair = c.definition.Common.Keypair
 	masterVM, err := svc.CreateVM(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create master server %d: %s", i, err.Error())
-	}
-	err = c.configureMaster(masterVM)
-	if err != nil {
-		svc.DeleteVM(masterVM.ID)
-		return nil, fmt.Errorf("failed to install master node '%d': %s", i, err.Error())
 	}
 
 	// Registers the new Master in the cluster struct
@@ -202,8 +236,9 @@ func (c *Cluster) addMasterNode(req providerapi.VMRequest) (*clusterapi.Node, er
 	// Update cluster definition in Object Storage
 	err = c.SaveDefinition()
 	if err != nil {
-		// Removes the ID we just added to the cluster struct
+		// Object Storage failed, removes the ID we just added to the cluster struct
 		c.definition.MasterIDs = c.definition.MasterIDs[:len(c.definition.MasterIDs)-1]
+		c.definition.MasterIPs = c.definition.MasterIPs[:len(c.definition.MasterIPs)-1]
 		svc.DeleteVM(masterVM.ID)
 		return nil, fmt.Errorf("failed to update cluster definition: %s", err.Error())
 	}
@@ -229,16 +264,16 @@ func (c *Cluster) addAgentNode(req providerapi.VMRequest, nodeType NodeType.Enum
 	coreName := "-agent"
 	if nodeType == NodeType.PublicAgent {
 		publicIP = true
-		coreName = "public" + coreName
+		coreName = "pub" + coreName
 	} else {
 		publicIP = false
-		coreName = "private" + coreName
+		coreName = "priv" + coreName
 	}
 
 	i := len(c.definition.PublicAgentIDs) + 1
 	req.PublicIP = publicIP
 	req.NetworkIDs = []string{c.definition.NetworkID}
-	req.Name = c.definition.Common.Name + ".dcos." + coreName + "-" + string(i)
+	req.Name = c.definition.Common.Name + "_dcos_" + coreName + "-" + strconv.Itoa(i)
 	req.KeyPair = c.definition.Common.Keypair
 	agentVM, err := svc.CreateVM(req)
 	if err != nil {
@@ -276,31 +311,46 @@ func (c *Cluster) addAgentNode(req providerapi.VMRequest, nodeType NodeType.Enum
 	return c.toNode(nodeType, req.TemplateID, agentVM), nil
 }
 
-//configureBootstrap prepares the bootstrap server for duty
-func (c *Cluster) configureBootstrap(targetVM *providerapi.VM) error {
-	_, err := c.executeScript(targetVM, "dcos_install_bootstrap_node.sh", map[string]interface{}{
+//configure prepares the bootstrap and masters for duty
+func (c *Cluster) configure() error {
+	svc := c.getService()
+
+	bootstrapVM, err := svc.GetVM(c.definition.BootstrapID)
+	if err != nil {
+		return err
+	}
+	retcode, output, err := c.executeScript(bootstrapVM, "dcos_install_bootstrap_node.sh", map[string]interface{}{
+		"DCOSVersion":   "1.11.1",
 		"BootstrapIP":   c.definition.BootstrapIP,
 		"BootstrapPort": "80",
 		"ClusterName":   c.definition.Common.Name,
 		"MasterIPs":     c.definition.MasterIPs,
-		"DNSServerIPs":  []string{"", ""},
+		//"DNSServerIPs":  []string{"", ""},
 	})
-	return err
-}
-
-//configureMaster installs and configures DCOS master on targetVM
-func (c *Cluster) configureMaster(targetVM *providerapi.VM) error {
-	svc := c.getService()
-	bootstrapVM, err := svc.GetVM(c.definition.BootstrapID)
 	if err != nil {
-		return fmt.Errorf("failed to load data of bootstrap server: %s", err.Error())
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("scripted Bootstrap configuration failed with error code %d:\n%s", retcode, *output)
 	}
 
-	_, err = c.executeScript(targetVM, "dcos_install_master_node.sh", map[string]interface{}{
-		"bootstrap_ip":   bootstrapVM.AccessIPv4,
-		"bootstrap_port": "80",
-	})
-	return err
+	for _, m := range c.definition.MasterIDs {
+		vm, err := svc.GetVM(m)
+		if err != nil {
+			continue
+		}
+		retcode, output, err := c.executeScript(vm, "dcos_install_master_node.sh", map[string]interface{}{
+			"BootstrapIP":   bootstrapVM.AccessIPv4,
+			"BootstrapPort": "80",
+		})
+		if err != nil {
+			return err
+		}
+		if retcode != 0 {
+			return fmt.Errorf("scripted Master configuration failed with error code %d:\n%s", retcode, *output)
+		}
+	}
+	return nil
 }
 
 //configureAgent installs and configure DCOS agent on targetVM
@@ -318,60 +368,76 @@ func (c *Cluster) configureAgent(targetVM *providerapi.VM, nodeType NodeType.Enu
 		typeStr = "no"
 	}
 
-	_, err = c.executeScript(targetVM, "dcos_install_agent_node.sh", map[string]interface{}{
-		"public_node":    typeStr,
-		"bootstrap_ip":   bootstrapVM.AccessIPv4,
-		"bootstrap_port": "80",
+	retcode, output, err := c.executeScript(targetVM, "dcos_install_agent_node.sh", map[string]interface{}{
+		"PublicNode":    typeStr,
+		"BootstrapIP":   bootstrapVM.AccessIPv4,
+		"BootstrapPort": "80",
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("scripted Agent configuration failed with error code %d:\n%s", retcode, *output)
+	}
+	return nil
 }
 
 //executeScript executes the script template with the parameters on targetVM
-func (c *Cluster) executeScript(targetVM *providerapi.VM, script string, data map[string]interface{}) (*string, error) {
+func (c *Cluster) executeScript(targetVM *providerapi.VM, script string, data map[string]interface{}) (int, *string, error) {
 	svc := c.getService()
 
 	ssh, err := svc.GetSSHConfig(targetVM.ID)
 	if err != nil {
-		return nil, fmt.Errorf("[%s] error reading SSHConfig: %s", targetVM.Name, err.Error())
+		return 0, nil, fmt.Errorf("[%s] error reading SSHConfig: %s", targetVM.Name, err.Error())
 	}
 	ssh.WaitServerReady(60 * time.Second)
 
-	// find the rice.Box
-	if c.templateBox == nil {
-		b, err := rice.FindBox("../dcos/scripts")
-		if err != nil {
-			return nil, fmt.Errorf("[%s] error loading script folder: %s", targetVM.Name, err.Error())
-		}
-		c.templateBox = b
-	}
-	// get file contents as string
-	templateString, err := c.templateBox.String(script)
+	// Configures IncludeInstallCommons var
+	installCommons, err := getInstallCommons()
 	if err != nil {
-		return nil, fmt.Errorf("[%s] error loading script template: %s", targetVM.Name, err.Error())
+		return 0, nil, err
+	}
+	data["IncludeInstallCommons"] = *installCommons
+
+	b, err := getTemplateBox()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	// get file contents as string
+	tmplString, err := b.String(script)
+	if err != nil {
+		return 0, nil, fmt.Errorf("[%s] error loading script template: %s", targetVM.Name, err.Error())
 	}
 	// parse and execute the template
-	tmplCmd, err := template.New("cmd").Parse(templateString)
+	tmplCmd, err := template.New("cmd").Parse(tmplString)
 	if err != nil {
-		return nil, fmt.Errorf("[%s] error parsing script template: %s", targetVM.Name, err.Error())
+		return 0, nil, fmt.Errorf("[%s] error parsing script template: %s", targetVM.Name, err.Error())
 	}
 
 	dataBuffer := bytes.NewBufferString("")
 	err = tmplCmd.Execute(dataBuffer, data)
 	if err != nil {
-		return nil, fmt.Errorf("[%s] error realizing script template: %s", targetVM.Name, err.Error())
+		return 0, nil, fmt.Errorf("[%s] error realizing script template: %s", targetVM.Name, err.Error())
 	}
 	cmd := dataBuffer.String()
-	cmdResult, err := ssh.Command(cmd)
+
+	cmdResult, err := ssh.SudoCommand(cmd)
 	if err != nil {
-		return nil, fmt.Errorf("[%s] error executing script '%s': %s", targetVM.Name, script, err.Error())
+		return 0, nil, fmt.Errorf("[%s] error executing script '%s': %s", targetVM.Name, script, err.Error())
 	}
+	retcode := 0
 	out, err := cmdResult.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("[%s] error fetching output of script '%s': %s", targetVM.Name, script, err.Error())
+	if ee, ok := err.(*exec.ExitError); ok {
+		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
+			retcode = int(status)
+		}
+	} else {
+		return 0, nil, fmt.Errorf("[%s] error fetching output of script '%s': %s", targetVM.Name, script, err.Error())
 	}
 
 	strOut := string(out)
-	return &strOut, nil
+	return retcode, &strOut, nil
 }
 
 //Initialize initializes DCOS
@@ -389,11 +455,11 @@ func (c *Cluster) Initialize() error {
 
 	svc := c.getService()
 
-	// Installs DCOS on the masters first
+	// 1st, installs DCOS on the masters
 	data := map[string]interface{}{
-		"bootstrapIP":   c.definition.BootstrapIP,
-		"bootstrapPort": "80",
-		"nodeType":      "master",
+		"BootstrapIP":   c.definition.BootstrapIP,
+		"BootstrapPort": "80",
+		"NodeType":      "master",
 	}
 	for _, m := range c.definition.MasterIDs {
 		vm, err := svc.GetVM(m)
@@ -401,14 +467,17 @@ func (c *Cluster) Initialize() error {
 			c.definition.Common.State = ClusterState.Created
 			return fmt.Errorf("failed to get information about master: %s", err.Error())
 		}
-		_, err = c.executeScript(vm, "dcos_initialize_cluster_node.sh", data)
+		retcode, output, err := c.executeScript(vm, "dcos_initialize_cluster_node.sh", data)
 		if err != nil {
 			c.definition.Common.State = ClusterState.Created
 			return fmt.Errorf("failed to initialize master '%s': %s", vm.Name, err.Error())
 		}
+		if retcode != 0 {
+			return fmt.Errorf("scripted initialization of master '%s' failed with error code %d:\n%s", vm.Name, retcode, *output)
+		}
 	}
 
-	// Installs DCOS on the Private Agents next
+	// Next, installs DCOS on the Private Agents
 	data["nodeType"] = "slave"
 	for _, a := range c.definition.PrivateAgentIDs {
 		err := c.initializeAgentNode(a, NodeType.PrivateAgent)
@@ -418,8 +487,8 @@ func (c *Cluster) Initialize() error {
 		}
 	}
 
-	// Installs DCOS on the Public Agents next
-	data["nodeType"] = "slave_public"
+	// Finally, installs DCOS on the Public Agents
+	data["NodeType"] = "slave_public"
 	for _, a := range c.definition.PublicAgentIDs {
 		err := c.initializeAgentNode(a, NodeType.PublicAgent)
 		if err != nil {
@@ -431,6 +500,7 @@ func (c *Cluster) Initialize() error {
 	return nil
 }
 
+//initializeAgentNode initializes DCOS on an Agent Node
 func (c *Cluster) initializeAgentNode(ID string, nodeType NodeType.Enum) error {
 	svc := c.getService()
 
@@ -443,14 +513,18 @@ func (c *Cluster) initializeAgentNode(ID string, nodeType NodeType.Enum) error {
 	if nodeType == NodeType.PublicAgent {
 		typeStr = typeStr + "_public"
 	}
-	_, err = c.executeScript(vm, "dcos_initialize_cluster_node.sh", map[string]interface{}{
-		"bootstrapIP":   c.definition.BootstrapIP,
-		"bootstrapPort": "80",
-		"nodeType":      typeStr,
+	retcode, output, err := c.executeScript(vm, "dcos_initialize_cluster_node.sh", map[string]interface{}{
+		"BootstrapIP":   c.definition.BootstrapIP,
+		"BootstrapPort": "80",
+		"NodeType":      typeStr,
 	})
 	if err != nil {
 		c.definition.Common.State = ClusterState.Created
 		return fmt.Errorf("failed to initialize agent '%s': %s", vm.Name, err.Error())
+	}
+	if retcode != 0 {
+		c.definition.Common.State = ClusterState.Created
+		return fmt.Errorf("scripted initialization of agent '%s' failed with error code %d:\n%s", vm.Name, retcode, *output)
 	}
 	return nil
 }
@@ -521,7 +595,7 @@ func (c *Cluster) ReadDefinition() (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		c.definition = d
+		c.definition = &d
 		return true, nil
 	}
 	return false, nil

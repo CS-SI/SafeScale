@@ -4,24 +4,19 @@
 #
 # This script has to be executed on the bootstrap/upgrade server
 
-
-# Installs and configures everything needed on any node
-{{.CommonConfigurationScript}}
-
-# Prepares the folder to contain cluster Bootstrap/Upgrade data
-mkdir -p /usr/local/dcos/
+{{.IncludeInstallCommons}}
 
 # Install DCOS environment
 mkdir -p /usr/local/dcos/genconf
 cd /usr/local/dcos
 
-cat genconf/config.yaml <<- EOF
+cat >genconf/config.yaml <<- EOF
 ---
 bootstrap_url: http://{{.BootstrapIP}}:{{.BootstrapPort}}
 cluster_name: {{.ClusterName}}
 exhibitor_storage_backend: static
 master_discovery: static
-ip_detect_public_filename: genconf/ip-detect-public.sh
+ip_detect_public_filename: genconf/ip-detect
 master_list:
 {{range .MasterIPs}}- {{.}}{{end}}
 {{if .DNSServerIPs}}
@@ -37,14 +32,18 @@ use_proxy: 'false'
 #- '.baz.com'
 EOF
 
-cat genconf/ip-detect-public.sh <<- EOF
+cat >genconf/ip-detect <<- EOF
 #!/usr/bin/env bash
-set -o nounset -o errexit
-export PATH=/usr/sbin:/usr/bin:$PATH
-echo $(ip addr show eth0 | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | head -1)
+curl ipinfo.io/ip
 EOF
+chmod a+rx genconf/ip-detect
 
-[ ! -f dcos_generate_config.sh ] && wget
-sudo bash dcos_generate_config.sh
+# Download if needed the file dcos_generate_config.sh and executes it
+[ ! -f dcos_generate_config.sh ] && wget -q https://downloads.dcos.io/dcos/stable/{{.DCOSVersion}}/dcos_generate_config.sh
+if [ -f dcos_generate_config.sh ]; then
+    bash dcos_generate_config.sh
+    exit $?
+fi
 
-exit 0
+# Reaching this point, something wrong happened
+exit 1

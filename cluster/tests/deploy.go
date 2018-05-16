@@ -16,22 +16,16 @@ import (
 //Run runs the deployment
 func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	sf := providers.NewFactory()
-	sf.RegisterClient("flexibleengine", &flexibleengine.Client{})
-	err := sf.Load()
-	if err != nil {
-		fmt.Printf("Error during Service Factory Load: %s", err.Error())
-		return
-	}
+	providers.Register("flexibleengine", &flexibleengine.Client{})
 	serviceName := "TestFlexibleEngine"
-	service := sf.Services[serviceName]
-	if service == nil {
-		fmt.Printf("Failed to load service '%s'.\n", serviceName)
+	service, err := providers.GetService(serviceName)
+	if err != nil {
+		fmt.Printf("failed to load service '%s'.\n", serviceName)
 		return
 	}
 
 	cf := cluster.NewFactory()
-	cm, err := cf.GetManager(Flavor.DCOS, "TextFlexibleEngine", service)
+	cm, err := cf.GetManager(Flavor.DCOS, serviceName, service)
 	if err != nil {
 		fmt.Println("Failed to instanciate Cluster Manager.")
 		return
@@ -46,8 +40,8 @@ func Run() {
 		fmt.Println("Cluster 'Test' not found, creating it")
 		cluster, err = cm.CreateCluster(clusterapi.ClusterRequest{
 			Name:       "Test",
-			Complexity: Complexity.Simple,
-			CIDR:       "192.168.0.0/18",
+			Complexity: Complexity.Dev,
+			CIDR:       "192.168.0.0/28",
 		})
 		if err != nil {
 			fmt.Printf("Failed to create cluster: %s\n", err.Error())

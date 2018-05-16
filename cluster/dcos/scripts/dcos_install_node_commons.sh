@@ -1,43 +1,49 @@
-#!/usr/bin/env bash
-# Installs and configure common tools for any kind of nodes
+#### Installs and configure common tools for any kind of nodes ####
 
-# Disables installation of docker-python from yum
-yum remove -y docker-python
-yum install -y yum-versionlock
-yum versionlock exclude docker-python
+export LANG=C
 
-# Installs PIP
-yum install -y python-pip
+(
+    # Disables installation of docker-python from yum
+    yum remove -y python-docker-py &>/dev/null
+    yum install -y yum-versionlock wget
+    yum versionlock exclude python-docker-py
 
-# Installs docker-python with pip
-pip install -y docker-py==1.10.6
+    # Installs PIP
+    yum install -y epel-release
+    yum install -y python-pip
 
-# Enable overlay module
-echo overlay >/etc/modules-load.d/overlay.conf
+    # Installs docker-python with pip
+    pip install -q docker-py==1.10.6 docker-compose
 
-# Loads overlay module
-modprobe overlay
+    # Enable overlay module
+    echo overlay >/etc/modules-load.d/10-overlay.conf
 
-# Enables docker yum repo
-yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+    # Loads overlay module
+    modprobe overlay
 
-# Creates docker systemd directory
-mkdir -p /etc/systemd/system/docker.service.d && chmod 0755 /etc/systemd/system/docker.service.d
+    # Enables docker yum repo
+    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
 
-# Configure docker to use overlay driver
-echo >/etc/systemd/system/docker.service.d/override.conf <<- EOF
+    # Creates docker systemd directory
+    mkdir -p /etc/systemd/system/docker.service.d && chmod 0755 /etc/systemd/system/docker.service.d
+
+    # Configure docker to use overlay driver
+    echo >/etc/systemd/system/docker.service.d/override.conf <<- EOF
 [Service]
 ExecStart=
 ExecStart=/usr/bin/dockerd --storage-driver=overlay --log-driver=none
 EOF
 
-# Installs docker
-sudo yum upgrade --assumeyes --tolerant
-sudo yum update --assumeyes
-yum install -y docker-ce-17.06.2
+    # Installs docker
+    yum upgrade --assumeyes --tolerant
+    yum update --assumeyes
+    yum install -y docker-ce-17.06.2.ce
 
-# Enable docker at boot
-systemctl enable docker.service
+    # Enable docker at boot
+    systemctl enable docker.service
+    systemctl start docker
 
-# Enables admin user to use docker
-usermod -aG docker {{.AdminUsername}}
+    # Enables admin user to use docker
+    usermod -aG docker gpac
+) >/dev/null
+####
