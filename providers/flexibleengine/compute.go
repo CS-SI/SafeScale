@@ -421,6 +421,18 @@ func validateVMName(req api.VMRequest) (bool, error) {
 	return true, nil
 }
 
+func (client *Client) loadGateway(networkID string) (*servers.Server, error) {
+	gwID, err := client.GetGateway(networkID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find Gateway %s", errorString(err))
+	}
+	gw, err := servers.Get(client.Compute, gwID).Extract()
+	if err != nil {
+		return nil, fmt.Errorf("unable to find Gateway %s", errorString(err))
+	}
+	return gw, nil
+}
+
 //WaitVMState waits a vm achieve state
 func (client *Client) waitVMReady(vmID string, timeout time.Duration) (*api.VM, error) {
 	cout := make(chan int)
