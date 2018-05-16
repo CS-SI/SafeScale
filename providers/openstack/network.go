@@ -200,18 +200,18 @@ func (client *Client) ListSafeScaleNetworks() ([]api.Network, error) {
 func (client *Client) DeleteNetwork(id string) error {
 	net, err := client.GetNetwork(id)
 	if err != nil {
-		return fmt.Errorf("Error deleting networks: %s", errorString(err))
+		return fmt.Errorf("error deleting networks: %s", errorString(err))
 	}
 
 	client.DeleteGateway(net.ID)
 	sns, err := client.ListSubnets(id)
 	if err != nil {
-		return fmt.Errorf("Error deleting network: %s", errorString(err))
+		return fmt.Errorf("error deleting network: %s", errorString(err))
 	}
 	for _, sn := range sns {
 		err := client.DeleteSubnet(sn.ID)
 		if err != nil {
-			return fmt.Errorf("Error deleting network: %s", errorString(err))
+			return fmt.Errorf("error deleting network: %s", errorString(err))
 		}
 	}
 	err = networks.Delete(client.Network, id).ExtractErr()

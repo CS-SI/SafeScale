@@ -92,19 +92,18 @@ configure_as_gateway() {
     PUBLIC_IP=$(curl ipinfo.io/ip)
     PUBLIC_IF=$(netstat -ie | grep -B1 ${PUBLIC_IP} | head -n1 | awk '{print $1}')
 
-    PRIVATE_IP=''
+    PRIVATE_IP=
     for IF in $(ls /sys/class/net); do
-        if [ ${IF} != "lo" ] && [ ${IF} != ${PUBLIC_IF} ]; then
+        if [ ${IF} != "lo" ] && [ ${IF} != "${PUBLIC_IF}" ]; then
             PRIVATE_IP=$(ip a |grep ${IF} | grep inet | awk '{print $2}' | cut -d '/' -f1)
         fi
     done
 
-    if [ -z ${PRIVATE_IP} ]; then
-        exit 1
-    fi
+    [ -z ${PRIVATE_IP} ] && return 1
+
     PRIVATE_IF=$(netstat -ie | grep -B1 ${PRIVATE_IP} | head -n1 | awk '{print $1}')
 
-    if [ ! -z $PUBLIC_IF ] && [ ! -z $PRIVATE_IF ]; then
+    if [ ! -z $PRIVATE_IF ]; then
         sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf
         sysctl -p /etc/sysctl.conf
 
@@ -115,7 +114,7 @@ iptables -t nat -A POSTROUTING -o ${PUBLIC_IF} -j MASQUERADE
 iptables -A FORWARD -i ${PRIVATE_IF} -o ${PUBLIC_IF} -j ACCEPT
 iptables -A FORWARD -i ${PUBLIC_IF} -o ${PRIVATE_IF} -m state --state RELATED,ESTABLISHED -j ACCEPT
 EOF
-        chmod u+x /sbin/routing
+
         cat <<- EOF >/etc/systemd/system/routing.service
 [Unit]
 Description=activate routing from ${PRIVATE_IF} to ${PUBLIC_IF}
@@ -130,9 +129,18 @@ ExecStart=/sbin/routing
 WantedBy=multi-user.target
 EOF
 
+        if [ -z $PUBLIC_IF ]; then
+            sed -i 's/-o //g; s/-i //g' /sbin/routing
+            sed -i 's/(Description=.*) to[[:space:]*$/\\1/g' /etc/systemd/system/routing.service
+        fi
+
+        chmod u+x /sbin/routing
+
         systemctl enable routing
         systemctl start routing
     fi
+
+    echo done
 }
 
 configure_gateway() {

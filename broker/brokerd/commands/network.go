@@ -216,7 +216,7 @@ func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 
 //Delete a network
 func (s *NetworkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Delete Network called")
+	log.Printf("Delete Network called for network '%s'", in.GetName())
 
 	ref := utils.GetReference(in)
 	if ref == "" {
