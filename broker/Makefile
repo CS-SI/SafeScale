@@ -12,9 +12,9 @@ brokerd:	sdk
 	@(cd brokerd && $(MAKE) $@)
 
 broker:	sdk
-	@(cd broker && $(MAKE) $@)
+	@(cd client && $(MAKE) $@)
 
 clean:
-	@(cd broker && $(MAKE) $@)
+	@(cd client && $(MAKE) $@)
 	@(cd brokerd && $(MAKE) $@)
 	@($(RM) broker_pb2.py broker.pb.go)
