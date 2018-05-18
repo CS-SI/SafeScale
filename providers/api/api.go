@@ -383,6 +383,8 @@ type ClientAPI interface {
 
 	//GetAuthOpts returns authentification options as a Config
 	GetAuthOpts() (Config, error)
+	//GetCfgOpts returns configuration options as a Config
+	GetCfgOpts() (Config, error)
 }
 
 // Config represents key/value configuration.

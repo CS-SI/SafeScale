@@ -89,13 +89,16 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 		mountPoint = api.DefaultContainerMountPoint + containerName
 	}
 
-	cfg, _ := srv.provider.GetAuthOpts()
-	authurl, _ := cfg.Config("AuthUrl")
+	authOpts, _ := srv.provider.GetAuthOpts()
+	authurl, _ := authOpts.Config("AuthUrl")
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
-	tenant, _ := cfg.Config("TenantName")
-	login, _ := cfg.Config("Login")
-	password, _ := cfg.Config("Password")
-	region, _ := cfg.Config("Region")
+	tenant, _ := authOpts.Config("TenantName")
+	login, _ := authOpts.Config("Login")
+	password, _ := authOpts.Config("Password")
+	region, _ := authOpts.Config("Region")
+
+	cfgOpts, _ := srv.provider.GetCfgOpts()
+	s3protocol, _ := cfgOpts.Config("S3Protocol")
 
 	data := struct {
 		Container  string
@@ -105,6 +108,7 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 		AuthURL    string
 		Region     string
 		MountPoint string
+		S3Protocol string
 	}{
 		Container:  containerName,
 		Tenant:     tenant,
@@ -113,6 +117,7 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 		AuthURL:    authurl,
 		Region:     region,
 		MountPoint: mountPoint,
+		S3Protocol: s3protocol,
 	}
 
 	return exec("mount_object_storage.sh", data, vm.ID, srv.provider)
@@ -164,7 +169,7 @@ func (s *ContainerServiceServer) List(ctx context.Context, in *google_protobuf.E
 
 //Create a new container
 func (s *ContainerServiceServer) Create(ctx context.Context, in *pb.Container) (*google_protobuf.Empty, error) {
-	log.Printf("Crete container called")
+	log.Printf("Create container called")
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
