@@ -19,10 +19,16 @@ clean:
 
 
 # DEPENDENCIES HANDLING
+#Generate enum tring
 STRINGER := golang.org/x/tools/cmd/stringer
+#Embed shell file into code go
 RICE := github.com/GeertJohan/go.rice
+#CLI parser
+URFAVE := github.com/urfave/cli
+#Configuration file handler
+VIPER := github.com/spf13/viper
 
-deps: DEPS := $(STRINGER) $(RICE)
+deps: DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER)
 
 deps: ; @$(GO) get $(DEPS)
 
