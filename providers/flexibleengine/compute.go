@@ -425,7 +425,7 @@ func (client *Client) GetVM(id string) (*api.VM, error) {
 }
 
 //ListVMs lists available VMs
-func (client *Client) ListVMs() ([]api.VM, error) {
+func (client *Client) ListVMs(all bool) ([]api.VM, error) {
 	pager := servers.List(client.Compute, servers.ListOpts{})
 	var vms []api.VM
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
