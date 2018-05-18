@@ -26,7 +26,7 @@ providers/aws/*_test.go
 
 #ignore binary files from build
 broker/client/broker
-broker/brokerd/brokerd
+broker/daemon/brokerd
 
 #ignore generated files
 *.pb.go

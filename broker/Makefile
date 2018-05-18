@@ -9,12 +9,12 @@ sdk:	broker.proto
 	@protoc -I. -I$(GOPATH)/src --python_out=plugins=grpc:. broker.proto
 
 brokerd:	sdk
-	@(cd brokerd && $(MAKE) $@)
+	@(cd daemon && $(MAKE) $@)
 
 broker:	sdk
 	@(cd client && $(MAKE) $@)
 
 clean:
 	@(cd client && $(MAKE) $@)
-	@(cd brokerd && $(MAKE) $@)
+	@(cd daemon && $(MAKE) $@)
 	@($(RM) broker_pb2.py broker.pb.go)
