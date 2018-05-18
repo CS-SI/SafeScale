@@ -124,7 +124,15 @@ func (client *Client) GetNetwork(id string) (*api.Network, error) {
 }
 
 //ListNetworks lists available networks
-func (client *Client) ListNetworks() ([]api.Network, error) {
+func (client *Client) ListNetworks(all bool) ([]api.Network, error) {
+	if all {
+		return client.listAllNetworks()
+	}
+	return client.listMonitoredNetworks()
+}
+
+//listAllNetworks lists available networks
+func (client *Client) listAllNetworks() ([]api.Network, error) {
 	// We have the option of filtering the network list. If we want the full
 	// collection, leave it as an empty struct
 	opts := networks.ListOpts{}
@@ -172,8 +180,8 @@ func (client *Client) ListNetworks() ([]api.Network, error) {
 	return netList, nil
 }
 
-//ListSafeScaleNetworks lists available networks created by SaeScale (ie those registered in object storage)
-func (client *Client) ListSafeScaleNetworks() ([]api.Network, error) {
+//listMonitoredNetworks lists available networks created by SaeScale (ie those registered in object storage)
+func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 	netIDs, err := client.ListObjects(api.NetworkContainerName, api.ObjectFilter{})
 	if err != nil {
 		return nil, err

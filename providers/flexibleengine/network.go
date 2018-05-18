@@ -195,7 +195,7 @@ func (client *Client) GetNetwork(id string) (*api.Network, error) {
 }
 
 //ListNetworks lists available networks
-func (client *Client) ListNetworks() ([]api.Network, error) {
+func (client *Client) ListNetworks(all bool) ([]api.Network, error) {
 	subnetList, err := client.listSubnets()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get networks list: %s", errorString(err))

@@ -100,10 +100,7 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 //List returns the network list
 func (srv *NetworkService) List(all bool) ([]api.Network, error) {
 
-	if all {
-		return srv.provider.ListNetworks()
-	}
-	return srv.provider.ListSafeScaleNetworks()
+	return srv.provider.ListNetworks(all)
 }
 
 //Get returns the network identified by ref, ref can be the name or the id

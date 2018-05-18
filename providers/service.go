@@ -316,7 +316,7 @@ func (srv *Service) GetNetworkByName(name string) (*api.Network, error) {
 
 //ListNetworksByName returns network list
 func (srv *Service) ListNetworksByName() (map[string]api.Network, error) {
-	nets, err := srv.ListNetworks()
+	nets, err := srv.ListNetworks(false)
 	if err != nil {
 		return nil, err
 	}
