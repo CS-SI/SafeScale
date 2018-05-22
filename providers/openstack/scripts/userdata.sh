@@ -7,6 +7,7 @@ exec 1<>/var/tmp/user_data.log
 exec 2>&1
 
 create_user() {
+    echo "Creating user {{.User}}..."
     useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
     echo "{{.User}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
@@ -21,9 +22,11 @@ create_user() {
 
     # Ensures ownership
     chown -R gpac:gpac /home/{{.User}}
+    echo done
 }
 
 configure_network_debian() {
+    echo "Configuring network (debian-based)..."
     rm -f /etc/network/interfaces.d/50-cloud-init.cfg
     mkdir -p /etc/network/interfaces.d
     # Configure all network interfaces in dhcp
@@ -32,7 +35,7 @@ configure_network_debian() {
             echo "auto ${IF}" >> /etc/network/interfaces.d/50-cloud-init.cfg
             echo "iface ${IF} inet dhcp" >> /etc/network/interfaces.d/50-cloud-init.cfg
         fi
-        done
+    done
 
     systemctl restart networking
 # Restart network interfaces except lo
@@ -45,9 +48,12 @@ configure_network_debian() {
 #         ifconfig ${IF} up
 #     fi
 # done
+    echo done
 }
 
 configure_network_netplan() {
+    echo "Configuring network (netplan-based)..."
+
     mv -f /etc/netplan /etc/netplan.orig
     mkdir -p /etc/netplan
     cat <<EOF >/etc/netplan/50-cloud-init.yaml
@@ -59,12 +65,18 @@ network:
       dhcp4: true
     ens4:
       dhcp4: true
+{{if .GatewayIP}}
+      gateway4: {{.GatewayIP}}
+{{end}}
 EOF
     netplan generate
     netplan apply
+
+    echo done
 }
 
 configure_network_redhat() {
+    echo "Configuring network (redhat-based)..."
     rm -f /etc/sysconfig/network-scripts/ifcfg-eth0
 #    mkdir -p /etc/network/interfaces.d
     # Configure all network interfaces in dhcp
@@ -73,7 +85,7 @@ configure_network_redhat() {
             cat <<EOF >/etc/sysconfig/network-scripts/ifcfg-$IF
 EOF
         fi
-        done
+    done
 
     systemctl restart networking
 # Restart network interfaces except lo
@@ -86,9 +98,11 @@ EOF
 #         ifconfig ${IF} up
 #     fi
 # done
+    echo done
 }
 
 configure_as_gateway() {
+    echo "Configuring host as gateway..."
     PUBLIC_IP=$(curl ipinfo.io/ip)
     PUBLIC_IF=$(netstat -ie | grep -B1 ${PUBLIC_IP} | head -n1 | awk '{print $1}')
 
@@ -143,24 +157,33 @@ EOF
     echo done
 }
 
-configure_gateway() {
-    echo "AddGateway"
-
-    GW=$(ip route show | grep default | cut -d ' ' -f3)
-    if [ -z $GW ]; then
-
-        cat <<-EOF > /etc/resolv.conf.gw
+configure_dns_legacy() {
+    cat <<-EOF > /etc/resolv.conf
 {{.ResolveConf}}
 EOF
+}
 
-        cat <<- EOF > /sbin/gateway
+configure_dns_resolvconf() {
+    cat <<-EOF >/etc/resolvconf/resolv.conf.d/original
+{{.ResolveConf}}
+EOF
+    rm -f /etc/resolvconf/resolv.conf.d/tail
+    cd /etc/resolvconf/resolv.conf.d && /etc/resolvconf/update.d/libc
+}
+
+configure_gateway() {
+    echo "Configuring default router to {{.GatewayIP}}"
+
+    route del -net default
+
+    cat <<- EOF > /sbin/gateway
 #!/bin/sh -
 echo "configure default gateway"
 /sbin/route add default gw {{.GatewayIP}}
-cp /etc/resolv.conf.gw /etc/resolv.conf
+
 EOF
-        chmod u+x /sbin/gateway
-        cat <<- EOF > /etc/systemd/system/gateway.service
+    chmod u+x /sbin/gateway
+    cat <<- EOF > /etc/systemd/system/gateway.service
 Description=create default gateway
 After=network.target
 
@@ -171,9 +194,10 @@ ExecStart=/sbin/gateway
 WantedBy=multi-user.target
 EOF
 
-        systemctl enable gateway
-        systemctl start gateway
-    fi
+    systemctl enable gateway
+    systemctl start gateway
+
+    echo done
 }
 
 LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
@@ -190,6 +214,7 @@ case $LINUX_KIND in
         {{end}}
         {{if .AddGateway}}
         configure_gateway
+        configure_dns_legacy
         {{end}}
         ;;
 
@@ -207,6 +232,7 @@ case $LINUX_KIND in
         {{end}}
         {{if .AddGateway}}
         configure_gateway
+        configure_dns_resolvconf
         {{end}}
         ;;
 
@@ -217,6 +243,7 @@ case $LINUX_KIND in
         {{end}}
         {{if .AddGateway}}
         configure_gateway
+        configure_dns_legacy
         {{end}}
         ;;
     *)
