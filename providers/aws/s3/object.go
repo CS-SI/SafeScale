@@ -173,11 +173,11 @@ func GetObjectMetadata(service *awss3.S3, container string, name string) (*api.O
 func ListObjects(service *awss3.S3, container string, filter api.ObjectFilter) ([]string, error) {
 	var objs []string
 
-	prefix := strings.Join([]string{filter.Path, filter.Prefix}, "/")
-	err := service.ListObjectsV2Pages(&awss3.ListObjectsV2Input{
-		Bucket: aws.String(container),
-		Prefix: aws.String(prefix),
-	},
+	var prefix string
+	if filter.Path != "" || filter.Prefix != "" {
+		prefix = strings.Join([]string{filter.Path, filter.Prefix}, "/")
+	}
+	err := service.ListObjectsV2Pages(&awss3.ListObjectsV2Input{Bucket: aws.String(container), Prefix: aws.String(prefix)},
 		func(out *awss3.ListObjectsV2Output, last bool) bool {
 			for _, o := range out.Contents {
 				objs = append(objs, *o.Key)
