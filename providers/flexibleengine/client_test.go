@@ -36,6 +36,32 @@ func getClient() *flexibleengine.Client {
 	return client
 }
 
+func Test_Template(t *testing.T) {
+	client := getClient()
+	//Data structure to apply to userdata.sh template
+	type userData struct {
+		User        string
+		Key         string
+		ConfIF      bool
+		IsGateway   bool
+		AddGateway  bool
+		ResolveConf string
+		GatewayIP   string
+	}
+	dataBuffer := bytes.NewBufferString("")
+	data := userData{
+		User:        api.DefaultUser,
+		Key:         "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+		ConfIF:      true,
+		IsGateway:   true,
+		AddGateway:  true,
+		ResolveConf: "dskjfdshjjkdhsksdhhkjs\nsfdsfsdq\ndfsqdfqsdfq",
+		GatewayIP:   "172.1.2.1",
+	}
+	err := client.osclt.UserDataTpl.Execute(dataBuffer, data)
+	assert.Nil(t, err)
+	fmt.Println(dataBuffer.String())
+}
 func Test_ListImages(t *testing.T) {
 	getTester().ListImages(t)
 }
