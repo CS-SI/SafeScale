@@ -2,6 +2,7 @@ package openstack
 
 import (
 	"fmt"
+	"log"
 	"text/template"
 
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
@@ -92,6 +93,9 @@ type CfgOptions struct {
 
 	//VolumeSpeeds map volume types with volume speeds
 	VolumeSpeeds map[string]VolumeSpeed.Enum
+
+	//S3Protocol protocol used to mount object storage (ex: swiftks or s3)
+	S3Protocol string
 }
 
 //errorString creates an error string from openstack api error
@@ -168,6 +172,12 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if len(cfg.S3Protocol) == 0 {
+		log.Print("No S3 protocol defined. Fallthrough default 'swiftks'")
+		cfg.S3Protocol = "swiftks"
+	}
+
 	clt := Client{
 		Opts:              &opts,
 		Cfg:               &cfg,
@@ -381,12 +391,13 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 				"standard":   VolumeSpeed.COLD,
 				"performant": VolumeSpeed.HDD,
 			},
-			DNSList: []string{"185.23.94.244", "185.23.94.244"},
+			DNSList:    []string{"185.23.94.244", "185.23.94.244"},
+			S3Protocol: "swiftks",
 		},
 	)
 }
 
-// GetAuthOpts
+//GetAuthOpts return auth parameters
 func (client *Client) GetAuthOpts() (api.Config, error) {
 	cfg := api.ConfigMap{}
 
@@ -395,6 +406,15 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 	cfg.Set("Password", client.Opts.Password)
 	cfg.Set("AuthUrl", client.Opts.IdentityEndpoint)
 	cfg.Set("Region", client.Opts.Region)
+
+	return cfg, nil
+}
+
+//GetCfgOpts return configuration parameters
+func (client *Client) GetCfgOpts() (api.Config, error) {
+	cfg := api.ConfigMap{}
+
+	cfg.Set("S3Protocol", client.Cfg.S3Protocol)
 
 	return cfg, nil
 }

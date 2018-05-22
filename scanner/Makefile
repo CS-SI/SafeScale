@@ -1,10 +1,12 @@
+GO?=go
+
 all: scanner
 
 scanner: scanner.go
-	go generate && go build
+	$(GO) generate && $(GO) build
 
 .PHONY: clean
 
 clean:
-	@(rm scanner)
+	@($(RM) scanner)
 

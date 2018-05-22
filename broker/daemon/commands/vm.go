@@ -81,15 +81,12 @@ func (srv *VMService) Create(name string, net string, cpu int, ram float32, disk
 
 //List returns the network list
 func (srv *VMService) List(all bool) ([]api.VM, error) {
-	if all {
-		return srv.provider.ListVMs()
-	}
-	return srv.provider.ListSafeScaleVMs()
+	return srv.provider.ListVMs(all)
 }
 
 //Get returns the network identified by ref, ref can be the name or the id
 func (srv *VMService) Get(ref string) (*api.VM, error) {
-	vms, err := srv.provider.ListVMs()
+	vms, err := srv.provider.ListVMs(false)
 	if err != nil {
 		return nil, err
 	}

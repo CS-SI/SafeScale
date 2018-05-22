@@ -1,5 +1,5 @@
 all:
 
 clean:
-	@(rm -f rice-box.go)	
+	@($(RM) rice-box.go)	
 

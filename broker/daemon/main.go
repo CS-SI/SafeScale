@@ -5,7 +5,7 @@ import (
 	"net"
 
 	pb "github.com/SafeScale/broker"
-	"github.com/SafeScale/broker/brokerd/commands"
+	"github.com/SafeScale/broker/daemon/commands"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )

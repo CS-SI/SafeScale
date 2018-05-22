@@ -316,7 +316,7 @@ func (srv *Service) GetNetworkByName(name string) (*api.Network, error) {
 
 //ListNetworksByName returns network list
 func (srv *Service) ListNetworksByName() (map[string]api.Network, error) {
-	nets, err := srv.ListNetworks()
+	nets, err := srv.ListNetworks(false)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +362,7 @@ func (srv *Service) CreateVMWithKeyPair(request api.VMRequest) (*api.VM, *api.Ke
 
 //ListVMsByName list VMs by name
 func (srv *Service) ListVMsByName() (map[string]api.VM, error) {
-	vms, err := srv.ListVMs()
+	vms, err := srv.ListVMs(false)
 	if err != nil {
 		return nil, err
 	}

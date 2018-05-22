@@ -1,11 +1,13 @@
-all:	generate
+GO?=go
 
 .PHONY:	generate clean
 
-DIRECTORIES = $(sort $(dir $(wildcard */)))
+all:	generate
 
-generate:
-	@(for d in $(DIRECTORIES); do (cd $$d; go generate); done)
+DIRECTORIES := $(sort $(dir $(wildcard */)))
+
+generate: 
+	@(for d in $(DIRECTORIES); do (cd $$d; $(GO) generate); done)
 	
 clean:
-	@(for d in $(DIRECTORIES); do (cd $$d; rm -f *_string.go); done)
+	@(for d in $(DIRECTORIES); do (cd $$d; $(RM) *_string.go); done)

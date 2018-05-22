@@ -1,14 +1,16 @@
+GO?=go
+
 all: build nfs
 
 build: *.go scripts/*
-	go generate
+	@$(GO) generate
 
 .PHONY: nfs clean
 
 nfs:
-	@(cd nfs && $(MAKE) $@)
+	@(cd nfs && $(MAKE))
 
 clean:
 	@(cd nfs && $(MAKE) $@)
-	@rm -f rice-box.go
+	@$(RM) rice-box.go
 

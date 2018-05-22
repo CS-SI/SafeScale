@@ -310,9 +310,7 @@ type ClientAPI interface {
 	//GetNetwork returns the network identified by id
 	GetNetwork(id string) (*Network, error)
 	//ListNetworks lists available networks
-	ListNetworks() ([]Network, error)
-	//ListSafeScaleNetworks lists available networks
-	ListSafeScaleNetworks() ([]Network, error)
+	ListNetworks(all bool) ([]Network, error)
 	//DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
 	//CreateGateway creates a public Gateway for a private network
@@ -325,9 +323,7 @@ type ClientAPI interface {
 	//GetVM returns the VM identified by id
 	GetVM(id string) (*VM, error)
 	//ListVMs lists available VMs
-	ListVMs() ([]VM, error)
-	//ListSafeScaleVMs lists available VMs created by SafeScale (ie registered in object storage)
-	ListSafeScaleVMs() ([]VM, error)
+	ListVMs(all bool) ([]VM, error)
 	//DeleteVM deletes the VM identified by id
 	DeleteVM(id string) error
 	//StopVM stops the VM identified by id
@@ -387,6 +383,8 @@ type ClientAPI interface {
 
 	//GetAuthOpts returns authentification options as a Config
 	GetAuthOpts() (Config, error)
+	//GetCfgOpts returns configuration options as a Config
+	GetCfgOpts() (Config, error)
 }
 
 // Config represents key/value configuration.

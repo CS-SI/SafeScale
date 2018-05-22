@@ -1,10 +1,12 @@
-all:	generate
+GO?=go
 
 .PHONY:	generate clean
 
+all:	generate
+
 generate:
-	@go generate
+	@$(GO) generate
 
 clean:
-	@(rm -f rice-box.go)
+	@($(RM) rice-box.go)
 

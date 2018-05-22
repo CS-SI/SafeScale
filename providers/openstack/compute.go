@@ -554,7 +554,15 @@ func (client *Client) GetVM(id string) (*api.VM, error) {
 }
 
 //ListVMs lists available VMs
-func (client *Client) ListVMs() ([]api.VM, error) {
+func (client *Client) ListVMs(all bool) ([]api.VM, error) {
+	if all {
+		return client.listAllVMs()
+	}
+	return client.listMonitoredVMs()
+}
+
+//listAllVMs lists available VMs
+func (client *Client) listAllVMs() ([]api.VM, error) {
 	pager := servers.List(client.Compute, servers.ListOpts{})
 	var vms []api.VM
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -574,8 +582,8 @@ func (client *Client) ListVMs() ([]api.VM, error) {
 	return vms, nil
 }
 
-//ListSafeScaleVMs lists available VMs created by SafeScale (ie registered in object storage)
-func (client *Client) ListSafeScaleVMs() ([]api.VM, error) {
+//listMonitoredVMs lists available VMs created by SafeScale (ie registered in object storage)
+func (client *Client) listMonitoredVMs() ([]api.VM, error) {
 	names, err := client.ListObjects(api.VMContainerName, api.ObjectFilter{})
 	if err != nil {
 		return nil, err
