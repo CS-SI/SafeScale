@@ -4,14 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 
 	pb "github.com/SafeScale/broker"
+	services "github.com/SafeScale/broker/daemon/services"
 	conv "github.com/SafeScale/broker/utils"
 	utils "github.com/SafeScale/broker/utils"
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/system"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -19,103 +16,6 @@ import (
 // broker vm list --all=false
 // broker vm inspect vm1
 // broker vm create vm2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
-
-//VMAPI defines API to manipulate VMs
-type VMAPI interface {
-	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.VM, error)
-	List(all bool) ([]api.VM, error)
-	Get(ref string) (*api.VM, error)
-	Delete(ref string) error
-	SSH(ref string) (*system.SSHConfig, error)
-}
-
-//NewVMService creates a VM service
-func NewVMService(api api.ClientAPI) VMAPI {
-	return &VMService{
-		provider: providers.FromClient(api),
-		network:  NewNetworkService(api),
-	}
-}
-
-//VMService vm service
-type VMService struct {
-	provider *providers.Service
-	network  NetworkAPI
-}
-
-//Create creates a network
-func (srv *VMService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.VM, error) {
-	_vm, err := srv.Get(name)
-	if _vm != nil || (err != nil && !strings.Contains(err.Error(), "does not exists")) {
-		return nil, fmt.Errorf("VM '%s' already exists", name)
-	}
-
-	n, err := srv.network.Get(net)
-	if err != nil {
-		return nil, err
-	}
-	tpls, err := srv.provider.SelectTemplatesBySize(api.SizingRequirements{
-		MinCores:    cpu,
-		MinRAMSize:  ram,
-		MinDiskSize: disk,
-	})
-	img, err := srv.provider.SearchImage(os)
-	if err != nil {
-		return nil, err
-	}
-	vmRequest := api.VMRequest{
-		ImageID:    img.ID,
-		Name:       name,
-		TemplateID: tpls[0].ID,
-		// IsGateway:  false,
-		PublicIP:   public,
-		NetworkIDs: []string{n.ID},
-	}
-	vm, err := srv.provider.CreateVM(vmRequest)
-	if err != nil {
-		return nil, err
-	}
-	return vm, nil
-
-}
-
-//List returns the network list
-func (srv *VMService) List(all bool) ([]api.VM, error) {
-	return srv.provider.ListVMs(all)
-}
-
-//Get returns the network identified by ref, ref can be the name or the id
-func (srv *VMService) Get(ref string) (*api.VM, error) {
-	vms, err := srv.provider.ListVMs(false)
-	if err != nil {
-		return nil, err
-	}
-	for _, vm := range vms {
-		if vm.ID == ref || vm.Name == ref {
-			return &vm, nil
-		}
-	}
-	return nil, fmt.Errorf("VM %s does not exists", ref)
-}
-
-//Delete deletes network referenced by ref
-func (srv *VMService) Delete(ref string) error {
-	vm, err := srv.Get(ref)
-	if err != nil {
-		return fmt.Errorf("VM '%s' does not exists", ref)
-	}
-	return srv.provider.DeleteVM(vm.ID)
-}
-
-// SSH returns ssh parameters to access the vm referenced by ref
-func (srv *VMService) SSH(ref string) (*system.SSHConfig, error) {
-	vm, err := srv.Get(ref)
-	if err != nil {
-		return nil, fmt.Errorf("VM '%s' does not exists", ref)
-	}
-
-	return srv.provider.GetSSHConfig(vm.ID)
-}
 
 //VMServiceServer VM service server grpc
 type VMServiceServer struct{}
@@ -128,7 +28,7 @@ func (s *VMServiceServer) List(ctx context.Context, in *pb.VMListRequest) (*pb.V
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	vmAPI := NewVMService(currentTenant.client)
+	vmAPI := services.NewVMService(currentTenant.client)
 
 	vms, err := vmAPI.List(in.GetAll())
 	if err != nil {
@@ -163,7 +63,7 @@ func (s *VMServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	vmService := NewVMService(currentTenant.client)
+	vmService := services.NewVMService(currentTenant.client)
 	vm, err := vmService.Create(in.GetName(), in.GetNetwork(),
 		int(in.GetCPUNumber()), in.GetRAM(), int(in.GetDisk()), in.GetImageID(), in.GetPublic())
 
@@ -199,7 +99,7 @@ func (s *VMServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	vmService := NewVMService(currentTenant.client)
+	vmService := services.NewVMService(currentTenant.client)
 	vm, err := vmService.Get(ref)
 	if err != nil {
 		return nil, err
@@ -231,7 +131,7 @@ func (s *VMServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
-	vmService := NewVMService(currentTenant.client)
+	vmService := services.NewVMService(currentTenant.client)
 	err := vmService.Delete(ref)
 	if err != nil {
 		return nil, err
@@ -252,7 +152,7 @@ func (s *VMServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshCon
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
-	vmService := NewVMService(currentTenant.client)
+	vmService := services.NewVMService(currentTenant.client)
 	sshConfig, err := vmService.SSH(ref)
 	if err != nil {
 		return nil, err
