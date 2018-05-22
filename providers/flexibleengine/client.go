@@ -93,16 +93,6 @@ func errorString(err error) string {
 }
 
 const (
-	//NetworkGWContainerName contains the name of the Object Storage Bucket in to put Gateway definitions (not needed in FlexibleEngine ?)
-	//const NetworkGWContainerName string = "0.%s.network-gws"
-	//VMContainerName contains the name of the Object Storage Bucket in to put VMs definitions
-	//const VMContainerName string = "0.%s.vms"
-	//NetworkGWContainerName contains the name of the Object Storage Bucket in to put Gateway definitions (not needed in FlexibleEngine ?)
-	NetworkGWContainerName string = "0.network-gws"
-
-	//VMContainerName contains the name of the Object Storage Bucket in to put VMs definitions
-	VMContainerName string = "0.vms"
-
 	defaultUser string = "cloud"
 
 	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com"
@@ -298,13 +288,13 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, err
 	}
 
-	err = clt.CreateContainer(NetworkGWContainerName)
+	err = clt.CreateContainer(api.NetworkContainerName)
 	if err != nil {
-		fmt.Printf("failed to create Object Container %s: %s\n", NetworkGWContainerName, errorString(err))
+		fmt.Printf("failed to create Object Container %s: %s\n", api.NetworkContainerName, errorString(err))
 	}
-	err = clt.CreateContainer(VMContainerName)
+	err = clt.CreateContainer(api.VMContainerName)
 	if err != nil {
-		fmt.Printf("failed to create Object Container %s: %s\n", VMContainerName, err)
+		fmt.Printf("failed to create Object Container %s: %s\n", api.VMContainerName, err)
 	}
 	return &clt, nil
 }
