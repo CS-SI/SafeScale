@@ -2,6 +2,7 @@ package dcos
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/SafeScale/providers"
@@ -66,6 +67,8 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 		return nil, fmt.Errorf("Failed to find a template suitable for master server: %s", err.Error())
 	}
 
+	req.Name = strings.ToLower(req.Name)
+
 	// Create a KeyPair for the cluster
 	name := "cluster_" + req.Name + "_key"
 	svc.DeleteKeyPair(name)
@@ -76,6 +79,10 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 
 	var masterCount int
 	var network *providerapi.Network
+	var gwRequest providerapi.GWRequest
+	var img *providerapi.Image
+	var keypair *providerapi.KeyPair
+	var tpls []providerapi.VMTemplate
 
 	// Saving cluster parameters, with status 'Creating'
 	cluster := &Cluster{
@@ -92,7 +99,7 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 
 	// Creates network
 	network, err = svc.CreateNetwork(providerapi.NetworkRequest{
-		Name: req.Name,
+		Name: "net-" + req.Name,
 		CIDR: req.CIDR,
 	})
 	if err != nil {
@@ -105,6 +112,32 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 	time.Sleep(3 * time.Second)
 	fmt.Println("Waking up...")
 
+	// Creates a Gateway (when calling broker API, won't be necessary)
+	tpls, err = svc.SelectTemplatesBySize(providerapi.SizingRequirements{
+		MinCores:    1,
+		MinRAMSize:  1,
+		MinDiskSize: 20,
+	})
+	img, err = svc.SearchImage("Ubuntu 16.04")
+	if err != nil {
+		goto cleanNetwork
+	}
+	keypair, err = svc.CreateKeyPair("kp_" + network.Name)
+	if err != nil {
+		goto cleanNetwork
+	}
+	defer svc.DeleteKeyPair(keypair.ID)
+	gwRequest = providerapi.GWRequest{
+		ImageID:    img.ID,
+		NetworkID:  network.ID,
+		KeyPair:    keypair,
+		TemplateID: tpls[0].ID,
+	}
+	err = svc.CreateGateway(gwRequest)
+	if err != nil {
+		goto cleanNetwork
+	}
+
 	// Creates bootstrap/upgrade server
 	_, err = cluster.AddNode(NodeType.Bootstrap, providerapi.VMRequest{
 		TemplateID: tmplBootstrap[0].ID,
@@ -112,7 +145,7 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 	})
 	if err != nil {
 		err = fmt.Errorf("failed to create DCOS bootstrap server: %s", err.Error())
-		goto cleanNetwork
+		goto cleanGateway
 	}
 
 	err = cluster.SaveDefinition()
@@ -169,6 +202,8 @@ cleanMasters:
 	//	}
 cleanBootstrap:
 	//	svc.DeleteVM(cluster.definition.BootstrapID)
+cleanGateway:
+	//  svc.DeleteGateway(cluster.definition.NetworkID)
 cleanNetwork:
 	//	svc.DeleteNetwork(cluster.definition.NetworkID)
 cleanKeypair:

@@ -21,6 +21,10 @@ import (
 
 //go:generate rice embed-go
 
+const (
+	dcosVersion string = "1.11.1"
+)
+
 var (
 	// templateBox is the rice box to use in this package
 	templateBox *rice.Box
@@ -189,7 +193,7 @@ func (c *Cluster) AddNode(nodeType NodeType.Enum, req providerapi.VMRequest) (*c
 func (c *Cluster) addBootstrapNode(req providerapi.VMRequest) (*clusterapi.Node, error) {
 	svc := c.getService()
 
-	req.Name = c.definition.Common.Name + "_dcos_bootstrap"
+	req.Name = c.definition.Common.Name + "-dcosbootstrap"
 	req.NetworkIDs = []string{c.definition.NetworkID}
 	req.PublicIP = true
 	req.KeyPair = c.definition.Common.Keypair
@@ -220,7 +224,7 @@ func (c *Cluster) addMasterNode(req providerapi.VMRequest) (*clusterapi.Node, er
 	svc := c.getService()
 
 	i := len(c.definition.MasterIDs) + 1
-	req.Name = c.definition.Common.Name + "_dcos_master-" + strconv.Itoa(i)
+	req.Name = c.definition.Common.Name + "-dcosmaster-" + strconv.Itoa(i)
 	req.NetworkIDs = []string{c.definition.NetworkID}
 	req.PublicIP = false
 	req.KeyPair = c.definition.Common.Keypair
@@ -261,7 +265,7 @@ func (c *Cluster) addAgentNode(req providerapi.VMRequest, nodeType NodeType.Enum
 	svc := c.getService()
 
 	var publicIP bool
-	coreName := "-agent"
+	coreName := "node"
 	if nodeType == NodeType.PublicAgent {
 		publicIP = true
 		coreName = "pub" + coreName
@@ -273,7 +277,7 @@ func (c *Cluster) addAgentNode(req providerapi.VMRequest, nodeType NodeType.Enum
 	i := len(c.definition.PublicAgentIDs) + 1
 	req.PublicIP = publicIP
 	req.NetworkIDs = []string{c.definition.NetworkID}
-	req.Name = c.definition.Common.Name + "_dcos_" + coreName + "-" + strconv.Itoa(i)
+	req.Name = c.definition.Common.Name + "-dcos" + coreName + "-" + strconv.Itoa(i)
 	req.KeyPair = c.definition.Common.Keypair
 	agentVM, err := svc.CreateVM(req)
 	if err != nil {
@@ -320,7 +324,7 @@ func (c *Cluster) configure() error {
 		return err
 	}
 	retcode, output, err := c.executeScript(bootstrapVM, "dcos_install_bootstrap_node.sh", map[string]interface{}{
-		"DCOSVersion":   "1.11.1",
+		"DCOSVersion":   dcosVersion,
 		"BootstrapIP":   c.definition.BootstrapIP,
 		"BootstrapPort": "80",
 		"ClusterName":   c.definition.Common.Name,
