@@ -27,8 +27,10 @@ RICE := github.com/GeertJohan/go.rice
 URFAVE := github.com/urfave/cli
 #Configuration file handler
 VIPER := github.com/spf13/viper
+#Data validation lib: at least used to validate VM name for flexibleengine
+PENGUS_CHECK := github.com/pengux/check
 
-deps: DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER)
+deps: DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK)
 
 deps: ; @$(GO) get $(DEPS)
 
