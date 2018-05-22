@@ -113,8 +113,8 @@ type deleteResult struct {
 
 //ListFloatingIPs lists all the floating IP currently requested for the VPC
 func (client *Client) ListFloatingIPs() pagination.Pager {
-	url := client.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips"
-	return pagination.NewPager(client.Network, url, func(r pagination.PageResult) pagination.Page {
+	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips"
+	return pagination.NewPager(client.osclt.Network, url, func(r pagination.PageResult) pagination.Page {
 		return floatingIPPage{pagination.LinkedPageBase{PageResult: r}}
 	})
 }
@@ -122,12 +122,12 @@ func (client *Client) ListFloatingIPs() pagination.Pager {
 //GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
 func (client *Client) GetFloatingIP(id string) (*FloatingIP, error) {
 	r := getResult{}
-	url := client.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips/" + id
+	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips/" + id
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	_, err := client.Provider.Request("GET", url, &opts)
+	_, err := client.osclt.Provider.Request("GET", url, &opts)
 	r.Err = err
 	fip, err := r.Extract()
 	if err != nil {
@@ -188,13 +188,13 @@ func (client *Client) CreateFloatingIP() (*FloatingIP, error) {
 	}
 
 	r := createResult{}
-	url := client.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips"
+	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips"
 	opts := gophercloud.RequestOpts{
 		JSONBody:     bb,
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	_, err = client.Provider.Request("POST", url, &opts)
+	_, err = client.osclt.Provider.Request("POST", url, &opts)
 	fip, err := r.Extract()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create Floating IP: %s", err)
@@ -205,12 +205,12 @@ func (client *Client) CreateFloatingIP() (*FloatingIP, error) {
 //DeleteFloatingIP deletes a floating IP
 func (client *Client) DeleteFloatingIP(id string) error {
 	r := deleteResult{}
-	url := client.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips/" + id
+	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips/" + id
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	_, r.Err = client.Provider.Request("DELETE", url, &opts)
+	_, r.Err = client.osclt.Provider.Request("DELETE", url, &opts)
 	err := r.ExtractErr()
 	return err
 }
@@ -229,7 +229,7 @@ func (client *Client) AssociateFloatingIP(vm *api.VM, id string) error {
 	}
 
 	r := servers.ActionResult{}
-	_, r.Err = client.Compute.Post(client.Compute.ServiceURL("servers", vm.ID, "action"), b, nil, nil)
+	_, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers", vm.ID, "action"), b, nil, nil)
 	err = r.ExtractErr()
 	if err != nil {
 		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, errorString(err))
@@ -251,7 +251,7 @@ func (client *Client) DissociateFloatingIP(vm *api.VM, id string) error {
 	}
 
 	r := servers.ActionResult{}
-	_, r.Err = client.Compute.Post(client.Compute.ServiceURL("servers", vm.ID, "action"), b, nil, nil)
+	_, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers", vm.ID, "action"), b, nil, nil)
 	err = r.ExtractErr()
 	if err != nil {
 		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, errorString(err))

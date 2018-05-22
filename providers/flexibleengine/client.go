@@ -92,23 +92,25 @@ func errorString(err error) string {
 	default:
 		return e.Error()
 	case *gc.ErrUnexpectedResponseCode:
-		return fmt.Sprintf("code : %d reason ; %s", e.Actual, string(e.Body[:]))
+		return fmt.Sprintf("code: %d reason: %s", e.Actual, string(e.Body[:]))
 	}
 }
 
-//NetworkGWContainerName contains the name of the Object Storage Bucket in to put Gateway definitions (not needed in FlexibleEngine ?)
-//const NetworkGWContainerName string = "0.%s.network-gws"
-//VMContainerName contains the name of the Object Storage Bucket in to put VMs definitions
-//const VMContainerName string = "0.%s.vms"
-//NetworkGWContainerName contains the name of the Object Storage Bucket in to put Gateway definitions (not needed in FlexibleEngine ?)
-const NetworkGWContainerName string = "0.network-gws"
+const (
+	//NetworkGWContainerName contains the name of the Object Storage Bucket in to put Gateway definitions (not needed in FlexibleEngine ?)
+	//const NetworkGWContainerName string = "0.%s.network-gws"
+	//VMContainerName contains the name of the Object Storage Bucket in to put VMs definitions
+	//const VMContainerName string = "0.%s.vms"
+	//NetworkGWContainerName contains the name of the Object Storage Bucket in to put Gateway definitions (not needed in FlexibleEngine ?)
+	NetworkGWContainerName string = "0.network-gws"
 
-//VMContainerName contains the name of the Object Storage Bucket in to put VMs definitions
-const VMContainerName string = "0.vms"
+	//VMContainerName contains the name of the Object Storage Bucket in to put VMs definitions
+	VMContainerName string = "0.vms"
 
-const defaultUser = "cloud"
+	defaultUser string = "cloud"
 
-const authURL = "https://iam.%s.prod-cloud-ocb.orange-business.com"
+	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com"
+)
 
 //VPL:BEGIN
 // aws provider isn't finished yet, copying the necessary here meanwhile...
@@ -267,8 +269,9 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 			Region:           opts.Region,
 		},
 		Cfg: &openstack.CfgOptions{
+			DNSList:             cfg.DNSList,
 			UseFloatingIP:       true,
-			UseLayer3Networking: false,
+			UseLayer3Networking: cfg.UseLayer3Networking,
 			VolumeSpeeds:        cfg.VolumeSpeeds,
 		},
 		Provider: provider,
@@ -282,7 +285,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	clt := Client{
 		Opts:      &opts,
 		Cfg:       &cfg,
-		Client:    &openstackClient,
+		osclt:     &openstackClient,
 		Identity:  identity,
 		S3Session: awsSession,
 	}
@@ -301,25 +304,27 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 
 	err = clt.CreateContainer(NetworkGWContainerName)
 	if err != nil {
-		fmt.Printf("Failed to create Object Container %s: %s\n", NetworkGWContainerName, errorString(err))
+		fmt.Printf("failed to create Object Container %s: %s\n", NetworkGWContainerName, errorString(err))
 	}
 	err = clt.CreateContainer(VMContainerName)
 	if err != nil {
-		fmt.Printf("Failed to create Object Container %s: %s\n", VMContainerName, err)
+		fmt.Printf("failed to create Object Container %s: %s\n", VMContainerName, err)
 	}
 	return &clt, nil
 }
 
 //Client is the implementation of the flexibleengine driver regarding to the api.ClientAPI
 type Client struct {
+	//Opts contains authentication options
 	Opts *AuthOptions
-	Cfg  *CfgOptions
-	*openstack.Client
+	//Cfg contains options
+	Cfg *CfgOptions
+	//Identity contains service client of Identity openstack service
 	Identity *gc.ServiceClient
-
 	// "AWS Session" for object storage use (compatible S3)
 	S3Session *awssession.Session
-
+	//osclt is the openstack.Client instance to use when fully openstack compliant
+	osclt *openstack.Client
 	// Instance of the VPC
 	vpc *VPC
 	// Contains the name of the default security group for the VPC
@@ -376,7 +381,7 @@ func (client *Client) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 	opts := secgroups.ListOpts{
 		Name: client.defaultSecurityGroup,
 	}
-	err := secgroups.List(client.Network, opts).EachPage(func(page pagination.Page) (bool, error) {
+	err := secgroups.List(client.osclt.Network, opts).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := secgroups.ExtractGroups(page)
 		if err != nil {
 			return false, err
@@ -413,7 +418,7 @@ func (client *Client) createTCPRules(groupID string) error {
 		Protocol:       secrules.ProtocolTCP,
 		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err := secrules.Create(client.Network, ruleOpts).Extract()
+	_, err := secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -426,7 +431,7 @@ func (client *Client) createTCPRules(groupID string) error {
 		Protocol:       secrules.ProtocolTCP,
 		RemoteIPPrefix: "::/0",
 	}
-	_, err = secrules.Create(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -441,7 +446,7 @@ func (client *Client) createTCPRules(groupID string) error {
 		Protocol:       secrules.ProtocolTCP,
 		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err = secrules.Create(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -454,7 +459,7 @@ func (client *Client) createTCPRules(groupID string) error {
 		Protocol:       secrules.ProtocolTCP,
 		RemoteIPPrefix: "::/0",
 	}
-	_, err = secrules.Create(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	return err
 }
 
@@ -470,7 +475,7 @@ func (client *Client) createUDPRules(groupID string) error {
 		Protocol:       secrules.ProtocolUDP,
 		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err := secrules.Create(client.Network, ruleOpts).Extract()
+	_, err := secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -483,7 +488,7 @@ func (client *Client) createUDPRules(groupID string) error {
 		Protocol:       secrules.ProtocolUDP,
 		RemoteIPPrefix: "::/0",
 	}
-	_, err = secrules.Create(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -498,7 +503,7 @@ func (client *Client) createUDPRules(groupID string) error {
 		Protocol:       secrules.ProtocolUDP,
 		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err = secrules.Create(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -511,7 +516,7 @@ func (client *Client) createUDPRules(groupID string) error {
 		Protocol:       secrules.ProtocolUDP,
 		RemoteIPPrefix: "::/0",
 	}
-	_, err = secrules.Create(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	return err
 }
 
@@ -525,7 +530,7 @@ func (client *Client) createICMPRules(groupID string) error {
 		Protocol:       secrules.ProtocolICMP,
 		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err := secrules.Create(client.Network, ruleOpts).Extract()
+	_, err := secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -538,7 +543,7 @@ func (client *Client) createICMPRules(groupID string) error {
 		Protocol:       secrules.ProtocolICMP,
 		RemoteIPPrefix: "::/0",
 	}
-	_, err = secrules.Create(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -553,7 +558,7 @@ func (client *Client) createICMPRules(groupID string) error {
 		Protocol:       secrules.ProtocolICMP,
 		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err = secrules.Create(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -566,7 +571,7 @@ func (client *Client) createICMPRules(groupID string) error {
 		Protocol:       secrules.ProtocolICMP,
 		RemoteIPPrefix: "::/0",
 	}
-	_, err = secrules.Create(client.Network, ruleOpts).Extract()
+	_, err = secrules.Create(client.osclt.Network, ruleOpts).Extract()
 	return err
 }
 
@@ -588,27 +593,24 @@ func (client *Client) initDefaultSecurityGroup() error {
 		Name:        client.defaultSecurityGroup,
 		Description: "Default security group for VPC " + client.Opts.VPCName,
 	}
-	group, err := secgroups.Create(client.Network, opts).Extract()
+	group, err := secgroups.Create(client.osclt.Network, opts).Extract()
 	if err != nil {
 		return fmt.Errorf("Failed to create Security Group '%s': %s", client.defaultSecurityGroup, errorString(err))
 	}
 	err = client.createTCPRules(group.ID)
-	if err != nil {
-		secgroups.Delete(client.Network, group.ID)
-		return err
+	if err == nil {
+		err = client.createUDPRules(group.ID)
+		if err == nil {
+			err = client.createICMPRules(group.ID)
+			if err == nil {
+				client.SecurityGroup = group
+				return nil
+			}
+		}
 	}
-	err = client.createUDPRules(group.ID)
-	if err != nil {
-		secgroups.Delete(client.Network, group.ID)
-		return err
-	}
-	err = client.createICMPRules(group.ID)
-	if err != nil {
-		secgroups.Delete(client.Network, group.ID)
-		return err
-	}
-	client.SecurityGroup = group
-	return nil
+	// Error occured...
+	secgroups.Delete(client.osclt.Network, group.ID)
+	return err
 }
 
 //initVPC initializes the VPC if it doesn't exist
@@ -638,7 +640,7 @@ func (client *Client) initVPC() error {
 func (client *Client) findVPCID() (*string, error) {
 	var router *openstack.Router
 	found := false
-	routers, err := client.Client.ListRouter()
+	routers, err := client.osclt.ListRouter()
 	if err != nil {
 		return nil, fmt.Errorf("Error listing routers: %s", errorString(err))
 	}
@@ -653,6 +655,19 @@ func (client *Client) findVPCID() (*string, error) {
 		return &router.ID, nil
 	}
 	return nil, nil
+}
+
+//GetAuthOpts returns the auth options
+func (client *Client) GetAuthOpts() (api.Config, error) {
+	cfg := api.ConfigMap{}
+
+	cfg.Set("DomainName", client.Opts.DomainName)
+	cfg.Set("Login", client.Opts.Username)
+	cfg.Set("Password", client.Opts.Password)
+	cfg.Set("AuthUrl", client.Opts.IdentityEndpoint)
+	cfg.Set("Region", client.Opts.Region)
+	cfg.Set("VPCName", client.Opts.VPCName)
+	return cfg, nil
 }
 
 func init() {
