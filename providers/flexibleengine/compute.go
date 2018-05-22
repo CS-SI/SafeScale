@@ -278,8 +278,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		defer client.DeleteKeyPair(kp.ID)
 	}
 
-	userData, err := client.PrepareUserData(request, isGateway, kp, gw)
-	fmt.Println(string(userData))
+	userData, err := client.osclt.PrepareUserData(request, isGateway, kp, gw)
 
 	// Determine system disk size based on vcpus count
 	template, err := client.GetTemplate(request.TemplateID)
@@ -332,13 +331,13 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 	r := servers.CreateResult{}
 	var httpResp *http.Response
-	httpResp, r.Err = client.Compute.Post(client.Compute.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
+	httpResp, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
 		OkCodes: []int{200, 202},
 	})
 	server, err := r.Extract()
 	if err != nil {
 		if server != nil {
-			servers.Delete(client.Compute, server.ID)
+			servers.Delete(client.osclt.Compute, server.ID)
 		}
 		return nil, fmt.Errorf("Query to create VM '%s' failed: %s (HTTP return code: %d)", request.Name, errorString(err), httpResp.StatusCode)
 	}
@@ -426,7 +425,7 @@ func (client *Client) loadGateway(networkID string) (*servers.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to find Gateway %s", errorString(err))
 	}
-	gw, err := servers.Get(client.Compute, gwID).Extract()
+	gw, err := servers.Get(client.osclt.Compute, gwID).Extract()
 	if err != nil {
 		return nil, fmt.Errorf("unable to find Gateway %s", errorString(err))
 	}
@@ -466,7 +465,7 @@ func (client *Client) waitVMReady(vmID string, timeout time.Duration) (*api.VM, 
 //pollVMReady polls until the VM is ready or time outs
 func pollVMReady(client *Client, vmID string, cout chan int, next chan bool, vmc chan *servers.Server) {
 	for {
-		server, err := servers.Get(client.Compute, vmID).Extract()
+		server, err := servers.Get(client.osclt.Compute, vmID).Extract()
 		if err != nil {
 			fmt.Println(err)
 			cout <- 0
@@ -490,7 +489,7 @@ func pollVMReady(client *Client, vmID string, cout chan int, next chan bool, vmc
 
 //GetVM returns the VM identified by id
 func (client *Client) GetVM(id string) (*api.VM, error) {
-	server, err := servers.Get(client.Compute, id).Extract()
+	server, err := servers.Get(client.osclt.Compute, id).Extract()
 	if err != nil {
 		return nil, fmt.Errorf("Error getting VM: %s", errorString(err))
 	}
@@ -500,23 +499,7 @@ func (client *Client) GetVM(id string) (*api.VM, error) {
 
 //ListVMs lists available VMs
 func (client *Client) ListVMs() ([]api.VM, error) {
-	pager := servers.List(client.Compute, servers.ListOpts{})
-	var vms []api.VM
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		list, err := servers.ExtractServers(page)
-		if err != nil {
-			return false, err
-		}
-
-		for _, srv := range list {
-			vms = append(vms, *client.toVM(&srv))
-		}
-		return true, nil
-	})
-	if len(vms) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
-	}
-	return vms, nil
+	return client.osclt.ListVMs()
 }
 
 //DeleteVM deletes the VM identified by id
@@ -532,20 +515,20 @@ func (client *Client) DeleteVM(id string) error {
 		fip, err := client.getFloatingIPOfVM(id)
 		if err == nil {
 			if fip != nil {
-				err = floatingips.DisassociateInstance(client.Compute, id, floatingips.DisassociateOpts{
+				err = floatingips.DisassociateInstance(client.osclt.Compute, id, floatingips.DisassociateOpts{
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
 					return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
 				}
-				err = floatingips.Delete(client.Compute, fip.ID).ExtractErr()
+				err = floatingips.Delete(client.osclt.Compute, fip.ID).ExtractErr()
 				if err != nil {
 					return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
 				}
 			}
 		}
 	}
-	err = servers.Delete(client.Compute, id).ExtractErr()
+	err = servers.Delete(client.osclt.Compute, id).ExtractErr()
 	if err != nil {
 		return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
 	}
@@ -595,7 +578,7 @@ func (client *Client) waitVMRemoved(vmID string, timeout time.Duration) error {
 func pollVMRemoved(client *Client, vmID string, cout chan int, next chan bool) {
 	for {
 		r := servers.GetResult{}
-		httpResp, err := client.Compute.Get(client.Compute.ServiceURL("servers", vmID), &r.Body, &gophercloud.RequestOpts{
+		httpResp, err := client.osclt.Compute.Get(client.osclt.Compute.ServiceURL("servers", vmID), &r.Body, &gophercloud.RequestOpts{
 			OkCodes: []int{200, 203, 404},
 		})
 		if err != nil {
@@ -651,7 +634,7 @@ func (client *Client) getSSHConfig(vm *api.VM) (*system.SSHConfig, error) {
 //getFloatingIP returns the floating IP associated with the VM identified by vmID
 //By convention only one floating IP is allocated to a VM
 func (client *Client) getFloatingIPOfVM(vmID string) (*floatingips.FloatingIP, error) {
-	pager := floatingips.List(client.Compute)
+	pager := floatingips.List(client.osclt.Compute)
 	var fips []floatingips.FloatingIP
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := floatingips.ExtractFloatingIPs(page)
@@ -719,7 +702,7 @@ func (client *Client) enableVMRouterMode(vm *api.VM) error {
 		},
 	}
 	opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
-	_, err = ports.Update(client.Network, *portID, opts).Extract()
+	_, err = ports.Update(client.osclt.Network, *portID, opts).Extract()
 	if err != nil {
 		return fmt.Errorf("Failed to enable Router Mode on VM '%s': %s", vm.Name, errorString(err))
 	}
@@ -734,7 +717,7 @@ func (client *Client) disableVMRouterMode(vm *api.VM) error {
 	}
 
 	opts := ports.UpdateOpts{AllowedAddressPairs: nil}
-	_, err = ports.Update(client.Network, *portID, opts).Extract()
+	_, err = ports.Update(client.osclt.Network, *portID, opts).Extract()
 	if err != nil {
 		return fmt.Errorf("Failed to disable Router Mode on VM '%s': %s", vm.Name, errorString(err))
 	}
@@ -779,8 +762,8 @@ func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
 
 //listInterfaces returns a pager of the interfaces attached to VM identified by 'serverID'
 func (client *Client) listInterfaces(vmID string) pagination.Pager {
-	url := client.Compute.ServiceURL("servers", vmID, "os-interface")
-	return pagination.NewPager(client.Compute, url, func(r pagination.PageResult) pagination.Page {
+	url := client.osclt.Compute.ServiceURL("servers", vmID, "os-interface")
+	return pagination.NewPager(client.osclt.Compute, url, func(r pagination.PageResult) pagination.Page {
 		return nics.InterfacePage{pagination.SinglePageBase(r)}
 	})
 }
@@ -910,4 +893,55 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 		}
 	}
 	return &vm
+}
+
+//CreateKeyPair creates and import a key pair
+func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
+	return client.osclt.CreateKeyPair(name)
+}
+
+//GetKeyPair returns the key pair identified by id
+func (client *Client) GetKeyPair(id string) (*api.KeyPair, error) {
+	return client.osclt.GetKeyPair(id)
+}
+
+//ListKeyPairs lists available key pairs
+func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
+	return client.osclt.ListKeyPairs()
+}
+
+//DeleteKeyPair deletes the key pair identified by id
+func (client *Client) DeleteKeyPair(id string) error {
+	return client.osclt.DeleteKeyPair(id)
+}
+
+//GetImage returns the Image referenced by id
+func (client *Client) GetImage(id string) (*api.Image, error) {
+	return client.osclt.GetImage(id)
+}
+
+//ListImages lists available OS images
+func (client *Client) ListImages() ([]api.Image, error) {
+	return client.osclt.ListImages()
+}
+
+//GetTemplate returns the Template referenced by id
+func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
+	return client.osclt.GetTemplate(id)
+}
+
+//ListTemplates lists available VM templates
+//VM templates are sorted using Dominant Resource Fairness Algorithm
+func (client *Client) ListTemplates() ([]api.VMTemplate, error) {
+	return client.osclt.ListTemplates()
+}
+
+//StopVM stops the VM identified by id
+func (client *Client) StopVM(id string) error {
+	return client.osclt.StopVM(id)
+}
+
+//StartVM starts the VM identified by id
+func (client *Client) StartVM(id string) error {
+	return client.osclt.StartVM(id)
 }

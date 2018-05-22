@@ -63,7 +63,7 @@ func Test_Template(t *testing.T) {
 		ResolveConf: "dskjfdshjjkdhsksdhhkjs\nsfdsfsdq\ndfsqdfqsdfq",
 		GatewayIP:   "172.1.2.1",
 	}
-	err := client.UserDataTpl.Execute(dataBuffer, data)
+	err := client.osclt.UserDataTpl.Execute(dataBuffer, data)
 	assert.Nil(t, err)
 	fmt.Println(dataBuffer.String())
 }

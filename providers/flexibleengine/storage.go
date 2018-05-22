@@ -13,6 +13,34 @@ import (
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 )
 
+//CreateVolumeAttachment attaches a volume to a VM
+//- name the name of the volume attachment
+//- volume the volume to attach
+//- vm the VM on which the volume is attached
+func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
+	return client.osclt.CreateVolumeAttachment(request)
+}
+
+//GetVolumeAttachment returns the volume attachment identified by id
+func (client *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment, error) {
+	return client.osclt.GetVolumeAttachment(serverID, id)
+}
+
+//ListVolumeAttachments lists available volume attachment
+func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttachment, error) {
+	return client.osclt.ListVolumeAttachments(serverID)
+}
+
+//DeleteVolumeAttachment deletes the volume attachment identifed by id
+func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
+	return client.osclt.DeleteVolumeAttachment(serverID, id)
+}
+
+//DeleteVolume deletes the volume identified by id
+func (client *Client) DeleteVolume(id string) error {
+	return client.osclt.DeleteVolume(id)
+}
+
 //toVM converts a Volume status returned by the OpenStack driver into VolumeState enum
 func toVolumeState(status string) VolumeState.Enum {
 	switch status {
@@ -80,7 +108,7 @@ func (client *Client) ExCreateVolume(request api.VolumeRequest, imageID string) 
 		VolumeType: client.getVolumeType(request.Speed),
 		ImageID:    imageID,
 	}
-	vol, err := v2_vol.Create(client.Volume, opts).Extract()
+	vol, err := v2_vol.Create(client.osclt.Volume, opts).Extract()
 	if err != nil {
 		return nil, fmt.Errorf("Error creating volume : %s", errorString(err))
 	}
@@ -94,20 +122,25 @@ func (client *Client) ExCreateVolume(request api.VolumeRequest, imageID string) 
 	return &v, nil
 }
 
-/*
-func (client *Client) containerFixUrl(uri string) (*string, error) {
-	u, err := url.Parse(client.Container.Endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to fix Object Storage URL: %s", errorString(err))
-	}
-	url := u.Scheme + "://" + u.Hostname() + uri
-	return &url, nil
+//GetVolume returns the volume identified by id
+func (client *Client) GetVolume(id string) (*api.Volume, error) {
+	return client.osclt.GetVolume(id)
 }
-*/
+
+//ListVolumes list available volumes
+func (client *Client) ListVolumes() ([]api.Volume, error) {
+	return client.osclt.ListVolumes()
+}
 
 //CreateContainer creates an object container
 func (client *Client) CreateContainer(name string) error {
 	return s3.CreateContainer(awss3.New(client.S3Session), name, client.Opts.Region)
+}
+
+//GetContainer get container info
+func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
+	//	return s3.GetContainer(awss3.New(client.S3Session), name)
+	return nil, fmt.Errorf("flexibleengine GetContainer not implemened")
 }
 
 //DeleteContainer deletes an object container
