@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/SafeScale/providers/cloudwatt"
-
+	"github.com/SafeScale/providers/flexibleengine"
 	"github.com/SafeScale/providers/ovh"
 
 	"github.com/stretchr/testify/assert"
@@ -55,8 +55,19 @@ func TestViper(t *testing.T) {
 func TestGetService(t *testing.T) {
 	providers.Register("ovh", &ovh.Client{})
 	providers.Register("cloudwatt", &cloudwatt.Client{})
+	providers.Register("flexibleEngine", &flexibleengine.Client{})
 	ovh, err := providers.GetService("TestOvh")
 	assert.NoError(t, err)
+<<<<<<< HEAD
+||||||| merged common ancestors
+	_, err = providers.GetService("TestCloudwatt")
+	assert.NoError(t, err)
+=======
+	_, err = providers.GetService("TestCloudwatt")
+	assert.NoError(t, err)
+	_, err = providers.GetService("TestFlexibleEngine")
+	assert.NoError(t, err)
+>>>>>>> develop
 	imgs, err := ovh.ListImages()
 	assert.NoError(t, err)
 	assert.True(t, len(imgs) > 3)
