@@ -197,9 +197,6 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 		netList = append(netList, *net)
 	}
 
-	if len(netList) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing networks: %s", errorString(err))
-	}
 	return netList, nil
 }
 

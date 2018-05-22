@@ -94,7 +94,7 @@ func (tester *ClientTester) GetKeyPair(t *testing.T) {
 func (tester *ClientTester) ListKeyPairs(t *testing.T) {
 	lst, err := tester.Service.ListKeyPairs()
 	assert.Nil(t, err)
-	assert.Empty(t, lst)
+	nbKP := len(lst)
 	kp, err := tester.Service.CreateKeyPair("kp")
 	assert.Nil(t, err)
 	defer tester.Service.DeleteKeyPair("kp")
@@ -103,6 +103,7 @@ func (tester *ClientTester) ListKeyPairs(t *testing.T) {
 	defer tester.Service.DeleteKeyPair("kp2")
 	lst, err = tester.Service.ListKeyPairs()
 	assert.Nil(t, err)
+	assert.EqualValues(t, nbKP+2, len(lst))
 	for _, kpe := range lst {
 		var kpr api.KeyPair
 		if kpe.ID == kp.ID {
@@ -110,7 +111,7 @@ func (tester *ClientTester) ListKeyPairs(t *testing.T) {
 		} else if kpe.ID == kp2.ID {
 			kpr = *kp2
 		} else {
-			t.Fail()
+			continue
 		}
 		assert.Equal(t, kpe.ID, kpr.ID)
 		assert.Equal(t, kpe.Name, kpr.Name)
@@ -195,6 +196,14 @@ func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
 
 //Networks test
 func (tester *ClientTester) Networks(t *testing.T) {
+	// Get inital number of networks
+	nets, err := tester.Service.ListNetworks(true)
+	assert.Nil(t, err)
+	nbAllNetworks := len(nets)
+	// nets, err = tester.Service.ListNetworks(false)
+	// assert.Nil(t, err)
+	// nbMonitoredNetworks := len(nets)
+
 	fmt.Println("Creating test_network1")
 	network1, kp1 := tester.CreateNetwork(t, "test_network_1", true)
 	fmt.Println("test_network1 created")
@@ -227,9 +236,9 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	defer tester.Service.DeleteKeyPair(kp2.ID)
 	defer tester.Service.DeleteNetwork(network2.ID)
 
-	nets, err := tester.Service.ListNetworks(false)
+	nets, err = tester.Service.ListNetworks(true)
 	assert.Nil(t, err)
-	assert.Equal(t, 2, len(nets))
+	assert.Equal(t, nbAllNetworks+2, len(nets))
 	found := 0
 	for _, n := range nets {
 		if n.ID == network1.ID {
@@ -237,7 +246,8 @@ func (tester *ClientTester) Networks(t *testing.T) {
 		} else if n.ID == network2.ID {
 			found++
 		} else {
-			t.Fail()
+			continue
+			// t.Fail()
 		}
 	}
 	assert.Equal(t, 2, found)
@@ -252,6 +262,11 @@ func (tester *ClientTester) Networks(t *testing.T) {
 
 //VMs test
 func (tester *ClientTester) VMs(t *testing.T) {
+	// Get initial number of VM
+	vms, err := tester.Service.ListVMs(false)
+	assert.NoError(t, err)
+	nbVMs := len(vms)
+
 	// TODO: handle kp delete
 	network, kp := tester.CreateNetwork(t, "test_network", false)
 	defer tester.Service.DeleteNetwork(network.ID)
@@ -306,8 +321,8 @@ func (tester *ClientTester) VMs(t *testing.T) {
 
 	network, err = tester.Service.GetNetwork(network.ID)
 	assert.NoError(t, err)
-	vms, err := tester.Service.ListVMs(false)
-	assert.Equal(t, 3, len(vms))
+	vms, err = tester.Service.ListVMs(false)
+	assert.Equal(t, nbVMs+3, len(vms))
 	found := 0
 	for _, v := range vms {
 		if v.Name == "gw_"+network.Name {
@@ -317,7 +332,9 @@ func (tester *ClientTester) VMs(t *testing.T) {
 		} else if v.ID == vm2.ID {
 			found++
 		} else {
-			t.Fatalf("Unknonw VM %+v\n", v)
+			fmt.Printf("Unknonw (preexisting?) VM %+v\n", v)
+			continue
+			// t.Fatalf("Unknonw VM %+v\n", v)
 		}
 	}
 	assert.Equal(t, 3, found)
@@ -375,29 +392,33 @@ func (tester *ClientTester) StartStopVM(t *testing.T) {
 
 //Volume test
 func (tester *ClientTester) Volume(t *testing.T) {
+	// Get initial number of volumes
+	lst, err := tester.Service.ListVolumes()
+	nbVolumes := len(lst)
+
 	v, err := tester.Service.CreateVolume(api.VolumeRequest{
-		Name:  "test_volume",
-		Size:  500,
+		Name:  "test_volume1",
+		Size:  100,
 		Speed: VolumeSpeed.HDD,
 	})
-	assert.Nil(t, err)
 	defer tester.Service.DeleteVolume(v.ID)
-	assert.Equal(t, "test_volume", v.Name)
-	assert.Equal(t, 500, v.Size)
+	assert.Nil(t, err)
+	assert.Equal(t, "test_volume1", v.Name)
+	assert.Equal(t, 100, v.Size)
 	assert.Equal(t, VolumeSpeed.HDD, v.Speed)
 
 	tester.Service.WaitVolumeState(v.ID, VolumeState.AVAILABLE, 40*time.Second)
 	v2, err := tester.Service.CreateVolume(api.VolumeRequest{
-		Name:  "test_volume",
-		Size:  500,
+		Name:  "test_volume2",
+		Size:  100,
 		Speed: VolumeSpeed.HDD,
 	})
-	assert.Nil(t, err)
 	defer tester.Service.DeleteVolume(v2.ID)
-	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
-	lst, err := tester.Service.ListVolumes()
 	assert.Nil(t, err)
-	assert.Equal(t, 2, len(lst))
+	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
+	lst, err = tester.Service.ListVolumes()
+	assert.Nil(t, err)
+	assert.Equal(t, nbVolumes+2, len(lst))
 	for _, vl := range lst {
 		if vl.ID == v.ID {
 			assert.Equal(t, v.Name, vl.Name)
@@ -421,27 +442,32 @@ func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
 	vm, err := tester.Service.GetVMByName("gw_" + net.Name)
+	defer tester.Service.DeleteVM(vm.ID)
 	assert.NoError(t, err)
 
 	v, err := tester.Service.CreateVolume(api.VolumeRequest{
-		Name:  "test_volume",
-		Size:  500,
+		Name:  "test_volume1",
+		Size:  100,
 		Speed: VolumeSpeed.HDD,
 	})
+	defer tester.Service.DeleteVolume(v.ID)
 	assert.Nil(t, err)
+
 	v2, err := tester.Service.CreateVolume(api.VolumeRequest{
 		Name:  "test_volume2",
-		Size:  500,
+		Size:  100,
 		Speed: VolumeSpeed.HDD,
 	})
+	defer tester.Service.DeleteVolume(v2.ID)
 	assert.Nil(t, err)
 	//defer clt.DeleteVolume(v.ID)
 	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
 	va, err := tester.Service.CreateVolumeAttachment(api.VolumeAttachmentRequest{
-		Name:     "Attachment",
+		Name:     "Attachment1",
 		ServerID: vm.ID,
 		VolumeID: v.ID,
 	})
+	defer tester.Service.DeleteVolumeAttachment(vm.ID, va.ID)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, va.Device)
 	va2, err := tester.Service.CreateVolumeAttachment(api.VolumeAttachmentRequest{
@@ -449,6 +475,7 @@ func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 		ServerID: vm.ID,
 		VolumeID: v2.ID,
 	})
+	defer tester.Service.DeleteVolumeAttachment(vm.ID, va2.ID)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, va2.Device)
 	val, err := tester.Service.GetVolumeAttachment(vm.ID, v.ID)
@@ -478,17 +505,6 @@ func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 			t.Fail()
 		}
 	}
-	err = tester.Service.DeleteVolumeAttachment(vm.ID, va.ID)
-	assert.Nil(t, err)
-	err = tester.Service.DeleteVolumeAttachment(vm.ID, va2.ID)
-	assert.Nil(t, err)
-	tester.Service.DeleteVM(vm.ID)
-	assert.Nil(t, err)
-	tester.Service.DeleteVolume(v.ID)
-	assert.Nil(t, err)
-	tester.Service.DeleteVolume(v2.ID)
-	assert.Nil(t, err)
-
 }
 
 //Containers test
