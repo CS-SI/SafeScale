@@ -345,6 +345,7 @@ func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp 
 		}
 		ResolveConf = buffer.String()
 	}
+
 	ip := ""
 	if gw != nil {
 		if len(gw.PrivateIPsV4) > 0 {
@@ -459,10 +460,6 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
 		}
 		defer client.DeleteKeyPair(kp.ID)
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	userData, err := client.PrepareUserData(request, isGateway, kp, gw)

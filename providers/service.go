@@ -237,7 +237,7 @@ func (srv *Service) SelectTemplatesBySize(sizing api.SizingRequirements) ([]api.
 		return nil, err
 	}
 	for _, tpl := range tpls {
-		if tpl.Cores >= sizing.MinCores && tpl.DiskSize >= sizing.MinDiskSize && tpl.RAMSize >= sizing.MinRAMSize {
+		if tpl.Cores >= sizing.MinCores && (tpl.DiskSize == 0 || tpl.DiskSize >= sizing.MinDiskSize) && tpl.RAMSize >= sizing.MinRAMSize {
 			selectedTpls = append(selectedTpls, tpl)
 		}
 	}

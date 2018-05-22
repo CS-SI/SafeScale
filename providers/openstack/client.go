@@ -397,7 +397,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	)
 }
 
-//GetAuthOpts return auth parameters
+//GetAuthOpts returns the auth options
 func (client *Client) GetAuthOpts() (api.Config, error) {
 	cfg := api.ConfigMap{}
 

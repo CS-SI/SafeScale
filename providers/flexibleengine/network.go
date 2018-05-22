@@ -8,12 +8,12 @@ import (
 
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/IPVersion"
-	"github.com/SafeScale/providers/openstack"
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/pengux/check"
 )
 
 //VPCRequest defines a request to create a VPC
@@ -68,20 +68,20 @@ func (client *Client) CreateVPC(req VPCRequest) (*VPC, error) {
 	}
 
 	resp := vpcCreateResult{}
-	url := client.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/vpcs"
+	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/vpcs"
 	opts := gc.RequestOpts{
 		JSONBody:     b,
 		JSONResponse: &resp.Body,
 		OkCodes:      []int{200, 201},
 	}
-	_, err = client.Provider.Request("POST", url, &opts)
+	_, err = client.osclt.Provider.Request("POST", url, &opts)
 	vpc, err := resp.Extract()
 	if err != nil {
 		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, errorString(err))
 	}
 
 	// Searching for the OpenStack Router corresponding to the VPC (router.id == vpc.id)
-	router, err := routers.Get(client.Network, vpc.ID).Extract()
+	router, err := routers.Get(client.osclt.Network, vpc.ID).Extract()
 	if err != nil {
 		client.DeleteVPC(vpc.ID)
 		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, errorString(err))
@@ -100,7 +100,7 @@ func (client *Client) CreateVPC(req VPCRequest) (*VPC, error) {
 
 func (client *Client) findOpenstackNetworkByName(name string) (*networks.Network, error) {
 	// Searching for the network corresponding to the VPC (network.name == vpc.id)
-	pager := networks.List(client.Network, networks.ListOpts{
+	pager := networks.List(client.osclt.Network, networks.ListOpts{
 		Name: name,
 	})
 	var network networks.Network
@@ -131,12 +131,12 @@ func (client *Client) findOpenstackNetworkByName(name string) (*networks.Network
 //GetVPC returns the information about a VPC identified by 'id'
 func (client *Client) GetVPC(id string) (*VPC, error) {
 	r := vpcGetResult{}
-	url := client.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/vpcs/" + id
+	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/vpcs/" + id
 	opts := gc.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	_, err := client.Provider.Request("GET", url, &opts)
+	_, err := client.osclt.Provider.Request("GET", url, &opts)
 	r.Err = err
 	vpc, err := r.Extract()
 	if err != nil {
@@ -166,9 +166,13 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		return nil, fmt.Errorf("Network '%s' already exists", req.Name)
 	}
 
+	if ok, err := validateNetworkName(req); !ok {
+		return nil, fmt.Errorf("network name '%s' invalid: %s", req.Name, err)
+	}
+
 	subnet, err = client.createSubnet(req.Name, req.CIDR)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating network named '%s': %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("error creating Network '%s': %s", req.Name, errorString(err))
 	}
 
 	return &api.Network{
@@ -177,6 +181,28 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		CIDR:      subnet.CIDR,
 		IPVersion: fromIntIPVersion(subnet.IPVersion),
 	}, nil
+}
+
+//validateNetworkName validates the name of a Network based on known FlexibleEngine requirements
+func validateNetworkName(req api.NetworkRequest) (bool, error) {
+	s := check.Struct{
+		"Name": check.Composite{
+			check.NonEmpty{},
+			check.Regex{`^[a-zA-Z0-9_-]+$`},
+			check.MaxChar{64},
+		},
+	}
+
+	e := s.Validate(req)
+	if e.HasErrors() {
+		errors, _ := e.GetErrorsByKey("Name")
+		var errs []string
+		for _, msg := range errors {
+			errs = append(errs, msg.Error())
+		}
+		return false, fmt.Errorf(strings.Join(errs, "; "))
+	}
+	return true, nil
 }
 
 //GetNetwork returns the network identified by id
@@ -214,12 +240,9 @@ func (client *Client) ListNetworks(all bool) ([]api.Network, error) {
 
 //DeleteNetwork consists to delete subnet in FlexibleEngine VPC
 func (client *Client) DeleteNetwork(id string) error {
-	vmID, err := client.readGateway(id)
-	if err == nil && vmID != "" {
-		err = client.DeleteGateway(vmID)
-		if err != nil {
-			return fmt.Errorf("Failed to delete gateway VM: %s", errorString(err))
-		}
+	err := client.DeleteGateway(id)
+	if err != nil {
+		return fmt.Errorf("failed to delete gateway VM: %s", errorString(err))
 	}
 	return client.deleteSubnet(id)
 }
@@ -328,13 +351,13 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 	}
 
 	resp := subnetCreateResult{}
-	url := client.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/subnets"
+	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/subnets"
 	opts := gc.RequestOpts{
 		JSONBody:     b,
 		JSONResponse: &resp.Body,
 		OkCodes:      []int{200, 201},
 	}
-	_, err = client.Provider.Request("POST", url, &opts)
+	_, err = client.osclt.Provider.Request("POST", url, &opts)
 	if err != nil {
 		return nil, fmt.Errorf("error requesting Subnet %s creation: %s", req.Name, errorString(err))
 	}
@@ -348,8 +371,8 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 
 //ListSubnets lists available subnet in VPC
 func (client *Client) listSubnets() (*[]subnets.Subnet, error) {
-	url := client.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/subnets?vpc_id=" + client.vpc.ID
-	pager := pagination.NewPager(client.Network, url, func(r pagination.PageResult) pagination.Page {
+	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/subnets?vpc_id=" + client.vpc.ID
+	pager := pagination.NewPager(client.osclt.Network, url, func(r pagination.PageResult) pagination.Page {
 		return subnets.SubnetPage{pagination.LinkedPageBase{PageResult: r}}
 	})
 	var subnetList []subnets.Subnet
@@ -370,12 +393,12 @@ func (client *Client) listSubnets() (*[]subnets.Subnet, error) {
 //getSubnet lists available subnet in VPC
 func (client *Client) getSubnet(id string) (*subnets.Subnet, error) {
 	r := subnetGetResult{}
-	url := client.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/subnets/" + id
+	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/subnets/" + id
 	opts := gc.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	_, err := client.Provider.Request("GET", url, &opts)
+	_, err := client.osclt.Provider.Request("GET", url, &opts)
 	r.Err = err
 	subnet, err := r.Extract()
 	if err != nil {
@@ -387,12 +410,12 @@ func (client *Client) getSubnet(id string) (*subnets.Subnet, error) {
 //deleteSubnet deletes a subnet
 func (client *Client) deleteSubnet(id string) error {
 	resp := subnetDeleteResult{}
-	url := client.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/vpcs/" + client.vpc.ID + "/subnets/" + id
+	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/vpcs/" + client.vpc.ID + "/subnets/" + id
 	opts := gc.RequestOpts{
 		//JSONResponse: &resp.Body,
 		OkCodes: []int{204},
 	}
-	_, err := client.Provider.Request("DELETE", url, &opts)
+	_, err := client.osclt.Provider.Request("DELETE", url, &opts)
 	if err != nil {
 		return fmt.Errorf("Error requesting subnet id '%s' deletion: %s", id, errorString(err))
 	}
@@ -443,66 +466,6 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 		return IPVersion.IPv6
 	}
 	return -1
-}
-
-/*
- * Invalidating methods from openstack
- */
-
-//CreateSubnet exists only to invalidate code from openstack
-// Subnets are managed by xxxNetwork() instead
-func (client *Client) CreateSubnet(name string, networkID string, cidr string, ipVersion IPVersion.Enum) (*openstack.Subnet, error) {
-	return nil, fmt.Errorf("flexibleengine.CreateSubnet() isn't available by design. Use flexibleengine.CreateNetwork() instead")
-}
-
-//GetSubnet exists only to invalidate code from openstack
-// Subnets are managed by xxxNetwork() for FlexibleEngine
-func (client *Client) GetSubnet(id string) (*openstack.Subnet, error) {
-	return nil, fmt.Errorf("flexibleengine.GetSubnet() isn't available by design. Use flexibleengine.GetNetwork() instead")
-}
-
-//ListSubnets exists only to invalidate code from openstack
-// Subnets are managed by xxxNetwork() for FlexibleEngine
-func (client *Client) ListSubnets(netID string) ([]openstack.Subnet, error) {
-	var subnetList []openstack.Subnet
-	return subnetList, fmt.Errorf("flexibleengine.ListSubnets() isn't available by design. Use flexibleengine.ListNetworks() instead")
-}
-
-//DeleteSubnet exists only to invalidate code from openstack.
-// Subnets are managed by xxxNetwork() for FlexibleEngine
-func (client *Client) DeleteSubnet(id string) error {
-	return fmt.Errorf("flexibleengine.DeleteSubnet() isn't available by design. Use flexibleengine.DeleteNetwork() instead")
-}
-
-//CreateRouter exists only to invalidate code from openstack.
-func (client *Client) CreateRouter(req openstack.RouterRequest) (*openstack.Router, error) {
-	return nil, fmt.Errorf("flexibleengine.CreateRouter() isn't available by design")
-}
-
-//GetRouter exists only to invalidate code from openstack.
-func (client *Client) GetRouter(id string) (*openstack.Router, error) {
-	return nil, fmt.Errorf("flexibleengine.GetRouter() isn't available by design")
-}
-
-//ListRouter exists only to invalidate code from openstack.
-func (client *Client) ListRouter() ([]openstack.Router, error) {
-	var ns []openstack.Router
-	return ns, fmt.Errorf("flexibleengine.ListRouter() isn't available by design")
-}
-
-//DeleteRouter exists only to invalidate code from openstack.
-func (client *Client) DeleteRouter(id string) error {
-	return fmt.Errorf("flexibleengine.DeleteRouter() isn't available by design")
-}
-
-//AddSubnetToRouter exists only to invalidate code from openstack.
-func (client *Client) AddSubnetToRouter(routerID string, subnetID string) error {
-	return fmt.Errorf("flexibleengine.AddSubnetToRouter() isn't available by design")
-}
-
-//RemoveSubnetFromRouter exists only to invalidate code from openstack.
-func (client *Client) RemoveSubnetFromRouter(routerID string, subnetID string) error {
-	return fmt.Errorf("flexibleengine.RemoveSubnetFromRouter() isn't available by design")
 }
 
 //writeGateway writes in Object Storage the ID of the VM acting as gateway for the network identified by netID
