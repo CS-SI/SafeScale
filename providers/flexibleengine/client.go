@@ -670,6 +670,11 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 	return cfg, nil
 }
 
+//GetCfgOpts return configuration parameters
+func (client *Client) GetCfgOpts() (api.Config, error) {
+	return client.osclt.GetCfgOpts()
+}
+
 func init() {
 	providers.Register("flexibleengine", &Client{})
 }

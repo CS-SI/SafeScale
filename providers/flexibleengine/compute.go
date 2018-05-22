@@ -486,8 +486,8 @@ func (client *Client) GetVM(id string) (*api.VM, error) {
 }
 
 //ListVMs lists available VMs
-func (client *Client) ListVMs() ([]api.VM, error) {
-	return client.osclt.ListVMs()
+func (client *Client) ListVMs(all bool) ([]api.VM, error) {
+	return client.osclt.ListVMs(all)
 }
 
 //DeleteVM deletes the VM identified by id
