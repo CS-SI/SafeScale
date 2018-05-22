@@ -503,55 +503,7 @@ func (client *Client) GetVM(id string) (*api.VM, error) {
 
 //ListVMs lists available VMs
 func (client *Client) ListVMs(all bool) ([]api.VM, error) {
-	if all {
-		return client.listAllVMs()
-	}
-	return client.listMonitoredVMs()
-}
-
-//listAllVMs lists available VMs
-func (client *Client) listAllVMs() ([]api.VM, error) {
-	pager := servers.List(client.osclt.Compute, servers.ListOpts{})
-	var vms []api.VM
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		list, err := servers.ExtractServers(page)
-		if err != nil {
-			return false, err
-		}
-		for _, srv := range list {
-			vms = append(vms, *client.toVM(&srv))
-		}
-		return true, nil
-	})
-	if len(vms) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
-	}
-	return vms, nil
-}
-
-//listMonitoredVMs lists available VMs created by SafeScale (ie registered in object storage)
-// This code seems to be the same than openstack provider, but it HAS TO BE DUPLICARED
-// because client.ListObjects() is different (Swift for openstack, S3 for flexibleengine).
-func (client *Client) listMonitoredVMs() ([]api.VM, error) {
-	names, err := client.ListObjects(api.VMContainerName, api.ObjectFilter{})
-	if err != nil {
-		return nil, err
-	}
-
-	var vms []api.VM
-
-	for _, name := range names {
-		vm, err := client.readVMDefinition(name)
-		if err != nil {
-			return nil, providers.ResourceNotFoundError("VM", name)
-		}
-		vms = append(vms, *vm)
-	}
-
-	if len(vms) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
-	}
-	return vms, nil
+	return client.osclt.ListVMs(all)
 }
 
 //DeleteVM deletes the VM identified by id
@@ -784,7 +736,7 @@ func (client *Client) saveVMDefinition(vm api.VM) error {
 	if err != nil {
 		return err
 	}
-	return client.PutObject(api.VMContainerName, api.Object{
+	return client.PutObject(VMContainerName, api.Object{
 		Name:    vm.ID,
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
@@ -792,12 +744,12 @@ func (client *Client) saveVMDefinition(vm api.VM) error {
 
 //removeVMDefinition removes the VM definition from Object Storage
 func (client *Client) removeVMDefinition(vmID string) error {
-	return client.DeleteObject(api.VMContainerName, vmID)
+	return client.DeleteObject(VMContainerName, vmID)
 }
 
 //readVMDefinition gets the VM definition from Object Storage
 func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
-	o, err := client.GetObject(api.VMContainerName, vmID, nil)
+	o, err := client.GetObject(VMContainerName, vmID, nil)
 	if err != nil {
 		return nil, err
 	}

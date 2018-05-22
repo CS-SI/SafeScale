@@ -238,14 +238,6 @@ func (client *Client) GetNetwork(id string) (*api.Network, error) {
 
 //ListNetworks lists available networks
 func (client *Client) ListNetworks(all bool) ([]api.Network, error) {
-	if all {
-		return client.listAllNetworks()
-	}
-	return client.listMonitoredNetworks()
-}
-
-//listAllNetworks lists available networks
-func (client *Client) listAllNetworks() ([]api.Network, error) {
 	subnetList, err := client.listSubnets()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get networks list: %s", errorString(err))
@@ -260,29 +252,6 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 		})
 	}
 	return networkList, nil
-}
-
-//listMonitoredNetworks lists available networks created by SafeScale (ie those registered in object storage)
-func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
-	netIDs, err := client.ListObjects(api.NetworkContainerName, api.ObjectFilter{})
-	if err != nil {
-		return nil, err
-	}
-
-	var netList []api.Network
-
-	for _, netID := range netIDs {
-		net, err := client.GetNetwork(netID)
-		if err != nil {
-			return nil, providers.ResourceNotFoundError("Network", netID)
-		}
-		netList = append(netList, *net)
-	}
-
-	if len(netList) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing networks: %s", errorString(err))
-	}
-	return netList, nil
 }
 
 //DeleteNetwork consists to delete subnet in FlexibleEngine VPC
@@ -517,7 +486,7 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 
 //writeGateway writes in Object Storage the ID of the VM acting as gateway for the network identified by netID
 func (client *Client) writeGateway(netID string, vmID string) error {
-	err := client.PutObject(api.NetworkContainerName, api.Object{
+	err := client.PutObject(NetworkGWContainerName, api.Object{
 		Name:    netID,
 		Content: strings.NewReader(vmID),
 	})
@@ -526,7 +495,7 @@ func (client *Client) writeGateway(netID string, vmID string) error {
 
 //readGateway reads inn Object Storage the ID of the VM acting as gateway for the network identified by netID
 func (client *Client) readGateway(netID string) (string, error) {
-	o, err := client.GetObject(api.NetworkContainerName, netID, nil)
+	o, err := client.GetObject(NetworkGWContainerName, netID, nil)
 	if err != nil {
 		return "", err
 	}
@@ -537,7 +506,7 @@ func (client *Client) readGateway(netID string) (string, error) {
 
 //removeGateway deletes from Object Storage the gateway data for the network identified by netID
 func (client *Client) removeGateway(netID string) error {
-	return client.DeleteObject(api.NetworkContainerName, netID)
+	return client.DeleteObject(NetworkGWContainerName, netID)
 }
 
 //CreateGateway creates a gateway for a network.
