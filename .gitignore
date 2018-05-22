@@ -35,5 +35,17 @@ rice-box.go
 
 #ignore results from scanner
 scanner/Test*
+<<<<<<< HEAD
 
 scanner/scanner
+||||||| parent of fbf4738... Ignore cluster/tests/deploy (executable)
+=======
+
+scanner/scanner
+
+cluster/tests/deploy
+>>>>>>> fbf4738... Ignore cluster/tests/deploy (executable)
+
+broker/daemon/brokerd
+
+broker/client/broker
