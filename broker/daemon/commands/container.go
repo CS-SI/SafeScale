@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"regexp"
 
+	services "github.com/SafeScale/broker/daemon/services"
 	conv "github.com/SafeScale/broker/utils"
 
 	pb "github.com/SafeScale/broker"
 
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -21,136 +19,6 @@ import (
 // broker container delete c1
 // broker container list
 // broker container inspect C1
-
-//ContainerAPI defines API to manipulate containers
-type ContainerAPI interface {
-	List() ([]string, error)
-	Create(string) error
-	Delete(string) error
-	Inspect(string) (*api.ContainerInfo, error)
-	Mount(string, string, string) error
-	UMount(string, string) error
-}
-
-//NewContainerService creates a Container service
-func NewContainerService(api api.ClientAPI) ContainerAPI {
-	return &ContainerService{
-		provider: providers.FromClient(api),
-	}
-}
-
-//ContainerService container service
-type ContainerService struct {
-	provider *providers.Service
-}
-
-//List retrieves all available containers
-func (srv *ContainerService) List() ([]string, error) {
-	return srv.provider.ListContainers()
-}
-
-//Create a container
-func (srv *ContainerService) Create(name string) error {
-	container, _ := srv.provider.GetContainer(name)
-	if container != nil {
-		return providers.ResourceAlreadyExistsError("Container", name)
-	}
-	return srv.provider.CreateContainer(name)
-}
-
-//Delete a container
-func (srv *ContainerService) Delete(name string) error {
-	return srv.provider.DeleteContainer(name)
-}
-
-//Inspect a container
-func (srv *ContainerService) Inspect(name string) (*api.ContainerInfo, error) {
-	return srv.provider.GetContainer(name)
-}
-
-//Mount a container on a VM on the given mount point
-func (srv *ContainerService) Mount(containerName, vmName, path string) error {
-	// Check container existence
-	_, err := srv.Inspect(containerName)
-	if err != nil {
-		return err
-	}
-
-	// Get VM ID
-	vmService := NewVMService(srv.provider)
-	vm, err := vmService.Get(vmName)
-	if err != nil {
-		return fmt.Errorf("No VM found with name or id '%s'", vmName)
-	}
-
-	// Create mount point
-	mountPoint := path
-	if path == api.DefaultContainerMountPoint {
-		mountPoint = api.DefaultContainerMountPoint + containerName
-	}
-
-	authOpts, _ := srv.provider.GetAuthOpts()
-	cfgValue, _ := authOpts.Config("AuthUrl")
-	authurl := regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(cfgValue.(string))[1]
-	cfgValue, _ = authOpts.Config("TenantName")
-	tenant := cfgValue.(string)
-	cfgValue, _ = authOpts.Config("Login")
-	login := cfgValue.(string)
-	cfgValue, _ = authOpts.Config("Password")
-	password := cfgValue.(string)
-	cfgValue, _ = authOpts.Config("Region")
-	region, _ := cfgValue.(string)
-
-	cfgOpts, _ := srv.provider.GetCfgOpts()
-	cfgValue, _ = cfgOpts.Config("S3Protocol")
-	s3protocol := cfgValue.(string)
-
-	data := struct {
-		Container  string
-		Tenant     string
-		Login      string
-		Password   string
-		AuthURL    string
-		Region     string
-		MountPoint string
-		S3Protocol string
-	}{
-		Container:  containerName,
-		Tenant:     tenant,
-		Login:      login,
-		Password:   password,
-		AuthURL:    authurl,
-		Region:     region,
-		MountPoint: mountPoint,
-		S3Protocol: s3protocol,
-	}
-
-	return exec("mount_object_storage.sh", data, vm.ID, srv.provider)
-}
-
-//UMount a container
-func (srv *ContainerService) UMount(containerName, vmName string) error {
-	// Check container existence
-	_, err := srv.Inspect(containerName)
-	if err != nil {
-		return err
-	}
-
-	// Get VM ID
-	vmService := NewVMService(srv.provider)
-	vm, err := vmService.Get(vmName)
-	if err != nil {
-		return fmt.Errorf("No VM found with name or id '%s'", vmName)
-	}
-
-	data := struct {
-		Container string
-	}{
-		Container: containerName,
-	}
-
-	return exec("umount_object_storage.sh", data, vm.ID, srv.provider)
-}
 
 //ContainerServiceServer is the container service grpc server
 type ContainerServiceServer struct{}
@@ -162,7 +30,7 @@ func (s *ContainerServiceServer) List(ctx context.Context, in *google_protobuf.E
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.client)
 	containers, err := service.List()
 	if err != nil {
 		return nil, err
@@ -179,7 +47,7 @@ func (s *ContainerServiceServer) Create(ctx context.Context, in *pb.Container) (
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.client)
 	err := service.Create(in.GetName())
 	if err != nil {
 		return nil, err
@@ -196,7 +64,7 @@ func (s *ContainerServiceServer) Delete(ctx context.Context, in *pb.Container) (
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.client)
 	err := service.Delete(in.GetName())
 	if err != nil {
 		return nil, err
@@ -213,7 +81,7 @@ func (s *ContainerServiceServer) Inspect(ctx context.Context, in *pb.Container) 
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.client)
 	resp, err := service.Inspect(in.GetName())
 	if err != nil {
 		return nil, err
@@ -230,7 +98,7 @@ func (s *ContainerServiceServer) Mount(ctx context.Context, in *pb.ContainerMoun
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.client)
 	err := service.Mount(in.GetContainer(), in.GetVM().GetName(), in.GetPath())
 
 	log.Println("End Mount container")
@@ -244,7 +112,7 @@ func (s *ContainerServiceServer) UMount(ctx context.Context, in *pb.ContainerMou
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.client)
 	err := service.UMount(in.GetContainer(), in.GetVM().GetName())
 
 	log.Println("End UMount container")
