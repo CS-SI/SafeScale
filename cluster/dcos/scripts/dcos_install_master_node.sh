@@ -8,10 +8,13 @@
 
 # Get install script from bootstrap server
 mkdir /tmp/dcos && cd /tmp/dcos
-curl -O http://{{.BootstrapIP}}:{{.BootstrapPort}}/dcos_install.sh
+curl -O http://{{.BootstrapIP}}:{{.BootstrapPort}}/dcos_install.sh || exit 1
 
 # Launch installation
-sudo bash dcos_install.sh master
+bash dcos_install.sh master
+retcode=$?
 
 #  Do some cleanup
 #rm -rf /tmp/dcos
+
+exit $retcode

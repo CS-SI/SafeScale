@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"runtime"
 
 	"github.com/SafeScale/cluster"
@@ -31,15 +32,17 @@ func Run() {
 		return
 	}
 
-	cluster, err := cm.GetCluster("Test")
+	clusterName := "test-cluster"
+
+	cluster, err := cm.GetCluster(clusterName)
 	if err != nil {
-		fmt.Println("Failed to load cluster 'Test' parameters: %s", err.Error())
+		fmt.Printf("Failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
 		return
 	}
 	if cluster == nil {
-		fmt.Println("Cluster 'Test' not found, creating it")
+		log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
 		cluster, err = cm.CreateCluster(clusterapi.ClusterRequest{
-			Name:       "Test",
+			Name:       clusterName,
 			Complexity: Complexity.Dev,
 			CIDR:       "192.168.0.0/28",
 		})
@@ -48,7 +51,7 @@ func Run() {
 			return
 		}
 	} else {
-		fmt.Println("Cluster 'Test' already created.")
+		fmt.Printf("Cluster '%s' already created.\n", clusterName)
 	}
 
 	state, err := cluster.GetState()

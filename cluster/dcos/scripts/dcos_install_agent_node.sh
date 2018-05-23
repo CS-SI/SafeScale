@@ -14,13 +14,12 @@ else
 fi
 
 # Get install script from bootstrap server
-mkdir /tmp/dcos
-cd /tmp/dcos
+mkdir /tmp/dcos && cd /tmp/dcos
 curl -O http://{{.BootstrapIP}}:{{.BootstrapPort}}/dcos_install.sh || exit 1
 
 # Launch installation
-sudo bash dcos_install.sh $MODE
+bash dcos_install.sh $MODE
 retcode=$?
 
 #rm -rf /tmp/dcos
-exit $?
+exit $retcode

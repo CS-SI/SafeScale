@@ -2,6 +2,7 @@ package dcos
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -39,6 +40,9 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 		return nil, fmt.Errorf("Invalid parameter req.CIDR: can't be empty")
 	}
 
+	req.Name = strings.ToLower(req.Name)
+	log.Printf("Creating cluster '%s'", req.Name)
+
 	svc := m.GetService()
 
 	// Figures out the best image for the job (DCOS supports only REHL 7, CentOS 7 and CoreOS)
@@ -66,8 +70,6 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 	if err != nil {
 		return nil, fmt.Errorf("Failed to find a template suitable for master server: %s", err.Error())
 	}
-
-	req.Name = strings.ToLower(req.Name)
 
 	// Create a KeyPair for the cluster
 	name := "cluster_" + req.Name + "_key"
@@ -98,6 +100,7 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 	}
 
 	// Creates network
+	log.Printf("Creating Network 'net-%s'", req.Name)
 	network, err = svc.CreateNetwork(providerapi.NetworkRequest{
 		Name: "net-" + req.Name,
 		CIDR: req.CIDR,
@@ -113,6 +116,7 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 	fmt.Println("Waking up...")
 
 	// Creates a Gateway (when calling broker API, won't be necessary)
+	log.Printf("Creating gateway of network '%s'", network.Name)
 	tpls, err = svc.SelectTemplatesBySize(providerapi.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
@@ -139,6 +143,7 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 	}
 
 	// Creates bootstrap/upgrade server
+	log.Printf("Creating DCOS Bootstrap server")
 	_, err = cluster.AddNode(NodeType.Bootstrap, providerapi.VMRequest{
 		TemplateID: tmplBootstrap[0].ID,
 		ImageID:    image.ID,
@@ -163,6 +168,7 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 		masterCount = 5
 	}
 
+	log.Printf("Creating DCOS Master servers (%d)", masterCount)
 	for i := 1; i <= masterCount; i++ {
 		// Creates Master Node
 		_, err = cluster.AddNode(NodeType.Master, providerapi.VMRequest{
@@ -175,6 +181,7 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 		}
 	}
 
+	log.Printf("Configuring cluster")
 	err = cluster.configure()
 	if err != nil {
 		err = fmt.Errorf("failed to configure bootstrap and masters servers: %s", err.Error())
@@ -188,12 +195,7 @@ func (m *Manager) CreateCluster(req clusterapi.ClusterRequest) (clusterapi.Clust
 		goto cleanMasters
 	}
 
-	// Initialize the cluster
-	err = cluster.Initialize()
-	if err != nil {
-		goto cleanMasters
-	}
-
+	log.Printf("Cluster '%s' created and initialized successfully", req.Name)
 	return cluster, nil
 
 cleanMasters:

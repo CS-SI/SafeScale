@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"log"
 	"os/exec"
 	"strconv"
 	"syscall"
@@ -226,7 +227,7 @@ func (c *Cluster) addMasterNode(req providerapi.VMRequest) (*clusterapi.Node, er
 	i := len(c.definition.MasterIDs) + 1
 	req.Name = c.definition.Common.Name + "-dcosmaster-" + strconv.Itoa(i)
 	req.NetworkIDs = []string{c.definition.NetworkID}
-	req.PublicIP = false
+	req.PublicIP = true
 	req.KeyPair = c.definition.Common.Keypair
 	masterVM, err := svc.CreateVM(req)
 	if err != nil {
@@ -323,13 +324,24 @@ func (c *Cluster) configure() error {
 	if err != nil {
 		return err
 	}
+
+	log.Printf("Configuring Bootstrap server")
+
+	var dnsServers []string
+	cfg, err := svc.GetCfgOpts()
+	if err != nil {
+		value, ok := cfg.Config("DNSList")
+		if ok {
+			dnsServers = value.([]string)
+		}
+	}
 	retcode, output, err := c.executeScript(bootstrapVM, "dcos_install_bootstrap_node.sh", map[string]interface{}{
 		"DCOSVersion":   dcosVersion,
 		"BootstrapIP":   c.definition.BootstrapIP,
 		"BootstrapPort": "80",
 		"ClusterName":   c.definition.Common.Name,
 		"MasterIPs":     c.definition.MasterIPs,
-		//"DNSServerIPs":  []string{"", ""},
+		"DNSServerIPs":  dnsServers,
 	})
 	if err != nil {
 		return err
@@ -343,6 +355,7 @@ func (c *Cluster) configure() error {
 		if err != nil {
 			continue
 		}
+		log.Printf("Configuring Master server '%s'", vm.Name)
 		retcode, output, err := c.executeScript(vm, "dcos_install_master_node.sh", map[string]interface{}{
 			"BootstrapIP":   bootstrapVM.AccessIPv4,
 			"BootstrapPort": "80",
@@ -354,6 +367,7 @@ func (c *Cluster) configure() error {
 			return fmt.Errorf("scripted Master configuration failed with error code %d:\n%s", retcode, *output)
 		}
 	}
+
 	return nil
 }
 
@@ -380,6 +394,8 @@ func (c *Cluster) configureAgent(targetVM *providerapi.VM, nodeType NodeType.Enu
 	if err != nil {
 		return err
 	}
+	fmt.Println(output)
+
 	if retcode != 0 {
 		return fmt.Errorf("scripted Agent configuration failed with error code %d:\n%s", retcode, *output)
 	}
@@ -432,105 +448,19 @@ func (c *Cluster) executeScript(targetVM *providerapi.VM, script string, data ma
 	}
 	retcode := 0
 	out, err := cmdResult.CombinedOutput()
-	if ee, ok := err.(*exec.ExitError); ok {
-		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-			retcode = int(status)
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			if status, ok := ee.Sys().(syscall.WaitStatus); ok {
+				retcode = int(status)
+			}
+		} else {
+			return 0, nil, fmt.Errorf("[%s] error fetching output of script '%s': %s", targetVM.Name, script, err.Error())
 		}
-	} else {
-		return 0, nil, fmt.Errorf("[%s] error fetching output of script '%s': %s", targetVM.Name, script, err.Error())
 	}
 
 	strOut := string(out)
+	fmt.Println(strOut)
 	return retcode, &strOut, nil
-}
-
-//Initialize initializes DCOS
-func (c *Cluster) Initialize() error {
-	if c.definition.Common.State != ClusterState.Created {
-		return fmt.Errorf("cluster '%s' isn't in a state allowing initialization", c.definition.Common.Name)
-	}
-
-	c.definition.Common.State = ClusterState.Initializing
-	err := c.SaveDefinition()
-	if err != nil {
-		c.definition.Common.State = ClusterState.Created
-		return fmt.Errorf("failed to save cluster state: %s", err.Error())
-	}
-
-	svc := c.getService()
-
-	// 1st, installs DCOS on the masters
-	data := map[string]interface{}{
-		"BootstrapIP":   c.definition.BootstrapIP,
-		"BootstrapPort": "80",
-		"NodeType":      "master",
-	}
-	for _, m := range c.definition.MasterIDs {
-		vm, err := svc.GetVM(m)
-		if err != nil {
-			c.definition.Common.State = ClusterState.Created
-			return fmt.Errorf("failed to get information about master: %s", err.Error())
-		}
-		retcode, output, err := c.executeScript(vm, "dcos_initialize_cluster_node.sh", data)
-		if err != nil {
-			c.definition.Common.State = ClusterState.Created
-			return fmt.Errorf("failed to initialize master '%s': %s", vm.Name, err.Error())
-		}
-		if retcode != 0 {
-			return fmt.Errorf("scripted initialization of master '%s' failed with error code %d:\n%s", vm.Name, retcode, *output)
-		}
-	}
-
-	// Next, installs DCOS on the Private Agents
-	data["nodeType"] = "slave"
-	for _, a := range c.definition.PrivateAgentIDs {
-		err := c.initializeAgentNode(a, NodeType.PrivateAgent)
-		if err != nil {
-			c.definition.Common.State = ClusterState.Created
-			return fmt.Errorf("failed to initialize private agent: %s", err.Error())
-		}
-	}
-
-	// Finally, installs DCOS on the Public Agents
-	data["NodeType"] = "slave_public"
-	for _, a := range c.definition.PublicAgentIDs {
-		err := c.initializeAgentNode(a, NodeType.PublicAgent)
-		if err != nil {
-			c.definition.Common.State = ClusterState.Created
-			return fmt.Errorf("failed to initialize public agent: %s", err.Error())
-		}
-	}
-
-	return nil
-}
-
-//initializeAgentNode initializes DCOS on an Agent Node
-func (c *Cluster) initializeAgentNode(ID string, nodeType NodeType.Enum) error {
-	svc := c.getService()
-
-	vm, err := svc.GetVM(ID)
-	if err != nil {
-		c.definition.Common.State = ClusterState.Created
-		return fmt.Errorf("failed to get information about VM identified by '%s': %s", ID, err.Error())
-	}
-	typeStr := "slave"
-	if nodeType == NodeType.PublicAgent {
-		typeStr = typeStr + "_public"
-	}
-	retcode, output, err := c.executeScript(vm, "dcos_initialize_cluster_node.sh", map[string]interface{}{
-		"BootstrapIP":   c.definition.BootstrapIP,
-		"BootstrapPort": "80",
-		"NodeType":      typeStr,
-	})
-	if err != nil {
-		c.definition.Common.State = ClusterState.Created
-		return fmt.Errorf("failed to initialize agent '%s': %s", vm.Name, err.Error())
-	}
-	if retcode != 0 {
-		c.definition.Common.State = ClusterState.Created
-		return fmt.Errorf("scripted initialization of agent '%s' failed with error code %d:\n%s", vm.Name, retcode, *output)
-	}
-	return nil
 }
 
 //DeleteNode deletes an Agent node
