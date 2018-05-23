@@ -201,7 +201,6 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 		return nil, fmt.Errorf("Error listing networks: %s", errorString(err))
 	}
 	return netList, nil
-
 }
 
 //DeleteNetwork deletes the network identified by id

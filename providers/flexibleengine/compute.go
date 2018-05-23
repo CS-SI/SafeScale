@@ -414,7 +414,7 @@ func (client *Client) loadGateway(networkID string) (*servers.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to find Gateway %s", errorString(err))
 	}
-	gw, err := servers.Get(client.Compute, gwID).Extract()
+	gw, err := servers.Get(client.osclt.Compute, gwID).Extract()
 	if err != nil {
 		return nil, fmt.Errorf("unable to find Gateway %s", errorString(err))
 	}

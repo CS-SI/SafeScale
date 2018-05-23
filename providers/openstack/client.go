@@ -414,6 +414,7 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 func (client *Client) GetCfgOpts() (api.Config, error) {
 	cfg := api.ConfigMap{}
 
+	cfg.Set("DNSList", client.Cfg.DNSList)
 	cfg.Set("S3Protocol", client.Cfg.S3Protocol)
 
 	return cfg, nil

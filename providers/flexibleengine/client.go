@@ -64,10 +64,6 @@ type AuthOptions struct {
 
 //CfgOptions configuration options
 type CfgOptions struct {
-	//VPL: No choice with FlexibleEngine
-	//Name of the provider (external) network
-	//ProviderNetwork string
-
 	//DNSList list of DNS
 	DNSList []string
 
@@ -662,9 +658,15 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 
 //GetCfgOpts return configuration parameters
 func (client *Client) GetCfgOpts() (api.Config, error) {
-	return client.osclt.GetCfgOpts()
+	cfg := api.ConfigMap{}
+
+	cfg.Set("DNSList", client.Cfg.DNSList)
+	cfg.Set("S3Protocol", "s3")
+
+	return cfg, nil
 }
 
+//init registers the flexibleengine provider
 func init() {
 	providers.Register("flexibleengine", &Client{})
 }
