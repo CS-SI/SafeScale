@@ -382,10 +382,17 @@ func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 	return gw, nil
 }
 
-func (client *Client) saveVMDefinition(vm api.VM) error {
+func (client *Client) saveVMDefinition(vm api.VM, netID string) error {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(vm)
+	if err != nil {
+		return err
+	}
+	err = client.PutObject(api.NetworkContainerName, api.Object{
+		Name:    fmt.Sprintf("%s/vm/%s", netID, vm.ID),
+		Content: bytes.NewReader(buffer.Bytes()),
+	})
 	if err != nil {
 		return err
 	}
@@ -394,9 +401,38 @@ func (client *Client) saveVMDefinition(vm api.VM) error {
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
 }
+
 func (client *Client) removeVMDefinition(vmID string) error {
+	// Find the network the vm the is attached on
+	networks, err := client.ListNetworks(false)
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for _, net := range networks {
+		vms, err := client.ListObjects(api.NetworkContainerName, api.ObjectFilter{
+			Prefix: fmt.Sprintf("%s/vm/%s", net.ID, vmID),
+		})
+		if err != nil {
+			return err
+		}
+		if len(vms) == 1 {
+			err := client.DeleteObject(api.NetworkContainerName, fmt.Sprintf("%s/vm/%s", net.ID, vmID))
+			if err != nil {
+				return err
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		fmt.Printf("VM %s not attached to any network !!", vmID)
+	}
+
 	return client.DeleteObject(api.VMContainerName, vmID)
 }
+
 func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
 	o, err := client.GetObject(api.VMContainerName, vmID, nil)
 	if err != nil {
@@ -500,7 +536,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	vm.PrivateKey = kp.PrivateKey
 	//if Floating IP are not used or no public address is requested
 	if !client.Cfg.UseFloatingIP || !request.PublicIP {
-		err = client.saveVMDefinition(*vm)
+		err = client.saveVMDefinition(*vm, request.NetworkIDs[0])
 		if err != nil {
 			client.DeleteVM(vm.ID)
 			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
@@ -532,7 +568,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	} else if IPVersion.IPv6.Is(ip.IP) {
 		vm.AccessIPv6 = ip.IP
 	}
-	err = client.saveVMDefinition(*vm)
+	err = client.saveVMDefinition(*vm, request.NetworkIDs[0])
 	if err != nil {
 		client.DeleteVM(vm.ID)
 		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
@@ -635,7 +671,11 @@ func (client *Client) getFloatingIP(vmID string) (*floatingips.FloatingIP, error
 
 //DeleteVM deletes the VM identified by id
 func (client *Client) DeleteVM(id string) error {
-	client.readVMDefinition(id)
+	_, err := client.readVMDefinition(id)
+	if err != nil {
+		return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+	}
+
 	if client.Cfg.UseFloatingIP {
 		fip, err := client.getFloatingIP(id)
 		if err == nil {
@@ -653,7 +693,7 @@ func (client *Client) DeleteVM(id string) error {
 			}
 		}
 	}
-	err := servers.Delete(client.Compute, id).ExtractErr()
+	err = servers.Delete(client.Compute, id).ExtractErr()
 	if err != nil {
 		return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
 	}
