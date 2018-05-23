@@ -227,7 +227,7 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	defer tester.Service.DeleteKeyPair(kp2.ID)
 	defer tester.Service.DeleteNetwork(network2.ID)
 
-	nets, err := tester.Service.ListNetworks()
+	nets, err := tester.Service.ListNetworks(false)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(nets))
 	found := 0
@@ -306,7 +306,7 @@ func (tester *ClientTester) VMs(t *testing.T) {
 
 	network, err = tester.Service.GetNetwork(network.ID)
 	assert.NoError(t, err)
-	vms, err := tester.Service.ListVMs()
+	vms, err := tester.Service.ListVMs(false)
 	assert.Equal(t, 3, len(vms))
 	found := 0
 	for _, v := range vms {
