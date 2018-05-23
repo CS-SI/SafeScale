@@ -391,23 +391,23 @@ type ClientAPI interface {
 type Config interface {
 	// Config gets a string configuration value and a
 	// bool indicating whether the value was present or not.
-	Config(name string) (string, bool)
+	Config(name string) (interface{}, bool)
 	// Set sets the configuration name to specified value
-	Set(name string, value string)
+	Set(name string, value interface{})
 }
 
 // ConfigMap is a map[string]string that implements
 // the Config method.
-type ConfigMap map[string]string
+type ConfigMap map[string]interface{}
 
 // Config gets a string configuration value and a
 // bool indicating whether the value was present or not.
-func (c ConfigMap) Config(name string) (string, bool) {
+func (c ConfigMap) Config(name string) (interface{}, bool) {
 	val, ok := c[name]
 	return val, ok
 }
 
 // Set sets name configuration to value
-func (c ConfigMap) Set(name string, value string) {
+func (c ConfigMap) Set(name string, value interface{}) {
 	c[name] = value
 }
