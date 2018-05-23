@@ -90,15 +90,20 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 	}
 
 	authOpts, _ := srv.provider.GetAuthOpts()
-	authurl, _ := authOpts.Config("AuthUrl")
-	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
-	tenant, _ := authOpts.Config("TenantName")
-	login, _ := authOpts.Config("Login")
-	password, _ := authOpts.Config("Password")
-	region, _ := authOpts.Config("Region")
+	cfgValue, _ := authOpts.Config("AuthUrl")
+	authurl := regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(cfgValue.(string))[1]
+	cfgValue, _ = authOpts.Config("TenantName")
+	tenant := cfgValue.(string)
+	cfgValue, _ = authOpts.Config("Login")
+	login := cfgValue.(string)
+	cfgValue, _ = authOpts.Config("Password")
+	password := cfgValue.(string)
+	cfgValue, _ = authOpts.Config("Region")
+	region, _ := cfgValue.(string)
 
 	cfgOpts, _ := srv.provider.GetCfgOpts()
-	s3protocol, _ := cfgOpts.Config("S3Protocol")
+	cfgValue, _ = cfgOpts.Config("S3Protocol")
+	s3protocol := cfgValue.(string)
 
 	data := struct {
 		Container  string
