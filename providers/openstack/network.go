@@ -3,6 +3,7 @@ package openstack
 import (
 	"bytes"
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
@@ -45,14 +46,14 @@ type Subnet struct {
 
 func (client *Client) saveGateway(netID string, vmID string) error {
 	err := client.PutObject(api.NetworkContainerName, api.Object{
-		Name:    netID,
+		Name:    fmt.Sprintf("%s/gw", netID),
 		Content: strings.NewReader(vmID),
 	})
 	return err
 }
 
 func (client *Client) getGateway(netID string) (string, error) {
-	o, err := client.GetObject(api.NetworkContainerName, netID, nil)
+	o, err := client.GetObject(api.NetworkContainerName, fmt.Sprintf("%s/gw", netID), nil)
 	if err != nil {
 		return "", err
 	}
@@ -62,7 +63,7 @@ func (client *Client) getGateway(netID string) (string, error) {
 }
 
 func (client *Client) removeGateway(netID string) error {
-	return client.DeleteObject(api.NetworkContainerName, netID)
+	return client.DeleteObject(api.NetworkContainerName, fmt.Sprintf("%s/gw", netID))
 }
 
 //CreateNetwork creates a network named name
@@ -187,28 +188,56 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 		return nil, err
 	}
 
+	// netIDs contains all entries of each network
+	// we have to cut entries on the first '/'
+	// and remenber network already added to the list to return
 	var netList []api.Network
-
+	seen := map[string]string{}
 	for _, netID := range netIDs {
-		net, err := client.GetNetwork(netID)
+		id := netID[0:strings.Index(netID, "/")]
+		net, err := client.GetNetwork(id)
 		if err != nil {
-			return nil, providers.ResourceNotFoundError("Network", netID)
+			return nil, providers.ResourceNotFoundError("Network", id)
 		}
-		netList = append(netList, *net)
+		if _, alreadyAdded := seen[id]; !alreadyAdded {
+			netList = append(netList, *net)
+			seen[id] = id
+		}
 	}
 
 	return netList, nil
 }
 
 //DeleteNetwork deletes the network identified by id
-func (client *Client) DeleteNetwork(id string) error {
-	net, err := client.GetNetwork(id)
+func (client *Client) DeleteNetwork(networkID string) error {
+	net, err := client.GetNetwork(networkID)
 	if err != nil {
 		return fmt.Errorf("error deleting networks: %s", errorString(err))
 	}
 
+	// Look for VMs attached on this network
+	vmids, err := client.ListObjects(api.NetworkContainerName, api.ObjectFilter{
+		Prefix: fmt.Sprintf("%s/vm/", networkID),
+	})
+	if err != nil {
+		return err
+	}
+	if len(vmids) > 1 {
+		gw, err := client.readGateway(networkID)
+		if err != nil {
+			return fmt.Errorf("Error getting gateway: %s", errorString(err))
+		}
+		var ids []string
+		for _, id := range vmids {
+			if !strings.HasSuffix(id, gw.ID) {
+				ids = append(ids, path.Base(id))
+			}
+		}
+		return fmt.Errorf("Network '%s' has vms attached: %s", networkID, strings.Join(ids, " "))
+	}
+
 	client.DeleteGateway(net.ID)
-	sns, err := client.listSubnets(id)
+	sns, err := client.listSubnets(networkID)
 	if err != nil {
 		return fmt.Errorf("error deleting network: %s", errorString(err))
 	}
@@ -218,7 +247,7 @@ func (client *Client) DeleteNetwork(id string) error {
 			return fmt.Errorf("error deleting network: %s", errorString(err))
 		}
 	}
-	err = networks.Delete(client.Network, id).ExtractErr()
+	err = networks.Delete(client.Network, networkID).ExtractErr()
 	if err != nil {
 		return fmt.Errorf("Error deleting network: %s", errorString(err))
 	}
