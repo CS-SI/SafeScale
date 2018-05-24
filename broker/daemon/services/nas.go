@@ -109,19 +109,23 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 		return nil, fmt.Errorf("No VM found with name or id '%s'", nas.ServerID)
 	}
 
-	data := struct {
-		ExportedPath string
-	}{
-		ExportedPath: nas.Path,
+	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		return nil, err
 	}
-	err = exec("nfs_unexport_repository.sh", data, vm.ID, srv.provider)
+
+	server, err := nfs.NewServer(*sshConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	err = server.RemoveShare(nas.Path)
 	if err != nil {
 		return nil, err
 	}
 
 	err = srv.removeNASDefinition(*nas)
 	return nas, err
-
 }
 
 //List return the list of all created nas
