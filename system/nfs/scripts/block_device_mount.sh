@@ -8,10 +8,11 @@ mkfs -t {{.FileSystem}} "{{.Device}}"
 
 # Create mountpoint
 mkdir -p "{{.MountPoint}}"
-chmod a+rw "{{.MountPoint}}"
 
 # Configure fstab
 echo "{{.Device}} {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab
 
 # Mounts device
 mount -a
+
+chmod a+rxw "{{.MountPoint}}"

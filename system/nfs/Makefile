@@ -10,4 +10,3 @@ build: *.go scripts/* SecurityFlavor/*.go
 
 clean:
 	@$(RM) rice-box.go SecurityFlavor/enum_string.go
-

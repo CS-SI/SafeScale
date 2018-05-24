@@ -7,6 +7,7 @@ import (
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VolumeSpeed"
+	"github.com/SafeScale/system/nfs"
 )
 
 //VolumeAPI defines API to manipulate VMs
@@ -108,16 +109,18 @@ func (srv *VolumeService) Attach(volumename string, vmname string, path string, 
 	if path == api.DefaultVolumeMountPoint {
 		mountPoint = api.DefaultVolumeMountPoint + volume.Name
 	}
-	data := struct {
-		Device     string
-		Fsformat   string
-		MountPoint string
-	}{
-		Device:     volatt.Device,
-		Fsformat:   format,
-		MountPoint: mountPoint,
+
+	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		return err
 	}
-	err = exec("mount_block_device.sh", data, vm.ID, srv.provider)
+
+	server, err := nfs.NewServer(*sshConfig)
+	if err != nil {
+		return err
+	}
+	err = server.MountBlockDevice(volatt.Device, mountPoint)
+
 	if err != nil {
 		srv.Detach(volumename, vmname)
 		return err
