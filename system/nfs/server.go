@@ -59,9 +59,9 @@ func (s *Server) AddShare(path string, acl string) error {
 }
 
 //RemoveShare stops export of a local mount point by NFS on the remote server
-func (s *Server) RemoveShare(mountPoint string) error {
+func (s *Server) RemoveShare(path string) error {
 	data := map[string]interface{}{
-		"MountPoint": mountPoint,
+		"Path": path,
 	}
 	retcode, stdout, stderr, err := executeScript(s.SshConfig, "nfs_server_path_unexport.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
