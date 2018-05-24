@@ -40,11 +40,9 @@ func (s *Server) MountBlockDevice(device string, mountPoint string) error {
 }
 
 //UnmountBlockDevice unmounts a local block device on the remote system
-// If persistent is true, updates the system configuration to remove the automatic mount at boot
-func (s *Server) UnmountBlockDevice(device string, mountPoint string) error {
+func (s *Server) UnmountBlockDevice(device string) error {
 	data := map[string]interface{}{
-		"Device":     device,
-		"MountPoint": mountPoint,
+		"Device": device,
 	}
 	_, _, _, err := executeScript(s.SshConfig, "block_device_unmount.sh", data)
 	return err

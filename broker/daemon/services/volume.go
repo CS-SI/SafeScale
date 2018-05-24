@@ -148,16 +148,16 @@ func (srv *VolumeService) Detach(volumename string, vmname string) error {
 		return fmt.Errorf("Error getting volume attachment: %s", err)
 	}
 
-	// Use script to:
-	//  - umount volume
-	//  - remove mount directory
-	//  - update fstab (remove line with device)
-	data := struct {
-		Device string
-	}{
-		Device: volatt.Device,
+	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		return err
 	}
-	err = exec("umount_block_device.sh", data, vm.ID, srv.provider)
+
+	server, err := nfs.NewServer(*sshConfig)
+	if err != nil {
+		return err
+	}
+	err = server.UnmountBlockDevice(volatt.Device)
 	if err != nil {
 		return err
 	}
