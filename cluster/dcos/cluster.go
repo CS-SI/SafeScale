@@ -45,11 +45,11 @@ type ClusterDefinition struct {
 	//BootstrapID is the identifier of the VM acting as bootstrap/upgrade server
 	BootstrapID string
 
-	//MasterIDs is a slice of VMIDs of the master
-	MasterIDs []string
-
 	//BootstrapIP contains the IP of the bootstrap server reachable by all master and agents
 	BootstrapIP string
+
+	//MasterIDs is a slice of VMIDs of the master
+	MasterIDs []string
 
 	//masterIPs contains a list of IP of the master servers
 	MasterIPs []string
@@ -57,8 +57,14 @@ type ClusterDefinition struct {
 	//PublicAgentIDs is a slice of VMIDs of the public agents
 	PublicAgentIDs []string
 
+	//PublicAgentIPs contains a list of IP of the Public Agent nodes
+	PublicAgentIPs []string
+
 	//PrivateAgentIDs is a slice of VMIDs of the private agents
 	PrivateAgentIDs []string
+
+	//PrivateAvgentIPs contains a list of IP of the Private Agent Nodes
+	PrivateAgentIPs []string
 
 	//StateCollectInterval in seconds
 	StateCollectInterval time.Duration
@@ -296,8 +302,11 @@ func (c *Cluster) addAgentNode(req providerapi.VMRequest, nodeType NodeType.Enum
 	// Registers the new Agent in the cluster struct
 	if nodeType == NodeType.PublicAgent {
 		c.definition.PublicAgentIDs = append(c.definition.PublicAgentIDs, agentVM.ID)
+		c.definition.PublicAgentIPs = append(c.definition.PublicAgentIPs, agentVM.PrivateIPsV4[0])
+
 	} else {
 		c.definition.PrivateAgentIDs = append(c.definition.PrivateAgentIDs, agentVM.ID)
+		c.definition.PrivateAgentIPs = append(c.definition.PrivateAgentIPs, agentVM.PrivateIPsV4[0])
 	}
 
 	// Update cluster definition in Object Storage
@@ -327,21 +336,25 @@ func (c *Cluster) configure() error {
 
 	log.Printf("Configuring Bootstrap server")
 
+	prepareDockerImages, err := realizePrepareDockerImage()
+	if err != nil {
+		return fmt.Errorf("failed to build configuration script: %s", retcode, *output)
+	}
 	var dnsServers []string
 	cfg, err := svc.GetCfgOpts()
-	if err != nil {
-		value, ok := cfg.Config("DNSList")
-		if ok {
-			dnsServers = value.([]string)
-		}
+	if err == nil {
+		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
 	retcode, output, err := c.executeScript(bootstrapVM, "dcos_install_bootstrap_node.sh", map[string]interface{}{
-		"DCOSVersion":   dcosVersion,
-		"BootstrapIP":   c.definition.BootstrapIP,
-		"BootstrapPort": "80",
-		"ClusterName":   c.definition.Common.Name,
-		"MasterIPs":     c.definition.MasterIPs,
-		"DNSServerIPs":  dnsServers,
+		"DCOSVersion":         dcosVersion,
+		"BootstrapIP":         c.definition.BootstrapIP,
+		"BootstrapPort":       "80",
+		"ClusterName":         c.definition.Common.Name,
+		"MasterIPs":           c.definition.MasterIPs,
+		"DNSServerIPs":        dnsServers,
+		"SSHPrivateKey":       c.definition.Common.Keypair.PrivateKey,
+		"SSHPublicKey":        c.definition.Common.Keypair.PublicKey,
+		"PrepareDockerImages": prepareDockerImages,
 	})
 	if err != nil {
 		return err
@@ -369,6 +382,35 @@ func (c *Cluster) configure() error {
 	}
 
 	return nil
+}
+
+//realizePrepareDockerImage creates the string corresponding to script
+// used to prepare Docker images on Bootstrap server
+func realizePrepareDockerImage() (string, error) {
+	// find the rice.Box
+	b, err := getTemplateBox()
+	if err != nil {
+		return nil, err
+	}
+
+	// get file contents as string
+	tmplString, err := b.String("dcos_docker_prepare_images.sh")
+	if err != nil {
+		return fmt.Errorf("error loading script template: %s", err.Error())
+	}
+	// Parse the template
+	tmplPrepared, err := template.New("prepare_docker_images").Parse(tmplString)
+	if err != nil {
+		return fmt.Errorf("error parsing script template: %s", err.Error())
+	}
+	// realize the template
+	dataBuffer := bytes.NewBufferString("")
+	err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{})
+	if err != nil {
+		return nil, fmt.Errorf("error realizing script template: %s", err.Error())
+	}
+	result := dataBuffer.String()
+	return dataBuffer.String(), nil
 }
 
 //configureAgent installs and configure DCOS agent on targetVM
@@ -459,7 +501,6 @@ func (c *Cluster) executeScript(targetVM *providerapi.VM, script string, data ma
 	}
 
 	strOut := string(out)
-	fmt.Println(strOut)
 	return retcode, &strOut, nil
 }
 

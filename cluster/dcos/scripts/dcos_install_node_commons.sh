@@ -3,21 +3,28 @@
 export LANG=C
 
 (
+
     # Disable SELinux
     setenforce 0
     sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/sysconfig/selinux
 
-    # Create group nogroupq
+    # Disables firewall
+    systemctl stop firewalld
+    systemctl disable firewalld
+
+    # Upgrade to last CentOS revision
+    rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info
+    yum install -y python-backports-ssl_match_hostname
+    yum upgrade --assumeyes --tolerant
+    yum update --assumeyes
+
+    # Create group nogroup
     groupadd nogroup
 
     # Disables installation of docker-python from yum
     yum remove -y python-docker-py &>/dev/null
-    yum install -y yum-versionlock wget unzip ipset
+    yum install -y yum-versionlock tar xz curl wget unzip ipset pigz
     yum versionlock exclude python-docker-py
-
-    # Installs necessary update before EPEL
-    rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info
-    yum install -y python-backports-ssl_match_hostname
 
     # Installs PIP
     yum install -y epel-release
@@ -52,5 +59,15 @@ EOF
 
     # Enables admin user to use docker
     usermod -aG docker gpac
+
+    # Creates user cladm
+    useradd -s /bin/bash -m -d /home/cladm cladm
+    useradd -aG docker cladm
+    mkdir -p /home/cladm/.ssh && chmod 0700 /home/cladm/.ssh
+    echo >/home/cladm/.ssh/authorized_keys <<- EOF
+{{ .SSHPublicKey }}
+EOF
+    chmod 0600 /home/cladm/.ssh/authorized_keys && chown -R cladm:cladm /home/cladm
+
 ) >/dev/null
 ####

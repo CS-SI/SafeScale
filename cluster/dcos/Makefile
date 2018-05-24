@@ -1,13 +1,15 @@
+GO?=go
+
 all: generate
 
-.PHONY: clean mrproper
+.PHONY: generate clean mrproper
 
-generate: cluster.go scripts/*
+generate: cluster.go scripts/*.sh
 	@echo "Generating dependencies..."
-	@go generate
+	@$(GO) generate
 
 clean:
-	@(rm -f rice-box.go)
+	@($(RM) -f rice-box.go)
 
 mrproper: clean
 
