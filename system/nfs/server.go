@@ -4,21 +4,22 @@ import (
 	"github.com/SafeScale/system"
 )
 
+//Server server structure
 type Server struct {
 	SshConfig system.SSHConfig
 }
 
-//GetHost returns the hostname or IP address of the nfs.Server
-func (ns *Server) GetHost() string {
-	return ns.SshConfig.Host
-}
-
 //NewServer instanciates a new nfs.Server struct
-func (s *Server) NewServer(sshconfig system.SSHConfig) (*Server, error) {
-	server := NFSServer{
+func NewServer(sshconfig system.SSHConfig) (*Server, error) {
+	server := Server{
 		SshConfig: sshconfig,
 	}
 	return &server, nil
+}
+
+//GetHost returns the hostname or IP address of the nfs.Server
+func (s *Server) GetHost() string {
+	return s.SshConfig.Host
 }
 
 //Install installs and configure NFS server on the remote host
@@ -27,8 +28,7 @@ func (s *Server) Install() error {
 	return err
 }
 
-//MountBlockDevice mounts a local block device in the remote system
-// If persistent is true, updates the system configuration to survive a reboot
+//MountBlockDevice mounts a block device in the remote system
 func (s *Server) MountBlockDevice(device string, mountPoint string) error {
 	data := map[string]interface{}{
 		"Device":     device,
