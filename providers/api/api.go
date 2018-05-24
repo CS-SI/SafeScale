@@ -387,27 +387,78 @@ type ClientAPI interface {
 	GetCfgOpts() (Config, error)
 }
 
-// Config represents key/value configuration.
+//Config represents key/value configuration.
 type Config interface {
 	// Config gets a string configuration value and a
 	// bool indicating whether the value was present or not.
 	Config(name string) (interface{}, bool)
-	// Set sets the configuration name to specified value
+	//Get is an alias to Config()
+	Get(name string) (interface{}, bool)
+	//Set sets the configuration name to specified value
 	Set(name string, value interface{})
+	//GetString returns a string corresponding to the key, empty string if it doesn't exist
+	GetString(name string) string
+	//GetSliceOfStrings returns a slice of strings corresponding to the key, empty string slice if it doesn't exist
+	GetSliceOfStrings(name string) []string
+	//GetMapOfStrings returns a string map of strings correspondong to the key, empty map if it doesn't exist
+	GetMapOfStrings(name string) map[string]string
+	//GetInteger returns an integer corresponding to the key, 0 if it doesn't exist
+	GetInteger(name string) int
 }
 
-// ConfigMap is a map[string]string that implements
+//ConfigMap is a map[string]string that implements
 // the Config method.
 type ConfigMap map[string]interface{}
 
-// Config gets a string configuration value and a
+//Config gets a string configuration value and a
 // bool indicating whether the value was present or not.
 func (c ConfigMap) Config(name string) (interface{}, bool) {
 	val, ok := c[name]
 	return val, ok
 }
 
-// Set sets name configuration to value
+//Get is an alias to Config()
+func (c ConfigMap) Get(name string) (interface{}, bool) {
+	return c.Config(name)
+}
+
+//GetString returns a string corresponding to the key, empty string if it doesn't exist
+func (c ConfigMap) GetString(name string) string {
+	val, ok := c.Get(name)
+	if ok {
+		return val.(string)
+	}
+	return ""
+}
+
+//GetSliceOfStrings returns a string slice corresponding to the key, empty string slice if it doesn't exist
+func (c ConfigMap) GetSliceOfStrings(name string) []string {
+	val, ok := c.Get(name)
+	if ok {
+		return val.([]string)
+	}
+	return []string{}
+}
+
+//GetMapOfStrings returns a string map of strings correspondong to the key, empty map if it doesn't exist
+func (c ConfigMap) GetMapOfStrings(name string) map[string]string {
+	val, ok := c.Get(name)
+	if ok {
+		return val.(map[string]string)
+	}
+	return map[string]string{}
+}
+
+//GetInteger returns an integer corresponding to the key, 0 if it doesn't exist
+func (c ConfigMap) GetInteger(name string) int {
+	val, ok := c.Get(name)
+	if ok {
+		return val.(int)
+	}
+	return 0
+}
+
+//Set sets name configuration to value
 func (c ConfigMap) Set(name string, value interface{}) {
 	c[name] = value
 }
