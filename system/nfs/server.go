@@ -24,8 +24,8 @@ func (s *Server) GetHost() string {
 
 //Install installs and configure NFS server on the remote host
 func (s *Server) Install() error {
-	_, _, _, err := executeScript(s.SshConfig, "nfs_server_install.sh", map[string]interface{}{})
-	return err
+	retcode, stdout, stderr, err := executeScript(s.SshConfig, "nfs_server_install.sh", map[string]interface{}{})
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install nfs server")
 }
 
 //MountBlockDevice mounts a block device in the remote system
@@ -35,8 +35,8 @@ func (s *Server) MountBlockDevice(device string, mountPoint string) error {
 		"MountPoint": mountPoint,
 		"FileSystem": "ext4",
 	}
-	_, _, _, err := executeScript(s.SshConfig, "block_device_mount.sh", data)
-	return err
+	retcode, stdout, stderr, err := executeScript(s.SshConfig, "block_device_mount.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
 }
 
 //UnmountBlockDevice unmounts a local block device on the remote system
@@ -44,18 +44,18 @@ func (s *Server) UnmountBlockDevice(device string) error {
 	data := map[string]interface{}{
 		"Device": device,
 	}
-	_, _, _, err := executeScript(s.SshConfig, "block_device_unmount.sh", data)
-	return err
+	retcode, stdout, stderr, err := executeScript(s.SshConfig, "block_device_unmount.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount block device")
 }
 
-//Export configures a local mountpoint to be exported by NFS
-func (s *Server) AddShare(mountPoint string, acl string) error {
+//AddShare configures a local path to be exported by NFS
+func (s *Server) AddShare(path string, acl string) error {
 	data := map[string]interface{}{
-		"MountPoint":   mountPoint,
+		"Path":         path,
 		"AccessRights": acl,
 	}
-	_, _, _, err := executeScript(s.SshConfig, "nfs_server_path_export.sh", data)
-	return err
+	retcode, stdout, stderr, err := executeScript(s.SshConfig, "nfs_server_path_export.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }
 
 //RemoveShare stops export of a local mount point by NFS on the remote server
@@ -63,6 +63,6 @@ func (s *Server) RemoveShare(mountPoint string) error {
 	data := map[string]interface{}{
 		"MountPoint": mountPoint,
 	}
-	_, _, _, err := executeScript(s.SshConfig, "nfs_server_path_unexport.sh", data)
-	return err
+	retcode, stdout, stderr, err := executeScript(s.SshConfig, "nfs_server_path_unexport.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
 }

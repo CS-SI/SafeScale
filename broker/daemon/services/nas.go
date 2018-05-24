@@ -9,6 +9,7 @@ import (
 
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
+	"github.com/SafeScale/system/nfs"
 )
 
 //NasAPI defines API to manipulate NAS
@@ -55,23 +56,32 @@ func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 		return nil, err
 	}
 
-	vm, err := srv.vmService.Get(vmName)
-	if err != nil {
-		return nil, fmt.Errorf("No VM found with name or id '%s'", vmName)
-	}
-
 	// Sanitize path
 	exportedPath, err := sanitize(path)
 	if err != nil {
 		return nil, fmt.Errorf("Invalid path to be exposed: '%s' : '%s'", path, err)
 	}
 
-	data := struct {
-		ExportedPath string
-	}{
-		ExportedPath: exportedPath,
+	vm, err := srv.vmService.Get(vmName)
+	if err != nil {
+		return nil, fmt.Errorf("No VM found with name or id '%s'", vmName)
 	}
-	err = exec("create_nas.sh", data, vm.ID, srv.provider)
+
+	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	server, err := nfs.NewServer(*sshConfig)
+	if err != nil {
+		return nil, err
+	}
+	err = server.Install()
+	if err != nil {
+		return nil, err
+	}
+
+	err = server.AddShare(exportedPath, "")
 	if err != nil {
 		return nil, err
 	}

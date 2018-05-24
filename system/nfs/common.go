@@ -3,11 +3,11 @@ package nfs
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 	"os/exec"
 	"syscall"
+	"text/template"
 
-	rice "github.com/GeertJohan/go.rice"
+	"github.com/GeertJohan/go.rice"
 	"github.com/SafeScale/system"
 )
 
@@ -57,7 +57,6 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		return 255, "", "", fmt.Errorf("failed to execute template: %s", err.Error())
 	}
 	tmplResult := buffer.String()
-
 	sshCmd, err := sshconfig.SudoCommand(tmplResult)
 	if err != nil {
 		return 255, "", "", err
@@ -78,4 +77,14 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		}
 	}
 	return retcode, stdout, stderr, nil
+}
+
+func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("%s: %s", msg, stderr)
+	}
+	return nil
 }
