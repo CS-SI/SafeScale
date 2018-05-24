@@ -14,12 +14,13 @@ import (
 //go:generate rice embed-go
 
 //templateProvider is the instance of TemplateProvider used by package nfs
-var tmplBox *rice.box
+var tmplBox *rice.Box
 
 //getTemplateProvider returns the instance of TemplateProvider
 func getTemplateBox() (*rice.Box, error) {
 	if tmplBox == nil {
-		tmplBox, err := rice.FindBox("../nfs/scripts")
+		var err error
+		tmplBox, err = rice.FindBox("../nfs/scripts")
 		if err != nil {
 			return nil, err
 		}
@@ -42,7 +43,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	// get file content as string
 	tmplContent, err := tmplBox.String(name)
 	if err != nil {
-		return 255, "", nil, err
+		return 255, "", "", err
 	}
 
 	// Prepare the template for execution
@@ -57,7 +58,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	}
 	tmplResult := buffer.String()
 
-	sshCmd, err := sshconfig.Command(tmplResult)
+	sshCmd, err := sshconfig.SudoCommand(tmplResult)
 	if err != nil {
 		return 255, "", "", err
 	}
