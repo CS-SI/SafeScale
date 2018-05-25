@@ -6,10 +6,12 @@ import (
 	"github.com/SafeScale/system"
 )
 
+//Client defines the structure of a Client object
 type Client struct {
 	SshConfig *system.SSHConfig
 }
 
+//NewNFSClient creates a new NFS client isntance
 func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
 	if sshconfig == nil {
 		return nil, fmt.Errorf("invalid parameter: 'sshconfig' can't be nil")
@@ -21,32 +23,29 @@ func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
 	return client, nil
 }
 
-//install installs NFS client on remote host
+//Install installs NFS client on remote host
 func (c *Client) Install() error {
-	_, _, _, err := executeScript(*c.SshConfig, "nfs_client_install.sh", map[string]interface{}{})
-	return err
+	retcode, stdout, stderr, err := executeScript(*c.SshConfig, "nfs_client_install.sh", map[string]interface{}{})
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install NFS client")
 }
 
-//MountRemoteShare defines a mount of a remote share and mount it
+//Mount defines a mount of a remote share and mount it
 func (c *Client) Mount(host string, share string, mountPoint string) error {
 	data := map[string]interface{}{
 		"Host":       host,
 		"Share":      share,
 		"MountPoint": mountPoint,
 	}
-	_, _, _, err := executeScript(*c.SshConfig, "nfs_client_share_mount.sh", data)
-	return err
+	retcode, stdout, stderr, err := executeScript(*c.SshConfig, "nfs_client_share_mount.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount remote NFS share")
 }
 
-func (c *Client) Unmount(host string, share string, mountPoint string) error {
+//Unmount a nfs share from NFS server
+func (c *Client) Unmount(host string, share string) error {
 	data := map[string]interface{}{
-		"Host":       host,
-		"Share":      share,
-		"MountPoint": mountPoint,
+		"Host":  host,
+		"Share": share,
 	}
-	_, _, _, err := executeScript(*c.SshConfig, "nfs_client_share_unmount.sh", data)
-	if err != nil {
-		return err
-	}
-	return nil
+	retcode, stdout, stderr, err := executeScript(*c.SshConfig, "nfs_client_share_unmount.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount remote NFS share")
 }

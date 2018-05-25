@@ -119,6 +119,6 @@ func (s *Share) Add() error {
 		"MountPoint":   s.Path,
 		"AccessRights": strings.TrimSpace(acls),
 	}
-	_, _, _, err := executeScript(s.Server.SshConfig, "nfs_server_path_export.sh", data)
-	return err
+	retcode, stdout, stderr, err := executeScript(*s.Server.SshConfig, "nfs_server_path_export.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }

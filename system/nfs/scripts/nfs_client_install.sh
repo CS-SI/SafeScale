@@ -4,10 +4,8 @@
 
 {{.CommonTools}}
 
-OS_FLAVOR=$(cat /etc/os-release)
-
 echo "Install NFS client"
-case $OS_FLAVOR in
+case $LINUX_KIND in
     debian|ubuntu)
         export DEBIAN_FRONTEND=noninteractive
         touch /var/log/lastlog
@@ -23,7 +21,7 @@ case $OS_FLAVOR in
         ;;
 
     *)
-        echo "Unsupported OS flavor '$OS_FLAVOR'!"
+        echo "Unsupported OS flavor '$LINUX_KIND'!"
         exit 1
 esac
 
