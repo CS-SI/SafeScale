@@ -115,7 +115,7 @@ func (srv *VolumeService) Attach(volumename string, vmname string, path string, 
 		return err
 	}
 
-	server, err := nfs.NewServer(*sshConfig)
+	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (srv *VolumeService) Detach(volumename string, vmname string) error {
 		return err
 	}
 
-	server, err := nfs.NewServer(*sshConfig)
+	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
 		return err
 	}

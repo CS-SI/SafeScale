@@ -4,6 +4,5 @@
 #
 # Unconfigures and unmounts a remote access to a NFS share
 
-umount -fl {{.MountPoint}}
-grep -v "^{{.Host}}:{{.Share}} " /etc/fstab >/etc/fstab.new
-mv /etc/fstab.new /etc/fstab
+umount -fl {{.Host}}:{{.Share}}
+sed -i '\#^{{.Host}}:{{.Share}}#d' /etc/fstab
