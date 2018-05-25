@@ -15,6 +15,8 @@ import (
 	clusterapi "github.com/SafeScale/perform/cluster/api"
 	"github.com/SafeScale/perform/cluster/api/ClusterState"
 	"github.com/SafeScale/perform/cluster/api/NodeType"
+	"github.com/SafeScale/perform/cluster/components"
+
 	"github.com/SafeScale/providers"
 
 	providerapi "github.com/SafeScale/providers/api"
@@ -387,12 +389,21 @@ func (c *Cluster) configure() error {
 //realizePrepareDockerImages creates the string corresponding to script
 // used to prepare Docker images on Bootstrap server
 func realizePrepareDockerImages() (string, error) {
+	// Get code to build and export needed docker images
+	realizedPrepareImageGuacamole, err := components.RealizeBuildScript("guacamole", map[string]interface{}{})
+	if err != nil {
+		return "", nil
+	}
+	realizedPrepareImageProxy, err := components.RealizeBuildScript("proxy", map[string]interface{}{})
+	if err != nil {
+		return "", nil
+	}
+
 	// find the rice.Box
 	b, err := getTemplateBox()
 	if err != nil {
 		return "", err
 	}
-
 	// get file contents as string
 	tmplString, err := b.String("dcos_docker_prepare_images.sh")
 	if err != nil {
@@ -405,7 +416,10 @@ func realizePrepareDockerImages() (string, error) {
 	}
 	// realize the template
 	dataBuffer := bytes.NewBufferString("")
-	err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{})
+	err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
+		"PrepareImageGuacamole": realizedPrepareImageGuacamole,
+		"PrepareImageProxy":     realizedPrepareImageProxy,
+	})
 	if err != nil {
 		return "", fmt.Errorf("error realizing script template: %s", err.Error())
 	}
