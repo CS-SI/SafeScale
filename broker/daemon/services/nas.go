@@ -72,7 +72,7 @@ func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 		return nil, err
 	}
 
-	server, err := nfs.NewServer(*sshConfig)
+	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 		return nil, err
 	}
 
-	server, err := nfs.NewServer(*sshConfig)
+	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +156,12 @@ func (srv *NasService) List() ([]api.Nas, error) {
 
 //Mount a directory exported by a nas on a local directory of a vm
 func (srv *NasService) Mount(name, vmName, path string) (*api.Nas, error) {
+	// Sanitize path
+	mountPath, err := sanitize(path)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid path to be mounted: '%s' : '%s'", path, err)
+	}
+
 	nas, err := srv.findNas(name)
 	if err != nil {
 		return nil, err
@@ -171,22 +177,22 @@ func (srv *NasService) Mount(name, vmName, path string) (*api.Nas, error) {
 		return nil, providers.ResourceNotFoundError("VM", nas.ServerID)
 	}
 
-	// Sanitize path
-	mountPath, err := sanitize(path)
+	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid path to be mounted: '%s' : '%s'", path, err)
+		return nil, err
 	}
 
-	data := struct {
-		NFSServer    string
-		ExportedPath string
-		MountPath    string
-	}{
-		NFSServer:    nfsServer.GetAccessIP(),
-		ExportedPath: nas.Path,
-		MountPath:    mountPath,
+	nsfclient, err := nfs.NewNFSClient(sshConfig)
+	if err != nil {
+		return nil, err
 	}
-	err = exec("mount_nfs_directory.sh", data, vm.ID, srv.provider)
+
+	err = nsfclient.Install()
+	if err != nil {
+		return nil, err
+	}
+
+	err = nsfclient.Mount(nfsServer.GetAccessIP(), nas.Path, mountPath)
 	if err != nil {
 		return nil, err
 	}
@@ -218,14 +224,17 @@ func (srv *NasService) UMount(name, vmName string) (*api.Nas, error) {
 		return nil, providers.ResourceNotFoundError("VM", nas.ServerID)
 	}
 
-	data := struct {
-		NFSServer    string
-		ExportedPath string
-	}{
-		NFSServer:    nfsServer.GetAccessIP(),
-		ExportedPath: nas.Path,
+	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		return nil, err
 	}
-	err = exec("umount_nfs_directory.sh", data, vm.ID, srv.provider)
+
+	nsfclient, err := nfs.NewNFSClient(sshConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nsfclient.Unmount(nfsServer.GetAccessIP(), nas.Path)
 	if err != nil {
 		return nil, err
 	}
