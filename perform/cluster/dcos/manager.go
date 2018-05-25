@@ -9,10 +9,10 @@ import (
 	"github.com/SafeScale/providers"
 	providerapi "github.com/SafeScale/providers/api"
 
-	clusterapi "github.com/SafeScale/cluster/api"
-	"github.com/SafeScale/cluster/api/ClusterState"
-	"github.com/SafeScale/cluster/api/Complexity"
-	"github.com/SafeScale/cluster/api/NodeType"
+	clusterapi "github.com/SafeScale/perform/cluster/api"
+	"github.com/SafeScale/perform/cluster/api/ClusterState"
+	"github.com/SafeScale/perform/cluster/api/Complexity"
+	"github.com/SafeScale/perform/cluster/api/NodeType"
 )
 
 //Manager is the implementation for DCOS

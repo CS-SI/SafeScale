@@ -5,37 +5,28 @@ import (
 	"log"
 	"runtime"
 
-	"github.com/SafeScale/cluster"
-	clusterapi "github.com/SafeScale/cluster/api"
-	"github.com/SafeScale/cluster/api/Complexity"
-	"github.com/SafeScale/cluster/api/Flavor"
-	"github.com/SafeScale/cluster/api/NodeType"
+	"github.com/SafeScale/perform/cluster"
+	clusterapi "github.com/SafeScale/perform/cluster/api"
+	"github.com/SafeScale/perform/cluster/api/Complexity"
+	"github.com/SafeScale/perform/cluster/api/Flavor"
+	"github.com/SafeScale/perform/cluster/api/NodeType"
 
-	"github.com/SafeScale/providers"
 	providerapi "github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/flexibleengine"
 )
 
 //Run runs the deployment
 func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	providers.Register("flexibleengine", &flexibleengine.Client{})
-	serviceName := "TestFlexibleEngine"
-	service, err := providers.GetService(serviceName)
-	if err != nil {
-		fmt.Printf("failed to load service '%s'.\n", serviceName)
-		return
-	}
 
 	cf := cluster.NewFactory()
-	cm, err := cf.GetManager(Flavor.DCOS, serviceName, service)
+	tenant := "TestFlexibleEngine"
+	cm, err := cf.GetManager(tenant)
 	if err != nil {
-		fmt.Println("Failed to instanciate Cluster Manager.")
+		fmt.Printf("Failed to instanciate Cluster Manager for tenant '%s'.\n", tenant)
 		return
 	}
 
 	clusterName := "test-cluster"
-
 	cluster, err := cm.GetCluster(clusterName)
 	if err != nil {
 		fmt.Printf("Failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
@@ -44,11 +35,12 @@ func Run() {
 	if cluster == nil {
 		log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
 		cluster, err = cm.CreateCluster(clusterapi.ClusterRequest{
-			Name: clusterName,
-			//Complexity: Complexity.Dev,
+			Name:       clusterName,
+			Complexity: Complexity.Dev,
 			//Complexity: Complexity.Normal,
-			Complexity: Complexity.Volume,
-			CIDR:       "192.168.0.0/28",
+			//Complexity: Complexity.Volume,
+			CIDR:   "192.168.0.0/28",
+			Flavor: Flavor.DCOS,
 		})
 		if err != nil {
 			fmt.Printf("Failed to create cluster: %s\n", err.Error())
@@ -66,6 +58,7 @@ func Run() {
 	fmt.Printf("Cluster state: %s\n", state.String())
 
 	// Figures out the best template for Agent nodes
+	service := cm.GetService()
 	tmplAgentNode, err := service.SelectTemplatesBySize(providerapi.SizingRequirements{
 		MinCores:    2,
 		MinRAMSize:  8,

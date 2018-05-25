@@ -1,8 +1,8 @@
 GO?=go
 
-.PHONY: clean providers brokerd broker system cluster clean deps
+.PHONY: clean providers brokerd broker system perform clean deps
 
-all: providers broker system
+all: providers broker system perform
 
 providers:
 	@(cd providers && $(MAKE))
@@ -13,8 +13,8 @@ broker:
 system:
 	@(cd system && $(MAKE))
 
-cluster:
-	@(cd cluster && $(MAKE))
+perform:
+	@(cd perform && $(MAKE))
 
 clean:
 	@(cd providers && $(MAKE) $@)

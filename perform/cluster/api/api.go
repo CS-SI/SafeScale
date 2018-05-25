@@ -5,17 +5,17 @@ import (
 	providerapi "github.com/SafeScale/providers/api"
 	"github.com/SafeScale/providers/api/VMState"
 
-	"github.com/SafeScale/cluster/api/ClusterState"
-	"github.com/SafeScale/cluster/api/Complexity"
-	"github.com/SafeScale/cluster/api/Flavor"
-	"github.com/SafeScale/cluster/api/NodeType"
+	"github.com/SafeScale/perform/cluster/api/ClusterState"
+	"github.com/SafeScale/perform/cluster/api/Complexity"
+	"github.com/SafeScale/perform/cluster/api/Flavor"
+	"github.com/SafeScale/perform/cluster/api/NodeType"
 )
 
 const (
-	//ClusterContainerName contains the name of the Object Storage container where to put Cluster definitions
+	//DeployContainerName contains the name of the Object Storage container where to put Cluster definitions
 	DeployContainerName = "0.deploy"
 
-	// Prefix to use to complete pathes of cluster definitions
+	//ClusterContainerNamePrefix is the prefix to use to complete pathes of cluster definitions
 	ClusterContainerNamePrefix = "0.clusters/"
 )
 
@@ -49,6 +49,9 @@ type ClusterRequest struct {
 
 	//Mode is the implementation wanted, can be Simple, HighAvailability or HighVolume
 	Complexity Complexity.Enum
+
+	//Flavor tells what kind of cluster to create
+	Flavor Flavor.Enum
 }
 
 //ClusterAPI is an interface of methods associated to Cluster-like structs
@@ -68,6 +71,8 @@ type ClusterAPI interface {
 	//getNode returns a node based on its ID
 	GetNode(string) (*Node, error)
 
+	//GetDefinition
+	GetDefinition() Cluster
 	//SaveClusterDefinition
 	SaveDefinition() error
 	//ReadClusterDefinition
@@ -80,31 +85,26 @@ type ClusterAPI interface {
 type Cluster struct {
 	//Name is the name of the cluster
 	Name string
-
 	//CIDR is the network CIDR wanted for the Network
 	CIDR string
-
+	//Flavor tells what kind of cluster it is
+	Flavor Flavor.Enum
 	//Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
 	Complexity Complexity.Enum
-
 	//Keypair contains the key-pair used inside the Cluster
 	Keypair *providerapi.KeyPair
-
 	//State
 	State ClusterState.Enum
 }
 
 //ClusterManager contains the bare minimum of information about a cluster manager
-// A Manager is able to handle many clusters on the same tenant and of the same flavor.
+// A Manager is able to handle many clusters on the same tenant.
 type ClusterManager struct {
-	//Service is the provider service used to managed infrastructure
+	//Service is the service corresponding to the tenant
 	Service *providers.Service
 
 	//Tenant where is hosted the infrastructure of the cluster
 	Tenant string
-
-	//Flavor is the name of the cluster method (currently can be only DCOS)
-	Flavor Flavor.Enum
 }
 
 //ClusterManagerAPI is an interface of methods associated to Manager-like structs

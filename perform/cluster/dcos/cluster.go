@@ -12,9 +12,9 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
-	clusterapi "github.com/SafeScale/cluster/api"
-	"github.com/SafeScale/cluster/api/ClusterState"
-	"github.com/SafeScale/cluster/api/NodeType"
+	clusterapi "github.com/SafeScale/perform/cluster/api"
+	"github.com/SafeScale/perform/cluster/api/ClusterState"
+	"github.com/SafeScale/perform/cluster/api/NodeType"
 	"github.com/SafeScale/providers"
 
 	providerapi "github.com/SafeScale/providers/api"
@@ -521,6 +521,11 @@ func (c *Cluster) ListNodes() (*[]clusterapi.Node, error) {
 //GetNode returns a node based on its ID
 func (*Cluster) GetNode(ID string) (*clusterapi.Node, error) {
 	return nil, fmt.Errorf("ListNodes not yet implemented")
+}
+
+//GetDefinition returns the public properties of the cluster
+func (c *Cluster) GetDefinition() clusterapi.Cluster {
+	return c.definition.Common
 }
 
 //SaveDefinition writes cluster definition in Object Storage
