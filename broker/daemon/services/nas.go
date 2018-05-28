@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log"
 	"path"
+	"strings"
 
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
+	"github.com/SafeScale/system/nfs"
 )
 
 //NasAPI defines API to manipulate NAS
@@ -55,23 +57,32 @@ func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 		return nil, err
 	}
 
-	vm, err := srv.vmService.Get(vmName)
-	if err != nil {
-		return nil, fmt.Errorf("No VM found with name or id '%s'", vmName)
-	}
-
 	// Sanitize path
 	exportedPath, err := sanitize(path)
 	if err != nil {
 		return nil, fmt.Errorf("Invalid path to be exposed: '%s' : '%s'", path, err)
 	}
 
-	data := struct {
-		ExportedPath string
-	}{
-		ExportedPath: exportedPath,
+	vm, err := srv.vmService.Get(vmName)
+	if err != nil {
+		return nil, fmt.Errorf("No VM found with name or id '%s'", vmName)
 	}
-	err = exec("create_nas.sh", data, vm.ID, srv.provider)
+
+	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	server, err := nfs.NewServer(sshConfig)
+	if err != nil {
+		return nil, err
+	}
+	err = server.Install()
+	if err != nil {
+		return nil, err
+	}
+
+	err = server.AddShare(exportedPath, "")
 	if err != nil {
 		return nil, err
 	}
@@ -88,30 +99,49 @@ func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 
 //Delete a container
 func (srv *NasService) Delete(name string) (*api.Nas, error) {
-	// TODO umount all clients
-	nas, err := srv.findNas(name)
+	// Retrieve info about the nas
+	nass, err := srv.Inspect(name)
 	if err != nil {
+		return nil, err
+	}
+
+	if len(nass) == 0 {
 		return nil, providers.ResourceNotFoundError("Nas", name)
 	}
+	if len(nass) > 1 {
+		var vms []string
+		for _, nas := range nass {
+			if !nas.IsServer {
+				vms = append(vms, nas.ServerID)
+			}
+		}
+		return nil, fmt.Errorf("Cannot delete nas '%s' because it is mounted on VMs : %s", name, strings.Join(vms, " "))
+	}
+
+	nas := nass[0]
 
 	vm, err := srv.vmService.Get(nas.ServerID)
 	if err != nil {
 		return nil, fmt.Errorf("No VM found with name or id '%s'", nas.ServerID)
 	}
 
-	data := struct {
-		ExportedPath string
-	}{
-		ExportedPath: nas.Path,
-	}
-	err = exec("nfs_unexport_repository.sh", data, vm.ID, srv.provider)
+	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	err = srv.removeNASDefinition(*nas)
-	return nas, err
+	server, err := nfs.NewServer(sshConfig)
+	if err != nil {
+		return nil, err
+	}
 
+	err = server.RemoveShare(nas.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	err = srv.removeNASDefinition(nas)
+	return &nas, err
 }
 
 //List return the list of all created nas
@@ -142,6 +172,12 @@ func (srv *NasService) List() ([]api.Nas, error) {
 
 //Mount a directory exported by a nas on a local directory of a vm
 func (srv *NasService) Mount(name, vmName, path string) (*api.Nas, error) {
+	// Sanitize path
+	mountPath, err := sanitize(path)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid path to be mounted: '%s' : '%s'", path, err)
+	}
+
 	nas, err := srv.findNas(name)
 	if err != nil {
 		return nil, err
@@ -157,22 +193,22 @@ func (srv *NasService) Mount(name, vmName, path string) (*api.Nas, error) {
 		return nil, providers.ResourceNotFoundError("VM", nas.ServerID)
 	}
 
-	// Sanitize path
-	mountPath, err := sanitize(path)
+	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid path to be mounted: '%s' : '%s'", path, err)
+		return nil, err
 	}
 
-	data := struct {
-		NFSServer    string
-		ExportedPath string
-		MountPath    string
-	}{
-		NFSServer:    nfsServer.GetAccessIP(),
-		ExportedPath: nas.Path,
-		MountPath:    mountPath,
+	nsfclient, err := nfs.NewNFSClient(sshConfig)
+	if err != nil {
+		return nil, err
 	}
-	err = exec("mount_nfs_directory.sh", data, vm.ID, srv.provider)
+
+	err = nsfclient.Install()
+	if err != nil {
+		return nil, err
+	}
+
+	err = nsfclient.Mount(nfsServer.GetAccessIP(), nas.Path, mountPath)
 	if err != nil {
 		return nil, err
 	}
@@ -204,14 +240,17 @@ func (srv *NasService) UMount(name, vmName string) (*api.Nas, error) {
 		return nil, providers.ResourceNotFoundError("VM", nas.ServerID)
 	}
 
-	data := struct {
-		NFSServer    string
-		ExportedPath string
-	}{
-		NFSServer:    nfsServer.GetAccessIP(),
-		ExportedPath: nas.Path,
+	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	if err != nil {
+		return nil, err
 	}
-	err = exec("umount_nfs_directory.sh", data, vm.ID, srv.provider)
+
+	nsfclient, err := nfs.NewNFSClient(sshConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	err = nsfclient.Unmount(nfsServer.GetAccessIP(), nas.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -244,6 +283,7 @@ func (srv *NasService) Inspect(name string) ([]api.Nas, error) {
 			return nil, providers.ResourceNotFoundError("Nas", name)
 		}
 		if nas.IsServer {
+			// NAS server is inserted at the 1st place in the list
 			nass = append([]api.Nas{*nas}, nass...)
 		} else {
 			nass = append(nass, *nas)

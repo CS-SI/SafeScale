@@ -5,12 +5,12 @@
 # Configures the NFS export of a local path
 
 # Determines the FSID value to use
-FSIDs=$(cat exports | sed -r 's/ /\n/g' | grep fsid= | sed -r 's/.+fsid=([[:alnum:]]+),.*/\1/g' | uniq | sort -n)
-LAST_FSID=$(echo $FSIDs | tail -n 1)
-if [ -z $LAST_FSID ]; then
+FSIDs=$(cat /etc/exports | sed -r 's/ /\n/g' | grep fsid= | sed -r 's/.+fsid=([[:alnum:]]+),.*/\1/g' | uniq | sort -n)
+LAST_FSID=$(echo "$FSIDs" | tail -n 1)
+if [ -z "$LAST_FSID" ]; then
     FSID=1
 else
-    FSID=$(( $LAST_FSID +1 ))
+    FSID=$((LAST_FSID + 1))
 fi
 
 # Adapts ACL
@@ -18,7 +18,7 @@ ACCESS_RIGHTS="{{.AccessRights}}"
 FILTERED_ACCESS_RIGHTS=
 if [ -z "$ACCESS_RIGHTS" ]; then
     # No access rights, using default ones
-    FILTERED_ACCESS_RIGHTS="*(rw,fsid=$FSID,sync,no_root_squash)"
+    FILTERED_ACCESS_RIGHTS="*(rw,fsid=$FSID,sync,no_root_squash,no_subtree_check)"
 else
     # Wants to ensure FSID is valid otherwise updates it
     ACL=$(echo $ACCESS_RIGHTS | sed -r 's/\((.*)\)')
@@ -35,14 +35,17 @@ else
         done
         if [ -z $FILTERED_ACCESS_RIGHTS ]; then
             # No updated access rights, with something between parenthesis, adding fsid= directive
-            FILTERED_ACCESS_RIGHTS=(echo $ACCESS_RIGHTS | sed -r 's/\)/,fsid=$FSID\)/g')
+            FILTERED_ACCESS_RIGHTS=$(echo $ACCESS_RIGHTS | sed -r 's/\)/,fsid=$FSID\)/g')
         fi
     else
         # No updated access rights without anything between parenthesis, adding fsid= directive
-        FILTERED_ACCESS_RIGHTS=(echo $ACCESS_RIGHTS | sed -r 's/\)/fsid=$FSID/g')
+        FILTERED_ACCESS_RIGHTS=$(echo $ACCESS_RIGHTS | sed -r 's/\)/fsid=$FSID/g')
     fi
 fi
 #VPL: cas non traité : rien entre parenthèse...
+
+# Create exported dir if necessary"
+mkdir -p {{.Path}}
 
 # Configures export
 echo "{{.Path}} $FILTERED_ACCESS_RIGHTS" >>/etc/exports

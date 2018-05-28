@@ -4,11 +4,11 @@
 # Unmount a block device and removes the corresponding entry from /etc/fstab
 
 # Unmounts filesystem
-umount -l -f "{{.MountPoint}}"
+umount -l -f "{{.Device}}"
 
 # Removes entry from fstab
-grep -v "^{{.Device}} {{.MountPoint}}" /etc/fstab >/etc/fstab.new
-mv /etc/fstab.new /etc/fstab
+sed -i '\#^{{.Device}}#d' /etc/fstab
 
 # Removes mount point
-rmdir -f "{{.MountPoint}}"
+# Mount point directory is not deleted as it might contain data
+# rmdir -f "{{.MountPoint}}"

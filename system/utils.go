@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"text/template"
 
-	rice "github.com/GeertJohan/go.rice"
+	"github.com/GeertJohan/go.rice"
 )
 
 //go:generate rice embed-go
@@ -25,7 +25,6 @@ func RealizeCommonTools() (string, error) {
 		if err != nil {
 			return "", err
 		}
-
 		// Prepare the template for execution
 		tmplPrepared, err := template.New("common_tools").Parse(tmplContent)
 		if err != nil {

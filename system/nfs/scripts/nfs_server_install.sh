@@ -25,7 +25,7 @@ case $LINUX_KIND in
         ;;
 
     *)
-        echo "Unsupported operating system '$OS_FLAVOR'"
+        echo "Unsupported operating system '$LINUX_KIND'"
         exit 1
         ;;
 esac

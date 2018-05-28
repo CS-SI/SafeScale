@@ -76,15 +76,21 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 	}
 
 	authOpts, _ := srv.provider.GetAuthOpts()
-	authurl, _ := authOpts.Config("AuthUrl")
+	authurlCfg, _ := authOpts.Config("AuthUrl")
+	authurl := authurlCfg.(string)
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
-	tenant, _ := authOpts.Config("TenantName")
-	login, _ := authOpts.Config("Login")
-	password, _ := authOpts.Config("Password")
-	region, _ := authOpts.Config("Region")
+	tenantCfg, _ := authOpts.Config("TenantName")
+	tenant := tenantCfg.(string)
+	loginCfg, _ := authOpts.Config("Login")
+	login := loginCfg.(string)
+	passwordCfg, _ := authOpts.Config("Password")
+	password := passwordCfg.(string)
+	regionCfg, _ := authOpts.Config("Region")
+	region := regionCfg.(string)
 
 	cfgOpts, _ := srv.provider.GetCfgOpts()
-	s3protocol, _ := cfgOpts.Config("S3Protocol")
+	objStorageProtocolCfg, _ := cfgOpts.Config("S3Protocol")
+	objStorageProtocol := objStorageProtocolCfg.(string)
 
 	data := struct {
 		Container  string
@@ -103,7 +109,7 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 		AuthURL:    authurl,
 		Region:     region,
 		MountPoint: mountPoint,
-		S3Protocol: s3protocol,
+		S3Protocol: objStorageProtocol,
 	}
 
 	return exec("mount_object_storage.sh", data, vm.ID, srv.provider)

@@ -3,6 +3,7 @@ package nfs
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/SafeScale/system/nfs/SecurityFlavor"
@@ -30,14 +31,14 @@ type ExportAcl struct {
 	Options ExportOptions
 }
 
-//NFSShare details the parameter of a NFS share
+//Share details the parameter of a NFS share
 type Share struct {
 	Server *Server
 	Path   string
 	ACLs   []ExportAcl
 }
 
-//NewNFSShare creates a share struct corresponding to the export of path on server
+//NewShare creates a share struct corresponding to the export of path on server
 func NewShare(server Server, path string) (*Share, error) {
 	if path == "" {
 		return nil, fmt.Errorf("invalid parameter: 'path' can't be empty")
@@ -105,31 +106,19 @@ func (s *Share) Add() error {
 			acl += ",subtree_check"
 		}
 		if a.Options.AnonUID > 0 {
-			acl += ",anonuid=" + a.Options.AnonUID
+			acl += ",anonuid=" + strconv.Itoa(a.Options.AnonUID)
 		}
 		if a.Options.AnonGID > 0 {
-			acl += ",anongid=" + a.Options.AnonGID
+			acl += ",anongid=" + strconv.Itoa(a.Options.AnonGID)
 		}
 		acl += ")"
 
 		acls += acl + " "
 	}
 	data := map[string]interface{}{
-		MountPoint:   s.Path,
-		AccessRights: strings.TrimSpace(acls),
+		"MountPoint":   s.Path,
+		"AccessRights": strings.TrimSpace(acls),
 	}
-	_, _, _, err = executeScript("nfs_server_path_export.sh", data)
-}
-
-//RemoveShare stops export of a local mount point by NFS on the remote server
-func (s *Server) RemoveShare(mountPoint string) error {
-	data := map[string]interface{}{
-		MountPoint: mountPoint,
-	}
-	_, _, _, err = executeScript("nfs_server_path_unexport.sh", data)
-}
-
-//Remove unexports and unconfigures the share
-func (s *Share) Remove() error {
-
+	retcode, stdout, stderr, err := executeScript(*s.Server.SshConfig, "nfs_server_path_export.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }
