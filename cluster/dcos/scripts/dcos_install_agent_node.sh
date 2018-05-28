@@ -1,10 +1,3 @@
-<<<<<<< HEAD
-#!/usr/bin/env bash
-#
-# Installs and configure a DCOS agent node
-# This script must be executed on agent node.
-|||||||
-=======
 #!/usr/bin/env bash
 #
 # Installs and configure a DCOS agent node
@@ -25,4 +18,3 @@ sudo bash dcos_install.sh $MODE
 
 #rm -rf /tmp/docs
 exit 0
->>>>>>> dcos
