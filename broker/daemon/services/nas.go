@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"path"
+	"strings"
 
 	"github.com/SafeScale/providers"
 	"github.com/SafeScale/providers/api"
@@ -98,11 +99,26 @@ func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 
 //Delete a container
 func (srv *NasService) Delete(name string) (*api.Nas, error) {
-	// TODO umount all clients
-	nas, err := srv.findNas(name)
+	// Retrieve info about the nas
+	nass, err := srv.Inspect(name)
 	if err != nil {
+		return nil, err
+	}
+
+	if len(nass) == 0 {
 		return nil, providers.ResourceNotFoundError("Nas", name)
 	}
+	if len(nass) > 1 {
+		var vms []string
+		for _, nas := range nass {
+			if !nas.IsServer {
+				vms = append(vms, nas.ServerID)
+			}
+		}
+		return nil, fmt.Errorf("Cannot delete nas '%s' because it is mounted on VMs : %s", name, strings.Join(vms, " "))
+	}
+
+	nas := nass[0]
 
 	vm, err := srv.vmService.Get(nas.ServerID)
 	if err != nil {
@@ -124,8 +140,8 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 		return nil, err
 	}
 
-	err = srv.removeNASDefinition(*nas)
-	return nas, err
+	err = srv.removeNASDefinition(nas)
+	return &nas, err
 }
 
 //List return the list of all created nas
@@ -267,6 +283,7 @@ func (srv *NasService) Inspect(name string) ([]api.Nas, error) {
 			return nil, providers.ResourceNotFoundError("Nas", name)
 		}
 		if nas.IsServer {
+			// NAS server is inserted at the 1st place in the list
 			nass = append([]api.Nas{*nas}, nass...)
 		} else {
 			nass = append(nass, *nas)
