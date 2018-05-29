@@ -1,4 +1,5 @@
 package tests
+
 /*
 * Copyright 2015-2018, CS Systemes d'Information, http://www.c-s.fr
 *
@@ -13,7 +14,7 @@ package tests
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-*/
+ */
 
 import (
 	"bytes"
@@ -28,12 +29,10 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
-	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
-	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenants
-	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenants
 	"github.com/stretchr/testify/assert"
 )
 

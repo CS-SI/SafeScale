@@ -1,4 +1,5 @@
 package main
+
 /*
 * Copyright 2015-2018, CS Systemes d'Information, http://www.c-s.fr
 *
@@ -13,7 +14,7 @@ package main
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-*/
+ */
 
 import (
 	"encoding/json"
@@ -28,13 +29,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 
-	"github.com/CS-SI/SafeScale/providers/api"
-
-	"github.com/CS-SI/SafeScale/providers/api"
-
 	"github.com/CS-SI/SafeScale/providers"
-	_ "github.com/CS-SI/SafeScale/providers/cloudwatt" // Imported to initialise tenants
-	_ "github.com/CS-SI/SafeScale/providers/ovh"       // Imported to initialise tenants
+	"github.com/CS-SI/SafeScale/providers/api"
+
+	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
 )
 
 const cmdNumberOfCPU string = "lscpu | grep 'CPU(s):' | grep -v 'NUMA' | tr -d '[:space:]' | cut -d: -f2"
@@ -298,9 +296,13 @@ func scanService(tenant string, service *providers.Service, c chan error) {
 func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	channels := []chan error{}
-	for name, service := range providers.Services() {
+	for tenantname, _ := range providers.Tenants() {
+		service, err := providers.GetService(tenantname)
+		if err != nil {
+			fmt.Printf("Unable to get service for tenant '%s': ", tenantname, err.Error())
+		}
 		c := make(chan error)
-		go scanService(name, service, c)
+		go scanService(tenantname, service, c)
 		channels = append(channels, c)
 	}
 	for _, c := range channels {

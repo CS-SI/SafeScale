@@ -1,4 +1,5 @@
 package api
+
 /*
 * Copyright 2015-2018, CS Systemes d'Information, http://www.c-s.fr
 *
@@ -13,19 +14,20 @@ package api
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-*/
+ */
 
 import (
 	"fmt"
 	"io"
 	"time"
 
-	"github.com/CS-SI/SafeScale/system"
+	// "github.com/CS-SI/SafeScale/system"
 
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/api/VMState"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/system"
 )
 
 const (
