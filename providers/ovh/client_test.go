@@ -18,9 +18,9 @@ package ovh_test
 import (
 	"testing"
 
-	"github.com/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers"
 
-	"github.com/SafeScale/providers/tests"
+	"github.com/CS-SI/SafeScale/providers/tests"
 )
 
 var tester *tests.ClientTester

@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"os"
 
-	pb "github.com/SafeScale/broker"
-	conv "github.com/SafeScale/broker/utils"
-	utils "github.com/SafeScale/broker/utils"
+	pb "github.com/CS-SI/SafeScale/broker"
+	conv "github.com/CS-SI/SafeScale/broker/utils"
+	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/urfave/cli"
 )
 

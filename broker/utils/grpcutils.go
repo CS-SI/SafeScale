@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/SafeScale/broker"
+	pb "github.com/CS-SI/SafeScale/broker"
 	"google.golang.org/grpc"
 )
 

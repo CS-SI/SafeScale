@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
 )
 
 //ContainerAPI defines API to manipulate containers

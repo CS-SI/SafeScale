@@ -19,8 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	pb "github.com/SafeScale/broker"
-	utils "github.com/SafeScale/broker/utils"
+	pb "github.com/CS-SI/SafeScale/broker"
+	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/urfave/cli"
 )
 

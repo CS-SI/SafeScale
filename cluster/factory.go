@@ -18,10 +18,10 @@ package cluster
 import (
 	"fmt"
 
-	clusterapi "github.com/SafeScale/cluster/api"
-	"github.com/SafeScale/cluster/api/Flavor"
-	"github.com/SafeScale/cluster/dcos"
-	"github.com/SafeScale/providers"
+	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
+	"github.com/CS-SI/SafeScale/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/cluster/dcos"
+	"github.com/CS-SI/SafeScale/providers"
 )
 
 //Factory instantiate cluster managers

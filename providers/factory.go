@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/spf13/viper"
 )
 

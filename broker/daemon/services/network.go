@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/api/IPVersion"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 )
 
 //NetworkAPI defines API to manage networks

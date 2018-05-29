@@ -23,12 +23,12 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
-	clusterapi "github.com/SafeScale/cluster/api"
-	"github.com/SafeScale/cluster/api/ClusterState"
-	"github.com/SafeScale/cluster/api/NodeType"
-	"github.com/SafeScale/providers"
+	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
+	"github.com/CS-SI/SafeScale/cluster/api/ClusterState"
+	"github.com/CS-SI/SafeScale/cluster/api/NodeType"
+	"github.com/CS-SI/SafeScale/providers"
 
-	providerapi "github.com/SafeScale/providers/api"
+	providerapi "github.com/CS-SI/SafeScale/providers/api"
 )
 
 //go:generate rice embed-go

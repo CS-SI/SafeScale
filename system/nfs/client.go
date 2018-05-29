@@ -18,7 +18,7 @@ package nfs
 import (
 	"fmt"
 
-	"github.com/SafeScale/system"
+	"github.com/CS-SI/SafeScale/system"
 )
 
 //Client defines the structure of a Client object

@@ -18,10 +18,10 @@ package flexibleengine
 import (
 	"fmt"
 
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/api/VolumeSpeed"
-	"github.com/SafeScale/providers/api/VolumeState"
-	"github.com/SafeScale/providers/aws/s3"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/aws/s3"
 
 	v2_vol "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 

@@ -20,12 +20,12 @@ import (
 	"io"
 	"time"
 
-	"github.com/SafeScale/system"
+	"github.com/CS-SI/SafeScale/system"
 
-	"github.com/SafeScale/providers/api/IPVersion"
-	"github.com/SafeScale/providers/api/VMState"
-	"github.com/SafeScale/providers/api/VolumeSpeed"
-	"github.com/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/api/VMState"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
 )
 
 const (

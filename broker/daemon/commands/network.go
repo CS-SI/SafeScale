@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"log"
 
-	pb "github.com/SafeScale/broker"
-	services "github.com/SafeScale/broker/daemon/services"
-	utils "github.com/SafeScale/broker/utils"
-	"github.com/SafeScale/providers/api/IPVersion"
+	pb "github.com/CS-SI/SafeScale/broker"
+	services "github.com/CS-SI/SafeScale/broker/daemon/services"
+	utils "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 

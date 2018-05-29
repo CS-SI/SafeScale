@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/system"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/system"
 )
 
 //VMAPI defines API to manipulate VMs

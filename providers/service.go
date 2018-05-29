@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/api/VMState"
-	"github.com/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/VMState"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
 	uuid "github.com/satori/go.uuid"
 )
 

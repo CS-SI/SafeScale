@@ -21,9 +21,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/api/VolumeSpeed"
-	"github.com/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
 	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects"
 
 	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers"

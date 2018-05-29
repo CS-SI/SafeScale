@@ -28,12 +28,12 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/system"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/system"
 
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/api/IPVersion"
-	"github.com/SafeScale/providers/api/VMState"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/api/VMState"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"

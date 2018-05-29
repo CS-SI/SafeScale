@@ -22,7 +22,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/SafeScale/broker/client/cmd"
+	"github.com/CS-SI/SafeScale/broker/client/cmd"
 	cli "github.com/urfave/cli"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"

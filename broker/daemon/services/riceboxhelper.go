@@ -21,7 +21,7 @@ import (
 	"text/template"
 
 	rice "github.com/GeertJohan/go.rice"
-	"github.com/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers"
 )
 
 //go:generate rice embed-go

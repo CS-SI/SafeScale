@@ -23,8 +23,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 
 	"github.com/GeertJohan/go.rice"
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"

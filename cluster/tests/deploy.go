@@ -19,13 +19,13 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/SafeScale/cluster"
-	clusterapi "github.com/SafeScale/cluster/api"
-	"github.com/SafeScale/cluster/api/Complexity"
-	"github.com/SafeScale/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
+	"github.com/CS-SI/SafeScale/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/cluster/api/Flavor"
 
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/flexibleengine"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/flexibleengine"
 )
 
 //Run runs the deployment
