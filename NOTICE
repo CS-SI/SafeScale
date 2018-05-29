@@ -24,6 +24,7 @@ github.com/spf13/viper
 github.com/urfave/cli
 github.com/pengux/check
 github.com/satori/go.uuid
+github.com/stretchr/testify
 
 
 ================================================================
@@ -52,4 +53,3 @@ The following components are provided under the  ISC License  (https://opensourc
 
 github.com/davecgh/go-spew/
 github.com/mjibson/go-dsp
-github.com/stretchr/testify
