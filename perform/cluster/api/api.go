@@ -16,14 +16,14 @@ package api
 */
 
 import (
-	"github.com/SafeScale/providers"
-	providerapi "github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/api/VMState"
+	"github.com/CS-SI/SafeScale/providers"
+	providerapi "github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/VMState"
 
-	"github.com/SafeScale/perform/cluster/api/ClusterState"
-	"github.com/SafeScale/perform/cluster/api/Complexity"
-	"github.com/SafeScale/perform/cluster/api/Flavor"
-	"github.com/SafeScale/perform/cluster/api/NodeType"
+	"github.com/CS-SI/SafeScale/cluster/api/ClusterState"
+	"github.com/CS-SI/SafeScale/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/cluster/api/NodeType"
 )
 
 const (

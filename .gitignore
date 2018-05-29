@@ -41,5 +41,6 @@ cluster/tests/deploy
 broker/daemon/brokerd
 broker/client/broker
 
-
-
+#ignore results of scanner
+scanner/Test*
+>>>>>>>>> Temporary merge branch 2

@@ -21,13 +21,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SafeScale/providers"
-	providerapi "github.com/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers"
+	providerapi "github.com/CS-SI/SafeScale/providers/api"
+	"github.com/davecgh/go-spew/spew"
 
-	clusterapi "github.com/SafeScale/perform/cluster/api"
-	"github.com/SafeScale/perform/cluster/api/ClusterState"
-	"github.com/SafeScale/perform/cluster/api/Complexity"
-	"github.com/SafeScale/perform/cluster/api/NodeType"
+	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
+	"github.com/CS-SI/SafeScale/cluster/api/ClusterState"
+	"github.com/CS-SI/SafeScale/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/cluster/api/NodeType"
 )
 
 //Manager is the implementation for DCOS
