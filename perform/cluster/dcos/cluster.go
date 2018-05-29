@@ -1,4 +1,5 @@
 package dcos
+
 /*
 * Copyright 2015-2018, CS Systemes d'Information, http://www.c-s.fr
 *
@@ -13,7 +14,7 @@ package dcos
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-*/
+ */
 
 import (
 	"bytes"
@@ -27,12 +28,15 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
-	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
-	"github.com/CS-SI/SafeScale/cluster/api/ClusterState"
-	"github.com/CS-SI/SafeScale/cluster/api/NodeType"
-	"github.com/CS-SI/SafeScale/providers"
 
-	providerapi "github.com/CS-SI/SafeScale/providers/api"
+	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/ClusterState"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
+	"github.com/CS-SI/SafeScale/perform/cluster/components"
+	"github.com/CS-SI/SafeScale/perform/utils"
+
+	pb "github.com/CS-SI/SafeScale/broker"
 )
 
 //go:generate rice embed-go

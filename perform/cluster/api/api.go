@@ -1,4 +1,5 @@
 package api
+
 /*
 * Copyright 2015-2018, CS Systemes d'Information, http://www.c-s.fr
 *
@@ -13,17 +14,17 @@ package api
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-*/
+ */
 
 import (
-	"github.com/CS-SI/SafeScale/providers"
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/VMState"
 
-	"github.com/CS-SI/SafeScale/cluster/api/ClusterState"
-	"github.com/CS-SI/SafeScale/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/cluster/api/Flavor"
-	"github.com/CS-SI/SafeScale/cluster/api/NodeType"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/ClusterState"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
+
+	pb "github.com/CS-SI/SafeScale/broker"
 )
 
 const (
