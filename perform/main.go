@@ -6,7 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/SafeScale/perform/command/cmd"
+	"github.com/CS-SI/SafeScale/perform/cmd"
+
 	cli "github.com/urfave/cli"
 )
 

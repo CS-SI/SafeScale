@@ -47,7 +47,7 @@ func Tenants() map[string]string {
 }
 
 // GetService return the service referenced by the given name.
-// If necessary, this function try to load serviec from configuration file
+// If necessary, this function try to load service from configuration file
 func GetService(tenantName string) (*Service, error) {
 	tenants := getTenantsFromCfg()
 	tenantInCfg := false

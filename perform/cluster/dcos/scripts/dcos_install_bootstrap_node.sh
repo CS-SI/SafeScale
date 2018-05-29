@@ -65,11 +65,11 @@ if [ -f dcos_generate_config.sh ]; then
     bash dcos_generate_config.sh || exit 1
 fi
 
-# Inserts the code to prepare docker images
-{{ .PrepareDockerImages }}
-
 # Starts local nginx server to serve files
 docker run -d -p 80:80 -v $PWD/genconf/serve:/usr/share/nginx/html:ro nginx >/dev/null && exit 0
+
+# Inserts the code to prepare docker images
+{{ .PrepareDockerImages }}
 
 # Reaching this point, something wrong happened
 exit 1

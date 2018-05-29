@@ -1,4 +1,5 @@
 package main
+
 /*
 * Copyright 2015-2018, CS Systemes d'Information, http://www.c-s.fr
 *
@@ -13,43 +14,35 @@ package main
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-*/
+ */
 
 import (
 	"fmt"
 	"log"
 	"runtime"
 
-	"github.com/SafeScale/perform/cluster"
-	clusterapi "github.com/SafeScale/perform/cluster/api"
-	"github.com/SafeScale/perform/cluster/api/Complexity"
-	"github.com/SafeScale/perform/cluster/api/Flavor"
-	"github.com/SafeScale/perform/cluster/api/NodeType"
+	"github.com/CS-SI/SafeScale/perform/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
 
-	providerapi "github.com/SafeScale/providers/api"
+	pb "github.com/CS-SI/SafeScale/broker"
 )
 
 //Run runs the deployment
 func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	cf := cluster.NewFactory()
-	tenant := "TestFlexibleEngine"
-	cm, err := cf.GetManager(tenant)
-	if err != nil {
-		fmt.Printf("Failed to instanciate Cluster Manager for tenant '%s'.\n", tenant)
-		return
-	}
-
 	clusterName := "test-cluster"
-	cluster, err := cm.GetCluster(clusterName)
+	instance, err := cluster.Get(clusterName)
 	if err != nil {
 		fmt.Printf("Failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
 		return
 	}
-	if cluster == nil {
+	if instance == nil {
 		log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
-		cluster, err = cm.CreateCluster(clusterapi.ClusterRequest{
+		instance, err = cluster.Create(clusterapi.Request{
 			Name:       clusterName,
 			Complexity: Complexity.Dev,
 			//Complexity: Complexity.Normal,
@@ -65,28 +58,18 @@ func Run() {
 		fmt.Printf("Cluster '%s' already created.\n", clusterName)
 	}
 
-	state, err := cluster.GetState()
+	state, err := instance.GetState()
 	if err != nil {
 		fmt.Println("Failed to get cluster state.")
 		return
 	}
 	fmt.Printf("Cluster state: %s\n", state.String())
 
-	// Figures out the best template for Agent nodes
-	service := cm.GetService()
-	tmplAgentNode, err := service.SelectTemplatesBySize(providerapi.SizingRequirements{
-		MinCores:    2,
-		MinRAMSize:  8,
-		MinDiskSize: 60,
-	})
-	if err != nil {
-		fmt.Printf("Failed to find a template suitable for Agent Nodes: %s\n", err.Error())
-		return
-	}
-
 	// Creates a Private Agent Node
-	_, err = cluster.AddNode(NodeType.PrivateAgent, providerapi.VMRequest{
-		TemplateID: tmplAgentNode[0].ID,
+	_, err = instance.AddNode(NodeType.PrivateAgent, &pb.VMDefinition{
+		CPUNumber: 2,
+		RAM:       8.0,
+		Disk:      60,
 	})
 	if err != nil {
 		fmt.Printf("Failed to create Private Agent Node: %s\n", err.Error())

@@ -1,4 +1,5 @@
 package cluster
+
 /*
 * Copyright 2015-2018, CS Systemes d'Information, http://www.c-s.fr
 *
@@ -13,53 +14,154 @@ package cluster
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-*/
+ */
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
+	"log"
+	"strings"
 
-	clusterapi "github.com/SafeScale/perform/cluster/api"
-	"github.com/SafeScale/perform/cluster/dcos"
+	pb "github.com/CS-SI/SafeScale/broker"
 
-	"github.com/SafeScale/providers"
+	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/perform/cluster/dcos"
+	"github.com/CS-SI/SafeScale/perform/utils"
 )
 
-//Factory instantiate cluster managers
-type Factory struct {
-	byTenants map[string]clusterapi.ClusterManagerAPI
+//Get returns the ClusterAPI instance corresponding to the cluster named 'name'
+func Get(name string) (clusterapi.ClusterAPI, error) {
+	tenant, err := utils.GetCurrentTenant()
+	if err != nil {
+		return nil, err
+	}
+
+	instance, err := readDefinition(tenant, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Cluster '%s': %s", name, err.Error())
+	}
+	if instance == nil {
+		return nil, nil
+	}
+	_, err = instance.GetState()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get state of the cluster: %s", err.Error())
+	}
+	return instance, nil
 }
 
-//NewFactory creates a new service factory
-func NewFactory() *Factory {
-	tenantMap := make(map[string]clusterapi.ClusterManagerAPI)
-	return &Factory{
-		byTenants: tenantMap,
+//readDefinition reads definition of cluster named 'name' in Object Storage
+func readDefinition(tenant string, name string) (clusterapi.ClusterAPI, error) {
+	ok, err := utils.FindMetadata(clusterapi.ClusterMetadataPrefix, name)
+	if !ok {
+		return nil, err
 	}
+
+	var d clusterapi.Cluster
+	err = utils.ReadMetadata(clusterapi.ClusterMetadataPrefix, name, func(buf *bytes.Buffer) error {
+		return gob.NewDecoder(buf).Decode(&d)
+	})
+	if err != nil {
+		return nil, err
+	}
+	switch d.Flavor {
+	case Flavor.DCOS:
+		instance := &dcos.Cluster{
+			Definition: &dcos.Definition{
+				Cluster: d,
+			},
+		}
+		// Re-read the definition with complete data unserialization
+		ok, err := instance.ReadDefinition()
+		if !ok {
+			return nil, err
+		}
+		return instance, nil
+	}
+	return nil, nil
 }
 
-//GetManager returns the ClusterManager for the flavor and tenant passed as parameters
-// If the ClusterManager doesn't exist yet, build it
-func (f *Factory) GetManager(tenant string) (clusterapi.ClusterManagerAPI, error) {
-	var clusterManager clusterapi.ClusterManagerAPI
-	if m, ok := f.byTenants[tenant]; ok {
-		return m, nil
+//Create creates a cluster following the parameters of the request
+func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
+	// Validates parameters
+	if req.Name == "" {
+		return nil, fmt.Errorf("Invalid parameter req.Name: can't be empty")
 	}
-	service, err := providers.GetService(tenant)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get service for tenant '%s'", tenant)
-	}
-	clusterManager = &dcos.Manager{
-		ClusterManager: clusterapi.ClusterManager{
-			Service: service,
-			Tenant:  tenant,
-		},
+	if req.CIDR == "" {
+		return nil, fmt.Errorf("Invalid parameter req.CIDR: can't be empty")
 	}
 
-	// Create Object Storage Container
-	err = service.CreateContainer(clusterapi.DeployContainerName)
+	// We need at first the Metadata container to be present
+	err := utils.CreateMetadataContainer()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Object Storage '%s': %s", clusterapi.DeployContainerName, err.Error())
+		fmt.Printf("failed to create Object Container: %s\n", err.Error())
 	}
-	f.byTenants[tenant] = clusterManager
-	return clusterManager, nil
+
+	var network *pb.Network
+	var instance clusterapi.ClusterAPI
+
+	log.Printf("Creating infrastructure for cluster '%s'", req.Name)
+
+	tenant, err := utils.GetCurrentTenant()
+	if err != nil {
+		return nil, err
+	}
+
+	// Creates network
+	log.Printf("Creating Network 'net-%s'", req.Name)
+	req.Name = strings.ToLower(req.Name)
+	network, err = utils.CreateNetwork("net-"+req.Name, req.CIDR)
+	if err != nil {
+		err = fmt.Errorf("Failed to create Network '%s': %s", req.Name, err.Error())
+		return nil, err
+	}
+
+	switch req.Flavor {
+	case Flavor.DCOS:
+		req.NetworkID = network.ID
+		req.Tenant = tenant
+		instance, err = dcos.NewCluster(req)
+		if err != nil {
+			//utils.DeleteNetwork(network.ID)
+			return nil, err
+		}
+	}
+
+	log.Printf("Cluster '%s' created and initialized successfully", req.Name)
+	return instance, nil
+}
+
+// Delete deletes the infrastructure of the cluster named 'name'
+func Delete(name string) error {
+	instance, err := Get(name)
+	if err != nil {
+		return fmt.Errorf("failed to find a cluster named '%s': %s", name, err.Error())
+	}
+	err = instance.Delete()
+	if err != nil {
+		return fmt.Errorf("failed to delete infrastructure of cluster '%s': %s", name, err.Error())
+	}
+
+	// Deletes the network and related stuff
+	utils.DeleteNetwork(instance.GetNetworkID())
+
+	// Cleanup Object Storage data
+	return instance.RemoveDefinition()
+}
+
+//List lists the clusters already created
+func List() ([]clusterapi.Cluster, error) {
+	var clusterList []clusterapi.Cluster
+	err := utils.BrowseMetadataContent(clusterapi.ClusterMetadataPrefix, func(buf *bytes.Buffer) error {
+		var c clusterapi.Cluster
+		err := gob.NewDecoder(buf).Decode(&c)
+		if err != nil {
+			return err
+		}
+		clusterList = append(clusterList, c)
+		return nil
+	})
+	return clusterList, err
 }
