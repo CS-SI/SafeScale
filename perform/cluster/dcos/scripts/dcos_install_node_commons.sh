@@ -9,8 +9,8 @@ export LANG=C
     sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/sysconfig/selinux
 
     # Disables firewall
-    systemctl stop firewalld
-    systemctl disable firewalld
+    systemctl stop firewalld 2>/dev/null
+    systemctl disable firewalld 2>/dev/null
 
     # Upgrade to last CentOS revision
     rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info
@@ -62,7 +62,7 @@ EOF
 
     # Creates user cladm
     useradd -s /bin/bash -m -d /home/cladm cladm
-    useradd -aG docker cladm
+    usermod -aG docker cladm
     mkdir -p /home/cladm/.ssh && chmod 0700 /home/cladm/.ssh
     echo >/home/cladm/.ssh/authorized_keys <<- EOF
 {{ .SSHPublicKey }}
