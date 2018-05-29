@@ -18,7 +18,7 @@ package nfs
 import (
 	"fmt"
 
-	"github.com/SafeScale/system"
+	"github.com/CS-SI/SafeScale/system"
 )
 
 //Server server structure

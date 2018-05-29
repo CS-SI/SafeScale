@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SafeScale/system/nfs/SecurityFlavor"
+	"github.com/CS-SI/SafeScale/system/nfs/SecurityFlavor"
 )
 
 type ExportOptions struct {

@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api"
 
 	"github.com/aws/aws-sdk-go/aws"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"

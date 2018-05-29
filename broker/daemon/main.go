@@ -19,8 +19,8 @@ import (
 	"log"
 	"net"
 
-	pb "github.com/SafeScale/broker"
-	"github.com/SafeScale/broker/daemon/commands"
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/daemon/commands"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )

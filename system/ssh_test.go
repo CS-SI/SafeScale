@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/SafeScale/system"
+	"github.com/CS-SI/SafeScale/system"
 )
 
 func Test_Command(t *testing.T) {

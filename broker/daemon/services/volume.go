@@ -19,10 +19,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/api/VolumeSpeed"
-	"github.com/SafeScale/system/nfs"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/system/nfs"
 )
 
 //VolumeAPI defines API to manipulate VMs

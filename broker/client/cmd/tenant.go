@@ -19,8 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	pb "github.com/SafeScale/broker"
-	utils "github.com/SafeScale/broker/utils"
+	pb "github.com/CS-SI/SafeScale/broker"
+	utils "github.com/CS-SI/SafeScale/broker/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )

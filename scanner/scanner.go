@@ -26,15 +26,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SafeScale/providers/api/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 
-	"github.com/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api"
 
-	"github.com/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api"
 
-	"github.com/SafeScale/providers"
-	_ "github.com/SafeScale/providers/cloudwatt" // Imported to initialise tenants
-	_ "github.com/SafeScale/providers/ovh"       // Imported to initialise tenants
+	"github.com/CS-SI/SafeScale/providers"
+	_ "github.com/CS-SI/SafeScale/providers/cloudwatt" // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/providers/ovh"       // Imported to initialise tenants
 )
 
 const cmdNumberOfCPU string = "lscpu | grep 'CPU(s):' | grep -v 'NUMA' | tr -d '[:space:]' | cut -d: -f2"

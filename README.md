@@ -45,8 +45,8 @@ SafeScale Security relies on Kong, an open source generic proxy to be put in bet
 The design of a SafeScale Security gateway can be depicted as bellow:
 ![SafeScale Security](img/SafeScale_Security.png "SafeScale Security")
 
-## Features available 
-SafeScale is currently under development and does not yet offer all the features planned. However, we are already releasing it with the following features:
+## Currently available features
+SafeScale is currently under active development and does not yet offer all the features planned. However, we are already publishing it with the following features:
 * SafeScale Broker:
   * Create / Destroy private networks
   * Create/Destroy Virtual Machine (VM),
@@ -55,7 +55,8 @@ SafeScale is currently under development and does not yet offer all the features
   * Create NAS, Connect/disconnect VM to NAS,
   
 * Providers addressed:
-  * OVH
+  * Generic OpenStack
+  * OVH Public Cloud
   * FlexibleEngine
   * CloudWatt
-  * AWS
+  * AWS: under development 

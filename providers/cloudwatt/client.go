@@ -18,10 +18,10 @@ package cloudwatt
 import (
 	"fmt"
 
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/api/VolumeSpeed"
-	"github.com/SafeScale/providers/openstack"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
 //ProviderNetwork name of CloudWatt external network

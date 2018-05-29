@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"log"
 
-	pb "github.com/SafeScale/broker"
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
-	_ "github.com/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
-	_ "github.com/SafeScale/providers/flexibleengine" // Imported to initialise tenants
-	_ "github.com/SafeScale/providers/ovh"            // Imported to initialise tenants
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenants
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
