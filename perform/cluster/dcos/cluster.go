@@ -27,20 +27,23 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
+
+	pb "github.com/SafeScale/broker"
+
 	clusterapi "github.com/SafeScale/perform/cluster/api"
 	"github.com/SafeScale/perform/cluster/api/ClusterState"
+	"github.com/SafeScale/perform/cluster/api/Complexity"
 	"github.com/SafeScale/perform/cluster/api/NodeType"
 	"github.com/SafeScale/perform/cluster/components"
-
-	"github.com/SafeScale/providers"
-
-	providerapi "github.com/SafeScale/providers/api"
+	"github.com/SafeScale/perform/utils"
 )
 
 //go:generate rice embed-go
 
 const (
 	dcosVersion string = "1.11.1"
+
+	timeoutCtxVM = 10 * time.Minute
 )
 
 var (
@@ -51,13 +54,10 @@ var (
 	installCommonsContent *string
 )
 
-//ClusterDefinition defines the values we want to keep in Object Storage
-type ClusterDefinition struct {
-	//Common cluster data
-	Common clusterapi.Cluster
-
-	//NetworkID is the network identifier where the cluster is created
-	NetworkID string
+//Definition defines the values we want to keep in Object Storage
+type Definition struct {
+	// common cluster data
+	clusterapi.Cluster
 
 	//BootstrapID is the identifier of the VM acting as bootstrap/upgrade server
 	BootstrapID string
@@ -89,24 +89,115 @@ type ClusterDefinition struct {
 
 //Cluster is the object describing a cluster created by ClusterManagerAPI.CreateCluster
 type Cluster struct {
-	//Manager is the cluster manager used to create the cluster
-	Manager *Manager
-
 	//Definition contains data defining the cluster
-	definition *ClusterDefinition
+	*Definition
 
 	//LastStateCollect contains the date of the last state collection
 	lastStateCollection time.Time
 }
 
-//getService returns a pointer to the infrastructure service of the cluster
-func (c *Cluster) getService() *providers.Service {
-	return c.Manager.GetService()
+//GetNetworkID returns the ID of the network used by the cluster
+func (c *Cluster) GetNetworkID() string {
+	return c.Definition.Cluster.GetNetworkID()
+}
+
+//NewCluster creates the necessary infrastructure of cluster
+func NewCluster(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
+	// Create a KeyPair for the cluster
+	svc, err := utils.GetProviderService()
+	if err != nil {
+		return nil, err
+	}
+	kpName := "cluster_" + req.Name + "_key"
+	svc.DeleteKeyPair(kpName)
+	kp, err := svc.CreateKeyPair(kpName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Key Pair: %s", err.Error())
+	}
+	defer svc.DeleteKeyPair(kpName)
+
+	var masterCount int
+	//	var keypair *providerapi.KeyPair
+
+	// Saving cluster parameters, with status 'Creating'
+	instance := Cluster{
+		Definition: &Definition{
+			Cluster: clusterapi.Cluster{
+				Name:       req.Name,
+				State:      ClusterState.Creating,
+				Complexity: req.Complexity,
+				Tenant:     req.Tenant,
+				NetworkID:  req.NetworkID,
+				Keypair:    kp,
+			},
+		},
+	}
+
+	// Creates bootstrap/upgrade server
+	log.Printf("Creating DCOS Bootstrap server")
+	_, err = instance.addBootstrap()
+	if err != nil {
+		err = fmt.Errorf("failed to create DCOS bootstrap server: %s", err.Error())
+		goto cleanNetwork
+	}
+
+	err = instance.WriteDefinition()
+	if err != nil {
+		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
+		goto cleanBootstrap
+	}
+
+	switch req.Complexity {
+	case Complexity.Dev:
+		masterCount = 1
+	case Complexity.Normal:
+		masterCount = 3
+	case Complexity.Volume:
+		masterCount = 5
+	}
+
+	log.Printf("Creating DCOS Master servers (%d)", masterCount)
+	for i := 1; i <= masterCount; i++ {
+		// Creates Master Node
+		_, err = instance.addMaster()
+		if err != nil {
+			err = fmt.Errorf("failed to add DCOS Master %d: %s", i, err.Error())
+			goto cleanMasters
+		}
+	}
+
+	log.Printf("Configuring cluster")
+	err = instance.configure()
+	if err != nil {
+		err = fmt.Errorf("failed to configure DCOS cluster: %s", err.Error())
+		goto cleanMasters
+	}
+
+	// Cluster created and configured successfully, saving again to Object Storage
+	instance.Definition.Cluster.State = ClusterState.Created
+	err = instance.WriteDefinition()
+	if err != nil {
+		goto cleanMasters
+	}
+
+	log.Printf("Cluster '%s' created and initialized successfully", req.Name)
+	return &instance, nil
+
+cleanMasters:
+	//for _, id := range instance.definition.MasterIDs {
+	//	utils.DeleteVM(id)
+	//}
+cleanBootstrap:
+	//utils.DeleteVM(instance.definition.BootstrapID)
+cleanNetwork:
+	//utils.DeleteNetwork(instance.definition.Common.NetworkID)
+	//instance.RemoveDefinition()
+	return nil, err
 }
 
 //GetName returns the name of the cluster
 func (c *Cluster) GetName() string {
-	return c.definition.Common.Name
+	return c.Definition.Cluster.Name
 }
 
 //getTemplateBox
@@ -176,10 +267,10 @@ func (c *Cluster) Stop() error {
 //GetState returns the current state of the cluster
 func (c *Cluster) GetState() (ClusterState.Enum, error) {
 	now := time.Now()
-	if now.After(c.lastStateCollection.Add(c.definition.StateCollectInterval)) {
+	if now.After(c.lastStateCollection.Add(c.Definition.StateCollectInterval)) {
 		return c.ForceGetState()
 	}
-	return c.definition.Common.State, nil
+	return c.Definition.Cluster.State, nil
 }
 
 //ForceGetState returns the current state of the cluster
@@ -190,104 +281,88 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 }
 
 //AddNode adds a node
-func (c *Cluster) AddNode(nodeType NodeType.Enum, req providerapi.VMRequest) (*clusterapi.Node, error) {
+func (c *Cluster) AddNode(nodeType NodeType.Enum, req *pb.VMDefinition) (*pb.VM, error) {
 	switch nodeType {
-	case NodeType.Bootstrap:
-		if c.definition.Common.State != ClusterState.Creating {
-			return nil, fmt.Errorf("The DCOS flavor of Cluster doesn't allow to add bootstrap node after initial setup")
-		}
-		return c.addBootstrapNode(req)
-	case NodeType.Master:
-		if c.definition.Common.State != ClusterState.Creating {
-			return nil, fmt.Errorf("The DCOS flavor of Cluster doesn't allow to add master node after initial setup")
-		}
-		return c.addMasterNode(req)
 	case NodeType.PublicAgent:
 		fallthrough
 	case NodeType.PrivateAgent:
-		if c.definition.Common.State == ClusterState.Creating {
+		if c.Definition.Cluster.State == ClusterState.Creating {
 			return nil, fmt.Errorf("The DCOS flavor of Cluster needs to be in state 'Created' at least to allow agent node addition.")
 		}
-		return c.addAgentNode(req, nodeType)
+		return c.addAgentNode(nodeType, req)
 	}
-	return nil, fmt.Errorf("unknown node type '%s'", nodeType)
+	return nil, fmt.Errorf("unmanaged node type '%s (%d)'", nodeType.String(), nodeType)
 }
 
-//addBootstrapNode
-func (c *Cluster) addBootstrapNode(req providerapi.VMRequest) (*clusterapi.Node, error) {
-	svc := c.getService()
-
-	req.Name = c.definition.Common.Name + "-dcosbootstrap"
-	req.NetworkIDs = []string{c.definition.NetworkID}
-	req.PublicIP = true
-	req.KeyPair = c.definition.Common.Keypair
-
-	bootstrapVM, err := svc.CreateVM(req)
+//addBootstrap
+func (c *Cluster) addBootstrap() (*pb.VM, error) {
+	name := c.Definition.Cluster.Name + "-dcosbootstrap"
+	bootstrapVM, err := utils.CreateVM(&pb.VMDefinition{
+		Name:      name,
+		CPUNumber: 4,
+		RAM:       32.0,
+		Disk:      120,
+		ImageID:   "CentOS 7.3",
+		Network:   c.Definition.Cluster.NetworkID,
+		Public:    true,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Bootstrap server: %s", err.Error())
+		return nil, fmt.Errorf("failed to create Bootstrap server: %v", err)
 	}
 
-	c.definition.BootstrapID = bootstrapVM.ID
-	c.definition.BootstrapIP = bootstrapVM.PrivateIPsV4[0]
+	c.Definition.BootstrapID = bootstrapVM.ID
+	c.Definition.BootstrapIP = bootstrapVM.IP
 
 	// Update cluster definition in Object Storage
-	err = c.SaveDefinition()
+	err = c.WriteDefinition()
 	if err != nil {
 		// Removes the ID we just added to the cluster struct
-		c.definition.BootstrapID = ""
-		c.definition.BootstrapIP = ""
-		svc.DeleteVM(bootstrapVM.ID)
-		return nil, fmt.Errorf("failed to update cluster definition: %s", err.Error())
+		c.Definition.BootstrapID = ""
+		c.Definition.BootstrapIP = ""
+		utils.DeleteVM(bootstrapVM.ID)
+		return nil, fmt.Errorf("failed to update Cluster definition: %s", err.Error())
 	}
 
-	return c.toNode(NodeType.Master, req.TemplateID, bootstrapVM), nil
+	return bootstrapVM, nil
 }
 
 //addMasterNode adds a master node
-func (c *Cluster) addMasterNode(req providerapi.VMRequest) (*clusterapi.Node, error) {
-	svc := c.getService()
+func (c *Cluster) addMaster() (*pb.VM, error) {
+	i := len(c.Definition.MasterIDs) + 1
+	name := c.Definition.Cluster.Name + "-dcosmaster-" + strconv.Itoa(i)
 
-	i := len(c.definition.MasterIDs) + 1
-	req.Name = c.definition.Common.Name + "-dcosmaster-" + strconv.Itoa(i)
-	req.NetworkIDs = []string{c.definition.NetworkID}
-	req.PublicIP = true
-	req.KeyPair = c.definition.Common.Keypair
-	masterVM, err := svc.CreateVM(req)
+	masterVM, err := utils.CreateVM(&pb.VMDefinition{
+		Name:      name,
+		CPUNumber: 4,
+		RAM:       16.0,
+		Disk:      60,
+		ImageID:   "CentOS 7.3",
+		Network:   c.Definition.Cluster.NetworkID,
+		Public:    true,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create master server %d: %s", i, err.Error())
+		return nil, fmt.Errorf("failed to create Master server %d: %s", i, err.Error())
 	}
 
 	// Registers the new Master in the cluster struct
-	c.definition.MasterIDs = append(c.definition.MasterIDs, masterVM.ID)
-	c.definition.MasterIPs = append(c.definition.MasterIPs, masterVM.PrivateIPsV4[0])
+	c.Definition.MasterIDs = append(c.Definition.MasterIDs, masterVM.ID)
+	c.Definition.MasterIPs = append(c.Definition.MasterIPs, masterVM.IP)
 
 	// Update cluster definition in Object Storage
-	err = c.SaveDefinition()
+	err = c.WriteDefinition()
 	if err != nil {
 		// Object Storage failed, removes the ID we just added to the cluster struct
-		c.definition.MasterIDs = c.definition.MasterIDs[:len(c.definition.MasterIDs)-1]
-		c.definition.MasterIPs = c.definition.MasterIPs[:len(c.definition.MasterIPs)-1]
-		svc.DeleteVM(masterVM.ID)
-		return nil, fmt.Errorf("failed to update cluster definition: %s", err.Error())
+		c.Definition.MasterIDs = c.Definition.MasterIDs[:len(c.Definition.MasterIDs)-1]
+		c.Definition.MasterIPs = c.Definition.MasterIPs[:len(c.Definition.MasterIPs)-1]
+		utils.DeleteVM(masterVM.ID)
+		return nil, fmt.Errorf("failed to update Cluster definition: %s", err.Error())
 	}
 
-	return c.toNode(NodeType.Master, req.TemplateID, masterVM), nil
-}
-
-//toNode converts a VM struct to a Node struct
-func (c *Cluster) toNode(nodeType NodeType.Enum, tmplID string, vm *providerapi.VM) *clusterapi.Node {
-	return &clusterapi.Node{
-		ID:         vm.ID,
-		TemplateID: tmplID,
-		State:      vm.State,
-		Type:       nodeType,
-	}
+	return masterVM, nil
 }
 
 //addAgentNode adds a Public Agent Node to the cluster
-func (c *Cluster) addAgentNode(req providerapi.VMRequest, nodeType NodeType.Enum) (*clusterapi.Node, error) {
-	svc := c.getService()
-
+func (c *Cluster) addAgentNode(nodeType NodeType.Enum, req *pb.VMDefinition) (*pb.VM, error) {
 	var publicIP bool
 	coreName := "node"
 	if nodeType == NodeType.PublicAgent {
@@ -298,79 +373,78 @@ func (c *Cluster) addAgentNode(req providerapi.VMRequest, nodeType NodeType.Enum
 		coreName = "priv" + coreName
 	}
 
-	i := len(c.definition.PublicAgentIDs) + 1
-	req.PublicIP = publicIP
-	req.NetworkIDs = []string{c.definition.NetworkID}
-	req.Name = c.definition.Common.Name + "-dcos" + coreName + "-" + strconv.Itoa(i)
-	req.KeyPair = c.definition.Common.Keypair
-	agentVM, err := svc.CreateVM(req)
+	i := len(c.Definition.PublicAgentIDs) + 1
+	req.Public = publicIP
+	req.Network = c.Definition.Cluster.NetworkID
+	req.Name = c.Definition.Cluster.Name + "-dcos" + coreName + "-" + strconv.Itoa(i)
+	req.ImageID = "CentOS 7.3"
+	agentVM, err := utils.CreateVM(req)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create Public Agent node '%s': %s", req.Name, err.Error())
+		return nil, fmt.Errorf("failed to create Master server %d: %s", i, err.Error())
 	}
 
 	// Installs DCOS on agent node
 	err = c.configureAgent(agentVM, nodeType)
 	if err != nil {
-		svc.DeleteVM(agentVM.ID)
-		return nil, fmt.Errorf("Failed to install DCOS on Agent Node: %s", err.Error())
-
+		utils.DeleteVM(agentVM.ID)
+		return nil, fmt.Errorf("failed to install DCOS on Agent Node: %s", err.Error())
 	}
 
 	// Registers the new Agent in the cluster struct
 	if nodeType == NodeType.PublicAgent {
-		c.definition.PublicAgentIDs = append(c.definition.PublicAgentIDs, agentVM.ID)
-		c.definition.PublicAgentIPs = append(c.definition.PublicAgentIPs, agentVM.PrivateIPsV4[0])
-
+		c.Definition.PublicAgentIDs = append(c.Definition.PublicAgentIDs, agentVM.ID)
+		c.Definition.PublicAgentIPs = append(c.Definition.PublicAgentIPs, agentVM.IP)
 	} else {
-		c.definition.PrivateAgentIDs = append(c.definition.PrivateAgentIDs, agentVM.ID)
-		c.definition.PrivateAgentIPs = append(c.definition.PrivateAgentIPs, agentVM.PrivateIPsV4[0])
+		c.Definition.PrivateAgentIDs = append(c.Definition.PrivateAgentIDs, agentVM.ID)
+		c.Definition.PrivateAgentIPs = append(c.Definition.PrivateAgentIPs, agentVM.IP)
 	}
 
 	// Update cluster definition in Object Storage
-	err = c.SaveDefinition()
+	err = c.WriteDefinition()
 	if err != nil {
 		// Removes the ID we just added to the cluster struct
 		if nodeType == NodeType.PublicAgent {
-			c.definition.PublicAgentIDs = c.definition.PublicAgentIDs[:len(c.definition.PublicAgentIDs)-1]
+			c.Definition.PublicAgentIDs = c.Definition.PublicAgentIDs[:len(c.Definition.PublicAgentIDs)-1]
+			c.Definition.PublicAgentIPs = c.Definition.PublicAgentIPs[:len(c.Definition.PublicAgentIPs)-1]
 		} else {
-			c.definition.PrivateAgentIDs = c.definition.PrivateAgentIDs[:len(c.definition.PrivateAgentIDs)-1]
+			c.Definition.PrivateAgentIDs = c.Definition.PrivateAgentIDs[:len(c.Definition.PrivateAgentIDs)-1]
+			c.Definition.PrivateAgentIPs = c.Definition.PrivateAgentIPs[:len(c.Definition.PrivateAgentIPs)-1]
 		}
-		svc.DeleteVM(agentVM.ID)
-		return nil, fmt.Errorf("failed to update cluster definition: %s", err.Error())
+		utils.DeleteVM(agentVM.ID)
+		return nil, fmt.Errorf("failed to update Cluster definition: %s", err.Error())
 	}
 
-	return c.toNode(nodeType, req.TemplateID, agentVM), nil
+	return agentVM, nil
 }
 
 //configure prepares the bootstrap and masters for duty
 func (c *Cluster) configure() error {
-	svc := c.getService()
-
-	bootstrapVM, err := svc.GetVM(c.definition.BootstrapID)
-	if err != nil {
-		return err
-	}
-
 	log.Printf("Configuring Bootstrap server")
 
 	prepareDockerImages, err := realizePrepareDockerImages()
 	if err != nil {
 		return fmt.Errorf("failed to build configuration script: %s", err.Error())
 	}
+
+	svc, err := utils.GetProviderService()
+	if err != nil {
+		return err
+	}
+
 	var dnsServers []string
 	cfg, err := svc.GetCfgOpts()
 	if err == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
-	retcode, output, err := c.executeScript(bootstrapVM, "dcos_install_bootstrap_node.sh", map[string]interface{}{
+	retcode, output, err := c.executeScript(c.Definition.BootstrapID, "dcos_install_bootstrap_node.sh", map[string]interface{}{
 		"DCOSVersion":         dcosVersion,
-		"BootstrapIP":         c.definition.BootstrapIP,
+		"BootstrapIP":         c.Definition.BootstrapIP,
 		"BootstrapPort":       "80",
-		"ClusterName":         c.definition.Common.Name,
-		"MasterIPs":           c.definition.MasterIPs,
+		"ClusterName":         c.Definition.Cluster.Name,
+		"MasterIPs":           c.Definition.MasterIPs,
 		"DNSServerIPs":        dnsServers,
-		"SSHPrivateKey":       c.definition.Common.Keypair.PrivateKey,
-		"SSHPublicKey":        c.definition.Common.Keypair.PublicKey,
+		"SSHPrivateKey":       c.Definition.Cluster.Keypair.PrivateKey,
+		"SSHPublicKey":        c.Definition.Cluster.Keypair.PublicKey,
 		"PrepareDockerImages": prepareDockerImages,
 	})
 	if err != nil {
@@ -380,14 +454,10 @@ func (c *Cluster) configure() error {
 		return fmt.Errorf("scripted Bootstrap configuration failed with error code %d:\n%s", retcode, *output)
 	}
 
-	for _, m := range c.definition.MasterIDs {
-		vm, err := svc.GetVM(m)
-		if err != nil {
-			continue
-		}
-		log.Printf("Configuring Master server '%s'", vm.Name)
-		retcode, output, err := c.executeScript(vm, "dcos_install_master_node.sh", map[string]interface{}{
-			"BootstrapIP":   bootstrapVM.AccessIPv4,
+	log.Printf("Configuring Master servers")
+	for _, m := range c.Definition.MasterIDs {
+		retcode, output, err := c.executeScript(m, "dcos_install_master_node.sh", map[string]interface{}{
+			"BootstrapIP":   c.Definition.BootstrapIP,
 			"BootstrapPort": "80",
 		})
 		if err != nil {
@@ -442,13 +512,7 @@ func realizePrepareDockerImages() (string, error) {
 }
 
 //configureAgent installs and configure DCOS agent on targetVM
-func (c *Cluster) configureAgent(targetVM *providerapi.VM, nodeType NodeType.Enum) error {
-	svc := c.getService()
-	bootstrapVM, err := svc.GetVM(c.definition.BootstrapID)
-	if err != nil {
-		return fmt.Errorf("failed to load data of bootstrap server: %s", err.Error())
-	}
-
+func (c *Cluster) configureAgent(targetVM *pb.VM, nodeType NodeType.Enum) error {
 	var typeStr string
 	if nodeType == NodeType.PublicAgent {
 		typeStr = "yes"
@@ -456,9 +520,9 @@ func (c *Cluster) configureAgent(targetVM *providerapi.VM, nodeType NodeType.Enu
 		typeStr = "no"
 	}
 
-	retcode, output, err := c.executeScript(targetVM, "dcos_install_agent_node.sh", map[string]interface{}{
+	retcode, output, err := c.executeScript(targetVM.ID, "dcos_install_agent_node.sh", map[string]interface{}{
 		"PublicNode":    typeStr,
-		"BootstrapIP":   bootstrapVM.AccessIPv4,
+		"BootstrapIP":   c.Definition.BootstrapIP,
 		"BootstrapPort": "80",
 	})
 	if err != nil {
@@ -473,12 +537,14 @@ func (c *Cluster) configureAgent(targetVM *providerapi.VM, nodeType NodeType.Enu
 }
 
 //executeScript executes the script template with the parameters on targetVM
-func (c *Cluster) executeScript(targetVM *providerapi.VM, script string, data map[string]interface{}) (int, *string, error) {
-	svc := c.getService()
-
-	ssh, err := svc.GetSSHConfig(targetVM.ID)
+func (c *Cluster) executeScript(targetID string, script string, data map[string]interface{}) (int, *string, error) {
+	svc, err := utils.GetProviderService()
 	if err != nil {
-		return 0, nil, fmt.Errorf("[%s] error reading SSHConfig: %s", targetVM.Name, err.Error())
+		return 0, nil, err
+	}
+	ssh, err := svc.GetSSHConfig(targetID)
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to read SSH config: %s", err.Error())
 	}
 	ssh.WaitServerReady(60 * time.Second)
 
@@ -497,24 +563,24 @@ func (c *Cluster) executeScript(targetVM *providerapi.VM, script string, data ma
 	// get file contents as string
 	tmplString, err := b.String(script)
 	if err != nil {
-		return 0, nil, fmt.Errorf("[%s] error loading script template: %s", targetVM.Name, err.Error())
+		return 0, nil, fmt.Errorf("failed to load script template: %s", err.Error())
 	}
 	// parse and execute the template
 	tmplCmd, err := template.New("cmd").Parse(tmplString)
 	if err != nil {
-		return 0, nil, fmt.Errorf("[%s] error parsing script template: %s", targetVM.Name, err.Error())
+		return 0, nil, fmt.Errorf("failed to parse script template: %s", err.Error())
 	}
 
 	dataBuffer := bytes.NewBufferString("")
 	err = tmplCmd.Execute(dataBuffer, data)
 	if err != nil {
-		return 0, nil, fmt.Errorf("[%s] error realizing script template: %s", targetVM.Name, err.Error())
+		return 0, nil, fmt.Errorf("failed to realize script template: %s", err.Error())
 	}
 	cmd := dataBuffer.String()
 
 	cmdResult, err := ssh.SudoCommand(cmd)
 	if err != nil {
-		return 0, nil, fmt.Errorf("[%s] error executing script '%s': %s", targetVM.Name, script, err.Error())
+		return 0, nil, fmt.Errorf("failed to execute script '%s': %s", script, err.Error())
 	}
 	retcode := 0
 	out, err := cmdResult.CombinedOutput()
@@ -524,7 +590,7 @@ func (c *Cluster) executeScript(targetVM *providerapi.VM, script string, data ma
 				retcode = int(status)
 			}
 		} else {
-			return 0, nil, fmt.Errorf("[%s] error fetching output of script '%s': %s", targetVM.Name, script, err.Error())
+			return 0, nil, fmt.Errorf("failed to fetch output of script '%s': %s", script, err.Error())
 		}
 	}
 
@@ -538,108 +604,84 @@ func (c *Cluster) DeleteNode(ID string) error {
 }
 
 //ListMasters lists the master nodes in the cluster
-func (c *Cluster) ListMasters() (*[]clusterapi.Node, error) {
+func (c *Cluster) ListMasters() ([]*pb.VM, error) {
 	return nil, fmt.Errorf("ListMasters not yet implemented")
 }
 
 //ListNodes lists the nodes in the cluster
-func (c *Cluster) ListNodes() (*[]clusterapi.Node, error) {
+func (c *Cluster) ListNodes() ([]*pb.VM, error) {
 	return nil, fmt.Errorf("ListNodes not yet implemented")
 }
 
 //GetNode returns a node based on its ID
-func (*Cluster) GetNode(ID string) (*clusterapi.Node, error) {
+func (*Cluster) GetNode(ID string) (*pb.VM, error) {
 	return nil, fmt.Errorf("ListNodes not yet implemented")
 }
 
 //GetDefinition returns the public properties of the cluster
 func (c *Cluster) GetDefinition() clusterapi.Cluster {
-	return c.definition.Common
+	return c.Definition.Cluster
 }
 
-//SaveDefinition writes cluster definition in Object Storage
-func (c *Cluster) SaveDefinition() error {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	err := enc.Encode(c.definition)
-	if err != nil {
-		return err
-	}
-	return c.getService().PutObject(clusterapi.DeployContainerName, providerapi.Object{
-		Name:    clusterapi.ClusterContainerNamePrefix + c.definition.Common.Name,
-		Content: bytes.NewReader(buffer.Bytes()),
-	})
+//WriteDefinition writes cluster definition in Object Storage
+func (c *Cluster) WriteDefinition() error {
+	//var buffer bytes.Buffer
+	//enc := gob.NewEncoder(&buffer)
+	//err := enc.Encode(c.definition)
+	//if err != nil {
+	//	return err
+	//}
+	//content := bytes.NewReader(buffer.Bytes()
+
+	utils.CreateMetadataContainer()
+
+	// writes  the data in Object Storage
+	return utils.WriteMetadata(clusterapi.ClusterMetadataPrefix, c.Definition.Cluster.Name, c.Definition)
 }
 
-//ReadDefinition reads definition of cluster named 'name' in Object Storage
+//ReadDefinition reads definition of cluster named 'name' from Metadata
 // Returns (true, nil) if found and loaded, (false, nil) if not found, and (false, error) in case of error
 func (c *Cluster) ReadDefinition() (bool, error) {
-	svc := c.getService()
+	utils.CreateMetadataContainer()
 
-	path := clusterapi.ClusterContainerNamePrefix + c.definition.Common.Name
-	list, err := svc.ListObjects(clusterapi.DeployContainerName, providerapi.ObjectFilter{
-		Path: path,
+	ok, err := utils.FindMetadata(clusterapi.ClusterMetadataPrefix, c.Definition.Cluster.Name)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return false, nil
+	}
+
+	// reads the data in Object Storage
+	var d Definition
+	err = utils.ReadMetadata(clusterapi.ClusterMetadataPrefix, c.Definition.Cluster.Name, func(buf *bytes.Buffer) error {
+		return gob.NewDecoder(buf).Decode(&d)
 	})
 	if err != nil {
 		return false, err
 	}
-	found := false
-	for _, i := range list {
-		if i == path {
-			found = true
-			break
-		}
-	}
-	if found {
-		o, err := svc.GetObject(clusterapi.DeployContainerName, clusterapi.ClusterContainerNamePrefix+c.definition.Common.Name, nil)
-		if err != nil {
-			return false, err
-		}
-		var buffer bytes.Buffer
-		buffer.ReadFrom(o.Content)
-		enc := gob.NewDecoder(&buffer)
-		var d ClusterDefinition
-		err = enc.Decode(&d)
-		if err != nil {
-			return false, err
-		}
-		c.definition = &d
-		return true, nil
-	}
-	return false, nil
+	c.Definition = &d
+	return true, nil
 }
 
 //RemoveDefinition removes definition of cluster from Object Storage
 func (c *Cluster) RemoveDefinition() error {
-	if len(c.definition.MasterIDs) > 0 ||
-		len(c.definition.PublicAgentIDs) > 0 ||
-		len(c.definition.PrivateAgentIDs) > 0 ||
-		c.definition.NetworkID != "" {
-		return fmt.Errorf("can't remove a definition of a cluster with infrastructure still existing")
+	if len(c.Definition.MasterIDs) > 0 ||
+		len(c.Definition.PublicAgentIDs) > 0 ||
+		len(c.Definition.PrivateAgentIDs) > 0 ||
+		c.Definition.Cluster.NetworkID != "" {
+		return fmt.Errorf("can't remove a definition of a cluster with infrastructure still running")
 	}
 
-	svc := c.getService()
-
-	path := clusterapi.ClusterContainerNamePrefix + c.definition.Common.Name
-	list, err := svc.ListObjects(clusterapi.DeployContainerName, providerapi.ObjectFilter{
-		Path: path,
-	})
+	err := utils.DeleteMetadata(clusterapi.ClusterMetadataPrefix, c.Definition.Cluster.Name)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to remove cluster definition in Object Storage: %s", err.Error())
 	}
-	found := false
-	for _, i := range list {
-		if i == path {
-			found = true
-			break
-		}
-	}
-	if found {
-		err := c.getService().DeleteObject(clusterapi.DeployContainerName, clusterapi.ClusterContainerNamePrefix+c.definition.Common.Name)
-		if err != nil {
-			return fmt.Errorf("failed to remove cluster definition in Object Storage: %s", err.Error())
-		}
-		c.definition.Common.State = ClusterState.Removed
-	}
+	c.Definition.Cluster.State = ClusterState.Removed
 	return nil
+}
+
+//Delete destroys everything related to the infrastructure built for the cluster
+func (c *Cluster) Delete() error {
+	return fmt.Errorf("dcos.Cluster.Delete not yet implemented")
 }
