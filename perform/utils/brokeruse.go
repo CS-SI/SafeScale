@@ -6,7 +6,8 @@ import (
 	"log"
 	"time"
 
-	pb "github.com/SafeScale/broker"
+	pb "github.com/CS-SI/SafeScale/broker"
+
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"
 )

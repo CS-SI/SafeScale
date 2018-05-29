@@ -1,4 +1,5 @@
 package main
+
 /*
 * Copyright 2015-2018, CS Systemes d'Information, http://www.c-s.fr
 *
@@ -13,20 +14,20 @@ package main
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-*/
+ */
 
 import (
 	"fmt"
 	"log"
 	"runtime"
 
-	"github.com/SafeScale/perform/cluster"
-	clusterapi "github.com/SafeScale/perform/cluster/api"
-	"github.com/SafeScale/perform/cluster/api/Complexity"
-	"github.com/SafeScale/perform/cluster/api/Flavor"
-	"github.com/SafeScale/perform/cluster/api/NodeType"
+	"github.com/CS-SI/SafeScale/perform/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
 
-	pb "github.com/SafeScale/broker"
+	pb "github.com/CS-SI/SafeScale/broker"
 )
 
 //Run runs the deployment

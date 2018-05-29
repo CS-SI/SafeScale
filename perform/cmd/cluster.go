@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/SafeScale/perform/cluster"
-	clusterapi "github.com/SafeScale/perform/cluster/api"
-	"github.com/SafeScale/perform/cluster/api/Complexity"
-	"github.com/SafeScale/perform/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/perform/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
+
 	"github.com/urfave/cli"
 )
 

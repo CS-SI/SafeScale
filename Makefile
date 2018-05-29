@@ -2,7 +2,7 @@ GO?=go
 
 .PHONY: clean providers brokerd broker system perform clean deps
 
-all: providers system broker 
+all: providers system broker perform
 
 providers:
 	@(cd providers && $(MAKE))

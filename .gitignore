@@ -40,6 +40,9 @@ scanner/scanner
 cluster/tests/deploy
 broker/daemon/brokerd
 broker/client/broker
+perform/perform
 
+#ignore results of scanner
+scanner/Test*
 
 
