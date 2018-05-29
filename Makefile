@@ -30,8 +30,12 @@ URFAVE := github.com/urfave/cli
 VIPER := github.com/spf13/viper
 #Data validation lib: at least used to validate VM name for flexibleengine
 PENGUS_CHECK := github.com/pengux/check
+UUID := github.com/satori/go.uuid
+SPEW := github.com/davecgh/go-spew/spew
+DSP := github.com/mjibson/go-dsp/fft
+TESTIFY := github.com/stretchr/testify
 
-deps: DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK)
+deps: DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY)
 
 deps: ; @$(GO) get $(DEPS)
 
