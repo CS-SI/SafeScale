@@ -2,6 +2,7 @@
 
 SafeScale is an Infrastructure and Platform as a Code tool.
 
+## Description
 SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters that span multiple Clouds. These APIs and CLIs are divided in 3 service layers:
 
 * SafeScale Broker to manage Cloud infrastructure
@@ -10,7 +11,7 @@ SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters 
 
 ![SafeScale](img/SafeScale.png "SafeScale")
 
-## SafeScale Broker
+### SafeScale Broker
 
 SafeScale Broker offers an API to completely abstract the IaaS services offered by Cloud platforms providers.
 It allows to:
@@ -25,7 +26,7 @@ It allows to:
 ![SafeScale Broker](img/SafeScale_Broker.png "SafeScale Broker")
 SafeScale Broker provides a complete abstraction overlay over underlying IaaS APIs to mask their heterogeneity.
 
-## SafeScale Perform
+### SafeScale Perform
 
 The concept of SafeScale Perform revolves around the offer of an API to create on-demand computing platforms. These platforms are built to by highly versatile providing all necessary building blocks to create a cutting-edge, production grade, scalable and highly available services: Micro service orchestration, Big Data and HPC computing frameworks, large scale data management, AI training and inference frameworks.
 ![SafeScale Perform](img/SafeScale_Perform.png "SafeScale Perform")
@@ -34,7 +35,7 @@ SafeScale Perform platforms resource management is centralized by Apache Mesos w
 A corollary of the centralized resource management system is that it allows the combined usage of various computing and service management frameworks which greatly simplifies the porting of in-house applications to the Cloud.
 It is also important to precise that SafeScale Perform platforms are not static, they can be up-scale and down scaled on-demand or automatically to adapt to load fluctuations and thus to optimize IT costs.
 
-## SafeScale Security
+### SafeScale Security
 
 SafeScale Security is a Web API and a Web Portal to create on-demand security gateways to protect Web services along 5 axes: Encryption, Authentication, Authorization, Auditability and Intrusion detection.
 SafeScale Security relies on Kong, an open source generic proxy to be put in between user and service. Kong intercepts user requests and service responses and executes plugins to empower any API. To build a SafeScale Security gateway 3 plugins are used: 
@@ -43,3 +44,18 @@ SafeScale Security relies on Kong, an open source generic proxy to be put in bet
 * UDP Log plugin to connect the Log management system, Logstash
 The design of a SafeScale Security gateway can be depicted as bellow:
 ![SafeScale Security](img/SafeScale_Security.png "SafeScale Security")
+
+## Features available 
+SafeScale is currently under development and does not yet offer all the features planned. However, we are already releasing it with the following features:
+* SafeScale Broker:
+  * Create / Destroy private networks
+  * Create/Destroy Virtual Machine (VM),
+  * Create / Destroy block and object storage,
+  * Mount object storage on file system,
+  * Create NAS, Connect/disconnect VM to NAS,
+  
+* Providers addressed:
+  * OVH
+  * FlexibleEngine
+  * CloudWatt
+  * AWS
