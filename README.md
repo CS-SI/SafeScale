@@ -60,3 +60,7 @@ SafeScale is currently under active development and does not yet offer all the f
   * FlexibleEngine
   * CloudWatt
   * AWS: under development 
+
+## License
+
+SafeScale is distributed by [CS Systemes d'Information](http://www.c-s.fr) under the [Apache License, Version 2.0](LICENSE). Please see the [third-party notices](NOTICE) file for additional copyright notices and license terms applicable to portions of the software.
