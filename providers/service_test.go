@@ -21,15 +21,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/SafeScale/providers/cloudwatt"
-	"github.com/SafeScale/providers/flexibleengine"
-	"github.com/SafeScale/providers/ovh"
+	"github.com/CS-SI/SafeScale/providers/cloudwatt"
+	"github.com/CS-SI/SafeScale/providers/flexibleengine"
+	"github.com/CS-SI/SafeScale/providers/ovh"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/spf13/viper"
 
-	"github.com/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers"
 )
 
 func TestCompare(t *testing.T) {

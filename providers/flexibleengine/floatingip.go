@@ -18,7 +18,7 @@ package flexibleengine
 import (
 	"fmt"
 
-	"github.com/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"

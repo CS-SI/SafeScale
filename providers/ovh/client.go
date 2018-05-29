@@ -16,11 +16,11 @@ package ovh
 */
 
 import (
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/openstack"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/openstack"
 
-	"github.com/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 )
 
 //ProviderNetwork name of ovh external network

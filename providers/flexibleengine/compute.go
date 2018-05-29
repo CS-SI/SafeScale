@@ -26,11 +26,11 @@ import (
 
 	"github.com/pengux/check"
 
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/api/IPVersion"
-	"github.com/SafeScale/providers/api/VMState"
-	"github.com/SafeScale/system"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/api/VMState"
+	"github.com/CS-SI/SafeScale/system"
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/gophercloud/gophercloud"

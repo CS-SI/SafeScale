@@ -16,9 +16,9 @@ package brokerd
 */
 
 import (
-	pb "github.com/SafeScale/broker"
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/system"
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/system"
 )
 
 // ToPBSshconfig converts a system.SSHConfig into a SshConfig

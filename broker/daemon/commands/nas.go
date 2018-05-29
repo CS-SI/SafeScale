@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"log"
 
-	services "github.com/SafeScale/broker/daemon/services"
+	services "github.com/CS-SI/SafeScale/broker/daemon/services"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 
-	pb "github.com/SafeScale/broker"
-	convert "github.com/SafeScale/broker/utils"
+	pb "github.com/CS-SI/SafeScale/broker"
+	convert "github.com/CS-SI/SafeScale/broker/utils"
 )
 
 // broker nas create nas1 vm1 --path="/shared/data"

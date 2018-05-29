@@ -28,17 +28,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
 
-	"github.com/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 
 	rice "github.com/GeertJohan/go.rice"
-	"github.com/SafeScale/providers/api/VMState"
+	"github.com/CS-SI/SafeScale/providers/api/VMState"
 
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/aws/s3"
-	"github.com/SafeScale/system"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/aws/s3"
+	"github.com/CS-SI/SafeScale/system"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"

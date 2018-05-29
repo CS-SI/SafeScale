@@ -23,7 +23,7 @@ import (
 	"text/template"
 
 	"github.com/GeertJohan/go.rice"
-	"github.com/SafeScale/system"
+	"github.com/CS-SI/SafeScale/system"
 )
 
 //go:generate rice embed-go

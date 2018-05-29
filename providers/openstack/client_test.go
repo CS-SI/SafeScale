@@ -22,11 +22,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers"
 
-	"github.com/SafeScale/providers/api"
-	"github.com/SafeScale/providers/openstack"
-	"github.com/SafeScale/providers/tests"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/openstack"
+	"github.com/CS-SI/SafeScale/providers/tests"
 )
 
 var tester *tests.ClientTester

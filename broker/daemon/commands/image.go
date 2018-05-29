@@ -16,8 +16,8 @@ package commands
 */
 
 import (
-	"github.com/SafeScale/providers"
-	"github.com/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
 )
 
 // broker vm create vm1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
