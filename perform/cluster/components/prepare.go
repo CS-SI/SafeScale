@@ -21,7 +21,7 @@ var (
 //getTemplateBox
 func getTemplateBox() (*rice.Box, error) {
 	if templateBox == nil {
-		b, err := rice.FindBox("../../perform/cluster/components/scripts")
+		b, err := rice.FindBox("../../../perform/cluster/components/scripts")
 		if err != nil {
 			return nil, err
 		}

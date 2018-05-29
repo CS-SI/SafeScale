@@ -1,0 +1,136 @@
+package utils
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	pb "github.com/SafeScale/broker"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	"google.golang.org/grpc"
+)
+
+const (
+	address = "localhost:50051"
+	//TimeoutCtxDefault default timeout for grpc command invocation
+	TimeoutCtxDefault = 20 * time.Second
+	//TimeoutCtxVM timeout for grpc command relative to VM creation
+	TimeoutCtxVM = 2 * time.Minute
+)
+
+//GetConnection returns a connection to GRPC server
+func GetConnection() *grpc.ClientConn {
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	return conn
+}
+
+//GetContext return a context for grpc commands
+func GetContext(timeout time.Duration) (context.Context, context.CancelFunc) {
+	// Contact the server and print out its response.
+	return context.WithTimeout(context.Background(), timeout)
+}
+
+//GetCurrentTenant returns the string of the current tenant set by broker
+func GetCurrentTenant() (string, error) {
+	conn := GetConnection()
+	defer conn.Close()
+	tenantSvc := pb.NewTenantServiceClient(conn)
+	ctx, cancel := GetContext(TimeoutCtxDefault)
+	defer cancel()
+	tenant, err := tenantSvc.Get(ctx, &google_protobuf.Empty{})
+	if err != nil {
+		return "", err
+	}
+	if tenant == nil || tenant.Name == "" {
+		return "", fmt.Errorf("Tenant must be set; use 'broker tenant set'.")
+	}
+	return tenant.Name, nil
+}
+
+//CreateNetwork creates a network using brokerd
+func CreateNetwork(name string, cidr string) (*pb.Network, error) {
+	conn := GetConnection()
+	defer conn.Close()
+	ctx, cancel := GetContext(10 * time.Minute)
+	defer cancel()
+	networkService := pb.NewNetworkServiceClient(conn)
+	netdef := &pb.NetworkDefinition{
+		CIDR: cidr,
+		Name: name,
+		Gateway: &pb.GatewayDefinition{
+			CPU:  1,
+			Disk: 30,
+			RAM:  1.0,
+			// CPUFrequency: ??,
+			ImageID: "Ubuntu 16.04",
+		},
+	}
+	network, err := networkService.Create(ctx, netdef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Network: %v", err)
+	}
+	//sleep 3s to wait Network in READY state for now, has to be smarter... Probably in service.CreateNetwork()
+	fmt.Println("Sleeping 3s...")
+	time.Sleep(3 * time.Second)
+	fmt.Println("Waking up...")
+
+	return network, nil
+}
+
+//DeleteNetwork deletes a network using brokerd
+func DeleteNetwork(id string) error {
+	conn := GetConnection()
+	defer conn.Close()
+	ctx, cancel := GetContext(10 * time.Minute)
+	defer cancel()
+	networkService := pb.NewNetworkServiceClient(conn)
+	_, err := networkService.Delete(ctx, &pb.Reference{ID: id})
+	if err != nil {
+		return fmt.Errorf("failed to delete Network: %v", err)
+	}
+	return nil
+}
+
+//CreateVM creates a VM using brokerd
+func CreateVM(req *pb.VMDefinition) (*pb.VM, error) {
+	conn := GetConnection()
+	defer conn.Close()
+	ctx, cancel := GetContext(TimeoutCtxVM)
+	defer cancel()
+	service := pb.NewVMServiceClient(conn)
+	vm, err := service.Create(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Bootstrap server: %v", err)
+	}
+	return vm, nil
+}
+
+//DeleteVM deletes a VM using brokerd
+func DeleteVM(id string) error {
+	conn := GetConnection()
+	defer conn.Close()
+	ctx, cancel := GetContext(TimeoutCtxVM)
+	defer cancel()
+	service := pb.NewVMServiceClient(conn)
+	_, err := service.Delete(ctx, &pb.Reference{ID: id})
+	return err
+}
+
+//CreateMetadataContainer creates the container that will be contain everything from SafeScale
+func CreateMetadataContainer() error {
+	conn := GetConnection()
+	defer conn.Close()
+	ctx, cancel := GetContext(TimeoutCtxVM)
+	defer cancel()
+	service := pb.NewContainerServiceClient(conn)
+	_, err := service.Create(ctx, &pb.Container{Name: "0.safescale"})
+	if err != nil {
+		return fmt.Errorf("failed to create Container '0.safescale: %s", err.Error())
+	}
+	return nil
+}

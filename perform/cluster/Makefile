@@ -1,12 +1,15 @@
-all: api dcos tests
+all: api components dcos tests
 
-.PHONY: api dcos tests clean mrproper
+.PHONY: api components dcos tests clean mrproper
 
 api:
 	@(cd api && $(MAKE))
 
 dcos:
 	@(cd dcos && $(MAKE))
+
+components:
+	@(cd components && $(MAKE))
 
 tests: api dcos
 	@(cd tests && $(MAKE))

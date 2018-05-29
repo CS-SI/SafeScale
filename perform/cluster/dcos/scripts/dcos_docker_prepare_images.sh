@@ -1,17 +1,18 @@
-# Prepares docker images needed to the deployment
+# Prepares docker images needed for the deployment
 #
 # This script has to be executed on the bootstrap/upgrade server
 
-mkdir /usr/local/dcos/genconf/serve/docker
+(
+    mkdir /usr/local/dcos/genconf/serve/docker
 
-{{ .PrepareImageGuacamole }}
-{{ .PrepareImageProxy }}
+    {{ .PrepareImageGuacamole }}
+    {{ .PrepareImageProxy }}
 
-############################################################
-# docker-compose file to starts guacamole+proxy containers #
-############################################################
+    ############################################################
+    # docker-compose file to starts guacamole+proxy containers #
+    ############################################################
 
-cat >/usr/local/dcos/genconf/serve/docker/docker-compose.yml <<-EOF
+    cat >/usr/local/dcos/genconf/serve/docker/docker-compose.yml <<-EOF
 version: '3'
 
 services:
@@ -37,8 +38,10 @@ networks:
 
 EOF
 
-################
-# Some cleanup #
-################
+    ################
+    # Some cleanup #
+    ################
 
-docker image prune -f
+    docker image prune -f
+
+) &>/var/tmp/prepare_docker_images.log
