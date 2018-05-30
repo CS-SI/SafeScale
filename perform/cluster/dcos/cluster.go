@@ -34,7 +34,8 @@ import (
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
 	"github.com/CS-SI/SafeScale/perform/cluster/components"
-	"github.com/CS-SI/SafeScale/perform/utils"
+	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/metadata"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )
@@ -634,18 +635,14 @@ func (c *Cluster) WriteDefinition() error {
 	//}
 	//content := bytes.NewReader(buffer.Bytes()
 
-	utils.CreateMetadataContainer()
-
 	// writes  the data in Object Storage
-	return utils.WriteMetadata(clusterapi.ClusterMetadataPrefix, c.Definition.Cluster.Name, c.Definition)
+	return metadata.Write(clusterapi.ClusterMetadataPath, c.Definition.Cluster.Name, c.Definition)
 }
 
 //ReadDefinition reads definition of cluster named 'name' from Metadata
 // Returns (true, nil) if found and loaded, (false, nil) if not found, and (false, error) in case of error
 func (c *Cluster) ReadDefinition() (bool, error) {
-	utils.CreateMetadataContainer()
-
-	ok, err := utils.FindMetadata(clusterapi.ClusterMetadataPrefix, c.Definition.Cluster.Name)
+	ok, err := metadata.Find(clusterapi.ClusterMetadataPath, c.Definition.Cluster.Name)
 	if err != nil {
 		return false, err
 	}
@@ -654,14 +651,20 @@ func (c *Cluster) ReadDefinition() (bool, error) {
 	}
 
 	// reads the data in Object Storage
-	var d Definition
-	err = utils.ReadMetadata(clusterapi.ClusterMetadataPrefix, c.Definition.Cluster.Name, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&d)
+	var def Definition
+	err = metadata.Read(clusterapi.ClusterMetadataPath, c.Definition.Cluster.Name, func(buf *bytes.Buffer) error {
+		var d interface{}
+		err := gob.NewDecoder(buf).Decode(&d)
+		if err != nil {
+			def = d.(Definition)
+			return nil
+		}
+		return err
 	})
 	if err != nil {
 		return false, err
 	}
-	c.Definition = &d
+	c.Definition = &def
 	return true, nil
 }
 
@@ -674,7 +677,7 @@ func (c *Cluster) RemoveDefinition() error {
 		return fmt.Errorf("can't remove a definition of a cluster with infrastructure still running")
 	}
 
-	err := utils.DeleteMetadata(clusterapi.ClusterMetadataPrefix, c.Definition.Cluster.Name)
+	err := metadata.Delete(clusterapi.ClusterMetadataPath, c.Definition.Cluster.Name)
 	if err != nil {
 		return fmt.Errorf("failed to remove cluster definition in Object Storage: %s", err.Error())
 	}

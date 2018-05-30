@@ -25,9 +25,11 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
+	"github.com/CS-SI/SafeScale/utils"
+
 	rice "github.com/GeertJohan/go.rice"
 
-	// OpenStack API from GopherCloud
+	// Gophercloud OpenStack API
 	gc "github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
@@ -304,9 +306,9 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, err
 	}
 
-	err = clt.CreateContainer(api.NetworkContainerName)
+	err = clt.CreateContainer(utils.MetadataContainerName)
 	if err != nil {
-		fmt.Printf("failed to create Object Container %s: %s\n", api.NetworkContainerName, errorString(err))
+		fmt.Printf("failed to create Object Container %s: %s\n", utils.MetadataContainerName, errorString(err))
 	}
 	err = clt.CreateContainer(api.VMContainerName)
 	if err != nil {

@@ -1,8 +1,11 @@
+GO?=go
+
+.PHONY: clean utils
+
 all: utils
 
-.PHONY: clean
-
-utils:	brokeruse.go provideruse.go metadata.go
+utils: *.go
 	@go generate
 
 clean:
+

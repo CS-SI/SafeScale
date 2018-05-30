@@ -20,29 +20,28 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"log"
+	"reflect"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/providers/api"
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenants
+	"github.com/CS-SI/SafeScale/utils"
+
+	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
-const (
-	metadataContainerName string = "0.safescale"
-)
-
-//FindMetadata returns the full path of the metadata search if it exists in Object Storage
+//Find returns the full path of the metadata search if it exists in Object Storage
 // If the returned string is "" and error is nil, metadata doesn't exist
-func FindMetadata(path string, name string) (bool, error) {
-	CreateMetadataContainer()
-
-	svc, err := GetProviderService()
+func Find(path string, name string) (bool, error) {
+	svc, err := utils.GetProviderService()
 	if err != nil {
 		return false, err
 	}
 
-	list, err := svc.ListObjects(metadataContainerName, api.ObjectFilter{
+	list, err := svc.ListObjects(utils.MetadataContainerName, api.ObjectFilter{
 		Path:   strings.TrimLeft(name, "/"),
 		Prefix: strings.TrimRight(path, "/"),
 	})
@@ -52,32 +51,32 @@ func FindMetadata(path string, name string) (bool, error) {
 	return len(list) > 0, nil
 }
 
-//DeleteMetadata removes metadata passed as parameter
-func DeleteMetadata(path string, name string) error {
-	svc, err := GetProviderService()
+//Delete removes metadata passed as parameter
+func Delete(path string, name string) error {
+	svc, err := utils.GetProviderService()
 	if err != nil {
 		return err
 	}
 	fullPath := strings.TrimRight(path, "/") + "/" + strings.TrimLeft(name, "/")
-	err = svc.DeleteObject(metadataContainerName, fullPath)
+	err = svc.DeleteObject(utils.MetadataContainerName, fullPath)
 	if err != nil {
 		return fmt.Errorf("failed to remove cluster definition in Object Storage: %s", err.Error())
 	}
 	return nil
 }
 
-//MetadataDecoder is the prototype of the function that will decode data read from Metadata
-type MetadataDecoder func(*bytes.Buffer) error
+//DecoderCallback is the prototype of the function that will decode data read from Metadata
+type DecoderCallback func(buffer *bytes.Buffer) error
 
-//ReadMetadata loads the content of the object stored in metadata container
-func ReadMetadata(path string, name string, call MetadataDecoder) error {
-	svc, err := GetProviderService()
+//Read loads the content of the object stored in metadata container
+func Read(path string, name string, call DecoderCallback) error {
+	svc, err := utils.GetProviderService()
 	if err != nil {
 		return err
 	}
 
 	fullPath := strings.TrimRight(path, "/") + "/" + strings.TrimLeft(name, "/")
-	o, err := svc.GetObject(metadataContainerName, fullPath, nil)
+	o, err := svc.GetObject(utils.MetadataContainerName, fullPath, nil)
 	if err != nil {
 		return err
 	}
@@ -86,48 +85,55 @@ func ReadMetadata(path string, name string, call MetadataDecoder) error {
 	return call(&buffer)
 }
 
-//WriteMetadata writes the content in Object Storage
-func WriteMetadata(path string, name string, content interface{}) error {
+//Write writes the content in Object Storage
+func Write(path string, name string, content interface{}) error {
 	var buffer bytes.Buffer
 	err := gob.NewEncoder(&buffer).Encode(content)
 	if err != nil {
 		return err
 	}
 
-	svc, err := GetProviderService()
+	svc, err := utils.GetProviderService()
 	if err != nil {
 		return err
 	}
 
 	fullPath := strings.TrimRight(path, "/") + "/" + strings.TrimLeft(name, "/")
-	return svc.PutObject(metadataContainerName, api.Object{
+	return svc.PutObject(utils.MetadataContainerName, api.Object{
 		Name:    fullPath,
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
 }
 
-//BrowseMetadataContent browses the content of a specific path in Metadata and executes 'call' on each entry
-func BrowseMetadataContent(path string, call MetadataDecoder) error {
-	svc, err := GetProviderService()
+//Browse browses the content of a specific path in Metadata and executes 'call' on each entry
+func Browse(path string, cb DecoderCallback) error {
+	svc, err := utils.GetProviderService()
 	if err != nil {
 		return err
 	}
 
-	list, err := svc.ListObjects(metadataContainerName, api.ObjectFilter{
-		Prefix: strings.TrimRight(path, "/"),
+	list, err := svc.ListObjects(utils.MetadataContainerName, api.ObjectFilter{
+		Path: strings.Trim(path, "/"),
 	})
 	if err != nil {
+		log.Printf("err type = %s", reflect.TypeOf(err))
+		// If bucket not found, return nil; no item will be processed, meaning empty path
+		if awsError, ok := err.(awserr.RequestFailure); ok {
+			if awsError.StatusCode() == 404 {
+				return nil
+			}
+		}
 		return err
 	}
 
 	for _, i := range list {
-		o, err := svc.GetObject(metadataContainerName, i, nil)
+		o, err := svc.GetObject(utils.MetadataContainerName, i, nil)
 		if err != nil {
 			return err
 		}
 		var buffer bytes.Buffer
 		buffer.ReadFrom(o.Content)
-		err = call(&buffer)
+		err = cb(&buffer)
 		if err != nil {
 			return err
 		}

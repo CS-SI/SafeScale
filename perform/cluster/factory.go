@@ -24,11 +24,12 @@ import (
 	"strings"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/utils/metadata"
 
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/perform/cluster/dcos"
-	"github.com/CS-SI/SafeScale/perform/utils"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 //Get returns the ClusterAPI instance corresponding to the cluster named 'name'
@@ -54,23 +55,29 @@ func Get(name string) (clusterapi.ClusterAPI, error) {
 
 //readDefinition reads definition of cluster named 'name' in Object Storage
 func readDefinition(tenant string, name string) (clusterapi.ClusterAPI, error) {
-	ok, err := utils.FindMetadata(clusterapi.ClusterMetadataPrefix, name)
+	ok, err := metadata.Find(clusterapi.ClusterMetadataPath, name)
 	if !ok {
 		return nil, err
 	}
 
-	var d clusterapi.Cluster
-	err = utils.ReadMetadata(clusterapi.ClusterMetadataPrefix, name, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&d)
+	var c clusterapi.Cluster
+	err = metadata.Read(clusterapi.ClusterMetadataPath, name, func(buf *bytes.Buffer) error {
+		var d interface{}
+		err := gob.NewDecoder(buf).Decode(&d)
+		if err != nil {
+			return nil
+		}
+		c = d.(clusterapi.Cluster)
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	switch d.Flavor {
+	switch c.Flavor {
 	case Flavor.DCOS:
 		instance := &dcos.Cluster{
 			Definition: &dcos.Definition{
-				Cluster: d,
+				Cluster: c,
 			},
 		}
 		// Re-read the definition with complete data unserialization
@@ -91,12 +98,6 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	}
 	if req.CIDR == "" {
 		return nil, fmt.Errorf("Invalid parameter req.CIDR: can't be empty")
-	}
-
-	// We need at first the Metadata container to be present
-	err := utils.CreateMetadataContainer()
-	if err != nil {
-		fmt.Printf("failed to create Object Container: %s\n", err.Error())
 	}
 
 	var network *pb.Network
@@ -154,12 +155,13 @@ func Delete(name string) error {
 //List lists the clusters already created
 func List() ([]clusterapi.Cluster, error) {
 	var clusterList []clusterapi.Cluster
-	err := utils.BrowseMetadataContent(clusterapi.ClusterMetadataPrefix, func(buf *bytes.Buffer) error {
-		var c clusterapi.Cluster
-		err := gob.NewDecoder(buf).Decode(&c)
+	err := metadata.Browse(clusterapi.ClusterMetadataPath, func(buf *bytes.Buffer) error {
+		var d interface{}
+		err := gob.NewDecoder(buf).Decode(&d)
 		if err != nil {
 			return err
 		}
+		c := d.(clusterapi.Cluster)
 		clusterList = append(clusterList, c)
 		return nil
 	})

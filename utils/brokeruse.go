@@ -28,14 +28,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	address = "localhost:50051"
-	//TimeoutCtxDefault default timeout for grpc command invocation
-	TimeoutCtxDefault = 20 * time.Second
-	//TimeoutCtxVM timeout for grpc command relative to VM creation
-	TimeoutCtxVM = 2 * time.Minute
-)
-
 //GetConnection returns a connection to GRPC server
 func GetConnection() *grpc.ClientConn {
 	// Set up a connection to the server.
@@ -136,18 +128,4 @@ func DeleteVM(id string) error {
 	service := pb.NewVMServiceClient(conn)
 	_, err := service.Delete(ctx, &pb.Reference{ID: id})
 	return err
-}
-
-//CreateMetadataContainer creates the container that will be contain everything from SafeScale
-func CreateMetadataContainer() error {
-	conn := GetConnection()
-	defer conn.Close()
-	ctx, cancel := GetContext(TimeoutCtxVM)
-	defer cancel()
-	service := pb.NewContainerServiceClient(conn)
-	_, err := service.Create(ctx, &pb.Container{Name: "0.safescale"})
-	if err != nil {
-		return fmt.Errorf("failed to create Container '0.safescale: %s", err.Error())
-	}
-	return nil
 }

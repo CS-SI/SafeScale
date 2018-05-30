@@ -32,6 +32,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/api/VMState"
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils"
+
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/gophercloud/gophercloud"
@@ -534,7 +536,9 @@ func (client *Client) listAllVMs() ([]api.VM, error) {
 // This code seems to be the same than openstack provider, but it HAS TO BE DUPLICARED
 // because client.ListObjects() is different (Swift for openstack, S3 for flexibleengine).
 func (client *Client) listMonitoredVMs() ([]api.VM, error) {
-	names, err := client.ListObjects(api.VMContainerName, api.ObjectFilter{})
+	names, err := client.ListObjects(api.VMContainerName, api.ObjectFilter{
+		Prefix: utils.MetadataContainerName,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -785,7 +789,7 @@ func (client *Client) saveVMDefinition(vm api.VM) error {
 	if err != nil {
 		return err
 	}
-	return client.PutObject(api.VMContainerName, api.Object{
+	return client.PutObject(utils.MetadataContainerName+"/"+api.VMContainerName, api.Object{
 		Name:    vm.ID,
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
@@ -793,12 +797,12 @@ func (client *Client) saveVMDefinition(vm api.VM) error {
 
 //removeVMDefinition removes the VM definition from Object Storage
 func (client *Client) removeVMDefinition(vmID string) error {
-	return client.DeleteObject(api.VMContainerName, vmID)
+	return client.DeleteObject(utils.MetadataContainerName+"/"+api.VMContainerName, vmID)
 }
 
 //readVMDefinition gets the VM definition from Object Storage
 func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
-	o, err := client.GetObject(api.VMContainerName, vmID, nil)
+	o, err := client.GetObject(utils.MetadataContainerName+"/"+api.VMContainerName, vmID, nil)
 	if err != nil {
 		return nil, err
 	}

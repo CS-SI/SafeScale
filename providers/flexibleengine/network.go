@@ -25,11 +25,14 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
+	"github.com/CS-SI/SafeScale/utils"
+
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
+
 	"github.com/pengux/check"
 )
 
@@ -265,7 +268,9 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 
 //listMonitoredNetworks lists available networks created by SafeScale (ie those registered in object storage)
 func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
-	netIDs, err := client.ListObjects(api.NetworkContainerName, api.ObjectFilter{})
+	netIDs, err := client.ListObjects(api.NetworkContainerName, api.ObjectFilter{
+		Prefix: utils.MetadataContainerName,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +523,7 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 
 //writeGateway writes in Object Storage the ID of the VM acting as gateway for the network identified by netID
 func (client *Client) writeGateway(netID string, vmID string) error {
-	err := client.PutObject(api.NetworkContainerName, api.Object{
+	err := client.PutObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, api.Object{
 		Name:    netID,
 		Content: strings.NewReader(vmID),
 	})
@@ -527,7 +532,7 @@ func (client *Client) writeGateway(netID string, vmID string) error {
 
 //readGateway reads inn Object Storage the ID of the VM acting as gateway for the network identified by netID
 func (client *Client) readGateway(netID string) (string, error) {
-	o, err := client.GetObject(api.NetworkContainerName, netID, nil)
+	o, err := client.GetObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, netID, nil)
 	if err != nil {
 		return "", err
 	}
@@ -538,7 +543,7 @@ func (client *Client) readGateway(netID string) (string, error) {
 
 //removeGateway deletes from Object Storage the gateway data for the network identified by netID
 func (client *Client) removeGateway(netID string) error {
-	return client.DeleteObject(api.NetworkContainerName, netID)
+	return client.DeleteObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, netID)
 }
 
 //CreateGateway creates a gateway for a network.

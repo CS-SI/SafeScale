@@ -49,11 +49,11 @@ const (
 
 const (
 	// NetworkContainerName is the tecnical name of the container used to store networks info
-	NetworkContainerName = "0.nw"
+	NetworkContainerName = "nw"
 	// VMContainerName is the tecnical name of the container used to store VMs info
-	VMContainerName = "0.vm"
+	VMContainerName = "vm"
 	// NasContainerName is the tecnical name of the container used to store nas info
-	NasContainerName = "0.nas"
+	NasContainerName = "nas"
 )
 
 //TimeoutError defines a Timeout error
