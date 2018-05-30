@@ -20,8 +20,8 @@ NodeType/enum_string.go: NodeType/enum.go
 	@(cd NodeType && go generate)
 
 clean:
-	@(rm -f ClusterState/enum_string.go)
-	@(rm -f Complexity/enum_string.go)
-	@(rm -f Flavor/enum_string.go)
-	@(rm -f NodeState/enum_string.go)
-	@(rm -f NodeType/enum_string.go)
+	@($(RM) ClusterState/enum_string.go)
+	@($(RM) Complexity/enum_string.go)
+	@($(RM) Flavor/enum_string.go)
+	@($(RM) NodeState/enum_string.go)
+	@($(RM) NodeType/enum_string.go)

@@ -20,6 +20,7 @@ clean:
 	@(cd providers && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
 	@(cd broker && $(MAKE) $@)
+	@(cd perform && $(MAKE) $@)
 
 
 # DEPENDENCIES HANDLING

@@ -8,14 +8,13 @@ all:	$(EXEC) cluster
 cluster:
 	@(cd cluster && $(MAKE))
 
-$(EXEC): main.go cmd/*.go utils/*.go
+$(EXEC): main.go cmd/*.go utils/*.go cluster
 	@$(GO) build -o $(EXEC)
 
 utils:
-	@(cd command && $(MAKE))
+	@(cd cmd && $(MAKE))
 
 clean:
 	@$(RM) $(EXEC)
 	@(cd cluster && $(MAKE) $@)
-	@(cd command && $(MAKE) $@)
 

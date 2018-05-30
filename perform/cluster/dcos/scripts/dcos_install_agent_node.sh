@@ -1,7 +1,6 @@
-
 #!/usr/bin/env bash
 #
-# Copyright 2015-2018 CS Systemes d'Information
+# Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

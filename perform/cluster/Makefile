@@ -1,15 +1,15 @@
-all: api components dcos tests
-
 .PHONY: api components dcos tests clean mrproper
+
+all: api components dcos tests
 
 api:
 	@(cd api && $(MAKE))
 
-dcos:
-	@(cd dcos && $(MAKE))
-
 components:
 	@(cd components && $(MAKE))
+
+dcos:
+	@(cd dcos && $(MAKE))
 
 tests: api dcos
 	@(cd tests && $(MAKE))
@@ -18,8 +18,9 @@ clean:
 	@(cd api && $(MAKE) $@)
 	@(cd dcos && $(MAKE) $@)
 	@(cd tests && $(MAKE) $@)
+	@(cd components && $(MAKE) $@)
 
 mrproper: clean
 	@(cd tests && rm -f debug)
-	@(rm -f dcos/rice-box.go)
+	@($(RM) dcos/rice-box.go)
 
