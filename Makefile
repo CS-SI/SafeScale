@@ -38,13 +38,23 @@ UUID := github.com/satori/go.uuid
 SPEW := github.com/davecgh/go-spew/spew
 DSP := github.com/mjibson/go-dsp/fft
 TESTIFY := github.com/stretchr/testify
-PROTOBUF = github.com/golang/protobuf/protoc-gen-go
-AWS := github.com/aws/aws-sdk-go
-GOPHER := github.com/gophercloud/gophercloud
-GOLANG := golang.org/x/crypto/ssh golang.org/x/net/context
+
+CRYPTO_SSH := golang.org/x/crypto/ssh
+
+# GRPC LIBS
+CONTEXT := golang.org/x/net/context
 GRPC := google.golang.org/grpc
+PROTOBUF := github.com/golang/protobuf/protoc-gen-go
+GRPC_LIBS := $(GRPC) $(PROTOBUF) $(CONTEXT)
 
-deps: DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(PROTOBUF) $(AWS) $(GOPHER) $(GOLANG) $(GRPC)
+## Providers SDK
+# OpenStack SDK for GO
+GOPHERCLOUD := github.com/gophercloud/gophercloud
+# AWS SDK for GO
+AWS := github.com/aws/aws-sdk-go
+# Providers SDK
+PROVIDERS_SDK := $(GOPHERCLOUD) $(AWS)
 
-deps: ; @$(GO) get -u $(DEPS)
+DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(CRYPTO_SSH) $(GRPC_LIBS) $(PROVIDERS_SDK)
 
+deps: ; $(GO) get $(DEPS)

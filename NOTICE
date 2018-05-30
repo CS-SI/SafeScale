@@ -43,6 +43,8 @@ The BSD-3-Clause Licence
 The following components are provided under the  BSD-3-Clause License  (https://opensource.org/licenses/BSD-3-Clause). See project link for details.
 
 github.com/golang/protobuf
+golang.org/x/crypto/ssh
+golang.org/x/net/context
 
 
 ================================================================
