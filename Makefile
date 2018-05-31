@@ -27,7 +27,7 @@ clean:
 #Generate enum tring
 STRINGER := golang.org/x/tools/cmd/stringer
 #Embed shell file into code go
-RICE := github.com/GeertJohan/go.rice
+RICE := github.com/GeertJohan/go.rice github.com/GeertJohan/go.rice/rice
 #CLI parser
 URFAVE := github.com/urfave/cli
 #Configuration file handler
@@ -38,8 +38,13 @@ UUID := github.com/satori/go.uuid
 SPEW := github.com/davecgh/go-spew/spew
 DSP := github.com/mjibson/go-dsp/fft
 TESTIFY := github.com/stretchr/testify
+PROTOBUF = github.com/golang/protobuf/protoc-gen-go
+AWS := github.com/aws/aws-sdk-go
+GOPHER := github.com/gophercloud/gophercloud
+GOLANG := golang.org/x/crypto/ssh golang.org/x/net/context
+GRPC := google.golang.org/grpc
 
-deps: DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY)
+deps: DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(PROTOBUF) $(AWS) $(GOPHER) $(GOLANG) $(GRPC)
 
-deps: ; @$(GO) get $(DEPS)
+deps: ; @$(GO) get -u $(DEPS)
 
