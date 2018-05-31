@@ -85,7 +85,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-				retcode = int(status)
+				retcode = status.ExitStatus()
 			}
 			stderr = string(ee.Stderr)
 		} else {

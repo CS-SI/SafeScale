@@ -588,7 +588,7 @@ func (c *Cluster) executeScript(targetID string, script string, data map[string]
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-				retcode = int(status)
+				retcode = status.ExitStatus()
 			}
 		} else {
 			return 0, nil, fmt.Errorf("failed to fetch output of script '%s': %s", script, err.Error())
