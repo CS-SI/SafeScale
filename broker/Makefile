@@ -6,7 +6,6 @@ all:	brokerd broker
 
 sdk:	broker.proto
 	@protoc -I. -I$(GOPATH)/src --go_out=plugins=grpc:. broker.proto
-	@protoc -I. -I$(GOPATH)/src --python_out=plugins=grpc:. broker.proto
 
 brokerd:	sdk
 	@(cd daemon && $(MAKE) $@)
