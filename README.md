@@ -24,12 +24,14 @@ It allows to:
 * Access VM Web Desktop.
 
 ![SafeScale Broker](img/SafeScale_Broker.png "SafeScale Broker")
+
 SafeScale Broker provides a complete abstraction overlay over underlying IaaS APIs to mask their heterogeneity.
 
 ### SafeScale Perform
 
 The concept of SafeScale Perform revolves around the offer of an API to create on-demand computing platforms. These platforms are built to by highly versatile providing all necessary building blocks to create a cutting-edge, production grade, scalable and highly available services: Micro service orchestration, Big Data and HPC computing frameworks, large scale data management, AI training and inference frameworks.
 ![SafeScale Perform](img/SafeScale_Perform.png "SafeScale Perform")
+
 The innovative aspect of SafeScale Perform platforms lies in their capacity to offer a combined usage of a large variety of frameworks and technologies without having to manage resources allocation (Node, RAM, CPU, and GPU).
 SafeScale Perform platforms resource management is centralized by Apache Mesos which guarantees a fair and efficient distribution of resources for all components hosted by the platform. This particularity enables SafeScale users to run concurrently services and compute loads of data without worrying about their partitioning over the nodes of the cluster and thus significantly accelerate the implementation of complex distributed services.
 A corollary of the centralized resource management system is that it allows the combined usage of various computing and service management frameworks which greatly simplifies the porting of in-house applications to the Cloud.
