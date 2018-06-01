@@ -27,7 +27,6 @@ import (
 
 	"github.com/pengux/check"
 
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
