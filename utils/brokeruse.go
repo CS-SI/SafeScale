@@ -31,7 +31,7 @@ import (
 //GetConnection returns a connection to GRPC server
 func GetConnection() *grpc.ClientConn {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(Address, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
