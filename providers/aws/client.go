@@ -31,6 +31,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/utils/metadata"
 
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 
@@ -125,9 +126,10 @@ func AuthenticatedClient(opts AuthOpts) (*Client, error) {
 		AuthOpts:    opts,
 		UserDataTpl: tpl,
 	}
-	c.CreateContainer("gpac.aws.networks")
-	c.CreateContainer("gpac.aws.wms")
-	c.CreateContainer("gpac.aws.volumes")
+	metadata.Initialize(&c)
+	//c.CreateContainer("gpac.aws.networks")
+	//c.CreateContainer("gpac.aws.wms")
+	//c.CreateContainer("gpac.aws.volumes")
 
 	return &c, nil
 }
@@ -1568,4 +1570,13 @@ func (c *Client) CopyObject(containerSrc, objectSrc, objectDst string) error {
 //DeleteObject deleta an object from a container
 func (c *Client) DeleteObject(container, object string) error {
 	return s3.DeleteObject(awss3.New(c.Session), container, object)
+}
+
+//GetAuthOpts
+func (c *Client) GetAuthOpts() {
+}
+
+//GetCfgOpts
+func (c *Client) GetCfgOpts() {
+
 }

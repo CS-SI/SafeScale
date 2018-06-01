@@ -27,7 +27,6 @@ import (
 
 	"github.com/pengux/check"
 
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/api/VMState"
@@ -536,14 +535,23 @@ func (client *Client) listAllVMs() ([]api.VM, error) {
 // This code seems to be the same than openstack provider, but it HAS TO BE DUPLICARED
 // because client.ListObjects() is different (Swift for openstack, S3 for flexibleengine).
 func (client *Client) listMonitoredVMs() ([]api.VM, error) {
-	names, err := client.ListObjects(api.VMContainerName, api.ObjectFilter{
+	var vms []api.VM
+	err := utils.BrowseMetadata(api.VMContainerName, func(buf *bytes.Buffer) error {
+		var vm api.VM
+		err := gob.NewDecoder(buf).Decode(&vm)
+		if err != nil {
+			return err
+		}
+		vms = append(vms, vm)
+		return nil
+	})
+
+	/*names, err := client.ListObjects(api.VMContainerName, api.ObjectFilter{
 		Prefix: utils.MetadataContainerName,
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	var vms []api.VM
 
 	for _, name := range names {
 		vm, err := client.readVMDefinition(name)
@@ -552,7 +560,7 @@ func (client *Client) listMonitoredVMs() ([]api.VM, error) {
 		}
 		vms = append(vms, *vm)
 	}
-
+	*/
 	if len(vms) == 0 && err != nil {
 		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
 	}
@@ -783,37 +791,44 @@ func (client *Client) disableVMRouterMode(vm *api.VM) error {
 
 //saveVMDefinition saves the VM definition in Object Storage
 func (client *Client) saveVMDefinition(vm api.VM) error {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	err := enc.Encode(vm)
-	if err != nil {
-		return err
-	}
-	return client.PutObject(utils.MetadataContainerName+"/"+api.VMContainerName, api.Object{
-		Name:    vm.ID,
-		Content: bytes.NewReader(buffer.Bytes()),
-	})
+	return utils.WriteMetadata(api.VMContainerName, vm.ID, vm)
+
+	/*	var buffer bytes.Buffer
+		enc := gob.NewEncoder(&buffer)
+		err := enc.Encode(vm)
+		if err != nil {
+			return err
+		}
+		return client.PutObject(utils.MetadataContainerName+"/"+api.VMContainerName, api.Object{
+			Name:    vm.ID,
+			Content: bytes.NewReader(buffer.Bytes()),
+		})*/
 }
 
 //removeVMDefinition removes the VM definition from Object Storage
 func (client *Client) removeVMDefinition(vmID string) error {
-	return client.DeleteObject(utils.MetadataContainerName+"/"+api.VMContainerName, vmID)
+	//return client.DeleteObject(utils.MetadataContainerName+"/"+api.VMContainerName, vmID)
+	return utils.DeleteMetadata(api.VMContainerName, vmID)
 }
 
 //readVMDefinition gets the VM definition from Object Storage
 func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
-	o, err := client.GetObject(utils.MetadataContainerName+"/"+api.VMContainerName, vmID, nil)
+	//o, err := client.GetObject(utils.MetadataContainerName+"/"+api.VMContainerName, vmID, nil)
+	var vm api.VM
+	err := utils.ReadMetadata(api.VMContainerName, vmID, func(buf *bytes.Buffer) error {
+		return gob.NewDecoder(buf).Decode(&vm)
+	})
 	if err != nil {
 		return nil, err
 	}
-	var buffer bytes.Buffer
+	/*var buffer bytes.Buffer
 	buffer.ReadFrom(o.Content)
 	enc := gob.NewDecoder(&buffer)
 	var vm api.VM
 	err = enc.Decode(&vm)
 	if err != nil {
 		return nil, err
-	}
+	}*/
 	return &vm, nil
 }
 

@@ -306,13 +306,10 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, err
 	}
 
-	err = clt.CreateContainer(utils.MetadataContainerName)
+	// Creates metadata Object Storage container
+	err = utils.InitializeMetadataContainer(&clt)
 	if err != nil {
-		fmt.Printf("failed to create Object Container %s: %s\n", utils.MetadataContainerName, errorString(err))
-	}
-	err = clt.CreateContainer(api.VMContainerName)
-	if err != nil {
-		fmt.Printf("failed to create Object Container %s: %s\n", api.VMContainerName, err)
+		return nil, err
 	}
 	return &clt, nil
 }

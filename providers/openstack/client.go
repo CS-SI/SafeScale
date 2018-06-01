@@ -25,6 +25,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/GeertJohan/go.rice"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -211,9 +212,10 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	clt.CreateContainer(api.NetworkContainerName)
-	clt.CreateContainer(api.VMContainerName)
-	clt.CreateContainer(api.NasContainerName)
+	utils.InitializeMetadataContainer(&clt)
+	//	clt.CreateContainer(api.NetworkContainerName)
+	//	clt.CreateContainer(api.VMContainerName)
+	//	clt.CreateContainer(api.NasContainerName)
 	return &clt, nil
 }
 

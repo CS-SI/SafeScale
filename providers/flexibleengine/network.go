@@ -523,27 +523,34 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 
 //writeGateway writes in Object Storage the ID of the VM acting as gateway for the network identified by netID
 func (client *Client) writeGateway(netID string, vmID string) error {
-	err := client.PutObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, api.Object{
+	/*err := client.PutObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, api.Object{
 		Name:    netID,
 		Content: strings.NewReader(vmID),
 	})
-	return err
+	return err*/
+	return utils.WriteMetadata(api.NetworkContainerName, netID, vmID)
 }
 
 //readGateway reads inn Object Storage the ID of the VM acting as gateway for the network identified by netID
 func (client *Client) readGateway(netID string) (string, error) {
-	o, err := client.GetObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, netID, nil)
+	/*o, err := client.GetObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, netID, nil)
 	if err != nil {
 		return "", err
 	}
 	var buffer bytes.Buffer
-	buffer.ReadFrom(o.Content)
-	return buffer.String(), nil
+	buffer.ReadFrom(o.Content)*/
+	var vmID string
+	err := utils.ReadMetadata(api.NetworkContainerName, netID, func(buf *bytes.Buffer) error {
+		vmID = buf.String()
+		return nil
+	})
+	return vmID, err
 }
 
 //removeGateway deletes from Object Storage the gateway data for the network identified by netID
 func (client *Client) removeGateway(netID string) error {
-	return client.DeleteObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, netID)
+	//return client.DeleteObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, netID)
+	return utils.DeleteMetadata(api.NetworkContainerName, netID)
 }
 
 //CreateGateway creates a gateway for a network.
