@@ -25,6 +25,10 @@ import (
 	"github.com/CS-SI/SafeScale/perform/cmd"
 
 	cli "github.com/urfave/cli"
+
+	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise provider cloudwatt
+	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise provider flexibleengine
+	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise provider ovh
 )
 
 const (

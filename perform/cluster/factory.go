@@ -24,24 +24,31 @@ import (
 	"strings"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/utils/metadata"
+
+	"github.com/CS-SI/SafeScale/utils"
 
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/perform/cluster/metadata"
+
 	"github.com/CS-SI/SafeScale/perform/cluster/dcos"
-	"github.com/CS-SI/SafeScale/utils"
 )
 
 //Get returns the ClusterAPI instance corresponding to the cluster named 'name'
 func Get(name string) (clusterapi.ClusterAPI, error) {
-	tenant, err := utils.GetCurrentTenant()
+	var data metadata.Record
+	err := data.Read(name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
 	}
 
-	instance, err := readDefinition(tenant, name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Cluster '%s': %s", name, err.Error())
+	var instance clusterapi.ClusterAPI
+	switch data.Common.Flavor {
+	case Flavor.DCOS:
+		instance, err = dcos.Load(data)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if instance == nil {
 		return nil, nil
@@ -51,43 +58,6 @@ func Get(name string) (clusterapi.ClusterAPI, error) {
 		return nil, fmt.Errorf("failed to get state of the cluster: %s", err.Error())
 	}
 	return instance, nil
-}
-
-//readDefinition reads definition of cluster named 'name' in Object Storage
-func readDefinition(tenant string, name string) (clusterapi.ClusterAPI, error) {
-	ok, err := metadata.Find(clusterapi.ClusterMetadataPath, name)
-	if !ok {
-		return nil, err
-	}
-
-	var c clusterapi.Cluster
-	err = metadata.Read(clusterapi.ClusterMetadataPath, name, func(buf *bytes.Buffer) error {
-		var d interface{}
-		err := gob.NewDecoder(buf).Decode(&d)
-		if err != nil {
-			return nil
-		}
-		c = d.(clusterapi.Cluster)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	switch c.Flavor {
-	case Flavor.DCOS:
-		instance := &dcos.Cluster{
-			Definition: &dcos.Definition{
-				Cluster: c,
-			},
-		}
-		// Re-read the definition with complete data unserialization
-		ok, err := instance.ReadDefinition()
-		if !ok {
-			return nil, err
-		}
-		return instance, nil
-	}
-	return nil, nil
 }
 
 //Create creates a cluster following the parameters of the request
@@ -123,7 +93,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	case Flavor.DCOS:
 		req.NetworkID = network.ID
 		req.Tenant = tenant
-		instance, err = dcos.NewCluster(req)
+		instance, err = dcos.Create(req)
 		if err != nil {
 			//utils.DeleteNetwork(network.ID)
 			return nil, err
@@ -149,20 +119,19 @@ func Delete(name string) error {
 	utils.DeleteNetwork(instance.GetNetworkID())
 
 	// Cleanup Object Storage data
-	return instance.RemoveDefinition()
+	return metadata.Delete(name)
 }
 
 //List lists the clusters already created
 func List() ([]clusterapi.Cluster, error) {
 	var clusterList []clusterapi.Cluster
-	err := metadata.Browse(clusterapi.ClusterMetadataPath, func(buf *bytes.Buffer) error {
-		var d interface{}
-		err := gob.NewDecoder(buf).Decode(&d)
+	err := utils.BrowseMetadata(metadata.Path, func(buf *bytes.Buffer) error {
+		var data metadata.Record
+		err := gob.NewDecoder(buf).Decode(&data)
 		if err != nil {
 			return err
 		}
-		c := d.(clusterapi.Cluster)
-		clusterList = append(clusterList, c)
+		clusterList = append(clusterList, data.Common)
 		return nil
 	})
 	return clusterList, err

@@ -1,6 +1,7 @@
-.PHONY: api components dcos tests clean mrproper
+all: api components dcos
 
-all: api components dcos tests
+#.PHONY: api components dcos tests clean mrproper
+.PHONY: api components dcos clean mrproper
 
 api:
 	@(cd api && $(MAKE))
@@ -23,4 +24,3 @@ clean:
 mrproper: clean
 	@(cd tests && rm -f debug)
 	@($(RM) dcos/rice-box.go)
-

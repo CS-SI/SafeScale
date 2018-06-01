@@ -24,7 +24,7 @@
 mkdir -p /usr/local/dcos/genconf
 cd /usr/local/dcos
 
-cat >genconf/config.yaml <<- EOF
+cat >genconf/config.yaml <<-'EOF'
 ---
 bootstrap_url: http://{{ .BootstrapIP }}:{{ .BootstrapPort }}
 cluster_name: {{ .ClusterName }}
@@ -55,18 +55,20 @@ oauth_enabled: 'false'
 EOF
 
 # Private SSH Key corresponding to the ssh_user
-cat >genconf/ssh_key <<EOF
+cat >genconf/ssh_key <<'EOF'
 {{.SSHPrivateKey}}
 EOF
 chmod 0600 genconf/ssh_key
 
+
 # Public SSH key to the home dir of the ssh_user
-cat >>/home/cladm/.ssh/authorized_keys <<-EOF
+cat >>/home/cladm/.ssh/authorized_keys <<-'EOF'
 {{ .SSHPublicKey}}
 EOF
+chmod 0600 /home/cladm/.ssh/authorized_keys && chown -R cladm:cladm /home/cladm
 
 # Script to detect IP
-cat >genconf/ip-detect <<- EOF
+cat >genconf/ip-detect <<-'EOF'
 #!/usr/bin/env bash
 #curl ipinfo.io/ip
 ifconfig eth0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*'

@@ -59,7 +59,7 @@ export LANG=C
     mkdir -p /etc/systemd/system/docker.service.d && chmod 0755 /etc/systemd/system/docker.service.d
 
     # Configure docker to use overlay driver
-    echo >/etc/systemd/system/docker.service.d/override.conf <<- EOF
+    echo >/etc/systemd/system/docker.service.d/override.conf <<-'EOF'
 [Service]
 ExecStart=
 ExecStart=/usr/bin/dockerd --storage-driver=overlay --log-driver=none
@@ -80,10 +80,6 @@ EOF
     useradd -s /bin/bash -m -d /home/cladm cladm
     usermod -aG docker cladm
     mkdir -p /home/cladm/.ssh && chmod 0700 /home/cladm/.ssh
-    echo >/home/cladm/.ssh/authorized_keys <<- EOF
-{{ .SSHPublicKey }}
-EOF
-    chmod 0600 /home/cladm/.ssh/authorized_keys && chown -R cladm:cladm /home/cladm
 
 ) >/dev/null
 ####

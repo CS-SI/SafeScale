@@ -18,7 +18,6 @@ package dcos
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"log"
 	"os/exec"
@@ -34,8 +33,9 @@ import (
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
 	"github.com/CS-SI/SafeScale/perform/cluster/components"
+	"github.com/CS-SI/SafeScale/perform/cluster/metadata"
+
 	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/metadata"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )
@@ -56,10 +56,8 @@ var (
 	installCommonsContent *string
 )
 
-//Definition defines the values we want to keep in Object Storage
-type Definition struct {
-	// common cluster data
-	clusterapi.Cluster
+//Specific defines the values specific to DCOS cluster we want to keep in Object Storage
+type Specific struct {
 
 	//BootstrapID is the identifier of the VM acting as bootstrap/upgrade server
 	BootstrapID string
@@ -91,8 +89,11 @@ type Definition struct {
 
 //Cluster is the object describing a cluster created by ClusterManagerAPI.CreateCluster
 type Cluster struct {
-	//Definition contains data defining the cluster
-	*Definition
+	// common cluster data
+	Common clusterapi.Cluster
+
+	//contains data defining the cluster
+	*Specific
 
 	//LastStateCollect contains the date of the last state collection
 	lastStateCollection time.Time
@@ -100,11 +101,21 @@ type Cluster struct {
 
 //GetNetworkID returns the ID of the network used by the cluster
 func (c *Cluster) GetNetworkID() string {
-	return c.Definition.Cluster.GetNetworkID()
+	return c.Common.GetNetworkID()
 }
 
-//NewCluster creates the necessary infrastructure of cluster
-func NewCluster(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
+//Load loads the internals of an existing cluster from metadata
+func Load(data metadata.Record) (clusterapi.ClusterAPI, error) {
+	specific := data.Internal.(Specific)
+	instance := &Cluster{
+		Common:   data.Common,
+		Specific: &specific,
+	}
+	return instance, nil
+}
+
+//Create creates the necessary infrastructure of cluster
+func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	// Create a KeyPair for the cluster
 	svc, err := utils.GetProviderService()
 	if err != nil {
@@ -123,15 +134,13 @@ func NewCluster(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 
 	// Saving cluster parameters, with status 'Creating'
 	instance := Cluster{
-		Definition: &Definition{
-			Cluster: clusterapi.Cluster{
-				Name:       req.Name,
-				State:      ClusterState.Creating,
-				Complexity: req.Complexity,
-				Tenant:     req.Tenant,
-				NetworkID:  req.NetworkID,
-				Keypair:    kp,
-			},
+		Common: clusterapi.Cluster{
+			Name:       req.Name,
+			State:      ClusterState.Creating,
+			Complexity: req.Complexity,
+			Tenant:     req.Tenant,
+			NetworkID:  req.NetworkID,
+			Keypair:    kp,
 		},
 	}
 
@@ -143,7 +152,7 @@ func NewCluster(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		goto cleanNetwork
 	}
 
-	err = instance.WriteDefinition()
+	err = instance.updateMetadata()
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
 		goto cleanBootstrap
@@ -176,8 +185,8 @@ func NewCluster(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	}
 
 	// Cluster created and configured successfully, saving again to Object Storage
-	instance.Definition.Cluster.State = ClusterState.Created
-	err = instance.WriteDefinition()
+	instance.Common.State = ClusterState.Created
+	err = instance.updateMetadata()
 	if err != nil {
 		goto cleanMasters
 	}
@@ -193,13 +202,13 @@ cleanBootstrap:
 	//utils.DeleteVM(instance.definition.BootstrapID)
 cleanNetwork:
 	//utils.DeleteNetwork(instance.definition.Common.NetworkID)
-	//instance.RemoveDefinition()
+	//instance.RemoveMetadata()
 	return nil, err
 }
 
 //GetName returns the name of the cluster
 func (c *Cluster) GetName() string {
-	return c.Definition.Cluster.Name
+	return c.Common.Name
 }
 
 //getTemplateBox
@@ -269,10 +278,10 @@ func (c *Cluster) Stop() error {
 //GetState returns the current state of the cluster
 func (c *Cluster) GetState() (ClusterState.Enum, error) {
 	now := time.Now()
-	if now.After(c.lastStateCollection.Add(c.Definition.StateCollectInterval)) {
+	if now.After(c.lastStateCollection.Add(c.Specific.StateCollectInterval)) {
 		return c.ForceGetState()
 	}
-	return c.Definition.Cluster.State, nil
+	return c.Common.State, nil
 }
 
 //ForceGetState returns the current state of the cluster
@@ -288,7 +297,7 @@ func (c *Cluster) AddNode(nodeType NodeType.Enum, req *pb.VMDefinition) (*pb.VM,
 	case NodeType.PublicAgent:
 		fallthrough
 	case NodeType.PrivateAgent:
-		if c.Definition.Cluster.State == ClusterState.Creating {
+		if c.Common.State == ClusterState.Creating {
 			return nil, fmt.Errorf("The DCOS flavor of Cluster needs to be in state 'Created' at least to allow agent node addition.")
 		}
 		return c.addAgentNode(nodeType, req)
@@ -298,29 +307,29 @@ func (c *Cluster) AddNode(nodeType NodeType.Enum, req *pb.VMDefinition) (*pb.VM,
 
 //addBootstrap
 func (c *Cluster) addBootstrap() (*pb.VM, error) {
-	name := c.Definition.Cluster.Name + "-dcosbootstrap"
+	name := c.Common.Name + "-dcosbootstrap"
 	bootstrapVM, err := utils.CreateVM(&pb.VMDefinition{
 		Name:      name,
 		CPUNumber: 4,
 		RAM:       32.0,
 		Disk:      120,
 		ImageID:   "CentOS 7.3",
-		Network:   c.Definition.Cluster.NetworkID,
+		Network:   c.Common.NetworkID,
 		Public:    true,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Bootstrap server: %v", err)
+		return nil, err
 	}
 
-	c.Definition.BootstrapID = bootstrapVM.ID
-	c.Definition.BootstrapIP = bootstrapVM.IP
+	c.Specific.BootstrapID = bootstrapVM.ID
+	c.Specific.BootstrapIP = bootstrapVM.IP
 
 	// Update cluster definition in Object Storage
-	err = c.WriteDefinition()
+	err = c.updateMetadata()
 	if err != nil {
 		// Removes the ID we just added to the cluster struct
-		c.Definition.BootstrapID = ""
-		c.Definition.BootstrapIP = ""
+		c.Specific.BootstrapID = ""
+		c.Specific.BootstrapIP = ""
 		utils.DeleteVM(bootstrapVM.ID)
 		return nil, fmt.Errorf("failed to update Cluster definition: %s", err.Error())
 	}
@@ -330,8 +339,8 @@ func (c *Cluster) addBootstrap() (*pb.VM, error) {
 
 //addMasterNode adds a master node
 func (c *Cluster) addMaster() (*pb.VM, error) {
-	i := len(c.Definition.MasterIDs) + 1
-	name := c.Definition.Cluster.Name + "-dcosmaster-" + strconv.Itoa(i)
+	i := len(c.Specific.MasterIDs) + 1
+	name := c.Common.Name + "-dcosmaster-" + strconv.Itoa(i)
 
 	masterVM, err := utils.CreateVM(&pb.VMDefinition{
 		Name:      name,
@@ -339,7 +348,7 @@ func (c *Cluster) addMaster() (*pb.VM, error) {
 		RAM:       16.0,
 		Disk:      60,
 		ImageID:   "CentOS 7.3",
-		Network:   c.Definition.Cluster.NetworkID,
+		Network:   c.Common.NetworkID,
 		Public:    true,
 	})
 	if err != nil {
@@ -347,15 +356,15 @@ func (c *Cluster) addMaster() (*pb.VM, error) {
 	}
 
 	// Registers the new Master in the cluster struct
-	c.Definition.MasterIDs = append(c.Definition.MasterIDs, masterVM.ID)
-	c.Definition.MasterIPs = append(c.Definition.MasterIPs, masterVM.IP)
+	c.Specific.MasterIDs = append(c.Specific.MasterIDs, masterVM.ID)
+	c.Specific.MasterIPs = append(c.Specific.MasterIPs, masterVM.IP)
 
 	// Update cluster definition in Object Storage
-	err = c.WriteDefinition()
+	err = c.updateMetadata()
 	if err != nil {
 		// Object Storage failed, removes the ID we just added to the cluster struct
-		c.Definition.MasterIDs = c.Definition.MasterIDs[:len(c.Definition.MasterIDs)-1]
-		c.Definition.MasterIPs = c.Definition.MasterIPs[:len(c.Definition.MasterIPs)-1]
+		c.Specific.MasterIDs = c.Specific.MasterIDs[:len(c.Specific.MasterIDs)-1]
+		c.Specific.MasterIPs = c.Specific.MasterIPs[:len(c.Specific.MasterIPs)-1]
 		utils.DeleteVM(masterVM.ID)
 		return nil, fmt.Errorf("failed to update Cluster definition: %s", err.Error())
 	}
@@ -375,10 +384,10 @@ func (c *Cluster) addAgentNode(nodeType NodeType.Enum, req *pb.VMDefinition) (*p
 		coreName = "priv" + coreName
 	}
 
-	i := len(c.Definition.PublicAgentIDs) + 1
+	i := len(c.Specific.PublicAgentIDs) + 1
 	req.Public = publicIP
-	req.Network = c.Definition.Cluster.NetworkID
-	req.Name = c.Definition.Cluster.Name + "-dcos" + coreName + "-" + strconv.Itoa(i)
+	req.Network = c.Common.NetworkID
+	req.Name = c.Common.Name + "-dcos" + coreName + "-" + strconv.Itoa(i)
 	req.ImageID = "CentOS 7.3"
 	agentVM, err := utils.CreateVM(req)
 	if err != nil {
@@ -394,23 +403,23 @@ func (c *Cluster) addAgentNode(nodeType NodeType.Enum, req *pb.VMDefinition) (*p
 
 	// Registers the new Agent in the cluster struct
 	if nodeType == NodeType.PublicAgent {
-		c.Definition.PublicAgentIDs = append(c.Definition.PublicAgentIDs, agentVM.ID)
-		c.Definition.PublicAgentIPs = append(c.Definition.PublicAgentIPs, agentVM.IP)
+		c.Specific.PublicAgentIDs = append(c.Specific.PublicAgentIDs, agentVM.ID)
+		c.Specific.PublicAgentIPs = append(c.Specific.PublicAgentIPs, agentVM.IP)
 	} else {
-		c.Definition.PrivateAgentIDs = append(c.Definition.PrivateAgentIDs, agentVM.ID)
-		c.Definition.PrivateAgentIPs = append(c.Definition.PrivateAgentIPs, agentVM.IP)
+		c.Specific.PrivateAgentIDs = append(c.Specific.PrivateAgentIDs, agentVM.ID)
+		c.Specific.PrivateAgentIPs = append(c.Specific.PrivateAgentIPs, agentVM.IP)
 	}
 
 	// Update cluster definition in Object Storage
-	err = c.WriteDefinition()
+	err = c.updateMetadata()
 	if err != nil {
 		// Removes the ID we just added to the cluster struct
 		if nodeType == NodeType.PublicAgent {
-			c.Definition.PublicAgentIDs = c.Definition.PublicAgentIDs[:len(c.Definition.PublicAgentIDs)-1]
-			c.Definition.PublicAgentIPs = c.Definition.PublicAgentIPs[:len(c.Definition.PublicAgentIPs)-1]
+			c.Specific.PublicAgentIDs = c.Specific.PublicAgentIDs[:len(c.Specific.PublicAgentIDs)-1]
+			c.Specific.PublicAgentIPs = c.Specific.PublicAgentIPs[:len(c.Specific.PublicAgentIPs)-1]
 		} else {
-			c.Definition.PrivateAgentIDs = c.Definition.PrivateAgentIDs[:len(c.Definition.PrivateAgentIDs)-1]
-			c.Definition.PrivateAgentIPs = c.Definition.PrivateAgentIPs[:len(c.Definition.PrivateAgentIPs)-1]
+			c.Specific.PrivateAgentIDs = c.Specific.PrivateAgentIDs[:len(c.Specific.PrivateAgentIDs)-1]
+			c.Specific.PrivateAgentIPs = c.Specific.PrivateAgentIPs[:len(c.Specific.PrivateAgentIPs)-1]
 		}
 		utils.DeleteVM(agentVM.ID)
 		return nil, fmt.Errorf("failed to update Cluster definition: %s", err.Error())
@@ -423,7 +432,7 @@ func (c *Cluster) addAgentNode(nodeType NodeType.Enum, req *pb.VMDefinition) (*p
 func (c *Cluster) configure() error {
 	log.Printf("Configuring Bootstrap server")
 
-	prepareDockerImages, err := realizePrepareDockerImages()
+	prepareDockerImages, err := c.realizePrepareDockerImages()
 	if err != nil {
 		return fmt.Errorf("failed to build configuration script: %s", err.Error())
 	}
@@ -438,15 +447,15 @@ func (c *Cluster) configure() error {
 	if err == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
-	retcode, output, err := c.executeScript(c.Definition.BootstrapID, "dcos_install_bootstrap_node.sh", map[string]interface{}{
+	retcode, output, err := c.executeScript(c.Specific.BootstrapID, "dcos_install_bootstrap_node.sh", map[string]interface{}{
 		"DCOSVersion":         dcosVersion,
-		"BootstrapIP":         c.Definition.BootstrapIP,
+		"BootstrapIP":         c.Specific.BootstrapIP,
 		"BootstrapPort":       "80",
-		"ClusterName":         c.Definition.Cluster.Name,
-		"MasterIPs":           c.Definition.MasterIPs,
+		"ClusterName":         c.Common.Name,
+		"MasterIPs":           c.Specific.MasterIPs,
 		"DNSServerIPs":        dnsServers,
-		"SSHPrivateKey":       c.Definition.Cluster.Keypair.PrivateKey,
-		"SSHPublicKey":        c.Definition.Cluster.Keypair.PublicKey,
+		"SSHPrivateKey":       c.Common.Keypair.PrivateKey,
+		"SSHPublicKey":        c.Common.Keypair.PublicKey,
 		"PrepareDockerImages": prepareDockerImages,
 	})
 	if err != nil {
@@ -457,9 +466,9 @@ func (c *Cluster) configure() error {
 	}
 
 	log.Printf("Configuring Master servers")
-	for _, m := range c.Definition.MasterIDs {
+	for _, m := range c.Specific.MasterIDs {
 		retcode, output, err := c.executeScript(m, "dcos_install_master_node.sh", map[string]interface{}{
-			"BootstrapIP":   c.Definition.BootstrapIP,
+			"BootstrapIP":   c.Specific.BootstrapIP,
 			"BootstrapPort": "80",
 		})
 		if err != nil {
@@ -475,13 +484,15 @@ func (c *Cluster) configure() error {
 
 //realizePrepareDockerImages creates the string corresponding to script
 // used to prepare Docker images on Bootstrap server
-func realizePrepareDockerImages() (string, error) {
+func (c *Cluster) realizePrepareDockerImages() (string, error) {
 	// Get code to build and export needed docker images
 	realizedPrepareImageGuacamole, err := components.RealizeBuildScript("guacamole", map[string]interface{}{})
 	if err != nil {
 		return "", nil
 	}
-	realizedPrepareImageProxy, err := components.RealizeBuildScript("proxy", map[string]interface{}{})
+	realizedPrepareImageProxy, err := components.RealizeBuildScript("proxy", map[string]interface{}{
+		"MasterIPs": c.Specific.MasterIPs,
+	})
 	if err != nil {
 		return "", nil
 	}
@@ -524,7 +535,7 @@ func (c *Cluster) configureAgent(targetVM *pb.VM, nodeType NodeType.Enum) error 
 
 	retcode, output, err := c.executeScript(targetVM.ID, "dcos_install_agent_node.sh", map[string]interface{}{
 		"PublicNode":    typeStr,
-		"BootstrapIP":   c.Definition.BootstrapIP,
+		"BootstrapIP":   c.Specific.BootstrapIP,
 		"BootstrapPort": "80",
 	})
 	if err != nil {
@@ -622,11 +633,11 @@ func (*Cluster) GetNode(ID string) (*pb.VM, error) {
 
 //GetDefinition returns the public properties of the cluster
 func (c *Cluster) GetDefinition() clusterapi.Cluster {
-	return c.Definition.Cluster
+	return c.Common
 }
 
-//WriteDefinition writes cluster definition in Object Storage
-func (c *Cluster) WriteDefinition() error {
+//updateMetadata writes cluster definition in Object Storage
+func (c *Cluster) updateMetadata() error {
 	//var buffer bytes.Buffer
 	//enc := gob.NewEncoder(&buffer)
 	//err := enc.Encode(c.definition)
@@ -636,9 +647,16 @@ func (c *Cluster) WriteDefinition() error {
 	//content := bytes.NewReader(buffer.Bytes()
 
 	// writes  the data in Object Storage
-	return metadata.Write(clusterapi.ClusterMetadataPath, c.Definition.Cluster.Name, c.Definition)
+	var anon interface{}
+	anon = c.Specific
+	data := metadata.Record{
+		Common:   c.Common,
+		Internal: anon,
+	}
+	return data.Write(c.Common.Name)
 }
 
+/*
 //ReadDefinition reads definition of cluster named 'name' from Metadata
 // Returns (true, nil) if found and loaded, (false, nil) if not found, and (false, error) in case of error
 func (c *Cluster) ReadDefinition() (bool, error) {
@@ -652,36 +670,41 @@ func (c *Cluster) ReadDefinition() (bool, error) {
 
 	// reads the data in Object Storage
 	var def Definition
-	err = metadata.Read(clusterapi.ClusterMetadataPath, c.Definition.Cluster.Name, func(buf *bytes.Buffer) error {
-		var d interface{}
-		err := gob.NewDecoder(buf).Decode(&d)
-		if err != nil {
-			def = d.(Definition)
-			return nil
-		}
-		return err
+	/*	err = metadata.Read(clusterapi.ClusterMetadataPath, c.Definition.Cluster.Name, func(buf *bytes.Buffer) error {
+			var d interface{}
+			err := gob.NewDecoder(buf).Decode(&d)
+			if err != nil {
+				def = d.(Definition)
+				return nil
+			}
+			return err
+		})
+	*
+	err = clustermetadata.Read(clusterapi.ClusterMetadataPath, c.Definition.Cluster.Name, func(buf *bytes.Buffer) error {
+		return gob.NewDecoder(buf).Decode(&def)
 	})
+
 	if err != nil {
 		return false, err
 	}
 	c.Definition = &def
 	return true, nil
 }
-
-//RemoveDefinition removes definition of cluster from Object Storage
-func (c *Cluster) RemoveDefinition() error {
-	if len(c.Definition.MasterIDs) > 0 ||
-		len(c.Definition.PublicAgentIDs) > 0 ||
-		len(c.Definition.PrivateAgentIDs) > 0 ||
-		c.Definition.Cluster.NetworkID != "" {
+*/
+//RemoveMetadata removes definition of cluster from Object Storage
+func (c *Cluster) RemoveMetadata() error {
+	if len(c.Specific.MasterIDs) > 0 ||
+		len(c.Specific.PublicAgentIDs) > 0 ||
+		len(c.Specific.PrivateAgentIDs) > 0 ||
+		c.Common.NetworkID != "" {
 		return fmt.Errorf("can't remove a definition of a cluster with infrastructure still running")
 	}
 
-	err := metadata.Delete(clusterapi.ClusterMetadataPath, c.Definition.Cluster.Name)
+	err := metadata.Delete(c.Common.Name)
 	if err != nil {
 		return fmt.Errorf("failed to remove cluster definition in Object Storage: %s", err.Error())
 	}
-	c.Definition.Cluster.State = ClusterState.Removed
+	c.Common.State = ClusterState.Removed
 	return nil
 }
 

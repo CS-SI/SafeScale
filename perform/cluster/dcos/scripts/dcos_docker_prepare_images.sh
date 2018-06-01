@@ -28,7 +28,7 @@
     # docker-compose file to starts guacamole+proxy containers #
     ############################################################
 
-    cat >/usr/local/dcos/genconf/serve/docker/docker-compose.yml <<-EOF
+    cat >/usr/local/dcos/genconf/serve/docker/docker-compose.yml <<-'EOF'
 version: '3'
 
 services:

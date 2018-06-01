@@ -18,18 +18,51 @@
 # Prepares guacamole docker instance #
 ######################################
 
-GUACAMOLE_VERSION=0.9.14
-GUACAMOLE_URL=http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUACAMOLE_VERSION}
 mkdir /tmp/guacamole.image
 
-cat >/tmp/guacamole.image/startup.sh <<-EOF
+cat >/tmp/guacamole.image/startup.sh <<-'EOF'
 #!/bin/bash
 
 # start up supervisord, all daemons should launched by supervisord.
 exec /usr/bin/supervisord -c /opt/supervisord.conf
 EOF
 
-cat >/tmp/guacamole.image/logback.xml <<-EOF
+cat >/tmp/guacamole.image/supervisord.conf <<-'EOF'
+[supervisord]
+nodaemon=true
+
+[unix_http_server]
+file=/var/run/supervisor.sock
+chmod=0700
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+[supervisorctl]
+serverurl=unix:////var/run/supervisor.sock
+username=admin
+password=admin
+
+[program:guacd]
+priority=200
+directory=/
+command=/usr/sbin/guacd -f
+user=root
+autostart=true
+autorestart=true
+stopsignal=QUIT
+
+[program:tomcat]
+priority=201
+directory=/
+command=/usr/local/tomcat/bin/catalina.sh run
+user=root
+autostart=true
+autorestart=true
+stopsignal=QUIT
+EOF
+
+cat >/tmp/guacamole.image/logback.xml <<-'EOF'
 <configuration>
     <!-- Appender for debugging -->
     <appender name="GUAC-DEBUG" class="ch.qos.logback.core.ConsoleAppender">
@@ -52,7 +85,7 @@ cat >/tmp/guacamole.image/logback.xml <<-EOF
 </configuration>
 EOF
 
-cat >/tmp/guacamole.image/user-mapping.xml <<-EOF
+cat >/tmp/guacamole.image/user-mapping.xml <<-'EOF'
 <user-mapping>
     <authorize username="cladm" password="{{ .Password }}">
 
@@ -74,9 +107,25 @@ cat >/tmp/guacamole.image/user-mapping.xml <<-EOF
 </user-mapping>
 EOF
 
-cat >/tmp/guacamole.image/Dockerfile <<-EOF
+cat >/tmp/guacamole.image/tomcat-users.xml <<-'EOF'
+<?xml version='1.0' encoding='utf-8'?>
+<tomcat-users>
+    <role rolename="admin-gui"/>
+    <role rolename="admin-script"/>
+    <role rolename="manager-gui"/>
+    <role rolename="manager-status"/>
+    <role rolename="manager-script"/>
+    <role rolename="manager-jmx"/>
+    <user name="admin" password="admin" roles="admin-gui,admin-script,manager-gui,manager-status,manager-script,manager-jmx"/>
+</tomcat-users>
+EOF
+
+cat >/tmp/guacamole.image/Dockerfile <<-'EOF'
 FROM debian:sid-slim AS Builder
 LABEL maintainer "CS SI"
+
+ARG GUACAMOLE_VERSION=0.9.14
+ARG GUACAMOLE_URL=http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUACAMOLE_VERSION}
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -100,18 +149,21 @@ RUN apt-get update -y \
 
 # Guacamole
 WORKDIR /usr/local/src
-ADD ${GUACAMOLE_URL}/source/guacamole-server-${GUACAMOLE_VERSION}.tar.gz ./
+ADD ${GUACAMOLE_URL}/source/guacamole-server-${GUACAMOLE_VERSION}.tar.gz ./guacamole-server-${GUACAMOLE_VERSION}.tar.gz
 RUN tar -zxvf guacamole-server-${GUACAMOLE_VERSION}.tar.gz -C . >/dev/null
 
 RUN cd guacamole-server-${GUACAMOLE_VERSION} \
  && CC=gcc-6 ./configure --prefix=/usr --with-init-dir=/etc/init.d  \
- && make \
+ && make -j \
  && make DESTDIR=/usr/local/dist install
 
 #------------------------- DIST phase -------------------------
 
 FROM tomcat:8.5-jre8-slim
 LABEL maintainer "CS SI"
+
+ARG GUACAMOLE_VERSION=0.9.14
+ARG GUACAMOLE_URL=http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUACAMOLE_VERSION}
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -150,7 +202,7 @@ ADD user-mapping.xml .guacamole/
 ADD logback.xml .guacamole/
 ENV GUACAMOLE_HOME /root/.guacamole
 
-mkdir /opt/safescale
+RUN mkdir /opt/safescale
 WORKDIR /opt/safescale
 ADD startup.sh ./
 RUN chmod u+x startup.sh
@@ -170,5 +222,5 @@ ENTRYPOINT ["/opt/safescale/startup.sh"]
 EOF
 docker build -t guacamole:latest /tmp/guacamole.image
 
-docker save guacamole:latest | pigz /usr/local/dcos/genconf/serve/docker/guacamole.tar.gz
+docker save guacamole:latest | pigz -c >/usr/local/dcos/genconf/serve/docker/guacamole.tar.gz
 rm -rf /tmp/guacamole.image

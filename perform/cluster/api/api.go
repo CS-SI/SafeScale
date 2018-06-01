@@ -27,11 +27,6 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 )
 
-const (
-	//ClusterMetadataPath is the path to use to reach Cluster Definitions/Metadata
-	ClusterMetadataPath = "cluster/"
-)
-
 //Request defines what kind of Cluster is wanted
 type Request struct {
 	//Name is the name of the cluster wanted
@@ -73,12 +68,10 @@ type ClusterAPI interface {
 
 	//GetDefinition
 	GetDefinition() Cluster
-	//SaveClusterDefinition
-	WriteDefinition() error
-	//ReadClusterDefinition
-	ReadDefinition() (bool, error)
-	//RemoveClusterDefinition
-	RemoveDefinition() error
+	//UpdateMetadata
+	//UpdateMetadata() error
+	//RemoveMetadata
+	//RemoveMetadata() error
 }
 
 //Cluster contains the bare minimum information about a cluster
