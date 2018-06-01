@@ -2,6 +2,15 @@
 
 SafeScale is an Infrastructure and Platform as a Code tool.
 
+## Table of content
+  - [Description](#description)
+    - [SafeScale Broker](#safescale-broker)
+    - [SafeScale Perform](#safescale-perform)
+    - [SafeScale Security](#safescale-security)
+  - [Currently available features](#currently-available-features)
+  - [Contributing](#contributing)
+  - [License](#license)
+
 ## Description
 SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters that span multiple Clouds. These APIs and CLIs are divided in 3 service layers:
 
@@ -21,7 +30,6 @@ It allows to:
 * Create / Destroy block and object storage,
 * Mount object storage on file system,
 * Create NAS, Connect/disconnect VM to NAS,
-* Access VM Web Desktop.
 
 ![SafeScale Broker](img/SafeScale_Broker.png "SafeScale Broker")
 
@@ -62,6 +70,14 @@ SafeScale is currently under active development and does not yet offer all the f
   * FlexibleEngine
   * CloudWatt
   * AWS: under development 
+
+## Contributing
+
+We are strongly interessted by new contributions.
+
+If you wish to contribute you can [fork the project](https://help.github.com/forking/), make your changes, commit to your repository, and then [create a pull request](https://help.github.com/articles/creating-a-pull-request-from-a-fork/). The development team can then review your contribution and commit it upstream as appropriate.
+
+For bugs and feature requests, [please create an issue](../../issues/new).
 
 ## License
 
