@@ -296,10 +296,10 @@ func scanService(tenant string, service *providers.Service, c chan error) {
 func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	channels := []chan error{}
-	for tenantname, _ := range providers.Tenants() {
+	for tenantname := range providers.Tenants() {
 		service, err := providers.GetService(tenantname)
 		if err != nil {
-			fmt.Printf("Unable to get service for tenant '%s': ", tenantname, err.Error())
+			fmt.Printf("Unable to get service for tenant '%s': %s", tenantname, err.Error())
 		}
 		c := make(chan error)
 		go scanService(tenantname, service, c)
