@@ -49,12 +49,10 @@ func getTester() *tests.ClientTester {
 
 func getClient() *openstack.Client {
 	if client == nil {
-		sf := providers.NewFactory()
-		sf.RegisterClient("openstack", &openstack.Client{})
-		sf.Load()
-
-		service := sf.Services["TestOpenStack"]
-		client = service.ClientAPI.(*openstack.Client)
+		service, _ := providers.GetService("TestOpenStack")
+		tester = &tests.ClientTester{
+			Service: *service,
+		}
 
 	}
 	return client

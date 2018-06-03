@@ -2,7 +2,10 @@ GO?=go
 
 .PHONY:	clean test
 
-all:
+all: vet
+
+vet:
+	@$(GO) vet
 
 test:
 	@$(GO) test

@@ -1,9 +1,14 @@
+GO?=go
 DIRECTORIES_ = $(sort $(dir $(wildcard */)))
 DIRECTORIES = $(filter-out tests/, $(DIRECTORIES_))
 
 .PHONY:	api aws cloudwatt flexibleengine openstack ovh clean
 
-all:	api aws cloudwatt flexibleengine openstack ovh
+all:	api aws cloudwatt flexibleengine openstack ovh vet
+
+vet:
+	@$(GO) vet
+	@$(GO) vet ./tests
 
 api:
 	@(cd $@ && $(MAKE))
