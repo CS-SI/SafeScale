@@ -1,8 +1,12 @@
 GO?=go
 
-all: generate
+all: generate vet
 
 .PHONY: generate clean mrproper
+
+vet:
+	@$(GO) vet
+
 
 generate: cluster.go scripts/*.sh
 	@echo "Generating dependencies..."

@@ -1,6 +1,17 @@
-all: enums
+
+GO?=go
+all: enums vet
 
 .PHONY: enums clean
+
+vet:
+	@$(GO) vet
+	@$(GO) vet ./ClusterState
+	@$(GO) vet ./Complexity
+	@$(GO) vet ./Flavor
+	@$(GO) vet ./NodeType
+	@$(GO) vet ./NodeState
+
 
 enums: ClusterState/enum_string.go Complexity/enum_string.go Flavor/enum_string.go NodeState/enum_string.go NodeType/enum_string.go
 
