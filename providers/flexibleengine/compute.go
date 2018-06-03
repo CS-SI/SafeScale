@@ -408,8 +408,8 @@ func validateVMName(req api.VMRequest) (bool, error) {
 	s := check.Struct{
 		"Name": check.Composite{
 			check.NonEmpty{},
-			check.Regex{`^[a-zA-Z0-9_-]+$`},
-			check.MaxChar{64},
+			check.Regex{Constraint: `^[a-zA-Z0-9_-]+$`},
+			check.MaxChar{Constraint: 64},
 		},
 	}
 
@@ -817,7 +817,7 @@ func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
 func (client *Client) listInterfaces(vmID string) pagination.Pager {
 	url := client.osclt.Compute.ServiceURL("servers", vmID, "os-interface")
 	return pagination.NewPager(client.osclt.Compute, url, func(r pagination.PageResult) pagination.Page {
-		return nics.InterfacePage{pagination.SinglePageBase(r)}
+		return nics.InterfacePage{SinglePageBase: pagination.SinglePageBase(r)}
 	})
 }
 

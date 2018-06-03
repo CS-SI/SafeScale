@@ -23,7 +23,7 @@ clean:
 	@(cd perform && $(MAKE) $@)
 
 
-# DEPENDENCIES HANDLING
+# DEPENDENCIES MANAGEMENT
 #Generate enum tring
 STRINGER := golang.org/x/tools/cmd/stringer
 #Embed shell file into code go
@@ -57,4 +57,4 @@ PROVIDERS_SDK := $(GOPHERCLOUD) $(AWS)
 
 DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(CRYPTO_SSH) $(GRPC_LIBS) $(PROVIDERS_SDK)
 
-deps: ; $(GO) get $(DEPS)
+deps: ; $(GO) get -u $(DEPS)

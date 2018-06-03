@@ -1,8 +1,14 @@
 GOPATH?=$(HOME)/go
+GO?=go
 
-all:	brokerd broker
+
+all:	brokerd broker vet
 
 .PHONY:	sdk broker brokerd clean
+
+vet:
+	@$(GO) vet
+	@$(GO) vet ./utils
 
 sdk:	broker.proto
 	@protoc -I. -I$(GOPATH)/src --go_out=plugins=grpc:. broker.proto
