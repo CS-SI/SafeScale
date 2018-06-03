@@ -1,6 +1,9 @@
 GO?=go
 
-all: scanner
+all: scanner vet
+
+vet:
+	@$(GO) vet
 
 scanner: scanner.go
 	$(GO) generate && $(GO) build
