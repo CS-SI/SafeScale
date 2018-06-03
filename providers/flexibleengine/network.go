@@ -209,8 +209,8 @@ func validateNetworkName(req api.NetworkRequest) (bool, error) {
 	s := check.Struct{
 		"Name": check.Composite{
 			check.NonEmpty{},
-			check.Regex{`^[a-zA-Z0-9_-]+$`},
-			check.MaxChar{64},
+			check.Regex{Constraint: `^[a-zA-Z0-9_-]+$`},
+			check.MaxChar{Constraint: 64},
 		},
 	}
 
@@ -427,7 +427,7 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 func (client *Client) listSubnets() (*[]subnets.Subnet, error) {
 	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/subnets?vpc_id=" + client.vpc.ID
 	pager := pagination.NewPager(client.osclt.Network, url, func(r pagination.PageResult) pagination.Page {
-		return subnets.SubnetPage{pagination.LinkedPageBase{PageResult: r}}
+		return subnets.SubnetPage{LinkedPageBase: pagination.LinkedPageBase{PageResult: r}}
 	})
 	var subnetList []subnets.Subnet
 	pager.EachPage(func(page pagination.Page) (bool, error) {

@@ -2,7 +2,16 @@ GO?=go
 
 .PHONY:	generate clean
 
-all:	generate
+all:	generate vet
+
+vet:
+	@$(GO) vet
+	@$(GO) vet ./IPVersion
+	@$(GO) vet ./VMState
+	@$(GO) vet ./VolumeSpeed
+	@$(GO) vet ./VolumeState
+
+
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
