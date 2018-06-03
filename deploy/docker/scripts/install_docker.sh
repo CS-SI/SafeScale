@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# nfs_server_install.sh
+# install_docker.sh
 #
-# Installs and configures a NFS Server service
+# Installs Docker
 
 {{.CommonTools}}
 
