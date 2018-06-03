@@ -1,7 +1,10 @@
-all: api components dcos
+GO?=go
+.PHONY: api components dcos tests clean mrproper
 
-#.PHONY: api components dcos tests clean mrproper
-.PHONY: api components dcos clean mrproper
+all: api components dcos tests vet
+
+vet:
+	@$(GO) vet
 
 api:
 	@(cd api && $(MAKE))
