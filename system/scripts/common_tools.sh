@@ -17,21 +17,33 @@
 
 # wait_for_apt waits an already running apt-like command to finish
 function wait_for_apt() {
-    local ROUNDS=60
+    wait_lockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
+}
 
-    if fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock &>/dev/null; then
-        echo "apt is locked, waiting... "
+
+function wait_lockfile() {
+    local ROUNDS=600
+    name=$1
+    shift
+    params=$@
+    echo "check $name lock"
+    echo ${params}
+    if fuser ${params} &>/dev/null; then
+        echo "${name} is locked, waiting... "
         local i
         for i in $(seq $ROUNDS); do
-            sleep 60
-            fuser /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock &>/dev/null || break
+            sleep 6
+            fuser ${params} &>/dev/null || break
         done
         if [ $i -ge $ROUNDS ]; then
-            echo "Timed out waiting (1 hour!) for apt lock!"
+            echo "Timed out waiting (1 hour!) for ${name} lock!"
             exit 100
         else
-            echo "apt is unlocked (waited $i mn), continuing."
+            t=$(($i*6))
+            echo "${name} is unlocked (waited $t seconds), continuing."
         fi
+    else
+        echo "${name}  is ready"
     fi
 }
 
