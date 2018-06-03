@@ -1,6 +1,9 @@
 GO?=go
 
-all: build
+all: build vet
+
+vet:
+	@$(GO) vet
 
 build: *.go scripts/* SecurityFlavor/*.go
 	@(cd SecurityFlavor && $(GO) generate)
