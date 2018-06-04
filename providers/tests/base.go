@@ -29,10 +29,12 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
+	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenants
 	"github.com/stretchr/testify/assert"
 )
 
