@@ -7,7 +7,7 @@
     - Download the compiler from [github](https://github.com/google/protobuf/releases/)
     - Follow install instruction
 - make
-- Transitive dependencies
+- Transitive dependencies. Note: most dependencies are retrived with `make deps` command ([see below](#Build))
 
 
 ## Build
@@ -27,3 +27,9 @@ make deps
 # Build SafeScale
 make
 ```
+
+These commands intitialize your workging directory and produces the folowwing binaries:
+
+ - `broker` in `SafeScale/broker/client`: CLI to deal with daemon brokerd. Available commands are described in [usage](#USAGE.md)
+ - `brokerd` in `SafeScale/broker/daemon`: daemon in charge of executing requests from broker on providers
+ - `perform` in `SafeScale/perform`: CLI to manage cluster. Available commands are described in [usage](#USAGE.md)
