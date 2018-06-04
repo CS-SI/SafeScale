@@ -82,6 +82,9 @@ For bugs and feature requests, [please create an issue](../../issues/new).
 ## Build
   [See Build file](./BUILDING.md)
 
+## Usage
+  [See Usage file](./USAGE.md)
+
 ## License
 
 SafeScale is distributed by [CS Systemes d'Information](http://www.c-s.fr) under the [Apache License, Version 2.0](LICENSE). Please see the [third-party notices](NOTICE) file for additional copyright notices and license terms applicable to portions of the software.
