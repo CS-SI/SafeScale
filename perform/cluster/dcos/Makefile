@@ -4,7 +4,7 @@ all: generate
 
 .PHONY: generate clean mrproper
 
-generate: cluster.go scripts/*.sh
+generate: dcos.go scripts/*.sh
 	@echo "Generating dependencies..."
 	@$(GO) generate
 
