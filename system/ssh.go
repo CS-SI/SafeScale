@@ -395,7 +395,7 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
-	fmt.Println(sshCmdString)
+	//log.Println(sshCmdString)
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
@@ -440,7 +440,7 @@ func (ssh *SSHConfig) Download(remotePath, localPath string) error {
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
 	cmd := exec.Command("bash", "-c", sshCmdString)
-	fmt.Println("cmd", sshCmdString)
+	//log.Println("cmd", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
 		tunnels: tunnels,
@@ -449,7 +449,7 @@ func (ssh *SSHConfig) Download(remotePath, localPath string) error {
 	return sshCommand.Run()
 }
 
-//Upload upload localPath into remotePath
+//Upload uploads localPath into remotePath
 func (ssh *SSHConfig) Upload(remotePath, localPath string) error {
 	tunnels, sshConfig, err := ssh.createTunnels()
 	if err != nil {
@@ -460,13 +460,30 @@ func (ssh *SSHConfig) Upload(remotePath, localPath string) error {
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
 	cmd := exec.Command("bash", "-c", sshCmdString)
-	fmt.Println("cmd", sshCmdString)
+	//log.Println("cmd", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
 		tunnels: tunnels,
 		keyFile: keyFile,
 	}
 	return sshCommand.Run()
+}
+
+//UploadString uploads a string into a remote file
+func (ssh *SSHConfig) UploadString(remotePath, content string) error {
+	f, err := ioutil.TempFile("/var/tmp", "__ssh__")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+
+	if _, err := f.Write([]byte(content)); err != nil {
+		return nil
+	}
+	if err := f.Close(); err != nil {
+		return nil
+	}
+	return ssh.Upload(remotePath, f.Name())
 }
 
 //Exec executes the cmd using ssh
@@ -489,7 +506,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
 	bash, err := exec.LookPath("bash")
-	fmt.Println("BASH ", bash)
+	//log.Println("BASH ", bash)
 	if err != nil {
 		for _, t := range tunnels {
 			t.Close()
@@ -505,7 +522,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 	} else {
 		args = []string{"-c", sshCmdString}
 	}
-	fmt.Println("ARGS ", args)
+	//log.Println("ARGS ", args)
 	return syscall.Exec(bash, args, nil)
 
 }
