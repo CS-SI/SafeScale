@@ -37,9 +37,12 @@ import (
 //Get returns the ClusterAPI instance corresponding to the cluster named 'name'
 func Get(name string) (clusterapi.ClusterAPI, error) {
 	var data metadata.Record
-	err := data.Read(name)
+	found, err := data.Read(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
+	}
+	if !found {
+		return nil, nil
 	}
 
 	var instance clusterapi.ClusterAPI
@@ -53,6 +56,7 @@ func Get(name string) (clusterapi.ClusterAPI, error) {
 	if instance == nil {
 		return nil, nil
 	}
+
 	_, err = instance.GetState()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state of the cluster: %s", err.Error())
@@ -110,15 +114,22 @@ func Delete(name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to find a cluster named '%s': %s", name, err.Error())
 	}
+	if instance == nil {
+		return fmt.Errorf("Cluster '%s' not found", name)
+	}
+
+	networkID := instance.GetNetworkID()
+
+	// Deletes all the infrastructure built for the cluster
 	err = instance.Delete()
 	if err != nil {
 		return fmt.Errorf("failed to delete infrastructure of cluster '%s': %s", name, err.Error())
 	}
 
 	// Deletes the network and related stuff
-	utils.DeleteNetwork(instance.GetNetworkID())
+	utils.DeleteNetwork(networkID)
 
-	// Cleanup Object Storage data
+	// Cleanup Object Storage metadata
 	return metadata.Delete(name)
 }
 

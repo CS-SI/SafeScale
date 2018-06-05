@@ -279,7 +279,7 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	vmReq := api.VMRequest{
 		ImageID:    req.ImageID,
 		KeyPair:    req.KeyPair,
-		Name:       "gw_" + net.Name,
+		Name:       "gw-" + net.Name,
 		TemplateID: req.TemplateID,
 		NetworkIDs: []string{req.NetworkID},
 		PublicIP:   true,

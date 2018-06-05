@@ -45,3 +45,5 @@ broker/client/broker
 # ignore binaries from perform
 perform/perform
 perform/cluster/tests/deploy
+
+*.code-workspace

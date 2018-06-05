@@ -54,23 +54,30 @@ func Delete(name string) error {
 }
 
 //Read reads metadata of cluster named 'name' from Object Storage
-func (data *Record) Read(name string) error {
+func (r *Record) Read(name string) (bool, error) {
 	found, err := utils.FindMetadata(Path, name)
+	if err != nil {
+		return false, err
+	}
 	if !found {
-		return err
+		return false, nil
 	}
 
 	err = utils.ReadMetadata(Path, name, func(buf *bytes.Buffer) error {
-		err := gob.NewDecoder(buf).Decode(data)
+		err := gob.NewDecoder(buf).Decode(r)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
-	return err
+	return true, err
 }
 
 //Write saves the content of m to the Object Storage
-func (data *Record) Write(name string) error {
-	return utils.WriteMetadata(Path, name, data)
+func (r *Record) Write(name string) error {
+	return utils.WriteMetadata(Path, name, r)
+}
+
+func init() {
+	gob.Register(Record{})
 }

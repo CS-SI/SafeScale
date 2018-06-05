@@ -49,9 +49,9 @@ const (
 
 const (
 	// NetworkContainerName is the tecnical name of the container used to store networks info
-	NetworkContainerName = "nw"
-	// VMContainerName is the tecnical name of the container used to store VMs info
-	VMContainerName = "vm"
+	NetworkContainerName = "network"
+	// VMContainerName is the technical name of the container used to store VMs info
+	VMContainerName = "host"
 	// NasContainerName is the tecnical name of the container used to store nas info
 	NasContainerName = "nas"
 )

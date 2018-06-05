@@ -70,11 +70,12 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{
+	client := &Client{
 		Client: os,
 		opts:   opts,
-	}, nil
+	}
 
+	return client, nil
 }
 
 //Client is the implementation of the ovh driver regarding to the api.ClientAPI

@@ -41,7 +41,7 @@ func Register(name string, client api.ClientAPI) {
 	providers[name] = client
 }
 
-// Tenants returns all knwon tenants
+// Tenants returns all known tenants
 func Tenants() map[string]string {
 	loadConfig()
 	return tenants

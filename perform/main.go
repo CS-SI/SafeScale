@@ -1,3 +1,5 @@
+package main
+
 /*
  * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
  *
@@ -13,8 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package main
 
 import (
 	"fmt"

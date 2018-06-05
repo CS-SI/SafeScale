@@ -17,6 +17,8 @@
 package api
 
 import (
+	"encoding/gob"
+
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
 
 	"github.com/CS-SI/SafeScale/perform/cluster/api/ClusterState"
@@ -94,25 +96,11 @@ type Cluster struct {
 	NetworkID string
 }
 
-/*
-//MarshalBinary helps gob.Encode to serialize Cluster struct
-func (c *Cluster) MarshalBinary() ([]byte, error) {
-	// A simple encoding: plain text.
-	var b bytes.Buffer
-	fmt.Fprintln(&b, c.Name, c.CIDR, c.Flavor, c.Complexity, c.Keypair, c.State, c.Tenant, c.NetworkID)
-	return b.Bytes(), nil
-}
-
-// UnmarshalBinary helps gob.Decode to unserialize Cluster struct
-func (c *Cluster) UnmarshalBinary(data []byte) error {
-	// A simple encoding: plain text.
-	b := bytes.NewBuffer(data)
-	_, err := fmt.Fscanln(b, &c.Name, &c.CIDR, &c.Flavor, &c.Complexity, &c.Keypair, &c.State, &c.Tenant, &c.NetworkID)
-	return err
-}
-*/
-
 //GetNetworkID returns the ID of the Network used by the cluster
 func (c *Cluster) GetNetworkID() string {
 	return c.NetworkID
+}
+
+func init() {
+	gob.Register(Cluster{})
 }

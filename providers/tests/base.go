@@ -346,9 +346,9 @@ func (tester *ClientTester) VMs(t *testing.T) {
 		} else if v.ID == vm2.ID {
 			found++
 		} else {
-			fmt.Printf("Unknonw (preexisting?) VM %+v\n", v)
+			fmt.Printf("Unknown (preexisting?) VM %+v\n", v)
 			continue
-			// t.Fatalf("Unknonw VM %+v\n", v)
+			// t.Fatalf("Unknown VM %+v\n", v)
 		}
 	}
 	assert.Equal(t, 3, found)
