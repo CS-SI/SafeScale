@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-#
 # Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,17 +16,16 @@
 #
 # This script has to be executed on the bootstrap/upgrade server
 
-(
-    mkdir /usr/local/dcos/genconf/serve/docker
+mkdir -p /usr/local/dcos/genconf/serve/docker
 
-    {{ .PrepareImageGuacamole }}
-    {{ .PrepareImageProxy }}
+{{ .PrepareImageGuacamole }}
+{{ .PrepareImageProxy }}
 
-    ############################################################
-    # docker-compose file to starts guacamole+proxy containers #
-    ############################################################
+############################################################
+# docker-compose file to starts guacamole+proxy containers #
+############################################################
 
-    cat >/usr/local/dcos/genconf/serve/docker/docker-compose.yml <<-'EOF'
+cat >/usr/local/dcos/genconf/serve/docker/dcos-master.yml <<-'EOF'
 version: '3'
 
 services:
@@ -54,10 +51,10 @@ networks:
 
 EOF
 
-    ################
-    # Some cleanup #
-    ################
+################
+# Some cleanup #
+################
 
-    docker image prune -f
+#docker image prune -f
 
-) &>/var/tmp/prepare_docker_images.log
+###

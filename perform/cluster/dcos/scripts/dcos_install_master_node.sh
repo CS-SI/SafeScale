@@ -17,6 +17,12 @@
 # Installs and configure a master node
 # This script must be executed on server to configure as master node
 
+# Redirects outputs to /var/tmp/install_master_node.log
+exec 1<&-
+exec 2<&-
+exec 1<>/var/tmp/install_master_node.log
+exec 2>&1
+
 # Installs and configures everything needed on any node
 {{.IncludeInstallCommons}}
 
@@ -24,18 +30,17 @@
 yum install -y tigervnc-server
 
 # Installs SafeScale containers
-curl http://{{.BootstrapIP}}:{{.BootstrapPort}}/docker/guacamole.tar.gz 2>/dev/null | docker image load
-curl http://{{.BootstrapIP}}:{{.BootstrapPort}}/docker/proxy.tar.gz 2>/dev/null | docker image load
+curl http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/docker/guacamole.tar.gz 2>/dev/null | docker image load
+curl http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/docker/proxy.tar.gz 2>/dev/null | docker image load
 
 # Get install script from bootstrap server
-mkdir /tmp/dcos && cd /tmp/dcos
-curl -O http://{{.BootstrapIP}}:{{.BootstrapPort}}/dcos_install.sh || exit 1
+mkdir /usr/local/dcos && cd /usr/local/dcos
+curl -O http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/dcos_install.sh || exit 1
 
 # Launch installation
-bash dcos_install.sh master
-retcode=$?
+bash dcos_install.sh master || exit 1
 
-#  Do some cleanup
-#rm -rf /tmp/dcos
+curl http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/docker/dcos-master.yml -O dcos-master.yml 2>/dev/null && \
+docker-compose -f /usr/local/dcos/dcos-master.yml up -d guacamole
 
-exit $retcode
+exit $?

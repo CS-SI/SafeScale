@@ -17,6 +17,12 @@
 # Installs and configure a DCOS agent node
 # This script must be executed on agent node.
 
+# Redirects outputs to /var/tmp/install_agent_node.log
+exec 1<&-
+exec 2<&-
+exec 1<>/var/tmp/install_agent_node.log
+exec 2>&1
+
 # Installs and configures everything needed on any node
 {{.IncludeInstallCommons}}
 

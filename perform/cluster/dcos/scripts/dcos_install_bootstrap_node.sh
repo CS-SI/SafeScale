@@ -18,7 +18,16 @@
 #
 # This script has to be executed on the bootstrap/upgrade server
 
+# Redirects outputs to /var/tmp/install_bootstrap_node.log
+exec 1<&-
+exec 2<&-
+exec 1<>/var/tmp/install_bootstrap_node.log
+exec 2>&1
+
 {{.IncludeInstallCommons}}
+
+# Pulling nginx in parallel to save some time
+docker pull nginx &
 
 # Install DCOS environment
 mkdir -p /usr/local/dcos/genconf
@@ -60,7 +69,6 @@ cat >genconf/ssh_key <<'EOF'
 EOF
 chmod 0600 genconf/ssh_key
 
-
 # Public SSH key to the home dir of the ssh_user
 cat >>/home/cladm/.ssh/authorized_keys <<-'EOF'
 {{ .SSHPublicKey}}
@@ -80,6 +88,7 @@ chmod a+rx genconf/ip-detect
 if [ -f dcos_generate_config.sh ]; then
     bash dcos_generate_config.sh || exit 1
 fi
+echo "Executing dcos_generate_config.sh..."
 
 # Starts local nginx server to serve files
 docker run -d -p 80:80 -v $PWD/genconf/serve:/usr/share/nginx/html:ro nginx >/dev/null && exit 0

@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-#
 # Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +22,7 @@ cat >/tmp/guacamole.image/startup.sh <<-'EOF'
 #!/bin/bash
 
 # start up supervisord, all daemons should launched by supervisord.
-exec /usr/bin/supervisord -c /opt/supervisord.conf
+exec /usr/bin/supervisord -c /opt/safescale/supervisord.conf
 EOF
 
 cat >/tmp/guacamole.image/supervisord.conf <<-'EOF'
