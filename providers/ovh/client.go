@@ -20,6 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/openstack"
+	"github.com/CS-SI/SafeScale/utils"
 
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 )
@@ -87,6 +88,13 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 		return nil, err
 	}
 	client.Client = os
+
+	// Creates metadata Object Storage container
+	err = utils.InitializeMetadataContainer(client)
+	if err != nil {
+		return nil, err
+	}
+
 	return client, nil
 
 }

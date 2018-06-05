@@ -212,10 +212,12 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	utils.InitializeMetadataContainer(&clt)
-	//	clt.CreateContainer(api.NetworkContainerName)
-	//	clt.CreateContainer(api.VMContainerName)
-	//	clt.CreateContainer(api.NasContainerName)
+	// Creates metadata Object Storage container
+	err = utils.InitializeMetadataContainer(&clt)
+	if err != nil {
+		return nil, err
+	}
+
 	return &clt, nil
 }
 
@@ -251,6 +253,10 @@ func (client *Client) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error
 			if e.Name == defaultSecurityGroup {
 				sgList = append(sgList, e)
 			}
+		} // Creates metadata Object Storage container
+		err = utils.InitializeMetadataContainer(client)
+		if err != nil {
+			return false, err
 		}
 		return true, nil
 	})

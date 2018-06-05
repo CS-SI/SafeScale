@@ -35,6 +35,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/api/VMState"
+	"github.com/CS-SI/SafeScale/utils"
+
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
@@ -399,7 +401,7 @@ func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 }
 
 func (client *Client) saveVMDefinition(vm api.VM, netID string) error {
-	var buffer bytes.Buffer
+	/*var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(vm)
 	if err != nil {
@@ -415,11 +417,12 @@ func (client *Client) saveVMDefinition(vm api.VM, netID string) error {
 	return client.PutObject(api.VMContainerName, api.Object{
 		Name:    vm.ID,
 		Content: bytes.NewReader(buffer.Bytes()),
-	})
+	})*/
+	return utils.WriteMetadata(api.VMContainerName, vm.ID, vm)
 }
 
 func (client *Client) removeVMDefinition(vmID string) error {
-	// Find the network the vm the is attached on
+	/*// Find the network the vm the is attached on
 	networks, err := client.ListNetworks(false)
 	if err != nil {
 		return err
@@ -446,11 +449,12 @@ func (client *Client) removeVMDefinition(vmID string) error {
 		fmt.Printf("VM %s not attached to any network !!", vmID)
 	}
 
-	return client.DeleteObject(api.VMContainerName, vmID)
+	return client.DeleteObject(api.VMContainerName, vmID)*/
+	return utils.DeleteMetadata(api.VMContainerName, vmID)
 }
 
 func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
-	o, err := client.GetObject(api.VMContainerName, vmID, nil)
+	/*o, err := client.GetObject(api.VMContainerName, vmID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -459,6 +463,13 @@ func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
 	enc := gob.NewDecoder(&buffer)
 	var vm api.VM
 	err = enc.Decode(&vm)
+	if err != nil {
+		return nil, err
+	}*/
+	var vm api.VM
+	err := utils.ReadMetadata(api.VMContainerName, vmID, func(buf *bytes.Buffer) error {
+		return gob.NewDecoder(buf).Decode(&vm)
+	})
 	if err != nil {
 		return nil, err
 	}
