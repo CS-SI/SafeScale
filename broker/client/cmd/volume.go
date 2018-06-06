@@ -106,7 +106,7 @@ var volumeDelete = cli.Command{
 		service := pb.NewVolumeServiceClient(conn)
 		_, err := service.Delete(ctx, &pb.Reference{Name: c.Args().First()})
 		if err != nil {
-			return fmt.Errorf("Could not get volume '%s': %v", c.Args().First(), err)
+			return fmt.Errorf("Could not delete volume '%s': %v", c.Args().First(), err)
 		}
 		fmt.Println(fmt.Sprintf("Volume '%s' deleted", c.Args().First()))
 
