@@ -22,5 +22,7 @@ package Flavor
 type Enum int
 
 const (
+	_ = iota
+	//DCOS flavor
 	DCOS Enum = iota
 )

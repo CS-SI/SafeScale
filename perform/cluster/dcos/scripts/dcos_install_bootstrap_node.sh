@@ -69,6 +69,7 @@ cat >genconf/ssh_key <<'EOF'
 EOF
 chmod 0600 genconf/ssh_key
 
+
 # Public SSH key to the home dir of the ssh_user
 cat >>/home/cladm/.ssh/authorized_keys <<-'EOF'
 {{ .SSHPublicKey}}

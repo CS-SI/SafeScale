@@ -66,7 +66,7 @@ func Run() {
 	fmt.Printf("Cluster state: %s\n", state.String())
 
 	// Creates a Private Agent Node
-	_, err = instance.AddNode(NodeType.PrivateAgent, &pb.VMDefinition{
+	_, err = instance.AddNode(NodeType.PrivateNode, &pb.VMDefinition{
 		CPUNumber: 2,
 		RAM:       8.0,
 		Disk:      60,

@@ -36,8 +36,8 @@ import (
 
 //Get returns the ClusterAPI instance corresponding to the cluster named 'name'
 func Get(name string) (clusterapi.ClusterAPI, error) {
-	var data metadata.Record
-	found, err := data.Read(name)
+	var record metadata.Record
+	found, err := record.Read(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
 	}
@@ -46,14 +46,16 @@ func Get(name string) (clusterapi.ClusterAPI, error) {
 	}
 
 	var instance clusterapi.ClusterAPI
-	switch data.Common.Flavor {
+	switch record.Common.Flavor {
 	case Flavor.DCOS:
-		instance, err = dcos.Load(data)
+		instance, err = dcos.Load(record)
 		if err != nil {
 			return nil, err
 		}
+	default:
+		found = false
 	}
-	if instance == nil {
+	if !found {
 		return nil, nil
 	}
 

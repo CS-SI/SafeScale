@@ -24,7 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/perform/cluster/api/ClusterState"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
-	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )
@@ -57,13 +56,19 @@ type ClusterAPI interface {
 	GetNetworkID() string
 
 	//AddNode adds a node
-	AddNode(NodeType.Enum, *pb.VMDefinition) (*pb.VM, error)
-	//DeleteNode deletes a node
-	DeleteNode(string) error
+	AddNode(bool, *pb.VMDefinition) (*pb.VM, error)
+	//DeleteLastNode deletes a node
+	DeleteLastNode(bool) error
+	//DeleteSpecificNode deletes a node identified by its ID
+	DeleteSpecificNode(string) error
 	//ListNodes lists the nodes in the cluster
-	ListNodes() ([]*pb.VM, error)
-	//getNode returns a node based on its ID
+	ListNodes(bool) []string
+	//FindNode tells if the ID of the VM passed as parameter is a node
+	SearchNode(string, bool) bool
+	//GetNode returns a node based on its ID
 	GetNode(string) (*pb.VM, error)
+	//CountNodes counts the nodes of the cluster
+	CountNodes(bool) uint
 
 	//Delete allows to destroy infrastructure of cluster
 	Delete() error
@@ -94,11 +99,23 @@ type Cluster struct {
 	Tenant string
 	//NetworkID is the ID of the network to use
 	NetworkID string
+	//PublicNodedIDs is a slice of VMIDs of the public cluster nodes
+	PublicNodeIDs []string
+	//PrivateNodedIDs is a slice of VMIDs of the private cluster nodes
+	PrivateNodeIDs []string
 }
 
 //GetNetworkID returns the ID of the Network used by the cluster
 func (c *Cluster) GetNetworkID() string {
 	return c.NetworkID
+}
+
+//CountNodes returns the number of public or private nodes in the cluster
+func (c *Cluster) CountNodes(public bool) uint {
+	if public {
+		return uint(len(c.PublicNodeIDs))
+	}
+	return uint(len(c.PrivateNodeIDs))
 }
 
 func init() {

@@ -26,8 +26,8 @@ const (
 	Bootstrap Enum = iota
 	//Master to represent a master node
 	Master
-	//PrivateAgent to represent a private agent
-	PrivateAgent
-	//PublicAgent to represent a public agent
-	PublicAgent
+	//PrivateNode to represent a private agent
+	PrivateNode
+	//PublicNode to represent a public agent
+	PublicNode
 )

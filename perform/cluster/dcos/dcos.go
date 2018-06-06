@@ -72,17 +72,11 @@ type Specific struct {
 	//masterIPs contains a list of IP of the master servers
 	MasterIPs []string
 
-	//PublicAgentIDs is a slice of VMIDs of the public agents
-	PublicAgentIDs []string
-
-	//PublicAgentIPs contains a list of IP of the Public Agent nodes
-	PublicAgentIPs []string
-
-	//PrivateAgentIDs is a slice of VMIDs of the private agents
-	PrivateAgentIDs []string
+	//PublicNodeIPs contains a list of IP of the Public Agent nodes
+	PublicNodeIPs []string
 
 	//PrivateAvgentIPs contains a list of IP of the Private Agent Nodes
-	PrivateAgentIPs []string
+	PrivateNodeIPs []string
 
 	//StateCollectInterval in seconds
 	StateCollectInterval time.Duration
@@ -103,6 +97,11 @@ type Cluster struct {
 //GetNetworkID returns the ID of the network used by the cluster
 func (c *Cluster) GetNetworkID() string {
 	return c.Common.GetNetworkID()
+}
+
+//CountNodes returns the number of public or private nodes in the cluster
+func (c *Cluster) CountNodes(public bool) uint {
+	return c.Common.CountNodes(public)
 }
 
 //Load loads the internals of an existing cluster from metadata
@@ -198,14 +197,14 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	return &instance, nil
 
 cleanMasters:
-	//for _, id := range instance.definition.MasterIDs {
-	//	utils.DeleteVM(id)
-	//}
+	for _, id := range instance.Specific.MasterIDs {
+		utils.DeleteVM(id)
+	}
 cleanBootstrap:
-	//utils.DeleteVM(instance.definition.BootstrapID)
+	utils.DeleteVM(instance.Specific.BootstrapID)
 cleanNetwork:
-	//utils.DeleteNetwork(instance.definition.Common.NetworkID)
-	//instance.RemoveMetadata()
+	utils.DeleteNetwork(instance.Common.NetworkID)
+	instance.RemoveMetadata()
 	return nil, err
 }
 
@@ -263,8 +262,10 @@ func (c *Cluster) Start() error {
 	state, _ := c.ForceGetState()
 	if state == ClusterState.Stopped {
 		// 1st starts the masters
-		// 2nd start the agents
-		// 3nd start the nodes
+		// 2nd start the private nodes
+		// 2rd start the public nodes
+		// 4th update metadata
+		c.updateMetadata()
 	}
 	return fmt.Errorf("Can't start an already started cluster")
 }
@@ -295,17 +296,17 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 }
 
 //AddNode adds a node
-func (c *Cluster) AddNode(nodeType NodeType.Enum, req *pb.VMDefinition) (*pb.VM, error) {
-	switch nodeType {
-	case NodeType.PublicAgent:
-		fallthrough
-	case NodeType.PrivateAgent:
-		if c.Common.State == ClusterState.Creating {
-			return nil, fmt.Errorf("The DCOS flavor of Cluster needs to be in state 'Created' at least to allow agent node addition.")
-		}
-		return c.addAgentNode(nodeType, req)
+func (c *Cluster) AddNode(public bool, req *pb.VMDefinition) (*pb.VM, error) {
+	var nodeType NodeType.Enum
+	if public {
+		nodeType = NodeType.PublicNode
+	} else {
+		nodeType = NodeType.PrivateNode
 	}
-	return nil, fmt.Errorf("unmanaged node type '%s (%d)'", nodeType.String(), nodeType)
+	if c.Common.State == ClusterState.Creating {
+		return nil, fmt.Errorf("The DCOS flavor of Cluster needs to be in state 'Created' at least to allow agent node addition.")
+	}
+	return c.addAgentNode(nodeType, req)
 }
 
 //addBootstrap
@@ -378,23 +379,25 @@ func (c *Cluster) addMaster() (*pb.VM, error) {
 //addAgentNode adds a Public Agent Node to the cluster
 func (c *Cluster) addAgentNode(nodeType NodeType.Enum, req *pb.VMDefinition) (*pb.VM, error) {
 	var publicIP bool
+	var index int
 	coreName := "node"
-	if nodeType == NodeType.PublicAgent {
+	if nodeType == NodeType.PublicNode {
 		publicIP = true
 		coreName = "pub" + coreName
+		index = len(c.Common.PublicNodeIDs) + 1
 	} else {
 		publicIP = false
 		coreName = "priv" + coreName
+		index = len(c.Common.PrivateNodeIDs) + 1
 	}
 
-	i := len(c.Specific.PublicAgentIDs) + 1
 	req.Public = publicIP
 	req.Network = c.Common.NetworkID
-	req.Name = c.Common.Name + "-dcos" + coreName + "-" + strconv.Itoa(i)
+	req.Name = c.Common.Name + "-dcos" + coreName + "-" + strconv.Itoa(index)
 	req.ImageID = "CentOS 7.3"
 	agentVM, err := utils.CreateVM(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Master server %d: %s", i, err.Error())
+		return nil, err
 	}
 
 	// Installs DCOS on agent node
@@ -405,24 +408,24 @@ func (c *Cluster) addAgentNode(nodeType NodeType.Enum, req *pb.VMDefinition) (*p
 	}
 
 	// Registers the new Agent in the cluster struct
-	if nodeType == NodeType.PublicAgent {
-		c.Specific.PublicAgentIDs = append(c.Specific.PublicAgentIDs, agentVM.ID)
-		c.Specific.PublicAgentIPs = append(c.Specific.PublicAgentIPs, agentVM.IP)
+	if nodeType == NodeType.PublicNode {
+		c.Common.PublicNodeIDs = append(c.Common.PublicNodeIDs, agentVM.ID)
+		c.Specific.PublicNodeIPs = append(c.Specific.PublicNodeIPs, agentVM.IP)
 	} else {
-		c.Specific.PrivateAgentIDs = append(c.Specific.PrivateAgentIDs, agentVM.ID)
-		c.Specific.PrivateAgentIPs = append(c.Specific.PrivateAgentIPs, agentVM.IP)
+		c.Common.PrivateNodeIDs = append(c.Common.PrivateNodeIDs, agentVM.ID)
+		c.Specific.PrivateNodeIPs = append(c.Specific.PrivateNodeIPs, agentVM.IP)
 	}
 
 	// Update cluster definition in Object Storage
 	err = c.updateMetadata()
 	if err != nil {
 		// Removes the ID we just added to the cluster struct
-		if nodeType == NodeType.PublicAgent {
-			c.Specific.PublicAgentIDs = c.Specific.PublicAgentIDs[:len(c.Specific.PublicAgentIDs)-1]
-			c.Specific.PublicAgentIPs = c.Specific.PublicAgentIPs[:len(c.Specific.PublicAgentIPs)-1]
+		if nodeType == NodeType.PublicNode {
+			c.Common.PublicNodeIDs = c.Common.PublicNodeIDs[:len(c.Common.PublicNodeIDs)-1]
+			c.Specific.PublicNodeIPs = c.Specific.PublicNodeIPs[:len(c.Specific.PublicNodeIPs)-1]
 		} else {
-			c.Specific.PrivateAgentIDs = c.Specific.PrivateAgentIDs[:len(c.Specific.PrivateAgentIDs)-1]
-			c.Specific.PrivateAgentIPs = c.Specific.PrivateAgentIPs[:len(c.Specific.PrivateAgentIPs)-1]
+			c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
+			c.Specific.PrivateNodeIPs = c.Specific.PrivateNodeIPs[:len(c.Specific.PrivateNodeIPs)-1]
 		}
 		utils.DeleteVM(agentVM.ID)
 		return nil, fmt.Errorf("failed to update Cluster definition: %s", err.Error())
@@ -530,7 +533,7 @@ func (c *Cluster) realizePrepareDockerImages() (string, error) {
 //configureAgent installs and configure DCOS agent on targetVM
 func (c *Cluster) configureAgent(targetVM *pb.VM, nodeType NodeType.Enum) error {
 	var typeStr string
-	if nodeType == NodeType.PublicAgent {
+	if nodeType == NodeType.PublicNode {
 		typeStr = "yes"
 	} else {
 		typeStr = "no"
@@ -617,9 +620,51 @@ func (c *Cluster) executeScript(targetID string, script string, data map[string]
 	return retcode, &strOut, nil
 }
 
-//DeleteNode deletes an Agent node
-func (c *Cluster) DeleteNode(ID string) error {
-	return fmt.Errorf("DeleteNode not yet implemented")
+//DeleteLastNode deletes the last Agent node added
+func (c *Cluster) DeleteLastNode(public bool) error {
+	var vmID string
+
+	if public {
+		vmID = c.Common.PublicNodeIDs[len(c.Common.PublicNodeIDs)-1]
+	} else {
+		vmID = c.Common.PrivateNodeIDs[len(c.Common.PrivateNodeIDs)-1]
+	}
+	err := utils.DeleteVM(vmID)
+	if err != nil {
+		return nil
+	}
+
+	if public {
+		c.Common.PublicNodeIDs = c.Common.PublicNodeIDs[:len(c.Common.PublicNodeIDs)-1]
+	} else {
+		c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
+	}
+	c.updateMetadata()
+	return nil
+}
+
+//DeleteSpecificNode deletes the node specified by its ID
+func (c *Cluster) DeleteSpecificNode(ID string) error {
+	var foundInPrivate bool
+	foundInPublic, idx := contains(c.Common.PublicNodeIDs, ID)
+	if !foundInPublic {
+		foundInPrivate, idx = contains(c.Common.PrivateNodeIDs, ID)
+	}
+	if !foundInPublic && !foundInPrivate {
+		return fmt.Errorf("VM ID '%s' isn't a registered Node of the Cluster '%s'.", ID, c.Common.Name)
+	}
+
+	err := utils.DeleteVM(ID)
+	if err != nil {
+		return err
+	}
+
+	if foundInPublic {
+		c.Common.PublicNodeIDs = append(c.Common.PublicNodeIDs[:idx], c.Common.PublicNodeIDs[idx+1:]...)
+	} else {
+		c.Common.PrivateNodeIDs = append(c.Common.PrivateNodeIDs[:idx], c.Common.PrivateNodeIDs[idx+1:]...)
+	}
+	return nil
 }
 
 //ListMasters lists the master nodes in the cluster
@@ -628,18 +673,66 @@ func (c *Cluster) ListMasters() ([]*pb.VM, error) {
 }
 
 //ListNodes lists the nodes in the cluster
-func (c *Cluster) ListNodes() ([]*pb.VM, error) {
-	return nil, fmt.Errorf("ListNodes not yet implemented")
+func (c *Cluster) ListNodes(public bool) []string {
+	if public {
+		return c.Common.PublicNodeIDs
+	}
+	return c.Common.PrivateNodeIDs
 }
 
 //GetNode returns a node based on its ID
-func (*Cluster) GetNode(ID string) (*pb.VM, error) {
-	return nil, fmt.Errorf("ListNodes not yet implemented")
+func (c *Cluster) GetNode(ID string) (*pb.VM, error) {
+	found, _ := contains(c.Common.PublicNodeIDs, ID)
+	if !found {
+		found, _ = contains(c.Common.PrivateNodeIDs, ID)
+	}
+	if !found {
+		return nil, fmt.Errorf("GetNode not yet implemented")
+	}
+	return utils.GetVM(ID)
+}
+
+func contains(list []string, ID string) (bool, int) {
+	var idx int
+	found := false
+	for i, v := range list {
+		if v == ID {
+			found = true
+			idx = i
+			break
+		}
+	}
+	return found, idx
+}
+
+//SearchNode tells if a VM ID corresponds to a node of the cluster
+func (c *Cluster) SearchNode(ID string, public bool) bool {
+	found, _ := contains(c.Common.PublicNodeIDs, ID)
+	if !found {
+		found, _ = contains(c.Common.PrivateNodeIDs, ID)
+	}
+	return found
 }
 
 //GetDefinition returns the public properties of the cluster
 func (c *Cluster) GetDefinition() clusterapi.Cluster {
 	return c.Common
+}
+
+//refreshMetadata reloads metadata from Object Storage
+func (c *Cluster) refreshMetadata() error {
+	var record metadata.Record
+	found, err := record.Read(c.Common.Name)
+	if err != nil {
+		return fmt.Errorf("failed to get information about Cluster '%s': %s", c.Common.Name, err.Error())
+	}
+	if !found {
+		return fmt.Errorf("failed to find metadata of Cluster '%s' on Object Storage", c.Common.Name)
+	}
+	c.Common = record.Common
+	specific := record.Internal.(Specific)
+	c.Specific = &specific
+	return nil
 }
 
 //updateMetadata writes cluster definition in Object Storage
@@ -657,8 +750,8 @@ func (c *Cluster) updateMetadata() error {
 //RemoveMetadata removes definition of cluster from Object Storage
 func (c *Cluster) RemoveMetadata() error {
 	if len(c.Specific.MasterIDs) > 0 ||
-		len(c.Specific.PublicAgentIDs) > 0 ||
-		len(c.Specific.PrivateAgentIDs) > 0 ||
+		len(c.Common.PublicNodeIDs) > 0 ||
+		len(c.Common.PrivateNodeIDs) > 0 ||
 		c.Common.NetworkID != "" {
 		return fmt.Errorf("can't remove a definition of a cluster with infrastructure still running")
 	}
@@ -681,7 +774,7 @@ func (c *Cluster) Delete() error {
 	}
 
 	// Deletes the public nodes
-	for _, n := range c.Specific.PublicAgentIDs {
+	for _, n := range c.Common.PublicNodeIDs {
 		err := utils.DeleteVM(n)
 		if err != nil {
 			return err
@@ -689,7 +782,7 @@ func (c *Cluster) Delete() error {
 	}
 
 	// Deletes the private nodes
-	for _, n := range c.Specific.PrivateAgentIDs {
+	for _, n := range c.Common.PrivateNodeIDs {
 		err := utils.DeleteVM(n)
 		if err != nil {
 			return err
