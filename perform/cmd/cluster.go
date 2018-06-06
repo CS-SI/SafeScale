@@ -21,10 +21,13 @@ import (
 	"fmt"
 	"log"
 
+	pb "github.com/CS-SI/SafeScale/broker"
+
 	"github.com/CS-SI/SafeScale/perform/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
 
 	"github.com/urfave/cli"
 )
@@ -41,12 +44,24 @@ var ClusterCmd = cli.Command{
 		clusterStop,
 		clusterStart,
 		clusterState,
+		clusterNode,
+	},
+}
+
+var clusterNode = cli.Command{
+	Name:      "node",
+	Usage:     "cluster node COMMAND",
+	ArgsUsage: "<cluster name>",
+	Subcommands: []cli.Command{
+		clusterNodeAdd,
+		clusterNodeDelete,
 	},
 }
 
 var clusterList = cli.Command{
-	Name:  "list",
-	Usage: "List available Clusters on the current tenant",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available Clusters on the current tenant",
 	Action: func(c *cli.Context) error {
 		list, err := cluster.List()
 		if err != nil {
@@ -132,8 +147,154 @@ var clusterCreate = cli.Command{
 	},
 }
 
+var clusterNodeAdd = cli.Command{
+	Name:      "add",
+	Usage:     "add a node to cluster",
+	ArgsUsage: "<cluster name>",
+	Flags: []cli.Flag{
+		cli.IntFlag{
+			Name:  "count",
+			Value: 1,
+			Usage: "How many nodes to add",
+		},
+		cli.BoolFlag{
+			Name:  "public",
+			Usage: "Affect public IP address to node",
+		},
+		cli.IntFlag{
+			Name:  "cpu",
+			Value: 2,
+			Usage: "Number of CPU for the VM",
+		},
+		cli.Float64Flag{
+			Name:  "ram",
+			Value: 8,
+			Usage: "RAM for the VM",
+		},
+		cli.IntFlag{
+			Name:  "disk",
+			Value: 100,
+			Usage: "Disk space for the VM",
+		},
+		cli.BoolFlag{
+			Name:   "gpu",
+			Usage:  "With GPU",
+			Hidden: true,
+		},
+	},
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <cluster name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("Cluster name required")
+		}
+		clusterName := c.Args().First()
+		instance, err := cluster.Get(clusterName)
+		if err != nil {
+			return err
+		}
+		if instance == nil {
+			return fmt.Errorf("Cluster '%s' not found.", clusterName)
+		}
+		public := c.Bool("public")
+		var nodeType NodeType.Enum
+		var nodeTypeString string
+		if public {
+			nodeType = NodeType.PublicAgent
+			nodeTypeString = "public"
+		} else {
+			nodeType = NodeType.PrivateAgent
+			nodeTypeString = "private"
+		}
+		count := uint16(c.Int("count"))
+		countS := ""
+		if count > 1 {
+			countS = "s"
+		}
+		fmt.Printf("Adding %d %s node%s to Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
+
+		for i := 0; i < int(c.Int("count")); i++ {
+			_, err = instance.AddNode(nodeType, &pb.VMDefinition{
+				CPUNumber: int32(c.Int("cpu")),
+				Disk:      int32(c.Float64("disk")),
+				RAM:       float32(c.Float64("ram")),
+			})
+			if err != nil {
+				return fmt.Errorf("Failed to add node #%d: %s", i+1, err.Error())
+			}
+		}
+
+		fmt.Printf("Added %d %s node%s to cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
+		return nil
+	},
+}
+
+var clusterNodeDelete = cli.Command{
+	Name:      "delete",
+	Aliases:   []string{"rm"},
+	Usage:     "delete last added node(s) from cluster",
+	ArgsUsage: "<cluster name>",
+	Flags: []cli.Flag{
+		cli.IntFlag{
+			Name:  "count",
+			Value: 1,
+			Usage: "Number of node(s) to delete",
+		},
+		cli.BoolFlag{
+			Name:  "public",
+			Usage: "Public node",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <cluster name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("Cluster name required")
+		}
+		clusterName := c.Args().First()
+		instance, err := cluster.Get(clusterName)
+		if err != nil {
+			return err
+		}
+		if instance == nil {
+			return fmt.Errorf("Cluster '%s' not found.", clusterName)
+		}
+		public := c.Bool("public")
+		var nodeType NodeType.Enum
+		var nodeTypeString string
+		if public {
+			nodeType = NodeType.PublicAgent
+			nodeTypeString = "public"
+		} else {
+			nodeType = NodeType.PrivateAgent
+			nodeTypeString = "private"
+		}
+		count := uint(c.Int("count"))
+		var countS string
+		if count > 1 {
+			countS = "s"
+		}
+		present := instance.CountNodes(public)
+		if count > present {
+			return fmt.Errorf("Can't delete %d %s node%s, the cluster contains only %d.", count, nodeTypeString, countS, present)
+		}
+
+		fmt.Printf("Deleting %d %s node%s from Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
+		for i := 0; i < int(count); i++ {
+			err = instance.DeleteNode(nodeType)
+			if err != nil {
+				return fmt.Errorf("Failed to delete node #%d: %s", i+1, err.Error())
+			}
+		}
+
+		fmt.Printf("%d %s node%s successfully deleted from cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
+		return nil
+	},
+}
+
 var clusterDelete = cli.Command{
 	Name:      "delete",
+	Aliases:   []string{"rm"},
 	Usage:     "Delete cluster",
 	ArgsUsage: "<cluster name>",
 	Action: func(c *cli.Context) error {
