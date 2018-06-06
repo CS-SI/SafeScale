@@ -47,13 +47,16 @@ func FindMetadata(path string, name string) (bool, error) {
 	}
 
 	list, err := svc.ListObjects(MetadataContainerName, api.ObjectFilter{
-		Path:   strings.TrimLeft(name, "/"),
-		Prefix: strings.TrimRight(path, "/"),
+		Path:   strings.Trim(path, "/"),
+		Prefix: strings.Trim(name, "/"),
 	})
 	if err != nil {
 		return false, err
 	}
-	return len(list) > 0, nil
+	if len(list) > 0 {
+		return true, nil
+	}
+	return false, nil
 }
 
 //DeleteMetadata removes metadata passed as parameter
