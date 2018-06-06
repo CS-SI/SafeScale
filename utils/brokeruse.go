@@ -114,7 +114,7 @@ func CreateVM(req *pb.VMDefinition) (*pb.VM, error) {
 	service := pb.NewVMServiceClient(conn)
 	vm, err := service.Create(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Bootstrap server: %v", err)
+		return nil, fmt.Errorf("failed to create server: %v", err)
 	}
 	return vm, nil
 }
@@ -128,4 +128,14 @@ func DeleteVM(id string) error {
 	service := pb.NewVMServiceClient(conn)
 	_, err := service.Delete(ctx, &pb.Reference{ID: id})
 	return err
+}
+
+//GetVM returns information about a VM
+func GetVM(id string) (*pb.VM, error) {
+	conn := GetConnection()
+	defer conn.Close()
+	ctx, cancel := GetContext(TimeoutCtxDefault)
+	defer cancel()
+	service := pb.NewVMServiceClient(conn)
+	return service.Inspect(ctx, &pb.Reference{ID: id})
 }
