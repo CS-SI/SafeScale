@@ -89,7 +89,7 @@ func (srv *VMService) List(all bool) ([]api.VM, error) {
 	return srv.provider.ListVMs(all)
 }
 
-//Get returns the network identified by ref, ref can be the name or the id
+//Get returns the VM identified by ref, ref can be the name or the id
 func (srv *VMService) Get(ref string) (*api.VM, error) {
 	vms, err := srv.provider.ListVMs(false)
 	if err != nil {
@@ -103,7 +103,7 @@ func (srv *VMService) Get(ref string) (*api.VM, error) {
 	return nil, fmt.Errorf("VM %s does not exists", ref)
 }
 
-//Delete deletes network referenced by ref
+//Delete deletes VM referenced by ref
 func (srv *VMService) Delete(ref string) error {
 	vm, err := srv.Get(ref)
 	if err != nil {
