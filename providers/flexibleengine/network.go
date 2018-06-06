@@ -18,6 +18,7 @@ package flexibleengine
 
 import (
 	"bytes"
+	"encoding/gob"
 	"fmt"
 	"net"
 	"strings"
@@ -541,8 +542,7 @@ func (client *Client) readGateway(netID string) (string, error) {
 	buffer.ReadFrom(o.Content)*/
 	var vmID string
 	err := utils.ReadMetadata(api.NetworkContainerName, netID, func(buf *bytes.Buffer) error {
-		vmID = buf.String()
-		return nil
+		return gob.NewDecoder(buf).Decode(&vmID)
 	})
 	return vmID, err
 }
