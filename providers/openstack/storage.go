@@ -439,7 +439,7 @@ func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error listing objects od container%s: %s", container, errorString(err))
+		return nil, fmt.Errorf("Error listing objects of container '%s': %s", container, errorString(err))
 	}
 	return objectList, nil
 }
