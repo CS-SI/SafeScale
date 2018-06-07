@@ -7,7 +7,6 @@ all:	$(EXEC) cluster vet
 
 vet:
 	@$(GO) vet
-	@$(GO) vet ./utils
 	@$(GO) vet ./cmd
 
 cluster:

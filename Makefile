@@ -4,19 +4,19 @@ GO?=go
 
 all: providers system broker perform utils
 
-providers:
+providers: broker
 	@(cd providers && $(MAKE))
 
-broker: providers system
+broker: system
 	@(cd broker && $(MAKE))
 
 system:
 	@(cd system && $(MAKE))
 
-perform:
+perform: utils
 	@(cd perform && $(MAKE))
 
-utils:
+utils: broker
 	@(cd utils && $(MAKE))
 
 clean:

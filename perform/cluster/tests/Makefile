@@ -1,8 +1,8 @@
-all: deploy
+all: create_cluster
 
 .PHONY: api dcos tests clean mrproper
 
-deploy: deploy.go ../api/*.go ../dcos/*.go ../*.go
+create_cluster: create_cluster.go ../api/*.go ../dcos/*.go ../*.go
 
 	@(go generate && go build $<)
 
