@@ -30,7 +30,7 @@ One section 'tenants' with specific authentication parameters for each tenant. S
 ```yaml
 [[tenants]]
 client = "ovh"
-name = "logical_name_for_this_tenant"
+name = "logical_name_for_this_ovh_tenant"
 ApplicationKey = "your_application_key"
 OpenstackID = "your_login"
 OpenstackPassword = "your_password"
@@ -39,11 +39,24 @@ ProjectName = "your_project_name_or_id"
 
 [[tenants]]
 client = "cloudwatt"
-name = "logical_name_for_this_tenant"
+name = "logical_name_for_this_cloudwatt_tenant"
 Username = "your_login"
 Password = "your_password"
 TenantName = "your_tenant_name_or_id"
 Region = "your_region"
+
+[[tenants]]
+client = "flexibleengine"
+name = "logical_name_for_this_flexibleengine_tenant"
+Username = "your_login"
+Password = "your_password"
+DomainName = "your_domaine_name"
+ProjectID = "your_project_id"
+Region = "your_region"
+VPCName = "your_VPC_name"
+VPCCIDR = "your_VPC_cidr"
+S3AccessKeyID = "your_S3_login"
+S3AccessKeyPassword = "your_S3_password"
 ```
 #### Usage
 
