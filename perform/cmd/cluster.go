@@ -17,9 +17,12 @@
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/utils"
@@ -41,6 +44,7 @@ var ClusterCmd = cli.Command{
 		clusterCreate,
 		clusterDelete,
 		clusterInspect,
+		clusterState,
 		clusterStop,
 		clusterStart,
 		clusterState,
@@ -88,12 +92,12 @@ var clusterInspect = cli.Command{
 		clusterName := c.Args().First()
 		instance, err := cluster.Get(clusterName)
 		if err != nil {
-			return fmt.Errorf("Could not inspect cluster '%s': %v", clusterName, err)
+			return fmt.Errorf("Could not inspect cluster '%s': %s", clusterName, err.Error())
 		}
 		if instance == nil {
 			return fmt.Errorf("cluster '%s' not found", clusterName)
 		}
-		out, _ := json.Marshal(instance.GetDefinition())
+		out, err := json.Marshal(instance.GetDefinition())
 		fmt.Println(string(out))
 
 		return nil
@@ -279,11 +283,20 @@ var clusterNodeDelete = cli.Command{
 			if err != nil {
 				return err
 			}
-			err = instance.DeleteSpecificNode(vmID)
-			if err != nil {
-				return err
+
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Printf("Are you sure to delete Cluster Node identified by '%s' in CLuster '%s' ? (y/N): ", vmID, clusterName)
+			resp, _ := reader.ReadString('\n')
+			resp = strings.ToLower(strings.TrimSuffix(resp, "\n"))
+			if resp == "y" {
+				err = instance.DeleteSpecificNode(vmID)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Node '%s' of cluster '%s' deleted.", vm.Name, clusterName)
+			} else {
+				fmt.Println("Aborted.")
 			}
-			fmt.Printf("Node '%s' of cluster '%s' deleted.", vm.Name, clusterName)
 			return nil
 		}
 
@@ -304,15 +317,23 @@ var clusterNodeDelete = cli.Command{
 			return fmt.Errorf("can't delete %d %s node%s, the cluster contains only %d of them", count, nodeTypeString, countS, present)
 		}
 
-		fmt.Printf("Deleting %d %s node%s from Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
-		for i := 0; i < int(count); i++ {
-			err = instance.DeleteLastNode(public)
-			if err != nil {
-				return fmt.Errorf("Failed to delete node #%d: %s", i+1, err.Error())
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Printf("Are you sure to delete %d %s node%s from Cluster %s ? (y/N): ", int(count), nodeTypeString, countS, clusterName)
+		resp, _ := reader.ReadString('\n')
+		resp = strings.ToLower(strings.TrimSuffix(resp, "\n"))
+		if resp == "y" {
+			fmt.Printf("Deleting %d %s node%s from Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
+			for i := 0; i < int(count); i++ {
+				err = instance.DeleteLastNode(public)
+				if err != nil {
+					return fmt.Errorf("Failed to delete node #%d: %s", i+1, err.Error())
+				}
 			}
-		}
 
-		fmt.Printf("%d %s node%s successfully deleted from cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
+			fmt.Printf("%d %s node%s successfully deleted from cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
+		} else {
+			fmt.Println("Aborted.")
+		}
 		return nil
 	},
 }
@@ -363,13 +384,20 @@ var clusterDelete = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Cluster name required")
 		}
-		err := cluster.Delete(c.Args().First())
-		if err != nil {
-			return err
+		clusterName := c.Args().First()
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Printf("Are you sure to delete Cluster '%s' ? (y/N): ", clusterName)
+		resp, _ := reader.ReadString('\n')
+		resp = strings.ToLower(strings.TrimSuffix(resp, "\n"))
+		if resp == "y" {
+			err := cluster.Delete(clusterName)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Cluster '%s' deleted.\n", clusterName)
+		} else {
+			fmt.Println("Aborted.")
 		}
-
-		fmt.Printf("Cluster '%s' deleted.\n", c.Args().First())
-
 		return nil
 	},
 }
@@ -425,7 +453,7 @@ var clusterStart = cli.Command{
 
 var clusterState = cli.Command{
 	Name:      "state",
-	Usage:     "Get cluster state",
+	Usage:     "Returns the current state of a cluster",
 	ArgsUsage: "<cluster name>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
@@ -433,16 +461,17 @@ var clusterState = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Cluster name required")
 		}
-		instance, err := cluster.Get(c.Args().First())
+		clusterName := c.Args().First()
+		instance, err := cluster.Get(clusterName)
 		if err != nil {
-			return err
+			return fmt.Errorf("Could not inspect cluster '%s': %v", clusterName, err)
+		}
+		if instance == nil {
+			return fmt.Errorf("cluster '%s' not found", clusterName)
 		}
 		state, err := instance.GetState()
-		if err != nil {
-			return err
-		}
-
-		fmt.Printf("Cluster '%s' state : %s\n", c.Args().First(), state.String())
+		out, _ := json.Marshal(map[string]string{"state": state.String()})
+		fmt.Println(string(out))
 
 		return nil
 	},
