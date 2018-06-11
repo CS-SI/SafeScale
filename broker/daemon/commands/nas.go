@@ -45,7 +45,7 @@ func (s *NasServiceServer) Create(ctx context.Context, in *pb.NasDefinition) (*p
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.client)
+	nasService := services.NewNasService(currentTenant.Client)
 	nas, err := nasService.Create(in.GetNas().GetName(), in.GetVM().GetName(), in.GetPath())
 
 	if err != nil {
@@ -63,7 +63,7 @@ func (s *NasServiceServer) Delete(ctx context.Context, in *pb.NasName) (*pb.NasD
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.client)
+	nasService := services.NewNasService(currentTenant.Client)
 	nas, err := nasService.Delete(in.GetName())
 
 	if err != nil {
@@ -81,7 +81,7 @@ func (s *NasServiceServer) List(ctx context.Context, in *google_protobuf.Empty) 
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.client)
+	nasService := services.NewNasService(currentTenant.Client)
 	nass, err := nasService.List()
 
 	if err != nil {
@@ -107,7 +107,7 @@ func (s *NasServiceServer) Mount(ctx context.Context, in *pb.NasDefinition) (*pb
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.client)
+	nasService := services.NewNasService(currentTenant.Client)
 	nas, err := nasService.Mount(in.GetNas().GetName(), in.GetVM().GetName(), in.GetPath())
 
 	if err != nil {
@@ -125,7 +125,7 @@ func (s *NasServiceServer) UMount(ctx context.Context, in *pb.NasDefinition) (*p
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.client)
+	nasService := services.NewNasService(currentTenant.Client)
 	nas, err := nasService.UMount(in.GetNas().GetName(), in.GetVM().GetName())
 
 	if err != nil {
@@ -143,7 +143,7 @@ func (s *NasServiceServer) Inspect(ctx context.Context, in *pb.NasName) (*pb.Nas
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.client)
+	nasService := services.NewNasService(currentTenant.Client)
 	nass, err := nasService.Inspect(in.GetName())
 
 	if err != nil {

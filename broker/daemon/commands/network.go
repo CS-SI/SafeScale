@@ -44,7 +44,7 @@ func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(currentTenant.client)
+	networkAPI := services.NewNetworkService(currentTenant.Client)
 	network, err := networkAPI.Create(in.GetName(), in.GetCIDR(), IPVersion.IPv4,
 		int(in.Gateway.GetCPU()), in.GetGateway().GetRAM(), int(in.GetGateway().GetDisk()), in.GetGateway().GetImageID(), in.GetGateway().GetName())
 
@@ -69,7 +69,7 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(currentTenant.client)
+	networkAPI := services.NewNetworkService(currentTenant.Client)
 
 	networks, err := networkAPI.List(in.GetAll())
 	if err != nil {
@@ -104,7 +104,7 @@ func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(currentTenant.client)
+	networkAPI := services.NewNetworkService(currentTenant.Client)
 	network, err := networkAPI.Get(ref)
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func (s *NetworkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*g
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(currentTenant.client)
+	networkAPI := services.NewNetworkService(currentTenant.Client)
 	err := networkAPI.Delete(ref)
 	if err != nil {
 		return nil, err

@@ -42,7 +42,7 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewSSHService(currentTenant.client)
+	service := services.NewSSHService(currentTenant.Client)
 	out, err := service.Run(in.GetVM().GetName(), in.GetCommand())
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*go
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewSSHService(currentTenant.client)
+	service := services.NewSSHService(currentTenant.Client)
 	err := service.Copy(in.GetSource(), in.GetDestination())
 	if err != nil {
 		return nil, err

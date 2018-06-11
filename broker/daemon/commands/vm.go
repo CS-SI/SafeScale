@@ -44,7 +44,7 @@ func (s *VMServiceServer) List(ctx context.Context, in *pb.VMListRequest) (*pb.V
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	vmAPI := services.NewVMService(currentTenant.client)
+	vmAPI := services.NewVMService(currentTenant.Client)
 
 	vms, err := vmAPI.List(in.GetAll())
 	if err != nil {
@@ -79,7 +79,7 @@ func (s *VMServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	vmService := services.NewVMService(currentTenant.client)
+	vmService := services.NewVMService(currentTenant.Client)
 	vm, err := vmService.Create(in.GetName(), in.GetNetwork(),
 		int(in.GetCPUNumber()), in.GetRAM(), int(in.GetDisk()), in.GetImageID(), in.GetPublic())
 
@@ -115,7 +115,7 @@ func (s *VMServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	vmService := services.NewVMService(currentTenant.client)
+	vmService := services.NewVMService(currentTenant.Client)
 	vm, err := vmService.Get(ref)
 	if err != nil {
 		return nil, err
@@ -147,7 +147,7 @@ func (s *VMServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
-	vmService := services.NewVMService(currentTenant.client)
+	vmService := services.NewVMService(currentTenant.Client)
 	err := vmService.Delete(ref)
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (s *VMServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshCon
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
-	vmService := services.NewVMService(currentTenant.client)
+	vmService := services.NewVMService(currentTenant.Client)
 	sshConfig, err := vmService.SSH(ref)
 	if err != nil {
 		return nil, err

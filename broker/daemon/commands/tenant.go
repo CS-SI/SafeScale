@@ -31,7 +31,7 @@ import (
 //Tenant structure to handle name and clientAPI for a tenant
 type Tenant struct {
 	name   string
-	client api.ClientAPI
+	Client api.ClientAPI
 }
 
 var (
@@ -80,8 +80,10 @@ func (s *TenantServiceServer) Get(ctx context.Context, in *google_protobuf.Empty
 	return &pb.TenantName{Name: tenant.name}, nil
 }
 
+var GetCurrentTenant = getCurrentTenant
+
 //GetCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
-func GetCurrentTenant() *Tenant {
+func getCurrentTenant() *Tenant {
 	if currentTenant == nil {
 		tenants, err := providers.Tenants()
 		if err != nil || len(tenants) != 1 {
@@ -94,7 +96,7 @@ func GetCurrentTenant() *Tenant {
 			if err != nil {
 				return nil
 			}
-			currentTenant = &Tenant{name: name, client: service}
+			currentTenant = &Tenant{name: name, Client: service}
 		}
 	}
 	return currentTenant
@@ -113,7 +115,7 @@ func (s *TenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*goog
 	if err != nil {
 		return nil, fmt.Errorf("Unable to set tenant '%s': %s", in.GetName(), err.Error())
 	}
-	currentTenant = &Tenant{name: in.GetName(), client: clientAPI}
+	currentTenant = &Tenant{name: in.GetName(), Client: clientAPI}
 	log.Printf("Current tenant is now '%s'", in.GetName())
 	return &google_protobuf.Empty{}, nil
 }

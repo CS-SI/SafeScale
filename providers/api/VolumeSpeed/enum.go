@@ -24,10 +24,10 @@ type Enum int
 
 const (
 
-	//SSD speed volume
-	SSD Enum = iota
+	//COLD speed volume
+	COLD Enum = iota
 	//HDD speed volume.
 	HDD
-	//COLD speed volume
-	COLD
+	//SSD speed volume
+	SSD
 )

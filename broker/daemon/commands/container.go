@@ -46,7 +46,7 @@ func (s *ContainerServiceServer) List(ctx context.Context, in *google_protobuf.E
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.Client)
 	containers, err := service.List()
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (s *ContainerServiceServer) Create(ctx context.Context, in *pb.Container) (
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.Client)
 	err := service.Create(in.GetName())
 	if err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ func (s *ContainerServiceServer) Delete(ctx context.Context, in *pb.Container) (
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.Client)
 	err := service.Delete(in.GetName())
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (s *ContainerServiceServer) Inspect(ctx context.Context, in *pb.Container) 
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.Client)
 	resp, err := service.Inspect(in.GetName())
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func (s *ContainerServiceServer) Mount(ctx context.Context, in *pb.ContainerMoun
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.Client)
 	err := service.Mount(in.GetContainer(), in.GetVM().GetName(), in.GetPath())
 
 	log.Println("End Mount container")
@@ -128,7 +128,7 @@ func (s *ContainerServiceServer) UMount(ctx context.Context, in *pb.ContainerMou
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.client)
+	service := services.NewContainerService(currentTenant.Client)
 	err := service.UMount(in.GetContainer(), in.GetVM().GetName())
 
 	log.Println("End UMount container")

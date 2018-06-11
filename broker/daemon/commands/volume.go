@@ -39,13 +39,17 @@ import (
 //VolumeServiceServer is the volume service grps server
 type VolumeServiceServer struct{}
 
+//VolumeServiceCreator is the function tu use to create a VolumeService instance
+var VolumeServiceCreator = services.NewVolumeService
+
 //List the available volumes
 func (s *VolumeServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.VolumeList, error) {
 	log.Printf("Volume List called")
-	if GetCurrentTenant() == nil {
+	tenant := GetCurrentTenant()
+	if tenant == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
-	service := services.NewVolumeService(currentTenant.client)
+	service := VolumeServiceCreator(tenant.Client)
 	volumes, err := service.List()
 	if err != nil {
 		return nil, err
@@ -64,11 +68,12 @@ func (s *VolumeServiceServer) List(ctx context.Context, in *google_protobuf.Empt
 //Create a new volume
 func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
 	log.Printf("Create Volume called")
-	if GetCurrentTenant() == nil {
+	tenant := GetCurrentTenant()
+	if tenant == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewVolumeService(currentTenant.client)
+	service := VolumeServiceCreator(tenant.Client)
 	vol, err := service.Create(in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
 	if err != nil {
 		return nil, err
@@ -82,11 +87,12 @@ func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*google_protobuf.Empty, error) {
 	log.Println("Attach volume called")
 
-	if GetCurrentTenant() == nil {
+	tenant := GetCurrentTenant()
+	if tenant == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewVolumeService(currentTenant.client)
+	service := services.NewVolumeService(currentTenant.Client)
 	err := service.Attach(in.GetVolume().GetName(), in.GetVM().GetName(), in.GetMountPath(), in.GetFormat())
 
 	if err != nil {
@@ -101,11 +107,12 @@ func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachmen
 func (s *VolumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachment) (*google_protobuf.Empty, error) {
 	log.Println("Detach volume called")
 
-	if GetCurrentTenant() == nil {
+	tenant := GetCurrentTenant()
+	if tenant == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewVolumeService(currentTenant.client)
+	service := services.NewVolumeService(currentTenant.Client)
 	err := service.Detach(in.GetVolume().GetName(), in.GetVM().GetName())
 
 	if err != nil {
@@ -126,10 +133,11 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 		return nil, fmt.Errorf("Neither name nor id given as reference")
 	}
 
-	if GetCurrentTenant() == nil {
+	tenant := GetCurrentTenant()
+	if tenant == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
-	service := services.NewVolumeService(currentTenant.client)
+	service := services.NewVolumeService(currentTenant.Client)
 	err := service.Delete(ref)
 	if err != nil {
 		return nil, err
@@ -147,11 +155,12 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 		return nil, fmt.Errorf("Neither name nor id given as reference")
 	}
 
-	if GetCurrentTenant() == nil {
+	tenant := GetCurrentTenant()
+	if tenant == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewVolumeService(currentTenant.client)
+	service := services.NewVolumeService(currentTenant.Client)
 	vol, err := service.Get(ref)
 	if err != nil {
 		return nil, err
