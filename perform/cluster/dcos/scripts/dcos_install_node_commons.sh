@@ -35,11 +35,12 @@ groupadd nogroup
 
 # Disables installation of docker-python from yum
 yum remove -y python-docker-py &>/dev/null
-yum install -y yum-versionlock tar xz curl wget unzip ipset pigz
+yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz
 yum versionlock exclude python-docker-py
 
 # Installs PIP
 yum install -y epel-release
+yum makecache fast
 yum install -y python-pip
 
 # Installs docker-python with pip

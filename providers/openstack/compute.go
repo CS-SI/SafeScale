@@ -21,7 +21,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/gob"
 	"encoding/pem"
 	"fmt"
 	"strings"
@@ -30,12 +29,11 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/system"
-
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/api/VMState"
-	"github.com/CS-SI/SafeScale/utils"
+	metadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/system"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
@@ -44,6 +42,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/pagination"
+
 	"golang.org/x/crypto/ssh"
 )
 
@@ -389,91 +388,43 @@ func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp 
 }
 
 func (client *Client) readGateway(networkID string) (*servers.Server, error) {
-	gwID, err := client.getGateway(networkID)
+	m, err := metadata.NewGateway(networkID)
+	found, err := m.Read()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating VM: Enable to found Gateway %s", errorString(err))
+		return nil, err
 	}
-	gw, err := servers.Get(client.Compute, gwID).Extract()
+	if !found {
+		return nil, fmt.Errorf("unable to found Gateway: %s", errorString(err))
+	}
+
+	gw, err := servers.Get(client.Compute, m.Get()).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating VM: Enable to found Gateway %s", errorString(err))
+		return nil, fmt.Errorf("Error creating VM: Usnable to found Gateway %s", errorString(err))
 	}
 	return gw, nil
 }
 
 func (client *Client) saveVMDefinition(vm api.VM, netID string) error {
-	/*var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	err := enc.Encode(vm)
+	m, err := metadata.NewHost()
 	if err != nil {
 		return err
 	}
-	err = client.PutObject(api.NetworkContainerName, api.Object{
-		Name:    fmt.Sprintf("%s/vm/%s", netID, vm.ID),
-		Content: bytes.NewReader(buffer.Bytes()),
-	})
-	if err != nil {
-		return err
-	}
-	return client.PutObject(api.VMContainerName, api.Object{
-		Name:    vm.ID,
-		Content: bytes.NewReader(buffer.Bytes()),
-	})*/
-	return utils.WriteMetadata(api.VMContainerName, vm.ID, vm)
-}
-
-func (client *Client) removeVMDefinition(vmID string) error {
-	/*// Find the network the vm the is attached on
-	networks, err := client.ListNetworks(false)
-	if err != nil {
-		return err
-	}
-
-	found := false
-	for _, net := range networks {
-		vms, err := client.ListObjects(api.NetworkContainerName, api.ObjectFilter{
-			Prefix: fmt.Sprintf("%s/vm/%s", net.ID, vmID),
-		})
-		if err != nil {
-			return err
-		}
-		if len(vms) == 1 {
-			err := client.DeleteObject(api.NetworkContainerName, fmt.Sprintf("%s/vm/%s", net.ID, vmID))
-			if err != nil {
-				return err
-			}
-			found = true
-			break
-		}
-	}
-	if !found {
-		fmt.Printf("VM %s not attached to any network !!", vmID)
-	}
-
-	return client.DeleteObject(api.VMContainerName, vmID)*/
-	return utils.DeleteMetadata(api.VMContainerName, vmID)
+	return m.Carry(&vm).Write()
 }
 
 func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
-	/*o, err := client.GetObject(api.VMContainerName, vmID, nil)
+	m, err := metadata.NewHost()
 	if err != nil {
 		return nil, err
 	}
-	var buffer bytes.Buffer
-	buffer.ReadFrom(o.Content)
-	enc := gob.NewDecoder(&buffer)
-	var vm api.VM
-	err = enc.Decode(&vm)
-	if err != nil {
-		return nil, err
-	}*/
-	var vm api.VM
-	err := utils.ReadMetadata(api.VMContainerName, vmID, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&vm)
-	})
+	found, err := m.ReadByID(vmID)
 	if err != nil {
 		return nil, err
 	}
-	return &vm, nil
+	if !found {
+		return nil, fmt.Errorf("failed to find vm by id '%s'", vmID)
+	}
+	return m.Get(), nil
 }
 
 //CreateVM creates a VM satisfying request
@@ -644,23 +595,17 @@ func (client *Client) listAllVMs() ([]api.VM, error) {
 
 //listMonitoredVMs lists available VMs created by SafeScale (ie registered in object storage)
 func (client *Client) listMonitoredVMs() ([]api.VM, error) {
-	names, err := client.ListObjects(api.VMContainerName, api.ObjectFilter{})
-	if err != nil {
-		return nil, err
-	}
-
 	var vms []api.VM
-
-	for _, name := range names {
-		vm, err := client.readVMDefinition(name)
-		if err != nil {
-			return nil, providers.ResourceNotFoundError("VM", name)
-		}
-		vms = append(vms, *vm)
+	m, err := metadata.NewHost()
+	if err != nil {
+		return vms, err
 	}
-
-	if len(vms) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
+	err = m.Browse(func(vm *api.VM) error {
+		vms = append(vms, *vm)
+		return nil
+	})
+	if err != nil {
+		return vms, err
 	}
 	return vms, nil
 }
@@ -698,7 +643,7 @@ func (client *Client) getFloatingIP(vmID string) (*floatingips.FloatingIP, error
 
 //DeleteVM deletes the VM identified by id
 func (client *Client) DeleteVM(id string) error {
-	_, err := client.readVMDefinition(id)
+	vm, err := client.readVMDefinition(id)
 	if err != nil {
 		return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
 	}
@@ -724,8 +669,12 @@ func (client *Client) DeleteVM(id string) error {
 	if err != nil {
 		return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
 	}
-	client.removeVMDefinition(id)
-	return nil
+
+	m, err := metadata.NewHost()
+	if err != nil {
+		return err
+	}
+	return m.Carry(vm).Delete()
 }
 
 //StopVM stops the VM identified by id

@@ -17,10 +17,10 @@
 package ovh
 
 import (
+	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/openstack"
-	"github.com/CS-SI/SafeScale/utils"
 
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 )
@@ -90,7 +90,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	client.Client = os
 
 	// Creates metadata Object Storage container
-	err = utils.InitializeMetadataContainer(client)
+	err = metadata.InitializeContainer(client)
 	if err != nil {
 		return nil, err
 	}

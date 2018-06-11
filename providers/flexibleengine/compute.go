@@ -17,9 +17,7 @@
 package flexibleengine
 
 import (
-	"bytes"
 	"encoding/base64"
-	"encoding/gob"
 	"fmt"
 	"net/http"
 	"strings"
@@ -30,8 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/api/VMState"
+	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils"
 
 	uuid "github.com/satori/go.uuid"
 
@@ -264,13 +262,19 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	var gw *api.VM
 	// If the VM is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
-		gwServer, err := client.loadGateway(request.NetworkIDs[0])
+		m, err := metadata.NewGateway(request.NetworkIDs[0])
 		if err != nil {
-			return nil, fmt.Errorf("No private VM can be created on a network without gateway")
+			return nil, err
 		}
-		gw, err = client.readVMDefinition(gwServer.ID)
+		found, err := m.Read()
 		if err != nil {
-			return nil, fmt.Errorf("Bad state, Gateway for network %s is not accessible", request.NetworkIDs[0])
+			return nil, err
+		}
+		if found {
+			gw, err = client.readVMDefinition(m.Get())
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -395,7 +399,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 
 	// Saving definition right now, without waiting for Public IP association
-	err = client.saveVMDefinition(*vm)
+	err = client.saveVMDefinition(vm)
 	if err != nil {
 		client.DeleteVM(vm.ID)
 		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
@@ -536,31 +540,14 @@ func (client *Client) listAllVMs() ([]api.VM, error) {
 // because client.ListObjects() is different (Swift for openstack, S3 for flexibleengine).
 func (client *Client) listMonitoredVMs() ([]api.VM, error) {
 	var vms []api.VM
-	err := utils.BrowseMetadata(api.VMContainerName, func(buf *bytes.Buffer) error {
-		var vm api.VM
-		err := gob.NewDecoder(buf).Decode(&vm)
-		if err != nil {
-			return err
-		}
-		vms = append(vms, vm)
+	m, err := metadata.NewHost()
+	if err != nil {
+		return vms, err
+	}
+	err = m.Browse(func(vm *api.VM) error {
+		vms = append(vms, *vm)
 		return nil
 	})
-
-	/*names, err := client.ListObjects(api.VMContainerName, api.ObjectFilter{
-		Prefix: utils.MetadataContainerName,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, name := range names {
-		vm, err := client.readVMDefinition(name)
-		if err != nil {
-			return nil, providers.ResourceNotFoundError("VM", name)
-		}
-		vms = append(vms, *vm)
-	}
-	*/
 	if len(vms) == 0 && err != nil {
 		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
 	}
@@ -575,7 +562,7 @@ func (client *Client) DeleteVM(id string) error {
 		return err
 	}
 
-	client.readVMDefinition(id)
+	vm, err := client.readVMDefinition(id)
 	if client.Cfg.UseFloatingIP {
 		fip, err := client.getFloatingIPOfVM(id)
 		if err == nil {
@@ -607,7 +594,7 @@ func (client *Client) DeleteVM(id string) error {
 		client.DeleteVolume(volume.ID)
 	}
 
-	client.removeVMDefinition(id)
+	client.removeVMDefinition(vm)
 
 	// FlexibleEngine may take time to remove VM, preventing for example DeleteNetwork to work if called to soon
 	// So we wait VM is effectively removed before returning
@@ -790,46 +777,39 @@ func (client *Client) disableVMRouterMode(vm *api.VM) error {
 }
 
 //saveVMDefinition saves the VM definition in Object Storage
-func (client *Client) saveVMDefinition(vm api.VM) error {
-	return utils.WriteMetadata(api.VMContainerName, vm.ID, vm)
-
-	/*	var buffer bytes.Buffer
-		enc := gob.NewEncoder(&buffer)
-		err := enc.Encode(vm)
-		if err != nil {
-			return err
-		}
-		return client.PutObject(utils.MetadataContainerName+"/"+api.VMContainerName, api.Object{
-			Name:    vm.ID,
-			Content: bytes.NewReader(buffer.Bytes()),
-		})*/
+func (client *Client) saveVMDefinition(vm *api.VM) error {
+	m, err := metadata.NewHost()
+	if err != nil {
+		return err
+	}
+	return m.Carry(vm).Write()
 }
 
 //removeVMDefinition removes the VM definition from Object Storage
-func (client *Client) removeVMDefinition(vmID string) error {
+func (client *Client) removeVMDefinition(vm *api.VM) error {
 	//return client.DeleteObject(utils.MetadataContainerName+"/"+api.VMContainerName, vmID)
-	return utils.DeleteMetadata(api.VMContainerName, vmID)
+	m, err := metadata.NewHost()
+	if err != nil {
+		return err
+	}
+	return m.Carry(vm).Delete()
 }
 
 //readVMDefinition gets the VM definition from Object Storage
 func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
 	//o, err := client.GetObject(utils.MetadataContainerName+"/"+api.VMContainerName, vmID, nil)
-	var vm api.VM
-	err := utils.ReadMetadata(api.VMContainerName, vmID, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&vm)
-	})
+	m, err := metadata.NewHost()
 	if err != nil {
 		return nil, err
 	}
-	/*var buffer bytes.Buffer
-	buffer.ReadFrom(o.Content)
-	enc := gob.NewDecoder(&buffer)
-	var vm api.VM
-	err = enc.Decode(&vm)
+	found, err := m.ReadByID(vmID)
 	if err != nil {
 		return nil, err
-	}*/
-	return &vm, nil
+	}
+	if !found {
+		return nil, fmt.Errorf("unable to find host identified by '%s'", vmID)
+	}
+	return m.Get(), nil
 }
 
 //listInterfaces returns a pager of the interfaces attached to VM identified by 'serverID'

@@ -17,16 +17,13 @@
 package flexibleengine
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 	"net"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
-	"github.com/CS-SI/SafeScale/utils"
+	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
@@ -184,7 +181,7 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		return nil, err
 	}
 	if subnet != nil {
-		return nil, fmt.Errorf("Network '%s' already exists", req.Name)
+		return nil, fmt.Errorf("network '%s' already exists", req.Name)
 	}
 
 	if ok, err := validateNetworkName(req); !ok {
@@ -193,15 +190,27 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 
 	subnet, err = client.createSubnet(req.Name, req.CIDR)
 	if err != nil {
-		return nil, fmt.Errorf("error creating Network '%s': %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, errorString(err))
 	}
 
-	return &api.Network{
+	// Creates metadata for the subnet
+	network := api.Network{
 		ID:        subnet.ID,
 		Name:      subnet.Name,
 		CIDR:      subnet.CIDR,
 		IPVersion: fromIntIPVersion(subnet.IPVersion),
-	}, nil
+	}
+	m, err := metadata.NewNetwork()
+	if err != nil {
+		client.DeleteNetwork(subnet.ID)
+		return nil, err
+	}
+	err = m.Carry(&network).Write()
+	if err != nil {
+		client.DeleteNetwork(subnet.ID)
+		return nil, err
+	}
+	return &network, nil
 }
 
 //validateNetworkName validates the name of a Network based on known FlexibleEngine requirements
@@ -269,23 +278,15 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 
 //listMonitoredNetworks lists available networks created by SafeScale (ie those registered in object storage)
 func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
-	netIDs, err := client.ListObjects(api.NetworkContainerName, api.ObjectFilter{
-		Prefix: utils.MetadataContainerName,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	var netList []api.Network
-
-	for _, netID := range netIDs {
-		net, err := client.GetNetwork(netID)
-		if err != nil {
-			return nil, providers.ResourceNotFoundError("Network", netID)
-		}
-		netList = append(netList, *net)
+	m, err := metadata.NewNetwork()
+	if err != nil {
+		return netList, err
 	}
-
+	err = m.Browse(func(net *api.Network) error {
+		netList = append(netList, *net)
+		return nil
+	})
 	if len(netList) == 0 && err != nil {
 		return nil, fmt.Errorf("Error listing networks: %s", errorString(err))
 	}
@@ -294,11 +295,32 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 
 //DeleteNetwork consists to delete subnet in FlexibleEngine VPC
 func (client *Client) DeleteNetwork(id string) error {
-	err := client.DeleteGateway(id)
+	net, err := client.GetNetwork(id)
 	if err != nil {
-		return fmt.Errorf("failed to delete gateway VM: %s", errorString(err))
+		return fmt.Errorf("failed to delete network: %s", errorString(err))
 	}
-	return client.deleteSubnet(id)
+
+	m, err := metadata.NewNetwork()
+	if err != nil {
+		return err
+	}
+	vmids, err := m.Carry(net).ListHosts()
+	if err != nil {
+		return err
+	}
+	if len(vmids) > 1 {
+		return fmt.Errorf("network '%s' has hosts attached: %s", net.Name, strings.Join(vmids, " "))
+	}
+
+	err = client.DeleteGateway(id)
+	if err != nil {
+		return fmt.Errorf("failed to delete gateway of network '%s': %s", net.Name, errorString(err))
+	}
+	err = client.deleteSubnet(id)
+	if err != nil {
+		return err
+	}
+	return m.Delete()
 }
 
 type subnetRequest struct {
@@ -480,17 +502,6 @@ func (client *Client) deleteSubnet(id string) error {
 	return nil
 }
 
-/* Not needed ?
-//findOpenstackSubnetById returns information about subnet
-func (client *Client) findOpenstackSubnetByID(id string) (*subnets.Subnet, error) {
-	subnet, err := subnets.Get(client.Network, id).Extract()
-	if err != nil {
-		return nil, fmt.Errorf("Error finding subnet id '%s': %s", id, errorString(err))
-	}
-	return subnet, nil
-}
-*/
-
 //findSubnetByName returns a subnets.Subnet if subnet named as 'name' exists
 func (client *Client) findSubnetByName(name string) (*subnets.Subnet, error) {
 	subnetList, err := client.listSubnets()
@@ -524,33 +535,37 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 
 //writeGateway writes in Object Storage the ID of the VM acting as gateway for the network identified by netID
 func (client *Client) writeGateway(netID string, vmID string) error {
-	/*err := client.PutObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, api.Object{
-		Name:    netID,
-		Content: strings.NewReader(vmID),
-	})
-	return err*/
-	return utils.WriteMetadata(api.NetworkContainerName, netID, vmID)
+	m, err := metadata.NewGateway(netID)
+	if err != nil {
+		return err
+	}
+	return m.Carry(vmID).Write()
 }
 
 //readGateway reads inn Object Storage the ID of the VM acting as gateway for the network identified by netID
 func (client *Client) readGateway(netID string) (string, error) {
-	/*o, err := client.GetObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, netID, nil)
+	m, err := metadata.NewGateway(netID)
 	if err != nil {
 		return "", err
 	}
-	var buffer bytes.Buffer
-	buffer.ReadFrom(o.Content)*/
-	var vmID string
-	err := utils.ReadMetadata(api.NetworkContainerName, netID, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&vmID)
-	})
-	return vmID, err
+	found, err := m.Read()
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		return "", fmt.Errorf("failed to find gateway for network identified by '%s'", netID)
+	}
+	return m.Get(), nil
 }
 
 //removeGateway deletes from Object Storage the gateway data for the network identified by netID
 func (client *Client) removeGateway(netID string) error {
 	//return client.DeleteObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, netID)
-	return utils.DeleteMetadata(api.NetworkContainerName, netID)
+	m, err := metadata.NewGateway(netID)
+	if err == nil {
+		err = m.Delete()
+	}
+	return err
 }
 
 //CreateGateway creates a gateway for a network.

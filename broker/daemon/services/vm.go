@@ -22,6 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system"
 )
 
@@ -91,14 +92,16 @@ func (srv *VMService) List(all bool) ([]api.VM, error) {
 
 //Get returns the VM identified by ref, ref can be the name or the id
 func (srv *VMService) Get(ref string) (*api.VM, error) {
-	vms, err := srv.provider.ListVMs(false)
+	m, err := metadata.NewHost()
 	if err != nil {
 		return nil, err
 	}
-	for _, vm := range vms {
-		if vm.ID == ref || vm.Name == ref {
-			return &vm, nil
-		}
+	found, err := m.ReadByName(ref)
+	if !found {
+		found, err = m.ReadByID(ref)
+	}
+	if found {
+		return m.Get(), nil
 	}
 	return nil, fmt.Errorf("VM %s does not exists", ref)
 }

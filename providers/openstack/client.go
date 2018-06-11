@@ -23,9 +23,9 @@ import (
 
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 
+	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/utils"
 	"github.com/GeertJohan/go.rice"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -213,7 +213,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, err
 	}
 	// Creates metadata Object Storage container
-	err = utils.InitializeMetadataContainer(&clt)
+	err = metadata.InitializeContainer(&clt)
 	if err != nil {
 		return nil, err
 	}
@@ -253,10 +253,6 @@ func (client *Client) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error
 			if e.Name == defaultSecurityGroup {
 				sgList = append(sgList, e)
 			}
-		} // Creates metadata Object Storage container
-		err = utils.InitializeMetadataContainer(client)
-		if err != nil {
-			return false, err
 		}
 		return true, nil
 	})

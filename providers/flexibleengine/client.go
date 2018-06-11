@@ -21,11 +21,11 @@ import (
 	"net/url"
 	"text/template"
 
+	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
-	"github.com/CS-SI/SafeScale/utils"
 
 	rice "github.com/GeertJohan/go.rice"
 
@@ -307,7 +307,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	}
 
 	// Creates metadata Object Storage container
-	err = utils.InitializeMetadataContainer(&clt)
+	err = metadata.InitializeContainer(&clt)
 	if err != nil {
 		return nil, err
 	}

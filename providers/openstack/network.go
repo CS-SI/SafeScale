@@ -17,16 +17,15 @@
 package openstack
 
 import (
-	"bytes"
 	"fmt"
-	"path"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
+	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	gc "github.com/gophercloud/gophercloud"
+
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
@@ -61,25 +60,11 @@ type Subnet struct {
 }
 
 func (client *Client) saveGateway(netID string, vmID string) error {
-	err := client.PutObject(api.NetworkContainerName, api.Object{
-		Name:    fmt.Sprintf("%s/gw", netID),
-		Content: strings.NewReader(vmID),
-	})
-	return err
-}
-
-func (client *Client) getGateway(netID string) (string, error) {
-	o, err := client.GetObject(api.NetworkContainerName, fmt.Sprintf("%s/gw", netID), nil)
+	m, err := metadata.NewGateway(netID)
 	if err != nil {
-		return "", err
+		return err
 	}
-	var buffer bytes.Buffer
-	buffer.ReadFrom(o.Content)
-	return buffer.String(), nil
-}
-
-func (client *Client) removeGateway(netID string) error {
-	return client.DeleteObject(api.NetworkContainerName, fmt.Sprintf("%s/gw", netID))
+	return m.Carry(vmID).Write()
 }
 
 //CreateNetwork creates a network named name
@@ -199,29 +184,17 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 
 //listMonitoredNetworks lists available networks created by SaeScale (ie those registered in object storage)
 func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
-	netIDs, err := client.ListObjects(api.NetworkContainerName, api.ObjectFilter{})
-	if err != nil {
-		return nil, err
-	}
-
-	// netIDs contains all entries of each network
-	// we have to cut entries on the first '/'
-	// and remenber network already added to the list to return
 	var netList []api.Network
-	seen := map[string]string{}
-	for _, netID := range netIDs {
-		id := netID[0:strings.Index(netID, "/")]
-		net, err := client.GetNetwork(id)
-		if err != nil {
-			return nil, providers.ResourceNotFoundError("Network", id)
-		}
-		if _, alreadyAdded := seen[id]; !alreadyAdded {
-			netList = append(netList, *net)
-			seen[id] = id
-		}
-	}
 
-	return netList, nil
+	m, err := metadata.NewNetwork()
+	if err != nil {
+		return netList, err
+	}
+	err = m.Browse(func(net *api.Network) error {
+		netList = append(netList, *net)
+		return nil
+	})
+	return netList, err
 }
 
 //DeleteNetwork deletes the network identified by id
@@ -231,25 +204,17 @@ func (client *Client) DeleteNetwork(networkID string) error {
 		return fmt.Errorf("error deleting networks: %s", errorString(err))
 	}
 
+	m, err := metadata.NewNetwork()
+	if err != nil {
+		return err
+	}
 	// Look for VMs attached on this network
-	vmids, err := client.ListObjects(api.NetworkContainerName, api.ObjectFilter{
-		Prefix: fmt.Sprintf("%s/vm/", networkID),
-	})
+	vmids, err := m.Carry(net).ListHosts()
 	if err != nil {
 		return err
 	}
 	if len(vmids) > 1 {
-		gw, err := client.readGateway(networkID)
-		if err != nil {
-			return fmt.Errorf("Error getting gateway: %s", errorString(err))
-		}
-		var ids []string
-		for _, id := range vmids {
-			if !strings.HasSuffix(id, gw.ID) {
-				ids = append(ids, path.Base(id))
-			}
-		}
-		return fmt.Errorf("Network '%s' has vms attached: %s", networkID, strings.Join(ids, " "))
+		return fmt.Errorf("Network '%s' has hosts attached: %s", networkID, strings.Join(vmids, " "))
 	}
 
 	client.DeleteGateway(net.ID)
@@ -298,17 +263,23 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 
 //DeleteGateway delete the public gateway of a private network
 func (client *Client) DeleteGateway(networkID string) error {
-	srv, err := client.readGateway(networkID)
+	m, err := metadata.NewGateway(networkID)
 	if err != nil {
-		return fmt.Errorf("Error deleting gateway: %s", errorString(err))
+		return err
 	}
-	client.DeleteVM(srv.ID)
-	// Loop waiting for effective deletion of the VM
-	for err = nil; err != nil; _, err = client.GetVM(srv.ID) {
-		time.Sleep(100 * time.Millisecond)
+	found, err := m.Read()
+	if err != nil {
+		return err
 	}
-	return client.removeGateway(networkID)
-
+	if found {
+		vmID := m.Get()
+		client.DeleteVM(vmID)
+		// Loop waiting for effective deletion of the VM
+		for err = nil; err != nil; _, err = client.GetVM(vmID) {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	return m.Delete()
 }
 
 func toGopherIPversion(v IPVersion.Enum) gc.IPVersion {

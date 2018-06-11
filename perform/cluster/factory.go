@@ -17,8 +17,6 @@
 package cluster
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 	"log"
 	"strings"
@@ -36,8 +34,11 @@ import (
 
 //Get returns the ClusterAPI instance corresponding to the cluster named 'name'
 func Get(name string) (clusterapi.ClusterAPI, error) {
-	var record metadata.Record
-	found, err := record.Read(name)
+	m, err := metadata.NewCluster()
+	if err != nil {
+		return nil, err
+	}
+	found, err := m.Read(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
 	}
@@ -46,9 +47,10 @@ func Get(name string) (clusterapi.ClusterAPI, error) {
 	}
 
 	var instance clusterapi.ClusterAPI
-	switch record.Common.Flavor {
+	common, _ := m.Get()
+	switch common.Flavor {
 	case Flavor.DCOS:
-		instance, err = dcos.Load(record)
+		instance, err = dcos.Load(m)
 		if err != nil {
 			return nil, err
 		}
@@ -57,11 +59,6 @@ func Get(name string) (clusterapi.ClusterAPI, error) {
 	}
 	if !found {
 		return nil, nil
-	}
-
-	_, err = instance.GetState()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get state of the cluster: %s", err.Error())
 	}
 	return instance, nil
 }
@@ -89,9 +86,10 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	// Creates network
 	log.Printf("Creating Network 'net-%s'", req.Name)
 	req.Name = strings.ToLower(req.Name)
-	network, err = utils.CreateNetwork("net-"+req.Name, req.CIDR)
+	networkName := "net-" + req.Name
+	network, err = utils.CreateNetwork(networkName, req.CIDR)
 	if err != nil {
-		err = fmt.Errorf("Failed to create Network '%s': %s", req.Name, err.Error())
+		err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
 		return nil, err
 	}
 
@@ -101,7 +99,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		req.Tenant = tenant
 		instance, err = dcos.Create(req)
 		if err != nil {
-			//utils.DeleteNetwork(network.ID)
+			utils.DeleteNetwork(network.ID)
 			return nil, err
 		}
 	}
@@ -129,22 +127,18 @@ func Delete(name string) error {
 	}
 
 	// Deletes the network and related stuff
-	utils.DeleteNetwork(networkID)
-
-	// Cleanup Object Storage metadata
-	return metadata.Delete(name)
+	return utils.DeleteNetwork(networkID)
 }
 
 //List lists the clusters already created
 func List() ([]clusterapi.Cluster, error) {
 	var clusterList []clusterapi.Cluster
-	err := utils.BrowseMetadata(metadata.Path, func(buf *bytes.Buffer) error {
-		var data metadata.Record
-		err := gob.NewDecoder(buf).Decode(&data)
-		if err != nil {
-			return err
-		}
-		clusterList = append(clusterList, data.Common)
+	m, err := metadata.NewCluster()
+	if err != nil {
+		return clusterList, err
+	}
+	err = m.Browse(func(c *clusterapi.Cluster) error {
+		clusterList = append(clusterList, *c)
 		return nil
 	})
 	return clusterList, err

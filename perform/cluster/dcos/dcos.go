@@ -32,6 +32,7 @@ import (
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/ClusterState"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
 	"github.com/CS-SI/SafeScale/perform/cluster/components"
 	"github.com/CS-SI/SafeScale/perform/cluster/metadata"
@@ -85,7 +86,7 @@ type Specific struct {
 //Cluster is the object describing a cluster created by ClusterManagerAPI.CreateCluster
 type Cluster struct {
 	// common cluster data
-	Common clusterapi.Cluster
+	Common *clusterapi.Cluster
 
 	//contains data defining the cluster
 	*Specific
@@ -105,10 +106,11 @@ func (c *Cluster) CountNodes(public bool) uint {
 }
 
 //Load loads the internals of an existing cluster from metadata
-func Load(data metadata.Record) (clusterapi.ClusterAPI, error) {
-	specific := data.Internal.(Specific)
+func Load(data *metadata.Cluster) (clusterapi.ClusterAPI, error) {
+	common, anon := data.Get()
+	specific := anon.(Specific)
 	instance := &Cluster{
-		Common:   data.Common,
+		Common:   common,
 		Specific: &specific,
 	}
 	return instance, nil
@@ -134,9 +136,10 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 
 	// Saving cluster parameters, with status 'Creating'
 	instance := Cluster{
-		Common: clusterapi.Cluster{
+		Common: &clusterapi.Cluster{
 			Name:       req.Name,
 			CIDR:       req.CIDR,
+			Flavor:     Flavor.DCOS,
 			State:      ClusterState.Creating,
 			Complexity: req.Complexity,
 			Tenant:     req.Tenant,
@@ -193,6 +196,12 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		goto cleanMasters
 	}
 
+	/*
+		_, err = instance.ForceGetState()
+		if err != nil {
+			return nil, err
+		}
+	*/
 	log.Printf("Cluster '%s' created and initialized successfully", req.Name)
 	return &instance, nil
 
@@ -291,8 +300,44 @@ func (c *Cluster) GetState() (ClusterState.Enum, error) {
 //ForceGetState returns the current state of the cluster
 // This method will trigger a effective state collection at each call
 func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
-	// Do effective state collection
-	return ClusterState.Error, nil
+	svc, err := utils.GetProviderService()
+	if err == nil {
+		cmd := "/opt/mesosphere/bin/dcos-diagnostics --diag || /opt/mesosphere/bin/3dt --diag"
+		for _, id := range c.Specific.MasterIDs {
+			ssh, err := svc.GetSSHConfig(id)
+			if err != nil {
+				continue
+			}
+			cmdResult, err := ssh.SudoCommand(cmd)
+			if err != nil {
+				continue
+			}
+			var retcode int
+			out, err := cmdResult.CombinedOutput()
+			if err != nil {
+				if ee, ok := err.(*exec.ExitError); ok {
+					if status, ok := ee.Sys().(syscall.WaitStatus); ok {
+						retcode = status.ExitStatus()
+					}
+				} else {
+					continue
+				}
+			}
+			switch retcode {
+			case 0:
+				c.Common.State = ClusterState.Nominal
+				err = nil
+			default:
+				c.Common.State = ClusterState.Error
+				err = fmt.Errorf(string(out))
+			}
+			c.lastStateCollection = time.Now()
+			return c.Common.State, err
+		}
+	}
+	c.Common.State = ClusterState.Error
+	c.lastStateCollection = time.Now()
+	return ClusterState.Error, err
 }
 
 //AddNode adds a node
@@ -716,35 +761,17 @@ func (c *Cluster) SearchNode(ID string, public bool) bool {
 
 //GetDefinition returns the public properties of the cluster
 func (c *Cluster) GetDefinition() clusterapi.Cluster {
-	return c.Common
-}
-
-//refreshMetadata reloads metadata from Object Storage
-func (c *Cluster) refreshMetadata() error {
-	var record metadata.Record
-	found, err := record.Read(c.Common.Name)
-	if err != nil {
-		return fmt.Errorf("failed to get information about Cluster '%s': %s", c.Common.Name, err.Error())
-	}
-	if !found {
-		return fmt.Errorf("failed to find metadata of Cluster '%s' on Object Storage", c.Common.Name)
-	}
-	c.Common = record.Common
-	specific := record.Internal.(Specific)
-	c.Specific = &specific
-	return nil
+	return *c.Common
 }
 
 //updateMetadata writes cluster definition in Object Storage
 func (c *Cluster) updateMetadata() error {
-	// writes  the data in Object Storage
-	var anon interface{}
-	anon = c.Specific
-	data := metadata.Record{
-		Common:   c.Common,
-		Internal: anon,
+	// writes the data in Object Storage
+	m, err := metadata.NewCluster()
+	if err != nil {
+		return err
 	}
-	return data.Write(c.Common.Name)
+	return m.Carry(c.Common, c.Specific).Write()
 }
 
 //RemoveMetadata removes definition of cluster from Object Storage
@@ -756,7 +783,11 @@ func (c *Cluster) RemoveMetadata() error {
 		return fmt.Errorf("can't remove a definition of a cluster with infrastructure still running")
 	}
 
-	err := metadata.Delete(c.Common.Name)
+	m, err := metadata.NewCluster()
+	if err != nil {
+		return err
+	}
+	err = m.Carry(c.Common, c.Specific).Delete()
 	if err != nil {
 		return fmt.Errorf("failed to remove cluster definition in Object Storage: %s", err.Error())
 	}
@@ -766,9 +797,15 @@ func (c *Cluster) RemoveMetadata() error {
 
 //Delete destroys everything related to the infrastructure built for the cluster
 func (c *Cluster) Delete() error {
+	m, err := metadata.NewCluster()
+	if err != nil {
+		return err
+	}
+	m.Carry(c.Common, c.Specific)
+
 	// Updates metadata
 	c.Common.State = ClusterState.Removed
-	err := c.updateMetadata()
+	err = m.Write()
 	if err != nil {
 		return err
 	}
@@ -789,7 +826,7 @@ func (c *Cluster) Delete() error {
 		}
 	}
 
-	// Deletes the masgers
+	// Deletes the masters
 	for _, n := range c.Specific.MasterIDs {
 		err := utils.DeleteVM(n)
 		if err != nil {
@@ -797,8 +834,14 @@ func (c *Cluster) Delete() error {
 		}
 	}
 
-	// Delete the bootstrap server
-	return utils.DeleteVM(c.Specific.BootstrapID)
+	// Deletes the bootstrap server
+	err = utils.DeleteVM(c.Specific.BootstrapID)
+	if err != nil {
+		return err
+	}
+
+	// Deletes the metadata
+	return m.Delete()
 }
 
 func init() {
