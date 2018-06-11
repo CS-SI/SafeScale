@@ -22,8 +22,9 @@ package ClusterState
 type Enum int
 
 const (
+	_ Enum = iota
 	//Nominal the cluster is started and fully operational
-	Nominal Enum = iota
+	Nominal
 	//Degraded the cluster is running but some key components are failing (typically a master)
 	Degraded
 	//Stopped the cluster is stopped
