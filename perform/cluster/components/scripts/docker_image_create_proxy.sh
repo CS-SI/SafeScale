@@ -21,71 +21,6 @@ mkdir /tmp/proxy.image
 cat >/tmp/proxy.image/startup.sh <<-'EOF'
 #!/bin/bash
 
-function update_file {
-    # Take two files in arguments : first must be docker default conf file, second must be the file used
-    # If file $1 is newer than file $2
-    if [ -f $2 ] && [ $1 -nt $2 ]
-    then
-        CHECKSUM_DOCKER_FILE=`md5sum $1 | tr -s ' ' | cut -d ' ' -f1`
-        CHECKSUM_CONF_FILE=`md5sum $2 | tr -s ' ' | cut -d ' ' -f1`
-        if [ "${CHECKSUM_DOCKER_FILE}" != "${CHECKSUM_CONF_FILE}" ]
-        then
-            # File has been updated => we save the old conf file and replace it by docker
-            DATE=`date +%Y-%m-%d-%H-%M-%S`
-            mv $2 $2-${DATE}.confsave
-            cp $1 $2
-        fi
-    else
-        if [ ! -f $2 ]
-        then
-            # File doesn't exist => we create it from default conf file
-            cp $1 $2
-        fi
-    fi
-}
-
-function update_conf {
-    # Take two folders in arguments : first must be docker default conf folder, second must be used folder containing same conf files
-    for file in `ls $1`
-    do
-        if [ -f $1/${file} ]
-        then
-            update_file $1/${file} $2/${file}
-        fi
-    done
-}
-
-# Path to default conf stored inside docker during build
-DATA_DOCKER_CONF=/data/docker-conf
-# Update conf file (only if conf file stored during build is more recent than current used file)
-update_conf ${DATA_DOCKER_CONF}/apache2-conf/ /apache2-conf/
-update_conf ${DATA_DOCKER_CONF}/Key/ /certificate/
-update_conf ${DATA_DOCKER_CONF}/logrotate.d/ /etc/logrotate.d/
-update_conf ${DATA_DOCKER_CONF}/sites-available/ /etc/apache2/sites-available/
-
-# If needed we change conf using requested domain name
-if [ ! -z ${DOMAIN_NAME+x} ] && [ "${DOMAIN_NAME}" != "" ]
-then
-    echo "Starting proxy on domain : ${DOMAIN_NAME}"
-    # Create all needed files
-    if [ "${DOMAIN_NAME}" != "${DEFAULT_DOMAIN_NAME}" ]
-    then
-        #Rename apache conf files
-        update_file ${DATA_DOCKER_CONF}/sites-available/${DEFAULT_DOMAIN_NAME}.conf /etc/apache2/sites-available/${DOMAIN_NAME}.conf
-
-    fi
-else
-    echo "Starting proxy on default domain : ${DEFAULT_DOMAIN_NAME}"
-    DOMAIN_NAME=${DEFAULT_DOMAIN_NAME}
-fi
-
-# Replace template tags by domain name
-sed -i -e "s#%%DOMAIN_NAME%%#${DOMAIN_NAME}#g" /etc/apache2/sites-available/000-default.conf
-sed -i -e "s#%%DOMAIN_NAME%%#${DOMAIN_NAME}#g" /etc/apache2/sites-available/${DOMAIN_NAME}.conf
-
-a2dissite ${DEFAULT_DOMAIN_NAME}.conf
-a2ensite ${DOMAIN_NAME}.conf
-
 # Make sure Apache will start no matter what.
 rm -f /var/run/apache2/apache2.pid &>/dev/null
 
@@ -144,7 +79,7 @@ autorestart=true
 stopsignal=QUIT
 EOF
 
-cat >/tmp/proxy.image/default.conf <<-'EOF'
+cat >/tmp/proxy.image/www-default.conf <<-'EOF'
 ServerSignature Off
 ServerTokens Prod
 
@@ -194,8 +129,8 @@ ServerTokens Prod
     SSLProtocol -ALL +TLSv1 +TLSv1.1 +TLSv1.2
     SSLHonorCipherOrder On
     SSLCipherSuite ECDHE-RSA-AES128-SHA256:AES128-GCM-SHA256:HIGH:!MD5:!aNULL:!EDH:!RC4
-    SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key
-    SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem
+    SSLCertificateKeyFile /etc/ssl/private/ssl-cert-safescale-selfsigned.key
+    SSLCertificateFile /etc/ssl/certs/ssl-cert-safescale-selfsigned.pem
     # MSIE 7 and newer should be able to use keepalive
     BrowserMatch "MSIE [2-6]" nokeepalive ssl-unclean-shutdown \
         downgrade-1.0 force-response-1.0
@@ -235,14 +170,6 @@ ServerTokens Prod
     </Location>
 {{- end }}
 {{ end }}
-
-
-
-    # Location managed by Shibboleth handler (shibd daemon)
-    <Location /Shibboleth.sso >
-        SetHandler shib
-    </Location>
-
 </VirtualHost>
 EOF
 
@@ -392,37 +319,6 @@ SecTmpDir /tmp/
 #
 SecDataDir /tmp/
 
-
-# -- File uploads handling configuration -------------------------------------
-
-# The location where ModSecurity stores intercepted uploaded files. This
-# location must be private to ModSecurity. You don't want other users on
-# the server to access the files, do you?
-#
-#SecUploadDir /opt/modsecurity/var/upload/
-
-# By default, only keep the files that were determined to be unusual
-# in some way (by an external inspection script). For this to work you
-# will also need at least one file inspection rule.
-#
-#SecUploadKeepFiles RelevantOnly
-
-# Uploaded files are by default created with permissions that do not allow
-# any other user to access them. You may need to relax that if you want to
-# interface ModSecurity to an external program (e.g., an anti-virus).
-#
-#SecUploadFileMode 0600
-
-
-# -- Debug log configuration -------------------------------------------------
-
-# The default debug log configuration is to duplicate the error, warning
-# and notice messages from the error log.
-#
-#SecDebugLog /opt/modsecurity/var/log/debug.log
-#SecDebugLogLevel 3
-
-
 # -- Audit log configuration -------------------------------------------------
 
 # Log the transactions that are marked by a rule, as well as those that
@@ -474,6 +370,9 @@ SecUnicodeMapFile unicode.mapping 20127
 SecStatusEngine On
 EOF
 
+cat >/tmp/proxy.image/logrotate_apache2.conf <<-'EOF'
+EOF
+
 cat >/tmp/proxy.image/mod_evasive.conf <<-'EOF'
 LoadModule evasive20_module modules/mod_evasive24.so
 <IfModule mod_evasive20.c>
@@ -484,7 +383,7 @@ LoadModule evasive20_module modules/mod_evasive24.so
     DOSSiteInterval     1
     DOSBlockingPeriod   10
 
-    DOSEmailNotify      admin@rus-copernicus.eu
+    #DOSEmailNotify      admin@rus-copernicus.eu
     #DOSSystemCommand    "su - someuser -c '/sbin/... %s ...'"
     DOSLogDir           "/var/log/apache2/"
 </IfModule>
@@ -497,8 +396,8 @@ LABEL maintainer "CS SI"
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install Apache2
-RUN yum update -y \
- && yum install -y httpd mod_security mod_evasive logrotate
+RUN apt update -y \
+ && apt install -y apache2 mod_security mod_evasive logrotate
 RUN add-apt-repository -y ppa:certbot/certbot \
  && apt-get update \
  && apt-get install -y python-certbot-apache
@@ -509,36 +408,29 @@ RUN a2enmod proxy \
  && a2enmod headers \
  && a2enmod rewrite
 
-# Volume Creation
-# Apache Conf
-VOLUME /config
-# Certificate
-VOLUME /certificate
+## Volume Creation
+## Apache Conf
+#VOLUME /config
+## Certificate
+#VOLUME /certificate
 
-# Create link to apache2 conf file
-WORKDIR /etc/modsecurity/
-# Remove conf file (they will be linked to the dockerfile volume)
-RUN cd /etc/httpd/conf.d \
- && rm -f mod_security.conf && ln -s /config/apache2/mod_security.conf \
- && rm -rf mod_evasive.conf && ln -s /config/apache2/mod_evasive.conf
+ADD mod_security.conf /etc/apache2/conf.d/mod_security.conf
+ADD mod_evasive.conf /etc/apache2/conf.d/mod_evasive.conf
+#ADD ./apache2-conf/ /data/docker-conf/apache2-conf/
+ADD www-default.conf /etc/apache2/sites-available/000-default.conf
+RUN a2ensite 000-default.conf
+
+# logrotate stuff
+ADD logrotate-apache2.conf/ /etc/logrotate.d/apache2.conf
+# Change group so that logrotate can run without the syslog group
+RUN sed -i 's/su root syslog/su root adm/' /etc/logrotate.conf
 
 # Add startup script
 RUN mkdir /opt/safescale
 WORKDIR /opt/safescale
 ADD startup.sh .
-ADD generateCertAndKeys.sh .
+#ADD generateCertAndKeys.sh .
 RUN chmod 755 /opt/safescale/*.sh
-
-# Store default conf files in /data/docker-conf/
-# This conf will update used conf file if more recent (see Scripts/startup.sh)
-RUN mkdir -p /data/docker-conf/apache2-conf/ /data/docker-conf/Key/ /data/docker-conf/logrotate.d/ /data/docker-conf/sites-available/
-ADD ./apache2-conf/ /data/docker-conf/apache2-conf/
-ADD ./Key/ /data/docker-conf/Key/
-ADD ./logrotate.d/ /data/docker-conf/logrotate.d/
-ADD ./sites-available/ /data/docker-conf/sites-available/
-
-# Change group so that logrotate can run without the syslog group
-RUN sed -i 's/su root syslog/su root adm/' /etc/logrotate.conf
 
 EXPOSE 80
 EXPOSE 443
