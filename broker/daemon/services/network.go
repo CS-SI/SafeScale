@@ -79,13 +79,15 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		return nil, err
 	}
 
-	keypair, err := srv.provider.CreateKeyPair("kp_" + network.Name)
-	defer srv.provider.DeleteKeyPair(keypair.ID)
-
+	keypairName := "kp_" + network.Name
+	// Makes sure keypair doesn't exist
+	srv.provider.DeleteKeyPair(keypairName)
+	keypair, err := srv.provider.CreateKeyPair(keypairName)
 	if err != nil {
 		srv.provider.DeleteNetwork(network.ID)
 		return nil, err
 	}
+	defer srv.provider.DeleteKeyPair(keypair.ID)
 
 	gwRequest := api.GWRequest{
 		ImageID:    img.ID,
