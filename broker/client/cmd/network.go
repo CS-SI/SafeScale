@@ -78,7 +78,7 @@ var networkDelete = cli.Command{
 		// Network
 		conn := utils.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		networkService := pb.NewNetworkServiceClient(conn)
 		_, err := networkService.Delete(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
