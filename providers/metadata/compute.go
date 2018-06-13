@@ -86,7 +86,7 @@ func (m *Host) Reload() error {
 		return err
 	}
 	if !found {
-		return fmt.Errorf("The metadata of host '%s' doesn't exist anymore", hostName)
+		return fmt.Errorf("metadata of host '%s' doesn't exist anymore", hostName)
 	}
 	return nil
 }
@@ -148,4 +148,71 @@ func (m *Host) Browse(callback func(*api.VM) error) error {
 		}
 		return callback(&vm)
 	})
+}
+
+//SaveHost saves the VM definition in Object Storage
+func SaveHost(vm *api.VM, netID string) error {
+	mh, err := NewHost()
+	if err != nil {
+		return err
+	}
+	err = mh.Carry(vm).Write()
+	if err != nil {
+		return err
+	}
+	mn, err := NewNetwork()
+	if err != nil {
+		return err
+	}
+	found, err := mn.ReadByID(netID)
+	if err != nil {
+		return err
+	}
+	if found {
+		return mn.AttachHost(vm)
+	}
+	return nil
+}
+
+//RemoveHost removes the VM definition from Object Storage
+func RemoveHost(vm *api.VM) error {
+	// First, browse networks to delete links on the deleted host
+	mn, err := NewNetwork()
+	if err != nil {
+		return err
+	}
+	mnb, err := NewNetwork()
+	if err != nil {
+		return err
+	}
+	err = mn.Browse(func(net *api.Network) error {
+		mnb.Carry(net).DetachHost(vm.ID)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Second deletes host metadata
+	mh, err := NewHost()
+	if err != nil {
+		return err
+	}
+	return mh.Carry(vm).Delete()
+}
+
+//LoadHost gets the VM definition from Object Storage
+func LoadHost(vmID string) (*Host, error) {
+	m, err := NewHost()
+	if err != nil {
+		return nil, err
+	}
+	found, err := m.ReadByID(vmID)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return m, nil
 }

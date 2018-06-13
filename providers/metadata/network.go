@@ -80,7 +80,7 @@ func (m *Network) Write() error {
 //Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (m *Network) Reload() error {
 	if m.network == nil {
-		panic("Metadata isn't linked with a Network!")
+		panic("m.network is nil!")
 	}
 	netName := m.network.Name
 	found, err := m.ReadByID(m.network.ID)
@@ -127,15 +127,14 @@ func (m *Network) ReadByName(name string) (bool, error) {
 
 //Delete updates the metadata corresponding to the network
 func (m *Network) Delete() error {
+	if m.network == nil {
+		panic("m.network is nil!")
+	}
 	err := m.folder.Delete(ByIDFolderName, m.network.ID)
 	if err != nil {
 		return err
 	}
-	err = m.folder.Delete(ByNameFolderName, m.network.Name)
-	if err != nil {
-		return err
-	}
-	return m.folder.Delete("", m.network.ID)
+	return m.folder.Delete(ByNameFolderName, m.network.Name)
 }
 
 //Browse walks through all the metadata objects in network
@@ -151,12 +150,11 @@ func (m *Network) Browse(callback func(*api.Network) error) error {
 }
 
 //AttachHost links host ID to the network
-func (m *Network) AttachHost(vmID string) error {
+func (m *Network) AttachHost(vm *api.VM) error {
 	if m.network == nil {
 		panic("m.network is nil!")
 	}
-
-	return m.folder.Write(m.network.ID+"/host", vmID, vmID)
+	return m.folder.Write(m.network.ID+"/host", vm.ID, vm)
 }
 
 //DetachHost unlinks host ID to network
@@ -168,29 +166,64 @@ func (m *Network) DetachHost(vmID string) error {
 }
 
 //ListHosts returns the list of ID of hosts attached to the network
-func (m *Network) ListHosts() ([]string, error) {
+func (m *Network) ListHosts() ([]*api.VM, error) {
 	if m.network == nil {
 		panic("m.network is nil!")
 	}
 
-	var list []string
+	var list []*api.VM
 	err := m.folder.Browse(m.network.ID+"/host", func(buf *bytes.Buffer) error {
-		var vmID string
-		err := gob.NewDecoder(buf).Decode(&vmID)
+		var vm api.VM
+		err := gob.NewDecoder(buf).Decode(&vm)
 		if err != nil {
 			return err
 		}
-		list = append(list, vmID)
+		list = append(list, &vm)
 		return nil
 	})
 	return list, err
+}
+
+//SaveNetwork saves the Network definition in Object Storage
+func SaveNetwork(net *api.Network) error {
+	m, err := NewNetwork()
+	if err != nil {
+		return err
+	}
+	return m.Carry(net).Write()
+}
+
+//RemoveNetwork removes the VM definition from Object Storage
+func RemoveNetwork(net *api.Network) error {
+	// First, browse networks to delete links on the deleted host
+	m, err := NewNetwork()
+	if err != nil {
+		return err
+	}
+	return m.Carry(net).Delete()
+}
+
+//LoadNetwork gets the VM definition from Object Storage
+func LoadNetwork(networkID string) (*Network, error) {
+	m, err := NewNetwork()
+	if err != nil {
+		return nil, err
+	}
+	found, err := m.ReadByID(networkID)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return m, nil
 }
 
 //Gateway links Object Storage folder and Network
 type Gateway struct {
 	folder    *metadata.Folder
 	networkID string
-	hostID    string
+	host      *api.VM
 }
 
 //NewGateway creates an instance of metadata.Gateway
@@ -201,31 +234,41 @@ func NewGateway(networkID string) (*Gateway, error) {
 	}
 	return &Gateway{
 		folder:    f,
-		hostID:    "",
+		host:      nil,
 		networkID: networkID,
 	}, nil
 }
 
 //Carry links a Network instance to the Metadata instance
-func (m *Gateway) Carry(id string) *Gateway {
-	m.hostID = id
+func (m *Gateway) Carry(vm *api.VM) *Gateway {
+	m.host = vm
 	return m
 }
 
 //Get returns the vmID linked to the metadata
-func (m *Gateway) Get() string {
-	return m.hostID
+func (m *Gateway) Get() *api.VM {
+	return m.host
 }
 
 //Write updates the metadata corresponding to the network in the Object Storage
 func (m *Gateway) Write() error {
-	return m.folder.Write(m.networkID, gatewayObjectName, m.hostID)
+	// A Gateway is a particular host : we want it listed in hosts, but not listed as attached to the network...
+	mh, err := NewHost()
+	if err != nil {
+		return err
+	}
+	err = mh.Carry(m.host).Write()
+	if err != nil {
+		return err
+	}
+	// ... with a reference as gw in network metadata
+	return m.folder.Write(m.networkID, gatewayObjectName, m.host)
 }
 
 //Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (m *Gateway) Reload() error {
-	if m.hostID == "" {
-		panic("Metadata isn't linked with a host!")
+	if m.host == nil {
+		panic("m.host is nil!")
 	}
 	found, err := m.Read()
 	if err != nil {
@@ -239,9 +282,9 @@ func (m *Gateway) Reload() error {
 
 //Read reads the metadata of a gateway of a network identified by ID from Object Storage
 func (m *Gateway) Read() (bool, error) {
-	var hostID string
+	var host api.VM
 	found, err := m.folder.Read(m.networkID, gatewayObjectName, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&hostID)
+		return gob.NewDecoder(buf).Decode(&host)
 	})
 	if err != nil {
 		return false, err
@@ -249,11 +292,36 @@ func (m *Gateway) Read() (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.hostID = hostID
+	m.host = &host
 	return true, nil
 }
 
 //Delete updates the metadata corresponding to the network
 func (m *Gateway) Delete() error {
-	return m.folder.Delete(m.networkID, "gw")
+	return m.folder.Delete(m.networkID, gatewayObjectName)
+}
+
+//LoadGateway returns the metadata of the Gateway of a network
+func LoadGateway(networkID string) (*Gateway, error) {
+	m, err := NewGateway(networkID)
+	if err != nil {
+		return nil, err
+	}
+	found, err := m.Read()
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		return m, nil
+	}
+	return nil, nil
+}
+
+//SaveGateway saves the metadata of a gateway
+func SaveGateway(vm *api.VM, networkID string) error {
+	m, err := NewGateway(networkID)
+	if err != nil {
+		return err
+	}
+	return m.Carry(vm).Write()
 }
