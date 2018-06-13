@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
@@ -81,6 +82,12 @@ var sshCopy = cli.Command{
 	Name:      "copy",
 	Usage:     "Copy a local file/directory to a VM or copy from VM to local",
 	ArgsUsage: "from to  Ex: /my/local/file.txt vm1:/remote/path/",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "timeout",
+			Value: "5",
+			Usage: "timeout in minutes",
+		}},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
 			fmt.Println("2 arguments (from and to) are required")
@@ -90,7 +97,12 @@ var sshCopy = cli.Command{
 
 		conn := utils.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		timeout := utils.TimeoutCtxVM
+		if c.IsSet("timeout") {
+			timeout = time.Duration(c.Float64("timeout")) * time.Minute
+		}
+
+		ctx, cancel := utils.GetContext(timeout)
 		defer cancel()
 		service := pb.NewSshServiceClient(conn)
 
