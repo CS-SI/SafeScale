@@ -87,17 +87,24 @@ func (f *Folder) absolutePath(path ...string) string {
 
 //Search tells if the object named 'name' is inside the ObjectStorage folder
 func (f *Folder) Search(path string, name string) (bool, error) {
+	absPath := strings.Trim(f.absolutePath(path), "/")
 	list, err := f.svc.ListObjects(ContainerName, api.ObjectFilter{
-		Path:   strings.Trim(f.absolutePath(path), "/"),
-		Prefix: name,
+		Path: absPath,
 	})
 	if err != nil {
 		return false, err
 	}
-	if len(list) > 0 {
-		return true, nil
+	if absPath != "" {
+		absPath += "/"
 	}
-	return false, nil
+	found := false
+	for _, item := range list {
+		if item == absPath+name {
+			found = true
+			break
+		}
+	}
+	return found, nil
 }
 
 //Delete removes metadata passed as parameter
@@ -115,22 +122,23 @@ func (f *Folder) Delete(path string, name string) error {
 // returns true, nil if the object has been found
 // The callback function has to know how to decode it and where to store the result
 func (f *Folder) Read(path string, name string, callback DecoderCallback) (bool, error) {
-	o, err := f.svc.GetObject(ContainerName, f.absolutePath(path, name), nil)
+	found, err := f.Search(path, name)
 	if err != nil {
-		// If bucket not found, return nil; no item will be processed, meaning empty path
-		if awsError, ok := err.(awserr.RequestFailure); ok {
-			if awsError.StatusCode() == 404 {
-				return false, nil
-			}
-		}
 		return false, err
 	}
-	var buffer bytes.Buffer
-	buffer.ReadFrom(o.Content)
-	if err != nil {
-		return true, err
+	if found {
+		o, err := f.svc.GetObject(ContainerName, f.absolutePath(path, name), nil)
+		if err != nil {
+			return false, err
+		}
+		var buffer bytes.Buffer
+		buffer.ReadFrom(o.Content)
+		if err != nil {
+			return true, err
+		}
+		return true, callback(&buffer)
 	}
-	return true, callback(&buffer)
+	return false, nil
 }
 
 //Write writes the content in Object Storage

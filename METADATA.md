@@ -10,24 +10,28 @@ Each object in this container/bucket is stored as a gob representation of Go str
 
 ### SafeScale Hosts
 
-The host informations are stored in ``0.safescale/host``.
+The host informations are stored in folder ``0.safescale/host``.
 
-Metadata for a host in stored in an object named with its ID on the Cloud Provider.
+Inside this folder, the metadata of a host is stored in object named with its ID in subfolder ``byID``,
+and in object named with its name in subfolder ``byName``.
 
 ### SafeScale Networks
 
 The metadata for network informations are stored in ``0.safescale/network``.
 
-Inside this folder, each network will have a folder named after its ID on the Cloud Provider.
+Inside this folder, the metadata of a network are stored in an object named with its ID in subfolder ``byID``,
+and in an object named with its name in subfolder ``byName``.
 
-For each network folder, there can be :
+metadata of objects linked to a network are stored in a subfolder named with the ID of the network, and in this subfolder will be find :
 
 * an object named ``gw`` which contains the ID of the host acting as a default gateway for the network if it exists.
-* an object for each vm attached to the network, named after its ID on the Cloud Provider.
+* a subfolder named ``host`` containing for each host attached to the network its metadata named with itd ID
 
 ### SafeScale NAS
 
 The metadata for NAS informations are stored in ``0.safescale/nas``.
+
+TO COMPLETE
 
 ### SafeScale Clusters
 
@@ -48,13 +52,27 @@ Inside this folder, the metadata of a cluster is stored in a file named as the C
 |
 + network (dir)
 | |
-| + 4d17de45-e019-445f-b746-9ab0805008a7 (dir)
-| | |
-| | + gw (obj)
+| + byID (dir)
 | | |
 | | + 4d17de45-e019-445f-b746-9ab0805008a7 (obj)
 | | |
 | | + ...
+| |
+| + byName (dir)
+| | |
+| | + net-dev (obj)
+| | |
+| | + ...
+| |
+| + 4d17de45-e019-445f-b746-9ab0805008a7 (dir)
+| | |
+| | + gw (obj)
+| | |
+| | + host (dir)
+| |   |
+| |   + 4d17de45-e019-445f-b746-9ab0805008a7 (obj)
+| |   |
+| |   + ...
 | |
 | + ...
 |
