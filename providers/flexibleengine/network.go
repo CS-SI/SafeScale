@@ -194,23 +194,19 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	}
 
 	// Creates metadata for the subnet
-	network := api.Network{
+	network := &api.Network{
 		ID:        subnet.ID,
 		Name:      subnet.Name,
 		CIDR:      subnet.CIDR,
 		IPVersion: fromIntIPVersion(subnet.IPVersion),
 	}
-	m, err := metadata.NewNetwork()
+	err = metadata.SaveNetwork(network)
 	if err != nil {
 		client.DeleteNetwork(subnet.ID)
 		return nil, err
 	}
-	err = m.Carry(&network).Write()
-	if err != nil {
-		client.DeleteNetwork(subnet.ID)
-		return nil, err
-	}
-	return &network, nil
+
+	return network, nil
 }
 
 //validateNetworkName validates the name of a Network based on known FlexibleEngine requirements
@@ -237,11 +233,18 @@ func validateNetworkName(req api.NetworkRequest) (bool, error) {
 
 //GetNetwork returns the network identified by id
 func (client *Client) GetNetwork(id string) (*api.Network, error) {
-	subnet, err := client.getSubnet(id)
+	m, err := metadata.LoadNetwork(id)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting network id '%s': %s", id, errorString(err))
+		return nil, err
+	}
+	if m != nil {
+		return m.Get(), nil
 	}
 
+	subnet, err := client.getSubnet(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed getting network id '%s': %s", id, errorString(err))
+	}
 	return &api.Network{
 		ID:        subnet.ID,
 		Name:      subnet.Name,
@@ -295,26 +298,24 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 
 //DeleteNetwork consists to delete subnet in FlexibleEngine VPC
 func (client *Client) DeleteNetwork(id string) error {
-	net, err := client.GetNetwork(id)
-	if err != nil {
-		return fmt.Errorf("failed to delete network: %s", errorString(err))
-	}
-
-	m, err := metadata.NewNetwork()
+	m, err := metadata.LoadNetwork(id)
 	if err != nil {
 		return err
 	}
-	vmids, err := m.Carry(net).ListHosts()
+	if m == nil {
+		return fmt.Errorf("failed to find network '%s' metadata", id)
+	}
+	vms, err := m.ListHosts()
 	if err != nil {
 		return err
 	}
-	if len(vmids) > 1 {
-		return fmt.Errorf("network '%s' has hosts attached: %s", net.Name, strings.Join(vmids, " "))
+	if len(vms) > 0 {
+		return fmt.Errorf("network '%s (%s)' has %d hosts attached", m.Get().Name, m.Get().ID, len(vms))
 	}
 
 	err = client.DeleteGateway(id)
 	if err != nil {
-		return fmt.Errorf("failed to delete gateway of network '%s': %s", net.Name, errorString(err))
+		return fmt.Errorf("failed to delete gateway of network '%s': %s", m.Get().Name, errorString(err))
 	}
 	err = client.deleteSubnet(id)
 	if err != nil {
@@ -533,41 +534,6 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 	return -1
 }
 
-//writeGateway writes in Object Storage the ID of the VM acting as gateway for the network identified by netID
-func (client *Client) writeGateway(netID string, vmID string) error {
-	m, err := metadata.NewGateway(netID)
-	if err != nil {
-		return err
-	}
-	return m.Carry(vmID).Write()
-}
-
-//readGateway reads inn Object Storage the ID of the VM acting as gateway for the network identified by netID
-func (client *Client) readGateway(netID string) (string, error) {
-	m, err := metadata.NewGateway(netID)
-	if err != nil {
-		return "", err
-	}
-	found, err := m.Read()
-	if err != nil {
-		return "", err
-	}
-	if !found {
-		return "", fmt.Errorf("failed to find gateway for network identified by '%s'", netID)
-	}
-	return m.Get(), nil
-}
-
-//removeGateway deletes from Object Storage the gateway data for the network identified by netID
-func (client *Client) removeGateway(netID string) error {
-	//return client.DeleteObject(utils.MetadataContainerName+"/"+api.NetworkContainerName, netID)
-	m, err := metadata.NewGateway(netID)
-	if err == nil {
-		err = m.Delete()
-	}
-	return err
-}
-
 //CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one vmID
@@ -586,31 +552,43 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	}
 	vm, err := client.createVM(vmReq, true)
 	if err != nil {
-		return fmt.Errorf("Error creating gateway : %s", errorString(err))
+		return fmt.Errorf("error creating gateway : %s", errorString(err))
 	}
-	err = client.writeGateway(req.NetworkID, vm.ID)
+	m, err := metadata.NewGateway(req.NetworkID)
+	if err == nil {
+		err = m.Carry(vm).Write()
+	}
 	if err != nil {
 		client.DeleteVM(vm.ID)
-		return fmt.Errorf("Error creating gateway : %s", errorString(err))
+		return fmt.Errorf("error creating gateway : %s", err.Error())
 	}
 	return nil
 }
 
 //GetGateway returns the name of the gateway of a network
-func (client *Client) GetGateway(networkID string) (string, error) {
-	vmID, err := client.readGateway(networkID)
+func (client *Client) GetGateway(networkID string) (*api.VM, error) {
+	m, err := metadata.LoadGateway(networkID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return vmID, nil
+	if m != nil {
+		return m.Get(), nil
+	}
+	return nil, fmt.Errorf("failed to load gateway metadata")
 }
 
 //DeleteGateway deletes the gateway associated with network identified by ID
 func (client *Client) DeleteGateway(networkID string) error {
-	vmID, err := client.readGateway(networkID)
+	m, err := metadata.LoadGateway(networkID)
 	if err != nil {
-		return fmt.Errorf("Error deleting gateway: %s", errorString(err))
+		return err
 	}
-	client.DeleteVM(vmID)
-	return client.removeGateway(networkID)
+	if m != nil {
+		err = client.DeleteVM(m.Get().ID)
+		if err != nil {
+			return err
+		}
+		return m.Delete()
+	}
+	return fmt.Errorf("failed to load gateway metadata")
 }

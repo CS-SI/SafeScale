@@ -315,8 +315,9 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 		Size:         client.toVMSize(server.Flavor),
 		State:        toVMState(server.Status),
 	}
-	vmDef, err := client.readVMDefinition(server.ID)
-	if err == nil {
+	m, err := metadata.LoadHost(server.ID)
+	if err == nil && m != nil {
+		vmDef := m.Get()
 		vm.GatewayID = vmDef.GatewayID
 		vm.PrivateKey = vmDef.PrivateKey
 		//Floating IP management
@@ -326,7 +327,6 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 		if vm.AccessIPv6 == "" {
 			vm.AccessIPv6 = vmDef.AccessIPv6
 		}
-
 	}
 	return &vm
 }
@@ -397,34 +397,11 @@ func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 		return nil, fmt.Errorf("unable to found Gateway: %s", errorString(err))
 	}
 
-	gw, err := servers.Get(client.Compute, m.Get()).Extract()
+	gw, err := servers.Get(client.Compute, m.Get().ID).Extract()
 	if err != nil {
 		return nil, fmt.Errorf("Error creating VM: Usnable to found Gateway %s", errorString(err))
 	}
 	return gw, nil
-}
-
-func (client *Client) saveVMDefinition(vm api.VM, netID string) error {
-	m, err := metadata.NewHost()
-	if err != nil {
-		return err
-	}
-	return m.Carry(&vm).Write()
-}
-
-func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
-	m, err := metadata.NewHost()
-	if err != nil {
-		return nil, err
-	}
-	found, err := m.ReadByID(vmID)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf("failed to find vm by id '%s'", vmID)
-	}
-	return m.Get(), nil
 }
 
 //CreateVM creates a VM satisfying request
@@ -441,9 +418,12 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		if err != nil {
 			return nil, fmt.Errorf("No private VM can be created on a network without gateway")
 		}
-		gw, err = client.readVMDefinition(gwServer.ID)
+		m, err := metadata.LoadHost(gwServer.ID)
 		if err != nil {
-			return nil, fmt.Errorf("Bad state, Gateway for network %s is not accessible", request.NetworkIDs[0])
+			return nil, fmt.Errorf("bad state, Gateway for network %s is not accessible", request.NetworkIDs[0])
+		}
+		if m != nil {
+			gw = m.Get()
 		}
 	}
 
@@ -512,46 +492,44 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 	vm.GatewayID = gwID
 	vm.PrivateKey = kp.PrivateKey
+
 	//if Floating IP are not used or no public address is requested
-	if !client.Cfg.UseFloatingIP || !request.PublicIP {
-		err = client.saveVMDefinition(*vm, request.NetworkIDs[0])
+	if client.Cfg.UseFloatingIP && request.PublicIP {
+		//Create the floating IP
+		ip, err := floatingips.Create(client.Compute, floatingips.CreateOpts{
+			Pool: client.Opts.FloatingIPPool,
+		}).Extract()
 		if err != nil {
-			client.DeleteVM(vm.ID)
+			servers.Delete(client.Compute, vm.ID)
 			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
 		}
-		return vm, nil
+
+		//Associate floating IP to VM
+		err = floatingips.AssociateInstance(client.Compute, vm.ID, floatingips.AssociateOpts{
+			FloatingIP: ip.IP,
+		}).ExtractErr()
+		if err != nil {
+			floatingips.Delete(client.Compute, ip.ID)
+			servers.Delete(client.Compute, vm.ID)
+			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+		}
+
+		if IPVersion.IPv4.Is(ip.IP) {
+			vm.AccessIPv4 = ip.IP
+		} else if IPVersion.IPv6.Is(ip.IP) {
+			vm.AccessIPv6 = ip.IP
+		}
 	}
 
-	//Create the floating IP
-	ip, err := floatingips.Create(client.Compute, floatingips.CreateOpts{
-		Pool: client.Opts.FloatingIPPool,
-	}).Extract()
-	if err != nil {
-		servers.Delete(client.Compute, vm.ID)
-		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+	if isGateway {
+		err = metadata.SaveGateway(vm, request.NetworkIDs[0])
+	} else {
+		err = metadata.SaveHost(vm, request.NetworkIDs[0])
 	}
-
-	//Associate floating IP to VM
-	err = floatingips.AssociateInstance(client.Compute, vm.ID, floatingips.AssociateOpts{
-		FloatingIP: ip.IP,
-	}).ExtractErr()
-	if err != nil {
-		floatingips.Delete(client.Compute, ip.ID)
-		servers.Delete(client.Compute, vm.ID)
-		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
-	}
-
-	if IPVersion.IPv4.Is(ip.IP) {
-		vm.AccessIPv4 = ip.IP
-	} else if IPVersion.IPv6.Is(ip.IP) {
-		vm.AccessIPv6 = ip.IP
-	}
-	err = client.saveVMDefinition(*vm, request.NetworkIDs[0])
 	if err != nil {
 		client.DeleteVM(vm.ID)
-		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+		return nil, fmt.Errorf("error creating VM: %s", errorString(err))
 	}
-
 	return vm, nil
 }
 
@@ -643,11 +621,10 @@ func (client *Client) getFloatingIP(vmID string) (*floatingips.FloatingIP, error
 
 //DeleteVM deletes the VM identified by id
 func (client *Client) DeleteVM(id string) error {
-	vm, err := client.readVMDefinition(id)
+	vm, err := client.GetVM(id)
 	if err != nil {
-		return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+		return err
 	}
-
 	if client.Cfg.UseFloatingIP {
 		fip, err := client.getFloatingIP(id)
 		if err == nil {
@@ -656,25 +633,24 @@ func (client *Client) DeleteVM(id string) error {
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+					return fmt.Errorf("error deleting VM %s : %s", vm.Name, errorString(err))
 				}
 				err = floatingips.Delete(client.Compute, fip.ID).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+					return fmt.Errorf("error deleting VM %s : %s", vm.Name, errorString(err))
 				}
 			}
 		}
 	}
+
 	err = servers.Delete(client.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+		return fmt.Errorf("Error deleting VM %s : %s", vm.Name, errorString(err))
 	}
 
-	m, err := metadata.NewHost()
-	if err != nil {
-		return err
-	}
-	return m.Carry(vm).Delete()
+	metadata.RemoveHost(vm)
+
+	return nil
 }
 
 //StopVM stops the VM identified by id

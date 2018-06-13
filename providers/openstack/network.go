@@ -18,7 +18,6 @@ package openstack
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -59,14 +58,6 @@ type Subnet struct {
 	NetworkID string `json:"network_id,omitempty"`
 }
 
-func (client *Client) saveGateway(netID string, vmID string) error {
-	m, err := metadata.NewGateway(netID)
-	if err != nil {
-		return err
-	}
-	return m.Carry(vmID).Write()
-}
-
 //CreateNetwork creates a network named name
 func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
 	// We specify a name and that it should forward packets
@@ -88,17 +79,29 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		return nil, fmt.Errorf("Error creating network %s: %s", req.Name, errorString(err))
 	}
 
-	return &api.Network{
+	net := &api.Network{
 		ID:        network.ID,
 		Name:      network.Name,
 		CIDR:      sn.Mask,
 		IPVersion: sn.IPVersion,
-	}, nil
-
+	}
+	err = metadata.SaveNetwork(net)
+	if err != nil {
+		return nil, err
+	}
+	return net, nil
 }
 
 //GetNetwork returns the network identified by id
 func (client *Client) GetNetwork(id string) (*api.Network, error) {
+	m, err := metadata.LoadNetwork(id)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return m.Get(), nil
+	}
+
 	network, err := networks.Get(client.Network, id).Extract()
 	if err != nil {
 		return nil, fmt.Errorf("Error getting network: %s", errorString(err))
@@ -115,7 +118,6 @@ func (client *Client) GetNetwork(id string) (*api.Network, error) {
 	// if err != nil {
 	// 	return nil, fmt.Errorf("Bad configuration, no gateway associated to this network")
 	// }
-
 	return &api.Network{
 		ID:        network.ID,
 		Name:      network.Name,
@@ -182,7 +184,7 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 	return netList, nil
 }
 
-//listMonitoredNetworks lists available networks created by SaeScale (ie those registered in object storage)
+//listMonitoredNetworks lists available networks created by SafeScale (ie those registered in object storage)
 func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 	var netList []api.Network
 
@@ -199,25 +201,23 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 
 //DeleteNetwork deletes the network identified by id
 func (client *Client) DeleteNetwork(networkID string) error {
-	net, err := client.GetNetwork(networkID)
-	if err != nil {
-		return fmt.Errorf("error deleting networks: %s", errorString(err))
-	}
-
-	m, err := metadata.NewNetwork()
+	m, err := metadata.LoadNetwork(networkID)
 	if err != nil {
 		return err
 	}
-	// Look for VMs attached on this network
-	vmids, err := m.Carry(net).ListHosts()
+	if m == nil {
+		return fmt.Errorf("failed to find network '%s' metadata", networkID)
+	}
+	vms, err := m.ListHosts()
 	if err != nil {
 		return err
 	}
-	if len(vmids) > 1 {
-		return fmt.Errorf("Network '%s' has hosts attached: %s", networkID, strings.Join(vmids, " "))
+	if len(vms) > 0 {
+		return fmt.Errorf("network '%s' has %d hosts attached", networkID, len(vms))
 	}
 
-	client.DeleteGateway(net.ID)
+	client.DeleteGateway(networkID)
+
 	sns, err := client.listSubnets(networkID)
 	if err != nil {
 		return fmt.Errorf("error deleting network: %s", errorString(err))
@@ -228,11 +228,8 @@ func (client *Client) DeleteNetwork(networkID string) error {
 			return fmt.Errorf("error deleting network: %s", errorString(err))
 		}
 	}
-	err = networks.Delete(client.Network, networkID).ExtractErr()
-	if err != nil {
-		return fmt.Errorf("Error deleting network: %s", errorString(err))
-	}
-	return nil
+
+	return m.Delete()
 }
 
 //CreateGateway creates a public Gateway for a private network
@@ -249,33 +246,25 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 		NetworkIDs: []string{req.NetworkID},
 		PublicIP:   true,
 	}
-	vm, err := client.createVM(vmReq, true)
+	_, err = client.createVM(vmReq, true)
 	if err != nil {
-		return fmt.Errorf("Error creating gateway : %s", errorString(err))
+		return fmt.Errorf("error creating gateway : %s", errorString(err))
 	}
-	err = client.saveGateway(req.NetworkID, vm.ID)
-	if err != nil {
-		client.DeleteVM(vm.ID)
-		return fmt.Errorf("Error creating gateway : %s", errorString(err))
-	}
+	// Note: no metadata.SaveGateway(), it's done in client.createVM()
 	return nil
 }
 
 //DeleteGateway delete the public gateway of a private network
 func (client *Client) DeleteGateway(networkID string) error {
-	m, err := metadata.NewGateway(networkID)
+	m, err := metadata.LoadGateway(networkID)
 	if err != nil {
 		return err
 	}
-	found, err := m.Read()
-	if err != nil {
-		return err
-	}
-	if found {
-		vmID := m.Get()
-		client.DeleteVM(vmID)
+	if m != nil {
+		vm := m.Get()
+		client.DeleteVM(vm.ID)
 		// Loop waiting for effective deletion of the VM
-		for err = nil; err != nil; _, err = client.GetVM(vmID) {
+		for err = nil; err != nil; _, err = client.GetVM(vm.ID) {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}

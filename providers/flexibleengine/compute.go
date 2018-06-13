@@ -262,19 +262,12 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	var gw *api.VM
 	// If the VM is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
-		m, err := metadata.NewGateway(request.NetworkIDs[0])
+		m, err := metadata.LoadGateway(request.NetworkIDs[0])
 		if err != nil {
 			return nil, err
 		}
-		found, err := m.Read()
-		if err != nil {
-			return nil, err
-		}
-		if found {
-			gw, err = client.readVMDefinition(m.Get())
-			if err != nil {
-				return nil, err
-			}
+		if m != nil {
+			gw = m.Get()
 		}
 	}
 
@@ -381,7 +374,6 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 	vm.GatewayID = gwID
 
-	//if Floating IP are not used or no public address is requested
 	if request.PublicIP {
 		fip, err := client.attachFloatingIP(vm)
 		if err != nil {
@@ -398,11 +390,14 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		}
 	}
 
-	// Saving definition right now, without waiting for Public IP association
-	err = client.saveVMDefinition(vm)
+	if isGateway {
+		err = metadata.SaveGateway(vm, request.NetworkIDs[0])
+	} else {
+		err = metadata.SaveHost(vm, request.NetworkIDs[0])
+	}
 	if err != nil {
 		client.DeleteVM(vm.ID)
-		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+		return nil, fmt.Errorf("rrror creating VM: %s", errorString(err))
 	}
 
 	return vm, nil
@@ -428,18 +423,6 @@ func validateVMName(req api.VMRequest) (bool, error) {
 		return false, fmt.Errorf(strings.Join(errs, " + "))
 	}
 	return true, nil
-}
-
-func (client *Client) loadGateway(networkID string) (*servers.Server, error) {
-	gwID, err := client.GetGateway(networkID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to find Gateway %s", errorString(err))
-	}
-	gw, err := servers.Get(client.osclt.Compute, gwID).Extract()
-	if err != nil {
-		return nil, fmt.Errorf("unable to find Gateway %s", errorString(err))
-	}
-	return gw, nil
 }
 
 //WaitVMState waits a vm achieve state
@@ -561,8 +544,10 @@ func (client *Client) DeleteVM(id string) error {
 	if err != nil {
 		return err
 	}
-
-	vm, err := client.readVMDefinition(id)
+	vm, err := client.GetVM(id)
+	if err != nil {
+		return err
+	}
 	if client.Cfg.UseFloatingIP {
 		fip, err := client.getFloatingIPOfVM(id)
 		if err == nil {
@@ -582,7 +567,7 @@ func (client *Client) DeleteVM(id string) error {
 	}
 	err = servers.Delete(client.osclt.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+		return fmt.Errorf("error deleting VM %s : %s", vm.Name, errorString(err))
 	}
 
 	// In FlexibleEngine, volumes may not be always automatically removed, so take care of them
@@ -594,7 +579,7 @@ func (client *Client) DeleteVM(id string) error {
 		client.DeleteVolume(volume.ID)
 	}
 
-	client.removeVMDefinition(vm)
+	metadata.RemoveHost(vm)
 
 	// FlexibleEngine may take time to remove VM, preventing for example DeleteNetwork to work if called to soon
 	// So we wait VM is effectively removed before returning
@@ -776,42 +761,6 @@ func (client *Client) disableVMRouterMode(vm *api.VM) error {
 	return nil
 }
 
-//saveVMDefinition saves the VM definition in Object Storage
-func (client *Client) saveVMDefinition(vm *api.VM) error {
-	m, err := metadata.NewHost()
-	if err != nil {
-		return err
-	}
-	return m.Carry(vm).Write()
-}
-
-//removeVMDefinition removes the VM definition from Object Storage
-func (client *Client) removeVMDefinition(vm *api.VM) error {
-	//return client.DeleteObject(utils.MetadataContainerName+"/"+api.VMContainerName, vmID)
-	m, err := metadata.NewHost()
-	if err != nil {
-		return err
-	}
-	return m.Carry(vm).Delete()
-}
-
-//readVMDefinition gets the VM definition from Object Storage
-func (client *Client) readVMDefinition(vmID string) (*api.VM, error) {
-	//o, err := client.GetObject(utils.MetadataContainerName+"/"+api.VMContainerName, vmID, nil)
-	m, err := metadata.NewHost()
-	if err != nil {
-		return nil, err
-	}
-	found, err := m.ReadByID(vmID)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf("unable to find host identified by '%s'", vmID)
-	}
-	return m.Get(), nil
-}
-
 //listInterfaces returns a pager of the interfaces attached to VM identified by 'serverID'
 func (client *Client) listInterfaces(vmID string) pagination.Pager {
 	url := client.osclt.Compute.ServiceURL("servers", vmID, "os-interface")
@@ -932,8 +881,9 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 		Size:         client.toVMSize(server.Flavor),
 		State:        toVMState(server.Status),
 	}
-	vmDef, err := client.readVMDefinition(server.ID)
-	if err == nil {
+	m, err := metadata.LoadHost(server.ID)
+	if err == nil && m != nil {
+		vmDef := m.Get()
 		vm.GatewayID = vmDef.GatewayID
 		vm.PrivateKey = vmDef.PrivateKey
 		//Floating IP management
