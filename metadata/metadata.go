@@ -111,7 +111,7 @@ func (f *Folder) Search(path string, name string) (bool, error) {
 func (f *Folder) Delete(path string, name string) error {
 	err := f.svc.DeleteObject(ContainerName, f.absolutePath(path, name))
 	if err != nil {
-		return fmt.Errorf("failed to remove cluster definition in Object Storage: %s", err.Error())
+		return fmt.Errorf("failed to remove metadata in Object Storage: %s", err.Error())
 	}
 	return nil
 }

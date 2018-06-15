@@ -21,11 +21,25 @@ mkdir /tmp/proxy.image
 cat >/tmp/proxy.image/startup.sh <<-'EOF'
 #!/bin/bash
 
+# Creates self-signed certificate if it doesn't exist yet
+if [ ! -f /etc/ssl/private/ssl-cert-safescale-selfsigned.key ]; then
+    HOSTNAME=$(hostname -s)
+    openssl req  -x509 -newkey rsa:4096 -sha256 -nodes -days 3650 \
+                -subj "/C=FR/ST=Haute-Garonne/L=Toulouse/O=CS-SI/CN=$HOSTNAME/" \
+                -keyout /etc/ssl/private/ssl-cert-safescale-selfsigned.key \
+                -out /etc/ssl/certs/ssl-cert-safescale-selfsigned.crt
+    chmod ug+r,o-r /etc/ssl/private/ssl-cert-safescale-selfsigned.key /etc/ssl/certs/ssl-cert-safescale-selfsigned.crt
+fi
+
+# Creates apache site configuration from template
+sed -e "s/##HOSTNAME##/$HOSTNAME/g" /etc/apache2/sites-available/default.conf.tmpl >/etc/apache2/sites-available/000-default.conf
+a2ensite 000-default.conf
+
 # Make sure Apache will start no matter what.
 rm -f /var/run/apache2/apache2.pid &>/dev/null
 
 # start up supervisord, all daemons should launched by supervisord.
-exec /usr/bin/supervisord -c /opt/supervisord.conf
+exec /usr/bin/supervisord -c /opt/safescale/supervisord.conf
 EOF
 
 cat >/tmp/proxy.image/supervisord.conf <<-'EOF'
@@ -79,11 +93,58 @@ autorestart=true
 stopsignal=QUIT
 EOF
 
-cat >/tmp/proxy.image/www-default.conf <<-'EOF'
+cat >/tmp/proxy.image/www-default.conf.tmpl <<-'EOF'
 ServerSignature Off
 ServerTokens Prod
 
+ServerSignature Off
+ServerTokens Prod
+
+<VirtualHost *:80>
+    # The ServerName directive sets the request scheme, hostname and port that
+    # the server uses to identify itself. This is used when creating
+    # redirection URLs. In the context of virtual hosts, the ServerName
+    # specifies what hostname must appear in the request's Host: header to
+    # match this virtual host. For the default virtual host (this file) this
+    # value is not decisive as it is used as a last resort host regardless.
+    # However, you must set it for any further virtual host explicitly.
+{{- if ne .DNSDomain "" }}
+    ServerName ##HOSTNAME##.{{ .DNSDomain }}
+    ServerAlias ##HOSTNAME##
+{{- else }}
+    ServerName ##HOSTNAME##
+{{- end }}
+
+    #ServerAdmin admin@rus-copernicus.eu
+
+    # Available loglevels: trace8, ..., trace1, debug, info, notice, warn,
+    # error, crit, alert, emerg.
+    # It is also possible to configure the loglevel for particular
+    # modules, e.g.
+    #LogLevel info ssl:warn
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+    # For most configuration files from conf-available/, which are
+    # enabled or disabled at a global level, it is possible to
+    # include a line for only one particular virtual host. For example the
+    # following line enables the CGI configuration for this host only
+    # after it has been globally disabled with "a2disconf".
+    #Include conf-available/serve-cgi-bin.conf
+    Redirect permanent / https://%{SERVER_NAME}%{REQUEST_URI}
+    RewriteEngine on
+    RewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI} [END,QSA,R=permanent]
+</VirtualHost>
+
 <VirtualHost *:443>
+{{- if ne .DNSDomain "" }}
+    ServerName ##HOSTNAME##.{{ .DNSDomain }}
+    ServerAlias ##HOSTNAME##
+{{- else }}
+    ServerName ##HOSTNAME##
+{{- end }}
+
     #ServerAdmin admin@rus-copernicus.eu
     #
     # LogLevel: Control the number of messages logged to the error_log.
@@ -130,7 +191,7 @@ ServerTokens Prod
     SSLHonorCipherOrder On
     SSLCipherSuite ECDHE-RSA-AES128-SHA256:AES128-GCM-SHA256:HIGH:!MD5:!aNULL:!EDH:!RC4
     SSLCertificateKeyFile /etc/ssl/private/ssl-cert-safescale-selfsigned.key
-    SSLCertificateFile /etc/ssl/certs/ssl-cert-safescale-selfsigned.pem
+    SSLCertificateFile /etc/ssl/certs/ssl-cert-safescale-selfsigned.crt
     # MSIE 7 and newer should be able to use keepalive
     BrowserMatch "MSIE [2-6]" nokeepalive ssl-unclean-shutdown \
         downgrade-1.0 force-response-1.0
@@ -140,21 +201,20 @@ ServerTokens Prod
     ProxyRequests Off
     SSLProxyEngine On
 
-    # Guacamole proxy configuration
-    <Location />
-        Order allow,deny
-        Allow from all
-        ProxyPass http://localhost:8080/guacamole/ flushpackets=on
-        ProxyPassReverse http://localhost:8080/guacamole/
-        ProxyPassReverseCookiePath /guacamole/ /
-    </Location>
-    <Location /websocket-tunnel>
-        Order allow,deny
-        Allow from all
-        ProxyPass ws://localhost:8080/guacamole/websocket-tunnel
-        ProxyPassReverse ws://localhost:8080/guacamole/websocket-tunnel
-    </Location>{{ if len(.MasterIPs) > 0}}
-{{- range $idx, $ip := .MasterIPs }}
+{{- $len := len .MasterIPs -}}
+{{- if gt $len 0 }}
+    <Proxy "balancer://http-masters">
+  {{- range $idx, $ip := .MasterIPs }}
+        BalancerMember "http://{{ $ip }}:8080/guacamole" route={{ $idx }}
+  {{- end }}
+    </Proxy>
+    <Proxy "balancer://ws-masters">
+  {{- range $idx, $ip := .MasterIPs }}
+        BalancerMember "ws://{{ $ip }}:8080/guacamole/websocket-tunnel" route={{ $idx }}
+  {{- end }}
+    </Proxy>
+
+  {{- range $idx, $ip := .MasterIPs }}
     <Location /master-{{ $idx }}/>
         Order allow,deny
         Allow from all
@@ -168,8 +228,21 @@ ServerTokens Prod
         ProxyPass ws://{{ $ip }}:8080/guacamole/websocket-tunnel
         ProxyPassReverse ws://{{ $ip }}:8080/guacamole/websocket-tunnel
     </Location>
-{{- end }}
+  {{- end }}
 {{ end }}
+    <Location />
+        Order allow,deny
+        Allow from all
+        ProxyPass "balancer://http-masters/ flushpackets=on stickysession=JSESSIONID|jsessionid scolonpathdelim=On
+        ProxyPassReverse "balancer://http-masters"
+        ProxyPassReverseCookiePath /guacamole/ /
+    </Location>
+    <Location /websocket-tunnel>
+        Order allow,deny
+        Allow from all
+        ProxyPass "balancer://ws-masters" stickysession=JSESSIONID|jsessionid
+        ProxyPassReverse "balancer://ws-masters"
+    </Location>
 </VirtualHost>
 EOF
 
@@ -370,7 +443,39 @@ SecUnicodeMapFile unicode.mapping 20127
 SecStatusEngine On
 EOF
 
-cat >/tmp/proxy.image/logrotate_apache2.conf <<-'EOF'
+cat >/tmp/proxy.image/logrotate-apache2.conf <<-'EOF'
+/var/log/apache2/*error.log
+/var/log/apache2/*access.log {
+        daily
+        missingok
+        rotate 7
+        compress
+        delaycompress
+        notifempty
+        create 640 root adm
+        sharedscripts
+        prerotate
+            if [ -d /etc/logrotate.d/httpd-prerotate ]; then \
+                run-parts /etc/logrotate.d/httpd-prerotate; \
+            fi;
+        endscript
+}
+
+/var/log/apache2/modsec_audit.log {
+        daily
+        missingok
+        rotate 7
+        compress
+        delaycompress
+        notifempty
+        create 640 root adm
+        sharedscripts
+        postrotate
+            if /etc/init.d/apache2 status > /dev/null ; then \
+                /etc/init.d/apache2 reload > /dev/null; \
+            fi;
+        endscript
+}
 EOF
 
 cat >/tmp/proxy.image/mod_evasive.conf <<-'EOF'
@@ -397,10 +502,10 @@ ENV DEBIAN_FRONTEND noninteractive
 
 # Install Apache2
 RUN apt update -y \
- && apt install -y apache2 mod_security mod_evasive logrotate
-RUN add-apt-repository -y ppa:certbot/certbot \
- && apt-get update \
- && apt-get install -y python-certbot-apache
+ && apt install -y apache2 libapache2-mod-security2 libapache2-mod-evasive logrotate openssl curl supervisor
+#RUN add-apt-repository -y ppa:certbot/certbot \
+# && apt-get update \
+# && apt-get install -y python-certbot-apache
 RUN a2enmod proxy \
  && a2enmod proxy_http \
  && a2enmod proxy_wstunnel \
@@ -408,29 +513,26 @@ RUN a2enmod proxy \
  && a2enmod headers \
  && a2enmod rewrite
 
-## Volume Creation
-## Apache Conf
-#VOLUME /config
-## Certificate
-#VOLUME /certificate
-
+# Apache stuff
 ADD mod_security.conf /etc/apache2/conf.d/mod_security.conf
 ADD mod_evasive.conf /etc/apache2/conf.d/mod_evasive.conf
-#ADD ./apache2-conf/ /data/docker-conf/apache2-conf/
-ADD www-default.conf /etc/apache2/sites-available/000-default.conf
-RUN a2ensite 000-default.conf
+ADD www-default.conf.tmpl /etc/apache2/sites-available/default.conf.tmpl
+RUN mkdir -p /etc/ssl/private /etc/ssl/certs
 
 # logrotate stuff
 ADD logrotate-apache2.conf/ /etc/logrotate.d/apache2.conf
-# Change group so that logrotate can run without the syslog group
 RUN sed -i 's/su root syslog/su root adm/' /etc/logrotate.conf
 
 # Add startup script
 RUN mkdir /opt/safescale
 WORKDIR /opt/safescale
 ADD startup.sh .
-#ADD generateCertAndKeys.sh .
+ADD supervisord.conf .
 RUN chmod 755 /opt/safescale/*.sh
+
+RUN apt-get autoremove -y \
+ && apt-get autoclean -y \
+ && rm -rf /var/cache/apt/archives/*
 
 EXPOSE 80
 EXPOSE 443
@@ -439,5 +541,5 @@ ENTRYPOINT ["/opt/safescale/startup.sh"]
 EOF
 docker build -t proxy:latest /tmp/proxy.image
 
-docker save proxy:latest | pigz /usr/local/dcos/genconf/serve/docker/proxy.tar.gz || exit 1
+docker save proxy:latest | pigz -c9 >/usr/local/dcos/genconf/serve/docker/proxy.tar.gz || exit 1
 rm -rf /tmp/proxy.image

@@ -18,7 +18,7 @@ export LANG=C
 
 # Disable SELinux
 setenforce 0
-sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/sysconfig/selinux
+sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
 
 # Disables firewall
 systemctl stop firewalld 2>/dev/null
@@ -44,7 +44,7 @@ yum makecache fast
 yum install -y python-pip
 
 # Installs docker-python with pip
-pip install -q docker-py==1.10.6 docker-compose
+pip install -q docker-py==1.10.6
 
 # Enable overlay module
 echo overlay >/etc/modules-load.d/10-overlay.conf
@@ -76,10 +76,39 @@ usermod -aG docker gpac
 # Installs docker-compose
 curl -L https://github.com/docker/compose/releases/download/1.21.2/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
 chmod a+rx /usr/local/bin/docker-compose
+[ -f /bin/docker-compose ] && mv -f /bin/docker-compose /bin/docker-compose.notused
 
 # Creates user cladm
 useradd -s /bin/bash -m -d /home/cladm cladm
 usermod -aG docker cladm
 mkdir -p /home/cladm/.ssh && chmod 0700 /home/cladm/.ssh
+mkdir -p /home/cladm/.local/bin && find /home/cladm/.local -exec chmod 0770 {} \;
+cat >>/home/cladm/.bashrc <<-'EOF'
+pathremove() {
+        local IFS=':'
+        local NEWPATH
+        local DIR
+        local PATHVARIABLE=${2:-PATH}
+        for DIR in ${!PATHVARIABLE} ; do
+                if [ "$DIR" != "$1" ] ; then
+                  NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
+                fi
+        done
+        export $PATHVARIABLE="$NEWPATH"
+}
+pathprepend() {
+        pathremove $1 $2
+        local PATHVARIABLE=${2:-PATH}
+        export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
+}
+pathappend() {
+        pathremove $1 $2
+        local PATHVARIABLE=${2:-PATH}
+        export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
+}
+pathprepend $HOME/.local/bin
+pathappend /opt/mesosphere/bin
+EOF
+chown -R cladm:cladm /home/cladm
 
 ####

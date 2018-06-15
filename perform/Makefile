@@ -9,11 +9,6 @@ vet:
 	@$(GO) vet
 	@$(GO) vet ./cmd
 
-vet:
-	@$(GO) vet
-	#@$(GO) vet ./utils
-	@$(GO) vet ./cmd
-
 cluster:
 	@(cd cluster && $(MAKE))
 
