@@ -46,7 +46,7 @@ func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 
 	networkAPI := services.NewNetworkService(currentTenant.client)
 	network, err := networkAPI.Create(in.GetName(), in.GetCIDR(), IPVersion.IPv4,
-		int(in.Gateway.GetCPU()), in.GetGateway().GetRAM(), int(in.GetGateway().GetDisk()), in.GetGateway().GetImageID())
+		int(in.Gateway.GetCPU()), in.GetGateway().GetRAM(), int(in.GetGateway().GetDisk()), in.GetGateway().GetImageID(), in.GetGateway().GetName())
 
 	if err != nil {
 		log.Println(err)

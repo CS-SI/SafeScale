@@ -27,7 +27,7 @@ import (
 
 //NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string) (*api.Network, error)
+	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*api.Network, error)
 	List(all bool) ([]api.Network, error)
 	Get(ref string) (*api.Network, error)
 	Delete(ref string) error
@@ -47,7 +47,7 @@ func NewNetworkService(api api.ClientAPI) NetworkAPI {
 }
 
 //Create creates a network
-func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string) (*api.Network, error) {
+func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*api.Network, error) {
 	// Check that no network with same name already exists
 	_net, err := srv.Get(net)
 	if _net != nil {
@@ -94,6 +94,7 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		NetworkID:  network.ID,
 		KeyPair:    keypair,
 		TemplateID: tpls[0].ID,
+		GWName:     gwname,
 	}
 
 	err = srv.provider.CreateGateway(gwRequest)

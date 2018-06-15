@@ -61,7 +61,9 @@ message GatewayDefinition{
     float RAM = 2;
     int32 Disk = 3;
     string ImageID = 5;
+    string name = 6;
 }
+
 message Network{
     string ID = 1;
     string Name = 2;
