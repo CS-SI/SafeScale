@@ -23,7 +23,6 @@ exec 2>&1
 create_user() {
     echo "Creating user {{.User}}..."
     useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
-    echo {{.User}}:"SAFESCALE" | chpasswd
     echo "{{.User}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
     # Sets ssh conf
@@ -53,16 +52,6 @@ configure_network_debian() {
     done
 
     systemctl restart networking
-# Restart network interfaces except lo
-#    for IF in $(ls /sys/class/net); do
-#     if [ $IF != "lo" ]; then
-#         IF_UP = $(ip a |grep ${IF} | grep 'state UP' | wc -l)
-#         if [ ${IF_UP} = "1" ]; then
-#             ifconfig ${IF} down
-#         fi
-#         ifconfig ${IF} up
-#     fi
-# done
     echo done
 }
 
