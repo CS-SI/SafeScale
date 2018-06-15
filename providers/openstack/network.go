@@ -87,6 +87,7 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	}
 	err = metadata.SaveNetwork(net)
 	if err != nil {
+		client.DeleteNetwork(network.ID)
 		return nil, err
 	}
 	return net, nil
