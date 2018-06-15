@@ -241,10 +241,14 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	if err != nil {
 		return fmt.Errorf("Network %s not found %s", req.NetworkID, errorString(err))
 	}
+	gwname := req.GWName
+	if gwname == "" {
+		gwname = "gw-" + net.Name
+	}
 	vmReq := api.VMRequest{
 		ImageID:    req.ImageID,
 		KeyPair:    req.KeyPair,
-		Name:       "gw-" + net.Name,
+		Name:       gwname,
 		TemplateID: req.TemplateID,
 		NetworkIDs: []string{req.NetworkID},
 		PublicIP:   true,

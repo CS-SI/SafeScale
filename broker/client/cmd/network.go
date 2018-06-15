@@ -148,7 +148,13 @@ var networkCreate = cli.Command{
 			Name:  "os",
 			Value: "Ubuntu 16.04",
 			Usage: "Image name for the gateway",
-		}},
+		},
+		cli.StringFlag{
+			Name:  "gwname",
+			Value: "",
+			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
@@ -170,6 +176,7 @@ var networkCreate = cli.Command{
 				RAM:  float32(c.Float64("ram")),
 				// CPUFrequency: ??,
 				ImageID: c.String("os"),
+				Name:    c.String("gwname"),
 			},
 		}
 		network, err := networkService.Create(ctx, netdef)

@@ -47,3 +47,5 @@ perform/perform
 perform/cluster/tests/deploy
 
 *.code-workspace
+
+perform/cluster/tests/create_cluster

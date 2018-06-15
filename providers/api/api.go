@@ -139,9 +139,11 @@ type GWRequest struct {
 	NetworkID string `json:"network_id,omitempty"`
 	//TemplateID the UUID of the template used to size the VM (see SelectTemplates)
 	TemplateID string `json:"template_id,omitempty"`
-	//ImageID  is the UUID of the image that contains the server's OS and initial state.
+	//ImageID is the UUID of the image that contains the server's OS and initial state.
 	ImageID string   `json:"image_id,omitempty"`
 	KeyPair *KeyPair `json:"key_pair,omitempty"`
+	//GWName is the name to give to the gateway
+	GWName string `json:"gw_name,omitempty"`
 }
 
 //Volume represents a block volume
