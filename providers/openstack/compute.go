@@ -120,6 +120,7 @@ func (client *Client) ListTemplates() ([]api.VMTemplate, error) {
 		}
 
 		for _, flv := range flavorList {
+
 			flvList = append(flvList, api.VMTemplate{
 				VMSize: api.VMSize{
 					Cores:    flv.VCPUs,
