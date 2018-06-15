@@ -135,7 +135,7 @@ func (m *Network) Delete() error {
 	if err != nil {
 		return err
 	}
-	return m.folder.Delete("", m.network.ID)
+	return nil
 }
 
 //Browse walks through all the metadata objects in network

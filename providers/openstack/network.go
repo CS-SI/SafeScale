@@ -67,6 +67,14 @@ func (client *Client) saveGateway(netID string, vmID string) error {
 	return m.Carry(vmID).Write()
 }
 
+func (client *Client) saveNetwork(network api.Network) error {
+	m, err := metadata.NewNetwork()
+	if err != nil {
+		return err
+	}
+	return m.Carry(&network).Write()
+}
+
 //CreateNetwork creates a network named name
 func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
 	// We specify a name and that it should forward packets
@@ -88,12 +96,19 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		return nil, fmt.Errorf("Error creating network %s: %s", req.Name, errorString(err))
 	}
 
-	return &api.Network{
+	apiNetwork := &api.Network{
 		ID:        network.ID,
 		Name:      network.Name,
 		CIDR:      sn.Mask,
 		IPVersion: sn.IPVersion,
-	}, nil
+	}
+
+	err = client.saveNetwork(*apiNetwork)
+	if err != nil {
+		client.DeleteNetwork(network.ID)
+		return nil, fmt.Errorf("Error creating network : %s", errorString(err))
+	}
+	return apiNetwork, nil
 
 }
 
@@ -232,6 +247,11 @@ func (client *Client) DeleteNetwork(networkID string) error {
 	if err != nil {
 		return fmt.Errorf("Error deleting network: %s", errorString(err))
 	}
+	err = m.Delete()
+	if err != nil {
+		return fmt.Errorf("Error deleting network: %s", errorString(err))
+	}
+
 	return nil
 }
 
