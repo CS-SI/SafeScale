@@ -220,5 +220,5 @@ ENTRYPOINT ["/opt/safescale/startup.sh"]
 EOF
 docker build -t guacamole:latest /tmp/guacamole.image
 
-docker save guacamole:latest | pigz -c >/usr/local/dcos/genconf/serve/docker/guacamole.tar.gz
+docker save guacamole:latest | pigz -c9 >/usr/local/dcos/genconf/serve/docker/guacamole.tar.gz
 rm -rf /tmp/guacamole.image

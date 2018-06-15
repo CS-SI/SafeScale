@@ -27,20 +27,57 @@ exec 2>&1
 {{.IncludeInstallCommons}}
 
 # Installs graphical environment
-yum install -y tigervnc-server
+yum install -y tigervnc-server xfce4
 
 # Installs SafeScale containers
-curl http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/docker/guacamole.tar.gz 2>/dev/null | docker image load
-curl http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/docker/proxy.tar.gz 2>/dev/null | docker image load
+curl -q http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/docker/guacamole.tar.gz 2>/dev/null | docker image load || {
+    retcode=$?
+    echo "Failed to load guacamole docker image"
+    exit $retcode
+}
+curl -q http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/docker/proxy.tar.gz 2>/dev/null | docker image load || {
+    retcode=$?
+    echo "Failed to load proxy docker image"
+    exit $retcode
+}
 
 # Get install script from bootstrap server
 mkdir /usr/local/dcos && cd /usr/local/dcos
-curl -O http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/dcos_install.sh || exit 1
+curl -q -O http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/dcos_install.sh || {
+    retcode=$?
+    echo "Failed to download dcos_install.sh from Bootstrap server"
+    exit $retcode
+}
+
+# Get the dcos binary
+curl -q -o ~cladm/.local/bin/dcos http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/dcos.bin || {
+    retcode=$?
+    echo "Failed to download dcos binary from Bootstrap server"
+    exit $retcode
+}
+chmod ug+rx ~cladm/.local/bin/dcos
+chown -R cladm:cladm ~cladm
 
 # Launch installation
-bash dcos_install.sh master || exit 1
+bash dcos_install.sh master || {
+    retcode=$?
+    echo "Failed to install DCOS on master"
+    exit $retcode
+}
 
-curl http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/docker/dcos-master.yml -O dcos-master.yml 2>/dev/null && \
-docker-compose -f /usr/local/dcos/dcos-master.yml up -d guacamole
+# Sets the url of the dcos master
+sudo -u cladm -i dcos config set core.dcos_url http://localhost
+
+# Starts containers for RemoteDesktop
+curl -q -o dcos-master.yml http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/docker/dcos-master.yml || {
+    retcode=$?
+    echo "Failed to download dcos-master.yml from Bootstrap server"
+    exit $retcode
+}
+/usr/local/bin/docker-compose -f /usr/local/dcos/dcos-master.yml up -d || {
+    retcode=$?
+    echo "Failed to start standalone docker containers"
+    exit $retcode
+}
 
 exit $?

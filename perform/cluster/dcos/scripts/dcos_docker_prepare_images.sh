@@ -33,20 +33,22 @@ services:
         container_name: guacamole
         hostname: guacamole
         image: guacamole:latest
+        ports:
+            - "9080:8080"
         networks:
-            default:
+            remotedesktop:
 
     proxy:
         container_name: proxy
         hostname: proxy
         image: proxy:latest
         ports:
-            - 443:443
+            - "9443:443"
         networks:
-            default:
+            remotedesktop:
 
 networks:
-    default:
+    remotedesktop:
         driver: bridge
 
 EOF
@@ -55,6 +57,6 @@ EOF
 # Some cleanup #
 ################
 
-#docker image prune -f
+docker image prune -f
 
 ###
