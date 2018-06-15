@@ -47,7 +47,11 @@ var sshRun = cli.Command{
 			Name:  "c",
 			Usage: "Command to execute",
 		},
-	},
+		cli.StringFlag{
+			Name:  "timeout",
+			Value: "5",
+			Usage: "timeout in minutes",
+		}},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <VM_name>")
@@ -57,7 +61,11 @@ var sshRun = cli.Command{
 
 		conn := utils.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		timeout := utils.TimeoutCtxDefault
+		if c.IsSet("timeout") {
+			timeout = time.Duration(c.Float64("timeout")) * time.Minute
+		}
+		ctx, cancel := utils.GetContext(timeout)
 		defer cancel()
 		service := pb.NewSshServiceClient(conn)
 

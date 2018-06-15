@@ -228,8 +228,16 @@ func (client *Client) DeleteNetwork(networkID string) error {
 			return fmt.Errorf("error deleting network: %s", errorString(err))
 		}
 	}
+	err = networks.Delete(client.Network, networkID).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("Error deleting network: %s", errorString(err))
+	}
+	err = m.Delete()
+	if err != nil {
+		return fmt.Errorf("Error deleting network: %s", errorString(err))
+	}
 
-	return m.Delete()
+	return nil
 }
 
 //CreateGateway creates a public Gateway for a private network
