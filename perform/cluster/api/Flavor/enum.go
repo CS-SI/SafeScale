@@ -25,4 +25,8 @@ const (
 	_ Enum = iota
 	//DCOS flavor
 	DCOS
+	//Kubernetes flavor for a pure Kubernetes cluster
+	Kubernetes
+	//Swarm flavor for a pure docker swarm cluster
+	Swarm
 )

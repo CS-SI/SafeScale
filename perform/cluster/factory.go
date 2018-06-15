@@ -102,6 +102,10 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 			utils.DeleteNetwork(network.ID)
 			return nil, err
 		}
+	case Flavor.Swarm:
+		fallthrough
+	case Flavor.Kubernetes:
+		return nil, fmt.Errorf("cluster Flavor '%s' not yet implemented", req.Flavor.String())
 	}
 
 	log.Printf("Cluster '%s' created and initialized successfully", req.Name)

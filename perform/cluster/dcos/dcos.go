@@ -36,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
 	"github.com/CS-SI/SafeScale/perform/cluster/components"
 	"github.com/CS-SI/SafeScale/perform/cluster/metadata"
+	"github.com/CS-SI/SafeScale/system"
 
 	"github.com/CS-SI/SafeScale/utils"
 
@@ -206,14 +207,14 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	return &instance, nil
 
 cleanMasters:
-	for _, id := range instance.Specific.MasterIDs {
-		utils.DeleteVM(id)
-	}
+	//for _, id := range instance.Specific.MasterIDs {
+	//	utils.DeleteVM(id)
+	//}
 cleanBootstrap:
-	utils.DeleteVM(instance.Specific.BootstrapID)
+	//utils.DeleteVM(instance.Specific.BootstrapID)
 cleanNetwork:
-	utils.DeleteNetwork(instance.Common.NetworkID)
-	instance.RemoveMetadata()
+	//utils.DeleteNetwork(instance.Common.NetworkID)
+	//instance.RemoveMetadata()
 	return nil, err
 }
 
@@ -332,11 +333,13 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 				err = fmt.Errorf(string(out))
 			}
 			c.lastStateCollection = time.Now()
+			c.updateMetadata()
 			return c.Common.State, err
 		}
 	}
 	c.Common.State = ClusterState.Error
 	c.lastStateCollection = time.Now()
+	c.updateMetadata()
 	return ClusterState.Error, err
 }
 
@@ -348,7 +351,7 @@ func (c *Cluster) AddNode(public bool, req *pb.VMDefinition) (*pb.VM, error) {
 	} else {
 		nodeType = NodeType.PrivateNode
 	}
-	if c.Common.State == ClusterState.Creating {
+	if c.Common.State != ClusterState.Created && c.Common.State != ClusterState.Nominal {
 		return nil, fmt.Errorf("The DCOS flavor of Cluster needs to be in state 'Created' at least to allow agent node addition.")
 	}
 	return c.addAgentNode(nodeType, req)
@@ -533,20 +536,160 @@ func (c *Cluster) configure() error {
 	return nil
 }
 
+//installKubernetes does the needed to have Kubernetes in DCOS
+func (c *Cluster) installKubernetes() (int, error) {
+	var count uint
+	var options string
+	switch c.Common.Complexity {
+	case Complexity.Dev:
+		count = 1
+		options = "dcos_kubernetes_options_dev.conf"
+	case Complexity.Normal:
+		fallthrough
+	case Complexity.Volume:
+		count = 3
+		options = "dcos_kubernetes_options_prod.conf"
+	}
+
+	// TODO: copy dcos options for kubernetes deployment in /var/tmp/kubernetes.json on remote master
+	svc, err := utils.GetProviderService()
+	if err != nil {
+		return 0, err
+	}
+	var ssh *system.SSHConfig
+	for _, masterID := range c.Specific.MasterIDs {
+		ssh, err = svc.GetSSHConfig(masterID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read SSH config: %s", err.Error())
+		}
+		ssh.WaitServerReady(60 * time.Second)
+		break
+	}
+	if ssh == nil {
+		return 0, fmt.Errorf("failed to find available master")
+	}
+
+	err = uploadTemplateAsFile(ssh, options, "/var/tmp/"+options)
+	if err != nil {
+		return 0, err
+	}
+	cmd := "sudo -u cladm -i dcos package install kubernetes --config=/var/tmp/" + options
+	fmt.Printf("count=%d, cmd=%s\n", count, cmd)
+
+	return 0, fmt.Errorf("installKubernetes() not yet implemented")
+}
+
+func uploadTemplateAsFile(ssh *system.SSHConfig, name string, path string) error {
+	b, err := getTemplateBox()
+	if err != nil {
+		return err
+	}
+	tmplString, err := b.String(name)
+	if err != nil {
+		return fmt.Errorf("failed to load script template: %s", err.Error())
+	}
+	err = ssh.UploadString(path, tmplString)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+//installSpark does the needed to have Spark installed in DCOS
+func (c *Cluster) installSpark() (int, error) {
+	svc, err := utils.GetProviderService()
+	if err != nil {
+		return 0, err
+	}
+	var ssh *system.SSHConfig
+	for _, masterID := range c.Specific.MasterIDs {
+		ssh, err = svc.GetSSHConfig(masterID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read SSH config: %s", err.Error())
+		}
+		ssh.WaitServerReady(60 * time.Second)
+		break
+	}
+	if ssh == nil {
+		return 0, fmt.Errorf("failed to find available master")
+	}
+
+	cmdResult, err := ssh.Command("sudo -u cladm -i dcos package install spark")
+	if err != nil {
+		return 0, fmt.Errorf("failed to execute spark package installation: %s", err.Error())
+	}
+	retcode := 0
+	out, err := cmdResult.CombinedOutput()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			if status, ok := ee.Sys().(syscall.WaitStatus); ok {
+				retcode = status.ExitStatus()
+			}
+		} else {
+			return 0, fmt.Errorf("failed to fetch output of spark package installation: %s", err.Error())
+		}
+	}
+	if retcode != 0 {
+		return retcode, fmt.Errorf("execution of spark package installation failed: %s", string(out))
+	}
+	return 0, nil
+}
+
+//installElastic does the needed to have Spark installed in DCOS
+func (c *Cluster) installElastic() (int, error) {
+	svc, err := utils.GetProviderService()
+	if err != nil {
+		return 0, err
+	}
+	var ssh *system.SSHConfig
+	for _, masterID := range c.Specific.MasterIDs {
+		ssh, err = svc.GetSSHConfig(masterID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to read SSH config: %s", err.Error())
+		}
+		ssh.WaitServerReady(60 * time.Second)
+		break
+	}
+	if ssh == nil {
+		return 0, fmt.Errorf("failed to find available master")
+	}
+
+	cmdResult, err := ssh.Command("sudo -u cladm -i dcos package install elastic")
+	if err != nil {
+		return 0, fmt.Errorf("failed to execute elastic package installation: %s", err.Error())
+	}
+	retcode := 0
+	out, err := cmdResult.CombinedOutput()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			if status, ok := ee.Sys().(syscall.WaitStatus); ok {
+				retcode = status.ExitStatus()
+			}
+		} else {
+			return 0, fmt.Errorf("failed to fetch output of elastic package installation: %s", err.Error())
+		}
+	}
+	if retcode != 0 {
+		return retcode, fmt.Errorf("execution of elasticsearch pâckage installation failed: %s", string(out))
+	}
+	return 0, nil
+}
+
 //realizePrepareDockerImages creates the string corresponding to script
 // used to prepare Docker images on Bootstrap server
 func (c *Cluster) realizePrepareDockerImages() (string, error) {
 	// Get code to build and export needed docker images
 	realizedPrepareImageGuacamole, err := components.RealizeBuildScript("guacamole", map[string]interface{}{})
 	if err != nil {
-		return "", nil
+		return "", err
 	}
-	/*realizedPrepareImageProxy, err := components.RealizeBuildScript("proxy", map[string]interface{}{
+	realizedPrepareImageProxy, err := components.RealizeBuildScript("proxy", map[string]interface{}{
 		"MasterIPs": c.Specific.MasterIPs,
+		"DNSDomain": "",
 	})
 	if err != nil {
-		return "", nil
-	}*/
+		return "", err
+	}
 
 	// find the rice.Box
 	b, err := getTemplateBox()
@@ -567,7 +710,7 @@ func (c *Cluster) realizePrepareDockerImages() (string, error) {
 	dataBuffer := bytes.NewBufferString("")
 	err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
 		"PrepareImageGuacamole": realizedPrepareImageGuacamole,
-		"PrepareImageProxy":     "", //realizedPrepareImageProxy,
+		"PrepareImageProxy":     realizedPrepareImageProxy,
 	})
 	if err != nil {
 		return "", fmt.Errorf("error realizing script template: %s", err.Error())
@@ -645,7 +788,7 @@ func (c *Cluster) executeScript(targetID string, script string, data map[string]
 	if err != nil {
 		return 0, nil, nil
 	}
-	cmdResult, err := ssh.SudoCommand(fmt.Sprintf("chmod a+rx %s; %s; rm -f %s", remotePath, remotePath, remotePath))
+	cmdResult, err := ssh.SudoCommand(fmt.Sprintf("chmod a+rx %s; %s; #rm -f %s", remotePath, remotePath, remotePath))
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to execute script '%s': %s", script, err.Error())
 	}
