@@ -23,6 +23,7 @@ exec 2>&1
 create_user() {
     echo "Creating user {{.User}}..."
     useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+    echo {{.User}}:"SAFESCALE" | chpasswd
     echo "{{.User}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
     # Sets ssh conf
@@ -91,27 +92,33 @@ EOF
 
 configure_network_redhat() {
     echo "Configuring network (redhat-based)..."
-    rm -f /etc/sysconfig/network-scripts/ifcfg-eth0
-#    mkdir -p /etc/network/interfaces.d
+
     # Configure all network interfaces in dhcp
     for IF in $(ls /sys/class/net); do
         if [ $IF != "lo" ]; then
-            cat <<EOF >/etc/sysconfig/network-scripts/ifcfg-$IF
+            cat >/etc/sysconfig/network-scripts/ifcfg-$IF <<-EOF
+DEVICE=$IF
+BOOTPROTO=dhcp
+ONBOOT=yes
 EOF
         fi
     done
+    systemctl restart network
 
-    systemctl restart networking
-# Restart network interfaces except lo
-#    for IF in $(ls /sys/class/net); do
-#     if [ $IF != "lo" ]; then
-#         IF_UP = $(ip a |grep ${IF} | grep 'state UP' | wc -l)
-#         if [ ${IF_UP} = "1" ]; then
-#             ifconfig ${IF} down
-#         fi
-#         ifconfig ${IF} up
-#     fi
-# done
+    # Determines which interface must be used as default route
+    PUBLIC_IP=$(curl ipinfo.io/ip 2>/dev/null)
+    ROUTE_IF=eth0
+    for IF in $(ls /sys/class/net); do
+        [ $IF != "lo" ] && [ "$(ifconfig $IF | grep 'inet ' | tr -s ' ' ' ' | cut -d' ' -f3)" = "$PUBLIC_IP" ] && {
+            ROUTE_IF=$IF
+            break
+        }
+    done
+    for IF in $(ls /sys/class/net); do
+        [ $IF != "lo" ] && [ $IF != $ROUTE_IF ] && echo 'DEFROUTE="no"' >>/etc/sysconfig/network-scripts/ifcfg-$IF
+    done
+    systemctl restart network
+
     echo done
 }
 
@@ -252,6 +259,9 @@ case $LINUX_KIND in
 
     redhat|centos)
         create_user
+        {{if .ConfIF}}
+        configure_network_redhat
+        {{end}}
         {{if .IsGateway}}
         configure_as_gateway
         {{end}}
