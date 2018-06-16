@@ -17,6 +17,8 @@
 package ovh
 
 import (
+	"strings"
+
 	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -121,6 +123,25 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 		Region:            Region,
 		ProjectName:       ProjectName,
 	})
+}
+
+func winOrFlex(name string) bool {
+	return strings.HasPrefix(name, "win") || strings.HasSuffix(name, "flex")
+}
+
+//ListTemplates overload OpenStack ListTemplate methode to filter wind and flex instance
+func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
+	allTemplates, err := c.Client.ListTemplates()
+	if err != nil {
+		return nil, err
+	}
+	var tpls []api.VMTemplate
+	for _, tpl := range allTemplates {
+		if !winOrFlex(tpl.Name) {
+			tpls = append(tpls, tpl)
+		}
+	}
+	return tpls, nil
 }
 
 func init() {
