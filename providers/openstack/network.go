@@ -274,15 +274,18 @@ func (client *Client) DeleteGateway(networkID string) error {
 	if err != nil {
 		return err
 	}
-	if m != nil {
-		vm := m.Get()
-		client.DeleteVM(vm.ID)
-		// Loop waiting for effective deletion of the VM
-		for err = nil; err != nil; _, err = client.GetVM(vm.ID) {
-			time.Sleep(100 * time.Millisecond)
-		}
+	if m == nil {
+		return nil
+	}
+
+	vm := m.Get()
+	client.DeleteVM(vm.ID)
+	// Loop waiting for effective deletion of the VM
+	for err = nil; err != nil; _, err = client.GetVM(vm.ID) {
+		time.Sleep(100 * time.Millisecond)
 	}
 	return m.Delete()
+
 }
 
 func toGopherIPversion(v IPVersion.Enum) gc.IPVersion {
