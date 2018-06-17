@@ -231,12 +231,6 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 	ignored := 0
 	succeeded := 0
 	for _, tpl := range tpls {
-		upperName := strings.ToUpper(tpl.Name)
-		if strings.Contains(upperName, "WIN") || strings.Contains(upperName, "FLEX") {
-			fmt.Printf("[%s] ignoring: %s\n", tenant, tpl.Name)
-			ignored++
-			continue
-		}
 		fmt.Printf("[%s] scanning template %s\n", tenant, tpl.Name)
 		ci, err := getCPUInfo(tenant, service, tpl, img, kp, net.ID)
 		if err == nil {
@@ -264,6 +258,9 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 		Templates: info,
 	})
 
+	f := fmt.Sprintf("%s/templates.json", tenant)
+	ioutil.WriteFile(f, content, 0666)
+
 	service.DeleteNetwork(net.ID)
 	service.DeleteKeyPair("key-scan")
 
@@ -271,8 +268,7 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 		c <- err
 		return
 	}
-	f := fmt.Sprintf("%s/templates.json", tenant)
-	ioutil.WriteFile(f, content, 0666)
+
 	c <- nil
 }
 
