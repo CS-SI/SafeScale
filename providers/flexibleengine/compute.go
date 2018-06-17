@@ -45,6 +45,26 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
+type gpuCfg struct {
+	GPUNumber int
+	GPUType   string
+}
+
+var gpuMap = map[string]gpuCfg{
+	"g1.xlarge": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "UNKNOW",
+	},
+	"g1.2xlarge": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "UNKNOW",
+	},
+	"g1.2xlarge.8": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1080 TI",
+	},
+}
+
 type blockDevice struct {
 	// SourceType must be one of: "volume", "snapshot", "image", or "blank".
 	SourceType exbfv.SourceType `json:"source_type" required:"true"`
@@ -928,15 +948,36 @@ func (client *Client) ListImages() ([]api.Image, error) {
 	return client.osclt.ListImages()
 }
 
+func addGPUCfg(tpl *api.VMTemplate) {
+	if cfg, ok := gpuMap[tpl.Name]; ok {
+		tpl.GPUNumber = cfg.GPUNumber
+		tpl.GPUType = cfg.GPUType
+	}
+}
+
 //GetTemplate returns the Template referenced by id
 func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
-	return client.osclt.GetTemplate(id)
+	tpl, err := client.osclt.GetTemplate(id)
+	if tpl != nil {
+		addGPUCfg(tpl)
+	}
+	return tpl, err
 }
 
 //ListTemplates lists available VM templates
 //VM templates are sorted using Dominant Resource Fairness Algorithm
 func (client *Client) ListTemplates() ([]api.VMTemplate, error) {
-	return client.osclt.ListTemplates()
+	allTemplates, err := client.osclt.ListTemplates()
+	if err != nil {
+		return nil, err
+	}
+	var tpls []api.VMTemplate
+	for _, tpl := range allTemplates {
+		addGPUCfg(&tpl)
+		tpls = append(tpls, tpl)
+	}
+
+	return tpls, nil
 }
 
 //StopVM stops the VM identified by id

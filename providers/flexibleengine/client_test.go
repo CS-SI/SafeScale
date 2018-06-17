@@ -44,10 +44,8 @@ func getTester() *tests.ClientTester {
 
 func getClient() *flexibleengine.Client {
 	if client == nil {
-
 		service, _ := providers.GetService("flexibleengine")
 		client = service.ClientAPI.(*flexibleengine.Client)
-
 	}
 	return client
 }
