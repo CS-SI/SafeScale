@@ -22,6 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/perform/cluster/api"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 const (
@@ -42,7 +43,11 @@ type Cluster struct {
 
 //NewCluster creates a new Cluster metadata
 func NewCluster() (*Cluster, error) {
-	f, err := metadata.NewFolder(clusterFolderName)
+	svc, err := utils.GetProviderService()
+	if err != nil {
+		return nil, err
+	}
+	f, err := metadata.NewFolder(svc, clusterFolderName)
 	if err != nil {
 		return nil, err
 	}

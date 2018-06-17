@@ -21,6 +21,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
@@ -200,7 +201,7 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		CIDR:      subnet.CIDR,
 		IPVersion: fromIntIPVersion(subnet.IPVersion),
 	}
-	err = metadata.SaveNetwork(network)
+	err = metadata.SaveNetwork(providers.FromClient(client), network)
 	if err != nil {
 		client.DeleteNetwork(subnet.ID)
 		return nil, err
@@ -233,7 +234,7 @@ func validateNetworkName(req api.NetworkRequest) (bool, error) {
 
 //GetNetwork returns the network identified by id
 func (client *Client) GetNetwork(id string) (*api.Network, error) {
-	m, err := metadata.LoadNetwork(id)
+	m, err := metadata.LoadNetwork(providers.FromClient(client), id)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +283,7 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 //listMonitoredNetworks lists available networks created by SafeScale (ie those registered in object storage)
 func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 	var netList []api.Network
-	m, err := metadata.NewNetwork()
+	m, err := metadata.NewNetwork(providers.FromClient(client))
 	if err != nil {
 		return netList, err
 	}
@@ -298,7 +299,7 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 
 //DeleteNetwork consists to delete subnet in FlexibleEngine VPC
 func (client *Client) DeleteNetwork(id string) error {
-	m, err := metadata.LoadNetwork(id)
+	m, err := metadata.LoadNetwork(providers.FromClient(client), id)
 	if err != nil {
 		return err
 	}
@@ -554,9 +555,9 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	if err != nil {
 		return fmt.Errorf("error creating gateway : %s", errorString(err))
 	}
-	m, err := metadata.NewGateway(req.NetworkID)
+	m, err := metadata.NewGateway(providers.FromClient(client), req.NetworkID)
 	if err == nil {
-		err = m.Carry(vm).Write()
+		err = m.Carry(vm).Write(providers.FromClient(client))
 	}
 	if err != nil {
 		client.DeleteVM(vm.ID)
@@ -567,7 +568,7 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 
 //GetGateway returns the name of the gateway of a network
 func (client *Client) GetGateway(networkID string) (*api.VM, error) {
-	m, err := metadata.LoadGateway(networkID)
+	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
 	if err != nil {
 		return nil, err
 	}
@@ -579,7 +580,7 @@ func (client *Client) GetGateway(networkID string) (*api.VM, error) {
 
 //DeleteGateway deletes the gateway associated with network identified by ID
 func (client *Client) DeleteGateway(networkID string) error {
-	m, err := metadata.LoadGateway(networkID)
+	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
 	if err != nil {
 		return err
 	}

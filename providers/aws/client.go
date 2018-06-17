@@ -29,9 +29,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
-	"github.com/CS-SI/SafeScale/utils/metadata"
 
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 

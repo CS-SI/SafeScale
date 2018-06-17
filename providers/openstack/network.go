@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
@@ -85,7 +86,7 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		CIDR:      sn.Mask,
 		IPVersion: sn.IPVersion,
 	}
-	err = metadata.SaveNetwork(net)
+	err = metadata.SaveNetwork(providers.FromClient(client), net)
 	if err != nil {
 		client.DeleteNetwork(network.ID)
 		return nil, err
@@ -95,7 +96,7 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 
 //GetNetwork returns the network identified by id
 func (client *Client) GetNetwork(id string) (*api.Network, error) {
-	m, err := metadata.LoadNetwork(id)
+	m, err := metadata.LoadNetwork(providers.FromClient(client), id)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +190,7 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 	var netList []api.Network
 
-	m, err := metadata.NewNetwork()
+	m, err := metadata.NewNetwork(providers.FromClient(client))
 	if err != nil {
 		return netList, err
 	}
@@ -202,7 +203,7 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 
 //DeleteNetwork deletes the network identified by id
 func (client *Client) DeleteNetwork(networkID string) error {
-	m, err := metadata.LoadNetwork(networkID)
+	m, err := metadata.LoadNetwork(providers.FromClient(client), networkID)
 	if err != nil {
 		return err
 	}
@@ -269,7 +270,7 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 
 //DeleteGateway delete the public gateway of a private network
 func (client *Client) DeleteGateway(networkID string) error {
-	m, err := metadata.LoadGateway(networkID)
+	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
 	if err != nil {
 		return err
 	}

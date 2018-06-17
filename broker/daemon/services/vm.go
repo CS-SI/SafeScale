@@ -92,7 +92,7 @@ func (srv *VMService) List(all bool) ([]api.VM, error) {
 
 //Get returns the VM identified by ref, ref can be the name or the id
 func (srv *VMService) Get(ref string) (*api.VM, error) {
-	m, err := metadata.NewHost()
+	m, err := metadata.NewHost(srv.provider)
 	if err != nil {
 		return nil, err
 	}

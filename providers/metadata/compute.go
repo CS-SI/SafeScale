@@ -21,6 +21,8 @@ import (
 	"encoding/gob"
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/providers"
+
 	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers/api"
 )
@@ -37,8 +39,8 @@ type Host struct {
 }
 
 //NewHost creates an instance of api.VM
-func NewHost() (*Host, error) {
-	f, err := metadata.NewFolder(hostFolderName)
+func NewHost(svc *providers.Service) (*Host, error) {
+	f, err := metadata.NewFolder(svc, hostFolderName)
 	if err != nil {
 		return nil, err
 	}
@@ -151,8 +153,8 @@ func (m *Host) Browse(callback func(*api.VM) error) error {
 }
 
 //SaveHost saves the VM definition in Object Storage
-func SaveHost(vm *api.VM, netID string) error {
-	mh, err := NewHost()
+func SaveHost(svc *providers.Service, vm *api.VM, netID string) error {
+	mh, err := NewHost(svc)
 	if err != nil {
 		return err
 	}
@@ -160,7 +162,7 @@ func SaveHost(vm *api.VM, netID string) error {
 	if err != nil {
 		return err
 	}
-	mn, err := NewNetwork()
+	mn, err := NewNetwork(svc)
 	if err != nil {
 		return err
 	}
@@ -175,13 +177,13 @@ func SaveHost(vm *api.VM, netID string) error {
 }
 
 //RemoveHost removes the VM definition from Object Storage
-func RemoveHost(vm *api.VM) error {
+func RemoveHost(svc *providers.Service, vm *api.VM) error {
 	// First, browse networks to delete links on the deleted host
-	mn, err := NewNetwork()
+	mn, err := NewNetwork(svc)
 	if err != nil {
 		return err
 	}
-	mnb, err := NewNetwork()
+	mnb, err := NewNetwork(svc)
 	if err != nil {
 		return err
 	}
@@ -194,7 +196,7 @@ func RemoveHost(vm *api.VM) error {
 	}
 
 	// Second deletes host metadata
-	mh, err := NewHost()
+	mh, err := NewHost(svc)
 	if err != nil {
 		return err
 	}
@@ -202,8 +204,8 @@ func RemoveHost(vm *api.VM) error {
 }
 
 //LoadHost gets the VM definition from Object Storage
-func LoadHost(vmID string) (*Host, error) {
-	m, err := NewHost()
+func LoadHost(svc *providers.Service, vmID string) (*Host, error) {
+	m, err := NewHost(svc)
 	if err != nil {
 		return nil, err
 	}

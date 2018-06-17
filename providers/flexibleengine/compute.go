@@ -25,6 +25,7 @@ import (
 
 	"github.com/pengux/check"
 
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/api/VMState"
@@ -262,7 +263,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	var gw *api.VM
 	// If the VM is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
-		m, err := metadata.LoadGateway(request.NetworkIDs[0])
+		m, err := metadata.LoadGateway(providers.FromClient(client), request.NetworkIDs[0])
 		if err != nil {
 			return nil, err
 		}
@@ -391,9 +392,9 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 
 	if isGateway {
-		err = metadata.SaveGateway(vm, request.NetworkIDs[0])
+		err = metadata.SaveGateway(providers.FromClient(client), vm, request.NetworkIDs[0])
 	} else {
-		err = metadata.SaveHost(vm, request.NetworkIDs[0])
+		err = metadata.SaveHost(providers.FromClient(client), vm, request.NetworkIDs[0])
 	}
 	if err != nil {
 		client.DeleteVM(vm.ID)
@@ -523,7 +524,7 @@ func (client *Client) listAllVMs() ([]api.VM, error) {
 // because client.ListObjects() is different (Swift for openstack, S3 for flexibleengine).
 func (client *Client) listMonitoredVMs() ([]api.VM, error) {
 	var vms []api.VM
-	m, err := metadata.NewHost()
+	m, err := metadata.NewHost(providers.FromClient(client))
 	if err != nil {
 		return vms, err
 	}
@@ -579,7 +580,7 @@ func (client *Client) DeleteVM(id string) error {
 		client.DeleteVolume(volume.ID)
 	}
 
-	metadata.RemoveHost(vm)
+	metadata.RemoveHost(providers.FromClient(client), vm)
 
 	// FlexibleEngine may take time to remove VM, preventing for example DeleteNetwork to work if called to soon
 	// So we wait VM is effectively removed before returning
@@ -881,7 +882,7 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 		Size:         client.toVMSize(server.Flavor),
 		State:        toVMState(server.Status),
 	}
-	m, err := metadata.LoadHost(server.ID)
+	m, err := metadata.LoadHost(providers.FromClient(client), server.ID)
 	if err == nil && m != nil {
 		vmDef := m.Get()
 		vm.GatewayID = vmDef.GatewayID

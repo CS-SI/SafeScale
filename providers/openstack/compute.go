@@ -315,7 +315,7 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 		Size:         client.toVMSize(server.Flavor),
 		State:        toVMState(server.Status),
 	}
-	m, err := metadata.LoadHost(server.ID)
+	m, err := metadata.LoadHost(providers.FromClient(client), server.ID)
 	if err == nil && m != nil {
 		vmDef := m.Get()
 		vm.GatewayID = vmDef.GatewayID
@@ -388,7 +388,7 @@ func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp 
 }
 
 func (client *Client) readGateway(networkID string) (*servers.Server, error) {
-	m, err := metadata.NewGateway(networkID)
+	m, err := metadata.NewGateway(providers.FromClient(client), networkID)
 	found, err := m.Read()
 	if err != nil {
 		return nil, err
@@ -418,7 +418,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		if err != nil {
 			return nil, fmt.Errorf("No private VM can be created on a network without gateway")
 		}
-		m, err := metadata.LoadHost(gwServer.ID)
+		m, err := metadata.LoadHost(providers.FromClient(client), gwServer.ID)
 		if err != nil {
 			return nil, fmt.Errorf("bad state, Gateway for network %s is not accessible", request.NetworkIDs[0])
 		}
@@ -483,6 +483,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 	vm, err := service.WaitVMState(server.ID, VMState.STARTED, 120*time.Second)
 	if err != nil {
+		servers.Delete(client.Compute, server.ID)
 		return nil, fmt.Errorf("Timeout creating VM: %s", errorString(err))
 	}
 	//Add gateway ID to VM definition
@@ -522,9 +523,9 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 
 	if isGateway {
-		err = metadata.SaveGateway(vm, request.NetworkIDs[0])
+		err = metadata.SaveGateway(providers.FromClient(client), vm, request.NetworkIDs[0])
 	} else {
-		err = metadata.SaveHost(vm, request.NetworkIDs[0])
+		err = metadata.SaveHost(providers.FromClient(client), vm, request.NetworkIDs[0])
 	}
 	if err != nil {
 		client.DeleteVM(vm.ID)
@@ -574,7 +575,7 @@ func (client *Client) listAllVMs() ([]api.VM, error) {
 //listMonitoredVMs lists available VMs created by SafeScale (ie registered in object storage)
 func (client *Client) listMonitoredVMs() ([]api.VM, error) {
 	var vms []api.VM
-	m, err := metadata.NewHost()
+	m, err := metadata.NewHost(providers.FromClient(client))
 	if err != nil {
 		return vms, err
 	}
@@ -648,7 +649,7 @@ func (client *Client) DeleteVM(id string) error {
 		return fmt.Errorf("Error deleting VM %s : %s", vm.Name, errorString(err))
 	}
 
-	metadata.RemoveHost(vm)
+	metadata.RemoveHost(providers.FromClient(client), vm)
 
 	return nil
 }

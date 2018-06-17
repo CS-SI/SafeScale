@@ -191,9 +191,9 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	}
 
 	if len(cfg.S3Protocol) == 0 {
-		log.Print("No S3 protocol defined. Fallback to protocol 'swiftks'")
 		cfg.S3Protocol = "swiftks"
 	}
+	log.Print("Object storage protocol: ", cfg.S3Protocol)
 
 	clt := Client{
 		Opts:              &opts,

@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/metadata"
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 )
 
@@ -39,8 +40,8 @@ type Network struct {
 }
 
 //NewNetwork creates an instance of network.Metadata
-func NewNetwork() (*Network, error) {
-	f, err := metadata.NewFolder(networkFolderName)
+func NewNetwork(svc *providers.Service) (*Network, error) {
+	f, err := metadata.NewFolder(svc, networkFolderName)
 	if err != nil {
 		return nil, err
 	}
@@ -185,8 +186,8 @@ func (m *Network) ListHosts() ([]*api.VM, error) {
 }
 
 //SaveNetwork saves the Network definition in Object Storage
-func SaveNetwork(net *api.Network) error {
-	m, err := NewNetwork()
+func SaveNetwork(svc *providers.Service, net *api.Network) error {
+	m, err := NewNetwork(svc)
 	if err != nil {
 		return err
 	}
@@ -194,9 +195,9 @@ func SaveNetwork(net *api.Network) error {
 }
 
 //RemoveNetwork removes the VM definition from Object Storage
-func RemoveNetwork(net *api.Network) error {
+func RemoveNetwork(svc *providers.Service, net *api.Network) error {
 	// First, browse networks to delete links on the deleted host
-	m, err := NewNetwork()
+	m, err := NewNetwork(svc)
 	if err != nil {
 		return err
 	}
@@ -204,8 +205,8 @@ func RemoveNetwork(net *api.Network) error {
 }
 
 //LoadNetwork gets the VM definition from Object Storage
-func LoadNetwork(networkID string) (*Network, error) {
-	m, err := NewNetwork()
+func LoadNetwork(svc *providers.Service, networkID string) (*Network, error) {
+	m, err := NewNetwork(svc)
 	if err != nil {
 		return nil, err
 	}
@@ -227,8 +228,8 @@ type Gateway struct {
 }
 
 //NewGateway creates an instance of metadata.Gateway
-func NewGateway(networkID string) (*Gateway, error) {
-	f, err := metadata.NewFolder(networkFolderName)
+func NewGateway(svc *providers.Service, networkID string) (*Gateway, error) {
+	f, err := metadata.NewFolder(svc, networkFolderName)
 	if err != nil {
 		return nil, err
 	}
@@ -251,9 +252,9 @@ func (m *Gateway) Get() *api.VM {
 }
 
 //Write updates the metadata corresponding to the network in the Object Storage
-func (m *Gateway) Write() error {
+func (m *Gateway) Write(svc *providers.Service) error {
 	// A Gateway is a particular host : we want it listed in hosts, but not listed as attached to the network...
-	mh, err := NewHost()
+	mh, err := NewHost(svc)
 	if err != nil {
 		return err
 	}
@@ -302,8 +303,8 @@ func (m *Gateway) Delete() error {
 }
 
 //LoadGateway returns the metadata of the Gateway of a network
-func LoadGateway(networkID string) (*Gateway, error) {
-	m, err := NewGateway(networkID)
+func LoadGateway(svc *providers.Service, networkID string) (*Gateway, error) {
+	m, err := NewGateway(svc, networkID)
 	if err != nil {
 		return nil, err
 	}
@@ -318,10 +319,10 @@ func LoadGateway(networkID string) (*Gateway, error) {
 }
 
 //SaveGateway saves the metadata of a gateway
-func SaveGateway(vm *api.VM, networkID string) error {
-	m, err := NewGateway(networkID)
+func SaveGateway(svc *providers.Service, vm *api.VM, networkID string) error {
+	m, err := NewGateway(svc, networkID)
 	if err != nil {
 		return err
 	}
-	return m.Carry(vm).Write()
+	return m.Carry(vm).Write(svc)
 }

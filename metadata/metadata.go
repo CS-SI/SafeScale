@@ -24,7 +24,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/utils"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
@@ -55,11 +54,7 @@ type Folder struct {
 type DecoderCallback func(buf *bytes.Buffer) error
 
 //NewFolder creates a new Metadata Folder object, ready to help access the metadata inside it
-func NewFolder(path string) (*Folder, error) {
-	svc, err := utils.GetProviderService()
-	if err != nil {
-		return nil, err
-	}
+func NewFolder(svc *providers.Service, path string) (*Folder, error) {
 	return &Folder{
 		path: strings.Trim(path, "/"),
 		svc:  svc,

@@ -35,7 +35,7 @@ func encrypt(key, text []byte) ([]byte, error) {
 	return text, nil
 }
 
-//decrypt() decrypts a byte slice previously encrypt with encrypt()
+//decrypt() decrypts a byte slice previously encrypted with encrypt()
 func decrypt(key, text []byte) ([]byte, error) {
 	if doEncrypt {
 		block, err := aes.NewCipher(key)
