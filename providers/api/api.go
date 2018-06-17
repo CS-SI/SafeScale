@@ -71,9 +71,11 @@ type KeyPair struct {
 
 //VMSize represent Sizing elements of a VM
 type VMSize struct {
-	Cores    int     `json:"cores,omitempty"`
-	RAMSize  float32 `json:"ram_size,omitempty"`
-	DiskSize int     `json:"disk_size,omitempty"`
+	Cores     int     `json:"cores,omitempty"`
+	RAMSize   float32 `json:"ram_size,omitempty"`
+	DiskSize  int     `json:"disk_size,omitempty"`
+	GPUNumber int     `json:"gpu_number,omitempty"`
+	GPUType   string  `json:"gpu_type,omitempty"`
 }
 
 //VMTemplate represents a VM template

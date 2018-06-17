@@ -18,6 +18,8 @@ package ovh_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/CS-SI/SafeScale/providers"
 
 	"github.com/CS-SI/SafeScale/providers/tests"
@@ -33,6 +35,21 @@ func getClient() *tests.ClientTester {
 		}
 	}
 	return tester
+
+}
+
+func Test_GetTemplate(t *testing.T) {
+	tpls, err := getClient().Service.ListTemplates()
+	assert.NoError(t, err)
+	find := false
+	for _, tpl := range tpls {
+		if tpl.Name == "g3-120" {
+			assert.Equal(t, 3, tpl.GPUNumber)
+			assert.Equal(t, "NVIDIA 1080 TI", tpl.GPUType)
+			find = true
+		}
+	}
+	assert.True(t, find)
 
 }
 

@@ -71,7 +71,7 @@ func (tester *ClientTester) ListVMTemplates(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
 	for _, f := range tpls {
-		t.Log(f.Name)
+		t.Log(f)
 		assert.NotEqual(t, f.ID, "")
 		assert.NotEqual(t, f.Name, "")
 		assert.NotEqual(t, f.Cores, 0)

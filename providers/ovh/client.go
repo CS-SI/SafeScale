@@ -30,6 +30,30 @@ import (
 //ProviderNetwork name of ovh external network
 const ProviderNetwork string = "Ext-Net"
 
+type gpuCfg struct {
+	GPUNumber int
+	GPUType   string
+}
+
+var gpuMap = map[string]gpuCfg{
+	"g2-15": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1070",
+	},
+	"g2-30": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1070",
+	},
+	"g3-120": gpuCfg{
+		GPUNumber: 3,
+		GPUType:   "NVIDIA 1080 TI",
+	},
+	"g3-30": gpuCfg{
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1080 TI",
+	},
+}
+
 /*AuthOptions fields are the union of those recognized by each identity implementation and
 provider.
 */
@@ -129,7 +153,14 @@ func winOrFlex(name string) bool {
 	return strings.HasPrefix(name, "win") || strings.HasSuffix(name, "flex")
 }
 
-//ListTemplates overload OpenStack ListTemplate methode to filter wind and flex instance
+func addGPUCfg(tpl *api.VMTemplate) {
+	if cfg, ok := gpuMap[tpl.Name]; ok {
+		tpl.GPUNumber = cfg.GPUNumber
+		tpl.GPUType = cfg.GPUType
+	}
+}
+
+//ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
 	allTemplates, err := c.Client.ListTemplates()
 	if err != nil {
@@ -138,10 +169,21 @@ func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
 	var tpls []api.VMTemplate
 	for _, tpl := range allTemplates {
 		if !winOrFlex(tpl.Name) {
+			addGPUCfg(&tpl)
 			tpls = append(tpls, tpl)
 		}
 	}
+
 	return tpls, nil
+}
+
+//GetTemplate overload OpenStack GetTemplate method to add GPU configuration
+func (c *Client) GetTemplate(id string) (*api.VMTemplate, error) {
+	tpl, err := c.Client.GetTemplate(id)
+	if tpl != nil {
+		addGPUCfg(tpl)
+	}
+	return tpl, err
 }
 
 func init() {
