@@ -46,7 +46,7 @@ const cmdCPUModelName string = "lscpu | grep 'Model name' | cut -d: -f2 | sed -e
 const cmdTotalRAM string = "cat /proc/meminfo | grep MemTotal | cut -d: -f2 | sed -e 's/^[[:space:]]*//' | cut -d' ' -f1"
 const cmdRAMFreq string = "sudo dmidecode -t memory | grep Speed | head -1 | cut -d' ' -f2"
 
-const cmdGPU string = "lspci | egrep -i 'VGA|3D' | grep -i nvidia | cut -d: -f3 | sed 's/.*controller://g'"
+const cmdGPU string = "lspci | egrep -i 'VGA|3D' | grep -i nvidia | cut -d: -f3 | sed 's/.*controller://g' | tr '\n' '%'"
 
 var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)",
 	cmdNumberOfCPU,
@@ -75,7 +75,7 @@ type CPUInfo struct {
 	CPUModel       string  `json:"cpu_model,omitempty"`
 	RAMSize        float64 `json:"ram_size,omitempty"`
 	RAMFreq        float64 `json:"ram_freq,omitempty"`
-	GPU            bool    `json:"gpu,omitempty"`
+	GPU            int     `json:"gpu,omitempty"`
 	GPUModel       string  `json:"gpu_model,omitempty"`
 }
 
@@ -120,8 +120,13 @@ func parseOutput(output []byte) (*CPUInfo, error) {
 	if err != nil {
 		info.RAMFreq = 0
 	}
-	info.GPUModel = strings.TrimSpace(tokens[9])
-	info.GPU = len(info.GPUModel) > 0
+	fmt.Println(tokens[9])
+	gpuTokens := strings.Split(tokens[9], "%")
+	nb := len(gpuTokens)
+	if nb > 1 {
+		info.GPUModel = strings.TrimSpace(gpuTokens[0])
+		info.GPU = nb - 1
+	}
 
 	return &info, nil
 }
