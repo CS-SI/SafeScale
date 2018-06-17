@@ -143,57 +143,108 @@ type ServerRequest struct {
 
 //WaitVMState waits a vm achieve state
 func (srv *Service) WaitVMState(vmID string, state VMState.Enum, timeout time.Duration) (*api.VM, error) {
-	cout := make(chan int)
-	next := make(chan bool)
-	vmc := make(chan *api.VM)
-
-	go pollVM(srv, vmID, state, cout, next, vmc)
-	for {
+	var vm *api.VM
+	var err error
+	timer := time.After(timeout)
+	next := true
+	for next {
+		vm, err = srv.GetVM(vmID)
+		if vm == nil {
+			return nil, err
+		} else if vm.State == state {
+			return vm, err
+		} else if vm.State == VMState.ERROR {
+			return vm, fmt.Errorf("VM in error state")
+		}
 		select {
-		case res := <-cout:
-			if res == 0 {
-				//next <- false
-				return nil, fmt.Errorf("Error getting vm state")
-			}
-			if res == 1 {
-				//next <- false
-				return <-vmc, nil
-			}
-			if res == 2 {
-				next <- true
-			}
-		case <-time.After(timeout):
-			next <- false
-			return nil, &api.TimeoutError{Message: "Wait vm state timeout"}
+		case <-timer:
+			return vm, fmt.Errorf("Timeout")
+		default:
 		}
 	}
+	return vm, err
 }
 
-func pollVM(client api.ClientAPI, vmID string, state VMState.Enum, cout chan int, next chan bool, vmc chan *api.VM) {
-	for {
+//WaitVMState waits a vm achieve state
+// func (srv *Service) WaitVMState(vmID string, state VMState.Enum, timeout time.Duration) (*api.VM, error) {
+// 	cout := make(chan int)
+// 	stop := make(chan bool)
+// 	vmc := make(chan *api.VM)
+// 	fmt.Println(timeout)
+// 	var vm *api.VM
+// 	var err error
+// 	go pollVM(srv, vmID, state, cout, stop, vmc)
+// 	stop <- false
+// 	timer := time.After(timeout)
+// 	finish := false
+// 	for !finish {
+// 		select {
+// 		case res := <-cout:
+// 			if res == 0 {
+// 				stop <- true
+// 				err = fmt.Errorf("VM in error state")
+// 				finish = true
+// 			}
+// 			if res == 1 {
+// 				fmt.Println("State achieved")
+// 				stop <- true
+// 				vm = <-vmc
+// 				fmt.Println("VM received")
+// 				finish = true
+// 			}
+// 			if res == 2 {
+// 				stop <- false
+// 			}
+// 		case <-timer:
+// 			stop <- true
+// 			err = fmt.Errorf("Timeout")
+// 			finish = true
+// 		default:
+// 		}
+// 	}
+// 	fmt.Println("receive result")
+// 	<-cout
+// 	fmt.Println("End of wait")
+// 	return vm, err
+// }
 
-		vm, err := client.GetVM(vmID)
-		if err != nil {
-			fmt.Println(err)
-			cout <- 0
-			return
-		}
-		if vm.State == state {
-			cout <- 1
-			vmc <- vm
-			return
-		}
-		if vm.State == VMState.ERROR {
-			fmt.Println("VM in error state")
-			cout <- 0
-			return
-		}
-		cout <- 2
-		if !<-next {
-			return
-		}
-	}
-}
+// func sendResul(cout chan int, res int) {
+// 	cout <- res
+// 	fmt.Println("result sent ", res)
+// }
+
+// func pollVM(client api.ClientAPI, vmID string, state VMState.Enum, cout chan int, stop chan bool, vmc chan *api.VM) {
+// 	finish := false
+// 	fmt.Println("Start polling")
+// 	for !finish {
+// 		res := -1
+// 		if finish {
+// 			return
+// 		}
+// 		finish = <-stop
+
+// 		fmt.Println("Get VM")
+// 		vm, err := client.GetVM(vmID)
+// 		if err != nil {
+// 			log.Print(err)
+// 			res = 0
+// 		} else if vm.State == state {
+// 			res = 1
+// 		} else if vm.State == VMState.ERROR {
+// 			res = 0
+// 		} else {
+// 			res = 2
+// 		}
+// 		fmt.Println(vm.State)
+// 		sendResul(cout, res)
+
+// 		if res == 1 {
+// 			fmt.Println("send vm")
+// 			vmc <- vm
+// 		}
+// 		fmt.Println("end")
+// 	}
+// }
 
 //WaitVolumeState waits a vm achieve state
 func (srv *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*api.Volume, error) {
