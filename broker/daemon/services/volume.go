@@ -96,7 +96,7 @@ func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) 
 }
 
 // Attach a volume to a VM
-func (srv *VolumeService) Attach(volumename string, vmname string, path string, format string) error {
+func (srv *VolumeService) Attach(volumename, vmname, path, format string) error {
 	// Get volume ID
 	volume, err := srv.Get(volumename)
 	if err != nil {
@@ -135,7 +135,7 @@ func (srv *VolumeService) Attach(volumename string, vmname string, path string, 
 	if err != nil {
 		return err
 	}
-	err = server.MountBlockDevice(volatt.Device, mountPoint)
+	err = server.MountBlockDevice(volatt.Device, mountPoint, format)
 
 	if err != nil {
 		srv.Detach(volumename, vmname)
