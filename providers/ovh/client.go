@@ -189,3 +189,27 @@ func (c *Client) GetTemplate(id string) (*api.VMTemplate, error) {
 func init() {
 	providers.Register("ovh", &Client{})
 }
+
+func isWindowsTemplate(t api.VMTemplate) bool {
+	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
+}
+func isGPUTemplate(t api.VMTemplate) bool {
+	return strings.HasPrefix(strings.ToLower(t.Name), "g")
+}
+
+var winAndGpuFilters = []api.TemplateFilter{isWindowsTemplate, isGPUTemplate}
+
+//ListTemplates lists available VM templates and apply a filter to exclude windows and GPU etmplates
+func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
+	tpl, err := c.Client.ListTemplates()
+	if err != nil {
+		return nil, err
+	}
+	rv := tpl[:0]
+	for _, t := range tpl {
+		if !api.AnyFilter(t, winAndGpuFilters) {
+			rv = append(rv, t)
+		}
+	}
+	return rv, nil
+}
