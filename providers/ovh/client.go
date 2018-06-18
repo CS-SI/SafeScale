@@ -149,32 +149,11 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	})
 }
 
-func winOrFlex(name string) bool {
-	return strings.HasPrefix(name, "win") || strings.HasSuffix(name, "flex")
-}
-
 func addGPUCfg(tpl *api.VMTemplate) {
 	if cfg, ok := gpuMap[tpl.Name]; ok {
 		tpl.GPUNumber = cfg.GPUNumber
 		tpl.GPUType = cfg.GPUType
 	}
-}
-
-//ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
-	allTemplates, err := c.Client.ListTemplates()
-	if err != nil {
-		return nil, err
-	}
-	var tpls []api.VMTemplate
-	for _, tpl := range allTemplates {
-		if !winOrFlex(tpl.Name) {
-			addGPUCfg(&tpl)
-			tpls = append(tpls, tpl)
-		}
-	}
-
-	return tpls, nil
 }
 
 //GetTemplate overload OpenStack GetTemplate method to add GPU configuration
@@ -193,23 +172,24 @@ func init() {
 func isWindowsTemplate(t api.VMTemplate) bool {
 	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
 }
-func isGPUTemplate(t api.VMTemplate) bool {
-	return strings.HasPrefix(strings.ToLower(t.Name), "g")
+func isFlexTemplate(t api.VMTemplate) bool {
+	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 
-var winAndGpuFilters = []api.TemplateFilter{isWindowsTemplate, isGPUTemplate}
+var filters = []api.TemplateFilter{isWindowsTemplate, isFlexTemplate}
 
-//ListTemplates lists available VM templates and apply a filter to exclude windows and GPU etmplates
+//ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
-	tpl, err := c.Client.ListTemplates()
+	allTemplates, err := c.Client.ListTemplates()
 	if err != nil {
 		return nil, err
 	}
-	rv := tpl[:0]
-	for _, t := range tpl {
-		if !api.AnyFilter(t, winAndGpuFilters) {
-			rv = append(rv, t)
+	tpls := allTemplates[:0]
+	for _, tpl := range allTemplates {
+		if !api.AnyFilter(tpl, filters) {
+			addGPUCfg(&tpl)
+			tpls = append(tpls, tpl)
 		}
 	}
-	return rv, nil
+	return tpls, nil
 }

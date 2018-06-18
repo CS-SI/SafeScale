@@ -24,7 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 
 	"github.com/CS-SI/SafeScale/providers/tests"
-	"github.com/stretchr/testify/assert"
 )
 
 var tester *tests.ClientTester
@@ -66,7 +65,7 @@ func Test_ListVMTemplates(t *testing.T) {
 	assert.NotEmpty(t, tpls)
 	for _, f := range tpls {
 		assert.True(t, !strings.HasPrefix(strings.ToLower(f.Name), "win"))
-		assert.True(t, !strings.HasPrefix(strings.ToLower(f.Name), "g"))
+		assert.True(t, !strings.HasSuffix(strings.ToLower(f.Name), "flex"))
 	}
 }
 
