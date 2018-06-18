@@ -42,15 +42,18 @@ func Register(name string, client api.ClientAPI) {
 }
 
 // Tenants returns all known tenants
-func Tenants() map[string]string {
-	loadConfig()
-	return tenants
+func Tenants() (map[string]string, error) {
+	err := loadConfig()
+	return tenants, err
 }
 
 // GetService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
 func GetService(tenantName string) (*Service, error) {
-	tenants := getTenantsFromCfg()
+	tenants, err := getTenantsFromCfg()
+	if err != nil {
+		return nil, err
+	}
 	tenantInCfg := false
 	clientProvider := "__not_found__"
 	for _, t := range tenants {
@@ -81,24 +84,29 @@ func GetService(tenantName string) (*Service, error) {
 }
 
 func loadConfig() error {
-	tenantsCfg := getTenantsFromCfg()
+	tenantsCfg, err := getTenantsFromCfg()
+	if err != nil {
+		return err
+	}
 	for _, t := range tenantsCfg {
 		tenant, _ := t.(map[string]interface{})
 		if name, ok := tenant["name"].(string); ok {
 			if provider, ok := tenant["client"].(string); ok {
 				tenants[name] = provider
 			} else {
-				return fmt.Errorf("Invalid configuration file. Tenant '%s' has no client type", name)
+				return fmt.Errorf("Invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
 			}
 		} else {
-			return fmt.Errorf("Invalid configuration file. A tenant has no 'name' entry")
+			return fmt.Errorf("Invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
 		}
 	}
 	return nil
 }
 
-func getTenantsFromCfg() []interface{} {
-	v := viper.New()
+var v *viper.Viper
+
+func getTenantsFromCfg() ([]interface{}, error) {
+	v = viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("$HOME/.safescale")
 	v.AddConfigPath("$HOME/.config/safescale")
@@ -106,10 +114,11 @@ func getTenantsFromCfg() []interface{} {
 	v.SetConfigName("tenants")
 
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
-		log.Printf("Error reading configuration file: %s", err.Error())
-		return nil
+		msg := fmt.Sprintf("Error reading configuration file: %s", err.Error())
+		log.Printf(msg)
+		return nil, fmt.Errorf(msg)
 	}
 	settings := v.AllSettings()
 	tenantsCfg, _ := settings["tenants"].([]interface{})
-	return tenantsCfg
+	return tenantsCfg, nil
 }

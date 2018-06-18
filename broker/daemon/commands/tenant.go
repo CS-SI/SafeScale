@@ -54,8 +54,13 @@ type TenantServiceServer struct{}
 func (s *TenantServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
 	log.Println("List tenant called")
 
+	tenants, err := providers.Tenants()
+	if err != nil {
+		return nil, err
+	}
+
 	var tl []*pb.Tenant
-	for tenantName, providerName := range providers.Tenants() {
+	for tenantName, providerName := range tenants {
 		tl = append(tl, &pb.Tenant{
 			Name:     tenantName,
 			Provider: providerName,
@@ -78,12 +83,13 @@ func (s *TenantServiceServer) Get(ctx context.Context, in *google_protobuf.Empty
 //GetCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
 func GetCurrentTenant() *Tenant {
 	if currentTenant == nil {
-		if len(providers.Tenants()) != 1 {
+		tenants, err := providers.Tenants()
+		if err != nil || len(tenants) != 1 {
 			return nil
 		}
 		// Set unqiue tenant as selected
 		log.Println("Unique tenant set")
-		for name := range providers.Tenants() {
+		for name := range tenants {
 			service, err := providers.GetService(name)
 			if err != nil {
 				return nil
