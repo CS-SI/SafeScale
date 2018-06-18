@@ -22,6 +22,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/daemon/commands"
+	"github.com/CS-SI/SafeScale/providers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -79,6 +80,12 @@ broker nas inspect nas1
 
 // *** MAIN ***
 func main() {
+	log.Println("Checking configuration")
+	_, err := providers.Tenants()
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+
 	log.Println("Starting server")
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
