@@ -220,6 +220,22 @@ func LoadNetwork(svc *providers.Service, networkID string) (*Network, error) {
 	return m, nil
 }
 
+//LoadNetworkByName gets the VM definition from Object Storage
+func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, error) {
+	m, err := NewNetwork(svc)
+	if err != nil {
+		return nil, err
+	}
+	found, err := m.ReadByName(networkname)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return m, nil
+}
+
 //Gateway links Object Storage folder and Network
 type Gateway struct {
 	folder    *metadata.Folder
@@ -324,5 +340,21 @@ func SaveGateway(svc *providers.Service, vm *api.VM, networkID string) error {
 	if err != nil {
 		return err
 	}
+	// Update network
+	n, err := NewNetwork(svc)
+	if err != nil {
+		return err
+	}
+	ok, err := n.ReadByID(networkID)
+	if !ok || err != nil {
+		return fmt.Errorf("metadata about the  '%s' doesn't exist anymore", networkID)
+	}
+	net := n.Get()
+	net.GatewayID = vm.ID
+	err = n.Write()
+	if err != nil {
+		return err
+	}
+
 	return m.Carry(vm).Write(svc)
 }

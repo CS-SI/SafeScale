@@ -228,7 +228,7 @@ type Network struct {
 	//Mask mask in CIDR notation
 	CIDR string `json:"mask,omitempty"`
 	// //Gateway network gateway
-	// GatewayID string
+	GatewayID string `json:"gwid,omitempty"`
 }
 
 /*

@@ -68,7 +68,7 @@ message Network{
     string ID = 1;
     string Name = 2;
     string CIDR = 3;
-    // string GatewayID = 4;
+    string GatewayID = 4;
 }
 
 

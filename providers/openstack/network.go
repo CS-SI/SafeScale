@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -125,7 +126,7 @@ func (client *Client) GetNetwork(id string) (*api.Network, error) {
 		Name:      network.Name,
 		CIDR:      sn.Mask,
 		IPVersion: sn.IPVersion,
-		// GatewayID: gwID,
+		// GatewayID: network.GatewayId,
 	}, nil
 }
 
@@ -195,6 +196,22 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 		return netList, err
 	}
 	err = m.Browse(func(net *api.Network) error {
+		// Get info about the gateway associated to this network
+		mgw, err := metadata.NewGateway(providers.FromClient(client), net.ID)
+		if err != nil {
+			log.Print(err.Error())
+			return nil
+		}
+		ok, err := mgw.Read()
+		if !ok || err != nil {
+			log.Print(err.Error())
+			return nil
+		}
+		gwvm := mgw.Get()
+
+		// Update GatewayId field
+		net.GatewayID = gwvm.ID
+
 		netList = append(netList, *net)
 		return nil
 	})

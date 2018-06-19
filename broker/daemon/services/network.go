@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 )
 
 //NetworkAPI defines API to manage networks
@@ -103,7 +104,8 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		return nil, err
 	}
 
-	return network, nil
+	rv, err := srv.Get(net)
+	return rv, err
 }
 
 //List returns the network list
@@ -114,13 +116,33 @@ func (srv *NetworkService) List(all bool) ([]api.Network, error) {
 
 //Get returns the network identified by ref, ref can be the name or the id
 func (srv *NetworkService) Get(ref string) (*api.Network, error) {
+
+	// We first try looking for network by ID
+	m, err := metadata.LoadNetwork(srv.provider, ref)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return m.Get(), nil
+	}
+
+	// If not found, we try looking for network by name
+	m, err = metadata.LoadNetworkByName(srv.provider, ref)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return m.Get(), nil
+	}
+
+	// If not found, we look for network any network from provider
 	nets, err := srv.List(true)
 	if err != nil {
 		return nil, err
 	}
 	for _, n := range nets {
 		if n.ID == ref || n.Name == ref {
-			return &n, nil
+			return &n, err
 		}
 	}
 	return nil, fmt.Errorf("Network '%s' does not exists", ref)

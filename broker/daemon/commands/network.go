@@ -112,9 +112,10 @@ func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 
 	log.Printf("End Inspect Network: '%s'", ref)
 	return &pb.Network{
-		ID:   network.ID,
-		Name: network.Name,
-		CIDR: network.CIDR,
+		ID:        network.ID,
+		Name:      network.Name,
+		CIDR:      network.CIDR,
+		GatewayID: network.GatewayID,
 	}, nil
 }
 
