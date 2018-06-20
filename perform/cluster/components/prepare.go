@@ -32,6 +32,13 @@ var (
 
 	//installCommonsContent contains the script to install/configure common components
 	installCommonsContent *string
+
+	funcMap = template.FuncMap{
+		// The name "inc" is what the function will be called in the template text.
+		"inc": func(i int) int {
+			return i + 1
+		},
+	}
 )
 
 //getTemplateBox
@@ -61,7 +68,7 @@ func RealizeBuildScript(component string, data map[string]interface{}) (string, 
 		return "", fmt.Errorf("error loading script template '%s': %s", scriptName, err.Error())
 	}
 	// Parse the template
-	tmplPrepared, err := template.New(scriptName).Parse(tmplString)
+	tmplPrepared, err := template.New(scriptName).Funcs(funcMap).Parse(tmplString)
 	if err != nil {
 		return "", fmt.Errorf("error parsing script template '%s': %s", scriptName, err.Error())
 	}
