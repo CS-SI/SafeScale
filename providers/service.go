@@ -160,6 +160,7 @@ func (srv *Service) WaitVMState(vmID string, state VMState.Enum, timeout time.Du
 		case <-timer:
 			return vm, fmt.Errorf("Timeout")
 		default:
+			time.Sleep(1)
 		}
 	}
 	return vm, err
