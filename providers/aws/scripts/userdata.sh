@@ -25,7 +25,7 @@ echo "{{.Key}}" > /home/{{.User}}/.ssh/authorized_keys
 # Acitvates IP forwarding
 {{ if .IsGateway }}
 
-PUBLIC_IP=$(curl ipinfo.io/ip)
+PUBLIC_IP=$(curl ipinfo.io/ip 2>/dev/null)
 PUBLIC_IF=$(netstat -ie | grep -B1 ${PUBLIC_IP} | head -n1 | awk '{print $1}')
 
 PRIVATE_IP=''

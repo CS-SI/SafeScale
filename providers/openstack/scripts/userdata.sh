@@ -22,20 +22,20 @@ exec 2>&1
 
 create_user() {
     echo "Creating user {{.User}}..."
-    useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
-    echo "{{.User}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
+    useradd {{ .User }} --home-dir /home/{{ .User }} --shell /bin/bash --comment "" --create-home
+    echo "{{ .User }} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
     # Sets ssh conf
-    mkdir /home/{{.User}}/.ssh
-    echo "{{.Key}}" >>/home/{{.User}}/.ssh/authorized_keys
-    chmod 0700 /home/{{.User}}/.ssh
-    chmod -R 0600 /home/{{.User}}/.ssh/*
+    mkdir /home/{{ .User }}/.ssh
+    echo "{{ .Key }}" >>/home/{{ .User }}/.ssh/authorized_keys
+    chmod 0700 /home/{{ .User }}/.ssh
+    chmod -R 0600 /home/{{ .User }}/.ssh/*
 
     # Create flag file to deactivate Welcome message on ssh
-    touch /home/{{.User}}/.hushlogin
+    touch /home/{{ .User }}/.hushlogin
 
     # Ensures ownership
-    chown -R gpac:gpac /home/{{.User}}
+    chown -R {{ .User }}:{{ .User }} /home/{{ .User }}
     echo done
 }
 
@@ -113,8 +113,9 @@ EOF
 
 configure_as_gateway() {
     echo "Configuring host as gateway..."
-    PUBLIC_IP=$(curl ipinfo.io/ip)
+    PUBLIC_IP=$(curl ipinfo.io/ip 2>/dev/null)
     PUBLIC_IF=$(netstat -ie | grep -B1 ${PUBLIC_IP} | head -n1 | awk '{print $1}')
+    PUBLIC_IP=${PUBLIC_IP%%:}
 
     PRIVATE_IP=
     for IF in $(ls /sys/class/net); do
@@ -126,6 +127,7 @@ configure_as_gateway() {
     [ -z ${PRIVATE_IP} ] && return 1
 
     PRIVATE_IF=$(netstat -ie | grep -B1 ${PRIVATE_IP} | head -n1 | awk '{print $1}')
+    PRIVATE_IF=${PRIVATE_IF%:}
 
     if [ ! -z $PRIVATE_IF ]; then
         sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf
@@ -154,8 +156,8 @@ WantedBy=multi-user.target
 EOF
 
         if [ -z $PUBLIC_IF ]; then
-            sed -i 's/-o //g; s/-i //g' /sbin/routing
-            sed -i 's/(Description=.*) to[[:space:]*$/\\1/g' /etc/systemd/system/routing.service
+            sed -i 's/-o  -j/-j/g; s/-i  -o/-o/g' /sbin/routing
+            sed -i 's/(Description=.*) to $/\\1/g' /etc/systemd/system/routing.service
         fi
 
         chmod u+x /sbin/routing
