@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -341,10 +342,17 @@ type subnetCommonResult struct {
 	gc.Result
 }
 
+type subnetEx struct {
+	subnets.Subnet
+	Status string `json:"status"`
+}
+
 // Extract is a function that accepts a result and extracts a Subnet from FlexibleEngine response.
-func (r subnetCommonResult) Extract() (*subnets.Subnet, error) {
+//func (r subnetCommonResult) Extract() (*subnets.Subnet, error) {
+func (r subnetCommonResult) Extract() (*subnetEx, error) {
 	var s struct {
-		Subnet *subnets.Subnet `json:"subnet"`
+		//		Subnet *subnets.Subnet `json:"subnet"`
+		Subnet *subnetEx `json:"subnet"`
 	}
 	err := r.ExtractInto(&s)
 	return s.Subnet, err
@@ -386,14 +394,20 @@ func cidrIntersects(n1, n2 *net.IPNet) bool {
 
 //createSubnet creates a subnet using native FlexibleEngine API
 func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, error) {
+	// Checks if subnet is inside CIDR of VPC
+	_, vpcnetDesc, _ := net.ParseCIDR(client.vpc.CIDR)
+	network, networkDesc, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", name, cidr, errorString(err))
+	}
+	if !cidrIntersects(vpcnetDesc, networkDesc) {
+		return nil, fmt.Errorf("can't create subnet with CIDR '%s': not inside network CIDR '%s'", cidr, client.vpc.CIDR)
+	}
+
 	// Validates CIDR regarding the existing subnets
 	subnets, err := client.listSubnets()
 	if err != nil {
 		return nil, err
-	}
-	network, networkDesc, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", name, cidr, errorString(err))
 	}
 	for _, s := range *subnets {
 		_, sDesc, _ := net.ParseCIDR(s.CIDR)
@@ -428,23 +442,43 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 		return nil, fmt.Errorf("error preparing Subnet %s creation: %s", req.Name, errorString(err))
 	}
 
-	resp := subnetCreateResult{}
+	respCreate := subnetCreateResult{}
 	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/subnets"
 	opts := gc.RequestOpts{
 		JSONBody:     b,
-		JSONResponse: &resp.Body,
+		JSONResponse: &respCreate.Body,
 		OkCodes:      []int{200, 201},
 	}
 	_, err = client.osclt.Provider.Request("POST", url, &opts)
 	if err != nil {
 		return nil, fmt.Errorf("error requesting Subnet %s creation: %s", req.Name, errorString(err))
 	}
-	subnet, err := resp.Extract()
+	subnet, err := respCreate.Extract()
 	if err != nil {
 		return nil, fmt.Errorf("error creating Subnet %s: %s", req.Name, errorString(err))
 	}
 
-	return subnet, nil
+	// Subnet creation started, need to wait the subnet to reach the status ACTIVE
+	timer := time.After(60 * time.Second)
+	respGet := subnetGetResult{}
+	opts.JSONResponse = &respGet.Body
+	opts.JSONBody = nil
+	for true {
+		_, err = client.osclt.Provider.Request("GET", url+"/"+subnet.ID, &opts)
+		if err == nil {
+			s, err := respGet.Extract()
+			if err == nil && s.Status == "ACTIVE" {
+				return &s.Subnet, nil
+			}
+		}
+		select {
+		case <-timer:
+			break
+		default:
+			time.Sleep(1)
+		}
+	}
+	return &subnet.Subnet, fmt.Errorf("timeout waiting subnet becoming active")
 }
 
 //ListSubnets lists available subnet in VPC
@@ -482,7 +516,7 @@ func (client *Client) getSubnet(id string) (*subnets.Subnet, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get information for subnet id '%s': %s", id, errorString(err))
 	}
-	return subnet, nil
+	return &subnet.Subnet, nil
 }
 
 //deleteSubnet deletes a subnet
@@ -543,10 +577,14 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	if err != nil {
 		return fmt.Errorf("Network %s not found: %s", req.NetworkID, errorString(err))
 	}
+	gwname := req.GWName
+	if gwname == "" {
+		gwname = "gw-" + net.Name
+	}
 	vmReq := api.VMRequest{
 		ImageID:    req.ImageID,
 		KeyPair:    req.KeyPair,
-		Name:       "gw-" + net.Name,
+		Name:       gwname,
 		TemplateID: req.TemplateID,
 		NetworkIDs: []string{req.NetworkID},
 		PublicIP:   true,
@@ -555,9 +593,10 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	if err != nil {
 		return fmt.Errorf("error creating gateway : %s", errorString(err))
 	}
-	m, err := metadata.NewGateway(providers.FromClient(client), req.NetworkID)
+	svc := providers.FromClient(client)
+	m, err := metadata.NewGateway(svc, req.NetworkID)
 	if err == nil {
-		err = m.Carry(vm).Write(providers.FromClient(client))
+		err = m.Carry(vm).Write(svc)
 	}
 	if err != nil {
 		client.DeleteVM(vm.ID)
