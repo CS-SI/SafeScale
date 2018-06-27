@@ -25,7 +25,7 @@ exec 1<>/var/tmp/install_bootstrap_node.log
 exec 2>&1
 
 ### Lauch downloads in parallel
-mkdir -p /usr/local/dcos/genconf
+mkdir -p /usr/local/dcos/genconf/serve/docker
 cd /usr/local/dcos
 yum makecache fast >/dev/null
 yum install -y wget >/dev/null
@@ -80,7 +80,6 @@ docker pull nginx &>/var/tmp/dpn.log &
 DPN_PID=$!
 
 # Stats build of needed docker images in backgroud
-mkdir -p /usr/local/dcos/genconf/serve/docker
 bash /var/tmp/docker_image_create_guacamole.sh &>/var/tmp/guacamole.log &
 G_PID=$!
 bash /var/tmp/docker_image_create_proxy.sh &>/var/tmp/proxy.log &
