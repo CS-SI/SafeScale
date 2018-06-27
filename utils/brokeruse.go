@@ -62,31 +62,29 @@ func GetCurrentTenant() (string, error) {
 }
 
 //CreateNetwork creates a network using brokerd
-func CreateNetwork(name string, cidr string) (*pb.Network, error) {
+func CreateNetwork(name string, cidr string, GWdef *pb.GatewayDefinition) (*pb.Network, error) {
 	conn := GetConnection()
 	defer conn.Close()
 	ctx, cancel := GetContext(10 * time.Minute)
 	defer cancel()
 	networkService := pb.NewNetworkServiceClient(conn)
-	netdef := &pb.NetworkDefinition{
-		CIDR: cidr,
-		Name: name,
-		Gateway: &pb.GatewayDefinition{
-			CPU:  1,
-			Disk: 30,
-			RAM:  1.0,
-			// CPUFrequency: ??,
+	if GWdef == nil {
+		GWdef = &pb.GatewayDefinition{
+			CPU:     1,
+			Disk:    30,
+			RAM:     1.0,
 			ImageID: "Ubuntu 16.04",
-		},
+		}
+	}
+	netdef := &pb.NetworkDefinition{
+		CIDR:    cidr,
+		Name:    name,
+		Gateway: GWdef,
 	}
 	network, err := networkService.Create(ctx, netdef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Network: %v", err)
 	}
-	//sleep 3s to wait Network in READY state for now, has to be smarter... Probably in service.CreateNetwork()
-	fmt.Println("Sleeping 3s...")
-	time.Sleep(3 * time.Second)
-	fmt.Println("Waking up...")
 
 	return network, nil
 }
