@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"text/template"
 
+	"github.com/CS-SI/SafeScale/system"
 	rice "github.com/GeertJohan/go.rice"
 )
 
@@ -53,30 +54,35 @@ func getTemplateBox() (*rice.Box, error) {
 	return templateBox, nil
 }
 
-//RealizeBuildScript creates the string corresponding to script
+//UploadBuildScript creates the string corresponding to script
 // used to prepare Docker image to be used by a cluster
-func RealizeBuildScript(component string, data map[string]interface{}) (string, error) {
+func UploadBuildScript(ssh *system.SSHConfig, component string, data map[string]interface{}) (string, error) {
 	// find the rice.Box
 	b, err := getTemplateBox()
 	if err != nil {
 		return "", err
 	}
 	scriptName := "docker_image_create_" + component + ".sh"
+	remotePath := "/var/tmp/" + scriptName
 	// get file contents as string
 	tmplString, err := b.String(scriptName)
 	if err != nil {
-		return "", fmt.Errorf("error loading script template '%s': %s", scriptName, err.Error())
+		return "", fmt.Errorf("error loading component '%s' template: %s", component, err.Error())
 	}
 	// Parse the template
 	tmplPrepared, err := template.New(scriptName).Funcs(funcMap).Parse(tmplString)
 	if err != nil {
-		return "", fmt.Errorf("error parsing script template '%s': %s", scriptName, err.Error())
+		return "", fmt.Errorf("error parsing component '%s' template: %s", component, err.Error())
 	}
 	// realize the template
 	dataBuffer := bytes.NewBufferString("")
 	err = tmplPrepared.Execute(dataBuffer, data)
 	if err != nil {
-		return "", fmt.Errorf("error realizing script template '%s': %s", scriptName, err.Error())
+		return "", fmt.Errorf("error realizing component '%s' template: %s", scriptName, err.Error())
 	}
-	return dataBuffer.String(), nil
+	err = ssh.UploadString(remotePath, dataBuffer.String())
+	if err != nil {
+		return "", err
+	}
+	return remotePath, nil
 }

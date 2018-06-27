@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,20 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-######################################
-# Prepares guacamole docker instance #
-######################################
+###################################
+# Prepares guacamole docker image #
+###################################
 
-mkdir /tmp/guacamole.image
+mkdir /var/tmp/guacamole.image
+cd /var/tmp/guacamole.image
 
-cat >/tmp/guacamole.image/startup.sh <<-'EOF'
+cat >startup.sh <<-'EOF'
 #!/bin/bash
+
+if [ ! -f /root/.guacamole/user-mapping.xml ]; then
+    sed -e "s/##HOSTNAME##/$(hostname -s)/g" \
+        -e "s/##PASSWORD##/{{ .Password }}/g" /root/.guacamole/user-mapping.xml.tmpl \
+        >/root/.guacamole/user-mapping.xml
+fi
 
 # start up supervisord, all daemons should launched by supervisord.
 exec /usr/bin/supervisord -c /opt/safescale/supervisord.conf
 EOF
 
-cat >/tmp/guacamole.image/supervisord.conf <<-'EOF'
+cat >supervisord.conf <<-'EOF'
 [supervisord]
 nodaemon=true
 
@@ -60,7 +68,7 @@ autorestart=true
 stopsignal=QUIT
 EOF
 
-cat >/tmp/guacamole.image/logback.xml <<-'EOF'
+cat >logback.xml <<-'EOF'
 <configuration>
     <!-- Appender for debugging -->
     <appender name="GUAC-DEBUG" class="ch.qos.logback.core.ConsoleAppender">
@@ -83,29 +91,28 @@ cat >/tmp/guacamole.image/logback.xml <<-'EOF'
 </configuration>
 EOF
 
-cat >/tmp/guacamole.image/user-mapping.xml <<-'EOF'
+cat >user-mapping.xml.tmpl <<-'EOF'
 <user-mapping>
-    <authorize username="cladm" password="{{ .Password }}">
+    <authorize username="cladm" password="##PASSWORD##">
 
         <!-- First authorized connection -->
-        <connection name="front_vnc">
+        <connection name="##HOSTNAME##">
             <protocol>vnc</protocol>
-            <param name="hostname">{{ .Hostname }}</param>
+            <param name="hostname">##HOSTNAME##</param>
             <param name="port">5900</param>
             <param name="enable-sftp">true</param>
             <param name="sftp-username">cladm</param>
-            <param name="sftp-password">{{ .Password }}</param>
+            <param name="sftp-password">##PASSWORD##</param>
             <param name="sftp-directory">/home/cladm/Desktop</param>
             <param name="sftp-root-directory">/home/cladm</param>
             <param name="sftp-server-alive-interval">60</param>
             <param name="color-depth">16</param>
-            <!--<param name="encodings">zrle ultra copyrect hextile zlib corre rre raw</param>-->
         </connection>
     </authorize>
 </user-mapping>
 EOF
 
-cat >/tmp/guacamole.image/tomcat-users.xml <<-'EOF'
+cat >tomcat-users.xml <<-'EOF'
 <?xml version='1.0' encoding='utf-8'?>
 <tomcat-users>
     <role rolename="admin-gui"/>
@@ -118,7 +125,7 @@ cat >/tmp/guacamole.image/tomcat-users.xml <<-'EOF'
 </tomcat-users>
 EOF
 
-cat >/tmp/guacamole.image/Dockerfile <<-'EOF'
+cat >Dockerfile <<-'EOF'
 FROM debian:sid-slim AS Builder
 LABEL maintainer "CS SI"
 
@@ -196,7 +203,7 @@ ADD tomcat-users.xml ./conf/
 
 WORKDIR /root
 RUN mkdir .guacamole
-ADD user-mapping.xml .guacamole/
+ADD user-mapping.xml.tmpl .guacamole/
 ADD logback.xml .guacamole/
 ENV GUACAMOLE_HOME /root/.guacamole
 
@@ -218,7 +225,7 @@ EXPOSE 8009
 
 ENTRYPOINT ["/opt/safescale/startup.sh"]
 EOF
-docker build -t guacamole:latest /tmp/guacamole.image
 
-docker save guacamole:latest | pigz -c9 >/usr/local/dcos/genconf/serve/docker/guacamole.tar.gz
-rm -rf /tmp/guacamole.image
+docker build -t guacamole:latest . && \
+docker save guacamole:latest | pigz -c9 >/usr/local/dcos/genconf/serve/docker/guacamole.tar.gz && \
+cd .. && rm -rf guacamole.image
