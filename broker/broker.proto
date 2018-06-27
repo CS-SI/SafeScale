@@ -12,7 +12,7 @@ message Tenant{
     string Provider = 2;
 }
 
-message TenantList{ 
+message TenantList{
     repeated Tenant Tenants = 1;
 }
 
@@ -123,7 +123,7 @@ message VM{
     string IP = 6;
     VMState State = 8;
     string PrivateKey = 9;
-    string GatewayID = 10; 
+    string GatewayID = 10;
 }
 
 message VMList{
@@ -198,7 +198,7 @@ service VolumeService{
     rpc Attach(VolumeAttachment) returns (google.protobuf.Empty) {}
     rpc Detach(VolumeDetachment) returns (google.protobuf.Empty){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
-    rpc List(google.protobuf.Empty) returns (VolumeList) {} 
+    rpc List(google.protobuf.Empty) returns (VolumeList) {}
     rpc Inspect(Reference) returns (Volume){}
 }
 

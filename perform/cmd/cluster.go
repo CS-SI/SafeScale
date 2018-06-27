@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -49,6 +48,7 @@ var ClusterCmd = cli.Command{
 		clusterStart,
 		clusterState,
 		clusterNode,
+		clusterKubectl,
 	},
 }
 
@@ -134,7 +134,7 @@ var clusterCreate = cli.Command{
 		if instance != nil {
 			return fmt.Errorf("cluster '%s' already exists.", clusterName)
 		}
-		log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
+
 		complexity, err := Complexity.FromString(c.String("complexity"))
 		if err != nil {
 			return err
@@ -446,6 +446,12 @@ var clusterStart = cli.Command{
 	Name:      "start",
 	Usage:     "Start the cluster",
 	ArgsUsage: "<cluster name>",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "name, n",
+			Usage: "Name of the cluster",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <cluster name>")
@@ -470,6 +476,32 @@ var clusterStart = cli.Command{
 var clusterState = cli.Command{
 	Name:      "state",
 	Usage:     "Returns the current state of a cluster",
+	ArgsUsage: "<cluster name>",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <cluster name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("Cluster name required")
+		}
+		clusterName := c.Args().First()
+		instance, err := cluster.Get(clusterName)
+		if err != nil {
+			return fmt.Errorf("Could not inspect cluster '%s': %v", clusterName, err)
+		}
+		if instance == nil {
+			return fmt.Errorf("cluster '%s' not found", clusterName)
+		}
+		state, err := instance.GetState()
+		out, _ := json.Marshal(map[string]string{"state": state.String()})
+		fmt.Println(string(out))
+
+		return nil
+	},
+}
+
+var clusterKubectl = cli.Command{
+	Name:      "kubectl",
+	Usage:     "cluster node COMMAND",
 	ArgsUsage: "<cluster name>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
