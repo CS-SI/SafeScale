@@ -26,25 +26,25 @@ systemctl disable firewalld 2>/dev/null
 
 # Upgrade to last CentOS revision
 rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info
-yum install -y python-backports-ssl_match_hostname
-yum upgrade --assumeyes --tolerant
-yum update --assumeyes
+yum install -y python-backports-ssl_match_hostname >/dev/null
+yum upgrade --assumeyes --tolerant >/dev/null
+yum update --assumeyes >/dev/null
 
 # Create group nogroup
 groupadd nogroup
 
 # Disables installation of docker-python from yum
 yum remove -y python-docker-py &>/dev/null
-yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz
-yum versionlock exclude python-docker-py
+yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz >/dev/null
+yum versionlock exclude python-docker-py >/dev/null
 
 # Installs PIP
-yum install -y epel-release
-yum makecache fast
-yum install -y python-pip
+yum install -y epel-release >/dev/null
+yum makecache fast >/dev/null
+yum install -y python-pip >/dev/null
 
 # Installs docker-python with pip
-pip install -q docker-py==1.10.6
+pip install -q docker-py==1.10.6 >/dev/null
 
 # Enable overlay module
 echo overlay >/etc/modules-load.d/10-overlay.conf
@@ -63,8 +63,8 @@ ExecStart=/usr/bin/dockerd --storage-driver=overlay --log-driver=none
 EOF
 
 # Installs docker
-yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-yum install -y docker-ce-17.06.2.ce
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo >/dev/null
+yum install -y docker-ce-17.06.2.ce >/dev/null
 
 # Enable docker at boot
 systemctl enable docker.service
@@ -74,7 +74,7 @@ systemctl start docker
 usermod -aG docker gpac
 
 # Installs docker-compose
-curl -L https://github.com/docker/compose/releases/download/1.21.2/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+curl -sS -L https://github.com/docker/compose/releases/download/1.21.2/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose >/dev/null
 chmod a+rx /usr/local/bin/docker-compose
 [ -f /bin/docker-compose ] && mv -f /bin/docker-compose /bin/docker-compose.notused
 
