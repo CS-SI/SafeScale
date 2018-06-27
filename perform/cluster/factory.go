@@ -19,9 +19,6 @@ package cluster
 import (
 	"fmt"
 	"log"
-	"strings"
-
-	pb "github.com/CS-SI/SafeScale/broker"
 
 	"github.com/CS-SI/SafeScale/utils"
 
@@ -73,7 +70,6 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		return nil, fmt.Errorf("Invalid parameter req.CIDR: can't be empty")
 	}
 
-	var network *pb.Network
 	var instance clusterapi.ClusterAPI
 
 	log.Printf("Creating infrastructure for cluster '%s'", req.Name)
@@ -82,24 +78,23 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Creates network
-	log.Printf("Creating Network 'net-%s'", req.Name)
-	req.Name = strings.ToLower(req.Name)
-	networkName := "net-" + req.Name
-	network, err = utils.CreateNetwork(networkName, req.CIDR)
-	if err != nil {
-		err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
-		return nil, err
-	}
+	/*
+		// Creates network
+		log.Printf("Creating Network 'net-%s'", req.Name)
+		req.Name = strings.ToLower(req.Name)
+		networkName := "net-" + req.Name
+		network, err = utils.CreateNetwork(networkName, req.CIDR)
+		if err != nil {
+			err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
+			return nil, err
+		}
+	*/
 
 	switch req.Flavor {
 	case Flavor.DCOS:
-		req.NetworkID = network.ID
 		req.Tenant = tenant
 		instance, err = dcos.Create(req)
 		if err != nil {
-			utils.DeleteNetwork(network.ID)
 			return nil, err
 		}
 	case Flavor.Swarm:
@@ -122,16 +117,8 @@ func Delete(name string) error {
 		return fmt.Errorf("Cluster '%s' not found", name)
 	}
 
-	networkID := instance.GetNetworkID()
-
 	// Deletes all the infrastructure built for the cluster
-	err = instance.Delete()
-	if err != nil {
-		return fmt.Errorf("failed to delete infrastructure of cluster '%s': %s", name, err.Error())
-	}
-
-	// Deletes the network and related stuff
-	return utils.DeleteNetwork(networkID)
+	return instance.Delete()
 }
 
 //List lists the clusters already created

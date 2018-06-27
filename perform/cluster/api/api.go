@@ -56,7 +56,9 @@ type ClusterAPI interface {
 	GetNetworkID() string
 
 	//AddNode adds a node
-	AddNode(bool, *pb.VMDefinition) (*pb.VM, error)
+	AddNode(bool, *pb.VMDefinition) (string, error)
+	//AddNodes adds several nodes
+	AddNodes(int, bool, *pb.VMDefinition) ([]string, error)
 	//DeleteLastNode deletes a node
 	DeleteLastNode(bool) error
 	//DeleteSpecificNode deletes a node identified by its ID

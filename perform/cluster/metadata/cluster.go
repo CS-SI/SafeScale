@@ -30,6 +30,43 @@ const (
 	clusterFolderName = "cluster"
 )
 
+type empty struct{}
+type semaphore chan empty
+
+// acquire n resources
+func (s semaphore) P(n int) {
+	e := empty{}
+	for i := 0; i < n; i++ {
+		s <- e
+	}
+}
+
+// release n resources
+func (s semaphore) V(n int) {
+	for i := 0; i < n; i++ {
+		<-s
+	}
+}
+
+/* mutexes */
+func (s semaphore) Lock() {
+	s.P(1)
+}
+
+func (s semaphore) Unlock() {
+	s.V(1)
+}
+
+/* signal-wait */
+
+func (s semaphore) Signal() {
+	s.V(1)
+}
+
+func (s semaphore) Wait(n int) {
+	s.P(n)
+}
+
 type record struct {
 	Common   *api.Cluster
 	Specific interface{}
@@ -39,6 +76,7 @@ type record struct {
 type Cluster struct {
 	folder *metadata.Folder
 	data   *record
+	lock   semaphore
 }
 
 //NewCluster creates a new Cluster metadata
@@ -54,6 +92,7 @@ func NewCluster() (*Cluster, error) {
 	return &Cluster{
 		folder: f,
 		data:   nil,
+		lock:   make(semaphore, 1),
 	}, nil
 }
 
@@ -80,14 +119,6 @@ func (m *Cluster) Delete() error {
 
 //Read reads metadata of cluster named 'name' from Object Storage
 func (m *Cluster) Read(name string) (bool, error) {
-	/*found, err := m.folder.Search(".", name)
-	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
-	}
-	*/
 	var data record
 	found, err := m.folder.Read(".", name, func(buf *bytes.Buffer) error {
 		err := gob.NewDecoder(buf).Decode(&data)
@@ -129,6 +160,16 @@ func (m *Cluster) Browse(callback func(c *api.Cluster) error) error {
 		}
 		return callback(data.Common)
 	})
+}
+
+//Acquire waits until the write lock is available, then locks the metadata
+func (m *Cluster) Acquire() {
+	m.lock.Lock()
+}
+
+//Release unlocks the metadata
+func (m *Cluster) Release() {
+	m.lock.Unlock()
 }
 
 func init() {
