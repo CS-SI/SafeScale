@@ -4,7 +4,7 @@ GO?=go
 
 all: providers system broker perform utils
 
-providers: broker
+providers:
 	@(cd providers && $(MAKE))
 
 broker: system
