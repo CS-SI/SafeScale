@@ -203,10 +203,12 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 			return nil
 		}
 		ok, err := mgw.Read()
-		if !ok || err != nil {
-			if err != nil {
-				log.Print(err.Error())
-			}
+		if err != nil {
+			log.Print(err.Error())
+			return nil
+		}
+		if !ok {
+			log.Print("gateway metadata not found")
 			return nil
 		}
 		gwvm := mgw.Get()
