@@ -276,7 +276,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 
 	// Validating name of the VM
 	if ok, err := validateVMName(request); !ok {
-		return nil, fmt.Errorf("name '%s' is invalid for a FlexibleEngine VM: %s", request.Name, errorString(err))
+		return nil, fmt.Errorf("name '%s' is invalid for a FlexibleEngine VM: %s", request.Name, providerError(err))
 	}
 
 	//Eventual network gateway
@@ -309,9 +309,8 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		name := fmt.Sprintf("%s_%s", request.Name, id)
 		kp, err = client.CreateKeyPair(name)
 		if err != nil {
-			return nil, fmt.Errorf("Error creating key pair for VM '%s': %s", request.Name, errorString(err))
+			return nil, fmt.Errorf("Error creating key pair for VM '%s': %s", request.Name, providerError(err))
 		}
-		defer client.DeleteKeyPair(kp.ID)
 	}
 
 	userData, err := client.osclt.PrepareUserData(request, isGateway, kp, gw)
@@ -319,7 +318,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	// Determine system disk size based on vcpus count
 	template, err := client.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get image: %s", errorString(err))
+		return nil, fmt.Errorf("Failed to get image: %s", providerError(err))
 	}
 
 	var diskSize int
@@ -356,14 +355,9 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		CreateOptsBuilder: srvOpts,
 		BlockDevice:       []blockDevice{bootdiskOpts},
 	}
-	// Defines Key name to use to login in the VM
-	kpOpts := keypairs.CreateOptsExt{
-		CreateOptsBuilder: bdOpts,
-		KeyName:           kp.ID,
-	}
-	b, err := kpOpts.ToServerCreateMap()
+	b, err := bdOpts.ToServerCreateMap()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to build query to create VM '%s': %s", request.Name, errorString(err))
+		return nil, fmt.Errorf("Failed to build query to create VM '%s': %s", request.Name, providerError(err))
 	}
 	r := servers.CreateResult{}
 	var httpResp *http.Response
@@ -375,14 +369,14 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		if server != nil {
 			servers.Delete(client.osclt.Compute, server.ID)
 		}
-		return nil, fmt.Errorf("Query to create VM '%s' failed: %s (HTTP return code: %d)", request.Name, errorString(err), httpResp.StatusCode)
+		return nil, fmt.Errorf("Query to create VM '%s' failed: %s (HTTP return code: %d)", request.Name, providerError(err), httpResp.StatusCode)
 	}
 
 	// Wait that VM is started
 	vm, err := client.waitVMReady(server.ID, 120*time.Second)
 	if err != nil {
 		client.DeleteVM(server.ID)
-		return nil, fmt.Errorf("Timeout waiting VM '%s' ready: %s", request.Name, errorString(err))
+		return nil, fmt.Errorf("Timeout waiting VM '%s' ready: %s", request.Name, providerError(err))
 	}
 
 	// Fixes the size of bootdisk, FlexibleEngine is used to not give one...
@@ -399,14 +393,14 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		fip, err := client.attachFloatingIP(vm)
 		if err != nil {
 			client.DeleteVM(vm.ID)
-			return nil, fmt.Errorf("Error attaching public IP for VM '%s': %s", request.Name, errorString(err))
+			return nil, fmt.Errorf("Error attaching public IP for VM '%s': %s", request.Name, providerError(err))
 		}
 		if isGateway {
 			err = client.enableVMRouterMode(vm)
 			if err != nil {
 				client.DeleteVM(vm.ID)
 				client.DeleteFloatingIP(fip.ID)
-				return nil, fmt.Errorf("Error enabling gateway mode of VM '%s': %s", request.Name, errorString(err))
+				return nil, fmt.Errorf("Error enabling gateway mode of VM '%s': %s", request.Name, providerError(err))
 			}
 		}
 	}
@@ -418,7 +412,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 	if err != nil {
 		client.DeleteVM(vm.ID)
-		return nil, fmt.Errorf("rrror creating VM: %s", errorString(err))
+		return nil, fmt.Errorf("failed to create VM: %s", providerError(err))
 	}
 
 	return vm, nil
@@ -505,7 +499,7 @@ func pollVMReady(client *Client, vmID string, cout chan int, next chan bool, vmc
 func (client *Client) GetVM(id string) (*api.VM, error) {
 	server, err := servers.Get(client.osclt.Compute, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting VM: %s", errorString(err))
+		return nil, fmt.Errorf("Error getting VM: %s", providerError(err))
 	}
 	vm := client.toVM(server)
 	return vm, nil
@@ -534,7 +528,7 @@ func (client *Client) listAllVMs() ([]api.VM, error) {
 		return true, nil
 	})
 	if len(vms) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
+		return nil, fmt.Errorf("Error listing vms : %s", providerError(err))
 	}
 	return vms, nil
 }
@@ -553,7 +547,7 @@ func (client *Client) listMonitoredVMs() ([]api.VM, error) {
 		return nil
 	})
 	if len(vms) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
+		return nil, fmt.Errorf("Error listing vms : %s", providerError(err))
 	}
 	return vms, nil
 }
@@ -577,18 +571,18 @@ func (client *Client) DeleteVM(id string) error {
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+					return fmt.Errorf("Error deleting VM %s : %s", id, providerError(err))
 				}
 				err = floatingips.Delete(client.osclt.Compute, fip.ID).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("Error deleting VM %s : %s", id, errorString(err))
+					return fmt.Errorf("Error deleting VM %s : %s", id, providerError(err))
 				}
 			}
 		}
 	}
 	err = servers.Delete(client.osclt.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("error deleting VM %s : %s", vm.Name, errorString(err))
+		return fmt.Errorf("error deleting VM %s : %s", vm.Name, providerError(err))
 	}
 
 	// In FlexibleEngine, volumes may not be always automatically removed, so take care of them
@@ -709,7 +703,7 @@ func (client *Client) getFloatingIPOfVM(vmID string) (*floatingips.FloatingIP, e
 	})
 	if len(fips) == 0 {
 		if err != nil {
-			return nil, fmt.Errorf("No floating IP found for VM %s: %s", vmID, errorString(err))
+			return nil, fmt.Errorf("No floating IP found for VM %s: %s", vmID, providerError(err))
 		}
 		return nil, fmt.Errorf("No floating IP found for VM %s", vmID)
 
@@ -724,13 +718,13 @@ func (client *Client) getFloatingIPOfVM(vmID string) (*floatingips.FloatingIP, e
 func (client *Client) attachFloatingIP(vm *api.VM) (*FloatingIP, error) {
 	fip, err := client.CreateFloatingIP()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to attach Floating IP on VM '%s': %s", vm.Name, errorString(err))
+		return nil, fmt.Errorf("Failed to attach Floating IP on VM '%s': %s", vm.Name, providerError(err))
 	}
 
 	err = client.AssociateFloatingIP(vm, fip.ID)
 	if err != nil {
 		client.DeleteFloatingIP(fip.ID)
-		return nil, fmt.Errorf("Failed to attach Floating IP to VM '%s': %s", vm.Name, errorString(err))
+		return nil, fmt.Errorf("Failed to attach Floating IP to VM '%s': %s", vm.Name, providerError(err))
 	}
 
 	updateAccessIPsOfVM(vm, fip.PublicIPAddress)
@@ -751,7 +745,7 @@ func updateAccessIPsOfVM(vm *api.VM, ip string) {
 func (client *Client) enableVMRouterMode(vm *api.VM) error {
 	portID, err := client.getOpenstackPortID(vm)
 	if err != nil {
-		return fmt.Errorf("Failed to enable Router Mode on VM '%s': %s", vm.Name, errorString(err))
+		return fmt.Errorf("Failed to enable Router Mode on VM '%s': %s", vm.Name, providerError(err))
 	}
 
 	pairs := []ports.AddressPair{
@@ -762,7 +756,7 @@ func (client *Client) enableVMRouterMode(vm *api.VM) error {
 	opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
 	_, err = ports.Update(client.osclt.Network, *portID, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Failed to enable Router Mode on VM '%s': %s", vm.Name, errorString(err))
+		return fmt.Errorf("Failed to enable Router Mode on VM '%s': %s", vm.Name, providerError(err))
 	}
 	return nil
 }
@@ -771,13 +765,13 @@ func (client *Client) enableVMRouterMode(vm *api.VM) error {
 func (client *Client) disableVMRouterMode(vm *api.VM) error {
 	portID, err := client.getOpenstackPortID(vm)
 	if err != nil {
-		return fmt.Errorf("Failed to disable Router Mode on VM '%s': %s", vm.Name, errorString(err))
+		return fmt.Errorf("Failed to disable Router Mode on VM '%s': %s", vm.Name, providerError(err))
 	}
 
 	opts := ports.UpdateOpts{AllowedAddressPairs: nil}
 	_, err = ports.Update(client.osclt.Network, *portID, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Failed to disable Router Mode on VM '%s': %s", vm.Name, errorString(err))
+		return fmt.Errorf("Failed to disable Router Mode on VM '%s': %s", vm.Name, providerError(err))
 	}
 	return nil
 }
@@ -814,7 +808,7 @@ func (client *Client) getOpenstackPortID(vm *api.VM) (*string, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error browsing Openstack Interfaces of VM '%s': %s", vm.Name, errorString(err))
+		return nil, fmt.Errorf("Error browsing Openstack Interfaces of VM '%s': %s", vm.Name, providerError(err))
 	}
 	if found {
 		return &nic.PortID, nil

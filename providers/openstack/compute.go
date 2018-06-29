@@ -158,18 +158,10 @@ func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
 		},
 	)
 	priKey := string(priKeyPem)
-
-	kp, err := keypairs.Create(client.Compute, keypairs.CreateOpts{
-		Name:      name,
-		PublicKey: pubKey,
-	}).Extract()
-	if err != nil {
-		return nil, err
-	}
 	return &api.KeyPair{
-		ID:         kp.Name,
-		Name:       kp.Name,
-		PublicKey:  kp.PublicKey,
+		ID:         name,
+		Name:       name,
+		PublicKey:  pubKey,
 		PrivateKey: priKey,
 	}, nil
 }
@@ -381,6 +373,7 @@ func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp 
 		ResolveConf: ResolveConf,
 		GatewayIP:   ip,
 	}
+
 	err = client.UserDataTpl.Execute(dataBuffer, data)
 	if err != nil {
 		return nil, err
@@ -454,7 +447,6 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		if err != nil {
 			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
 		}
-		defer client.DeleteKeyPair(kp.ID)
 	}
 
 	userData, err := client.PrepareUserData(request, isGateway, kp, gw)
@@ -470,7 +462,6 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 	server, err := servers.Create(client.Compute, keypairs.CreateOptsExt{
 		CreateOptsBuilder: srvOpts,
-		KeyName:           kp.ID,
 	}).Extract()
 	if err != nil {
 		if server != nil {

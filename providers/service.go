@@ -158,7 +158,7 @@ func (srv *Service) WaitVMState(vmID string, state VMState.Enum, timeout time.Du
 		}
 		select {
 		case <-timer:
-			return vm, fmt.Errorf("Timeout")
+			return vm, fmt.Errorf("timeout waiting host '%s' to reach state '%s'", vm.Name, state.String())
 		default:
 			time.Sleep(1)
 		}
@@ -410,7 +410,7 @@ func (srv *Service) CreateVMWithKeyPair(request api.VMRequest) (*api.VM, *api.Ke
 	if err != nil {
 		return nil, nil, err
 	}
-	defer srv.DeleteKeyPair(kpName)
+	//defer srv.DeleteKeyPair(kpName)
 
 	//Create VM
 	vmReq := api.VMRequest{
