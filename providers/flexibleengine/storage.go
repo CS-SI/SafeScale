@@ -126,7 +126,7 @@ func (client *Client) ExCreateVolume(request api.VolumeRequest, imageID string) 
 	}
 	vol, err := v2_vol.Create(client.osclt.Volume, opts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume : %s", errorString(err))
+		return nil, fmt.Errorf("Error creating volume : %s", providerError(err))
 	}
 	v := api.Volume{
 		ID:    vol.ID,

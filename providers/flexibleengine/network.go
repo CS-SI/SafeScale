@@ -84,7 +84,7 @@ func (client *Client) CreateVPC(req VPCRequest) (*VPC, error) {
 
 	b, err := gc.BuildRequestBody(req, "vpc")
 	if err != nil {
-		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, providerError(err))
 	}
 
 	resp := vpcCreateResult{}
@@ -97,21 +97,21 @@ func (client *Client) CreateVPC(req VPCRequest) (*VPC, error) {
 	_, err = client.osclt.Provider.Request("POST", url, &opts)
 	vpc, err := resp.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, providerError(err))
 	}
 
 	// Searching for the OpenStack Router corresponding to the VPC (router.id == vpc.id)
 	router, err := routers.Get(client.osclt.Network, vpc.ID).Extract()
 	if err != nil {
 		client.DeleteVPC(vpc.ID)
-		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, providerError(err))
 	}
 	vpc.Router = router
 
 	// Searching for the OpenStack Network corresponding to the VPC (network.name == vpc.id)
 	network, err := client.findOpenstackNetworkByName(vpc.ID)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, providerError(err))
 	}
 	vpc.Network = network
 
@@ -128,7 +128,7 @@ func (client *Client) findOpenstackNetworkByName(name string) (*networks.Network
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := networks.ExtractNetworks(page)
 		if err != nil {
-			return false, fmt.Errorf("Error finding Openstack Network named '%s': %s", name, errorString(err))
+			return false, fmt.Errorf("Error finding Openstack Network named '%s': %s", name, providerError(err))
 		}
 		for _, n := range list {
 			if n.Name == name {
@@ -140,7 +140,7 @@ func (client *Client) findOpenstackNetworkByName(name string) (*networks.Network
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find Openstack Network named '%s': %s", name, errorString(err))
+		return nil, fmt.Errorf("Failed to find Openstack Network named '%s': %s", name, providerError(err))
 	}
 	if found {
 		return &network, nil
@@ -160,7 +160,7 @@ func (client *Client) GetVPC(id string) (*VPC, error) {
 	r.Err = err
 	vpc, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting Network %s: %s", id, errorString(err))
+		return nil, fmt.Errorf("Error getting Network %s: %s", id, providerError(err))
 	}
 	return vpc, nil
 }
@@ -192,7 +192,7 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 
 	subnet, err = client.createSubnet(req.Name, req.CIDR)
 	if err != nil {
-		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, providerError(err))
 	}
 
 	// Creates metadata for the subnet
@@ -245,7 +245,7 @@ func (client *Client) GetNetwork(id string) (*api.Network, error) {
 
 	subnet, err := client.getSubnet(id)
 	if err != nil {
-		return nil, fmt.Errorf("failed getting network id '%s': %s", id, errorString(err))
+		return nil, fmt.Errorf("failed getting network id '%s': %s", id, providerError(err))
 	}
 	return &api.Network{
 		ID:        subnet.ID,
@@ -267,7 +267,7 @@ func (client *Client) ListNetworks(all bool) ([]api.Network, error) {
 func (client *Client) listAllNetworks() ([]api.Network, error) {
 	subnetList, err := client.listSubnets()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get networks list: %s", errorString(err))
+		return nil, fmt.Errorf("Failed to get networks list: %s", providerError(err))
 	}
 	var networkList []api.Network
 	for _, subnet := range *subnetList {
@@ -293,7 +293,7 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 		return nil
 	})
 	if len(netList) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing networks: %s", errorString(err))
+		return nil, fmt.Errorf("Error listing networks: %s", providerError(err))
 	}
 	return netList, nil
 }
@@ -317,7 +317,7 @@ func (client *Client) DeleteNetwork(id string) error {
 
 	err = client.DeleteGateway(id)
 	if err != nil {
-		return fmt.Errorf("failed to delete gateway of network '%s': %s", m.Get().Name, errorString(err))
+		return fmt.Errorf("failed to delete gateway of network '%s': %s", m.Get().Name, providerError(err))
 	}
 	err = client.deleteSubnet(id)
 	if err != nil {
@@ -398,7 +398,7 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 	_, vpcnetDesc, _ := net.ParseCIDR(client.vpc.CIDR)
 	network, networkDesc, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", name, cidr, errorString(err))
+		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", name, cidr, providerError(err))
 	}
 	if !cidrIntersects(vpcnetDesc, networkDesc) {
 		return nil, fmt.Errorf("can't create subnet with CIDR '%s': not inside network CIDR '%s'", cidr, client.vpc.CIDR)
@@ -419,7 +419,7 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 	// Calculate IP address for gateway
 	n, err := convertIPv4ToNumber(network.To4())
 	if err != nil {
-		return nil, fmt.Errorf("failed to choose gateway IP address for the subnet: %s", errorString(err))
+		return nil, fmt.Errorf("failed to choose gateway IP address for the subnet: %s", providerError(err))
 	}
 	gw := convertNumberToIPv4(n + 1)
 
@@ -439,7 +439,7 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 	}
 	b, err := gc.BuildRequestBody(req, "subnet")
 	if err != nil {
-		return nil, fmt.Errorf("error preparing Subnet %s creation: %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("error preparing Subnet %s creation: %s", req.Name, providerError(err))
 	}
 
 	respCreate := subnetCreateResult{}
@@ -451,11 +451,11 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 	}
 	_, err = client.osclt.Provider.Request("POST", url, &opts)
 	if err != nil {
-		return nil, fmt.Errorf("error requesting Subnet %s creation: %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("error requesting Subnet %s creation: %s", req.Name, providerError(err))
 	}
 	subnet, err := respCreate.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("error creating Subnet %s: %s", req.Name, errorString(err))
+		return nil, fmt.Errorf("error creating Subnet %s: %s", req.Name, providerError(err))
 	}
 
 	// Subnet creation started, need to wait the subnet to reach the status ACTIVE
@@ -491,7 +491,7 @@ func (client *Client) listSubnets() (*[]subnets.Subnet, error) {
 	pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := subnets.ExtractSubnets(page)
 		if err != nil {
-			return false, fmt.Errorf("Error listing subnets: %s", errorString(err))
+			return false, fmt.Errorf("Error listing subnets: %s", providerError(err))
 		}
 
 		for _, subnet := range list {
@@ -514,7 +514,7 @@ func (client *Client) getSubnet(id string) (*subnets.Subnet, error) {
 	r.Err = err
 	subnet, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get information for subnet id '%s': %s", id, errorString(err))
+		return nil, fmt.Errorf("Failed to get information for subnet id '%s': %s", id, providerError(err))
 	}
 	return &subnet.Subnet, nil
 }
@@ -529,11 +529,11 @@ func (client *Client) deleteSubnet(id string) error {
 	}
 	_, err := client.osclt.Provider.Request("DELETE", url, &opts)
 	if err != nil {
-		return fmt.Errorf("Error requesting subnet id '%s' deletion: %s", id, errorString(err))
+		return fmt.Errorf("Error requesting subnet id '%s' deletion: %s", id, providerError(err))
 	}
 	err = resp.ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting subnet id '%s': %s", id, errorString(err))
+		return fmt.Errorf("Error deleting subnet id '%s': %s", id, providerError(err))
 	}
 	return nil
 }
@@ -542,7 +542,7 @@ func (client *Client) deleteSubnet(id string) error {
 func (client *Client) findSubnetByName(name string) (*subnets.Subnet, error) {
 	subnetList, err := client.listSubnets()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find in Subnets: %s", errorString(err))
+		return nil, fmt.Errorf("Failed to find in Subnets: %s", providerError(err))
 	}
 	found := false
 	var subnet subnets.Subnet
@@ -575,7 +575,7 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 func (client *Client) CreateGateway(req api.GWRequest) error {
 	net, err := client.GetNetwork(req.NetworkID)
 	if err != nil {
-		return fmt.Errorf("Network %s not found: %s", req.NetworkID, errorString(err))
+		return fmt.Errorf("Network %s not found: %s", req.NetworkID, providerError(err))
 	}
 	gwname := req.GWName
 	if gwname == "" {
@@ -591,7 +591,7 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	}
 	vm, err := client.createVM(vmReq, true)
 	if err != nil {
-		return fmt.Errorf("error creating gateway : %s", errorString(err))
+		return fmt.Errorf("error creating gateway : %s", providerError(err))
 	}
 	svc := providers.FromClient(client)
 	m, err := metadata.NewGateway(svc, req.NetworkID)

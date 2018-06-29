@@ -126,7 +126,7 @@ func AuthenticatedClient(opts AuthOpts) (*Client, error) {
 		AuthOpts:    opts,
 		UserDataTpl: tpl,
 	}
-	metadata.Initialize(&c)
+	metadata.InitializeContainer(&c)
 	//c.CreateContainer("gpac.aws.networks")
 	//c.CreateContainer("gpac.aws.wms")
 	//c.CreateContainer("gpac.aws.volumes")
@@ -988,7 +988,6 @@ func (c *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer c.DeleteKeyPair(kpTmp.ID)
 		kp = kpTmp
 	}
 	//If the VM is not a Gateway, get gateway of the first network

@@ -101,7 +101,7 @@ type CfgOptions struct {
 }
 
 //errorString creates an error string from flexibleengine api error
-func errorString(err error) string {
+func providerError(err error) string {
 	switch e := err.(type) {
 	default:
 		return e.Error()
@@ -173,13 +173,13 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	}
 	err = gcos.AuthenticateV3(provider, &authOptions, gc.EndpointOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", providerError(err))
 	}
 
 	//Identity API
 	identity, err := gcos.NewIdentityV3(provider, gc.EndpointOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", providerError(err))
 	}
 
 	// Recover Project ID of region
@@ -189,22 +189,22 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	}
 	allPages, err := projects.List(identity, listOpts).AllPages()
 	if err != nil {
-		return nil, fmt.Errorf("failed to query project ID corresponding to region '%s': %s", opts.Region, errorString(err))
+		return nil, fmt.Errorf("failed to query project ID corresponding to region '%s': %s", opts.Region, providerError(err))
 	}
 	allProjects, err := projects.ExtractProjects(allPages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load project ID corresponding to region '%s': %s", opts.Region, errorString(err))
+		return nil, fmt.Errorf("failed to load project ID corresponding to region '%s': %s", opts.Region, providerError(err))
 	}
 	if len(allProjects) > 0 {
 		opts.ProjectID = allProjects[0].ID
 	} else {
-		return nil, fmt.Errorf("failed to found project ID corresponding to region '%s': %s", opts.Region, errorString(err))
+		return nil, fmt.Errorf("failed to found project ID corresponding to region '%s': %s", opts.Region, providerError(err))
 	}
 
 	//Compute API
 	compute, err := gcos.NewComputeV2(provider, gc.EndpointOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", providerError(err))
 	}
 
 	//Network API
@@ -213,7 +213,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Region: opts.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", providerError(err))
 	}
 
 	//Storage API
@@ -222,7 +222,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Region: opts.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", providerError(err))
 	}
 
 	// Need to get Endpoint URL for ObjectStorage, thzt will be used with AWS S3 protocol
@@ -231,7 +231,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Region: opts.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", providerError(err))
 	}
 	// Fix URL of ObjectStorage for FlexibleEngine...
 	u, _ := url.Parse(objectStorage.Endpoint)
@@ -277,6 +277,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 			UseFloatingIP:       true,
 			UseLayer3Networking: cfg.UseLayer3Networking,
 			VolumeSpeeds:        cfg.VolumeSpeeds,
+			S3Protocol:          "s3",
 		},
 		Provider: provider,
 		Compute:  compute,
@@ -395,7 +396,7 @@ func (client *Client) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error listing routers: %s", errorString(err))
+		return nil, fmt.Errorf("Error listing routers: %s", providerError(err))
 	}
 	if len(sgList) == 0 {
 		return nil, nil
@@ -596,7 +597,7 @@ func (client *Client) initDefaultSecurityGroup() error {
 	}
 	group, err := secgroups.Create(client.osclt.Network, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Failed to create Security Group '%s': %s", client.defaultSecurityGroup, errorString(err))
+		return fmt.Errorf("Failed to create Security Group '%s': %s", client.defaultSecurityGroup, providerError(err))
 	}
 	err = client.createTCPRules(group.ID)
 	if err == nil {
@@ -631,7 +632,7 @@ func (client *Client) initVPC() error {
 		CIDR: client.Opts.VPCCIDR,
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to initialize VPC '%s': %s", client.Opts.VPCName, errorString(err))
+		return fmt.Errorf("Failed to initialize VPC '%s': %s", client.Opts.VPCName, providerError(err))
 	}
 	client.vpc = vpc
 	return nil
@@ -643,7 +644,7 @@ func (client *Client) findVPCID() (*string, error) {
 	found := false
 	routers, err := client.osclt.ListRouter()
 	if err != nil {
-		return nil, fmt.Errorf("Error listing routers: %s", errorString(err))
+		return nil, fmt.Errorf("Error listing routers: %s", providerError(err))
 	}
 	for _, r := range routers {
 		if r.Name == client.Opts.VPCName {
