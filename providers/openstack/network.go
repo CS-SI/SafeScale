@@ -348,13 +348,18 @@ func (client *Client) createSubnet(name string, networkID string, cidr string, i
 		EnableDHCP: &dhcp,
 	}
 
+	if !client.Cfg.UseLayer3Networking {
+		noGateway := ""
+		opts.GatewayIP = &noGateway
+	}
+
 	// Execute the operation and get back a subnets.Subnet struct
 	subnet, err := subnets.Create(client.Network, opts).Extract()
-	if client.Cfg.UseLayer3Networking {
-		if err != nil {
-			return nil, fmt.Errorf("Error creating subnet: %s", errorString(err))
-		}
+	if err != nil {
+		return nil, fmt.Errorf("Error creating subnet: %s", errorString(err))
+	}
 
+	if client.Cfg.UseLayer3Networking {
 		router, err := client.createRouter(RouterRequest{
 			Name:      subnet.ID,
 			NetworkID: client.ProviderNetworkID,
