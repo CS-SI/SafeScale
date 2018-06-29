@@ -424,7 +424,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 	case _ = <-c:
 		return nil
 	case <-time.After(timeout):
-		return fmt.Errorf("Timeout")
+		return fmt.Errorf("timeout waiting SSH server of host '%s'", ssh.Host)
 	}
 
 }
