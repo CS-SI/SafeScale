@@ -33,7 +33,7 @@ case $LINUX_KIND in
         wait_for_apt && apt-get install -qqy  docker-ce
         ;;
     centos|rhel)
-       yum install -y yum-utils device-mapper-persistent-data lvm2
+        yum install -y yum-utils device-mapper-persistent-data lvm2
         yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
         yum install -y docker-ce
         ;;
