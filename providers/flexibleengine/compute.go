@@ -19,6 +19,7 @@ package flexibleengine
 import (
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -31,6 +32,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api/VMState"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 
 	uuid "github.com/satori/go.uuid"
 
@@ -38,7 +41,6 @@ import (
 	nics "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
 	exbfv "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
@@ -263,12 +265,12 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 	return map[string]interface{}{"server": b}, nil
 }
 
-//CreateVM creates a new VM
+// CreateVM creates a new VM
 func (client *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 	return client.createVM(request, false)
 }
 
-//createVM creates a new VM and configure it as gateway for the network if isGateway is true
+// createVM creates a new VM and configure it as gateway for the network if isGateway is true
 func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, error) {
 	if isGateway && !request.PublicIP {
 		return nil, fmt.Errorf("can't create a gateway without public IP")
@@ -373,7 +375,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 
 	// Wait that VM is started
-	vm, err := client.waitVMReady(server.ID, 120*time.Second)
+	vm, err := client.waitVMReady(server.ID, time.Minute*5)
 	if err != nil {
 		client.DeleteVM(server.ID)
 		return nil, fmt.Errorf("Timeout waiting VM '%s' ready: %s", request.Name, providerError(err))
@@ -418,7 +420,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	return vm, nil
 }
 
-//validateVMName validates the name of a VM based on known FlexibleEngine requirements
+// validateVMName validates the name of a VM based on known FlexibleEngine requirements
 func validateVMName(req api.VMRequest) (bool, error) {
 	s := check.Struct{
 		"Name": check.Composite{
@@ -440,62 +442,31 @@ func validateVMName(req api.VMRequest) (bool, error) {
 	return true, nil
 }
 
-//WaitVMState waits a vm achieve state
+// WaitVMReady waits a vm achieve ready state
 func (client *Client) waitVMReady(vmID string, timeout time.Duration) (*api.VM, error) {
-	cout := make(chan int)
-	next := make(chan bool)
-	vmc := make(chan *servers.Server)
+	var server *servers.Server
+	var err error
 
-	go pollVMReady(client, vmID, cout, next, vmc)
-	for {
-		select {
-		case res := <-cout:
-			if res == 0 {
-				return nil, fmt.Errorf("Error querying VM state")
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			server, err = servers.Get(client.osclt.Compute, vmID).Extract()
+			if err != nil {
+				return err
 			}
-			if res == 1 {
-				server := <-vmc
-				return client.toVM(server), nil
+			if server.Status != "ACTIVE" {
+				return fmt.Errorf("host in '%s' state", server.Status)
 			}
-			if res == 2 {
-				next <- true
-			}
-			if res == 3 {
-				return nil, fmt.Errorf("VM in Error state")
-			}
-		case <-time.After(timeout):
-			next <- false
-			return nil, &api.TimeoutError{Message: "Timeout waiting VM state"}
-		}
+			return nil
+		},
+		timeout,
+	)
+	if retryErr != nil {
+		return nil, retryErr
 	}
+	return client.toVM(server), nil
 }
 
-//pollVMReady polls until the VM is ready or time outs
-func pollVMReady(client *Client, vmID string, cout chan int, next chan bool, vmc chan *servers.Server) {
-	for {
-		server, err := servers.Get(client.osclt.Compute, vmID).Extract()
-		if err != nil {
-			fmt.Println(err)
-			cout <- 0
-			return
-		}
-		if server.Status == "ACTIVE" {
-			cout <- 1
-			vmc <- server
-			return
-		}
-		if server.Status == "ERROR" {
-			cout <- 3
-			return
-		}
-		cout <- 2
-		if !<-next {
-			return
-		}
-	}
-}
-
-//GetVM returns the VM identified by id
+// GetVM returns the VM identified by id
 func (client *Client) GetVM(id string) (*api.VM, error) {
 	server, err := servers.Get(client.osclt.Compute, id).Extract()
 	if err != nil {
@@ -505,7 +476,7 @@ func (client *Client) GetVM(id string) (*api.VM, error) {
 	return vm, nil
 }
 
-//ListVMs lists available VMs
+// ListVMs lists available VMs
 func (client *Client) ListVMs(all bool) ([]api.VM, error) {
 	if all {
 		return client.listAllVMs()
@@ -513,7 +484,7 @@ func (client *Client) ListVMs(all bool) ([]api.VM, error) {
 	return client.listMonitoredVMs()
 }
 
-//listAllVMs lists available VMs
+// listAllVMs lists available VMs
 func (client *Client) listAllVMs() ([]api.VM, error) {
 	pager := servers.List(client.osclt.Compute, servers.ListOpts{})
 	var vms []api.VM
@@ -533,7 +504,7 @@ func (client *Client) listAllVMs() ([]api.VM, error) {
 	return vms, nil
 }
 
-//listMonitoredVMs lists available VMs created by SafeScale (ie registered in object storage)
+// listMonitoredVMs lists available VMs created by SafeScale (ie registered in object storage)
 // This code seems to be the same than openstack provider, but it HAS TO BE DUPLICARED
 // because client.ListObjects() is different (Swift for openstack, S3 for flexibleengine).
 func (client *Client) listMonitoredVMs() ([]api.VM, error) {
@@ -552,7 +523,7 @@ func (client *Client) listMonitoredVMs() ([]api.VM, error) {
 	return vms, nil
 }
 
-//DeleteVM deletes the VM identified by id
+// DeleteVM deletes the VM identified by id
 func (client *Client) DeleteVM(id string) error {
 	// Retrieve the list of attached volumes before deleting the VM
 	volumeAttachments, err := client.ListVolumeAttachments(id)
@@ -601,54 +572,21 @@ func (client *Client) DeleteVM(id string) error {
 	return client.waitVMRemoved(id, 120*time.Second)
 }
 
-//waitVMDeleted waits
+// waitVMDeleted waits
 func (client *Client) waitVMRemoved(vmID string, timeout time.Duration) error {
-	cout := make(chan int)
-	next := make(chan bool)
-
-	go pollVMRemoved(client, vmID, cout, next)
-	for {
-		select {
-		case res := <-cout:
-			if res == 0 {
-				return fmt.Errorf("Error querying VM state")
-			}
-			if res == 1 {
-				return nil
-			}
-			if res == 2 {
-				next <- true
-			}
-		case <-time.After(timeout):
-			next <- false
-			return &api.TimeoutError{Message: "Wait VM removed timeout"}
-		}
-	}
+	return retry.WhileSuccessfulDelay1SecondWithNotify(
+		func() error {
+			_, err := servers.Get(client.osclt.Compute, vmID).Extract()
+			return err
+		},
+		timeout,
+		func(try retry.Try, verdict Verdict.Enum) {
+			log.Printf("Client.waitVMRemoved(%s): try #%d: verdict=%s, err=%v", vmID, try.Count, verdict.String(), try.Err)
+		},
+	)
 }
 
-//pollVMDeleted is used to verify if a VM has been removed
-func pollVMRemoved(client *Client, vmID string, cout chan int, next chan bool) {
-	for {
-		r := servers.GetResult{}
-		httpResp, err := client.osclt.Compute.Get(client.osclt.Compute.ServiceURL("servers", vmID), &r.Body, &gophercloud.RequestOpts{
-			OkCodes: []int{200, 203, 404},
-		})
-		if err != nil {
-			cout <- 0
-			return
-		}
-		if httpResp.StatusCode == 404 {
-			cout <- 1
-			return
-		}
-		cout <- 2
-		if !<-next {
-			return
-		}
-	}
-}
-
-//GetSSHConfig creates SSHConfig to connect a VM by its ID
+// GetSSHConfig creates SSHConfig to connect a VM by its ID
 func (client *Client) GetSSHConfig(id string) (*system.SSHConfig, error) {
 	vm, err := client.GetVM(id)
 	if err != nil {
@@ -683,8 +621,8 @@ func (client *Client) getSSHConfig(vm *api.VM) (*system.SSHConfig, error) {
 	return &sshConfig, nil
 }
 
-//getFloatingIP returns the floating IP associated with the VM identified by vmID
-//By convention only one floating IP is allocated to a VM
+// getFloatingIP returns the floating IP associated with the VM identified by vmID
+// By convention only one floating IP is allocated to a VM
 func (client *Client) getFloatingIPOfVM(vmID string) (*floatingips.FloatingIP, error) {
 	pager := floatingips.List(client.osclt.Compute)
 	var fips []floatingips.FloatingIP
@@ -714,7 +652,7 @@ func (client *Client) getFloatingIPOfVM(vmID string) (*floatingips.FloatingIP, e
 	return &fips[0], nil
 }
 
-//attachFloatingIP creates a Floating IP and attaches it to a VM
+// attachFloatingIP creates a Floating IP and attaches it to a VM
 func (client *Client) attachFloatingIP(vm *api.VM) (*FloatingIP, error) {
 	fip, err := client.CreateFloatingIP()
 	if err != nil {
@@ -732,7 +670,7 @@ func (client *Client) attachFloatingIP(vm *api.VM) (*FloatingIP, error) {
 	return fip, nil
 }
 
-//updateAccessIPsOfVM updates the IP address(es) to use to access the VM
+// updateAccessIPsOfVM updates the IP address(es) to use to access the VM
 func updateAccessIPsOfVM(vm *api.VM, ip string) {
 	if IPVersion.IPv4.Is(ip) {
 		vm.AccessIPv4 = ip
@@ -741,7 +679,7 @@ func updateAccessIPsOfVM(vm *api.VM, ip string) {
 	}
 }
 
-//EnableVMRouterMode enables the VM to act as a router/gateway.
+// EnableVMRouterMode enables the VM to act as a router/gateway.
 func (client *Client) enableVMRouterMode(vm *api.VM) error {
 	portID, err := client.getOpenstackPortID(vm)
 	if err != nil {
@@ -761,7 +699,7 @@ func (client *Client) enableVMRouterMode(vm *api.VM) error {
 	return nil
 }
 
-//DisableVMRouterMode disables the VM to act as a router/gateway.
+// DisableVMRouterMode disables the VM to act as a router/gateway.
 func (client *Client) disableVMRouterMode(vm *api.VM) error {
 	portID, err := client.getOpenstackPortID(vm)
 	if err != nil {
@@ -776,7 +714,7 @@ func (client *Client) disableVMRouterMode(vm *api.VM) error {
 	return nil
 }
 
-//listInterfaces returns a pager of the interfaces attached to VM identified by 'serverID'
+// listInterfaces returns a pager of the interfaces attached to VM identified by 'serverID'
 func (client *Client) listInterfaces(vmID string) pagination.Pager {
 	url := client.osclt.Compute.ServiceURL("servers", vmID, "os-interface")
 	return pagination.NewPager(client.osclt.Compute, url, func(r pagination.PageResult) pagination.Page {
@@ -784,7 +722,7 @@ func (client *Client) listInterfaces(vmID string) pagination.Pager {
 	})
 }
 
-//getOpenstackPortID returns the port ID corresponding to the first private IP address of the VM
+// getOpenstackPortID returns the port ID corresponding to the first private IP address of the VM
 // returns nil,nil if not found
 func (client *Client) getOpenstackPortID(vm *api.VM) (*string, error) {
 	ip := vm.PrivateIPsV4[0]
@@ -816,7 +754,7 @@ func (client *Client) getOpenstackPortID(vm *api.VM) (*string, error) {
 	return nil, nil
 }
 
-//toVMSize converts flavor attributes returned by OpenStack driver into api.VM
+// toVMSize converts flavor attributes returned by OpenStack driver into api.VM
 func (client *Client) toVMSize(flavor map[string]interface{}) api.VMSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
@@ -833,7 +771,7 @@ func (client *Client) toVMSize(flavor map[string]interface{}) api.VMSize {
 	return api.VMSize{}
 }
 
-//toVMState converts VM status returned by FlexibleEngine driver into VMState enum
+// toVMState converts VM status returned by FlexibleEngine driver into VMState enum
 func toVMState(status string) VMState.Enum {
 	switch status {
 	case "BUILD", "build", "BUILDING", "building":
@@ -849,39 +787,26 @@ func toVMState(status string) VMState.Enum {
 	}
 }
 
-//convertAdresses converts adresses returned by the FlexibleEngine driver and arranges them by version in a map
-//func (client *Client) convertAdresses(addresses map[string]interface{}) (map[IPVersion.Enum][]string, string, string) {
+// convertAdresses converts adresses returned by the FlexibleEngine driver and arranges them by version in a map
 func (client *Client) convertAdresses(addresses map[string]interface{}) map[IPVersion.Enum][]string {
 	addrs := make(map[IPVersion.Enum][]string)
-	//	var AccessIPv4 string
-	//	var AccessIPv6 string
 	for _, obj := range addresses {
 		for _, networkAddresses := range obj.([]interface{}) {
 			address := networkAddresses.(map[string]interface{})
 			version := address["version"].(float64)
 			fixedIP := address["addr"].(string)
-			/*			if n == ProviderInternetGW {
-						switch version {
-						case 4:
-							AccessIPv4 = fixedIP
-						case 6:
-							AccessIPv6 = fixedIP
-						}
-					} else {*/
 			switch version {
 			case 4:
 				addrs[IPVersion.IPv4] = append(addrs[IPVersion.IPv4], fixedIP)
 			case 6:
 				addrs[IPVersion.IPv6] = append(addrs[IPVersion.IPv4], fixedIP)
 			}
-			//}
 		}
 	}
-	//return addrs, AccessIPv4, AccessIPv6
 	return addrs
 }
 
-//toVM converts a FlexibleEngine (almost OpenStack...) server into api VM
+// toVM converts a FlexibleEngine (almost OpenStack...) server into api VM
 func (client *Client) toVM(server *servers.Server) *api.VM {
 	//	adresses, ipv4, ipv6 := client.convertAdresses(server.Addresses)
 	adresses := client.convertAdresses(server.Addresses)
@@ -912,32 +837,32 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 	return &vm
 }
 
-//CreateKeyPair creates and import a key pair
+// CreateKeyPair creates and import a key pair
 func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
 	return client.osclt.CreateKeyPair(name)
 }
 
-//GetKeyPair returns the key pair identified by id
+// GetKeyPair returns the key pair identified by id
 func (client *Client) GetKeyPair(id string) (*api.KeyPair, error) {
 	return client.osclt.GetKeyPair(id)
 }
 
-//ListKeyPairs lists available key pairs
+// ListKeyPairs lists available key pairs
 func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
 	return client.osclt.ListKeyPairs()
 }
 
-//DeleteKeyPair deletes the key pair identified by id
+// DeleteKeyPair deletes the key pair identified by id
 func (client *Client) DeleteKeyPair(id string) error {
 	return client.osclt.DeleteKeyPair(id)
 }
 
-//GetImage returns the Image referenced by id
+// GetImage returns the Image referenced by id
 func (client *Client) GetImage(id string) (*api.Image, error) {
 	return client.osclt.GetImage(id)
 }
 
-//ListImages lists available OS images
+// ListImages lists available OS images
 func (client *Client) ListImages() ([]api.Image, error) {
 	return client.osclt.ListImages()
 }
@@ -949,7 +874,7 @@ func addGPUCfg(tpl *api.VMTemplate) {
 	}
 }
 
-//GetTemplate returns the Template referenced by id
+// GetTemplate returns the Template referenced by id
 func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
 	tpl, err := client.osclt.GetTemplate(id)
 	if tpl != nil {
@@ -958,8 +883,8 @@ func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
 	return tpl, err
 }
 
-//ListTemplates lists available VM templates
-//VM templates are sorted using Dominant Resource Fairness Algorithm
+// ListTemplates lists available VM templates
+// VM templates are sorted using Dominant Resource Fairness Algorithm
 func (client *Client) ListTemplates() ([]api.VMTemplate, error) {
 	allTemplates, err := client.osclt.ListTemplates()
 	if err != nil {
@@ -974,12 +899,12 @@ func (client *Client) ListTemplates() ([]api.VMTemplate, error) {
 	return tpls, nil
 }
 
-//StopVM stops the VM identified by id
+// StopVM stops the VM identified by id
 func (client *Client) StopVM(id string) error {
 	return client.osclt.StopVM(id)
 }
 
-//StartVM starts the VM identified by id
+// StartVM starts the VM identified by id
 func (client *Client) StartVM(id string) error {
 	return client.osclt.StartVM(id)
 }

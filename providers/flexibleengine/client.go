@@ -225,7 +225,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, fmt.Errorf("%s", providerError(err))
 	}
 
-	// Need to get Endpoint URL for ObjectStorage, thzt will be used with AWS S3 protocol
+	// Need to get Endpoint URL for ObjectStorage, that will be used with AWS S3 protocol
 	objectStorage, err := gcos.NewObjectStorageV1(provider, gc.EndpointOpts{
 		Type:   "object",
 		Region: opts.Region,
