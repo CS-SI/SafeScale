@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package utils
+package provideruse
 
 import (
 	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 )
 
 //GetProviderService returns the service provider corresponding to the current Tenant
 func GetProviderService() (*providers.Service, error) {
-	tenant, err := GetCurrentTenant()
+	tenant, err := brokeruse.GetCurrentTenant()
 	if err != nil {
 		return nil, err
 	}
