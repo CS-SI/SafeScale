@@ -204,7 +204,9 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 		}
 		ok, err := mgw.Read()
 		if !ok || err != nil {
-			log.Print(err.Error())
+			if err != nil {
+				log.Print(err.Error())
+			}
 			return nil
 		}
 		gwvm := mgw.Get()
