@@ -24,6 +24,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	"github.com/urfave/cli"
 )
 
@@ -59,13 +60,13 @@ var sshRun = cli.Command{
 			return fmt.Errorf("VM name required")
 		}
 
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
 		timeout := utils.TimeoutCtxDefault
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
-		ctx, cancel := utils.GetContext(timeout)
+		ctx, cancel := brokeruse.GetContext(timeout)
 		defer cancel()
 		service := pb.NewSshServiceClient(conn)
 
@@ -103,14 +104,14 @@ var sshCopy = cli.Command{
 			return fmt.Errorf("2 arguments (from and to) are required")
 		}
 
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
 		timeout := utils.TimeoutCtxVM
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
 
-		ctx, cancel := utils.GetContext(timeout)
+		ctx, cancel := brokeruse.GetContext(timeout)
 		defer cancel()
 		service := pb.NewSshServiceClient(conn)
 
@@ -137,9 +138,9 @@ var sshConnect = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("VM name required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewVMServiceClient(conn)
 
