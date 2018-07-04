@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 
 	"github.com/CS-SI/SafeScale/perform/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
@@ -267,7 +267,7 @@ var clusterNodeDelete = cli.Command{
 			return err
 		}
 		if instance == nil {
-			return fmt.Errorf("Cluster '%s' not found.", clusterName)
+			return fmt.Errorf("cluster '%s' not found.", clusterName)
 		}
 
 		vmID := c.String("id")
@@ -279,7 +279,7 @@ var clusterNodeDelete = cli.Command{
 			if !found {
 				return fmt.Errorf("node '%s' isn't a node of the cluster '%s'", vmID, clusterName)
 			}
-			vm, err := utils.GetVM(vmID)
+			vm, err := brokeruse.GetVM(vmID)
 			if err != nil {
 				return err
 			}
