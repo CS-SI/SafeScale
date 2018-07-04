@@ -1,23 +1,27 @@
 GO?=go
+GOBIN?=~/go/bin
+CP?=cp
 
-.PHONY: clean providers brokerd broker system perform utils clean deps
+EXECS=broker/client/broker broker/daemon/brokerd perform/perform
 
-all: providers system broker perform utils
+.PHONY: clean providers brokerd broker system perform utils clean deps $(EXECS)
+
+all: utils providers system broker perform
+
+utils:
+	@(cd utils && $(MAKE))
 
 providers:
 	@(cd providers && $(MAKE))
 
-broker: system
-	@(cd broker && $(MAKE))
-
 system:
 	@(cd system && $(MAKE))
 
-perform: utils
-	@(cd perform && $(MAKE))
+broker: utils system providers
+	@(cd broker && $(MAKE))
 
-utils: broker
-	@(cd utils && $(MAKE))
+perform: utils system providers broker
+	@(cd perform && $(MAKE))
 
 clean:
 	@(cd providers && $(MAKE) $@)
@@ -25,6 +29,14 @@ clean:
 	@(cd broker && $(MAKE) $@)
 	@(cd perform && $(MAKE) $@)
 
+broker/client/broker: broker
+
+broker/daemon/brokerd: broker
+
+perform/perform: perform
+
+install: $(EXECS)
+	@($(CP) -f $^ $(GOBIN))
 
 # DEPENDENCIES MANAGEMENT
 #Generate enum tring
