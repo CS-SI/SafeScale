@@ -166,7 +166,7 @@ func (m *Network) DetachHost(vmID string) error {
 	return m.folder.Delete(m.network.ID+"/host", vmID)
 }
 
-//ListHosts returns the list of ID of hosts attached to the network
+//ListHosts returns the list of ID of hosts attached to the network (be careful: including gateway)
 func (m *Network) ListHosts() ([]*api.VM, error) {
 	if m.network == nil {
 		panic("m.network is nil!")
@@ -262,7 +262,7 @@ func (m *Gateway) Carry(vm *api.VM) *Gateway {
 	return m
 }
 
-//Get returns the vmID linked to the metadata
+//Get returns the *api.VM linked to the metadata
 func (m *Gateway) Get() *api.VM {
 	return m.host
 }
