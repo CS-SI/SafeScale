@@ -1,5 +1,7 @@
 
 GO?=go
+ENUM_STRINGS=ClusterState/enum_string.go Complexity/enum_string.go Flavor/enum_string.go NodeState/enum_string.go NodeType/enum_string.go
+
 all: enums vet
 
 .PHONY: enums clean
@@ -12,8 +14,7 @@ vet:
 	@$(GO) vet ./NodeType
 	@$(GO) vet ./NodeState
 
-
-enums: ClusterState/enum_string.go Complexity/enum_string.go Flavor/enum_string.go NodeState/enum_string.go NodeType/enum_string.go
+enums: $(ENUM_STRINGS)
 
 ClusterState/enum_string.go: ClusterState/enum.go
 	@(cd ClusterState && go generate)
