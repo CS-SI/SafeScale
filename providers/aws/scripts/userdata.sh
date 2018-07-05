@@ -85,7 +85,7 @@ if [ -z $GW ]
 then
 
 cat <<-EOF > /etc/resolv.conf.gw
-{{.ResolveConf}}
+{{.ResolvConf}}
 EOF
 
 cat <<- EOF > /sbin/gateway

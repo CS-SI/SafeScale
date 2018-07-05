@@ -336,24 +336,27 @@ type userData struct {
 	IsGateway bool
 	//If true configure default gateway
 	AddGateway bool
-	//Content of the /etc/resolve.conf of the Gateway
+	//Content of the /etc/resolv.conf of the Gateway
 	//Used only if IsGateway is true
-	ResolveConf string
+	ResolvConf string
 	//IP of the gateway
 	GatewayIP string
+	//Password for the user gpac (for troubleshoot use, useable only in console)
+	Password string
 }
 
 //PrepareUserData prepares the initial configuration script
 func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp *api.KeyPair, gw *api.VM) ([]byte, error) {
 	dataBuffer := bytes.NewBufferString("")
-	var ResolveConf string
+	var ResolvConf string
 	var err error
 	if !request.PublicIP {
 		var buffer bytes.Buffer
 		for _, dns := range client.Cfg.DNSList {
 			buffer.WriteString(fmt.Sprintf("nameserver %s\n", dns))
 		}
-		ResolveConf = buffer.String()
+		buffer.WriteString("nameserver 1.1.1.1\n")
+		ResolvConf = buffer.String()
 	}
 
 	ip := ""
@@ -365,13 +368,14 @@ func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp 
 		}
 	}
 	data := userData{
-		User:        api.DefaultUser,
-		Key:         strings.Trim(kp.PublicKey, "\n"),
-		ConfIF:      !client.Cfg.AutoVMNetworkInterfaces,
-		IsGateway:   isGateway && !client.Cfg.UseLayer3Networking,
-		AddGateway:  !request.PublicIP && !client.Cfg.UseLayer3Networking,
-		ResolveConf: ResolveConf,
-		GatewayIP:   ip,
+		User:       api.DefaultUser,
+		Key:        strings.Trim(kp.PublicKey, "\n"),
+		ConfIF:     !client.Cfg.AutoVMNetworkInterfaces,
+		IsGateway:  isGateway && !client.Cfg.UseLayer3Networking,
+		AddGateway: !request.PublicIP && !client.Cfg.UseLayer3Networking,
+		ResolvConf: ResolvConf,
+		GatewayIP:  ip,
+		Password:   "SafeScale", // TODO: generate a strong password for gpac user...
 	}
 
 	err = client.UserDataTpl.Execute(dataBuffer, data)
@@ -388,12 +392,12 @@ func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("unable to found Gateway: %s", errorString(err))
+		return nil, fmt.Errorf("unable to find gateway of network '%s'", networkID)
 	}
 
 	gw, err := servers.Get(client.Compute, m.Get().ID).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating VM: Usnable to found Gateway %s", errorString(err))
+		return nil, fmt.Errorf("Error creating VM: Unable to get gateway: %s", errorString(err))
 	}
 	return gw, nil
 }
