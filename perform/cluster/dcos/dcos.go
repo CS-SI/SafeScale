@@ -541,7 +541,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 	// Registers the new Master in the cluster struct
 	c.metadata.Acquire()
 	c.Specific.MasterIDs = append(c.Specific.MasterIDs, masterVM.ID)
-	c.Specific.MasterIPs = append(c.Specific.MasterIPs, masterVM.IP)
+	c.Specific.MasterIPs = append(c.Specific.MasterIPs, masterVM.PUBLIC_IP)
 
 	// Update cluster definition in Object Storage
 	err = c.updateMetadata()
@@ -628,10 +628,10 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 	c.metadata.Acquire()
 	if nodeType == NodeType.PublicNode {
 		c.Common.PublicNodeIDs = append(c.Common.PublicNodeIDs, vm.ID)
-		c.Specific.PublicNodeIPs = append(c.Specific.PublicNodeIPs, vm.IP)
+		c.Specific.PublicNodeIPs = append(c.Specific.PublicNodeIPs, vm.PRIVATE_IP)
 	} else {
 		c.Common.PrivateNodeIDs = append(c.Common.PrivateNodeIDs, vm.ID)
-		c.Specific.PrivateNodeIPs = append(c.Specific.PrivateNodeIPs, vm.IP)
+		c.Specific.PrivateNodeIPs = append(c.Specific.PrivateNodeIPs, vm.PRIVATE_IP)
 	}
 
 	// Update cluster definition in Object Storage

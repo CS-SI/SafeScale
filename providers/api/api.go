@@ -122,6 +122,28 @@ func (vm *VM) GetAccessIP() string {
 	return ip
 }
 
+//GetPublicIP computes public IP of the VM
+func (vm *VM) GetPublicIP() string {
+	ip := vm.AccessIPv4
+	if ip == "" {
+		ip = vm.AccessIPv6
+	}
+	return ip
+}
+
+//GetPrivateIP computes private IP of the VM
+func (vm *VM) GetPrivateIP() string {
+	ip := ""
+	if len(vm.PrivateIPsV4) > 0 {
+		ip = vm.PrivateIPsV4[0]
+	} else {
+		if len(vm.PrivateIPsV6) > 0 {
+			ip = vm.PrivateIPsV6[0]
+		}
+	}
+	return ip
+}
+
 //VMRequest represents requirements to create virtual machine properties
 type VMRequest struct {
 	Name string `json:"name,omitempty"`

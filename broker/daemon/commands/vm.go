@@ -55,17 +55,7 @@ func (s *VMServiceServer) List(ctx context.Context, in *pb.VMListRequest) (*pb.V
 
 	// Map api.VM to pb.VM
 	for _, vm := range vms {
-		pbvm = append(pbvm, &pb.VM{
-			CPU:        int32(vm.Size.Cores),
-			Disk:       int32(vm.Size.DiskSize),
-			GatewayID:  vm.GatewayID,
-			ID:         vm.ID,
-			IP:         vm.GetAccessIP(),
-			Name:       vm.Name,
-			PrivateKey: vm.PrivateKey,
-			RAM:        vm.Size.RAMSize,
-			State:      pb.VMState(vm.State),
-		})
+		pbvm = append(pbvm, conv.ToPBVM(&vm))
 	}
 	rv := &pb.VMList{VMs: pbvm}
 	log.Printf("End List VM")
@@ -89,17 +79,7 @@ func (s *VMServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.
 	}
 
 	log.Printf("VM '%s' created", in.GetName())
-	return &pb.VM{
-		CPU:        int32(vm.Size.Cores),
-		Disk:       int32(vm.Size.DiskSize),
-		GatewayID:  vm.GatewayID,
-		ID:         vm.ID,
-		IP:         vm.GetAccessIP(),
-		Name:       vm.Name,
-		PrivateKey: vm.PrivateKey,
-		RAM:        vm.Size.RAMSize,
-		State:      pb.VMState(vm.State),
-	}, nil
+	return conv.ToPBVM(vm), nil
 }
 
 //Inspect a VM
@@ -122,17 +102,7 @@ func (s *VMServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM
 	}
 
 	log.Printf("End Inspect VM: '%s'", in.GetName())
-	return &pb.VM{
-		CPU:        int32(vm.Size.Cores),
-		Disk:       int32(vm.Size.DiskSize),
-		GatewayID:  vm.GatewayID,
-		ID:         vm.ID,
-		IP:         vm.GetAccessIP(),
-		Name:       vm.Name,
-		PrivateKey: vm.PrivateKey,
-		RAM:        vm.Size.RAMSize,
-		State:      pb.VMState(vm.State),
-	}, nil
+	return conv.ToPBVM(vm), nil
 }
 
 //Delete a VM

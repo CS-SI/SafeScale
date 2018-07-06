@@ -1,11 +1,6 @@
 syntax = "proto3";
 
-import "github.com/golang/protobuf/ptypes/empty/empty.proto";
-// import "google/protobuf/empty.proto";
-// import "github.com/golang/protobuf/ptypes/empty";
-// message Empty{
-
-// }
+import "google/protobuf/empty.proto";
 
 message Tenant{
     string Name = 1;
@@ -120,7 +115,8 @@ message VM{
     int32 CPU = 3;
     float RAM = 4;
     int32 Disk = 5;
-    string IP = 6;
+    string PUBLIC_IP = 6;
+    string PRIVATE_IP = 7;
     VMState State = 8;
     string PrivateKey = 9;
     string GatewayID = 10;

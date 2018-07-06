@@ -96,3 +96,19 @@ func ToPBNas(in *api.Nas) *pb.NasDefinition {
 		IsServer: in.IsServer,
 	}
 }
+
+// ToPBVM convert a VM from api to protocolbuffer format
+func ToPBVM(in *api.VM) *pb.VM {
+	return &pb.VM{
+		CPU:        int32(in.Size.Cores),
+		Disk:       int32(in.Size.DiskSize),
+		GatewayID:  in.GatewayID,
+		ID:         in.ID,
+		PUBLIC_IP:  in.GetPublicIP(),
+		PRIVATE_IP: in.GetPrivateIP(),
+		Name:       in.Name,
+		PrivateKey: in.PrivateKey,
+		RAM:        in.Size.RAMSize,
+		State:      pb.VMState(in.State),
+	}
+}
