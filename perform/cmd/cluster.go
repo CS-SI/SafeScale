@@ -28,6 +28,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/perform/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
+	"github.com/CS-SI/SafeScale/perform/cluster/api/ClusterState"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
 
@@ -97,9 +98,29 @@ var clusterInspect = cli.Command{
 		if instance == nil {
 			return fmt.Errorf("cluster '%s' not found", clusterName)
 		}
-		out, err := json.Marshal(instance.GetDefinition())
-		fmt.Println(string(out))
 
+		byteOutput, err := json.Marshal(instance.GetConfig())
+		if err != nil {
+			return err
+		}
+		var output map[string]interface{}
+		err = json.Unmarshal(byteOutput, &output)
+		if err != nil {
+			return err
+		}
+
+		output["State"] = ClusterState.Enum(int(output["State"].(float64))).String()
+		output["Flavor"] = Flavor.Enum(int(output["Flavor"].(float64))).String()
+		output["Complexity"] = Complexity.Enum(int(output["Complexity"].(float64))).String()
+		delete(output, "Keypair")
+		delete(output, "PrivateNodeIDs")
+		delete(output, "PublicNodeIDs")
+		byteOutput, err = json.Marshal(output)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(string(byteOutput))
 		return nil
 	},
 }
@@ -118,6 +139,10 @@ var clusterCreate = cli.Command{
 			Name:  "cidr, N",
 			Value: "192.168.0.0/24",
 			Usage: "CIDR of the network",
+		},
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: "Doesn't delete resources on failure",
 		},
 		// cli.StringFlag{
 		// 	Name:  "flavor, F",
@@ -145,10 +170,11 @@ var clusterCreate = cli.Command{
 			return err
 		}
 		instance, err = cluster.Create(clusterapi.Request{
-			Name:       clusterName,
-			Complexity: complexity,
-			CIDR:       c.String("cidr"),
-			Flavor:     Flavor.DCOS,
+			Name:          clusterName,
+			Complexity:    complexity,
+			CIDR:          c.String("cidr"),
+			Flavor:        Flavor.DCOS,
+			KeepOnFailure: c.Bool("keep-on-failure"),
 		})
 		if err != nil {
 			if instance != nil {
@@ -157,7 +183,7 @@ var clusterCreate = cli.Command{
 			return fmt.Errorf("failed to create cluster: %s", err.Error())
 		}
 
-		out, _ := json.Marshal(instance.GetDefinition())
+		out, _ := json.Marshal(instance.GetConfig())
 		fmt.Println(string(out))
 
 		return nil

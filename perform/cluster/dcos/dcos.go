@@ -29,6 +29,10 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/CS-SI/SafeScale/utils/retry"
+
+	"github.com/CS-SI/SafeScale/perform/cluster/dcos/ErrorCode"
+
 	rice "github.com/GeertJohan/go.rice"
 
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
@@ -38,6 +42,8 @@ import (
 	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
 	"github.com/CS-SI/SafeScale/perform/cluster/components"
 	"github.com/CS-SI/SafeScale/perform/cluster/metadata"
+	"github.com/CS-SI/SafeScale/perform/cluster/utils"
+
 	"github.com/CS-SI/SafeScale/providers"
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
@@ -56,23 +62,34 @@ const (
 
 	timeoutCtxVM = 10 * time.Minute
 
+	shortTimeoutSSH = time.Minute
+	longTimeoutSSH  = 5 * time.Minute
+
 	bootstrapHTTPPort = 10080
 
 	tempFolder = "/var/tmp/"
+
+	centos = "CentOS 7.3"
 )
 
 var (
 	// templateBox is the rice box to use in this package
 	templateBox *rice.Box
 
-	//installCommonsContent contains the script to install/configure common components
-	installCommonsContent *string
+	//installCommonRequirementsContent contains the script to install/configure common components
+	installCommonRequirementsContent *string
 
 	//funcMap defines the custome functions to be used in templates
 	funcMap = template.FuncMap{
 		// The name "inc" is what the function will be called in the template text.
 		"inc": func(i int) int {
 			return i + 1
+		},
+		"errcode": func(msg string) int {
+			if code, ok := ErrorCode.ErrorCodes[msg]; ok {
+				return int(code)
+			}
+			return 1023
 		},
 	}
 )
@@ -158,8 +175,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		CPU:     4,
 		RAM:     32.0,
 		Disk:    120,
-		ImageID: "CentOS 7.3",
-		Name:    req.Name + "-dcosbootstrap",
+		ImageID: centos,
 	})
 	if err != nil {
 		err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
@@ -168,26 +184,23 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	req.NetworkID = network.ID
 
 	// Saving cluster parameters, with status 'Creating'
-	var instance Cluster
-	var masterCount int
-	var privateNodeCount int
-	var kp *providerapi.KeyPair
-	var kpName string
-	var gw *providerapi.VM
-	var m *providermetadata.Gateway
-	var found bool
-	var bootstrapChannel chan error
-	var mastersChannel chan error
-	var nodesChannel chan error
-	var bootstrapStatus error
-	var mastersStatus error
-	var nodesStatus error
+	var (
+		instance                                       Cluster
+		masterCount, privateNodeCount                  int
+		kp                                             *providerapi.KeyPair
+		kpName                                         string
+		gw                                             *providerapi.VM
+		m                                              *providermetadata.Gateway
+		found                                          bool
+		bootstrapChannel, mastersChannel, nodesChannel chan error
+		bootstrapStatus, mastersStatus, nodesStatus    error
+	)
 
 	nodesDef := pb.VMDefinition{
 		CPUNumber: 4,
 		RAM:       16.0,
 		Disk:      100,
-		ImageID:   "Centos 7.3",
+		ImageID:   centos,
 	}
 
 	svc, err := provideruse.GetProviderService()
@@ -222,14 +235,16 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	// Saving cluster parameters, with status 'Creating'
 	instance = Cluster{
 		Common: &clusterapi.Cluster{
-			Name:       req.Name,
-			CIDR:       req.CIDR,
-			Flavor:     Flavor.DCOS,
-			State:      ClusterState.Creating,
-			Complexity: req.Complexity,
-			Tenant:     req.Tenant,
-			NetworkID:  req.NetworkID,
-			Keypair:    kp,
+			Name:          req.Name,
+			CIDR:          req.CIDR,
+			Flavor:        Flavor.DCOS,
+			State:         ClusterState.Creating,
+			Complexity:    req.Complexity,
+			Tenant:        req.Tenant,
+			NetworkID:     req.NetworkID,
+			Keypair:       kp,
+			AdminPassword: utils.GeneratePassword(),
+			PublicIP:      gw.GetAccessIP(),
 		},
 		Specific: &Specific{
 			BootstrapID: gw.ID,
@@ -258,6 +273,9 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Step 1: starts masters and nodes creations
+	bootstrapChannel = make(chan error)
+	go instance.asyncPrepareBootstrap(bootstrapChannel)
+
 	mastersChannel = make(chan error)
 	go instance.asyncCreateMasters(masterCount, mastersChannel)
 
@@ -265,17 +283,15 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	go instance.asyncCreateNodes(privateNodeCount, false, &nodesDef, nodesChannel)
 
 	// Step 2: awaits masters creation and bootstrap configuration coroutines
+	bootstrapStatus = <-bootstrapChannel
 	mastersStatus = <-mastersChannel
-	//log.Println("Checkpoint: Masters created.")
 
 	// Step 3: starts bootstrap configuration, if masters have been created
 	//         successfully
-	if mastersStatus == nil {
+	if bootstrapStatus == nil && mastersStatus == nil {
 		bootstrapChannel = make(chan error)
 		go instance.asyncConfigureBootstrap(bootstrapChannel)
-
 		bootstrapStatus = <-bootstrapChannel
-		//log.Println("Checkpoint: Bootstrap configured.")
 	}
 
 	if bootstrapStatus == nil && mastersStatus == nil {
@@ -283,21 +299,17 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		go instance.asyncConfigureMasters(mastersChannel)
 	}
 
-	nodesStatus = <-nodesChannel
-	//	log.Println("Checkpoint: Nodes created.")
-
 	// Starts nodes configuration, if all masters and nodes
 	// have been created and bootstrap has been configured with success
+	nodesStatus = <-nodesChannel
 	if bootstrapStatus == nil && mastersStatus == nil && nodesStatus == nil {
 		nodesChannel = make(chan error)
 		go instance.asyncConfigurePrivateNodes(nodesChannel)
 		nodesStatus = <-nodesChannel
-		//log.Println("Checkpoint: Nodes configured.")
 	}
 
 	if bootstrapStatus == nil && mastersStatus == nil {
 		mastersStatus = <-mastersChannel
-		//log.Println("Checkpoint: Masters configured.")
 	}
 	if bootstrapStatus == nil && mastersStatus == nil && nodesStatus == nil {
 		_, err = instance.installKubernetes()
@@ -335,19 +347,25 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	return &instance, nil
 
 cleanNodes:
-	//for _, id := range instance.Specific.PublicNodeIDs {
-	//	brokeruse.DeleteVM(id)
-	//}
-	//for _, id := range instance.Specific.PrivateNodeIDs {
-	//	brokeruse.DeleteVM(id)
-	//}
+	if !req.KeepOnFailure {
+		for _, id := range instance.Common.PublicNodeIDs {
+			brokeruse.DeleteVM(id)
+		}
+		for _, id := range instance.Common.PrivateNodeIDs {
+			brokeruse.DeleteVM(id)
+		}
+	}
 cleanMasters:
-	//for _, id := range instance.Specific.MasterIDs {
-	//	brokeruse.DeleteVM(id)
-	//}
+	if !req.KeepOnFailure {
+		for _, id := range instance.Specific.MasterIDs {
+			brokeruse.DeleteVM(id)
+		}
+	}
 cleanNetwork:
-	//brokeruse.DeleteNetwork(instance.Common.NetworkID)
-	//instance.RemoveMetadata()
+	if !req.KeepOnFailure {
+		brokeruse.DeleteNetwork(instance.Common.NetworkID)
+		instance.removeMetadata()
+	}
 	return nil, err
 }
 
@@ -381,7 +399,7 @@ func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.VMDefinition,
 				CPUNumber: 4,
 				RAM:       16.0,
 				Disk:      100,
-				ImageID:   "Centos 7.3",
+				ImageID:   centos,
 			},
 			r,
 			d)
@@ -522,14 +540,14 @@ func (c *Cluster) createAndConfigureNode(public bool, req *pb.VMDefinition) (str
 func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 	log.Printf("[Masters: #%d] starting creation...\n", index)
 
-	name := c.Common.Name + "-dcosmaster-" + strconv.Itoa(index)
+	name := c.Common.Name + "-master-" + strconv.Itoa(index)
 
 	masterVM, err := brokeruse.CreateVM(&pb.VMDefinition{
 		Name:      name,
 		CPUNumber: 4,
 		RAM:       16.0,
 		Disk:      60,
-		ImageID:   "CentOS 7.3",
+		ImageID:   centos,
 		Network:   c.Common.NetworkID,
 		Public:    false,
 	})
@@ -542,7 +560,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 	// Registers the new Master in the cluster struct
 	c.metadata.Acquire()
 	c.Specific.MasterIDs = append(c.Specific.MasterIDs, masterVM.ID)
-	c.Specific.MasterIPs = append(c.Specific.MasterIPs, masterVM.PUBLIC_IP)
+	c.Specific.MasterIPs = append(c.Specific.MasterIPs, masterVM.PRIVATE_IP)
 
 	// Update cluster definition in Object Storage
 	err = c.updateMetadata()
@@ -557,9 +575,38 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 		done <- fmt.Errorf("failed to update Cluster definition: %s", err.Error())
 		return
 	}
+	c.metadata.Release()
+
+	// Installs DCOS requirements...
+	ssh, err := c.provider.GetSSHConfig(masterVM.ID)
+	if err != nil {
+		done <- err
+		return
+	}
+	err = ssh.WaitServerReady(longTimeoutSSH)
+	if err != nil {
+		done <- err
+		return
+	}
+	retcode, _, err := c.executeScript(ssh, "dcos_install_master.sh", map[string]interface{}{})
+	if err != nil {
+		log.Printf("[Masters: #%d (%s)] configuration failed: %s\n", index, masterVM.ID, err.Error())
+		done <- err
+		return
+	}
+	if retcode != 0 {
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[Masters: #%d (%s)] installation failed:\nretcode=%d (%s)", index, masterVM.ID, errcode, errcode.String())
+			done <- fmt.Errorf("scripted Master installation failed with error code %d (%s)", errcode, errcode.String())
+		} else {
+			log.Printf("[Masters: #%d (%s)] installation failed:\nretcode=%d", index, masterVM.ID, retcode)
+			done <- fmt.Errorf("scripted Master installation failed with error code %d", retcode)
+		}
+		return
+	}
 
 	log.Printf("[Masters: #%d] creation successful", index)
-	c.metadata.Release()
 	done <- nil
 }
 
@@ -572,11 +619,18 @@ func (c *Cluster) asyncConfigureMaster(index int, masterID string, done chan err
 		done <- err
 		return
 	}
-	retcode, output, err := c.executeScript(ssh, "dcos_install_master_node.sh", map[string]interface{}{
+	err = ssh.WaitServerReady(longTimeoutSSH)
+	if err != nil {
+		done <- err
+		return
+	}
+	retcode, _, err := c.executeScript(ssh, "dcos_configure_master.sh", map[string]interface{}{
 		"BootstrapIP":   c.Specific.BootstrapIP,
 		"BootstrapPort": bootstrapHTTPPort,
 		"ClusterName":   c.Common.Name,
 		"MasterIndex":   index,
+		"CladmPassword": c.Common.AdminPassword, // TODO: strong auto generated password
+		"Host":          ssh.Host,
 	})
 	if err != nil {
 		log.Printf("[Masters: #%d (%s)] configuration failed: %s\n", index, masterID, err.Error())
@@ -584,8 +638,14 @@ func (c *Cluster) asyncConfigureMaster(index int, masterID string, done chan err
 		return
 	}
 	if retcode != 0 {
-		log.Printf("[Masters: #%d (%s)] configuration failed:\nretcode=%d\n%s\n", index, masterID, retcode, *output)
-		done <- fmt.Errorf("scripted Master configuration failed with error code %d:\n%s", retcode, *output)
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[Masters: #%d (%s)] configuration failed:\nretcode:%d (%s)", index, masterID, errcode, errcode.String())
+			done <- fmt.Errorf("scripted Master configuration failed with error code %d (%s)", errcode, errcode.String())
+		} else {
+			log.Printf("[Masters: #%d (%s)] configuration failed:\nretcode=%d", index, masterID, retcode)
+			done <- fmt.Errorf("scripted Master configuration failed with error code %d", retcode)
+		}
 		return
 	}
 
@@ -613,11 +673,12 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 	}
 	log.Printf("[Nodes: %s #%d] starting creation...\n", nodeTypeStr, index)
 
+	// Create the host
 	req.Public = publicIP
 	req.Network = c.Common.NetworkID
-	req.Name = c.Common.Name + "-dcos" + coreName + "-" + strconv.Itoa(count+1)
-	req.ImageID = "CentOS 7.3"
-	vm, err := brokeruse.CreateVM(req)
+	req.Name = c.Common.Name + "-" + coreName + "-" + strconv.Itoa(count+1)
+	req.ImageID = centos
+	nodeVM, err := brokeruse.CreateVM(req)
 	if err != nil {
 		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -628,11 +689,11 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 	// Registers the new Agent in the cluster struct
 	c.metadata.Acquire()
 	if nodeType == NodeType.PublicNode {
-		c.Common.PublicNodeIDs = append(c.Common.PublicNodeIDs, vm.ID)
-		c.Specific.PublicNodeIPs = append(c.Specific.PublicNodeIPs, vm.PRIVATE_IP)
+		c.Common.PublicNodeIDs = append(c.Common.PublicNodeIDs, nodeVM.ID)
+		c.Specific.PublicNodeIPs = append(c.Specific.PublicNodeIPs, nodeVM.PRIVATE_IP)
 	} else {
-		c.Common.PrivateNodeIDs = append(c.Common.PrivateNodeIDs, vm.ID)
-		c.Specific.PrivateNodeIPs = append(c.Specific.PrivateNodeIPs, vm.PRIVATE_IP)
+		c.Common.PrivateNodeIDs = append(c.Common.PrivateNodeIDs, nodeVM.ID)
+		c.Specific.PrivateNodeIPs = append(c.Specific.PrivateNodeIPs, nodeVM.PRIVATE_IP)
 	}
 
 	// Update cluster definition in Object Storage
@@ -646,17 +707,49 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 			c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
 			c.Specific.PrivateNodeIPs = c.Specific.PrivateNodeIPs[:len(c.Specific.PrivateNodeIPs)-1]
 		}
-		brokeruse.DeleteVM(vm.ID)
+		brokeruse.DeleteVM(nodeVM.ID)
 		c.metadata.Release()
-		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
+		log.Printf("[Nodes: %s #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
-		done <- fmt.Errorf("failed to update Cluster definition: %s", err.Error())
+		done <- fmt.Errorf("failed to update Cluster configuration: %s", err.Error())
+		return
+	}
+	c.metadata.Release()
+
+	// Installs DCOS requirements
+	ssh, err := c.provider.GetSSHConfig(nodeVM.ID)
+	if err != nil {
+		done <- err
+		return
+	}
+	err = ssh.WaitServerReady(longTimeoutSSH)
+	if err != nil {
+		done <- err
+		return
+	}
+	retcode, _, err := c.executeScript(ssh, "dcos_install_node.sh", map[string]interface{}{
+		"BootstrapIP":   c.Specific.BootstrapIP,
+		"BootstrapPort": bootstrapHTTPPort,
+	})
+	if err != nil {
+		log.Printf("[Nodes: %s #%d (%s)] installation failed: %s\n", nodeTypeStr, index, nodeVM.ID, err.Error())
+		done <- err
+		return
+	}
+	if retcode != 0 {
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[Nodes: %s #%d (%s)] installation failed: retcode: %d (%s)", nodeTypeStr, index, nodeVM.ID, errcode, errcode.String())
+			done <- fmt.Errorf("scripted Node configuration failed with error code %d (%s)", errcode, errcode.String())
+		} else {
+			log.Printf("[Nodes: %s #%d (%s)] installation failed: retcode=%d", nodeTypeStr, index, nodeVM.ID, retcode)
+			done <- fmt.Errorf("scripted Agent configuration failed with error code %d", retcode)
+		}
 		return
 	}
 
 	log.Printf("[Nodes: %s #%d] creation successful\n", nodeTypeStr, index)
-	c.metadata.Release()
-	result <- vm.ID
+	result <- nodeVM.ID
 	done <- nil
 }
 
@@ -679,7 +772,12 @@ func (c *Cluster) asyncConfigureNode(index int, nodeID string, nodeType NodeType
 		done <- err
 		return
 	}
-	retcode, output, err := c.executeScript(ssh, "dcos_install_agent_node.sh", map[string]interface{}{
+	err = ssh.WaitServerReady(shortTimeoutSSH)
+	if err != nil {
+		done <- err
+		return
+	}
+	retcode, _, err := c.executeScript(ssh, "dcos_configure_node.sh", map[string]interface{}{
 		"PublicNode":    publicStr,
 		"BootstrapIP":   c.Specific.BootstrapIP,
 		"BootstrapPort": bootstrapHTTPPort,
@@ -690,12 +788,56 @@ func (c *Cluster) asyncConfigureNode(index int, nodeID string, nodeType NodeType
 		return
 	}
 	if retcode != 0 {
-		log.Printf("[Nodes: %s #%d (%s)] configuration failed: %s\n", nodeTypeStr, index, nodeID, *output)
-		done <- fmt.Errorf("scripted Agent configuration failed with error code %d:\n%s", retcode, *output)
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[Nodes: %s #%d (%s)] configuration failed: retcode: %d (%s)", nodeTypeStr, index, nodeID, errcode, errcode.String())
+			done <- fmt.Errorf("scripted Agent configuration failed with error code %d (%s)", errcode, errcode.String())
+		} else {
+			log.Printf("[Nodes: %s #%d (%s)] configuration failed: retcode=%d", nodeTypeStr, index, nodeID, retcode)
+			done <- fmt.Errorf("scripted Agent configuration failed with error code %d", retcode)
+		}
 		return
 	}
 
 	log.Printf("[Nodes: %s #%d (%s)] configuration successful\n", nodeTypeStr, index, nodeID)
+	done <- nil
+}
+
+//asyncPrepareBootstrap prepares the bootstrap
+func (c *Cluster) asyncPrepareBootstrap(done chan error) {
+	log.Printf("[Bootstrap] starting preparation...")
+
+	ssh, err := c.provider.GetSSHConfig(c.Specific.BootstrapID)
+	if err != nil {
+		done <- err
+		return
+	}
+	err = ssh.WaitServerReady(longTimeoutSSH)
+	if err != nil {
+		done <- err
+		return
+	}
+	retcode, _, err := c.executeScript(ssh, "dcos_prepare_bootstrap.sh", map[string]interface{}{
+		"DCOSVersion": dcosVersion,
+	})
+	if err != nil {
+		log.Printf("[Bootstrap] configuration failed: %s", err.Error())
+		done <- err
+		return
+	}
+	if retcode != 0 {
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[Bootstrap] configuration failed:\nretcode=%d (%s)", errcode, errcode.String())
+			done <- fmt.Errorf("scripted Bootstrap configuration failed with error code %d (%s)", errcode, errcode.String())
+		} else {
+			log.Printf("[Bootstrap] configuration failed:\nretcode=%d", retcode)
+			done <- fmt.Errorf("scripted Bootstrap configuration failed with error code %d", retcode)
+		}
+		return
+	}
+
+	log.Printf("[Bootstrap] preparation successful")
 	done <- nil
 }
 
@@ -704,6 +846,11 @@ func (c *Cluster) asyncConfigureBootstrap(done chan error) {
 	log.Printf("[Bootstrap] starting configuration...")
 
 	ssh, err := c.provider.GetSSHConfig(c.Specific.BootstrapID)
+	if err != nil {
+		done <- err
+		return
+	}
+	err = ssh.WaitServerReady(shortTimeoutSSH)
 	if err != nil {
 		done <- err
 		return
@@ -719,8 +866,7 @@ func (c *Cluster) asyncConfigureBootstrap(done chan error) {
 	if err == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
-	retcode, output, err := c.executeScript(ssh, "dcos_install_bootstrap_node.sh", map[string]interface{}{
-		"DCOSVersion":   dcosVersion,
+	retcode, _, err := c.executeScript(ssh, "dcos_configure_bootstrap.sh", map[string]interface{}{
 		"BootstrapIP":   c.Specific.BootstrapIP,
 		"BootstrapPort": bootstrapHTTPPort,
 		"ClusterName":   c.Common.Name,
@@ -735,12 +881,18 @@ func (c *Cluster) asyncConfigureBootstrap(done chan error) {
 		return
 	}
 	if retcode != 0 {
-		log.Printf("[Bootstrap] configuration failed:\nretcode=%d:\n%s", retcode, *output)
-		done <- fmt.Errorf("scripted Bootstrap configuration failed with error code %d:\n%s", retcode, *output)
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[Bootstrap] configuration failed:\nretcode=%d (%s)", errcode, errcode.String())
+			done <- fmt.Errorf("scripted Bootstrap configuration failed with error code %d (%s)", errcode, errcode.String())
+		} else {
+			log.Printf("[Bootstrap] configuration failed:\nretcode=%d", retcode)
+			done <- fmt.Errorf("scripted Bootstrap configuration failed with error code %d", retcode)
+		}
 		return
 	}
 
-	log.Printf("[Bootstrap] configuration sucessful")
+	log.Printf("[Bootstrap] configuration successful")
 	done <- nil
 }
 
@@ -761,10 +913,10 @@ func getTemplateBox() (*rice.Box, error) {
 	return templateBox, nil
 }
 
-//getInstallCommons returns the string corresponding to the script dcos_install_node_commons.sh
+//getInstallCommonRequirements returns the string corresponding to the script dcos_install_node_commons.sh
 // which installs common components (docker in particular)
-func getInstallCommons() (*string, error) {
-	if installCommonsContent == nil {
+func (c *Cluster) getInstallCommonRequirements() (*string, error) {
+	if installCommonRequirementsContent == nil {
 		// find the rice.Box
 		b, err := getTemplateBox()
 		if err != nil {
@@ -772,25 +924,28 @@ func getInstallCommons() (*string, error) {
 		}
 
 		// get file contents as string
-		tmplString, err := b.String("dcos_install_node_commons.sh")
+		tmplString, err := b.String("dcos_install_requirements.sh")
 		if err != nil {
 			return nil, fmt.Errorf("error loading script template: %s", err.Error())
 		}
 
 		// parse then execute the template
-		tmplPrepared, err := template.New("install_commons").Funcs(funcMap).Parse(tmplString)
+		tmplPrepared, err := template.New("install_requirements").Funcs(funcMap).Parse(tmplString)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
 		}
 		dataBuffer := bytes.NewBufferString("")
-		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{})
+		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
+			"CIDR":          c.Common.CIDR,
+			"CladmPassword": c.Common.AdminPassword,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
 		}
 		result := dataBuffer.String()
-		installCommonsContent = &result
+		installCommonRequirementsContent = &result
 	}
-	return installCommonsContent, nil
+	return installCommonRequirementsContent, nil
 }
 
 //Start starts the cluster named 'name'
@@ -834,6 +989,10 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 	cmd := "/opt/mesosphere/bin/dcos-diagnostics --diag || /opt/mesosphere/bin/3dt --diag"
 	for _, id := range c.Specific.MasterIDs {
 		ssh, err := c.provider.GetSSHConfig(id)
+		if err != nil {
+			continue
+		}
+		err = ssh.WaitServerReady(shortTimeoutSSH)
 		if err != nil {
 			continue
 		}
@@ -980,7 +1139,13 @@ func (c *Cluster) findAvailableMaster() (*system.SSHConfig, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to read SSH config: %s", err.Error())
 		}
-		//ssh.WaitServerReady(60 * time.Second)
+		err = ssh.WaitServerReady(shortTimeoutSSH)
+		if err != nil {
+			if _, ok := err.(retry.TimeoutError); ok {
+				continue
+			}
+			return nil, err
+		}
 		break
 	}
 	if ssh == nil {
@@ -1035,17 +1200,9 @@ func (c *Cluster) installSpark() (int, error) {
 
 //installElastic does the needed to have Spark installed in DCOS
 func (c *Cluster) installElastic() (int, error) {
-	var ssh *system.SSHConfig
-	var err error
-	for _, masterID := range c.Specific.MasterIDs {
-		ssh, err = c.provider.GetSSHConfig(masterID)
-		if err != nil {
-			return 0, fmt.Errorf("failed to read SSH config: %s", err.Error())
-		}
-		break
-	}
-	if ssh == nil {
-		return 0, fmt.Errorf("failed to find available master")
+	ssh, err := c.findAvailableMaster()
+	if err != nil {
+		return 0, nil
 	}
 
 	cmdResult, err := ssh.Command("sudo -u cladm -i dcos package install elastic")
@@ -1072,15 +1229,14 @@ func (c *Cluster) installElastic() (int, error) {
 //uploadDockerImageBuildScripts creates the string corresponding to script
 // used to prepare Docker images on Bootstrap server
 func (c *Cluster) uploadDockerImageBuildScripts(ssh *system.SSHConfig) error {
-	_, err := components.UploadBuildScript(ssh, "guacamole", map[string]interface{}{
-		"Password": "",
-	})
+	_, err := components.UploadBuildScript(ssh, "guacamole", map[string]interface{}{})
 	if err != nil {
 		return err
 	}
 	_, err = components.UploadBuildScript(ssh, "proxy", map[string]interface{}{
-		"DNSDomain": "",
-		"MasterIPs": c.Specific.MasterIPs,
+		"ClusterName": c.Common.Name,
+		"DNSDomain":   "",
+		"MasterIPs":   c.Specific.MasterIPs,
 	})
 	if err != nil {
 		return err
@@ -1118,17 +1274,19 @@ func (c *Cluster) uploadTemplateToFile(ssh *system.SSHConfig, tmplName string, f
 //executeScript executes the script template with the parameters on targetVM
 func (c *Cluster) executeScript(ssh *system.SSHConfig, script string, data map[string]interface{}) (int, *string, error) {
 	// Configures IncludeInstallCommons var
-	installCommons, err := getInstallCommons()
+	installCommons, err := c.getInstallCommonRequirements()
 	if err != nil {
 		return 0, nil, err
 	}
-	data["IncludeInstallCommons"] = *installCommons
+	data["InstallCommonRequirements"] = *installCommons
 
 	path, err := c.uploadTemplateToFile(ssh, script, script, data)
 	if err != nil {
 		return 0, nil, nil
 	}
-	cmdResult, err := ssh.SudoCommand(fmt.Sprintf("chmod a+rx %s; %s; #rm -f %s", path, path, path))
+	cmdResult, err := ssh.SudoCommand(fmt.Sprintf("chmod a+rx %s; %s", path, path))
+	//	cmdResult, err := ssh.SudoCommand(fmt.Sprintf("chmod a+rx %s; %s; #rm -f %s", path, path, path))
+
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to execute script '%s': %s", script, err.Error())
 	}
@@ -1242,12 +1400,12 @@ func (c *Cluster) SearchNode(ID string, public bool) bool {
 	return found
 }
 
-//GetDefinition returns the public properties of the cluster
-func (c *Cluster) GetDefinition() clusterapi.Cluster {
+//GetConfig returns the public properties of the cluster
+func (c *Cluster) GetConfig() clusterapi.Cluster {
 	return *c.Common
 }
 
-//updateMetadata writes cluster definition in Object Storage
+//updateMetadata writes cluster config in Object Storage
 func (c *Cluster) updateMetadata() error {
 	if c.metadata == nil {
 		m, err := metadata.NewCluster()
@@ -1260,13 +1418,13 @@ func (c *Cluster) updateMetadata() error {
 	return c.metadata.Write()
 }
 
-//RemoveMetadata removes definition of cluster from Object Storage
-func (c *Cluster) RemoveMetadata() error {
+//removeMetadata removes config of cluster from Object Storage
+func (c *Cluster) removeMetadata() error {
 	if len(c.Specific.MasterIDs) > 0 ||
 		len(c.Common.PublicNodeIDs) > 0 ||
 		len(c.Common.PrivateNodeIDs) > 0 ||
 		c.Common.NetworkID != "" {
-		return fmt.Errorf("can't remove a definition of a cluster with infrastructure still running")
+		return fmt.Errorf("can't remove cluster, resources still present")
 	}
 
 	if c.metadata == nil {
@@ -1275,8 +1433,10 @@ func (c *Cluster) RemoveMetadata() error {
 
 	err := c.metadata.Delete()
 	if err != nil {
-		return fmt.Errorf("failed to remove cluster definition in Object Storage: %s", err.Error())
+		return fmt.Errorf("failed to remove cluster metadata in Object Storage: %s", err.Error())
 	}
+	c.Common = &clusterapi.Cluster{}
+	c.Specific = &Specific{}
 	c.Common.State = ClusterState.Removed
 	return nil
 }

@@ -23,12 +23,6 @@ cd /var/tmp/guacamole.image
 cat >startup.sh <<-'EOF'
 #!/bin/bash
 
-if [ ! -f /root/.guacamole/user-mapping.xml ]; then
-    sed -e "s/##HOSTNAME##/$(hostname -s)/g" \
-        -e "s/##PASSWORD##/{{ .Password }}/g" /root/.guacamole/user-mapping.xml.tmpl \
-        >/root/.guacamole/user-mapping.xml
-fi
-
 # start up supervisord, all daemons should launched by supervisord.
 exec /usr/bin/supervisord -c /opt/safescale/supervisord.conf
 EOF
@@ -91,27 +85,6 @@ cat >logback.xml <<-'EOF'
 </configuration>
 EOF
 
-cat >user-mapping.xml.tmpl <<-'EOF'
-<user-mapping>
-    <authorize username="cladm" password="##PASSWORD##">
-
-        <!-- First authorized connection -->
-        <connection name="##HOSTNAME##">
-            <protocol>vnc</protocol>
-            <param name="hostname">##HOSTNAME##</param>
-            <param name="port">5900</param>
-            <param name="enable-sftp">true</param>
-            <param name="sftp-username">cladm</param>
-            <param name="sftp-password">##PASSWORD##</param>
-            <param name="sftp-directory">/home/cladm/Desktop</param>
-            <param name="sftp-root-directory">/home/cladm</param>
-            <param name="sftp-server-alive-interval">60</param>
-            <param name="color-depth">16</param>
-        </connection>
-    </authorize>
-</user-mapping>
-EOF
-
 cat >tomcat-users.xml <<-'EOF'
 <?xml version='1.0' encoding='utf-8'?>
 <tomcat-users>
@@ -159,7 +132,7 @@ RUN tar -zxvf guacamole-server-${GUACAMOLE_VERSION}.tar.gz -C . >/dev/null
 
 RUN cd guacamole-server-${GUACAMOLE_VERSION} \
  && CC=gcc-6 ./configure --prefix=/usr --with-init-dir=/etc/init.d  \
- && make -j \
+ && make -j3 \
  && make DESTDIR=/usr/local/dist install
 
 #------------------------- DIST phase -------------------------
@@ -203,7 +176,6 @@ ADD tomcat-users.xml ./conf/
 
 WORKDIR /root
 RUN mkdir .guacamole
-ADD user-mapping.xml.tmpl .guacamole/
 ADD logback.xml .guacamole/
 ENV GUACAMOLE_HOME /root/.guacamole
 

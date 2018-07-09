@@ -162,13 +162,12 @@ bash dcos_install.sh master || exit {{ errcode "DcosInstallExecution" }}
 # Sets the url of the dcos master
 echo "Waiting for DCOS cli download..."
 bg_wait DDB {{ errcode "DcosCliDownload" }}
-SETUP_MASTER="dcos cluster setup http://localhost"
-cat >>~cladm/.profile <<-EOF
+cat >>~cladm/.bashrc <<-EOF
+
 # Makes sure dcos is configured correctly
-$SETUP_MASTER &>/dev/null
+dcos cluster setup http://localhost &>/dev/null
 EOF
 chown -R cladm:cladm ~cladm
-sudo -u cladm -i $SETUP_MASTER
 
 # Starts containers for RemoteDesktop
 echo "Waiting for Guacamole Image download..."

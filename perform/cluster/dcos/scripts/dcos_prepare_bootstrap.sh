@@ -32,7 +32,7 @@ download_dcos_config_generator() {
         echo "download_dcos_config_generator:"
         echo "-------------------------------"
         while true; do
-            wget -q https://downloads.dcos.io/dcos/stable/{{.DCOSVersion}}/dcos_generate_config.sh
+            wget -q https://downloads.dcos.io/dcos/stable/{{ .DCOSVersion }}/dcos_generate_config.sh
             [ $? -eq 0 ] && break
             echo "Retrying to download DCOS configuration generator..."
         done
@@ -94,7 +94,7 @@ export -f download_rclone_package
 mkdir -p /usr/local/dcos/genconf/serve/docker && \
 cd /usr/local/dcos && \
 yum makecache fast && \
-yum install -y wget time && \
+yum install -y wget time
 [ $? -ne 0 ] && exit {{ errcode "ToolsInstall" }}
 
 # bg_start <what> <duration> <command>...
