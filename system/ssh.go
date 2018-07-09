@@ -33,6 +33,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CS-SI/SafeScale/utils/retry"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -51,10 +52,13 @@ type sshTunnel struct {
 	port      int
 	cmd       *exec.Cmd
 	cmdString string
+	keyFile   *os.File
 }
 
 //Close close ssh tunnel
 func (tunnel *sshTunnel) Close() error {
+	defer os.Remove(tunnel.keyFile.Name())
+
 	err := tunnel.cmd.Process.Kill()
 	if err != nil {
 		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
@@ -73,7 +77,6 @@ func (tunnel *sshTunnel) Close() error {
 		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
 	}
 	return nil
-
 }
 
 //GetFreePort get a frre port
@@ -87,7 +90,7 @@ func getFreePort() (int, error) {
 	return port, nil
 }
 
-func createKeyFile(content string) (*os.File, error) {
+func createTempFile(content string) (*os.File, error) {
 	f, err := ioutil.TempFile("/tmp", "")
 	if err != nil {
 		return nil, err
@@ -111,16 +114,15 @@ func isTunnelReady(port int) bool {
 
 //CreateTunnel create SSH from local host to remote host throw gateway
 func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
-	f, err := createKeyFile(cfg.GatewayConfig.PrivateKey)
+	f, err := createTempFile(cfg.GatewayConfig.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
-	//defer os.Remove(f.Name())
 	freePort, err := getFreePort()
 	if err != nil {
 		return nil, err
 	}
-	options := "-q -oServerAliveInterval=60 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes"
+	options := "-q -oServerAliveInterval=60 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 	cmdString := fmt.Sprintf("ssh -i %s -NL %d:%s:%d %s@%s %s -p %d",
 		f.Name(),
 		freePort,
@@ -145,6 +147,7 @@ func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 		port:      freePort,
 		cmd:       cmd,
 		cmdString: cmdString,
+		keyFile:   f,
 	}, nil
 }
 
@@ -308,12 +311,12 @@ func (ssh *SSHConfig) createTunnels() ([]*sshTunnel, *SSHConfig, error) {
 }
 
 func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string, *os.File, error) {
-	f, err := createKeyFile(sshConfig.PrivateKey)
+	f, err := createTempFile(sshConfig.PrivateKey)
 	if err != nil {
 		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
 	//defer os.Remove(f.Name())
-	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes"
+	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 
 	sshCmdString := fmt.Sprintf("ssh -i %s %s -p %d %s@%s",
 		f.Name(),
@@ -337,12 +340,12 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 }
 
 func createDownloadCmd(sshConfig *SSHConfig, remotePath, localPath string) (string, *os.File, error) {
-	f, err := createKeyFile(sshConfig.PrivateKey)
+	f, err := createTempFile(sshConfig.PrivateKey)
 	if err != nil {
 		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
 	//defer os.Remove(f.Name())
-	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes"
+	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 
 	sshCmdString := fmt.Sprintf("scp -i %s -P %d %s %s@%s:%s %s",
 		f.Name(),
@@ -357,12 +360,12 @@ func createDownloadCmd(sshConfig *SSHConfig, remotePath, localPath string) (stri
 }
 
 func createUploadCmd(sshConfig *SSHConfig, remotePath, localPath string) (string, *os.File, error) {
-	f, err := createKeyFile(sshConfig.PrivateKey)
+	f, err := createTempFile(sshConfig.PrivateKey)
 	if err != nil {
 		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
 	//defer os.Remove(f.Name())
-	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes"
+	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 
 	sshCmdString := fmt.Sprintf("scp -i %s -P %d %s %s %s@%s:%s",
 		f.Name(),
@@ -407,26 +410,17 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 
 //WaitServerReady waits until the SSH server is ready
 func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
-	c := make(chan bool, 1)
-	go func() {
-		for {
+	err := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
 			cmd, _ := ssh.Command("whoami")
-			err := cmd.Run()
-			if err == nil {
-				c <- true
-				return
-			}
-			time.Sleep(1 * time.Second)
-		}
-
-	}()
-	select {
-	case _ = <-c:
-		return nil
-	case <-time.After(timeout):
-		return fmt.Errorf("Timeout")
+			return cmd.Run()
+		},
+		timeout,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait SSH ready on server '%s': %s", ssh.Host, err.Error())
 	}
-
+	return nil
 }
 
 //Download dowloads remotePath into localPath
@@ -449,7 +443,7 @@ func (ssh *SSHConfig) Download(remotePath, localPath string) error {
 	return sshCommand.Run()
 }
 
-//Upload uploads localPath into remotePath
+// Upload uploads localPath into remotePath
 func (ssh *SSHConfig) Upload(remotePath, localPath string) error {
 	tunnels, sshConfig, err := ssh.createTunnels()
 	if err != nil {
@@ -469,21 +463,15 @@ func (ssh *SSHConfig) Upload(remotePath, localPath string) error {
 	return sshCommand.Run()
 }
 
-//UploadString uploads a string into a remote file
+// UploadString uploads a string into a remote file
 func (ssh *SSHConfig) UploadString(remotePath, content string) error {
-	f, err := ioutil.TempFile("/var/tmp", "__ssh__")
+	f, err := createTempFile(content)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(f.Name())
-
-	if _, err := f.Write([]byte(content)); err != nil {
-		return nil
-	}
-	if err := f.Close(); err != nil {
-		return nil
-	}
-	return ssh.Upload(remotePath, f.Name())
+	err = ssh.Upload(remotePath, f.Name())
+	os.Remove(f.Name())
+	return err
 }
 
 //Exec executes the cmd using ssh
@@ -523,8 +511,9 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 		args = []string{"-c", sshCmdString}
 	}
 	//log.Println("ARGS ", args)
-	return syscall.Exec(bash, args, nil)
-
+	err = syscall.Exec(bash, args, nil)
+	os.Remove(keyFile.Name())
+	return err
 }
 
 // Enter Enter to interactive shell
@@ -537,15 +526,6 @@ func (ssh *SSHConfig) Enter() error {
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, "", false)
-	if err != nil {
-		for _, t := range tunnels {
-			t.Close()
-		}
-		if keyFile != nil {
-			os.Remove(keyFile.Name())
-		}
-		return fmt.Errorf("Unable to create command : %s", err.Error())
-	}
 	if err != nil {
 		for _, t := range tunnels {
 			t.Close()
@@ -571,7 +551,9 @@ func (ssh *SSHConfig) Enter() error {
 	proc.Stdout = os.Stdout
 	proc.Stdin = os.Stdin
 	proc.Stderr = os.Stderr
-	return proc.Run()
+	err = proc.Run()
+	os.Remove(keyFile.Name())
+	return err
 }
 
 // CommandContext is like Command but includes a context.

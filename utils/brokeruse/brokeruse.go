@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package utils
+package brokeruse
 
 import (
 	"context"
@@ -23,6 +23,7 @@ import (
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/utils"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc"
@@ -31,7 +32,7 @@ import (
 //GetConnection returns a connection to GRPC server
 func GetConnection() *grpc.ClientConn {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(Address, grpc.WithInsecure())
+	conn, err := grpc.Dial(utils.Address, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -49,7 +50,7 @@ func GetCurrentTenant() (string, error) {
 	conn := GetConnection()
 	defer conn.Close()
 	tenantSvc := pb.NewTenantServiceClient(conn)
-	ctx, cancel := GetContext(TimeoutCtxDefault)
+	ctx, cancel := GetContext(utils.TimeoutCtxDefault)
 	defer cancel()
 	tenant, err := tenantSvc.Get(ctx, &google_protobuf.Empty{})
 	if err != nil {
@@ -107,7 +108,7 @@ func DeleteNetwork(id string) error {
 func CreateVM(req *pb.VMDefinition) (*pb.VM, error) {
 	conn := GetConnection()
 	defer conn.Close()
-	ctx, cancel := GetContext(TimeoutCtxVM)
+	ctx, cancel := GetContext(utils.TimeoutCtxVM)
 	defer cancel()
 	service := pb.NewVMServiceClient(conn)
 	vm, err := service.Create(ctx, req)
@@ -121,7 +122,7 @@ func CreateVM(req *pb.VMDefinition) (*pb.VM, error) {
 func DeleteVM(id string) error {
 	conn := GetConnection()
 	defer conn.Close()
-	ctx, cancel := GetContext(TimeoutCtxVM)
+	ctx, cancel := GetContext(utils.TimeoutCtxVM)
 	defer cancel()
 	service := pb.NewVMServiceClient(conn)
 	_, err := service.Delete(ctx, &pb.Reference{ID: id})
@@ -132,7 +133,7 @@ func DeleteVM(id string) error {
 func GetVM(id string) (*pb.VM, error) {
 	conn := GetConnection()
 	defer conn.Close()
-	ctx, cancel := GetContext(TimeoutCtxDefault)
+	ctx, cancel := GetContext(utils.TimeoutCtxDefault)
 	defer cancel()
 	service := pb.NewVMServiceClient(conn)
 	return service.Inspect(ctx, &pb.Reference{ID: id})

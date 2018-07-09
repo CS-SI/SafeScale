@@ -23,6 +23,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
@@ -59,9 +60,9 @@ var nasCreate = cli.Command{
 			return fmt.Errorf("Nas and VM name required")
 		}
 
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
@@ -91,9 +92,9 @@ var nasDelete = cli.Command{
 			return fmt.Errorf("Nas name required")
 		}
 
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
@@ -112,9 +113,9 @@ var nasList = cli.Command{
 	Name:  "list",
 	Usage: "List all created nas",
 	Action: func(c *cli.Context) error {
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
@@ -148,9 +149,9 @@ var nasMount = cli.Command{
 			return fmt.Errorf("Nas and VM name required")
 		}
 
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
@@ -178,9 +179,9 @@ var nasUmount = cli.Command{
 			return fmt.Errorf("Nas and VM name required")
 		}
 
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
@@ -207,9 +208,9 @@ var nasInspect = cli.Command{
 			return fmt.Errorf("Nas name required")
 		}
 
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 

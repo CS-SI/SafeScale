@@ -52,7 +52,7 @@ type VMService struct {
 //Create creates a network
 func (srv *VMService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.VM, error) {
 	_vm, err := srv.Get(name)
-	if _vm != nil || (err != nil && !strings.Contains(err.Error(), "does not exists")) {
+	if _vm != nil || (err != nil && !strings.Contains(err.Error(), "does not exist")) {
 		return nil, fmt.Errorf("VM '%s' already exists", name)
 	}
 
@@ -103,14 +103,14 @@ func (srv *VMService) Get(ref string) (*api.VM, error) {
 	if found {
 		return m.Get(), nil
 	}
-	return nil, fmt.Errorf("VM %s does not exists", ref)
+	return nil, fmt.Errorf("VM %s does not exist", ref)
 }
 
 //Delete deletes VM referenced by ref
 func (srv *VMService) Delete(ref string) error {
 	vm, err := srv.Get(ref)
 	if err != nil {
-		return fmt.Errorf("VM '%s' does not exists", ref)
+		return fmt.Errorf("VM '%s' does not exist", ref)
 	}
 	return srv.provider.DeleteVM(vm.ID)
 }
@@ -119,7 +119,7 @@ func (srv *VMService) Delete(ref string) error {
 func (srv *VMService) SSH(ref string) (*system.SSHConfig, error) {
 	vm, err := srv.Get(ref)
 	if err != nil {
-		return nil, fmt.Errorf("VM '%s' does not exists", ref)
+		return nil, fmt.Errorf("VM '%s' does not exist", ref)
 	}
 
 	return srv.provider.GetSSHConfig(vm.ID)

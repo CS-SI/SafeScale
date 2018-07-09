@@ -14,21 +14,18 @@
  * limitations under the License.
  */
 
-package utils
+package ErrorCode
 
-import (
-	"github.com/CS-SI/SafeScale/providers"
+var (
+
+	//ErrorCodes contains a mapping between string name and error code
+	ErrorCodes map[string]Enum
 )
 
-//GetProviderService returns the service provider corresponding to the current Tenant
-func GetProviderService() (*providers.Service, error) {
-	tenant, err := GetCurrentTenant()
-	if err != nil {
-		return nil, err
+func init() {
+	ErrorCodes = make(map[string]Enum, NextErrorCode)
+	var i Enum
+	for i = 1; i < NextErrorCode; i++ {
+		ErrorCodes[i.String()] = i
 	}
-	svc, err := providers.GetService(tenant)
-	if err != nil {
-		return nil, err
-	}
-	return svc, nil
 }

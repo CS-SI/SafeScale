@@ -19,6 +19,7 @@ package openstack
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -203,10 +204,12 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 			return nil
 		}
 		ok, err := mgw.Read()
-		if !ok || err != nil {
-			if err != nil {
-				log.Print(err.Error())
-			}
+		if err != nil {
+			log.Print(err.Error())
+			return nil
+		}
+		if !ok {
+			log.Print("gateway metadata not found")
 			return nil
 		}
 		gwvm := mgw.Get()
@@ -233,8 +236,21 @@ func (client *Client) DeleteNetwork(networkID string) error {
 	if err != nil {
 		return err
 	}
+	gwID := m.Get().GatewayID
 	if len(vms) > 0 {
-		return fmt.Errorf("network '%s' has %d hosts attached", networkID, len(vms))
+		var allvms []string
+		for _, i := range vms {
+			if gwID != i.ID {
+				allvms = append(allvms, i.Name)
+			}
+		}
+		if len(allvms) > 0 {
+			var lenS string
+			if len(allvms) > 1 {
+				lenS = "s"
+			}
+			return fmt.Errorf("network '%s' has %d host%s attached (%s)", networkID, len(allvms), lenS, strings.Join(allvms, ","))
+		}
 	}
 
 	client.DeleteGateway(networkID)

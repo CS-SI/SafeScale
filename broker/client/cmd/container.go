@@ -23,6 +23,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
@@ -45,9 +46,9 @@ var containerList = cli.Command{
 	Name:  "list",
 	Usage: "List containers",
 	Action: func(c *cli.Context) error {
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewContainerServiceClient(conn)
 
@@ -72,9 +73,9 @@ var containerCreate = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewContainerServiceClient(conn)
 
@@ -97,9 +98,9 @@ var containerDelete = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewContainerServiceClient(conn)
 
@@ -122,9 +123,9 @@ var containerInspect = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewContainerServiceClient(conn)
 
@@ -156,9 +157,9 @@ var containerMount = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container and VM name required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewContainerServiceClient(conn)
 
@@ -187,9 +188,9 @@ var containerUmount = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container and VM name required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewContainerServiceClient(conn)
 

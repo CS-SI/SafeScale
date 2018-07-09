@@ -22,6 +22,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
@@ -41,9 +42,9 @@ var tenantList = cli.Command{
 	Name:  "list",
 	Usage: "List available tenants",
 	Action: func(c *cli.Context) error {
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		tenantService := pb.NewTenantServiceClient(conn)
 		tenants, err := tenantService.List(ctx, &google_protobuf.Empty{})
@@ -61,9 +62,9 @@ var tenantGet = cli.Command{
 	Name:  "get",
 	Usage: "Get current tenant",
 	Action: func(c *cli.Context) error {
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		tenantService := pb.NewTenantServiceClient(conn)
 		tenant, err := tenantService.Get(ctx, &google_protobuf.Empty{})
@@ -87,9 +88,9 @@ var tenantSet = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Tenant name required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		tenantService := pb.NewTenantServiceClient(conn)
 		_, err := tenantService.Set(ctx, &pb.TenantName{Name: c.Args().First()})

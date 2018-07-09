@@ -147,7 +147,7 @@ func (client *Client) GetFloatingIP(id string) (*FloatingIP, error) {
 	r.Err = err
 	fip, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get information for Floating IP id '%s': %s", id, errorString(err))
+		return nil, fmt.Errorf("Failed to get information for Floating IP id '%s': %s", id, providerError(err))
 	}
 	return fip, nil
 }
@@ -172,7 +172,7 @@ func (client *Client) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) 
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to browser Floating IPs: %s", errorString(err))
+		return nil, fmt.Errorf("Failed to browser Floating IPs: %s", providerError(err))
 	}
 	if found {
 		return &fip, nil
@@ -187,7 +187,7 @@ func (client *Client) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	bi, err := ipOpts.toFloatingIPCreateMap()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to build request to create FloatingIP: %s", errorString(err))
+		return nil, fmt.Errorf("Failed to build request to create FloatingIP: %s", providerError(err))
 	}
 	bandwidthOpts := bandwidthCreateOpts{
 		Name:      "bandwidth-" + client.vpc.Name,
@@ -196,7 +196,7 @@ func (client *Client) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	bb, err := bandwidthOpts.toBandwidthCreateMap()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to build request to create FloatingIP: %s", errorString(err))
+		return nil, fmt.Errorf("Failed to build request to create FloatingIP: %s", providerError(err))
 	}
 	// Merger bi in bb
 	for k, v := range bi {
@@ -235,7 +235,7 @@ func (client *Client) DeleteFloatingIP(id string) error {
 func (client *Client) AssociateFloatingIP(vm *api.VM, id string) error {
 	fip, err := client.GetFloatingIP(id)
 	if err != nil {
-		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, errorString(err))
+		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, providerError(err))
 	}
 
 	b := map[string]interface{}{
@@ -248,7 +248,7 @@ func (client *Client) AssociateFloatingIP(vm *api.VM, id string) error {
 	_, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers", vm.ID, "action"), b, nil, nil)
 	err = r.ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, errorString(err))
+		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, providerError(err))
 	}
 	return nil
 }
@@ -257,7 +257,7 @@ func (client *Client) AssociateFloatingIP(vm *api.VM, id string) error {
 func (client *Client) DissociateFloatingIP(vm *api.VM, id string) error {
 	fip, err := client.GetFloatingIP(id)
 	if err != nil {
-		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, errorString(err))
+		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, providerError(err))
 	}
 
 	b := map[string]interface{}{
@@ -270,7 +270,7 @@ func (client *Client) DissociateFloatingIP(vm *api.VM, id string) error {
 	_, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers", vm.ID, "action"), b, nil, nil)
 	err = r.ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, errorString(err))
+		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, providerError(err))
 	}
 	return nil
 }

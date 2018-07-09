@@ -23,9 +23,10 @@ exec 2>&1
 create_user() {
     echo "Creating user {{.User}}..."
     useradd {{ .User }} --home-dir /home/{{ .User }} --shell /bin/bash --comment "" --create-home
+    echo gpac:{{.Password}} | chpasswd
     echo "{{ .User }} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
-    # Sets ssh conf
+    # Sets ssh config
     mkdir /home/{{ .User }}/.ssh
     echo "{{ .Key }}" >>/home/{{ .User }}/.ssh/authorized_keys
     chmod 0700 /home/{{ .User }}/.ssh
@@ -82,6 +83,16 @@ EOF
 configure_network_redhat() {
     echo "Configuring network (redhat-based)..."
 
+    # We don't want NetworkManager
+    systemctl disable NetworkManager &>/dev/null
+    systemctl stop NetworkManager &>/dev/null
+    yum remove -y NetworkManager &>/dev/null
+    systemctl restart network
+
+    # We don't want firewalld
+    systemctl disable firewalld &>/dev/null
+    systemctl stop firewalld &>/dev/null
+
     # Configure all network interfaces in dhcp
     for IF in $(ls /sys/class/net); do
         if [ $IF != "lo" ]; then
@@ -94,28 +105,28 @@ EOF
     done
     systemctl restart network
 
-    # Determines which interface must be used as default route
-    PUBLIC_IP=$(curl ipinfo.io/ip 2>/dev/null)
-    ROUTE_IF=eth0
-    for IF in $(ls /sys/class/net); do
-        [ $IF != "lo" ] && [ "$(ifconfig $IF | grep 'inet ' | tr -s ' ' ' ' | cut -d' ' -f3)" = "$PUBLIC_IP" ] && {
-            ROUTE_IF=$IF
-            break
-        }
-    done
-    for IF in $(ls /sys/class/net); do
-        [ $IF != "lo" ] && [ $IF != $ROUTE_IF ] && echo 'DEFROUTE="no"' >>/etc/sysconfig/network-scripts/ifcfg-$IF
-    done
-    systemctl restart network
-
     echo done
+}
+
+configure_initial_firewall() {
+    # Change default policy for table filter chain INPUT to be DROP (block everything)
+    iptables -t filter --policy DROP INPUT
+    # Opens up the required (loopback comm, ping, ssh, established connection)
+    iptables -t filter -A INPUT -s 127.0.0.0/8 -j ACCEPT
+    iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT
+    iptables -A INPUT -p icmp --icmp-type 8 -s 0/0 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+    iptables -A OUTPUT -p icmp --icmp-type 0 -d 0/0 -m state --state ESTABLISHED,RELATED -j ACCEPT
+    iptables -A INPUT -p icmp --icmp-type 0 -s 0/0 -m state --state ESTABLISHED,RELATED -j ACCEPT
+    iptables -A OUTPUT -p icmp --icmp-type 8 -d 0/0 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+    iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+    iptables -A INPUT -p tcp --dport ssh -j ACCEPT
 }
 
 configure_as_gateway() {
     echo "Configuring host as gateway..."
     PUBLIC_IP=$(curl ipinfo.io/ip 2>/dev/null)
     PUBLIC_IF=$(netstat -ie | grep -B1 ${PUBLIC_IP} | head -n1 | awk '{print $1}')
-    PUBLIC_IP=${PUBLIC_IP%%:}
+    PUBLIC_IF=${PUBLIC_IF%%:}
 
     PRIVATE_IP=
     for IF in $(ls /sys/class/net); do
@@ -127,11 +138,16 @@ configure_as_gateway() {
     [ -z ${PRIVATE_IP} ] && return 1
 
     PRIVATE_IF=$(netstat -ie | grep -B1 ${PRIVATE_IP} | head -n1 | awk '{print $1}')
-    PRIVATE_IF=${PRIVATE_IF%:}
+    PRIVATE_IF=${PRIVATE_IF%%:}
 
     if [ ! -z $PRIVATE_IF ]; then
-        sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf
-        sysctl -p /etc/sysctl.conf
+        grep -v "net.ipv4.ip_forward=" /etc/sysctl.conf >/etc/sysctl.conf.new
+        mv /etc/sysctl.conf.new /etc/sysctl.conf
+        for i in /etc/sysctl.d/* /etc/sysctl.conf; do
+            grep -v "net.ipv4.ip_forward=" $i >${i}.new
+            mv -f ${i}.new ${i}
+        done
+        echo "net.ipv4.ip_forward=1" >/etc/sysctl.d/98-forward.conf
 
         cat <<- EOF >/sbin/routing
 #!/bin/sh -
@@ -171,13 +187,13 @@ EOF
 
 configure_dns_legacy() {
     cat <<-EOF > /etc/resolv.conf
-{{.ResolveConf}}
+{{.ResolvConf}}
 EOF
 }
 
 configure_dns_resolvconf() {
     cat <<-EOF >/etc/resolvconf/resolv.conf.d/original
-{{.ResolveConf}}
+{{.ResolvConf}}
 EOF
     rm -f /etc/resolvconf/resolv.conf.d/tail
     cd /etc/resolvconf/resolv.conf.d && /etc/resolvconf/update.d/libc
@@ -191,8 +207,7 @@ configure_gateway() {
     cat <<- EOF > /sbin/gateway
 #!/bin/sh -
 echo "configure default gateway"
-/sbin/route add default gw {{.GatewayIP}}
-
+/sbin/route add -net default gw {{.GatewayIP}}
 EOF
     chmod u+x /sbin/gateway
     cat <<- EOF > /etc/systemd/system/gateway.service
@@ -215,6 +230,10 @@ EOF
 LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
 VERSION_ID=$(cat /etc/os-release | grep "^VERSION_ID=" | cut -d= -f2 | sed 's/"//g')
 
+echo "ConfIF={{.ConfIF}}"
+echo "IsGateway={{.IsGateway}}"
+echo "AddGateway={{.AddGateway}}"
+
 case $LINUX_KIND in
     debian)
         create_user
@@ -223,6 +242,7 @@ case $LINUX_KIND in
         {{end}}
         {{if .IsGateway}}
         configure_as_gateway
+        systemctl restart systemd-sysctl
         {{end}}
         {{if .AddGateway}}
         configure_gateway
@@ -241,6 +261,7 @@ case $LINUX_KIND in
         {{end}}
         {{if .IsGateway}}
         configure_as_gateway
+        systemctl restart systemd-sysctl
         {{end}}
         {{if .AddGateway}}
         configure_gateway
@@ -255,6 +276,7 @@ case $LINUX_KIND in
         {{end}}
         {{if .IsGateway}}
         configure_as_gateway
+        systemctl restart systemd-sysctl
         {{end}}
         {{if .AddGateway}}
         configure_gateway
@@ -266,5 +288,6 @@ case $LINUX_KIND in
         exit 1
         ;;
 esac
+configure_initial_firewall
 
 exit 0

@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 
 	"github.com/CS-SI/SafeScale/perform/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
@@ -110,15 +110,20 @@ var clusterCreate = cli.Command{
 	ArgsUsage: "<cluster name>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "complexity, c",
+			Name:  "complexity, C",
 			Value: "Normal",
 			Usage: "Complexity of the cluster; can be DEV, NORMAL, VOLUME",
 		},
 		cli.StringFlag{
-			Name:  "cidr",
+			Name:  "cidr, N",
 			Value: "192.168.0.0/24",
 			Usage: "CIDR of the network",
 		},
+		// cli.StringFlag{
+		// 	Name:  "flavor, F",
+		// 	Value: "DCOS",
+		// 	Usage: "Flavor of cluster",
+		// },
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
@@ -146,6 +151,9 @@ var clusterCreate = cli.Command{
 			Flavor:     Flavor.DCOS,
 		})
 		if err != nil {
+			if instance != nil {
+				instance.Delete()
+			}
 			return fmt.Errorf("failed to create cluster: %s", err.Error())
 		}
 
@@ -267,7 +275,7 @@ var clusterNodeDelete = cli.Command{
 			return err
 		}
 		if instance == nil {
-			return fmt.Errorf("Cluster '%s' not found.", clusterName)
+			return fmt.Errorf("cluster '%s' not found.", clusterName)
 		}
 
 		vmID := c.String("id")
@@ -279,7 +287,7 @@ var clusterNodeDelete = cli.Command{
 			if !found {
 				return fmt.Errorf("node '%s' isn't a node of the cluster '%s'", vmID, clusterName)
 			}
-			vm, err := utils.GetVM(vmID)
+			vm, err := brokeruse.GetVM(vmID)
 			if err != nil {
 				return err
 			}

@@ -54,7 +54,7 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	if _net != nil {
 		return nil, fmt.Errorf("Network %s already exists", net)
 	}
-	if err != nil && !strings.Contains(err.Error(), "does not exists") {
+	if err != nil && !strings.Contains(err.Error(), "does not exist") {
 		return nil, fmt.Errorf("Network %s already exists", net)
 	}
 
@@ -88,7 +88,6 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		srv.provider.DeleteNetwork(network.ID)
 		return nil, err
 	}
-	defer srv.provider.DeleteKeyPair(keypair.ID)
 
 	gwRequest := api.GWRequest{
 		ImageID:    img.ID,
@@ -145,14 +144,14 @@ func (srv *NetworkService) Get(ref string) (*api.Network, error) {
 			return &n, err
 		}
 	}
-	return nil, fmt.Errorf("Network '%s' does not exists", ref)
+	return nil, fmt.Errorf("Network '%s' does not exist", ref)
 }
 
 //Delete deletes network referenced by ref
 func (srv *NetworkService) Delete(ref string) error {
 	n, err := srv.Get(ref)
 	if err != nil {
-		return fmt.Errorf("Network %s does not exists", ref)
+		return fmt.Errorf("Network %s does not exist", ref)
 	}
 	return srv.provider.DeleteNetwork(n.ID)
 }

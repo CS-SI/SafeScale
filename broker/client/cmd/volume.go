@@ -23,6 +23,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
@@ -45,9 +46,9 @@ var volumeList = cli.Command{
 	Name:  "list",
 	Usage: "List available volumes",
 	Action: func(c *cli.Context) error {
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVolumeServiceClient(conn)
 		resp, err := service.List(ctx, &google_protobuf.Empty{})
@@ -72,9 +73,9 @@ var volumeInspect = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Volume name or ID required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVolumeServiceClient(conn)
 		volume, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
@@ -99,9 +100,9 @@ var volumeDelete = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Volume name or ID required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVolumeServiceClient(conn)
 		_, err := service.Delete(ctx, &pb.Reference{Name: c.Args().First()})
@@ -145,9 +146,9 @@ var volumeCreate = cli.Command{
 			return fmt.Errorf(msg)
 		}
 
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVolumeServiceClient(conn)
 		volume, err := service.Create(ctx, &pb.VolumeDefinition{
@@ -188,9 +189,9 @@ var volumeAttach = cli.Command{
 			return fmt.Errorf("Volume and VM name required")
 		}
 
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVolumeServiceClient(conn)
 		_, err := service.Attach(ctx, &pb.VolumeAttachment{
@@ -219,9 +220,9 @@ var volumeDetach = cli.Command{
 			return fmt.Errorf("Volume and VM name required")
 		}
 
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVolumeServiceClient(conn)
 

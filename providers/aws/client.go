@@ -126,7 +126,7 @@ func AuthenticatedClient(opts AuthOpts) (*Client, error) {
 		AuthOpts:    opts,
 		UserDataTpl: tpl,
 	}
-	metadata.Initialize(&c)
+	metadata.InitializeContainer(&c)
 	//c.CreateContainer("gpac.aws.networks")
 	//c.CreateContainer("gpac.aws.wms")
 	//c.CreateContainer("gpac.aws.volumes")
@@ -332,7 +332,7 @@ func (c *Client) GetImage(id string) (*api.Image, error) {
 		return nil, err
 	}
 	if len(images.Images) == 0 {
-		return nil, fmt.Errorf("Image %s does not exists", id)
+		return nil, fmt.Errorf("Image %s does not exist", id)
 	}
 	img := images.Images[0]
 	return &api.Image{
@@ -871,23 +871,23 @@ type userData struct {
 	IsGateway bool
 	//If true configure default gateway
 	AddGateway bool
-	//Content of the /etc/resolve.conf of the Gateway
+	//Content of the /etc/resolv.conf of the Gateway
 	//Used only if IsGateway is true
-	ResolveConf string
+	ResolvConf string
 	//IP of the gateway
 	GatewayIP string
 }
 
 func (c *Client) prepareUserData(request api.VMRequest, kp *api.KeyPair, gw *api.VM) (string, error) {
 	dataBuffer := bytes.NewBufferString("")
-	var ResolveConf string
+	var ResolvConf string
 	var err error
 	// if !request.PublicIP {
 	// 	var buffer bytes.Buffer
 	// 	for _, dns := range client.Cfg.DNSList {
 	// 		buffer.WriteString(fmt.Sprintf("nameserver %s\n", dns))
 	// 	}
-	// 	ResolveConf = buffer.String()
+	// 	ResoleConf = buffer.String()
 	// }
 	ip := ""
 	if gw != nil {
@@ -898,12 +898,12 @@ func (c *Client) prepareUserData(request api.VMRequest, kp *api.KeyPair, gw *api
 		}
 	}
 	data := userData{
-		User:        api.DefaultUser,
-		Key:         strings.Trim(kp.PublicKey, "\n"),
-		IsGateway:   request.IsGateway,
-		AddGateway:  !request.PublicIP,
-		ResolveConf: ResolveConf,
-		GatewayIP:   ip,
+		User:       api.DefaultUser,
+		Key:        strings.Trim(kp.PublicKey, "\n"),
+		IsGateway:  request.IsGateway,
+		AddGateway: !request.PublicIP,
+		ResolvConf: ResolvConf,
+		GatewayIP:  ip,
 	}
 	err = c.UserDataTpl.Execute(dataBuffer, data)
 	if err != nil {
@@ -988,7 +988,6 @@ func (c *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer c.DeleteKeyPair(kpTmp.ID)
 		kp = kpTmp
 	}
 	//If the VM is not a Gateway, get gateway of the first network
@@ -1483,7 +1482,7 @@ func (c *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment
 			}, nil
 		}
 	}
-	return nil, fmt.Errorf("Volume attachment of volume %s on server %s does not exists", serverID, id)
+	return nil, fmt.Errorf("Volume attachment of volume %s on server %s does not exist", serverID, id)
 }
 
 //ListVolumeAttachments lists available volume attachment

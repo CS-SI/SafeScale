@@ -22,6 +22,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	"github.com/urfave/cli"
 )
 
@@ -47,9 +48,9 @@ var vmList = cli.Command{
 			Usage: "List all VMs on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVMServiceClient(conn)
 		vms, err := service.List(ctx, &pb.VMListRequest{
@@ -75,9 +76,9 @@ var vmInspect = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("VM name or ID required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVMServiceClient(conn)
 		resp, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
@@ -137,9 +138,9 @@ var vmCreate = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("VM name required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		service := pb.NewVMServiceClient(conn)
 		resp, err := service.Create(ctx, &pb.VMDefinition{
@@ -172,9 +173,9 @@ var vmDelete = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("VM name or ID required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVMServiceClient(conn)
 		_, err := service.Delete(ctx, &pb.Reference{Name: c.Args().First()})
@@ -196,9 +197,9 @@ var vmSsh = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("VM name or ID required")
 		}
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVMServiceClient(conn)
 		resp, err := service.SSH(ctx, &pb.Reference{Name: c.Args().First()})

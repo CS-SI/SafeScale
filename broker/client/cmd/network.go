@@ -22,6 +22,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	"github.com/urfave/cli"
 )
 
@@ -46,9 +47,9 @@ var networkList = cli.Command{
 			Usage: "List all Networks on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		networkService := pb.NewNetworkServiceClient(conn)
 		networks, err := networkService.List(ctx, &pb.NWListRequest{
@@ -76,9 +77,9 @@ var networkDelete = cli.Command{
 		}
 
 		// Network
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		networkService := pb.NewNetworkServiceClient(conn)
 		_, err := networkService.Delete(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
@@ -103,9 +104,9 @@ var networkInspect = cli.Command{
 		}
 
 		// Network
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		networkService := pb.NewNetworkServiceClient(conn)
 		network, err := networkService.Inspect(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
@@ -162,9 +163,9 @@ var networkCreate = cli.Command{
 			return fmt.Errorf("Network name reqired")
 		}
 		// Network
-		conn := utils.GetConnection()
+		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := utils.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
 		defer cancel()
 		networkService := pb.NewNetworkServiceClient(conn)
 		netdef := &pb.NetworkDefinition{
