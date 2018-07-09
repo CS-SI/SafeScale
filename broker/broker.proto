@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-import "google/protobuf/empty.proto";
+import "github.com/golang/protobuf/ptypes/empty/empty.proto";
 
 message Tenant{
     string Name = 1;

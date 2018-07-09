@@ -43,7 +43,8 @@ import (
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system"
 
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
+	"github.com/CS-SI/SafeScale/utils/provideruse"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )
@@ -131,7 +132,7 @@ func (c *Cluster) CountNodes(public bool) uint {
 
 //Load loads the internals of an existing cluster from metadata
 func Load(data *metadata.Cluster) (clusterapi.ClusterAPI, error) {
-	svc, err := utils.GetProviderService()
+	svc, err := provideruse.GetProviderService()
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +154,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	log.Printf("Creating Network 'net-%s'", req.Name)
 	req.Name = strings.ToLower(req.Name)
 	networkName := "net-" + req.Name
-	network, err := utils.CreateNetwork(networkName, req.CIDR, &pb.GatewayDefinition{
+	network, err := brokeruse.CreateNetwork(networkName, req.CIDR, &pb.GatewayDefinition{
 		CPU:     4,
 		RAM:     32.0,
 		Disk:    120,
@@ -189,7 +190,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		ImageID:   "Centos 7.3",
 	}
 
-	svc, err := utils.GetProviderService()
+	svc, err := provideruse.GetProviderService()
 	if err != nil {
 		goto cleanNetwork
 	}
@@ -335,17 +336,17 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 
 cleanNodes:
 	//for _, id := range instance.Specific.PublicNodeIDs {
-	//	utils.DeleteVM(id)
+	//	brokeruse.DeleteVM(id)
 	//}
 	//for _, id := range instance.Specific.PrivateNodeIDs {
-	//	utils.DeleteVM(id)
+	//	brokeruse.DeleteVM(id)
 	//}
 cleanMasters:
 	//for _, id := range instance.Specific.MasterIDs {
-	//	utils.DeleteVM(id)
+	//	brokeruse.DeleteVM(id)
 	//}
 cleanNetwork:
-	//utils.DeleteNetwork(instance.Common.NetworkID)
+	//brokeruse.DeleteNetwork(instance.Common.NetworkID)
 	//instance.RemoveMetadata()
 	return nil, err
 }
@@ -523,7 +524,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 
 	name := c.Common.Name + "-dcosmaster-" + strconv.Itoa(index)
 
-	masterVM, err := utils.CreateVM(&pb.VMDefinition{
+	masterVM, err := brokeruse.CreateVM(&pb.VMDefinition{
 		Name:      name,
 		CPUNumber: 4,
 		RAM:       16.0,
@@ -550,7 +551,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 		c.Specific.MasterIDs = c.Specific.MasterIDs[:len(c.Specific.MasterIDs)-1]
 		c.Specific.MasterIPs = c.Specific.MasterIPs[:len(c.Specific.MasterIPs)-1]
 		c.metadata.Release()
-		utils.DeleteVM(masterVM.ID)
+		brokeruse.DeleteVM(masterVM.ID)
 
 		log.Printf("[Masters: #%d] creation failed: %s\n", index, err.Error())
 		done <- fmt.Errorf("failed to update Cluster definition: %s", err.Error())
@@ -616,7 +617,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 	req.Network = c.Common.NetworkID
 	req.Name = c.Common.Name + "-dcos" + coreName + "-" + strconv.Itoa(count+1)
 	req.ImageID = "CentOS 7.3"
-	vm, err := utils.CreateVM(req)
+	vm, err := brokeruse.CreateVM(req)
 	if err != nil {
 		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -645,7 +646,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 			c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
 			c.Specific.PrivateNodeIPs = c.Specific.PrivateNodeIPs[:len(c.Specific.PrivateNodeIPs)-1]
 		}
-		utils.DeleteVM(vm.ID)
+		brokeruse.DeleteVM(vm.ID)
 		c.metadata.Release()
 		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -918,7 +919,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.VMDefinition) ([]stri
 	if len(errors) > 0 {
 		if len(vms) > 0 {
 			for _, vmID := range vms {
-				utils.DeleteVM(vmID)
+				brokeruse.DeleteVM(vmID)
 			}
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
@@ -1156,7 +1157,7 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 	} else {
 		vmID = c.Common.PrivateNodeIDs[len(c.Common.PrivateNodeIDs)-1]
 	}
-	err := utils.DeleteVM(vmID)
+	err := brokeruse.DeleteVM(vmID)
 	if err != nil {
 		return nil
 	}
@@ -1181,7 +1182,7 @@ func (c *Cluster) DeleteSpecificNode(ID string) error {
 		return fmt.Errorf("VM ID '%s' isn't a registered Node of the Cluster '%s'.", ID, c.Common.Name)
 	}
 
-	err := utils.DeleteVM(ID)
+	err := brokeruse.DeleteVM(ID)
 	if err != nil {
 		return err
 	}
@@ -1216,7 +1217,7 @@ func (c *Cluster) GetNode(ID string) (*pb.VM, error) {
 	if !found {
 		return nil, fmt.Errorf("GetNode not yet implemented")
 	}
-	return utils.GetVM(ID)
+	return brokeruse.GetVM(ID)
 }
 
 func contains(list []string, ID string) (bool, int) {
@@ -1295,7 +1296,7 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the public nodes
 	for _, n := range c.Common.PublicNodeIDs {
-		err := utils.DeleteVM(n)
+		err := brokeruse.DeleteVM(n)
 		if err != nil {
 			return err
 		}
@@ -1303,7 +1304,7 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the private nodes
 	for _, n := range c.Common.PrivateNodeIDs {
-		err := utils.DeleteVM(n)
+		err := brokeruse.DeleteVM(n)
 		if err != nil {
 			return err
 		}
@@ -1311,14 +1312,14 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the masters
 	for _, n := range c.Specific.MasterIDs {
-		err := utils.DeleteVM(n)
+		err := brokeruse.DeleteVM(n)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Deletes the network and gateway
-	err = utils.DeleteNetwork(c.Common.NetworkID)
+	err = brokeruse.DeleteNetwork(c.Common.NetworkID)
 	if err != nil {
 		return err
 	}

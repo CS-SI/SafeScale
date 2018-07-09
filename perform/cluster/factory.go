@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
@@ -74,7 +74,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 
 	log.Printf("Creating infrastructure for cluster '%s'", req.Name)
 
-	tenant, err := utils.GetCurrentTenant()
+	tenant, err := brokeruse.GetCurrentTenant()
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		log.Printf("Creating Network 'net-%s'", req.Name)
 		req.Name = strings.ToLower(req.Name)
 		networkName := "net-" + req.Name
-		network, err = utils.CreateNetwork(networkName, req.CIDR)
+		network, err = brokeruse.CreateNetwork(networkName, req.CIDR)
 		if err != nil {
 			err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
 			return nil, err
