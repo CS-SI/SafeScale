@@ -34,8 +34,5 @@ sed -i -e "s/<USER>/cladm/g" /etc/systemd/system/vncserver\@:0.service && \
 systemctl daemon-reload
 [ $? -ne 0 ] && exit {{ errcode "DesktopInstall" }}
 
-# Configure Firewall by allowing full communication on the private network
-iptables -A INPUT -s {{ .CIDR }} -j ACCEPT
-
 echo "Master installed successfully."
 exit 0

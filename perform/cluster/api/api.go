@@ -42,6 +42,8 @@ type Request struct {
 	NetworkID string
 	//Tenant contains the name of the tenant
 	Tenant string
+	// KeepOnFailure is set to True to keep resources on cluster creation failure
+	KeepOnFailure bool
 }
 
 //ClusterAPI is an interface of methods associated to Cluster-like structs
@@ -75,8 +77,8 @@ type ClusterAPI interface {
 	//Delete allows to destroy infrastructure of cluster
 	Delete() error
 
-	//GetDefinition
-	GetDefinition() Cluster
+	//GetConfig ...
+	GetConfig() Cluster
 	//UpdateMetadata
 	//UpdateMetadata() error
 	//RemoveMetadata
@@ -85,26 +87,31 @@ type ClusterAPI interface {
 
 //Cluster contains the bare minimum information about a cluster
 type Cluster struct {
-	//Name is the name of the cluster
+	// Name is the name of the cluster
 	Name string
-	//CIDR is the network CIDR wanted for the Network
+	// CIDR is the network CIDR wanted for the Network
 	CIDR string
-	//Flavor tells what kind of cluster it is
+	// Flavor tells what kind of cluster it is
 	Flavor Flavor.Enum
-	//Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
+	// Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
 	Complexity Complexity.Enum
-	//Keypair contains the key-pair used inside the Cluster
+	// Keypair contains the key-pair used inside the Cluster
 	Keypair *providerapi.KeyPair
-	//State
+	// State of the cluster
 	State ClusterState.Enum
-	//Tenant is the name of the tenant
+	// Tenant is the name of the tenant
 	Tenant string
-	//NetworkID is the ID of the network to use
+	// NetworkID is the ID of the network to use
 	NetworkID string
-	//PublicNodedIDs is a slice of VMIDs of the public cluster nodes
+	// PublicNodedIDs is a slice of VMIDs of the public cluster nodes
 	PublicNodeIDs []string
-	//PrivateNodedIDs is a slice of VMIDs of the private cluster nodes
+	// PrivateNodedIDs is a slice of VMIDs of the private cluster nodes
 	PrivateNodeIDs []string
+	// AdminPassword contains the password of cladm account. This password
+	// is used to connect via Guacamole, but can't be used with SSH
+	AdminPassword string
+	// PublicIP is the IP address to reach the cluster (ie the public IP address of the network gateway)
+	PublicIP string
 }
 
 //GetNetworkID returns the ID of the Network used by the cluster

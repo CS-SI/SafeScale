@@ -22,7 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/perform/cluster/api"
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/provideruse"
 )
 
 const (
@@ -81,7 +81,7 @@ type Cluster struct {
 
 //NewCluster creates a new Cluster metadata
 func NewCluster() (*Cluster, error) {
-	svc, err := utils.GetProviderService()
+	svc, err := provideruse.GetProviderService()
 	if err != nil {
 		return nil, err
 	}

@@ -112,10 +112,10 @@ ServerTokens Prod
 
 <VirtualHost *:443>
 {{- if ne .DNSDomain "" }}
-    ServerName ##HOSTNAME##.{{ .DNSDomain }}
-    ServerAlias ##HOSTNAME##
+    ServerName {{ .ClusterName }}-proxy.{{ .DNSDomain }}
+    ServerAlias {{ .ClusterName }}-proxy
 {{- else }}
-    ServerName ##HOSTNAME##
+    ServerName {{ .ClusterName }}-proxy
 {{- end }}
 
     #ServerAdmin admin@rus-copernicus.eu
@@ -186,6 +186,19 @@ ServerTokens Prod
         BalancerMember "ws://{{ $ip }}:9080/guacamole/websocket-tunnel" route={{ inc $idx }}
   {{- end }}
     </Proxy>
+    <Location />
+        Order allow,deny
+        Allow from all
+        ProxyPass "balancer://http-masters/ flushpackets=on stickysession=JSESSIONID|jsessionid scolonpathdelim=On
+        ProxyPassReverse "balancer://http-masters"
+        ProxyPassReverseCookiePath /guacamole/ /
+    </Location>
+    <Location /websocket-tunnel>
+        Order allow,deny
+        Allow from all
+        ProxyPass "balancer://ws-masters" stickysession=JSESSIONID|jsessionid
+        ProxyPassReverse "balancer://ws-masters"
+    </Location>
 
   {{- range $idx, $ip := .MasterIPs }}
     <Location /master-{{ inc $idx }}/>
@@ -203,19 +216,7 @@ ServerTokens Prod
     </Location>
   {{- end }}
 {{ end }}
-    <Location />
-        Order allow,deny
-        Allow from all
-        ProxyPass "balancer://http-masters/ flushpackets=on stickysession=JSESSIONID|jsessionid scolonpathdelim=On
-        ProxyPassReverse "balancer://http-masters"
-        ProxyPassReverseCookiePath /guacamole/ /
-    </Location>
-    <Location /websocket-tunnel>
-        Order allow,deny
-        Allow from all
-        ProxyPass "balancer://ws-masters" stickysession=JSESSIONID|jsessionid
-        ProxyPassReverse "balancer://ws-masters"
-    </Location>
+
 </VirtualHost>
 EOF
 

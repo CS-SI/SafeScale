@@ -120,7 +120,6 @@ bg_wait PROXY {{ errcode "DockerProxyBuild" }}
 docker run -d --restart always -p 443:443 --name proxy proxy:latest >/dev/null || exit {{ errcode "DockerProxyStart" }}
 # ... and instructs host firewall to allow access on port 443
 iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
-#iptables -t filter -A OUTPUT -p tcp --sport https -m conntrack --ctstate ESTABLISHED -j ACCEPT
 
 # Awaits the build of Guacamole Docker Image...
 bg_wait GUACAMOLE {{ errcode "DockerGuacamoleBuild" }}

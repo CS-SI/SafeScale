@@ -110,16 +110,13 @@ EOF
 
 configure_initial_firewall() {
     # Change default policy for table filter chain INPUT to be DROP (block everything)
-    iptables -t filter --policy DROP INPUT
+    iptables -t filter --policy INPUT DROP
     # Opens up the required (loopback comm, ping, ssh, established connection)
-    iptables -t filter -A INPUT -s 127.0.0.0/8 -j ACCEPT
-    iptables -A OUTPUT -d 127.0.0.0/8 -j ACCEPT
-    iptables -A INPUT -p icmp --icmp-type 8 -s 0/0 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
-    iptables -A OUTPUT -p icmp --icmp-type 0 -d 0/0 -m state --state ESTABLISHED,RELATED -j ACCEPT
-    iptables -A INPUT -p icmp --icmp-type 0 -s 0/0 -m state --state ESTABLISHED,RELATED -j ACCEPT
-    iptables -A OUTPUT -p icmp --icmp-type 8 -d 0/0 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
-    iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-    iptables -A INPUT -p tcp --dport ssh -j ACCEPT
+    iptables -t filter -A INPUT -i lo -j ACCEPT
+    iptables -t filter -A INPUT -p icmp --icmp-type 8 -s 0/0 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+    iptables -t filter -A INPUT -p icmp --icmp-type 0 -s 0/0 -m state --state ESTABLISHED,RELATED -j ACCEPT
+    iptables -t filter -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+    iptables -t filter -A INPUT -p tcp --dport ssh -j ACCEPT
 }
 
 configure_as_gateway() {

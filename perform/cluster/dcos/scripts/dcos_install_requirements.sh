@@ -24,14 +24,12 @@ install_common_requirements() {
 
     # Configure Firewall to accept all traffic from/to the private network
     iptables -t filter -A INPUT -s {{ .CIDR }} -j ACCEPT
-    iptables -t filter -A OUTPUT 3 -d {{ .CIDR }} -j ACCEPT
 
     # Upgrade to last CentOS revision
-    yum makecache fast && \
     rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info && \
-    yum install -y python-backports-ssl_match_hostname && \
-    yum upgrade --assumeyes --tolerant && \
-    yum update --assumeyes
+    yum install -y python-backports-ssl_match_hostname #&& \
+    #yum upgrade --assumeyes --tolerant && \
+    #yum update --assumeyes
     [ $? -ne 0 ] && exit {{ errcode "SystemUpdate" }}
 
     # Create group nogroup
@@ -90,6 +88,7 @@ EOF
     # Creates user cladm
     useradd -s /bin/bash -m -d /home/cladm cladm
     usermod -aG docker cladm
+    echo "cladm:{{ .CladmPassword }}" | chpasswd
     mkdir -p /home/cladm/.ssh && chmod 0700 /home/cladm/.ssh
     mkdir -p /home/cladm/.local/bin && find /home/cladm/.local -exec chmod 0770 {} \;
     cat >>/home/cladm/.bashrc <<-'EOF'
