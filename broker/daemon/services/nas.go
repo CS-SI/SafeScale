@@ -17,15 +17,13 @@
 package services
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
-	"log"
 	"path"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system/nfs"
 )
 
@@ -162,28 +160,19 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 
 //List return the list of all created nas
 func (srv *NasService) List() ([]api.Nas, error) {
-	names, err := srv.provider.ListObjects(api.NasContainerName, api.ObjectFilter{
-		Path:   "",
-		Prefix: "",
+	var nass []api.Nas
+	m, err := metadata.NewNas(srv.provider)
+	if err != nil {
+		return nass, err
+	}
+	err = m.Browse(func(nas *api.Nas) error {
+		nass = append(nass, *nas)
+		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nass, err
 	}
-
-	var nass []api.Nas
-
-	for _, name := range names {
-		nas, err := srv.readNasDefinition(name)
-		if err != nil {
-			return nil, providers.ResourceNotFoundError("Nas", name)
-		}
-		if nas.IsServer {
-			nass = append(nass, *nas)
-		}
-	}
-
 	return nass, nil
-
 }
 
 //Mount a directory exported by a nas on a local directory of a vm
@@ -311,68 +300,29 @@ func (srv *NasService) Inspect(name string) ([]api.Nas, error) {
 }
 
 func (srv *NasService) saveNASDefinition(nas api.Nas) error {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	err := enc.Encode(nas)
-	if err != nil {
-		return err
-	}
-	name := fmt.Sprintf("%s/%s", nas.Name, nas.ServerID)
-	log.Printf("Saving nas definition: %s", name)
-	return srv.provider.PutObject(api.NasContainerName, api.Object{
-		Name:    name,
-		Content: bytes.NewReader(buffer.Bytes()),
-	})
+	return metadata.SaveNas(srv.provider, &nas)
 }
 
 func (srv *NasService) removeNASDefinition(nas api.Nas) error {
-
-	fullName := fmt.Sprintf("%s/%s", nas.Name, nas.ServerID)
-	log.Printf("Removing name definition: %s", fullName)
-
-	return srv.provider.DeleteObject(api.NasContainerName, fullName)
+	return metadata.RemoveNas(srv.provider, &nas)
 }
 
 func (srv *NasService) readNasDefinition(nasName string) (*api.Nas, error) {
-	o, err := srv.provider.GetObject(api.NasContainerName, nasName, nil)
-	if err != nil {
-		return nil, err
-	}
-	var buffer bytes.Buffer
-	buffer.ReadFrom(o.Content)
-	enc := gob.NewDecoder(&buffer)
-	var nas api.Nas
-	err = enc.Decode(&nas)
-	if err != nil {
-		return nil, err
-	}
-	return &nas, nil
+	return srv.findNas(nasName)
 }
 
 func (srv *NasService) findNas(name string) (*api.Nas, error) {
-	names, err := srv.provider.ListObjects(api.NasContainerName, api.ObjectFilter{
-		Path:   "",
-		Prefix: name,
-	})
+	mn, err := metadata.NewNas(srv.provider)
 	if err != nil {
 		return nil, err
 	}
 
-	found := false
-	var nas *api.Nas
-	for _, nasName := range names {
-		nas, err = srv.readNasDefinition(nasName)
-		if err != nil {
-			return nil, providers.ResourceNotFoundError("Nas", nasName)
-		}
-		if nas.IsServer {
-			found = true
-			break
-		}
+	found, err := mn.ReadByName(name)
+	if err != nil {
+		return nil, err
 	}
 	if !found {
 		return nil, providers.ResourceNotFoundError("Nas", name)
 	}
-
-	return nas, nil
+	return mn.Get(), nil
 }
