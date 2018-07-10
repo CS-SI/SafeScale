@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -29,16 +30,18 @@ import (
 )
 
 const (
-	//ContainerName is the name of the Object Storage Container/Bucket used to store metadata
-	ContainerName string = "0.safescale"
+	//ContainerNamePrefix is the name of the Object Storage Container/Bucket used to store metadata
+	containerNamePrefix string = "0.safescale"
 )
+
+var containerName string
 
 //InitializeContainer creates the Object Storage Container/Bucket that will store the metadata
 func InitializeContainer(client api.ClientAPI) error {
 	svc := providers.FromClient(client)
-	err := svc.CreateContainer(ContainerName)
+	err := svc.CreateContainer(containerName)
 	if err != nil {
-		fmt.Printf("failed to create Object Container %s: %s\n", ContainerName, err.Error())
+		fmt.Printf("failed to create Object Container %s: %s\n", containerName, err.Error())
 	}
 	return err
 }
@@ -83,7 +86,7 @@ func (f *Folder) absolutePath(path ...string) string {
 //Search tells if the object named 'name' is inside the ObjectStorage folder
 func (f *Folder) Search(path string, name string) (bool, error) {
 	absPath := strings.Trim(f.absolutePath(path), "/")
-	list, err := f.svc.ListObjects(ContainerName, api.ObjectFilter{
+	list, err := f.svc.ListObjects(containerName, api.ObjectFilter{
 		Path: absPath,
 	})
 	if err != nil {
@@ -104,7 +107,7 @@ func (f *Folder) Search(path string, name string) (bool, error) {
 
 //Delete removes metadata passed as parameter
 func (f *Folder) Delete(path string, name string) error {
-	err := f.svc.DeleteObject(ContainerName, f.absolutePath(path, name))
+	err := f.svc.DeleteObject(containerName, f.absolutePath(path, name))
 	if err != nil {
 		return fmt.Errorf("failed to remove metadata in Object Storage: %s", err.Error())
 	}
@@ -122,7 +125,7 @@ func (f *Folder) Read(path string, name string, callback DecoderCallback) (bool,
 		return false, err
 	}
 	if found {
-		o, err := f.svc.GetObject(ContainerName, f.absolutePath(path, name), nil)
+		o, err := f.svc.GetObject(containerName, f.absolutePath(path, name), nil)
 		if err != nil {
 			return false, err
 		}
@@ -144,7 +147,7 @@ func (f *Folder) Write(path string, name string, content interface{}) error {
 		return err
 	}
 
-	return f.svc.PutObject(ContainerName, api.Object{
+	return f.svc.PutObject(containerName, api.Object{
 		Name:    f.absolutePath(path, name),
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
@@ -152,7 +155,7 @@ func (f *Folder) Write(path string, name string, content interface{}) error {
 
 //Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
 func (f *Folder) Browse(path string, callback DecoderCallback) error {
-	list, err := f.svc.ListObjects(ContainerName, api.ObjectFilter{
+	list, err := f.svc.ListObjects(containerName, api.ObjectFilter{
 		Path: strings.Trim(f.absolutePath(path), "/"),
 	})
 	if err != nil {
@@ -166,7 +169,7 @@ func (f *Folder) Browse(path string, callback DecoderCallback) error {
 	}
 
 	for _, i := range list {
-		o, err := f.svc.GetObject(ContainerName, i, nil)
+		o, err := f.svc.GetObject(containerName, i, nil)
 		if err != nil {
 			return err
 		}
@@ -178,4 +181,11 @@ func (f *Folder) Browse(path string, callback DecoderCallback) error {
 		}
 	}
 	return nil
+}
+
+func init() {
+	containerName = containerNamePrefix
+	if suffix, ok := os.LookupEnv("SAFESCALE_METADATA_SUFFIX"); ok {
+		containerName += "." + suffix
+	}
 }
