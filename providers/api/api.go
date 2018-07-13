@@ -324,105 +324,105 @@ func (r Range) String() string {
 type ClientAPI interface {
 	Build(map[string]interface{}) (ClientAPI, error)
 
-	//ListImages lists available OS images
+	// ListImages lists available OS images
 	ListImages() ([]Image, error)
-	//GetImage returns the Image referenced by id
+	// GetImage returns the Image referenced by id
 	GetImage(id string) (*Image, error)
 
-	//GetTemplate returns the Template referenced by id
+	// GetTemplate returns the Template referenced by id
 	GetTemplate(id string) (*VMTemplate, error)
-	//ListTemplates lists available VM templates
-	//VM templates are sorted using Dominant Resource Fairness Algorithm
+	// ListTemplates lists available VM templates
+	// VM templates are sorted using Dominant Resource Fairness Algorithm
 	ListTemplates() ([]VMTemplate, error)
 
-	//CreateKeyPair creates and import a key pair
+	// CreateKeyPair creates and import a key pair
 	CreateKeyPair(name string) (*KeyPair, error)
-	//GetKeyPair returns the key pair identified by id
+	// GetKeyPair returns the key pair identified by id
 	GetKeyPair(id string) (*KeyPair, error)
-	//ListKeyPairs lists available key pairs
+	// ListKeyPairs lists available key pairs
 	ListKeyPairs() ([]KeyPair, error)
-	//DeleteKeyPair deletes the key pair identified by id
+	// DeleteKeyPair deletes the key pair identified by id
 	DeleteKeyPair(id string) error
 
-	//CreateNetwork creates a network named name
+	// CreateNetwork creates a network named name
 	CreateNetwork(req NetworkRequest) (*Network, error)
-	//GetNetwork returns the network identified by id
+	// GetNetwork returns the network identified by id
 	GetNetwork(id string) (*Network, error)
-	//ListNetworks lists available networks
+	// ListNetworks lists available networks
 	ListNetworks(all bool) ([]Network, error)
-	//DeleteNetwork deletes the network identified by id
+	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
-	//CreateGateway creates a public Gateway for a private network
+	// CreateGateway creates a public Gateway for a private network
 	CreateGateway(req GWRequest) error
-	//DeleteGateway delete the public gateway of a private network
+	// DeleteGateway delete the public gateway of a private network
 	DeleteGateway(networkID string) error
 
-	//CreateVM creates a VM that fulfils the request
+	// CreateVM creates a VM that fulfils the request
 	CreateVM(request VMRequest) (*VM, error)
-	//GetVM returns the VM identified by id
+	// GetVM returns the VM identified by id
 	GetVM(id string) (*VM, error)
-	//ListVMs lists available VMs
+	// ListVMs lists available VMs
 	ListVMs(all bool) ([]VM, error)
-	//DeleteVM deletes the VM identified by id
+	// DeleteVM deletes the VM identified by id
 	DeleteVM(id string) error
-	//StopVM stops the VM identified by id
+	// StopVM stops the VM identified by id
 	StopVM(id string) error
-	//StartVM starts the VM identified by id
+	// StartVM starts the VM identified by id
 	StartVM(id string) error
-	//GetSSHConfig creates SSHConfig from VM
+	// GetSSHConfig creates SSHConfig from VM
 	GetSSHConfig(id string) (*system.SSHConfig, error)
 
-	//CreateVolume creates a block volume
-	//- name is the name of the volume
-	//- size is the size of the volume in GB
-	//- volumeType is the type of volume to create, if volumeType is empty the driver use a default type
+	// CreateVolume creates a block volume
+	// - name is the name of the volume
+	// - size is the size of the volume in GB
+	// - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 	CreateVolume(request VolumeRequest) (*Volume, error)
-	//GetVolume returns the volume identified by id
+	// GetVolume returns the volume identified by id
 	GetVolume(id string) (*Volume, error)
-	//ListVolumes list available volumes
+	// ListVolumes list available volumes
 	ListVolumes() ([]Volume, error)
-	//DeleteVolume deletes the volume identified by id
+	// DeleteVolume deletes the volume identified by id
 	DeleteVolume(id string) error
 
-	//CreateVolumeAttachment attaches a volume to a VM
+	// CreateVolumeAttachment attaches a volume to a VM
 	//- name the name of the volume attachment
 	//- volume the volume to attach
 	//- vm the VM on which the volume is attached
 	CreateVolumeAttachment(request VolumeAttachmentRequest) (*VolumeAttachment, error)
-	//GetVolumeAttachment returns the volume attachment identified by id
+	// GetVolumeAttachment returns the volume attachment identified by id
 	GetVolumeAttachment(serverID, id string) (*VolumeAttachment, error)
-	//ListVolumeAttachments lists available volume attachment
+	// ListVolumeAttachments lists available volume attachment
 	ListVolumeAttachments(serverID string) ([]VolumeAttachment, error)
-	//DeleteVolumeAttachment deletes the volume attachment identifed by id
+	// DeleteVolumeAttachment deletes the volume attachment identifed by id
 	DeleteVolumeAttachment(serverID, id string) error
 
-	//CreateContainer creates an object container
+	// CreateContainer creates an object container
 	CreateContainer(name string) error
-	//DeleteContainer deletes an object container
+	// DeleteContainer deletes an object container
 	DeleteContainer(name string) error
-	//ListContainers list object containers
+	// ListContainers list object containers
 	ListContainers() ([]string, error)
-	//Getcontainer returns info of the container
+	// Getcontainer returns info of the container
 	GetContainer(name string) (*ContainerInfo, error)
 
-	//PutObject put an object into an object container
+	// PutObject put an object into an object container
 	PutObject(container string, obj Object) error
-	//UpdateObjectMetadata update an object into  object container
+	// UpdateObjectMetadata update an object into  object container
 	UpdateObjectMetadata(container string, obj Object) error
-	//GetObject get  object content from an object container
+	// GetObject get  object content from an object container
 	GetObject(container string, name string, ranges []Range) (*Object, error)
-	//GetObjectMetadata get  object metadata from an object container
+	// GetObjectMetadata get  object metadata from an object container
 	GetObjectMetadata(container string, name string) (*Object, error)
-	//ListObjects list objects of a container
+	// ListObjects list objects of a container
 	ListObjects(container string, filter ObjectFilter) ([]string, error)
-	//CopyObject copies an object
+	// CopyObject copies an object
 	CopyObject(containerSrc, objectSrc, objectDst string) error
-	//DeleteObject delete an object from a container
+	// DeleteObject delete an object from a container
 	DeleteObject(container, object string) error
 
-	//GetAuthOpts returns authentification options as a Config
+	// GetAuthOpts returns authentification options as a Config
 	GetAuthOpts() (Config, error)
-	//GetCfgOpts returns configuration options as a Config
+	// GetCfgOpts returns configuration options as a Config
 	GetCfgOpts() (Config, error)
 }
 
