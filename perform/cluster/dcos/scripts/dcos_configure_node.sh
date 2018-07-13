@@ -24,41 +24,20 @@ exec 2<&-
 exec 1<>/var/tmp/configure_node.log
 exec 2>&1
 
-# Get rclone package
-download_rclone_package() {
-    while true; do
-        wget -q -c -O /var/tmp/rclone.rpm http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/rclone.rpm
-        [ $? -eq 0 ] && break
-        echo "Trying again to download rclone package from Bootstrap server..."
-    done
-    exit 0
-}
-export -f download_rclone_package
+{{ .CommonTools }}
 
-# bg_start <what> <duration> <command>...
-bg_start() {
-    local pid=${1}_PID
-    local log=${1}.log
-    local duration=$2
-    shift 2
-    timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
-    eval ${pid}=$!
-}
+# # Get rclone package
+# download_rclone_package() {
+#     while true; do
+#         wget -q -c -O /var/tmp/rclone.rpm http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/rclone.rpm
+#         [ $? -eq 0 ] && break
+#         echo "Trying again to download rclone package from Bootstrap server..."
+#     done
+#     exit 0
+# }
+# export -f download_rclone_package
 
-# bg_wait <what> <error message>
-bg_wait() {
-    local pid="${1}_PID"
-    local log="${1}.log"
-    eval "wait \$$pid"
-    retcode=$?
-    cat /var/tmp/$log
-    [ $retcode -ne 0 ] && exit $2
-    rm -f /var/tmp/$log
-}
-
-#timeout 10m /usr/bin/time -p bash -c download_rclone_package &>/var/tmp/DRP.log &
-#DRP_PID=$!
-bg_start DRP 10m bash -c download_rclone_package
+# bg_start DRP 10m bash -c download_rclone_package
 
 if [ "{{ .PublicNode }}" = "yes" ]; then
     MODE=slave_public
@@ -74,9 +53,9 @@ curl -sS -q -L -O http://{{.BootstrapIP}}:{{.BootstrapPort}}/dcos_install.sh || 
 bash dcos_install.sh $MODE || exit {{ errcode "DcosInstallExecution" }}
 rm -rf /tmp/dcos
 
-bg_wait DRP {{ errcode "RcloneDownload" }}
-rpm -U /var/tmp/rclone.rpm || exit {{ errcode "RcloneInstall" }}
-rm -f /var/tmp/rclone.rpm
+# bg_wait DRP {{ errcode "RcloneDownload" }}
+# rpm -U /var/tmp/rclone.rpm || exit {{ errcode "RcloneInstall" }}
+# rm -f /var/tmp/rclone.rpm
 
 echo
 echo "Node configured successfully."

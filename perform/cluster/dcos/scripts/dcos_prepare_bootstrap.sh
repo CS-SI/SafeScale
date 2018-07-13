@@ -25,14 +25,19 @@ exec 2<&-
 exec 1<>/var/tmp/prepare_bootstrap.log
 exec 2>&1
 
+{{ .CommonTools }}
+
+wait_for_userdata
+
 # Download if needed the file dcos_generate_config.sh and executes it
 download_dcos_config_generator() {
     [ ! -f dcos_generate_config.sh ] && {
         echo "-------------------------------"
         echo "download_dcos_config_generator:"
         echo "-------------------------------"
+        >dcos_generate_config.sh
         while true; do
-            wget -q https://downloads.dcos.io/dcos/stable/{{ .DCOSVersion }}/dcos_generate_config.sh
+            wget -q -c https://downloads.dcos.io/dcos/stable/{{ .DCOSVersion }}/dcos_generate_config.sh
             [ $? -eq 0 ] && break
             echo "Retrying to download DCOS configuration generator..."
         done
@@ -74,22 +79,6 @@ download_kubectl_bin() {
 }
 export -f download_kubectl_bin
 
-download_rclone_package() {
-    [ ! -f /usr/local/dcos/genconf/serve/rclone.rpm ] && {
-        echo "--------------------"
-        echo "download_rclone_bin:"
-        echo "--------------------"
-        while true; do
-            wget -q -O /usr/local/dcos/genconf/serve/rclone.rpm https://downloads.rclone.org/rclone-current-linux-amd64.rpm
-            [ $? -eq 0 ] && break
-            echo "Retrying to download rclone package..."
-        done
-    }
-    echo "Rclone successfully downloaded."
-    exit 0
-}
-export -f download_rclone_package
-
 # Lauch downloads in parallel
 mkdir -p /usr/local/dcos/genconf/serve/docker && \
 cd /usr/local/dcos && \
@@ -97,46 +86,14 @@ yum makecache fast && \
 yum install -y wget time
 [ $? -ne 0 ] && exit {{ errcode "ToolsInstall" }}
 
-# bg_start <what> <duration> <command>...
-bg_start() {
-    local pid=${1}_PID
-    local log=${1}.log
-    local duration=$2
-    shift 2
-    timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
-    eval $pid=$!
-}
-
-# bg_wait <what> <error message>
-bg_wait() {
-    local pid="${1}_PID"
-    local log="${1}.log"
-    eval "wait \$$pid"
-    retcode=$?
-    cat /var/tmp/$log
-    [ $retcode -ne 0 ] && exit $2
-    rm -f /var/tmp/$log
-}
-
-#timeout 15m /usr/bin/time -p bash -c download_dcos_config_generator &>/var/tmp/DDCG.log &
-#DDCG_PID=$!
 bg_start DDCG 15m bash -c download_dcos_config_generator
-#timeout 10m /usr/bin/time -p bash -c download_dcos_bin &>/var/tmp/DDB.log &
-#DDB_PID=$!
 bg_start DDB 10m bash -c download_dcos_bin
-#timeout 10m /usr/bin/time -p bash -c download_kubectl_bin &>/var/tmp/DKB.log &
-#DKB_PID=$!
 bg_start DKB 10m bash -c download_kubectl_bin
-#timeout 10m /usr/bin/time -p bash -c download_rclone_package &>/var/tmp/DRP.log &
-#DRP_PID=$!
-bg_start DRP 10m bash -c download_rclone_package
 
 # Install requirements for DCOS environment
 {{ .InstallCommonRequirements }}
 
 # Pulling nginx in parallel to save some time
-#/usr/bin/time -p docker pull nginx &>/var/tmp/DPN.log &
-#DPN_PID=$!
 bg_start DPN 10m docker pull nginx
 
 # Awaits download of DCOS configuration generator
@@ -154,11 +111,6 @@ bg_wait DDB {{ errcode "DcosCliDownload" }}
 # Awaits the download of kubectl binary
 echo "Waiting for download_kubectl_binary..."
 bg_wait DKB {{ errcode "KubectlDownload" }}
-
-# Awaits the download of rclone package
-echo "Waiting for download_rclone_package..."
-bg_wait DRP {{ errcode "RcloneDownload" }}
-rpm -U /usr/local/dcos/genconf/serve/rclone.rpm || exit {{ errcode "RcloneInstall" }}
 
 echo
 echo "Bootstrap prepared successfully."

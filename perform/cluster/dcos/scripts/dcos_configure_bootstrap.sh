@@ -18,6 +18,7 @@
 #
 # This script has to be executed on the bootstrap/upgrade server
 
+
 # Redirects outputs to /var/tmp/configure_bootstrap.log
 rm -f /var/tmp/configure_bootstrap.log
 exec 1<&-
@@ -25,33 +26,10 @@ exec 2<&-
 exec 1<>/var/tmp/configure_bootstrap.log
 exec 2>&1
 
-# bg_start <what> <duration> <command>...
-bg_start() {
-    local pid=${1}_PID
-    local log=${1}.log
-    local duration=$2
-    shift 2
-    timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
-    eval "$pid=$!"
-}
-
-# bg_wait <what> <error message>
-bg_wait() {
-    local pid="${1}_PID"
-    local log="${1}.log"
-    eval "wait \$$pid"
-    retcode=$?
-    cat /var/tmp/$log
-    [ $retcode -ne 0 ] && exit $2
-    rm -f /var/tmp/$log
-}
+{{ .CommonTools }}
 
 # Stats build of needed docker images in backgroud
-#/usr/bin/time -p bash /var/tmp/docker_image_create_guacamole.sh &>/var/tmp/guacamole.log &
-#G_PID=$!
 bg_start GUACAMOLE 30m bash /var/tmp/docker_image_create_guacamole.sh
-#/usr/bin/time -p bash /var/tmp/docker_image_create_proxy.sh &>/var/tmp/proxy.log &
-#P_PID=$!
 bg_start PROXY 30m bash /var/tmp/docker_image_create_proxy.sh
 
 cd /usr/local/dcos
@@ -117,9 +95,10 @@ docker run -d --restart always -p {{ .BootstrapPort }}:80 -v $PWD/genconf/serve:
 # Awaits the proxy docker image is built
 echo "Waiting for proxy docker image..."
 bg_wait PROXY {{ errcode "DockerProxyBuild" }}
-docker run -d --restart always -p 443:443 --name proxy proxy:latest >/dev/null || exit {{ errcode "DockerProxyStart" }}
+docker run -d --restart always -p 443:443 --hostname proxy --name proxy proxy:latest >/dev/null || exit {{ errcode "DockerProxyStart" }}
 # ... and instructs host firewall to allow access on port 443
 iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+save_iptables_rules
 
 # Awaits the build of Guacamole Docker Image...
 bg_wait GUACAMOLE {{ errcode "DockerGuacamoleBuild" }}

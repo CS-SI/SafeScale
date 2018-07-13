@@ -39,9 +39,10 @@ const (
 	DockerComposeConfig
 	DockerComposeExecution
 	DesktopInstall
+	DesktopStart
+	DesktopTimeout
 	GuacamoleImageDownload
 	KubectlDownload
-	DesktopStart
 	SystemUpdate
 	ToolsInstall
 	PipInstall

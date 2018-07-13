@@ -74,8 +74,10 @@ const (
 
 var (
 	// templateBox is the rice box to use in this package
-	templateBox *rice.Box
+	templateBoxes = map[string]*rice.Box{}
 
+	// commonToolsContent contains the script containing commons tools
+	commonToolsContent *string
 	//installCommonRequirementsContent contains the script to install/configure common components
 	installCommonRequirementsContent *string
 
@@ -186,7 +188,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	// Saving cluster parameters, with status 'Creating'
 	var (
 		instance                                       Cluster
-		masterCount, privateNodeCount                  int
+		masterCount, privateNodeCount, retcode         int
 		kp                                             *providerapi.KeyPair
 		kpName                                         string
 		gw                                             *providerapi.VM
@@ -311,12 +313,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	if bootstrapStatus == nil && mastersStatus == nil {
 		mastersStatus = <-mastersChannel
 	}
-	if bootstrapStatus == nil && mastersStatus == nil && nodesStatus == nil {
-		_, err = instance.installKubernetes()
-		if err != nil {
-			goto cleanNodes
-		}
-	}
+
 	if bootstrapStatus != nil {
 		err = bootstrapStatus
 		goto cleanNodes
@@ -337,13 +334,33 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		goto cleanMasters
 	}
 
-	/*
-		_, err = instance.ForceGetState()
-		if err != nil {
-			return nil, err
-		}
-	*/
-	//	log.Printf("Cluster '%s' created and initialized successfully", req.Name)
+	// Get the state of the cluster until successful
+	err = retry.Action(
+		func() error {
+			status, err := instance.ForceGetState()
+			if err != nil {
+				return err
+			}
+			if status != ClusterState.Nominal {
+				return fmt.Errorf("cluster is not ready for duty")
+			}
+			return nil
+		},
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(5*time.Minute)),
+		retry.Constant(5*time.Second),
+		nil, nil, nil,
+	)
+	if err != nil {
+		goto cleanNodes
+	}
+	// If DCOS is ready, install Kubernetes
+	retcode, err = instance.installKubernetes()
+	if err != nil {
+		goto cleanNodes
+	}
+	if retcode != 0 {
+		err = fmt.Errorf("failed to install Kubernetes: retcode=%d", retcode)
+	}
 	return &instance, nil
 
 cleanNodes:
@@ -364,7 +381,7 @@ cleanMasters:
 cleanNetwork:
 	if !req.KeepOnFailure {
 		brokeruse.DeleteNetwork(instance.Common.NetworkID)
-		instance.removeMetadata()
+		instance.metadata.Delete()
 	}
 	return nil, err
 }
@@ -821,18 +838,18 @@ func (c *Cluster) asyncPrepareBootstrap(done chan error) {
 		"DCOSVersion": dcosVersion,
 	})
 	if err != nil {
-		log.Printf("[Bootstrap] configuration failed: %s", err.Error())
+		log.Printf("[Bootstrap] preparation failed: %s", err.Error())
 		done <- err
 		return
 	}
 	if retcode != 0 {
 		if retcode < int(ErrorCode.NextErrorCode) {
 			errcode := ErrorCode.Enum(retcode)
-			log.Printf("[Bootstrap] configuration failed:\nretcode=%d (%s)", errcode, errcode.String())
-			done <- fmt.Errorf("scripted Bootstrap configuration failed with error code %d (%s)", errcode, errcode.String())
+			log.Printf("[Bootstrap] preparation failed: retcode=%d (%s)", errcode, errcode.String())
+			done <- fmt.Errorf("scripted Bootstrap preparation failed with error code %d (%s)", errcode, errcode.String())
 		} else {
-			log.Printf("[Bootstrap] configuration failed:\nretcode=%d", retcode)
-			done <- fmt.Errorf("scripted Bootstrap configuration failed with error code %d", retcode)
+			log.Printf("[Bootstrap] preparation failed: retcode=%d", retcode)
+			done <- fmt.Errorf("scripted Bootstrap preparation failed with error code %d", retcode)
 		}
 		return
 	}
@@ -901,24 +918,76 @@ func (c *Cluster) GetName() string {
 	return c.Common.Name
 }
 
-//getTemplateBox
-func getTemplateBox() (*rice.Box, error) {
-	if templateBox == nil {
-		b, err := rice.FindBox("../dcos/scripts")
+// getDCOSTemplateBox
+func getDCOSTemplateBox() (*rice.Box, error) {
+	var b *rice.Box
+	var found bool
+	var err error
+	if b, found = templateBoxes["../dcos/scripts"]; !found {
+		// Note: path MUST be literal for rice to work
+		b, err = rice.FindBox("../dcos/scripts")
 		if err != nil {
 			return nil, err
 		}
-		templateBox = b
+		templateBoxes["../dcos/scripts"] = b
 	}
-	return templateBox, nil
+	return b, nil
 }
 
-//getInstallCommonRequirements returns the string corresponding to the script dcos_install_node_commons.sh
+// getSystemTemplateBox
+func getSystemTemplateBox() (*rice.Box, error) {
+	var b *rice.Box
+	var found bool
+	var err error
+	if b, found = templateBoxes["../../../system/scripts"]; !found {
+		// Note: path MUST be literal for rice to work
+		b, err = rice.FindBox("../../../system/scripts")
+		if err != nil {
+			return nil, err
+		}
+		templateBoxes["../../../system/scripts"] = b
+	}
+	return b, nil
+}
+
+// getCommonTools returns the string corresponding to the script common_tools.sh
+// which defines variables and functions useable everywhere
+func (c *Cluster) getCommonTools() (*string, error) {
+	if commonToolsContent == nil {
+		// find the rice.Box
+		b, err := getSystemTemplateBox()
+		if err != nil {
+			return nil, err
+		}
+
+		// get file contents as string
+		tmplString, err := b.String("common_tools.sh")
+		if err != nil {
+			return nil, fmt.Errorf("error loading script template: %s", err.Error())
+		}
+
+		// parse then execute the template
+		tmplPrepared, err := template.New("common_tools").Funcs(funcMap).Parse(tmplString)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+		}
+		dataBuffer := bytes.NewBufferString("")
+		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{})
+		if err != nil {
+			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
+		}
+		result := dataBuffer.String()
+		commonToolsContent = &result
+	}
+	return commonToolsContent, nil
+}
+
+// getInstallCommonRequirements returns the string corresponding to the script dcos_install_node_commons.sh
 // which installs common components (docker in particular)
 func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 	if installCommonRequirementsContent == nil {
 		// find the rice.Box
-		b, err := getTemplateBox()
+		b, err := getDCOSTemplateBox()
 		if err != nil {
 			return nil, err
 		}
@@ -986,7 +1055,7 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 	var ran bool // Tells if command has been run on remote host
 	var out []byte
 
-	cmd := "/opt/mesosphere/bin/dcos-diagnostics --diag || /opt/mesosphere/bin/3dt --diag"
+	cmd := "/opt/mesosphere/bin/dcos-diagnostics --diag"
 	for _, id := range c.Specific.MasterIDs {
 		ssh, err := c.provider.GetSSHConfig(id)
 		if err != nil {
@@ -1155,7 +1224,7 @@ func (c *Cluster) findAvailableMaster() (*system.SSHConfig, error) {
 }
 
 func uploadTemplateAsFile(ssh *system.SSHConfig, name string, path string) error {
-	b, err := getTemplateBox()
+	b, err := getDCOSTemplateBox()
 	if err != nil {
 		return err
 	}
@@ -1245,7 +1314,7 @@ func (c *Cluster) uploadDockerImageBuildScripts(ssh *system.SSHConfig) error {
 }
 
 func (c *Cluster) uploadTemplateToFile(ssh *system.SSHConfig, tmplName string, fileName string, data map[string]interface{}) (string, error) {
-	b, err := getTemplateBox()
+	b, err := getDCOSTemplateBox()
 	if err != nil {
 		return "", err
 	}
@@ -1273,12 +1342,19 @@ func (c *Cluster) uploadTemplateToFile(ssh *system.SSHConfig, tmplName string, f
 
 //executeScript executes the script template with the parameters on targetVM
 func (c *Cluster) executeScript(ssh *system.SSHConfig, script string, data map[string]interface{}) (int, *string, error) {
-	// Configures IncludeInstallCommons var
-	installCommons, err := c.getInstallCommonRequirements()
+	// Configures CommonTools template var
+	commonTools, err := c.getCommonTools()
 	if err != nil {
 		return 0, nil, err
 	}
-	data["InstallCommonRequirements"] = *installCommons
+	data["CommonTools"] = *commonTools
+
+	// Configures InstallCommonRequirements template var
+	installCommonRequirements, err := c.getInstallCommonRequirements()
+	if err != nil {
+		return 0, nil, err
+	}
+	data["InstallCommonRequirements"] = *installCommonRequirements
 
 	path, err := c.uploadTemplateToFile(ssh, script, script, data)
 	if err != nil {
@@ -1416,29 +1492,6 @@ func (c *Cluster) updateMetadata() error {
 		c.metadata = m
 	}
 	return c.metadata.Write()
-}
-
-//removeMetadata removes config of cluster from Object Storage
-func (c *Cluster) removeMetadata() error {
-	if len(c.Specific.MasterIDs) > 0 ||
-		len(c.Common.PublicNodeIDs) > 0 ||
-		len(c.Common.PrivateNodeIDs) > 0 ||
-		c.Common.NetworkID != "" {
-		return fmt.Errorf("can't remove cluster, resources still present")
-	}
-
-	if c.metadata == nil {
-		return nil
-	}
-
-	err := c.metadata.Delete()
-	if err != nil {
-		return fmt.Errorf("failed to remove cluster metadata in Object Storage: %s", err.Error())
-	}
-	c.Common = &clusterapi.Cluster{}
-	c.Specific = &Specific{}
-	c.Common.State = ClusterState.Removed
-	return nil
 }
 
 //Delete destroys everything related to the infrastructure built for the cluster

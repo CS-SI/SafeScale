@@ -24,12 +24,12 @@ exec 2<&-
 exec 1<>/var/tmp/install_node.log
 exec 2>&1
 
+{{ .CommonTools }}
+
+wait_for_userdata
+
 # Installs and configures everything needed on any node
 {{ .InstallCommonRequirements }}
-
-# Configure Firewall by allowing full communication on the private network
-iptables -A INPUT -s {{ .CIDR }} -j ACCEPT
-#iptables -A OUTPUT -d {{ .CIDR }} -j ACCEPT
 
 echo "Node installed successfully."
 exit 0

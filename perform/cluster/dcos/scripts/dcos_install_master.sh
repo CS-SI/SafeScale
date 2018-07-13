@@ -23,16 +23,12 @@ exec 2<&-
 exec 1<>/var/tmp/install_master.log
 exec 2>&1
 
+{{ .CommonTools }}
+
+wait_for_userdata
+
 # Installs and configures everything needed on any node
 {{ .InstallCommonRequirements }}
-
-# Installs and configure graphical environment
-yum groupinstall -y Xfce && \
-yum install -y tigervnc-server xorg-x11-fonts-Type1 firefox &&
-cp -s /lib/systemd/system/vncserver\@.service /etc/systemd/system/vncserver\@:0.service && \
-sed -i -e "s/<USER>/cladm/g" /etc/systemd/system/vncserver\@:0.service && \
-systemctl daemon-reload
-[ $? -ne 0 ] && exit {{ errcode "DesktopInstall" }}
 
 echo "Master installed successfully."
 exit 0

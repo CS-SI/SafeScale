@@ -24,6 +24,13 @@ exec 2<&-
 exec 1<>/var/tmp/configure_master.log
 exec 2>&1
 
+{{ .CommonTools }}
+
+###############################################
+### Defining functions used asynchroniously ###
+###############################################
+
+# Download Guacamole docker image from Bootstrap server
 download_safescale_guacamole_image() {
     while true; do
         while true; do
@@ -40,7 +47,7 @@ download_safescale_guacamole_image() {
 }
 export -f download_safescale_guacamole_image
 
-# Get install script from bootstrap server
+# Get install script from Bootstrap server
 download_dcos_install() {
     mkdir -p /usr/local/dcos
     cd /usr/local/dcos
@@ -55,7 +62,7 @@ download_dcos_install() {
 }
 export -f download_dcos_install
 
-# Get the dcos binary
+# Get the dcos binary from Bootstrap server
 download_dcos_binary() {
     while true; do
         wget -q -c -O ~cladm/.local/bin/dcos http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/dcos.bin
@@ -68,7 +75,7 @@ download_dcos_binary() {
 }
 export -f download_dcos_binary
 
-# Get the kubectl binary
+# Get the kubectl binary from Bootstrap server
 download_kubectl_binary() {
     while true; do
         wget -q -c -O ~cladm/.local/bin/kubectl http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/kubectl.bin
@@ -81,81 +88,62 @@ download_kubectl_binary() {
 }
 export -f download_kubectl_binary
 
-# Get rclone package
-download_rclone_package() {
-    while true; do
-        wget -q -c -O /var/tmp/rclone.rpm http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/rclone.rpm
-        [ $? -eq 0 ] && break
-        echo "Trying again to download rclone package from Bootstrap server..."
-    done
-    exit 0
-}
-export -f download_rclone_package
+# Installs and configure graphical environment on Master server
+install_desktop() {
+    yum groupinstall -y -t Xfce && \
+    yum install -y -t tigervnc-server xorg-x11-fonts-Type1 firefox && \
+    cp -s /lib/systemd/system/vncserver\@.service /etc/systemd/system/vncserver\@:0.service && \
+    sed -i -e "s/<USER>/cladm/g" /etc/systemd/system/vncserver\@:0.service && \
+    systemctl daemon-reload && \
+    systemctl enable vncserver\@:0.service
+    [ $? -ne 0 ] && exit {{ errcode "DesktopInstall" }}
 
-# bg_start <what> <duration> <command>...
-bg_start() {
-    local pid=${1}_PID
-    local log=${1}.log
-    local duration=$2
-    shift 2
-    timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
-    eval ${pid}=$!
-}
-
-# bg_wait <what> <error message>
-bg_wait() {
-    local pid="${1}_PID"
-    local log="${1}.log"
-    eval "wait \$$pid"
-    retcode=$?
-    cat /var/tmp/$log
-    [ $retcode -ne 0 ] && exit $2
-    rm -f /var/tmp/$log
-}
-
-# Launch background download tasks
-#timeout 10m /usr/bin/time -p bash -c download_safescale_guacamole_image &>/var/tmp/DSGI.log &
-#DSGI_PID=$!
-bg_start DSGI 10m bash -c download_safescale_guacamole_image
-#timeout 10m /usr/bin/time -p bash -c download_dcos_install &>/var/tmp/DDI.log &
-#DDI_PID=$!
-bg_start DDI 10m bash -c download_dcos_install
-#timeout 10m /usr/bin/time -p bash -c download_dcos_binary &>/var/tmp/DDB.log &
-#DDB_PID=$!
-bg_start DDB 10m bash -c download_dcos_binary
-#timeout 10m /usr/bin/time -p bash -c download_kubectl_binary &>/var/tmp/DKB.log &
-#DKB_PID=$!
-bg_start DKB 10m bash -c download_kubectl_binary
-#timeout 10m /usr/bin/time -p bash -c download_rclone_package &>/var/tmp/DRP.log &
-#DRP_PID=$!
-bg_start DRP 10m bash -c download_rclone_package
-
-# Configure Xvnc parameters
-mkdir -p ~cladm/.vnc
-cat >~cladm/.vnc/xstartup <<-'EOF'
+    # Configure Xvnc parameters
+    mkdir -p ~cladm/.vnc
+    cat >~cladm/.vnc/xstartup <<-'EOF'
 #!/bin/sh
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
+export DISPLAY=:0
 exec startxfce4
 EOF
+    chmod u+rx ~cladm/.vnc/xstartup
 
-cat >~cladm/.vnc/config <<-'EOF'
+    cat >~cladm/.vnc/config <<-'EOF'
 screen=0 1600x900x24
-desktop={{ .ClusterName }}-dcosmaster-{{ .MasterIndex }}
+geometry=1600x900
+desktop={{ .ClusterName }}-master-{{ .MasterIndex }}
+passwordfile=
 extension=GLX
 noreset
 SecurityTypes=None
 ZlibLevel=0
 EOF
-chown -R cladm:cladm ~cladm/.vnc
+    chown -R cladm:cladm ~cladm/.vnc
 
-# Starts Xvnc
-systemctl restart vncserver\@:0.service
-[ $? -ne 0 ] && exit {{ errcode "DesktopStart" }}
+    systemctl restart vncserver\@:0.service
+    [ $? -ne 0 ] && exit {{ errcode "DesktopStart" }}
+}
+export -f install_desktop
 
-# Launch DCOS installation
+########################################
+### Launch background download tasks ###
+########################################
+
+#bg_start ID 10m bash -c install_desktop
+bg_start DSGI 10m bash -c download_safescale_guacamole_image
+bg_start DDI 10m bash -c download_dcos_install
+bg_start DDB 10m bash -c download_dcos_binary
+bg_start DKB 10m bash -c download_kubectl_binary
+
+#########################
+### DCOS installation ###
+#########################
+
 echo "Waiting for DCOS Installer download..."
 bg_wait DDI {{ errcode "DcosInstallDownload" }}
+
+# Launch DCOS installation
 cd /usr/local/dcos
 bash dcos_install.sh master || exit {{ errcode "DcosInstallExecution" }}
 
@@ -169,14 +157,25 @@ dcos cluster setup http://localhost &>/dev/null
 EOF
 chown -R cladm:cladm ~cladm
 
-# Starts containers for RemoteDesktop
+###################################
+### Install Desktop environment ###
+###################################
+
+install_desktop
+
+##########################################################
+### Guacamole docker container configuration and start ###
+##########################################################
+
+
+
 echo "Waiting for Guacamole Image download..."
 bg_wait DSGI {{ errcode "GuacamoleImageDownload" }}
+
+# Configuring guacamole image
 cat >/var/tmp/user-mapping.xml <<-'EOF'
 <user-mapping>
     <authorize username="cladm" password="{{ .CladmPassword }}">
-
-        <!-- First authorized connection -->
         <connection name="master-{{ .MasterIndex }}">
             <protocol>vnc</protocol>
             <param name="hostname">{{ .Host }}</param>
@@ -192,26 +191,36 @@ cat >/var/tmp/user-mapping.xml <<-'EOF'
     </authorize>
 </user-mapping>
 EOF
-
 cat >/var/tmp/Dockerfile.guacamole <<-'EOF'
 FROM guacamole:latest
 ADD user-mapping.xml /root/.guacamole/
 EOF
-GUACAMOLE_TAG=master-{{ .MasterIndex }}
-docker build -f /var/tmp/Dockerfile.guacamole -t guacamole:$GUACAMOLE_TAG /var/tmp
+docker build -f /var/tmp/Dockerfile.guacamole -t guacamole:master-{{ .MasterIndex }} /var/tmp
 rm -f /var/tmp/Dockerfile.guacamole /var/tmp/user-mapping.xml
-docker run -d --restart always -p 9080:8080 -p 4822:4822 --name guacamole guacamole:$GUACAMOLE_TAG >/dev/null || exit {{ errcode "DockerProxyStart" }}
 
-# Install rclone
-echo "Waiting for Rclone download..."
-bg_wait DRP {{ errcode "RCloneDownload" }}
-rpm -U /var/tmp/rclone.rpm || exit {{ errcode "RcloneInstall" }}
-rm -f /var/tmp/rclone.rpm
+# guacd need sshd to authorize password authentication...
+cat >>/etc/ssh/sshd_config <<-'EOF'
+# Allow Password Authentication from docker default bridge network, for guacd to work
+Match address 172.17.0.0/16
+    PasswordAuthentication yes
+EOF
+systemctl reload sshd
 
-# awaits the end of the download of kubectl binary
+# Starting Guacamole container
+docker run -d \
+           --restart always \
+           -p 9080:8080 -p 4822:4822 \
+           --hostname guacamole --name guacamole \
+           guacamole:master-{{ .MasterIndex }} >/dev/null || exit {{ errcode "DockerProxyStart" }}
+
+########################################################
+### awaits the end of the download of kubectl binary ###
+########################################################
+
 echo "Waiting for kubectl download..."
 bg_wait DKB {{ errcode "KubectlDownload" }}
 
+### Done
 echo
 echo "Master configured successfully."
 exit 0

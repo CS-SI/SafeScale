@@ -44,7 +44,7 @@ if [ ! -f /etc/ssl/private/ssl-cert-safescale-selfsigned.key ]; then
 fi
 
 # Creates apache site configuration from template
-sed -e "s/##HOSTNAME##/$HOSTNAME/g" /etc/apache2/sites-available/default.conf.tmpl >/etc/apache2/sites-available/000-default.conf
+sed -i -e "s/##HOSTNAME##/$HOSTNAME/g" /etc/apache2/sites-available/000-default.conf
 a2ensite 000-default.conf
 
 # Make sure Apache will start no matter what.
@@ -103,7 +103,7 @@ autorestart=true
 stopsignal=QUIT
 EOF
 
-cat >www-default.conf.tmpl <<-'EOF'
+cat >default.conf <<-'EOF'
 ServerSignature Off
 ServerTokens Prod
 
@@ -173,42 +173,48 @@ ServerTokens Prod
     # General proxy config
     ProxyRequests Off
     SSLProxyEngine On
+    RewriteEngine On
+    RewriteRule "^/$" "/master-1/desktop/" [R]
 
 {{- $len := len .MasterIPs -}}
 {{- if gt $len 0 }}
     <Proxy "balancer://http-masters">
   {{- range $idx, $ip := .MasterIPs }}
-        BalancerMember "http://{{ $ip }}:9080/guacamole" route={{ inc $idx }}
+        BalancerMember "http://{{ $ip }}:9080/guacamole" route={{ inc $idx }} flushpackets=on
   {{- end }}
+        ProxySet stickysession=ROUTEID
     </Proxy>
     <Proxy "balancer://ws-masters">
   {{- range $idx, $ip := .MasterIPs }}
         BalancerMember "ws://{{ $ip }}:9080/guacamole/websocket-tunnel" route={{ inc $idx }}
   {{- end }}
+        ProxySet stickysession=ROUTEID
     </Proxy>
-    <Location />
+    <Location /desktop/>
         Order allow,deny
         Allow from all
-        ProxyPass "balancer://http-masters/ flushpackets=on stickysession=JSESSIONID|jsessionid scolonpathdelim=On
+        ProxyPass "balancer://http-masters"
         ProxyPassReverse "balancer://http-masters"
         ProxyPassReverseCookiePath /guacamole/ /
+        Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
     </Location>
-    <Location /websocket-tunnel>
+    <Location /desktop/websocket-tunnel>
         Order allow,deny
         Allow from all
-        ProxyPass "balancer://ws-masters" stickysession=JSESSIONID|jsessionid
+        ProxyPass "balancer://ws-masters"
         ProxyPassReverse "balancer://ws-masters"
+        Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
     </Location>
 
   {{- range $idx, $ip := .MasterIPs }}
-    <Location /master-{{ inc $idx }}/>
+    <Location /master-{{ inc $idx }}/desktop/>
         Order allow,deny
         Allow from all
         ProxyPass http://{{ $ip }}:9080/guacamole/ flushpackets=on
         ProxyPassReverse http://{{ $ip }}:9080/guacamole/
         ProxyPassReverseCookiePath /guacamole/ /
     </Location>
-    <Location /master-{{ inc $idx }}/websocket-tunnel>
+    <Location /master-{{ inc $idx }}/desktop/websocket-tunnel>
         Order allow,deny
         Allow from all
         ProxyPass ws://{{ $ip }}:9080/guacamole/websocket-tunnel
@@ -482,9 +488,11 @@ RUN apt update -y \
 # && apt-get install -y python-certbot-apache
 RUN a2enmod proxy \
  && a2enmod proxy_http \
+ && a2enmod proxy_http2 \
  && a2enmod proxy_wstunnel \
  && a2enmod proxy_balancer \
  && a2enmod proxy_connect \
+ && a2enmod lbmethod_byrequests \
  && a2enmod ssl \
  && a2enmod headers \
  && a2enmod rewrite
@@ -492,7 +500,7 @@ RUN a2enmod proxy \
 # Apache stuff
 ADD mod_security.conf /etc/apache2/conf.d/mod_security.conf
 ADD mod_evasive.conf /etc/apache2/conf.d/mod_evasive.conf
-ADD www-default.conf.tmpl /etc/apache2/sites-available/default.conf.tmpl
+ADD default.conf /etc/apache2/sites-available/000-default.conf
 RUN mkdir -p /etc/ssl/private /etc/ssl/certs
 
 # logrotate stuff

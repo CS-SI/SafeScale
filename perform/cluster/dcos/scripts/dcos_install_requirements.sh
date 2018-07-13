@@ -13,6 +13,8 @@
 # limitations under the License.
 
 #### Installs and configure common tools for any kind of nodes ####
+
+
 install_common_requirements() {
     echo "Installing common requirements..."
 
@@ -24,12 +26,13 @@ install_common_requirements() {
 
     # Configure Firewall to accept all traffic from/to the private network
     iptables -t filter -A INPUT -s {{ .CIDR }} -j ACCEPT
+    save_iptables_rules
 
     # Upgrade to last CentOS revision
     rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info && \
-    yum install -y python-backports-ssl_match_hostname #&& \
-    #yum upgrade --assumeyes --tolerant && \
-    #yum update --assumeyes
+    yum install -y python-backports-ssl_match_hostname && \
+    yum upgrade --assumeyes --tolerant && \
+    yum update --assumeyes
     [ $? -ne 0 ] && exit {{ errcode "SystemUpdate" }}
 
     # Create group nogroup
@@ -76,7 +79,7 @@ EOF
     systemctl enable docker.service
     systemctl start docker
 
-    # Enables admin user to use docker
+    # Enables admin user to use docker CLI
     usermod -aG docker gpac
 
     # Installs docker-compose
@@ -124,5 +127,5 @@ EOF
 export -f install_common_requirements
 
 yum makecache fast
-yum install -y wget time
+yum install -y wget time rclone
 /usr/bin/time -p bash -c install_common_requirements
