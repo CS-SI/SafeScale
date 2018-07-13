@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
 #
@@ -14,14 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 # wait_for_apt waits an already running apt-like command to finish
-function wait_for_apt() {
+wait_for_apt() {
     wait_lockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
 }
 
-
-function wait_lockfile() {
+wait_lockfile() {
     local ROUNDS=600
     name=$1
     shift
@@ -43,12 +40,12 @@ function wait_lockfile() {
             echo "${name} is unlocked (waited $t seconds), continuing."
         fi
     else
-        echo "${name}  is ready"
+        echo "${name} is ready"
     fi
 }
 
 # Convert netmask to CIDR
-function netmask2cidr() {
+netmask2cidr() {
     # Assumes there's no "255." after a non-255 byte in the mask
     local x=${1##*255.}
     set -- 0^^^128^192^224^240^248^252^254^ $(( (${#1} - ${#x})*2 )) ${x%%.*}
@@ -57,14 +54,14 @@ function netmask2cidr() {
 }
 
 # Convert CIDR to netmask
-function cidr2netmask() {
+cidr2netmask() {
     local m=${1#*/}
     local v=$(( 0xffffffff ^ ((1 << (32 - $m)) - 1) ))
     echo "$(( (v >> 24) & 0xff )).$(( (v >> 16) & 0xff )).$(( (v >> 8) & 0xff )).$(( v & 0xff ))"
 }
 
 # Convert CIDR to network
-function cidr2network() {
+cidr2network() {
     local ip=${1%%/*}
     local mask=$(cidr2netmask $1)
     IFS=. read -r m1 m2 m3 m4 <<< $mask
@@ -73,7 +70,7 @@ function cidr2network() {
 }
 
 # Convert CIDR to broadcast
-function cidr2broadcast() {
+cidr2broadcast() {
     local ip=${1%%/*}
     local mask=$(cidr2netmask $1)
     IFS=. read -r m1 m2 m3 m4 <<< $mask
@@ -81,5 +78,45 @@ function cidr2broadcast() {
     echo $(($o1+(255-($o1 | $m1)))).$(($o2+(255-($o2 | $m2)))).$(($o3+(255-($o3 | $m3)))).$(($o4+(255-($o4 | $m4))))
 }
 
-# Determines the kind of Linux distribution
-export LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
+# bg_start <what> <duration> <command>...
+bg_start() {
+   local pid=${1}_PID
+   local log=${1}.log
+   local duration=$2
+   shift 2
+   timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
+   eval "$pid=$!"
+}
+
+# bg_wait <what> <error message>
+bg_wait() {
+   local pid="${1}_PID"
+   local log="${1}.log"
+   eval "wait \$$pid"
+   retcode=$?
+   cat /var/tmp/$log
+   [ $retcode -ne 0 ] && exit $2
+   rm -f /var/tmp/$log
+}
+
+# Waits the completion of the execution of userdata
+wait_for_userdata() {
+    while true; do
+        [ -f /var/tmp/userdata.done ] && break
+        echo "Waiting userdata finished..."
+        sleep 5
+    done
+}
+
+save_iptables_rules() {
+   case $LINUX_KIND in
+       rhel|centos) iptables-save >/etc/sysconfig/iptables ;;
+       debian|ubuntu) iptables-save >/etc/iptables/rules.v4 ;;
+   esac
+}
+
+detect_facts() {
+   local -g LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
+   local -g VERSION_ID=$(cat /etc/os-release | grep "^VERSION_ID=" | cut -d= -f2 | sed 's/"//g')
+}
+detect_facts
