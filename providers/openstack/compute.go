@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/utils/retry"
+
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -87,9 +89,18 @@ func (client *Client) GetImage(id string) (*api.Image, error) {
 
 //GetTemplate returns the Template referenced by id
 func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
-	flv, err := flavors.Get(client.Compute, id).Extract()
+	// Try 10 seconds to get template
+	var flv *flavors.Flavor
+	err := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			var err error
+			flv, err = flavors.Get(client.Compute, id).Extract()
+			return err
+		},
+		10*time.Second,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting template: %s", errorString(err))
+		return nil, fmt.Errorf("error getting template: %s", errorString(err))
 	}
 	return &api.VMTemplate{
 		VMSize: api.VMSize{
@@ -227,8 +238,10 @@ func (client *Client) DeleteKeyPair(id string) error {
 func (client *Client) toVMSize(flavor map[string]interface{}) api.VMSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
-		tpl, _ := client.GetTemplate(fid)
-		return tpl.VMSize
+		tpl, err := client.GetTemplate(fid)
+		if err == nil {
+			return tpl.VMSize
+		}
 	}
 	if _, ok := flavor["vcpus"]; ok {
 		return api.VMSize{
@@ -348,6 +361,7 @@ type userData struct {
 //PrepareUserData prepares the initial configuration script
 func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp *api.KeyPair, gw *api.VM) ([]byte, error) {
 	dataBuffer := bytes.NewBufferString("")
+
 	var ResolvConf string
 	var err error
 	if !request.PublicIP {
@@ -355,7 +369,6 @@ func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp 
 		for _, dns := range client.Cfg.DNSList {
 			buffer.WriteString(fmt.Sprintf("nameserver %s\n", dns))
 		}
-		buffer.WriteString("nameserver 1.1.1.1\n")
 		ResolvConf = buffer.String()
 	}
 
@@ -367,6 +380,7 @@ func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp 
 			ip = gw.PrivateIPsV6[0]
 		}
 	}
+
 	data := userData{
 		User:       api.DefaultUser,
 		Key:        strings.Trim(kp.PublicKey, "\n"),
@@ -375,10 +389,16 @@ func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp 
 		AddGateway: !request.PublicIP && !client.Cfg.UseLayer3Networking,
 		ResolvConf: ResolvConf,
 		GatewayIP:  ip,
-		Password:   "SafeScale", // TODO: generate a strong password for gpac user...
 	}
-
-	err = client.UserDataTpl.Execute(dataBuffer, data)
+	type finalUserData struct {
+		userData
+		Password string
+	}
+	finalData := finalUserData{
+		userData: data,
+		Password: "SafeScale",
+	}
+	err = client.UserDataTpl.Execute(dataBuffer, finalData)
 	if err != nil {
 		return nil, err
 	}
