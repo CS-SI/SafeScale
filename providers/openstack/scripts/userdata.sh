@@ -74,7 +74,8 @@ create_user() {
 # Configure network for Debian distribution
 configure_network_debian() {
     echo "Configuring network (debian-based)..."
-    local path=/etc/network/interfaces.d cfg=$path/50-cloud-init.cfg
+    local path=/etc/network/interfaces.d 
+    local cfg=$path/50-cloud-init.cfg
     rm -f $cfg
     mkdir -p $path
     # Configure all network interfaces in dhcp
