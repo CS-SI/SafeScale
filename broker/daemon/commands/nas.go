@@ -154,7 +154,7 @@ func (s *NasServiceServer) Inspect(ctx context.Context, in *pb.NasName) (*pb.Nas
 
 	// Map api.Network to pb.Network
 	for _, nas := range nass {
-		pbnass = append(pbnass, convert.ToPBNas(&nas))
+		pbnass = append(pbnass, convert.ToPBNas(nas))
 	}
 	rv := &pb.NasList{NasList: pbnass}
 	log.Printf("End Inspect Nas")

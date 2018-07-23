@@ -47,11 +47,6 @@ const (
 	DefaultNasMountPath = "/data"
 )
 
-const (
-	//NasContainerName is the technical name of the container used to store nas info
-	NasContainerName = "nas"
-)
-
 //TimeoutError defines a Timeout error
 type TimeoutError struct {
 	Message string
@@ -204,8 +199,9 @@ type VolumeAttachmentRequest struct {
 
 // Nas represents a nas definition
 type Nas struct {
+	ID       string `json:"id,omitempty"`
 	Name     string `json:"name,omitempty"`
-	ServerID string `json:"vm,omitempty"`
+	Host     string `json:"vm,omitempty"`
 	Path     string `json:"path,omitempty"`
 	IsServer bool   `json:"isServer,omitempty"`
 }
