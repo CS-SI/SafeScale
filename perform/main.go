@@ -38,10 +38,11 @@ const (
 )
 
 func main() {
+	//cli.VersionFlags = "V, version"
 	app := cli.NewApp()
 	app.Name = "perform"
 	app.Usage = "perform COMMAND"
-	app.Version = "0.0.1"
+	app.Version = "0.1.0"
 	app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "CS-SI",
@@ -52,9 +53,10 @@ func main() {
 
 	app.Commands = append(app.Commands, cmd.ClusterCmd)
 	sort.Sort(cli.CommandsByName(cmd.ClusterCmd.Subcommands))
-
-	//app.Commands = append(app.Commands, cmd.TenantCmd)
-	//sort.Sort(cli.CommandsByName(cmd.TenantCmd.Subcommands))
+	app.Commands = append(app.Commands, cmd.NodeCmd)
+	sort.Sort(cli.CommandsByName(cmd.NodeCmd.Subcommands))
+	app.Commands = append(app.Commands, cmd.CommandCmd)
+	sort.Sort(cli.CommandsByName(cmd.CommandCmd.Subcommands))
 
 	sort.Sort(cli.CommandsByName(app.Commands))
 	err := app.Run(os.Args)
