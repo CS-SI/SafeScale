@@ -260,10 +260,11 @@ message NasName{
 }
 
 message NasDefinition{
-    NasName Nas = 1;
-    Reference VM = 2;
-    string path = 3;
-    bool isServer =4;
+    string ID = 1;
+    NasName Nas = 2;
+    Reference VM = 3;
+    string path = 4;
+    bool isServer = 5;
 }
 
 message NasList{
