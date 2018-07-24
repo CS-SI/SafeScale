@@ -84,12 +84,12 @@ var volumeInspect = cli.Command{
 		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVolumeServiceClient(conn)
-		volume, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
+		volumeInfo, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
 		if err != nil {
 			return fmt.Errorf("Could not get volume '%s': %v", c.Args().First(), err)
 		}
 
-		out, _ := json.Marshal(volume)
+		out, _ := json.Marshal(volumeInfo)
 		fmt.Println(string(out))
 
 		return nil

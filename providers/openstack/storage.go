@@ -200,7 +200,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		VolumeID: request.VolumeID,
 	}).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume attachement between server %s and volume %s: %s", request.ServerID, request.VolumeID, errorString(err))
+		return nil, fmt.Errorf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, errorString(err))
 	}
 
 	vaapi := &api.VolumeAttachment{
@@ -228,7 +228,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 func (client *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment, error) {
 	va, err := volumeattach.Get(client.Compute, serverID, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting volume attachement %s: %s", id, errorString(err))
+		return nil, fmt.Errorf("Error getting volume attachment %s: %s", id, errorString(err))
 	}
 	return &api.VolumeAttachment{
 		ID:       va.ID,
@@ -267,22 +267,22 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttach
 func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 	va, err := client.GetVolumeAttachment(serverID, id)
 	if err != nil {
-		return fmt.Errorf("Error deleting volume attachement %s: %s", id, errorString(err))
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
 	}
 
 	err = volumeattach.Delete(client.Compute, serverID, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting volume attachement %s: %s", id, errorString(err))
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
 	}
 
 	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), id)
 	if err != nil {
-		return fmt.Errorf("Error deleting volume attachement %s: %s", id, errorString(err))
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
 	}
 
 	err = mtdVol.Detach(va)
 	if err != nil {
-		return fmt.Errorf("Error deleting volume attachement %s: %s", id, errorString(err))
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
 	}
 
 	return nil

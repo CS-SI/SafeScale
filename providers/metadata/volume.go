@@ -170,6 +170,24 @@ func (m *Volume) Detach(va *api.VolumeAttachment) error {
 	return m.folder.Delete(m.volume.ID, va.ServerID)
 }
 
+//GetAttachment return associated attachment (if any) to this volume
+func (m *Volume) GetAttachment() (*api.VolumeAttachment, error) {
+	if m.volume == nil {
+		panic("m.volume is nil!")
+	}
+
+	var rv *api.VolumeAttachment
+	err := m.folder.Browse(m.volume.ID, func(buf *bytes.Buffer) error {
+		err := gob.NewDecoder(buf).Decode(&rv)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return rv, err
+}
+
 //SaveVolume saves the Volume definition in Object Storage
 func SaveVolume(svc *providers.Service, volume *api.Volume) error {
 	m, err := NewVolume(svc)

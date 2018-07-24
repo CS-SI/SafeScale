@@ -183,11 +183,13 @@ type VolumeRequest struct {
 
 //VolumeAttachment represents a volume attachment
 type VolumeAttachment struct {
-	ID       string `json:"id,omitempty"`
-	Name     string `json:"name,omitempty"`
-	VolumeID string `json:"volume,omitempty"`
-	ServerID string `json:"vm,omitempty"`
-	Device   string `json:"device,omitempty"`
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name,omitempty"`
+	VolumeID   string `json:"volume,omitempty"`
+	ServerID   string `json:"vm,omitempty"`
+	Device     string `json:"device,omitempty"`
+	MountPoint string `json:"mountpoint,omitempty"`
+	Format     string `json:"format,omitempty"`
 }
 
 //VolumeAttachmentRequest represents a volume attachment request

@@ -31,6 +31,7 @@ import (
 type VolumeAPI interface {
 	Delete(ref string) error
 	Get(ref string) (*api.Volume, error)
+	Inspect(ref string) (*api.Volume, *api.VolumeAttachment, error)
 	List(all bool) ([]api.Volume, error)
 	Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error)
 	Attach(volume string, vm string, path string, format string) error
@@ -73,6 +74,24 @@ func (srv *VolumeService) Get(ref string) (*api.Volume, error) {
 		return nil, fmt.Errorf("Volume %s does not exist", ref)
 	}
 	return m.Get(), nil
+}
+
+//Inspect returns the volume identified by ref and its attachment (if any)
+func (srv *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachment, error) {
+	mtdvol, err := metadata.LoadVolume(srv.provider, ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	if mtdvol == nil {
+		return nil, nil, fmt.Errorf("Volume %s does not exist", ref)
+	}
+
+	va, err := mtdvol.GetAttachment()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return mtdvol.Get(), va, nil
 }
 
 // Create a volume
@@ -140,6 +159,15 @@ func (srv *VolumeService) Attach(volumename, vmname, path, format string) error 
 		srv.Detach(volumename, vmname)
 		return err
 	}
+
+	//Update volume attacheemnt info ith mountpoint
+	volatt.MountPoint = mountPoint
+	volatt.Format = format
+	mtdVol, err := metadata.LoadVolume(srv.provider, volumename)
+	if err != nil {
+		return err
+	}
+	mtdVol.Attach(volatt)
 
 	return nil
 }

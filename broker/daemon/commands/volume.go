@@ -58,7 +58,7 @@ func (s *VolumeServiceServer) List(ctx context.Context, in *pb.VolumeListRequest
 
 	// Map api.Volume to pb.Volume
 	for _, volume := range volumes {
-		pbvolumes = append(pbvolumes, conv.ToPbVolume(volume))
+		pbvolumes = append(pbvolumes, conv.ToPbVolume(&volume))
 	}
 	rv := &pb.VolumeList{Volumes: pbvolumes}
 	log.Printf("End Volume List")
@@ -80,7 +80,7 @@ func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 	}
 
 	log.Printf("Volume '%s' created: %v", in.GetName(), vol)
-	return conv.ToPbVolume(*vol), nil
+	return conv.ToPbVolume(vol), nil
 }
 
 //Attach a volume to a VM and create a mount point
@@ -147,7 +147,7 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 }
 
 //Inspect a volume
-func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Volume, error) {
+func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VolumeInfo, error) {
 	log.Printf("Inspect Volume called")
 
 	ref := utils.GetReference(in)
@@ -161,11 +161,11 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 	}
 
 	service := services.NewVolumeService(currentTenant.Client)
-	vol, err := service.Get(ref)
+	volume, volattach, err := service.Inspect(ref)
 	if err != nil {
 		return nil, err
 	}
 
 	log.Printf("End Inspect volume: '%s'", ref)
-	return conv.ToPbVolume(*vol), nil
+	return conv.ToPbVolumeInfo(volume, volattach), nil
 }
