@@ -43,14 +43,14 @@ type VolumeServiceServer struct{}
 var VolumeServiceCreator = services.NewVolumeService
 
 //List the available volumes
-func (s *VolumeServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.VolumeList, error) {
+func (s *VolumeServiceServer) List(ctx context.Context, in *pb.VolumeListRequest) (*pb.VolumeList, error) {
 	log.Printf("Volume List called")
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 	service := VolumeServiceCreator(tenant.Client)
-	volumes, err := service.List()
+	volumes, err := service.List(in.GetAll())
 	if err != nil {
 		return nil, err
 	}

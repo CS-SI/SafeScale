@@ -376,7 +376,7 @@ type ClientAPI interface {
 	// GetVolume returns the volume identified by id
 	GetVolume(id string) (*Volume, error)
 	// ListVolumes list available volumes
-	ListVolumes() ([]Volume, error)
+	ListVolumes(all bool) ([]Volume, error)
 	// DeleteVolume deletes the volume identified by id
 	DeleteVolume(id string) error
 

@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system/nfs"
 )
 
@@ -30,7 +31,7 @@ import (
 type VolumeAPI interface {
 	Delete(ref string) error
 	Get(ref string) (*api.Volume, error)
-	List() ([]api.Volume, error)
+	List(all bool) ([]api.Volume, error)
 	Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error)
 	Attach(volume string, vm string, path string, format string) error
 	Detach(volume string, vm string) error
@@ -49,8 +50,8 @@ type VolumeService struct {
 }
 
 //List returns the network list
-func (srv *VolumeService) List() ([]api.Volume, error) {
-	return srv.provider.ListVolumes()
+func (srv *VolumeService) List(all bool) ([]api.Volume, error) {
+	return srv.provider.ListVolumes(all)
 }
 
 //Delete deletes volume referenced by ref
@@ -64,16 +65,18 @@ func (srv *VolumeService) Delete(ref string) error {
 
 //Get returns the volume identified by ref, ref can be the name or the id
 func (srv *VolumeService) Get(ref string) (*api.Volume, error) {
-	volumes, err := srv.List()
+	m, err := metadata.NewVolume(srv.provider)
 	if err != nil {
 		return nil, err
 	}
-	for _, volume := range volumes {
-		if volume.ID == ref || volume.Name == ref {
-			return &volume, nil
-		}
+	found, err := m.ReadByName(ref)
+	if !found {
+		found, err = m.ReadByID(ref)
 	}
-	return nil, fmt.Errorf("Volume '%s' does not exist", ref)
+	if found {
+		return m.Get(), nil
+	}
+	return nil, fmt.Errorf("Volume %s does not exist", ref)
 }
 
 // Create a volume

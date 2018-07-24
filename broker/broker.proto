@@ -173,6 +173,10 @@ message Volume{
     int32 Size = 4;
 }
 
+message VolumeListRequest{
+    bool All = 1;
+}
+
 message VolumeList{
     repeated Volume volumes = 1;
 }
@@ -194,7 +198,7 @@ service VolumeService{
     rpc Attach(VolumeAttachment) returns (google.protobuf.Empty) {}
     rpc Detach(VolumeDetachment) returns (google.protobuf.Empty){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
-    rpc List(google.protobuf.Empty) returns (VolumeList) {}
+    rpc List(VolumeListRequest) returns (VolumeList) {}
     rpc Inspect(Reference) returns (Volume){}
 }
 
