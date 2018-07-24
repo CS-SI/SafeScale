@@ -203,12 +203,25 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		return nil, fmt.Errorf("Error creating volume attachement between server %s and volume %s: %s", request.ServerID, request.VolumeID, errorString(err))
 	}
 
-	return &api.VolumeAttachment{
+	vaapi := &api.VolumeAttachment{
 		ID:       va.ID,
 		ServerID: va.ServerID,
 		VolumeID: va.VolumeID,
 		Device:   va.Device,
-	}, nil
+	}
+
+	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), request.VolumeID)
+	if err != nil {
+		// TODO ? Detach volume ?
+		return nil, err
+	}
+	err = mtdVol.Attach(vaapi)
+	if err != nil {
+		// TODO ? Detach volume ?
+		return vaapi, err
+	}
+
+	return vaapi, nil
 }
 
 //GetVolumeAttachment returns the volume attachment identified by id
@@ -252,10 +265,26 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttach
 
 //DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
-	err := volumeattach.Delete(client.Compute, serverID, id).ExtractErr()
+	va, err := client.GetVolumeAttachment(serverID, id)
 	if err != nil {
 		return fmt.Errorf("Error deleting volume attachement %s: %s", id, errorString(err))
 	}
+
+	err = volumeattach.Delete(client.Compute, serverID, id).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachement %s: %s", id, errorString(err))
+	}
+
+	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), id)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachement %s: %s", id, errorString(err))
+	}
+
+	err = mtdVol.Detach(va)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachement %s: %s", id, errorString(err))
+	}
+
 	return nil
 }
 

@@ -152,6 +152,24 @@ func (m *Volume) Browse(callback func(*api.Volume) error) error {
 	})
 }
 
+//Attach add a volume attachment to the volume definition in Object Storage
+func (m *Volume) Attach(va *api.VolumeAttachment) error {
+	if m.volume == nil {
+		panic("m.volume is nil!")
+	}
+
+	return m.folder.Write(m.volume.ID, va.ServerID, va)
+}
+
+//Detach remove a volume attachment from the volume definition in Object Storage
+func (m *Volume) Detach(va *api.VolumeAttachment) error {
+	if m.volume == nil {
+		panic("m.volume is nil!")
+	}
+
+	return m.folder.Delete(m.volume.ID, va.ServerID)
+}
+
 //SaveVolume saves the Volume definition in Object Storage
 func SaveVolume(svc *providers.Service, volume *api.Volume) error {
 	m, err := NewVolume(svc)

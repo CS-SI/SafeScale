@@ -65,18 +65,14 @@ func (srv *VolumeService) Delete(ref string) error {
 
 //Get returns the volume identified by ref, ref can be the name or the id
 func (srv *VolumeService) Get(ref string) (*api.Volume, error) {
-	m, err := metadata.NewVolume(srv.provider)
+	m, err := metadata.LoadVolume(srv.provider, ref)
 	if err != nil {
 		return nil, err
 	}
-	found, err := m.ReadByName(ref)
-	if !found {
-		found, err = m.ReadByID(ref)
+	if m == nil {
+		return nil, fmt.Errorf("Volume %s does not exist", ref)
 	}
-	if found {
-		return m.Get(), nil
-	}
-	return nil, fmt.Errorf("Volume %s does not exist", ref)
+	return m.Get(), nil
 }
 
 // Create a volume
