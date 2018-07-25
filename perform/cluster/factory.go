@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/perform/cluster/metadata"
 
+	"github.com/CS-SI/SafeScale/perform/cluster/boh"
 	"github.com/CS-SI/SafeScale/perform/cluster/dcos"
 )
 
@@ -51,6 +52,11 @@ func Get(name string) (clusterapi.ClusterAPI, error) {
 		if err != nil {
 			return nil, err
 		}
+	case Flavor.BOH:
+		instance, err = boh.Load(m)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		found = false
 	}
@@ -64,10 +70,10 @@ func Get(name string) (clusterapi.ClusterAPI, error) {
 func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	// Validates parameters
 	if req.Name == "" {
-		return nil, fmt.Errorf("Invalid parameter req.Name: can't be empty")
+		panic("req.Name is empty!")
 	}
 	if req.CIDR == "" {
-		return nil, fmt.Errorf("Invalid parameter req.CIDR: can't be empty")
+		panic("req.CIDR is empty!")
 	}
 
 	var instance clusterapi.ClusterAPI
@@ -78,22 +84,17 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-	/*
-		// Creates network
-		log.Printf("Creating Network 'net-%s'", req.Name)
-		req.Name = strings.ToLower(req.Name)
-		networkName := "net-" + req.Name
-		network, err = brokeruse.CreateNetwork(networkName, req.CIDR)
-		if err != nil {
-			err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
-			return nil, err
-		}
-	*/
 
 	switch req.Flavor {
 	case Flavor.DCOS:
 		req.Tenant = tenant
 		instance, err = dcos.Create(req)
+		if err != nil {
+			return nil, err
+		}
+	case Flavor.BOH:
+		req.Tenant = tenant
+		instance, err = boh.Create(req)
 		if err != nil {
 			return nil, err
 		}

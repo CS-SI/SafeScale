@@ -28,7 +28,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 )
 
-//Request defines what kind of Cluster is wanted
+// Request defines what kind of Cluster is wanted
 type Request struct {
 	//Name is the name of the cluster wanted
 	Name string
@@ -44,6 +44,8 @@ type Request struct {
 	Tenant string
 	// KeepOnFailure is set to True to keep resources on cluster creation failure
 	KeepOnFailure bool
+	// ImageID tells (if permitted by Flavor) the Linux distribution to use
+	ImageID string
 }
 
 //ClusterAPI is an interface of methods associated to Cluster-like structs

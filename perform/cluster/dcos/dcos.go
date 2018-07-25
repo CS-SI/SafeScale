@@ -29,6 +29,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	"github.com/CS-SI/SafeScale/perform/cluster/dcos/ErrorCode"
@@ -42,7 +43,6 @@ import (
 	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
 	"github.com/CS-SI/SafeScale/perform/cluster/components"
 	"github.com/CS-SI/SafeScale/perform/cluster/metadata"
-	"github.com/CS-SI/SafeScale/perform/cluster/utils"
 
 	"github.com/CS-SI/SafeScale/providers"
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
@@ -119,6 +119,15 @@ type Specific struct {
 
 	//StateCollectInterval in seconds
 	StateCollectInterval time.Duration
+
+	// PrivateLastIndex
+	MasterLastIndex int
+
+	// PrivateLastIndex
+	PrivateLastIndex int
+
+	// PublicLastIndex
+	PublicLastIndex int
 }
 
 //Cluster is the object describing a cluster created by ClusterManagerAPI.CreateCluster
@@ -169,6 +178,12 @@ func Load(data *metadata.Cluster) (clusterapi.ClusterAPI, error) {
 
 //Create creates the necessary infrastructure of cluster
 func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
+	// Generate needed password for account cladm
+	cladmPassword, err := utils.GeneratePassword(16)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate password for user cladm: %s", err.Error())
+	}
+
 	// Creates network
 	log.Printf("Creating Network 'net-%s'", req.Name)
 	req.Name = strings.ToLower(req.Name)
@@ -245,7 +260,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 			Tenant:        req.Tenant,
 			NetworkID:     req.NetworkID,
 			Keypair:       kp,
-			AdminPassword: utils.GeneratePassword(),
+			AdminPassword: cladmPassword,
 			PublicIP:      gw.GetAccessIP(),
 		},
 		Specific: &Specific{
@@ -465,7 +480,7 @@ func (c *Cluster) asyncConfigurePrivateNodes(done chan error) {
 	}
 }
 
-//asyncCreateMasters
+// asyncCreateMasters
 // Intended to be used as goroutine
 func (c *Cluster) asyncCreateMasters(count int, done chan error) {
 	var countS string
@@ -496,7 +511,7 @@ func (c *Cluster) asyncCreateMasters(count int, done chan error) {
 	done <- nil
 }
 
-//asyncConfigureMasters configure masters
+// asyncConfigureMasters configure masters
 func (c *Cluster) asyncConfigureMasters(done chan error) {
 	fmt.Println("Configuring DCOS masters...")
 
@@ -523,7 +538,7 @@ func (c *Cluster) asyncConfigureMasters(done chan error) {
 	done <- nil
 }
 
-//createAndConfigureNode creates and configure a Node
+// createAndConfigureNode creates and configure a Node
 func (c *Cluster) createAndConfigureNode(public bool, req *pb.VMDefinition) (string, error) {
 	var nodeType NodeType.Enum
 	if public {
@@ -553,16 +568,21 @@ func (c *Cluster) createAndConfigureNode(public bool, req *pb.VMDefinition) (str
 	return vmID, nil
 }
 
-//asyncCreateMaster adds a master node
+// asyncCreateMaster adds a master node
 func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 	log.Printf("[Masters: #%d] starting creation...\n", index)
 
-	name := c.Common.Name + "-master-" + strconv.Itoa(index)
+	name, err := c.buildHostname("master", NodeType.Master)
+	if err != nil {
+		log.Printf("[Masters: #%d] creation failed: %s\n", index, err.Error())
+		done <- fmt.Errorf("failed to create Master server %d: %s", index, err.Error())
+		return
+	}
 
 	masterVM, err := brokeruse.CreateVM(&pb.VMDefinition{
 		Name:      name,
 		CPUNumber: 4,
-		RAM:       16.0,
+		RAM:       15.0,
 		Disk:      60,
 		ImageID:   centos,
 		Network:   c.Common.NetworkID,
@@ -627,7 +647,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 	done <- nil
 }
 
-//asyncConfigureMaster configure DCOS on master
+// asyncConfigureMaster configure DCOS on master
 func (c *Cluster) asyncConfigureMaster(index int, masterID string, done chan error) {
 	log.Printf("[Masters: #%d (%s)] starting configuration...\n", index, masterID)
 
@@ -670,32 +690,33 @@ func (c *Cluster) asyncConfigureMaster(index int, masterID string, done chan err
 	done <- nil
 }
 
-//asyncCreateNode creates a Node in the cluster
+// asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
 func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMDefinition, result chan string, done chan error) {
 	var publicIP bool
-	var count int
 	var nodeTypeStr string
-	coreName := "node"
 	if nodeType == NodeType.PublicNode {
 		nodeTypeStr = "public"
 		publicIP = true
-		coreName = "pub" + coreName
-		count = len(c.Common.PublicNodeIDs)
 	} else {
 		nodeTypeStr = "private"
 		publicIP = false
-		coreName = "priv" + coreName
-		count = len(c.Common.PrivateNodeIDs)
 	}
 	log.Printf("[Nodes: %s #%d] starting creation...\n", nodeTypeStr, index)
 
 	// Create the host
+	var err error
+	req.Name, err = c.buildHostname("node", nodeType)
+	if err != nil {
+		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
+		result <- ""
+		done <- err
+		return
+	}
 	req.Public = publicIP
 	req.Network = c.Common.NetworkID
-	req.Name = c.Common.Name + "-" + coreName + "-" + strconv.Itoa(count+1)
 	req.ImageID = centos
-	nodeVM, err := brokeruse.CreateVM(req)
+	node, err := brokeruse.CreateVM(req)
 	if err != nil {
 		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -706,11 +727,11 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 	// Registers the new Agent in the cluster struct
 	c.metadata.Acquire()
 	if nodeType == NodeType.PublicNode {
-		c.Common.PublicNodeIDs = append(c.Common.PublicNodeIDs, nodeVM.ID)
-		c.Specific.PublicNodeIPs = append(c.Specific.PublicNodeIPs, nodeVM.PRIVATE_IP)
+		c.Common.PublicNodeIDs = append(c.Common.PublicNodeIDs, node.ID)
+		c.Specific.PublicNodeIPs = append(c.Specific.PublicNodeIPs, node.PRIVATE_IP)
 	} else {
-		c.Common.PrivateNodeIDs = append(c.Common.PrivateNodeIDs, nodeVM.ID)
-		c.Specific.PrivateNodeIPs = append(c.Specific.PrivateNodeIPs, nodeVM.PRIVATE_IP)
+		c.Common.PrivateNodeIDs = append(c.Common.PrivateNodeIDs, node.ID)
+		c.Specific.PrivateNodeIPs = append(c.Specific.PrivateNodeIPs, node.PRIVATE_IP)
 	}
 
 	// Update cluster definition in Object Storage
@@ -724,7 +745,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 			c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
 			c.Specific.PrivateNodeIPs = c.Specific.PrivateNodeIPs[:len(c.Specific.PrivateNodeIPs)-1]
 		}
-		brokeruse.DeleteVM(nodeVM.ID)
+		brokeruse.DeleteVM(node.ID)
 		c.metadata.Release()
 		log.Printf("[Nodes: %s #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -734,13 +755,15 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 	c.metadata.Release()
 
 	// Installs DCOS requirements
-	ssh, err := c.provider.GetSSHConfig(nodeVM.ID)
+	ssh, err := c.provider.GetSSHConfig(node.ID)
 	if err != nil {
+		result <- ""
 		done <- err
 		return
 	}
 	err = ssh.WaitServerReady(longTimeoutSSH)
 	if err != nil {
+		result <- ""
 		done <- err
 		return
 	}
@@ -749,28 +772,30 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 		"BootstrapPort": bootstrapHTTPPort,
 	})
 	if err != nil {
-		log.Printf("[Nodes: %s #%d (%s)] installation failed: %s\n", nodeTypeStr, index, nodeVM.ID, err.Error())
+		log.Printf("[Nodes: %s #%d (%s)] installation failed: %s\n", nodeTypeStr, index, node.ID, err.Error())
+		result <- ""
 		done <- err
 		return
 	}
 	if retcode != 0 {
+		result <- ""
 		if retcode < int(ErrorCode.NextErrorCode) {
 			errcode := ErrorCode.Enum(retcode)
-			log.Printf("[Nodes: %s #%d (%s)] installation failed: retcode: %d (%s)", nodeTypeStr, index, nodeVM.ID, errcode, errcode.String())
+			log.Printf("[Nodes: %s #%d (%s)] installation failed: retcode: %d (%s)", nodeTypeStr, index, node.ID, errcode, errcode.String())
 			done <- fmt.Errorf("scripted Node configuration failed with error code %d (%s)", errcode, errcode.String())
 		} else {
-			log.Printf("[Nodes: %s #%d (%s)] installation failed: retcode=%d", nodeTypeStr, index, nodeVM.ID, retcode)
+			log.Printf("[Nodes: %s #%d (%s)] installation failed: retcode=%d", nodeTypeStr, index, node.ID, retcode)
 			done <- fmt.Errorf("scripted Agent configuration failed with error code %d", retcode)
 		}
 		return
 	}
 
 	log.Printf("[Nodes: %s #%d] creation successful\n", nodeTypeStr, index)
-	result <- nodeVM.ID
+	result <- node.ID
 	done <- nil
 }
 
-//asyncConfigureNode installs and configure DCOS agent on targetVM
+// asyncConfigureNode installs and configure DCOS agent on targetVM
 func (c *Cluster) asyncConfigureNode(index int, nodeID string, nodeType NodeType.Enum, done chan error) {
 	var publicStr string
 	var nodeTypeStr string
@@ -820,7 +845,7 @@ func (c *Cluster) asyncConfigureNode(index int, nodeID string, nodeType NodeType
 	done <- nil
 }
 
-//asyncPrepareBootstrap prepares the bootstrap
+// asyncPrepareBootstrap prepares the bootstrap
 func (c *Cluster) asyncPrepareBootstrap(done chan error) {
 	log.Printf("[Bootstrap] starting preparation...")
 
@@ -858,7 +883,7 @@ func (c *Cluster) asyncPrepareBootstrap(done chan error) {
 	done <- nil
 }
 
-//asyncConfigureBootstrap prepares the bootstrap
+// asyncConfigureBootstrap prepares the bootstrap
 func (c *Cluster) asyncConfigureBootstrap(done chan error) {
 	log.Printf("[Bootstrap] starting configuration...")
 
@@ -913,7 +938,48 @@ func (c *Cluster) asyncConfigureBootstrap(done chan error) {
 	done <- nil
 }
 
-//GetName returns the name of the cluster
+// buildHostname builds a unique hostname in the cluster
+func (c *Cluster) buildHostname(core string, nodeType NodeType.Enum) (string, error) {
+	var (
+		index    int
+		coreName string
+	)
+
+	switch nodeType {
+	case NodeType.PublicNode:
+		coreName = "pub" + core
+	case NodeType.PrivateNode:
+		coreName = "priv" + core
+	case NodeType.Master:
+		coreName = core
+	default:
+		return "", fmt.Errorf("Invalid Node Type '%v'", nodeType)
+	}
+
+	c.metadata.Acquire()
+	switch nodeType {
+	case NodeType.PublicNode:
+		c.Specific.PublicLastIndex++
+		index = c.Specific.PublicLastIndex
+	case NodeType.PrivateNode:
+		c.Specific.PrivateLastIndex++
+		index = c.Specific.PrivateLastIndex
+	case NodeType.Master:
+		c.Specific.MasterLastIndex++
+		index = c.Specific.MasterLastIndex
+	}
+
+	// Update cluster definition in Object Storage
+	err := c.metadata.Write()
+	if err != nil {
+		c.metadata.Release()
+		return "", err
+	}
+	c.metadata.Release()
+	return c.Common.Name + "-" + coreName + "-" + strconv.Itoa(index), nil
+}
+
+// GetName returns the name of the cluster
 func (c *Cluster) GetName() string {
 	return c.Common.Name
 }
@@ -1358,7 +1424,7 @@ func (c *Cluster) executeScript(ssh *system.SSHConfig, script string, data map[s
 
 	path, err := c.uploadTemplateToFile(ssh, script, script, data)
 	if err != nil {
-		return 0, nil, nil
+		return 0, nil, err
 	}
 	cmdResult, err := ssh.SudoCommand(fmt.Sprintf("chmod a+rx %s; %s", path, path))
 	//	cmdResult, err := ssh.SudoCommand(fmt.Sprintf("chmod a+rx %s; %s; #rm -f %s", path, path, path))
@@ -1413,7 +1479,7 @@ func (c *Cluster) DeleteSpecificNode(ID string) error {
 		foundInPrivate, idx = contains(c.Common.PrivateNodeIDs, ID)
 	}
 	if !foundInPublic && !foundInPrivate {
-		return fmt.Errorf("VM ID '%s' isn't a registered Node of the Cluster '%s'.", ID, c.Common.Name)
+		return fmt.Errorf("host ID '%s' isn't a registered Node of the Cluster '%s'", ID, c.Common.Name)
 	}
 
 	err := brokeruse.DeleteVM(ID)

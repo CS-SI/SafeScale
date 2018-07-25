@@ -33,10 +33,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/CS-SI/SafeScale/utils/retry"
-
-	"github.com/CS-SI/SafeScale/perform/cluster/dcos/ErrorCode"
-
 	rice "github.com/GeertJohan/go.rice"
 
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
@@ -44,16 +40,19 @@ import (
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/NodeType"
+	"github.com/CS-SI/SafeScale/perform/cluster/dcos/ErrorCode"
 	"github.com/CS-SI/SafeScale/perform/cluster/metadata"
-	"github.com/CS-SI/SafeScale/perform/cluster/utils"
 
 	"github.com/CS-SI/SafeScale/providers"
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
-	"github.com/CS-SI/SafeScale/system"
 
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
+	"github.com/CS-SI/SafeScale/utils/retry"
+
+	"github.com/CS-SI/SafeScale/system"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )
@@ -157,6 +156,12 @@ func Load(data *metadata.Cluster) (clusterapi.ClusterAPI, error) {
 
 // Create creates the necessary infrastructure of cluster
 func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
+	// Generate needed password for account cladm
+	cladmPassword, err := utils.GeneratePassword(16)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate password for user cladm: %s", err.Error())
+	}
+
 	// Creates network
 	log.Printf("Creating Network 'net-%s'", req.Name)
 	req.Name = strings.ToLower(req.Name)
@@ -233,7 +238,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 			Tenant:        req.Tenant,
 			NetworkID:     req.NetworkID,
 			Keypair:       kp,
-			AdminPassword: utils.GeneratePassword(),
+			AdminPassword: cladmPassword,
 			PublicIP:      gw.GetAccessIP(),
 		},
 		Specific: &Specific{},

@@ -1,6 +1,6 @@
 
 GO?=go
-ENUM_STRINGS=ClusterState/enum_string.go Complexity/enum_string.go Flavor/enum_string.go NodeState/enum_string.go NodeType/enum_string.go
+ENUM_STRINGS=ClusterState/enum_string.go Complexity/enum_string.go NodeState/enum_string.go NodeType/enum_string.go
 
 all: enums vet
 
@@ -10,7 +10,6 @@ vet:
 	@$(GO) vet
 	@$(GO) vet ./ClusterState
 	@$(GO) vet ./Complexity
-	@$(GO) vet ./Flavor
 	@$(GO) vet ./NodeType
 	@$(GO) vet ./NodeState
 
@@ -22,9 +21,6 @@ ClusterState/enum_string.go: ClusterState/enum.go
 Complexity/enum_string.go: Complexity/enum.go
 	@(cd Complexity && go generate)
 
-Flavor/enum_string.go: Flavor/enum.go
-	@(cd Flavor && go generate)
-
 NodeState/enum_string.go: NodeState/enum.go
 	@(cd NodeState && go generate)
 
@@ -34,6 +30,5 @@ NodeType/enum_string.go: NodeType/enum.go
 clean:
 	@($(RM) ClusterState/enum_string.go)
 	@($(RM) Complexity/enum_string.go)
-	@($(RM) Flavor/enum_string.go)
 	@($(RM) NodeState/enum_string.go)
 	@($(RM) NodeType/enum_string.go)
