@@ -34,6 +34,7 @@ fw_i_accept() {
 fw_f_accept() {
     iptables -A FORWARD -j ACCEPT $*
 }
+
 PR_IP=
 PR_IF=
 PU_IP=
@@ -54,7 +55,7 @@ save_iptables_rules() {
 create_user() {
     echo "Creating user {{ .User }}..."
     useradd {{ .User }} --home-dir /home/{{ .User }} --shell /bin/bash --comment "" --create-home
-    echo gpac:{{ .Password }} | chpasswd
+    echo "gpac:{{ .Password }}" | chpasswd
     echo "{{ .User }} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
     # Sets ssh config
@@ -74,7 +75,7 @@ create_user() {
 # Configure network for Debian distribution
 configure_network_debian() {
     echo "Configuring network (debian-based)..."
-    local path=/etc/network/interfaces.d 
+    local path=/etc/network/interfaces.d
     local cfg=$path/50-cloud-init.cfg
     rm -f $cfg
     mkdir -p $path
@@ -240,17 +241,50 @@ configure_as_gateway() {
 }
 
 configure_dns_legacy() {
-    cat <<-'EOF' > /etc/resolv.conf
-{{ .ResolvConf }}
+    echo "Configuring /etc/resolv.conf..."
+
+    cat <<-'EOF' >/etc/resolv.conf
+{{- if .DNSServers }}
+  {{- range .DNSServers }}
+nameserver {{ . }}
+  {{- end }}
+{{- end }}
 EOF
 }
 
 configure_dns_resolvconf() {
+    echo "Configuring resolvconf..."
+
     cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/original
-{{ .ResolvConf }}
+{{- if .DNSServers }}
+  {{- range .DNSServers }}
+nameserver {{ . }}
+  {{- end }}
+{{- end }}
 EOF
     rm -f /etc/resolvconf/resolv.conf.d/tail
     cd /etc/resolvconf/resolv.conf.d && /etc/resolvconf/update.d/libc
+}
+
+configure_dns_systemd_resolved() {
+    echo "Configuring systemd-resolved..."
+
+    cat <<-'EOF' >/etc/systemd/resolved.conf
+[Resolve]
+{{- if .DNSServers }}
+DNS={{ range .DNSServers }}{{ . }} {{ end }}
+{{- else }}
+DNS=
+{{- end}}
+#FallbackDNS=
+#Domains=
+#LLMNR=no
+#MulticastDNS=no
+#DNSSEC=no
+Cache=yes
+DNSStubListener=yes
+EOF
+    systemctl restart systemd-resolved
 }
 
 configure_gateway() {
@@ -284,32 +318,15 @@ EOF
 }
 
 case $LINUX_KIND in
-    debian)
+    debian|ubuntu)
         create_user
         {{- if .ConfIF }}
-        configure_network_debian
+        systemctl status systemd-networkd &>/dev/null && configure_network_netplan || configure_network_debian
         {{- end }}
         {{- if .IsGateway }}
         configure_as_gateway
         {{- else if .AddGateway }}
-        configure_dns_legacy
-        configure_gateway
-        {{- end }}
-        ;;
-
-    ubuntu)
-        create_user
-        {{- if .ConfIF }}
-        if [[ "$VERSION_ID" = "17.10" || "$VERSION_ID" = "18.04" ]]; then
-            configure_network_netplan
-        else
-            configure_network_debian
-        fi
-        {{- end }}
-        {{- if .IsGateway }}
-        configure_as_gateway
-        {{- else if .AddGateway }}
-        configure_dns_resolvconf
+        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_resolvconf
         configure_gateway
         {{- end }}
         ;;
