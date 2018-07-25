@@ -53,7 +53,7 @@ UUID := github.com/satori/go.uuid
 SPEW := github.com/davecgh/go-spew/spew
 DSP := github.com/mjibson/go-dsp/fft
 TESTIFY := github.com/stretchr/testify
-
+PASSWORD := github.com/sethvargo/go-password/password
 CRYPTO_SSH := golang.org/x/crypto/ssh
 
 # GRPC LIBS
@@ -70,6 +70,6 @@ AWS := github.com/aws/aws-sdk-go
 # Providers SDK
 PROVIDERS_SDK := $(GOPHERCLOUD) $(AWS)
 
-DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(CRYPTO_SSH) $(GRPC_LIBS) $(PROVIDERS_SDK)
+DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(PASSWORD) $(CRYPTO_SSH) $(GRPC_LIBS) $(PROVIDERS_SDK)
 
 deps: ; $(GO) get -u $(DEPS)
