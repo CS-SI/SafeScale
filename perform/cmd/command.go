@@ -20,129 +20,64 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/perform/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
 
-	"github.com/urfave/cli"
+	cli "github.com/jawher/mow.cli"
 )
 
 var (
-	clusterName string
+	clusterName     *string
+	clusterInstance clusterapi.ClusterAPI
 )
 
 // CommandCmd command
-var CommandCmd = cli.Command{
-	Name:    "command",
-	Aliases: []string{"cmd"},
-	Usage:   "command COMMAND",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "cluster, c",
-			Usage: "Name of the cluster",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		clusterName := c.String("cluster")
-		if clusterName == "" {
-			fmt.Println("Missing mandatory options --cluster,-c <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
+func CommandCmd(cmd *cli.Cmd) {
+	cmd.Spec = "CLUSTERNAME"
+	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+
+	cmd.Command("dcos", "call dcos command on cluster", commandDcos)
+	cmd.Command("kubectl", "call kubectl command on cluster", commandKubectl)
+	cmd.Command("marathon", "call marathon command on cluster", commandMarathon)
+
+	cmd.Before = func() {
+		if *clusterName == "" {
+			fmt.Println("Missing or invalid mandatory option --cluster,-c <cluster name>")
+			//cli.ShowSubcommandHelp(c)
+			return
 		}
-		instance, err := cluster.Get(clusterName)
+		var err error
+		clusterInstance, err = cluster.Get(*clusterName)
 		if err != nil {
-			return fmt.Errorf("failed to get cluster '%s' information: %s", clusterName, err.Error())
+			fmt.Printf("failed to get cluster '%s' information: %s\n", *clusterName, err.Error())
+			return
 		}
-		if instance == nil {
-			return fmt.Errorf("cluster '%s' not found", clusterName)
+		if clusterInstance == nil {
+			fmt.Printf("cluster '%s' not found\n", *clusterName)
+			return
 		}
-		fmt.Println("not yet implemented")
-		return nil
-	},
-	Subcommands: []cli.Command{
-		commandDcos,
-		commandKubectl,
-		commandMarathon,
-	},
+	}
 }
 
-var commandDcos = cli.Command{
-	Name:  "dcos",
-	Usage: "Runs a dcos cli command",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "cluster, c",
-			Usage: "Name of the cluster",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		clusterName := c.String("cluster")
-		if clusterName == "" {
-			fmt.Println("Missing mandatory options --cluster,-c <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
-		}
-		instance, err := cluster.Get(clusterName)
-		if err != nil {
-			return fmt.Errorf("failed to get cluster '%s' information: %s", clusterName, err.Error())
-		}
-		if instance == nil {
-			return fmt.Errorf("cluster '%s' not found", clusterName)
-		}
+func commandDcos(cmd *cli.Cmd) {
+	cmd.Spec = "-- [ARG...]"
+
+	cmd.Action = func() {
 		fmt.Println("not yet implemented")
-		return nil
-	},
+	}
 }
 
-var commandKubectl = cli.Command{
-	Name:  "kubectl",
-	Usage: "Runs a kubectl command",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "cluster, c",
-			Usage: "Name of the cluster",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		clusterName := c.String("cluster")
-		if clusterName == "" {
-			fmt.Println("Missing mandatory options --cluster <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
-		}
-		instance, err := cluster.Get(clusterName)
-		if err != nil {
-			return fmt.Errorf("failed to get cluster '%s' information: %s", clusterName, err.Error())
-		}
-		if instance == nil {
-			return fmt.Errorf("cluster '%s' not found", clusterName)
-		}
+func commandKubectl(cmd *cli.Cmd) {
+	cmd.Spec = "-- [ARG...]"
+
+	cmd.Action = func() {
 		fmt.Println("not yet implemented")
-		return nil
-	},
+	}
 }
 
-var commandMarathon = cli.Command{
-	Name:  "marathon",
-	Usage: "Run a marathon command",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "cluster, n",
-			Usage: "Name of the cluster",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		clusterName := c.String("cluster")
-		if clusterName == "" {
-			fmt.Println("Missing mandatory options --cluster <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
-		}
-		instance, err := cluster.Get(clusterName)
-		if err != nil {
-			return fmt.Errorf("failed to get cluster '%s' information: %s", clusterName, err.Error())
-		}
-		if instance == nil {
-			return fmt.Errorf("cluster '%s' not found", clusterName)
-		}
+func commandMarathon(cmd *cli.Cmd) {
+	cmd.Spec = "-- [ARG...]"
+
+	cmd.Action = func() {
 		fmt.Println("not yet implemented")
-		return nil
-	},
+	}
 }

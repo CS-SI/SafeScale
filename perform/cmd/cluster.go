@@ -17,447 +17,410 @@
 package cmd
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
+	"strconv"
 
-	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/perform/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/ClusterState"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/perform/cluster/api/Flavor"
 
-	"github.com/urfave/cli"
+	cli "github.com/jawher/mow.cli"
 )
 
 // ClusterCmd command
-var ClusterCmd = cli.Command{
-	Name:  "cluster",
-	Usage: "cluster COMMAND",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "Show details",
-		},
-		cli.BoolFlag{
-			Name:  "debug, d",
-			Usage: "Show debug info",
-		},
-	},
-	Subcommands: []cli.Command{
-		clusterList,
-		clusterCreate,
-		clusterDelete,
-		clusterInspect,
-		clusterStop,
-		clusterStart,
-		clusterState,
-		clusterExpand,
-		clusterShrink,
-	},
+func ClusterCmd(cmd *cli.Cmd) {
+	cmd.Command("ls list", "List available Clusters on the current tenant", clusterList)
+	cmd.Command("create", "Create cluster", clusterCreate)
+	cmd.Command("delete rm destroy", "Delete a cluster", clusterDelete)
+	cmd.Command("inspect show", "Inspect a cluster", clusterInspect)
+	cmd.Command("stop", "Stop a cluster", clusterStop)
+	cmd.Command("start", "Start a cluster", clusterStart)
+	cmd.Command("state", "State of a cluster", clusterState)
+	cmd.Command("expand grow", "Expand a cluster", clusterExpand)
+	cmd.Command("shrink reduce", "Shrink a cluster", clusterShrink)
+	cmd.Command("node", "Node management", NodeCmd)
+	cmd.Command("command cmd", "Command execution", CommandCmd)
 }
 
-var clusterList = cli.Command{
-	Name:    "list",
-	Aliases: []string{"ls"},
-	Usage:   "List available Clusters on the current tenant",
-	Action: func(c *cli.Context) error {
+func clusterList(cmd *cli.Cmd) {
+	cmd.Action = func() {
 		list, err := cluster.List()
 		if err != nil {
-			return fmt.Errorf("Could not get cluster list: %v", err)
+			fmt.Printf("Could not get cluster list: %v\n", err)
+			return
 		}
-		out, _ := json.Marshal(list)
-		fmt.Println(string(out))
-
-		return nil
-	},
+		jsoned, err := json.Marshal(list)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			return
+		}
+		var toFormat []interface{}
+		err = json.Unmarshal(jsoned, &toFormat)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			return
+		}
+		var formatted []interface{}
+		for _, value := range toFormat {
+			formatted = append(formatted, formatClusterConfig(value))
+		}
+		jsoned, err = json.Marshal(formatted)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			return
+		}
+		fmt.Println(string(jsoned))
+	}
 }
 
-var clusterInspect = cli.Command{
-	Name:      "inspect",
-	Usage:     "inspect Cluster",
-	ArgsUsage: "<cluster name>",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "name, n",
-			Usage: "Name of the cluster",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
+func formatClusterConfig(value interface{}) map[string]interface{} {
+	item := value.(map[string]interface{})
+
+	e := Flavor.Enum(int(item["Flavor"].(float64)))
+	item["FlavorLabel"] = e.String()
+
+	c := Complexity.Enum(int(item["Complexity"].(float64)))
+	item["ComplexityLabel"] = c.String()
+
+	s := ClusterState.Enum(int(item["State"].(float64)))
+	item["StateLabel"] = s.String()
+
+	delete(item, "PrivateNodeIDs")
+	delete(item, "PublicNodeIDs")
+
+	return item
+}
+
+func clusterInspect(cmd *cli.Cmd) {
+	cmd.Spec = "CLUSTERNAME"
+
+	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+
+	cmd.Action = func() {
+		if *clusterName == "" {
+			fmt.Println("Invalid empty argument CLUSTERNAME")
+			return
 		}
-		clusterName := c.Args().First()
-		instance, err := cluster.Get(clusterName)
+		instance, err := cluster.Get(*clusterName)
 		if err != nil {
-			return fmt.Errorf("Could not inspect cluster '%s': %s", clusterName, err.Error())
+			fmt.Printf("Could not inspect cluster '%s': %s\n", *clusterName, err.Error())
+			return
 		}
 		if instance == nil {
-			return fmt.Errorf("cluster '%s' not found", clusterName)
+			fmt.Printf("cluster '%s' not found.\n", *clusterName)
+			return
 		}
 
-		byteOutput, err := json.Marshal(instance.GetConfig())
+		err = outputClusterConfig(instance.GetConfig())
 		if err != nil {
-			return err
+			fmt.Printf("%v\n", err)
 		}
-		var output map[string]interface{}
-		err = json.Unmarshal(byteOutput, &output)
-		if err != nil {
-			return err
-		}
-
-		output["State"] = ClusterState.Enum(int(output["State"].(float64))).String()
-		output["Flavor"] = Flavor.Enum(int(output["Flavor"].(float64))).String()
-		output["Complexity"] = Complexity.Enum(int(output["Complexity"].(float64))).String()
-		delete(output, "PrivateNodeIDs")
-		delete(output, "PublicNodeIDs")
-		byteOutput, err = json.Marshal(output)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(string(byteOutput))
-		return nil
-	},
+	}
 }
 
-var clusterCreate = cli.Command{
-	Name:      "create",
-	Usage:     "create a new cluster",
-	ArgsUsage: "<cluster name>",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "complexity, C",
-			Value: "Normal",
-			Usage: "Complexity of the cluster; can be DEV, NORMAL, VOLUME",
-		},
-		cli.StringFlag{
-			Name:  "cidr, N",
-			Value: "192.168.0.0/24",
-			Usage: "CIDR of the network",
-		},
-		cli.BoolFlag{
-			Name:  "keep-on-failure, k",
-			Usage: "Doesn't delete resources on failure",
-		},
-		// cli.StringFlag{
-		// 	Name:  "flavor, F",
-		// 	Value: "DCOS",
-		// 	Usage: "Flavor of cluster",
-		// },
-	},
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
+func outputClusterConfig(result interface{}) error {
+	jsoned, err := json.Marshal(result)
+	if err != nil {
+		return err
+	}
+
+	var toFormat map[string]interface{}
+	err = json.Unmarshal(jsoned, &toFormat)
+	if err != nil {
+		return err
+	}
+
+	formatted := formatClusterConfig(toFormat)
+
+	jsoned, err = json.Marshal(formatted)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(jsoned))
+	return nil
+}
+
+func clusterCreate(cmd *cli.Cmd) {
+	cmd.Spec = "CLUSTERNAME -F [-C] [-N] [-k]"
+
+	clusterName := cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+	complexityStr := cmd.StringOpt("C complexity", "Normal", "Complexity of the cluster; can be DEV, NORMAL (default), VOLUME")
+	cidr := cmd.StringOpt("N cidr", "192.168.0.0/24", "CIDR of the network (default: 192.168.0.0/24)")
+	keep := cmd.BoolOpt("k keep-on-failure", false, "if set, don't delete resources on failure (default: false)")
+	flavorStr := cmd.StringOpt("F flavor", "", "Flavor of Cluster; can be DCOS, BOH (Bunch Of Hosts)")
+
+	cmd.Action = func() {
+		if *clusterName == "" {
+			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
+			return
 		}
-		clusterName := c.Args().First()
-		instance, err := cluster.Get(clusterName)
+		instance, err := cluster.Get(*clusterName)
 		if err != nil {
-			return err
+			fmt.Printf("%v\n", err)
+			return
 		}
-		if instance != nil {
-			return fmt.Errorf("cluster '%s' already exists.", clusterName)
+		if clusterInstance != nil {
+			fmt.Printf("cluster '%s' already exists.\n", *clusterName)
+			return
 		}
 
-		complexity, err := Complexity.FromString(c.String("complexity"))
+		complexity, err := Complexity.FromString(*complexityStr)
 		if err != nil {
-			return err
+			fmt.Printf("%v\n", err)
+			return
+		}
+		flavor := Flavor.Parse(*flavorStr)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			return
 		}
 		instance, err = cluster.Create(clusterapi.Request{
-			Name:          clusterName,
+			Name:          *clusterName,
 			Complexity:    complexity,
-			CIDR:          c.String("cidr"),
-			Flavor:        Flavor.DCOS,
-			KeepOnFailure: c.Bool("keep-on-failure"),
+			CIDR:          *cidr,
+			Flavor:        flavor,
+			KeepOnFailure: *keep,
 		})
 		if err != nil {
 			if instance != nil {
 				instance.Delete()
 			}
-			return fmt.Errorf("failed to create cluster: %s", err.Error())
+			fmt.Printf("failed to create cluster: %s", err.Error())
+			return
 		}
 
-		out, _ := json.Marshal(instance.GetConfig())
-		fmt.Println(string(out))
-
-		return nil
-	},
+		jsoned, err := json.Marshal(instance.GetConfig())
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			return
+		}
+		var toFormat map[string]interface{}
+		err = json.Unmarshal(jsoned, &toFormat)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			return
+		}
+		formatted := formatClusterConfig(toFormat)
+		delete(formatted, "PrivateNodeIDs")
+		delete(formatted, "PublicNodeIDs")
+		jsoned, err = json.Marshal(formatted)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			return
+		}
+		fmt.Println(string(jsoned))
+	}
 }
 
-var clusterDelete = cli.Command{
-	Name:      "delete",
-	Aliases:   []string{"rm", "destroy"},
-	Usage:     "Delete cluster",
-	ArgsUsage: "<cluster name>",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "force, f",
-			Usage: "force delete",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
+func clusterDelete(cmd *cli.Cmd) {
+	cmd.Spec = "CLUSTERNAME [-f]"
+
+	clusterName := cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+	force := cmd.BoolOpt("f force", false, "Force deletion")
+
+	cmd.Action = func() {
+		if *clusterName == "" {
+			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
+			return
 		}
-		clusterName := c.Args().First()
-		instance, err := cluster.Get(clusterName)
+
+		instance, err := cluster.Get(*clusterName)
 		if err != nil {
-			return err
+			fmt.Printf("%v\n", err)
+			return
 		}
 		if instance == nil {
-			return fmt.Errorf("cluster '%s' not found.", clusterName)
+			fmt.Printf("cluster '%s' not found\n", *clusterName)
+			return
 		}
-		if !c.Bool("force") {
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Printf("Are you sure to delete Cluster '%s' ? (y/N): ", clusterName)
-			resp, _ := reader.ReadString('\n')
-			resp = strings.ToLower(strings.TrimSuffix(resp, "\n"))
-			if resp != "y" {
-				fmt.Println("Aborted.")
-				return nil
-			}
+		if !*force && !userConfirmed(fmt.Sprintf("Are you sure to delete Cluster '%s'", *clusterName)) {
+			fmt.Println("Aborted.")
+			return
 		}
-		err = cluster.Delete(clusterName)
+		err = cluster.Delete(*clusterName)
 		if err != nil {
-			return err
+			fmt.Printf("%v\n", err)
+			return
 		}
 
-		fmt.Printf("Cluster '%s' deleted.\n", clusterName)
-		return nil
-	},
+		fmt.Printf("Cluster '%s' deleted.\n", *clusterName)
+	}
 }
 
-var clusterStop = cli.Command{
-	Name:      "stop",
-	Usage:     "Stop the cluster",
-	ArgsUsage: "<cluster name>",
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
+func clusterStop(cmd *cli.Cmd) {
+	cmd.Spec = "CLUSTERNAME"
+
+	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+
+	cmd.Action = func() {
+		if *clusterName == "" {
+			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
+			return
 		}
-		instance, err := cluster.Get(c.Args().First())
+
+		instance, err := cluster.Get(*clusterName)
 		if err != nil {
-			return err
+			fmt.Printf("%v\n", err)
+			return
+		}
+		if instance == nil {
+			fmt.Printf("Cluster '%s' not found.\n", *clusterName)
+			return
 		}
 		err = instance.Stop()
 		if err != nil {
-			return err
+			fmt.Printf("%v\n", err)
+			return
 		}
-		fmt.Printf("Cluster '%s' stopped.\n", c.Args().First())
-
-		return nil
-	},
+		fmt.Printf("Cluster '%s' stopped.\n", *clusterName)
+	}
 }
 
-var clusterStart = cli.Command{
-	Name:      "start",
-	Usage:     "Start the cluster",
-	ArgsUsage: "<cluster name>",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "name, n",
-			Usage: "Name of the cluster",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
+func clusterStart(cmd *cli.Cmd) {
+	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+
+	cmd.Action = func() {
+		if *clusterName == "" {
+			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
+			return
 		}
-		instance, err := cluster.Get(c.Args().First())
+
+		instance, err := cluster.Get(*clusterName)
 		if err != nil {
-			return nil
+			fmt.Printf("%v\n", err)
+			return
+		}
+		if instance == nil {
+			fmt.Printf("Cluster '%s' not found.\n", *clusterName)
+			return
 		}
 		err = instance.Start()
 		if err != nil {
-			return err
+			fmt.Printf("%v\n", err)
+			return
 		}
 
-		fmt.Printf("Cluster '%s' started.\n", c.Args().First())
-
-		return nil
-	},
+		fmt.Printf("Cluster '%s' started.\n", *clusterName)
+	}
 }
 
-var clusterState = cli.Command{
-	Name:      "state",
-	Usage:     "Returns the current state of a cluster",
-	ArgsUsage: "<cluster name>",
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
+func clusterState(cmd *cli.Cmd) {
+	cmd.Spec = "CLUSTERNAME"
+
+	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+
+	cmd.Action = func() {
+		if *clusterName == "" {
+			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
+			return
 		}
-		clusterName := c.Args().First()
-		instance, err := cluster.Get(clusterName)
+
+		instance, err := cluster.Get(*clusterName)
 		if err != nil {
-			return fmt.Errorf("Could not inspect cluster '%s': %v", clusterName, err)
+			fmt.Printf("Could not inspect cluster '%s': %v\n", *clusterName, err)
+			return
 		}
 		if instance == nil {
-			return fmt.Errorf("cluster '%s' not found", clusterName)
+			fmt.Printf("cluster '%s' not found.\n", *clusterName)
+			return
 		}
 		state, err := instance.GetState()
 		out, _ := json.Marshal(map[string]string{"state": state.String()})
 		fmt.Println(string(out))
-
-		return nil
-	},
+	}
 }
 
-var clusterExpand = cli.Command{
-	Name:      "expand",
-	Usage:     "add node(s) to cluster",
-	ArgsUsage: "<cluster name>",
-	Flags: []cli.Flag{
-		cli.IntFlag{
-			Name:  "count, n",
-			Value: 1,
-			Usage: "How many nodes to add",
-		},
-		cli.BoolFlag{
-			Name:  "public, p",
-			Usage: "Affect public IP address to node",
-		},
-		cli.IntFlag{
-			Name:  "cpu, c",
-			Value: 2,
-			Usage: "Number of CPU for the host",
-		},
-		cli.Float64Flag{
-			Name:  "ram, r",
-			Value: 8,
-			Usage: "RAM for the host",
-		},
-		cli.IntFlag{
-			Name:  "disk, d",
-			Value: 100,
-			Usage: "Disk space for the host",
-		},
-		cli.BoolFlag{
-			Name:   "gpu",
-			Usage:  "With GPU",
-			Hidden: true,
-		},
-	},
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
+func clusterExpand(cmd *cli.Cmd) {
+	//cmd.Spec = "CLUSTERNAME [-n] [-p] [-c] [-r] [-d] [-g]"
+	cmd.Spec = "CLUSTERNAME [-n] [-p] [-c] [-r] [-d]"
+
+	clusterName := cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+	count := cmd.IntOpt("n count", 1, "Number of nodes to create")
+	public := cmd.BoolOpt("p public", false, "Attach public IP address to node (default: false)")
+	cpu := cmd.IntOpt("c cpu", 2, "Number of CPU for the Host (default: 2)")
+	ram := cmd.StringOpt("r ram", "7.0", "RAM for the host (default: 7 GB)")
+	disk := cmd.IntOpt("d disk", 100, "System disk size for the host (default: 100 GB)")
+	//gpu := cmd.BoolOpt("g gpu", false, "With GPU")
+
+	cmd.Action = func() {
+		if *clusterName == "" {
+			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
+			return
 		}
-		clusterName := c.Args().First()
-		instance, err := cluster.Get(clusterName)
+		ramF, err := strconv.ParseFloat(*ram, 32)
 		if err != nil {
-			return err
+			fmt.Printf("%v\n", err)
+			return
+		}
+
+		finalCPU := int32(*cpu)
+		finalDisk := int32(*disk)
+		finalRAM := float32(ramF)
+		err = createNodes(*clusterName, *public, *count, finalCPU, finalRAM, finalDisk)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+			return
+		}
+	}
+}
+
+func clusterShrink(cmd *cli.Cmd) {
+	cmd.Spec = "CLUSTERNAME [-n] [-p]"
+
+	clusterName := cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+	count := cmd.IntOpt("n count", 1, "Number of node(s) to delete (default: 1)")
+	public := cmd.BoolOpt("p public", false, "Delete a public node if set (default: false)")
+
+	cmd.Action = func() {
+		if *clusterName == "" {
+			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
+			return
+		}
+
+		instance, err := cluster.Get(*clusterName)
+		if err != nil {
+			fmt.Printf("%v", err)
+			return
 		}
 		if instance == nil {
-			return fmt.Errorf("cluster '%s' not found.", clusterName)
+			fmt.Printf("cluster '%s' not found.", *clusterName)
+			return
 		}
-		public := c.Bool("public")
+
 		var nodeTypeString string
-		if public {
+		if *public {
 			nodeTypeString = "public"
 		} else {
 			nodeTypeString = "private"
 		}
-		count := uint16(c.Int("count"))
-		countS := ""
-		if count > 1 {
-			countS = "s"
-		}
-		fmt.Printf("Adding %d %s node%s to Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
-
-		for i := 0; i < int(c.Int("count")); i++ {
-			_, err = instance.AddNode(public, &pb.VMDefinition{
-				CPUNumber: int32(c.Int("cpu")),
-				Disk:      int32(c.Float64("disk")),
-				RAM:       float32(c.Float64("ram")),
-			})
-			if err != nil {
-				return fmt.Errorf("Failed to add node #%d: %s", i+1, err.Error())
-			}
-		}
-
-		fmt.Printf("Added %d %s node%s to cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
-		return nil
-	},
-}
-
-var clusterShrink = cli.Command{
-	Name:      "shrink",
-	Usage:     "delete last added node(s) from cluster",
-	ArgsUsage: "<cluster name>",
-	Flags: []cli.Flag{
-		cli.IntFlag{
-			Name:  "count, n",
-			Value: 1,
-			Usage: "Number of node(s) to delete",
-		},
-		cli.BoolFlag{
-			Name:  "public, p",
-			Usage: "Public node",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <cluster name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Cluster name required")
-		}
-		clusterName := c.Args().First()
-		instance, err := cluster.Get(clusterName)
-		if err != nil {
-			return err
-		}
-		if instance == nil {
-			return fmt.Errorf("cluster '%s' not found.", clusterName)
-		}
-
-		public := c.Bool("public")
-		var nodeTypeString string
-		if public {
-			nodeTypeString = "public"
-		} else {
-			nodeTypeString = "private"
-		}
-		count := uint(c.Int("count"))
 		var countS string
-		if count > 1 {
+		if *count > 1 {
 			countS = "s"
 		}
-		present := instance.CountNodes(public)
-		if count > present {
-			return fmt.Errorf("can't delete %d %s node%s, the cluster contains only %d of them", count, nodeTypeString, countS, present)
+		present := instance.CountNodes(*public)
+		if *count > int(present) {
+			fmt.Printf("can't delete %d %s node%s, the cluster contains only %d of them", *count, nodeTypeString, countS, present)
+			return
 		}
 
-		msg := fmt.Sprintf("Are you sure to delete %d %s node%s from Cluster %s", int(count), nodeTypeString, countS, clusterName)
+		msg := fmt.Sprintf("Are you sure to delete %d %s node%s from Cluster %s", *count, nodeTypeString, countS, *clusterName)
 		if !userConfirmed(msg) {
 			fmt.Println("Aborted.")
-			return nil
+			return
 		}
 
-		fmt.Printf("Deleting %d %s node%s from Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
-		for i := 0; i < int(count); i++ {
-			err = instance.DeleteLastNode(public)
+		fmt.Printf("Deleting %d %s node%s from Cluster '%s' (this may take a while)...\n", *count, nodeTypeString, countS, *clusterName)
+		for i := 0; i < *count; i++ {
+			err = instance.DeleteLastNode(*public)
 			if err != nil {
-				return fmt.Errorf("Failed to delete node #%d: %s", i+1, err.Error())
+				fmt.Printf("Failed to delete node #%d: %s", i+1, err.Error())
+				return
 			}
 		}
 
-		fmt.Printf("%d %s node%s successfully deleted from cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
-		return nil
-	},
+		fmt.Printf("%d %s node%s successfully deleted from cluster '%s'.\n", *count, nodeTypeString, countS, *clusterName)
+	}
 }

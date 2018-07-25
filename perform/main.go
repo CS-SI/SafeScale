@@ -19,12 +19,11 @@ package main
 import (
 	"fmt"
 	"os"
-	"sort"
 	"time"
 
 	"github.com/CS-SI/SafeScale/perform/cmd"
 
-	cli "github.com/urfave/cli"
+	cli "github.com/jawher/mow.cli"
 
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise provider cloudwatt
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise provider flexibleengine
@@ -38,29 +37,31 @@ const (
 )
 
 func main() {
-	//cli.VersionFlags = "V, version"
-	app := cli.NewApp()
-	app.Name = "perform"
-	app.Usage = "perform COMMAND"
-	app.Version = "0.1.0"
-	app.Authors = []cli.Author{
+	app := cli.App("perform", "SafeScale perform")
+	//app.Version = "0.1.0"
+	/*app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "CS-SI",
 			Email: "safescale@c-s.fr",
 		},
 	}
-	app.EnableBashCompletion = true
+	app.EnableBashCompletion = true*/
 
-	app.Commands = append(app.Commands, cmd.ClusterCmd)
-	sort.Sort(cli.CommandsByName(cmd.ClusterCmd.Subcommands))
-	app.Commands = append(app.Commands, cmd.NodeCmd)
-	sort.Sort(cli.CommandsByName(cmd.NodeCmd.Subcommands))
-	app.Commands = append(app.Commands, cmd.CommandCmd)
-	sort.Sort(cli.CommandsByName(cmd.CommandCmd.Subcommands))
+	app.Command("cluster", "cluster management", cmd.ClusterCmd)
+	//app.Command("node", "Node management", cmd.NodeCmd)
+	//app.Command("command cmd", "cluster-wide commands", cmd.CommandCmd)
 
-	sort.Sort(cli.CommandsByName(app.Commands))
-	err := app.Run(os.Args)
-	if err != nil {
-		fmt.Println(err)
+	verbose := *app.BoolOpt("verbose v", false, "Increase verbosity")
+	debug := *app.BoolOpt("debug d", false, "Enable debug mode")
+
+	app.Before = func() {
+		if verbose {
+			fmt.Printf("Verbosity wanted.")
+		}
+		if debug {
+			fmt.Printf("Debug enabled")
+		}
 	}
+
+	app.Run(os.Args)
 }
