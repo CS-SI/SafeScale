@@ -17,19 +17,19 @@
 package utils
 
 import (
-	"math"
+	"fmt"
 
 	"github.com/sethvargo/go-password/password"
 )
 
-var generator password.Generator
+var generator *password.Generator
 
 // GeneratePassword generates a password with length at least 12
 func GeneratePassword(length uint8) (string, error) {
 	if length < 12 {
 		panic("length under 12!")
 	}
-	password, err := generator.Generate(length, 4, 4, false, true)
+	password, err := generator.Generate(int(length), 4, 4, false, true)
 	if err != nil {
 		return "", err
 	}
@@ -40,13 +40,13 @@ func init() {
 	var err error
 	// generator is created with characters allowed
 	// potential confusing characters, like i/l/| or 0/O, are removed to ease human readability
- 	generator, err = password.NewGenerator(password.GeneratorInput{
-		LowerLetters: "abcdefghjkmnopqrstuvwxyz"
-    	UpperLetters: "ABCDEFGHJKLMNPQRSTUVWXYZ"
-    	Digits: "123456789"
-		Symbols: "-+*/.,:()[]{}#_",
+	generator, err = password.NewGenerator(&password.GeneratorInput{
+		LowerLetters: "abcdefghjkmnopqrstuvwxyz",
+		UpperLetters: "ABCDEFGHJKLMNPQRSTUVWXYZ",
+		Digits:       "123456789",
+		Symbols:      "-+*/.,:()[]{}#_",
 	})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create password generator: %s!", err.Error())
+		panic(fmt.Sprintf("Failed to create password generator: %s!", err.Error()))
 	}
 }
