@@ -52,14 +52,12 @@ var (
 	}
 )
 
-// Parse returns a Flavor.Enum corresponding to the content of the parameter
-func Parse(v string) (e Enum, err error) {
+// Parse returns a Flavor.Enum corresponding to the string parameter
+func Parse(v string) (e Enum) {
 	var found bool
 	lowered := strings.ToLower(v)
-	if e, found = parseMap[lowered]; found {
-		err = nil
-	} else {
-		err = fmt.Errorf("Unknown Flavor '%s'", v)
+	if e, found = parseMap[lowered]; !found {
+		panic(fmt.Sprintf("Flavor.Enum '%s' doesn't exist!", v))
 	}
 	return
 }
@@ -68,5 +66,5 @@ func (e Enum) String() string {
 	if str, found := stringMap[e]; found {
 		return str
 	}
-	return ""
+	panic(fmt.Sprintf("Flavor.Enum value '%d' doesn't have string match!", e))
 }
