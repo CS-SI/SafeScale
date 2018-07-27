@@ -33,8 +33,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/api/VMState"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system"
 
@@ -254,19 +254,19 @@ func (client *Client) toVMSize(flavor map[string]interface{}) api.VMSize {
 	return api.VMSize{}
 }
 
-// toVMState converts VM status returned by OpenStack driver into VMState enum
-func toVMState(status string) VMState.Enum {
+// toHostState converts VM status returned by OpenStack driver into HostState enum
+func toHostState(status string) HostState.Enum {
 	switch status {
 	case "BUILD", "build", "BUILDING", "building":
-		return VMState.STARTING
+		return HostState.STARTING
 	case "ACTIVE", "active":
-		return VMState.STARTED
+		return HostState.STARTED
 	case "RESCUED", "rescued":
-		return VMState.STOPPING
+		return HostState.STOPPING
 	case "STOPPED", "stopped", "SHUTOFF", "shutoff":
-		return VMState.STOPPED
+		return HostState.STOPPED
 	default:
-		return VMState.ERROR
+		return HostState.ERROR
 	}
 }
 
@@ -320,7 +320,7 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 		AccessIPv4:   server.AccessIPv4,
 		AccessIPv6:   server.AccessIPv6,
 		Size:         client.toVMSize(server.Flavor),
-		State:        toVMState(server.Status),
+		State:        toHostState(server.Status),
 	}
 	m, err := metadata.LoadHost(providers.FromClient(client), server.ID)
 	if err == nil && m != nil {
@@ -497,7 +497,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	service := providers.Service{
 		ClientAPI: client,
 	}
-	vm, err := service.WaitVMState(server.ID, VMState.STARTED, 120*time.Second)
+	vm, err := service.WaitHostState(server.ID, HostState.STARTED, 120*time.Second)
 	if err != nil {
 		servers.Delete(client.Compute, server.ID)
 		return nil, fmt.Errorf("Timeout creating VM: %s", errorString(err))
