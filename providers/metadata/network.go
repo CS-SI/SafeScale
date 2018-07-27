@@ -29,7 +29,7 @@ import (
 const (
 	//NetworkFolderName is the technical name of the container used to store networks info
 	networkFolderName = "network"
-	//GatewayObjectName is the name of the object containing the id of the VM acting as a default gateway for a network
+	//GatewayObjectName is the name of the object containing the id of the host acting as a default gateway for a network
 	gatewayObjectName = "gw"
 )
 
@@ -151,19 +151,19 @@ func (m *Network) Browse(callback func(*api.Network) error) error {
 }
 
 //AttachHost links host ID to the network
-func (m *Network) AttachHost(vm *api.VM) error {
+func (m *Network) AttachHost(host *api.VM) error {
 	if m.network == nil {
 		panic("m.network is nil!")
 	}
-	return m.folder.Write(m.network.ID+"/host", vm.ID, vm)
+	return m.folder.Write(m.network.ID+"/host", host.ID, host)
 }
 
 //DetachHost unlinks host ID to network
-func (m *Network) DetachHost(vmID string) error {
+func (m *Network) DetachHost(hostID string) error {
 	if m.network == nil {
 		panic("m.network is nil!")
 	}
-	return m.folder.Delete(m.network.ID+"/host", vmID)
+	return m.folder.Delete(m.network.ID+"/host", hostID)
 }
 
 //ListHosts returns the list of ID of hosts attached to the network (be careful: including gateway)
@@ -174,18 +174,18 @@ func (m *Network) ListHosts() ([]*api.VM, error) {
 
 	var list []*api.VM
 	err := m.folder.Browse(m.network.ID+"/host", func(buf *bytes.Buffer) error {
-		var vm api.VM
-		err := gob.NewDecoder(buf).Decode(&vm)
+		var host api.VM
+		err := gob.NewDecoder(buf).Decode(&host)
 		if err != nil {
 			return err
 		}
-		list = append(list, &vm)
+		list = append(list, &host)
 		return nil
 	})
 	return list, err
 }
 
-//SaveNetwork saves the Network definition in Object Storage
+// SaveNetwork saves the Network definition in Object Storage
 func SaveNetwork(svc *providers.Service, net *api.Network) error {
 	m, err := NewNetwork(svc)
 	if err != nil {
@@ -194,7 +194,7 @@ func SaveNetwork(svc *providers.Service, net *api.Network) error {
 	return m.Carry(net).Write()
 }
 
-//RemoveNetwork removes the VM definition from Object Storage
+// RemoveNetwork removes the Network definition from Object Storage
 func RemoveNetwork(svc *providers.Service, net *api.Network) error {
 	// First, browse networks to delete links on the deleted host
 	m, err := NewNetwork(svc)
@@ -204,7 +204,7 @@ func RemoveNetwork(svc *providers.Service, net *api.Network) error {
 	return m.Carry(net).Delete()
 }
 
-//LoadNetwork gets the VM definition from Object Storage
+// LoadNetwork gets the Network definition from Object Storage
 func LoadNetwork(svc *providers.Service, networkID string) (*Network, error) {
 	m, err := NewNetwork(svc)
 	if err != nil {
@@ -220,7 +220,7 @@ func LoadNetwork(svc *providers.Service, networkID string) (*Network, error) {
 	return m, nil
 }
 
-//LoadNetworkByName gets the VM definition from Object Storage
+// LoadNetworkByName gets the Network definition from Object Storage
 func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, error) {
 	m, err := NewNetwork(svc)
 	if err != nil {
@@ -236,14 +236,14 @@ func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, er
 	return m, nil
 }
 
-//Gateway links Object Storage folder and Network
+// Gateway links Object Storage folder and Network
 type Gateway struct {
 	folder    *metadata.Folder
 	networkID string
 	host      *api.VM
 }
 
-//NewGateway creates an instance of metadata.Gateway
+// NewGateway creates an instance of metadata.Gateway
 func NewGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 	f, err := metadata.NewFolder(svc, networkFolderName)
 	if err != nil {
@@ -257,12 +257,12 @@ func NewGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 }
 
 //Carry links a Network instance to the Metadata instance
-func (m *Gateway) Carry(vm *api.VM) *Gateway {
-	m.host = vm
+func (m *Gateway) Carry(host *api.VM) *Gateway {
+	m.host = host
 	return m
 }
 
-//Get returns the *api.VM linked to the metadata
+// Get returns the *api.VM linked to the metadata
 func (m *Gateway) Get() *api.VM {
 	return m.host
 }
@@ -335,7 +335,7 @@ func LoadGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 }
 
 //SaveGateway saves the metadata of a gateway
-func SaveGateway(svc *providers.Service, vm *api.VM, networkID string) error {
+func SaveGateway(svc *providers.Service, host *api.VM, networkID string) error {
 	m, err := NewGateway(svc, networkID)
 	if err != nil {
 		return err
@@ -350,11 +350,11 @@ func SaveGateway(svc *providers.Service, vm *api.VM, networkID string) error {
 		return fmt.Errorf("metadata about the  '%s' doesn't exist anymore", networkID)
 	}
 	net := n.Get()
-	net.GatewayID = vm.ID
+	net.GatewayID = host.ID
 	err = n.Write()
 	if err != nil {
 		return err
 	}
 
-	return m.Carry(vm).Write(svc)
+	return m.Carry(host).Write(svc)
 }
