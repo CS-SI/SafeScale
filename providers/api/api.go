@@ -23,8 +23,9 @@ import (
 
 	// "github.com/CS-SI/SafeScale/system"
 
+	"github.com/CS-SI/SafeScale/providers/api/HostAdditionalInfo"
+	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/api/VMState"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
 	"github.com/CS-SI/SafeScale/system"
@@ -92,18 +93,24 @@ type SizingRequirements struct {
 	MinDiskSize int     `json:"min_disk_size,omitempty"`
 }
 
+// HostAdditionalInfoType ...
+type HostAdditionalInfoType map[HostAdditionalInfo.Enum]interface{}
+
 //VM represents a virtual machine properties
 type VM struct {
-	ID           string       `json:"id,omitempty"`
-	Name         string       `json:"name,omitempty"`
-	PrivateIPsV4 []string     `json:"private_ips_v4,omitempty"`
-	PrivateIPsV6 []string     `json:"private_ips_v6,omitempty"`
-	AccessIPv4   string       `json:"access_ip_v4,omitempty"`
-	AccessIPv6   string       `json:"access_ip_v6,omitempty"`
-	Size         VMSize       `json:"size,omitempty"`
-	State        VMState.Enum `json:"state,omitempty"`
-	PrivateKey   string       `json:"private_key,omitempty"`
-	GatewayID    string       `json:"gateway_id,omitempty"`
+	ID           string         `json:"id,omitempty"`
+	Name         string         `json:"name,omitempty"`
+	PrivateIPsV4 []string       `json:"private_ips_v4,omitempty"`
+	PrivateIPsV6 []string       `json:"private_ips_v6,omitempty"`
+	AccessIPv4   string         `json:"access_ip_v4,omitempty"`
+	AccessIPv6   string         `json:"access_ip_v6,omitempty"`
+	Size         VMSize         `json:"size,omitempty"`
+	State        HostState.Enum `json:"state,omitempty"`
+	PrivateKey   string         `json:"private_key,omitempty"`
+	GatewayID    string         `json:"gateway_id,omitempty"`
+	// This field can contain any kind of supplemental information that will be stored as-is
+	// functions using
+	AdditionalInfo HostAdditionalInfoType `json:"additional_info,omitempty"`
 }
 
 //GetAccessIP computes access IP of the VM

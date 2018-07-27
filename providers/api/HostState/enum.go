@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package VMState
+package HostState
 
 //go:generate stringer -type=Enum
 
@@ -22,14 +22,14 @@ package VMState
 type Enum int
 
 const (
-	/*STOPPED VM is stopped*/
+	// STOPPED when host is stopped
 	STOPPED Enum = iota
-	/*STARTING VM is starting*/
+	// STARTING when host is starting
 	STARTING
-	/*STARTED VM is started*/
+	// STARTED when host is started
 	STARTED
-	/*STOPPING VM is stopping*/
+	// STOPPING when host is stopping
 	STOPPING
-	/*ERROR VM is in error state*/
+	// ERROR when host is in error state*/
 	ERROR
 )
