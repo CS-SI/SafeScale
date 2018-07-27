@@ -35,7 +35,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 
-	"github.com/CS-SI/SafeScale/providers/api/VMState"
+	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -821,7 +821,7 @@ func (c *Client) getSubnets(vpcIDs []string) ([]*ec2.Subnet, error) {
 	return out.Subnets, nil
 
 }
-func getState(state *ec2.InstanceState) (VMState.Enum, error) {
+func getState(state *ec2.InstanceState) (HostState.Enum, error) {
 	// The low byte represents the state. The high byte is an opaque internal value
 	// and should be ignored.
 	//
@@ -838,27 +838,27 @@ func getState(state *ec2.InstanceState) (VMState.Enum, error) {
 	//    * 80 : stopped
 	fmt.Println("State", state.Code)
 	if state == nil {
-		return VMState.ERROR, fmt.Errorf("Unexpected VM state")
+		return HostState.ERROR, fmt.Errorf("Unexpected VM state")
 	}
 	if *state.Code == 0 {
-		return VMState.STARTING, nil
+		return HostState.STARTING, nil
 	}
 	if *state.Code == 16 {
-		return VMState.STARTED, nil
+		return HostState.STARTED, nil
 	}
 	if *state.Code == 32 {
-		return VMState.STOPPING, nil
+		return HostState.STOPPING, nil
 	}
 	if *state.Code == 48 {
-		return VMState.STOPPED, nil
+		return HostState.STOPPED, nil
 	}
 	if *state.Code == 64 {
-		return VMState.STOPPING, nil
+		return HostState.STOPPING, nil
 	}
 	if *state.Code == 80 {
-		return VMState.STOPPED, nil
+		return HostState.STOPPED, nil
 	}
-	return VMState.ERROR, fmt.Errorf("Unexpected VM state")
+	return HostState.ERROR, fmt.Errorf("Unexpected VM state")
 }
 
 //Data structure to apply to userdata.sh template
@@ -1091,7 +1091,7 @@ func (c *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 	service := providers.Service{
 		ClientAPI: c,
 	}
-	_, err = service.WaitVMState(*instance.InstanceId, VMState.STARTED, 120*time.Second)
+	_, err = service.WaitHostState(*instance.InstanceId, HostState.STARTED, 120*time.Second)
 	if err != nil {
 		return nil, err
 	}
