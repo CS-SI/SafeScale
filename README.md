@@ -48,7 +48,7 @@ It is also important to precise that SafeScale Perform platforms are not static,
 ### SafeScale Security
 
 SafeScale Security is a Web API and a Web Portal to create on-demand security gateways to protect Web services along 5 axes: Encryption, Authentication, Authorization, Auditability and Intrusion detection.
-SafeScale Security relies on Kong, an open source generic proxy to be put in between user and service. Kong intercepts user requests and service responses and executes plugins to empower any API. To build a SafeScale Security gateway 3 plugins are used: 
+SafeScale Security relies on Kong, an open source generic proxy to be put in between user and service. Kong intercepts user requests and service responses and executes plugins to empower any API. To build a SafeScale Security gateway 3 plugins are used:
 * Dynamic SSL plugin to encrypt traffic between the user and the service protected
 * Open ID plugin to connect the Identity and Access Management server, KeyCloak
 * UDP Log plugin to connect the Log management system, Logstash
@@ -63,13 +63,14 @@ SafeScale is currently under active development and does not yet offer all the f
   * Create / Destroy block and object storage,
   * Mount object storage on file system,
   * Create NAS, Connect/disconnect VM to NAS,
-  
+
 * Providers addressed:
   * Generic OpenStack
   * OVH Public Cloud
   * FlexibleEngine
+  * OpenTelekom
   * CloudWatt
-  * AWS: under development 
+  * AWS: under development
 
 ## Contributing
 
