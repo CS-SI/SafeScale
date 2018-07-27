@@ -22,6 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers/cloudwatt"
 	"github.com/CS-SI/SafeScale/providers/flexibleengine"
+	"github.com/CS-SI/SafeScale/providers/opentelekom"
 	"github.com/CS-SI/SafeScale/providers/ovh"
 
 	"github.com/stretchr/testify/require"
@@ -47,17 +48,20 @@ func TestGetService(t *testing.T) {
 	providers.Register("ovh", &ovh.Client{})
 	providers.Register("cloudwatt", &cloudwatt.Client{})
 	providers.Register("flexibleEngine", &flexibleengine.Client{})
+	providers.Register("opentelekom", &opentelekom.Client{})
 	ovh, err := providers.GetService("TestOvh")
 	require.Nil(t, err)
 	_, err = providers.GetService("TestCloudwatt")
 	require.Nil(t, err)
 	_, err = providers.GetService("TestFlexibleEngine")
 	require.Nil(t, err)
+	_, err = providers.GetService("TestOpenTelekom")
+	require.Nil(t, err)
 	imgs, err := ovh.ListImages()
 	require.Nil(t, err)
 	require.True(t, len(imgs) > 3)
-	_, err = providers.GetService("TestCloudwatt")
-	require.Nil(t, err)
+	//_, err = providers.GetService("TestCloudwatt")
+	//require.Nil(t, err)
 }
 func TestGetServiceErr(t *testing.T) {
 	createTenantFile()
