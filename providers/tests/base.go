@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/api/VMState"
 
 	"github.com/CS-SI/SafeScale/providers"
 
@@ -32,9 +32,11 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
-	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
-	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenants
-	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenant cloudwatt
+	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenant flexibleengine
+	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise tenant opentelekoms
+	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenant ovh
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -388,21 +390,21 @@ func (tester *ClientTester) StartStopVM(t *testing.T) {
 		err := tester.Service.StopVM(vm.ID)
 		assert.Nil(t, err)
 		start := time.Now()
-		vm, err = tester.Service.WaitVMState(vm.ID, VMState.STOPPED, 40*time.Second)
+		vm, err = tester.Service.WaitHostState(vm.ID, HostState.STOPPED, 40*time.Second)
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		assert.Equal(t, vm.State, VMState.STOPPED)
+		assert.Equal(t, vm.State, HostState.STOPPED)
 	}
 	{
 		err := tester.Service.StartVM(vm.ID)
 		assert.Nil(t, err)
 		start := time.Now()
-		vm, err = tester.Service.WaitVMState(vm.ID, VMState.STARTED, 40*time.Second)
+		vm, err = tester.Service.WaitHostState(vm.ID, HostState.STARTED, 40*time.Second)
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		assert.Equal(t, vm.State, VMState.STARTED)
+		assert.Equal(t, vm.State, HostState.STARTED)
 	}
 
 }
