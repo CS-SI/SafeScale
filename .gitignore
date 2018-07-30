@@ -47,4 +47,4 @@ deploy/deploy
 
 *.code-workspace
 
-perform/cluster/tests/create_cluster
+cluster/tests/create_cluster
