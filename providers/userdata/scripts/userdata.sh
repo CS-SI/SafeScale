@@ -147,7 +147,19 @@ reset_iptables() {
             systemctl stop ufw &>/dev/null
             systemctl disable ufw &>/dev/null
             apt purge ufw &>/dev/null
-            apt install -y iptables-persistent
+            apt install -y iptables-persistent &>/dev/null
+            [ $? -ne 0 ] && (
+                # at least for Ubuntu 16.04 (and older ?)
+                mkdir -p /etc/iptables
+                cd /etc/network/if-pre-up.d
+                cat <<-'EOF' >iptables
+#!/bin/sh
+DIR=/etc/iptables
+mkdir -p $DIR
+[ -f $DIR/rules.v4 ] && iptables-restore <$DIR/rules.v4
+EOF
+                chmod a+rx iptables
+            )
             ;;
 
         rhel|centos)
