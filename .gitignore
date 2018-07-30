@@ -24,10 +24,6 @@ providers/aws/*_test.go
 #remove tenants configuration
 *.toml
 
-#ignore binary files from build
-broker/client/broker
-broker/daemon/brokerd
-
 #ignore generated files
 *.pb.go
 *_pb2.py
@@ -45,6 +41,9 @@ broker/client/broker
 # ignore binaries from perform
 perform/perform
 perform/cluster/tests/deploy
+
+# ignore binaries from deploy
+deploy/deploy
 
 *.code-workspace
 
