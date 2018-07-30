@@ -17,15 +17,10 @@
 package openstack_test
 
 import (
-	"bytes"
-	"fmt"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 
 	"github.com/CS-SI/SafeScale/providers"
 
-	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/tests"
 )
@@ -58,6 +53,9 @@ func getClient() *openstack.Client {
 	return client
 }
 
+/* TODO
+   review the code to test with userdata.Prepare, or move the test to userdata ?
+
 func Test_Template(t *testing.T) {
 	client := getClient()
 	//Data structure to apply to userdata.sh template
@@ -80,10 +78,11 @@ func Test_Template(t *testing.T) {
 		ResolvConf: "dskjfdshjjkdhsksdhhkjs\nsfdsfsdq\ndfsqdfqsdfq",
 		GatewayIP:  "172.1.2.1",
 	}
-	err := client.UserDataTpl.Execute(dataBuffer, data)
+	output, err := userdata.Prepare(client, dataBuffer, data)
 	assert.Nil(t, err)
-	fmt.Println(dataBuffer.String())
-}
+	fmt.Println(output.String())
+}*/
+
 func Test_ListImages(t *testing.T) {
 	getTester().ListImages(t)
 }
