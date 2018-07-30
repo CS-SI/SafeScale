@@ -72,8 +72,8 @@ func (client *Client) GetVolume(id string) (*api.Volume, error) {
 }
 
 // ListVolumes list available volumes
-func (client *Client) ListVolumes() ([]api.Volume, error) {
-	return client.feclt.ListVolumes()
+func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
+	return client.feclt.ListVolumes(all)
 }
 
 // CreateContainer creates an object container
