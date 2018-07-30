@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
@@ -315,7 +316,10 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		}
 	}
 
-	userData, err := client.osclt.PrepareUserData(request, isGateway, kp, gw)
+	userData, err := userdata.Prepare(client, request, isGateway, kp, gw)
+	if err != nil {
+		return nil, err
+	}
 
 	// Determine system disk size based on vcpus count
 	template, err := client.GetTemplate(request.TemplateID)
