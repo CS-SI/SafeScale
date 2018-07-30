@@ -20,5 +20,6 @@ package utils
 import (
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenants
 )
