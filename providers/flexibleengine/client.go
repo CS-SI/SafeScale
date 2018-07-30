@@ -19,15 +19,12 @@ package flexibleengine
 import (
 	"fmt"
 	"net/url"
-	"text/template"
 
 	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
-
-	rice "github.com/GeertJohan/go.rice"
 
 	// Gophercloud OpenStack API
 	gc "github.com/gophercloud/gophercloud"
@@ -46,9 +43,8 @@ import (
 
 //go:generate rice embed-go
 
-/*AuthOptions fields are the union of those recognized by each identity implementation and
-provider.
-*/
+// AuthOptions fields are the union of those recognized by each identity implementation and
+// provider.
 type AuthOptions struct {
 	IdentityEndpoint string
 	Username         string
@@ -80,7 +76,7 @@ type AuthOptions struct {
 	S3AccessKeyPassword string
 }
 
-//CfgOptions configuration options
+// CfgOptions configuration options
 type CfgOptions struct {
 	//DNSList list of DNS
 	DNSList []string
@@ -93,14 +89,14 @@ type CfgOptions struct {
 	//if UseFloatingIP is true UseLayer3Networking must be true
 	UseLayer3Networking bool
 
-	//AutoVMNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
-	AutoVMNetworkInterfaces bool
+	//AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
+	AutoHostNetworkInterfaces bool
 
 	//VolumeSpeeds map volume types with volume speeds
 	VolumeSpeeds map[string]VolumeSpeed.Enum
 }
 
-//errorString creates an error string from flexibleengine api error
+// errorString creates an error string from flexibleengine api error
 func providerError(err error) string {
 	switch e := err.(type) {
 	default:
@@ -119,7 +115,7 @@ const (
 //VPL:BEGIN
 // aws provider isn't finished yet, copying the necessary here meanwhile...
 
-//AuthOpts AWS credentials
+// AuthOpts AWS credentials
 type awsAuthOpts struct {
 	// AWS Access key ID
 	AccessKeyID string
@@ -155,13 +151,19 @@ func (o awsAuthOpts) IsExpired() bool {
 
 //VPL:END
 
-//AuthenticatedClient returns an authenticated client
+// AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
-	provider, err := gcos.NewClient(fmt.Sprintf(authURL, opts.Region))
+	if opts.IdentityEndpoint == "" {
+		opts.IdentityEndpoint = fmt.Sprintf(authURL, opts.Region)
+	}
+	provider, err := gcos.NewClient(opts.IdentityEndpoint)
+	if err != nil {
+		return nil, err
+	}
 	authOptions := tokens.AuthOptions{
-		IdentityEndpoint: fmt.Sprintf(authURL, opts.Region),
+		IdentityEndpoint: opts.IdentityEndpoint,
 		Username:         opts.Username,
 		Password:         opts.Password,
 		DomainName:       opts.DomainName,
@@ -216,7 +218,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, fmt.Errorf("%s", providerError(err))
 	}
 
-	//Storage API
+	// Storage API
 	blockStorage, err := gcos.NewBlockStorageV2(provider, gc.EndpointOpts{
 		Type:   "volumev2",
 		Region: opts.Region,
@@ -250,19 +252,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	box, err := rice.FindBox("../openstack/scripts")
-	if err != nil {
-		return nil, err
-	}
-	userDataStr, err := box.String("userdata.sh")
-	if err != nil {
-		return nil, err
-	}
-	tpl, err := template.New("user_data").Parse(userDataStr)
-	if err != nil {
-		return nil, err
-	}
 	openstackClient := openstack.Client{
 		Opts: &openstack.AuthOptions{
 			IdentityEndpoint: opts.IdentityEndpoint,
@@ -284,8 +273,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Network:  network,
 		Volume:   blockStorage,
 		//Container:   objectStorage,
-		ScriptBox:   box,
-		UserDataTpl: tpl,
 	}
 	clt := Client{
 		Opts:      &opts,
@@ -317,25 +304,25 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 
 //Client is the implementation of the flexibleengine driver regarding to the api.ClientAPI
 type Client struct {
-	//Opts contains authentication options
+	// Opts contains authentication options
 	Opts *AuthOptions
-	//Cfg contains options
+	// Cfg contains options
 	Cfg *CfgOptions
-	//Identity contains service client of Identity openstack service
+	// Identity contains service client of Identity openstack service
 	Identity *gc.ServiceClient
-	// "AWS Session" for object storage use (compatible S3)
+	// S3Session is the "AWS Session" for object storage use (compatible S3)
 	S3Session *awssession.Session
-	//osclt is the openstack.Client instance to use when fully openstack compliant
+	// osclt is the openstack.Client instance to use when fully openstack compliant
 	osclt *openstack.Client
 	// Instance of the VPC
 	vpc *VPC
-	// Contains the name of the default security group for the VPC
+	// defaultSecurityGroup contains the name of the default security group for the VPC
 	defaultSecurityGroup string
-	// Instance of the default security group
+	// SecurityGroup is an instance of the default security group
 	SecurityGroup *secgroups.SecGroup
 }
 
-//Build build a new Client from configuration parameter
+// Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	Username, _ := params["Username"].(string)
 	Password, _ := params["Password"].(string)
@@ -376,7 +363,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
  *      a default Security Group is changed
  */
 
-//getDefaultSecurityGroup returns the default security group for the client, in the form
+// getDefaultSecurityGroup returns the default security group for the client, in the form
 // sg-<VPCName>, if it exists.
 func (client *Client) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 	var sgList []secgroups.SecGroup
@@ -408,7 +395,7 @@ func (client *Client) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 	return &sgList[0], nil
 }
 
-//createTCPRules creates TCP rules to configure the default security group
+// createTCPRules creates TCP rules to configure the default security group
 func (client *Client) createTCPRules(groupID string) error {
 	// Inbound == ingress == coming from Outside
 	ruleOpts := secrules.CreateOpts{
@@ -465,7 +452,7 @@ func (client *Client) createTCPRules(groupID string) error {
 	return err
 }
 
-//createTCPRules creates UDP rules to configure the default security group
+// createTCPRules creates UDP rules to configure the default security group
 func (client *Client) createUDPRules(groupID string) error {
 	// Inbound == ingress == coming from Outside
 	ruleOpts := secrules.CreateOpts{
@@ -522,7 +509,7 @@ func (client *Client) createUDPRules(groupID string) error {
 	return err
 }
 
-//createICMPRules creates UDP rules to configure the default security group
+// createICMPRules creates UDP rules to configure the default security group
 func (client *Client) createICMPRules(groupID string) error {
 	// Inbound == ingress == coming from Outside
 	ruleOpts := secrules.CreateOpts{
@@ -577,9 +564,9 @@ func (client *Client) createICMPRules(groupID string) error {
 	return err
 }
 
-//initDefaultSecurityGroup create an open Security Group
-//The default security group opens all TCP, UDP, ICMP ports
-//Security is managed individually on each VM using a linux firewall
+// initDefaultSecurityGroup create an open Security Group
+// The default security group opens all TCP, UDP, ICMP ports
+// Security is managed individually on each VM using a linux firewall
 func (client *Client) initDefaultSecurityGroup() error {
 	client.defaultSecurityGroup = "sg-" + client.Opts.VPCName
 
@@ -615,7 +602,7 @@ func (client *Client) initDefaultSecurityGroup() error {
 	return err
 }
 
-//initVPC initializes the VPC if it doesn't exist
+// initVPC initializes the VPC if it doesn't exist
 func (client *Client) initVPC() error {
 	// Tries to get VPC information
 	vpcID, err := client.findVPCID()
@@ -638,7 +625,7 @@ func (client *Client) initVPC() error {
 	return nil
 }
 
-//findVPC returns the ID about the VPC
+// findVPC returns the ID about the VPC
 func (client *Client) findVPCID() (*string, error) {
 	var router *openstack.Router
 	found := false
@@ -659,7 +646,7 @@ func (client *Client) findVPCID() (*string, error) {
 	return nil, nil
 }
 
-//GetAuthOpts returns the auth options
+// GetAuthOpts returns the auth options
 func (client *Client) GetAuthOpts() (api.Config, error) {
 	cfg := api.ConfigMap{}
 
@@ -669,20 +656,23 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 	cfg.Set("AuthUrl", client.Opts.IdentityEndpoint)
 	cfg.Set("Region", client.Opts.Region)
 	cfg.Set("VPCName", client.Opts.VPCName)
+
 	return cfg, nil
 }
 
-//GetCfgOpts return configuration parameters
+// GetCfgOpts return configuration parameters
 func (client *Client) GetCfgOpts() (api.Config, error) {
 	cfg := api.ConfigMap{}
 
 	cfg.Set("DNSList", client.Cfg.DNSList)
 	cfg.Set("S3Protocol", "s3")
+	cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
+	cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
 
 	return cfg, nil
 }
 
-//init registers the flexibleengine provider
+// init registers the flexibleengine provider
 func init() {
 	providers.Register("flexibleengine", &Client{})
 }
