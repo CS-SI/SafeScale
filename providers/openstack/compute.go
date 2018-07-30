@@ -17,16 +17,13 @@
 package openstack
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	uuid "github.com/satori/go.uuid"
@@ -36,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
@@ -359,52 +357,6 @@ type userData struct {
 	Password string
 }
 
-// PrepareUserData prepares the initial configuration script
-func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp *api.KeyPair, gw *api.VM) ([]byte, error) {
-	// Generate password for user gpac
-	gpacPassword, err := utils.GeneratePassword(16)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate password: %s", err.Error())
-	}
-
-	// Determine Gateway IP
-	ip := ""
-	if gw != nil {
-		if len(gw.PrivateIPsV4) > 0 {
-			ip = gw.PrivateIPsV4[0]
-		} else if len(gw.PrivateIPsV6) > 0 {
-			ip = gw.PrivateIPsV6[0]
-		}
-	}
-
-	data := userData{
-		User:       api.DefaultUser,
-		Key:        strings.Trim(kp.PublicKey, "\n"),
-		ConfIF:     !client.Cfg.AutoVMNetworkInterfaces,
-		IsGateway:  isGateway && !client.Cfg.UseLayer3Networking,
-		AddGateway: !request.PublicIP && !client.Cfg.UseLayer3Networking,
-		DNSServers: client.Cfg.DNSList,
-		GatewayIP:  ip,
-	}
-
-	type finalUserData struct {
-		userData
-		Password string
-	}
-	finalData := finalUserData{
-		userData: data,
-		Password: gpacPassword,
-	}
-
-	dataBuffer := bytes.NewBufferString("")
-	err = client.UserDataTpl.Execute(dataBuffer, finalData)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println(string(dataBuffer.Bytes()))
-	return dataBuffer.Bytes(), nil
-}
-
 func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 	m, err := metadata.NewGateway(providers.FromClient(client), networkID)
 	found, err := m.Read()
@@ -473,7 +425,11 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		}
 	}
 
-	userData, err := client.PrepareUserData(request, isGateway, kp, gw)
+	userData, err := userdata.Prepare(client, request, isGateway, kp, gw)
+	if err != nil {
+		return nil, err
+	}
+
 	//fmt.Println(string(userData))
 	//Create VM
 	srvOpts := servers.CreateOpts{
