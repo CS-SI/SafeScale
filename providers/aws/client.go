@@ -1575,7 +1575,14 @@ func (c *Client) DeleteObject(container, object string) error {
 func (c *Client) GetAuthOpts() {
 }
 
-//GetCfgOpts
-func (c *Client) GetCfgOpts() {
+//GetCfgOpts return configuration parameters
+func (c *Client) GetCfgOpts() (api.Config, error) {
+	cfg := api.ConfigMap{}
 
+	cfg.Set("DNSList", c.Cfg.DNSList)
+	cfg.Set("S3Protocol", c.Cfg.S3Protocol)
+	cfg.Set("AutoHostNetworkInterfaces", c.Cfg.AutoHostNetworkInterfaces)
+	cfg.Set("UseLayer3Networking", c.Cfg.UseLayer3Networking)
+
+	return cfg, nil
 }

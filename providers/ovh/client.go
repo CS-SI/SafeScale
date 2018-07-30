@@ -97,11 +97,11 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 		Region:     opts.Region,
 	},
 		openstack.CfgOptions{
-			ProviderNetwork:         ProviderNetwork,
-			UseFloatingIP:           false,
-			UseLayer3Networking:     false,
-			AutoVMNetworkInterfaces: false,
-			DNSList:                 []string{"213.186.33.99", "1.1.1.1"},
+			ProviderNetwork:           ProviderNetwork,
+			UseFloatingIP:             false,
+			UseLayer3Networking:       false,
+			AutoHostNetworkInterfaces: false,
+			DNSList:                   []string{"213.186.33.99", "1.1.1.1"},
 			VolumeSpeeds: map[string]VolumeSpeed.Enum{
 				"classic":    VolumeSpeed.COLD,
 				"high-speed": VolumeSpeed.HDD,
@@ -158,8 +158,16 @@ func (c *Client) GetTemplate(id string) (*api.VMTemplate, error) {
 	return tpl, err
 }
 
-func init() {
-	providers.Register("ovh", &Client{})
+// GetCfgOpts return configuration parameters
+func (client *Client) GetCfgOpts() (api.Config, error) {
+        cfg := api.ConfigMap{}
+
+        cfg.Set("DNSList", client.Cfg.DNSList)
+        cfg.Set("S3Protocol", client.Cfg.S3Protocol)
+        cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
+        cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
+
+        return cfg, nil
 }
 
 func isWindowsTemplate(t api.VMTemplate) bool {
@@ -186,3 +194,8 @@ func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
 	}
 	return tpls, nil
 }
+
+func init() {
+	providers.Register("ovh", &Client{})
+}
+
