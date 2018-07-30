@@ -109,6 +109,6 @@ func ToPBVM(in *api.VM) *pb.VM {
 		Name:       in.Name,
 		PrivateKey: in.PrivateKey,
 		RAM:        in.Size.RAMSize,
-		State:      pb.VMState(in.State),
+		State:      pb.HostState(in.State),
 	}
 }
