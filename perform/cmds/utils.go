@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-package cmd
+package cmds
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
+
+	"github.com/CS-SI/SafeScale/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/perform/cluster"
 )
 
-func userConfirmed(msg string) bool {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("%s ? (y/N): ", msg)
-	resp, _ := reader.ReadString('\n')
-	resp = strings.ToLower(strings.TrimSuffix(resp, "\n"))
-	return resp == "y"
-}
+var (
+	clusterName     *string
+	clusterInstance clusterapi.ClusterAPI
+	pkgManagerKind  *string
+
+	// RebrandingPrefix is used to store the optional prefix to use when calling external SafeScale commands
+	RebrandingPrefix string
+)
 
 func createNodes(clusterName string, public bool, count int, cpu int32, ram float32, disk int32) error {
 	instance, err := cluster.Get(clusterName)
@@ -66,4 +66,13 @@ func createNodes(clusterName string, public bool, count int, cpu int32, ram floa
 	}
 	fmt.Printf("Added %d %s node%s to cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
 	return nil
+}
+
+// RebrandCommand allows to prefix a command with cmds.RebrandingPrefix
+// ie: with cmds.RebrandingPrefix == "safe "
+//     "deploy ..." becomes "safe deploy ..."
+//     with cmds.RebrandingPrefix == "my"
+//     "perform ..." becomes "myperform ..."
+func RebrandCommand(command string) string {
+	return fmt.Sprintf("%s%s", RebrandingPrefix, command)
 }

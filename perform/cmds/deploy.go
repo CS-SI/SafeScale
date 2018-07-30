@@ -14,30 +14,25 @@
  * limitations under the License.
  */
 
-package cmd
+package cmds
 
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/perform/cluster"
-	clusterapi "github.com/CS-SI/SafeScale/perform/cluster/api"
+	"github.com/CS-SI/SafeScale/cluster"
 
 	cli "github.com/jawher/mow.cli"
 )
 
-var (
-	clusterName     *string
-	clusterInstance clusterapi.ClusterAPI
-)
-
-// CommandCmd command
-func CommandCmd(cmd *cli.Cmd) {
+// DeployCmd command
+func DeployCmd(cmd *cli.Cmd) {
 	cmd.Spec = "CLUSTERNAME"
+
 	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
 
-	cmd.Command("dcos", "call dcos command on cluster", commandDcos)
-	cmd.Command("kubectl", "call kubectl command on cluster", commandKubectl)
-	cmd.Command("marathon", "call marathon command on cluster", commandMarathon)
+	cmd.Command("package pkg", "Deploy an operating system package on all nodes", deployPackageCmd)
+	cmd.Command("service svc", "Deploy a service on the cluster", deployServiceCmd)
+	cmd.Command("application app", "Deploy an application on the cluster", deployApplicationCmd)
 
 	cmd.Before = func() {
 		if *clusterName == "" {
@@ -58,26 +53,46 @@ func CommandCmd(cmd *cli.Cmd) {
 	}
 }
 
-func commandDcos(cmd *cli.Cmd) {
-	cmd.Spec = "-- [ARG...]"
+// deployPackageCmd ...
+func deployPackageCmd(cmd *cli.Cmd) {
+	cmd.Spec = "-k"
 
-	cmd.Action = func() {
-		fmt.Println("not yet implemented")
+	pkgManagerKind = cmd.StringOpt("kind k", "", "Kind of package manager; can be apt, yum, dnf")
+
+	cmd.Command("check c", "Check if a package is installed on cluster nodes", deployPackageCheckCmd)
+
+	cmd.Before = func() {
+		if *pkgManagerKind == "" {
+			fmt.Println("Invalid empty option --kind,-k")
+			return
+		}
 	}
 }
 
-func commandKubectl(cmd *cli.Cmd) {
-	cmd.Spec = "-- [ARG...]"
+// deployPackageCheckCmd
+func deployPackageCheckCmd(cmd *cli.Cmd) {
+	cmd.Spec = "PKGNAME [-t]"
+
+	pkgname := cmd.StringArg("PKGNAME", "", "Name of the package")
 
 	cmd.Action = func() {
-		fmt.Println("not yet implemented")
+		if *pkgname == "" {
+			fmt.Println("Invalid empty argument PKGNAME")
+			return
+		}
+		fmt.Println("deployPackageCmd not yet implemented")
 	}
 }
 
-func commandMarathon(cmd *cli.Cmd) {
-	cmd.Spec = "-- [ARG...]"
-
+// deployServiceCmd ...
+func deployServiceCmd(cmd *cli.Cmd) {
 	cmd.Action = func() {
-		fmt.Println("not yet implemented")
+		fmt.Println("deployServiceCmd not yet implemented")
+	}
+}
+
+func deployApplicationCmd(cmd *cli.Cmd) {
+	cmd.Action = func() {
+		fmt.Println("deployApplicationCmd not yet implemented")
 	}
 }

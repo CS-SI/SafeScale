@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-package cmd
+package cmds
 
 import (
 	"encoding/json"
 	"fmt"
 	"strconv"
 
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/brokeruse"
 
-	"github.com/CS-SI/SafeScale/perform/cluster"
+	"github.com/CS-SI/SafeScale/cluster"
 
 	cli "github.com/jawher/mow.cli"
 )
@@ -118,7 +119,7 @@ func nodeDelete(cmd *cli.Cmd) {
 		}
 
 		msg := fmt.Sprintf("Are you sure to delete Cluster Node identified by '%s' in Cluster '%s'", *nodeName, *clusterName)
-		if !userConfirmed(msg) {
+		if !utils.UserConfirmed(msg) {
 			fmt.Println("Aborted.")
 			return
 		}
