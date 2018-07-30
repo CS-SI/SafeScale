@@ -48,12 +48,7 @@ const (
 	DefaultNasMountPath = "/data"
 )
 
-const (
-	//NasContainerName is the technical name of the container used to store nas info
-	NasContainerName = "nas"
-)
-
-// TimeoutError defines a Timeout error
+//TimeoutError defines a Timeout error
 type TimeoutError struct {
 	Message string
 }
@@ -195,11 +190,13 @@ type VolumeRequest struct {
 
 //VolumeAttachment represents a volume attachment
 type VolumeAttachment struct {
-	ID       string `json:"id,omitempty"`
-	Name     string `json:"name,omitempty"`
-	VolumeID string `json:"volume,omitempty"`
-	ServerID string `json:"vm,omitempty"`
-	Device   string `json:"device,omitempty"`
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name,omitempty"`
+	VolumeID   string `json:"volume,omitempty"`
+	ServerID   string `json:"vm,omitempty"`
+	Device     string `json:"device,omitempty"`
+	MountPoint string `json:"mountpoint,omitempty"`
+	Format     string `json:"format,omitempty"`
 }
 
 //VolumeAttachmentRequest represents a volume attachment request
@@ -211,8 +208,9 @@ type VolumeAttachmentRequest struct {
 
 // Nas represents a nas definition
 type Nas struct {
+	ID       string `json:"id,omitempty"`
 	Name     string `json:"name,omitempty"`
-	ServerID string `json:"vm,omitempty"`
+	Host     string `json:"vm,omitempty"`
 	Path     string `json:"path,omitempty"`
 	IsServer bool   `json:"isServer,omitempty"`
 }
@@ -387,7 +385,7 @@ type ClientAPI interface {
 	// GetVolume returns the volume identified by id
 	GetVolume(id string) (*Volume, error)
 	// ListVolumes list available volumes
-	ListVolumes() ([]Volume, error)
+	ListVolumes(all bool) ([]Volume, error)
 	// DeleteVolume deletes the volume identified by id
 	DeleteVolume(id string) error
 

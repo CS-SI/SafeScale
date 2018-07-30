@@ -22,9 +22,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
+	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects"
 
 	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers"
@@ -100,6 +102,12 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 		Speed: client.getVolumeSpeed(vol.VolumeType),
 		State: toVolumeState(vol.Status),
 	}
+	err = metadata.SaveVolume(providers.FromClient(client), &v)
+	if err != nil {
+		client.DeleteVolume(v.ID)
+		return nil, fmt.Errorf("Error creating volume : %s", errorString(err))
+	}
+
 	return &v, nil
 }
 
@@ -119,8 +127,16 @@ func (client *Client) GetVolume(id string) (*api.Volume, error) {
 	return &av, nil
 }
 
-// ListVolumes list available volumes
-func (client *Client) ListVolumes() ([]api.Volume, error) {
+func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
+	if all {
+		return client.listAllVolumes()
+	}
+	return client.listMonitoredVolumes()
+
+}
+
+//ListVolumes list available volumes
+func (client *Client) listAllVolumes() ([]api.Volume, error) {
 	var vs []api.Volume
 	err := volumes.List(client.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumes.ExtractVolumes(page)
@@ -145,9 +161,30 @@ func (client *Client) ListVolumes() ([]api.Volume, error) {
 	return vs, nil
 }
 
-// DeleteVolume deletes the volume identified by id
+//listMonitoredVolumess lists available Volumes created by SafeScale (ie registered in object storage)
+func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
+	var vols []api.Volume
+	m, err := metadata.NewVolume(providers.FromClient(client))
+	if err != nil {
+		return vols, err
+	}
+	err = m.Browse(func(vol *api.Volume) error {
+		vols = append(vols, *vol)
+		return nil
+	})
+	if err != nil {
+		return vols, err
+	}
+	return vols, nil
+}
+
+//DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(id string) error {
 	err := volumes.Delete(client.Volume, id).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("Error deleting volume: %s", errorString(err))
+	}
+	err = metadata.RemoveVolume(providers.FromClient(client), id)
 	if err != nil {
 		return fmt.Errorf("Error deleting volume: %s", errorString(err))
 	}
@@ -163,22 +200,35 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		VolumeID: request.VolumeID,
 	}).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume attachement between server %s and volume %s: %s", request.ServerID, request.VolumeID, errorString(err))
+		return nil, fmt.Errorf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, errorString(err))
 	}
 
-	return &api.VolumeAttachment{
+	vaapi := &api.VolumeAttachment{
 		ID:       va.ID,
 		ServerID: va.ServerID,
 		VolumeID: va.VolumeID,
 		Device:   va.Device,
-	}, nil
+	}
+
+	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), request.VolumeID)
+	if err != nil {
+		// TODO ? Detach volume ?
+		return nil, err
+	}
+	err = mtdVol.Attach(vaapi)
+	if err != nil {
+		// TODO ? Detach volume ?
+		return vaapi, err
+	}
+
+	return vaapi, nil
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (client *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment, error) {
 	va, err := volumeattach.Get(client.Compute, serverID, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting volume attachement %s: %s", id, errorString(err))
+		return nil, fmt.Errorf("Error getting volume attachment %s: %s", id, errorString(err))
 	}
 	return &api.VolumeAttachment{
 		ID:       va.ID,
@@ -215,10 +265,26 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttach
 
 // DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
-	err := volumeattach.Delete(client.Compute, serverID, id).ExtractErr()
+	va, err := client.GetVolumeAttachment(serverID, id)
 	if err != nil {
-		return fmt.Errorf("Error deleting volume attachement %s: %s", id, errorString(err))
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
 	}
+
+	err = volumeattach.Delete(client.Compute, serverID, id).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
+	}
+
+	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), id)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
+	}
+
+	err = mtdVol.Detach(va)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
+	}
+
 	return nil
 }
 

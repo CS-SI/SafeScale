@@ -24,7 +24,6 @@ import (
 	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/utils/brokeruse"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/urfave/cli"
 )
 
@@ -45,13 +44,20 @@ var VolumeCmd = cli.Command{
 var volumeList = cli.Command{
 	Name:  "list",
 	Usage: "List available volumes",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "all",
+			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
+		}},
 	Action: func(c *cli.Context) error {
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
 		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVolumeServiceClient(conn)
-		resp, err := service.List(ctx, &google_protobuf.Empty{})
+		resp, err := service.List(ctx, &pb.VolumeListRequest{
+			All: c.Bool("all"),
+		})
 		if err != nil {
 			return fmt.Errorf("Could not get volume list: %v", err)
 		}
@@ -78,12 +84,12 @@ var volumeInspect = cli.Command{
 		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
 		service := pb.NewVolumeServiceClient(conn)
-		volume, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
+		volumeInfo, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
 		if err != nil {
 			return fmt.Errorf("Could not get volume '%s': %v", c.Args().First(), err)
 		}
 
-		out, _ := json.Marshal(volume)
+		out, _ := json.Marshal(volumeInfo)
 		fmt.Println(string(out))
 
 		return nil

@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system/nfs"
 )
 
@@ -30,7 +31,8 @@ import (
 type VolumeAPI interface {
 	Delete(ref string) error
 	Get(ref string) (*api.Volume, error)
-	List() ([]api.Volume, error)
+	Inspect(ref string) (*api.Volume, *api.VolumeAttachment, error)
+	List(all bool) ([]api.Volume, error)
 	Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error)
 	Attach(volume string, vm string, path string, format string) error
 	Detach(volume string, vm string) error
@@ -49,8 +51,8 @@ type VolumeService struct {
 }
 
 //List returns the network list
-func (srv *VolumeService) List() ([]api.Volume, error) {
-	return srv.provider.ListVolumes()
+func (srv *VolumeService) List(all bool) ([]api.Volume, error) {
+	return srv.provider.ListVolumes(all)
 }
 
 //Delete deletes volume referenced by ref
@@ -64,16 +66,32 @@ func (srv *VolumeService) Delete(ref string) error {
 
 //Get returns the volume identified by ref, ref can be the name or the id
 func (srv *VolumeService) Get(ref string) (*api.Volume, error) {
-	volumes, err := srv.List()
+	m, err := metadata.LoadVolume(srv.provider, ref)
 	if err != nil {
 		return nil, err
 	}
-	for _, volume := range volumes {
-		if volume.ID == ref || volume.Name == ref {
-			return &volume, nil
-		}
+	if m == nil {
+		return nil, fmt.Errorf("Volume %s does not exist", ref)
 	}
-	return nil, fmt.Errorf("Volume '%s' does not exist", ref)
+	return m.Get(), nil
+}
+
+//Inspect returns the volume identified by ref and its attachment (if any)
+func (srv *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachment, error) {
+	mtdvol, err := metadata.LoadVolume(srv.provider, ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	if mtdvol == nil {
+		return nil, nil, fmt.Errorf("Volume %s does not exist", ref)
+	}
+
+	va, err := mtdvol.GetAttachment()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return mtdvol.Get(), va, nil
 }
 
 // Create a volume
@@ -141,6 +159,15 @@ func (srv *VolumeService) Attach(volumename, vmname, path, format string) error 
 		srv.Detach(volumename, vmname)
 		return err
 	}
+
+	//Update volume attacheemnt info ith mountpoint
+	volatt.MountPoint = mountPoint
+	volatt.Format = format
+	mtdVol, err := metadata.LoadVolume(srv.provider, volumename)
+	if err != nil {
+		return err
+	}
+	mtdVol.Attach(volatt)
 
 	return nil
 }

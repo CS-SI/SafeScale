@@ -199,7 +199,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	clt.CreateContainer(api.NasContainerName)
 	return &clt, nil
 }
 

@@ -412,7 +412,7 @@ func (tester *ClientTester) StartStopVM(t *testing.T) {
 //Volume test
 func (tester *ClientTester) Volume(t *testing.T) {
 	// Get initial number of volumes
-	lst, err := tester.Service.ListVolumes()
+	lst, err := tester.Service.ListVolumes(true)
 	nbVolumes := len(lst)
 
 	v, err := tester.Service.CreateVolume(api.VolumeRequest{
@@ -435,7 +435,7 @@ func (tester *ClientTester) Volume(t *testing.T) {
 	defer tester.Service.DeleteVolume(v2.ID)
 	assert.Nil(t, err)
 	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
-	lst, err = tester.Service.ListVolumes()
+	lst, err = tester.Service.ListVolumes(true)
 	assert.Nil(t, err)
 	assert.Equal(t, nbVolumes+2, len(lst))
 	for _, vl := range lst {

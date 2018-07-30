@@ -53,12 +53,44 @@ func ToAPISshConfig(from *pb.SshConfig) *system.SSHConfig {
 }
 
 //ToPbVolume converts an api.Volume to a *Volume
-func ToPbVolume(in api.Volume) *pb.Volume {
+func ToPbVolume(in *api.Volume) *pb.Volume {
 	return &pb.Volume{
 		ID:    in.ID,
 		Name:  in.Name,
 		Size:  int32(in.Size),
 		Speed: pb.VolumeSpeed(in.Speed),
+	}
+}
+
+//ToPbVolumeAttachment converts an api.Volume to a *Volume
+func ToPbVolumeAttachment(in *api.VolumeAttachment) *pb.VolumeAttachment {
+	return &pb.VolumeAttachment{
+		Volume:    &pb.Reference{ID: in.VolumeID},
+		VM:        &pb.Reference{ID: in.ServerID},
+		MountPath: in.MountPoint,
+		Device:    in.Device,
+	}
+}
+
+//ToPbVolumeInfo merges and converts an api.Volume and an api.VolumeAttachment to a *VolumeInfo
+func ToPbVolumeInfo(volume *api.Volume, volumeAttch *api.VolumeAttachment) *pb.VolumeInfo {
+	if volumeAttch != nil {
+		return &pb.VolumeInfo{
+			ID:        volume.ID,
+			Name:      volume.Name,
+			Size:      int32(volume.Size),
+			Speed:     pb.VolumeSpeed(volume.Speed),
+			Host:      &pb.Reference{ID: volumeAttch.ServerID},
+			MountPath: volumeAttch.MountPoint,
+			Device:    volumeAttch.Device,
+			Format:    volumeAttch.Format,
+		}
+	}
+	return &pb.VolumeInfo{
+		ID:    volume.ID,
+		Name:  volume.Name,
+		Size:  int32(volume.Size),
+		Speed: pb.VolumeSpeed(volume.Speed),
 	}
 }
 
@@ -88,10 +120,11 @@ func ToPBContainerMountPoint(in *api.ContainerInfo) *pb.ContainerMountingPoint {
 // ToPBNas convert a Nas from api to protocolbuffer format
 func ToPBNas(in *api.Nas) *pb.NasDefinition {
 	return &pb.NasDefinition{
+		ID: in.ID,
 		Nas: &pb.NasName{
 			Name: in.Name},
 		VM: &pb.Reference{
-			ID: in.ServerID},
+			Name: in.Host},
 		Path:     in.Path,
 		IsServer: in.IsServer,
 	}

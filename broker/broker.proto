@@ -172,9 +172,29 @@ message Volume{
     VolumeSpeed Speed = 3;
     int32 Size = 4;
 }
+//message VolumeInfo{
+//    Volume Volume = 1;
+//    VolumeAttachment Attachment = 2;
+//
+//}
+
+message VolumeInfo{
+    string ID = 1;
+    string Name = 2;
+    VolumeSpeed Speed = 3;
+    int32 Size = 4;
+    Reference Host = 5;
+    string MountPath = 6;
+    string Format = 7;
+    string Device = 8;
+}
+
+message VolumeListRequest{
+    bool All = 1;
+}
 
 message VolumeList{
-    repeated Volume volumes = 1;
+    repeated Volume Volumes = 1;
 }
 
 message VolumeAttachment{
@@ -182,6 +202,7 @@ message VolumeAttachment{
     Reference VM = 3;
     string MountPath = 4;
     string Format = 5;
+    string Device = 6;
 }
 
 message VolumeDetachment{
@@ -194,8 +215,8 @@ service VolumeService{
     rpc Attach(VolumeAttachment) returns (google.protobuf.Empty) {}
     rpc Detach(VolumeDetachment) returns (google.protobuf.Empty){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
-    rpc List(google.protobuf.Empty) returns (VolumeList) {}
-    rpc Inspect(Reference) returns (Volume){}
+    rpc List(VolumeListRequest) returns (VolumeList) {}
+    rpc Inspect(Reference) returns (VolumeInfo){}
 }
 
 // broker container create c1
@@ -260,10 +281,11 @@ message NasName{
 }
 
 message NasDefinition{
-    NasName Nas = 1;
-    Reference VM = 2;
-    string path = 3;
-    bool isServer =4;
+    string ID = 1;
+    NasName Nas = 2;
+    Reference VM = 3;
+    string path = 4;
+    bool isServer = 5;
 }
 
 message NasList{
