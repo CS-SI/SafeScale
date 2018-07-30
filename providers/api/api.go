@@ -23,21 +23,22 @@ import (
 
 	// "github.com/CS-SI/SafeScale/system"
 
+	"github.com/CS-SI/SafeScale/providers/api/HostAdditionalInfo"
+	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/api/VMState"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
 	"github.com/CS-SI/SafeScale/system"
 )
 
 const (
-	//DefaultUser Default VM user
+	// DefaultUser Default Host user
 	DefaultUser = "gpac"
 
-	//DefaultVolumeMountPoint Default mount point for volumes
+	// DefaultVolumeMountPoint Default mount point for volumes
 	DefaultVolumeMountPoint = "/shared/"
 
-	//DefaultContainerMountPoint Default mount point for containers
+	// DefaultContainerMountPoint Default mount point for containers
 	DefaultContainerMountPoint = "/containers/"
 
 	// DefaultNasExposedPath Default path to be exported by nfs server
@@ -52,7 +53,7 @@ const (
 	NasContainerName = "nas"
 )
 
-//TimeoutError defines a Timeout error
+// TimeoutError defines a Timeout error
 type TimeoutError struct {
 	Message string
 }
@@ -61,7 +62,7 @@ func (e *TimeoutError) Error() string {
 	return e.Message
 }
 
-//KeyPair represents a SSH key pair
+// KeyPair represents a SSH key pair
 type KeyPair struct {
 	ID         string `json:"id,omitempty"`
 	Name       string `json:"name,omitempty"`
@@ -69,7 +70,7 @@ type KeyPair struct {
 	PublicKey  string `json:"public_key,omitempty"`
 }
 
-//VMSize represent Sizing elements of a VM
+// VMSize represent Sizing elements of a VM
 type VMSize struct {
 	Cores     int     `json:"cores,omitempty"`
 	RAMSize   float32 `json:"ram_size,omitempty"`
@@ -78,35 +79,41 @@ type VMSize struct {
 	GPUType   string  `json:"gpu_type,omitempty"`
 }
 
-//VMTemplate represents a VM template
+// VMTemplate represents a VM template
 type VMTemplate struct {
 	VMSize `json:"vm_size,omitempty"`
 	ID     string `json:"id,omitempty"`
 	Name   string `json:"name,omitempty"`
 }
 
-//SizingRequirements represents VM sizing requirements to fulfil
+// SizingRequirements represents VM sizing requirements to fulfil
 type SizingRequirements struct {
 	MinCores    int     `json:"min_cores,omitempty"`
 	MinRAMSize  float32 `json:"min_ram_size,omitempty"`
 	MinDiskSize int     `json:"min_disk_size,omitempty"`
 }
 
-//VM represents a virtual machine properties
+// HostAdditionalInfoType ...
+type HostAdditionalInfoType map[HostAdditionalInfo.Enum]interface{}
+
+// VM represents a virtual machine properties
 type VM struct {
-	ID           string       `json:"id,omitempty"`
-	Name         string       `json:"name,omitempty"`
-	PrivateIPsV4 []string     `json:"private_ips_v4,omitempty"`
-	PrivateIPsV6 []string     `json:"private_ips_v6,omitempty"`
-	AccessIPv4   string       `json:"access_ip_v4,omitempty"`
-	AccessIPv6   string       `json:"access_ip_v6,omitempty"`
-	Size         VMSize       `json:"size,omitempty"`
-	State        VMState.Enum `json:"state,omitempty"`
-	PrivateKey   string       `json:"private_key,omitempty"`
-	GatewayID    string       `json:"gateway_id,omitempty"`
+	ID           string         `json:"id,omitempty"`
+	Name         string         `json:"name,omitempty"`
+	PrivateIPsV4 []string       `json:"private_ips_v4,omitempty"`
+	PrivateIPsV6 []string       `json:"private_ips_v6,omitempty"`
+	AccessIPv4   string         `json:"access_ip_v4,omitempty"`
+	AccessIPv6   string         `json:"access_ip_v6,omitempty"`
+	Size         VMSize         `json:"size,omitempty"`
+	State        HostState.Enum `json:"state,omitempty"`
+	PrivateKey   string         `json:"private_key,omitempty"`
+	GatewayID    string         `json:"gateway_id,omitempty"`
+	// This field can contain any kind of supplemental information that will be stored as-is
+	// functions using
+	AdditionalInfo HostAdditionalInfoType `json:"additional_info,omitempty"`
 }
 
-//GetAccessIP computes access IP of the VM
+// GetAccessIP computes access IP of the VM
 func (vm *VM) GetAccessIP() string {
 	ip := vm.AccessIPv4
 	if ip == "" {
@@ -158,7 +165,7 @@ type VMRequest struct {
 	KeyPair *KeyPair `json:"key_pair,omitempty"`
 }
 
-//GWRequest to create a Gateway into a network
+// GWRequest to create a Gateway into a network
 type GWRequest struct {
 	NetworkID string `json:"network_id,omitempty"`
 	//TemplateID the UUID of the template used to size the VM (see SelectTemplates)
@@ -170,7 +177,7 @@ type GWRequest struct {
 	GWName string `json:"gw_name,omitempty"`
 }
 
-//Volume represents a block volume
+// Volume represents a block volume
 type Volume struct {
 	ID    string           `json:"id,omitempty"`
 	Name  string           `json:"name,omitempty"`
@@ -179,7 +186,7 @@ type Volume struct {
 	State VolumeState.Enum `json:"state,omitempty"`
 }
 
-//VolumeRequest represents a volume request
+// VolumeRequest represents a volume request
 type VolumeRequest struct {
 	Name  string           `json:"name,omitempty"`
 	Size  int              `json:"size,omitempty"`
@@ -225,14 +232,14 @@ type ContainerInfo struct {
 }
 
 /*
-//RouterRequest represents a router request
+// RouterRequest represents a router request
 type RouterRequest struct {
 	Name string `json:"name,omitempty"`
 	//NetworkID is the Network ID which the router gateway is connected to.
 	NetworkID string `json:"network_id,omitempty"`
 }
 
-//Router represents a router
+// Router represents a router
 type Router struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
@@ -241,7 +248,7 @@ type Router struct {
 }
 */
 
-//Network representes a virtual network
+// Network representes a virtual network
 type Network struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
@@ -254,8 +261,8 @@ type Network struct {
 }
 
 /*
-//Subnet represents a sub network where Mask is defined in CIDR notation
-//like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
+// Subnet represents a sub network where Mask is defined in CIDR notation
+// like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type Subnet struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
@@ -268,8 +275,8 @@ type Subnet struct {
 }
 */
 
-//NetworkRequest represents network requirements to create a subnet where Mask is defined in CIDR notation
-//like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
+// NetworkRequest represents network requirements to create a subnet where Mask is defined in CIDR notation
+// like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type NetworkRequest struct {
 	Name string `json:"name,omitempty"`
 	//IPVersion must be IPv4 or IPv6 (see IPVersion)
@@ -278,7 +285,7 @@ type NetworkRequest struct {
 	CIDR string `json:"cidr,omitempty"`
 }
 
-//Object object to put in a container
+// Object object to put in a container
 type Object struct {
 	Name          string            `json:"name,omitempty"`
 	Content       io.ReadSeeker     `json:"content,omitempty"`
@@ -290,7 +297,7 @@ type Object struct {
 	ContentLength int64             `json:"content_length,omitempty"`
 }
 
-//ObjectFilter filter object
+// ObjectFilter filter object
 type ObjectFilter struct {
 	Prefix string `json:"prefix,omitempty"`
 	Path   string `json:"path,omitempty"`
@@ -302,7 +309,7 @@ type Range struct {
 	To   *int `json:"to,omitempty"`
 }
 
-//NewRange creates a range
+// NewRange creates a range
 func NewRange(from, to int) Range {
 	return Range{&from, &to}
 }
@@ -320,7 +327,7 @@ func (r Range) String() string {
 	return ""
 }
 
-//ClientAPI is an API defining an IaaS driver
+// ClientAPI is an API defining an IaaS driver
 type ClientAPI interface {
 	Build(map[string]interface{}) (ClientAPI, error)
 
@@ -426,7 +433,7 @@ type ClientAPI interface {
 	GetCfgOpts() (Config, error)
 }
 
-//Config represents key/value configuration.
+// Config represents key/value configuration.
 type Config interface {
 	// Config gets a string configuration value and a
 	// bool indicating whether the value was present or not.
@@ -445,23 +452,23 @@ type Config interface {
 	GetInteger(name string) int
 }
 
-//ConfigMap is a map[string]string that implements
+// ConfigMap is a map[string]string that implements
 // the Config method.
 type ConfigMap map[string]interface{}
 
-//Config gets a string configuration value and a
+// Config gets a string configuration value and a
 // bool indicating whether the value was present or not.
 func (c ConfigMap) Config(name string) (interface{}, bool) {
 	val, ok := c[name]
 	return val, ok
 }
 
-//Get is an alias to Config()
+// Get is an alias to Config()
 func (c ConfigMap) Get(name string) (interface{}, bool) {
 	return c.Config(name)
 }
 
-//GetString returns a string corresponding to the key, empty string if it doesn't exist
+// GetString returns a string corresponding to the key, empty string if it doesn't exist
 func (c ConfigMap) GetString(name string) string {
 	val, ok := c.Get(name)
 	if ok {
@@ -470,7 +477,7 @@ func (c ConfigMap) GetString(name string) string {
 	return ""
 }
 
-//GetSliceOfStrings returns a string slice corresponding to the key, empty string slice if it doesn't exist
+// GetSliceOfStrings returns a string slice corresponding to the key, empty string slice if it doesn't exist
 func (c ConfigMap) GetSliceOfStrings(name string) []string {
 	val, ok := c.Get(name)
 	if ok {
@@ -479,7 +486,7 @@ func (c ConfigMap) GetSliceOfStrings(name string) []string {
 	return []string{}
 }
 
-//GetMapOfStrings returns a string map of strings correspondong to the key, empty map if it doesn't exist
+// GetMapOfStrings returns a string map of strings correspondong to the key, empty map if it doesn't exist
 func (c ConfigMap) GetMapOfStrings(name string) map[string]string {
 	val, ok := c.Get(name)
 	if ok {
@@ -488,7 +495,7 @@ func (c ConfigMap) GetMapOfStrings(name string) map[string]string {
 	return map[string]string{}
 }
 
-//GetInteger returns an integer corresponding to the key, 0 if it doesn't exist
+// GetInteger returns an integer corresponding to the key, 0 if it doesn't exist
 func (c ConfigMap) GetInteger(name string) int {
 	val, ok := c.Get(name)
 	if ok {
@@ -497,7 +504,7 @@ func (c ConfigMap) GetInteger(name string) int {
 	return 0
 }
 
-//Set sets name configuration to value
+// Set sets name configuration to value
 func (c ConfigMap) Set(name string, value interface{}) {
 	c[name] = value
 }

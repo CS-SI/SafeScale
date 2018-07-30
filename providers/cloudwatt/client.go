@@ -55,10 +55,10 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 		FloatingIPPool: "public",
 	},
 		openstack.CfgOptions{
-			ProviderNetwork:         "public",
-			UseFloatingIP:           true,
-			UseLayer3Networking:     true,
-			AutoVMNetworkInterfaces: true,
+			ProviderNetwork:           "public",
+			UseFloatingIP:             true,
+			UseLayer3Networking:       true,
+			AutoHostNetworkInterfaces: true,
 			VolumeSpeeds: map[string]VolumeSpeed.Enum{
 				"standard":   VolumeSpeed.COLD,
 				"performant": VolumeSpeed.HDD,
@@ -97,6 +97,18 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 		TenantName: TenantName,
 		Region:     Region,
 	})
+}
+
+// GetCfgOpts return configuration parameters
+func (c *Client) GetCfgOpts() (api.Config, error) {
+	cfg := api.ConfigMap{}
+
+	cfg.Set("DNSList", c.Cfg.DNSList)
+	cfg.Set("S3Protocol", c.Cfg.S3Protocol)
+	cfg.Set("AutoHostNetworkInterfaces", c.Cfg.AutoHostNetworkInterfaces)
+	cfg.Set("UseLayer3Networking", c.Cfg.UseLayer3Networking)
+
+	return cfg, nil
 }
 
 func init() {

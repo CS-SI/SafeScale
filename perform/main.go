@@ -19,15 +19,15 @@ package main
 import (
 	"fmt"
 	"os"
-	"sort"
 	"time"
 
-	"github.com/CS-SI/SafeScale/perform/cmd"
+	cli "github.com/jawher/mow.cli"
 
-	cli "github.com/urfave/cli"
+	"github.com/CS-SI/SafeScale/perform/cmds"
 
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise provider cloudwatt
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise provider flexibleengine
+	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise provider opentelekom
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise provider ovh
 )
 
@@ -38,29 +38,39 @@ const (
 )
 
 func main() {
-	//cli.VersionFlags = "V, version"
-	app := cli.NewApp()
-	app.Name = "perform"
-	app.Usage = "perform COMMAND"
-	app.Version = "0.1.0"
-	app.Authors = []cli.Author{
+	app := cli.App("perform", "SafeScale perform")
+	//app.Version = "0.1.0"
+	/*app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "CS-SI",
 			Email: "safescale@c-s.fr",
 		},
 	}
-	app.EnableBashCompletion = true
+	app.EnableBashCompletion = true*/
 
-	app.Commands = append(app.Commands, cmd.ClusterCmd)
-	sort.Sort(cli.CommandsByName(cmd.ClusterCmd.Subcommands))
-	app.Commands = append(app.Commands, cmd.NodeCmd)
-	sort.Sort(cli.CommandsByName(cmd.NodeCmd.Subcommands))
-	app.Commands = append(app.Commands, cmd.CommandCmd)
-	sort.Sort(cli.CommandsByName(cmd.CommandCmd.Subcommands))
+	app.Command("create", "create perform cluster", cmds.CreateCmd)
+	app.Command("expand", "Add a node to the perform cluster", cmds.ExpandCmd)
+	app.Command("shrink", "Remove a node from perform cluster", cmds.ShrinkCmd)
+	app.Command("dcos", "execute dcos command", cmds.DcosCmd)
+	app.Command("marathon", "Executes marathon command", cmds.MarathonCmd)
+	app.Command("kubectl", "Executes kubectl command", cmds.KubectlCmd)
+	app.Command("deploy", "Deploy a package or service on cluster", cmds.DeployCmd)
 
-	sort.Sort(cli.CommandsByName(app.Commands))
-	err := app.Run(os.Args)
-	if err != nil {
-		fmt.Println(err)
+	verbose := app.BoolOpt("verbose v", false, "Increase verbosity")
+	debug := app.BoolOpt("debug d", false, "Enable debug mode")
+	rebrand := app.StringOpt("rebrand", "", "Prefix to use when calling external commands")
+
+	app.Before = func() {
+		if *verbose {
+			fmt.Printf("Verbosity wanted.")
+		}
+		if *debug {
+			fmt.Printf("Debug enabled")
+		}
+		if *rebrand != "" {
+			cmds.RebrandingPrefix = *rebrand
+		}
 	}
+
+	app.Run(os.Args)
 }

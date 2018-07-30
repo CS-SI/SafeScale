@@ -96,7 +96,7 @@ message VMDefinition{
     bool Public = 10;
 }
 
-enum VMState {
+enum HostState {
     /*STOPPED VM is stopped*/
 	STOPPED = 0;
 	/*STARTING VM is starting*/
@@ -117,7 +117,7 @@ message VM{
     int32 Disk = 5;
     string PUBLIC_IP = 6;
     string PRIVATE_IP = 7;
-    VMState State = 8;
+    HostState State = 8;
     string PrivateKey = 9;
     string GatewayID = 10;
 }

@@ -50,7 +50,7 @@ func NewHost(svc *providers.Service) (*Host, error) {
 	}, nil
 }
 
-//Carry links a VM instance to the Metadata instance
+// Carry links a Host instance to the Metadata instance
 func (m *Host) Carry(host *api.VM) *Host {
 	if host == nil {
 		panic("host parameter is nil!")
@@ -59,12 +59,12 @@ func (m *Host) Carry(host *api.VM) *Host {
 	return m
 }
 
-//Get returns the Network instance linked to metadata
+// Get returns the Network instance linked to metadata
 func (m *Host) Get() *api.VM {
 	return m.host
 }
 
-//Write updates the metadata corresponding to the host in the Object Storage
+// Write updates the metadata corresponding to the host in the Object Storage
 func (m *Host) Write() error {
 	if m.host == nil {
 		panic("m.host is nil!")
@@ -77,7 +77,7 @@ func (m *Host) Write() error {
 	return m.folder.Write(ByNameFolderName, m.host.Name, m.host)
 }
 
-//Reload reloads the content of the Object Storage, overriding what is in the metadata instance
+// Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (m *Host) Reload() error {
 	if m.host == nil {
 		panic("Metadata isn't linked with a host!")
@@ -93,7 +93,7 @@ func (m *Host) Reload() error {
 	return nil
 }
 
-//ReadByID reads the metadata of a network identified by ID from Object Storage
+// ReadByID reads the metadata of a network identified by ID from Object Storage
 func (m *Host) ReadByID(id string) (bool, error) {
 
 	var host api.VM
@@ -110,7 +110,7 @@ func (m *Host) ReadByID(id string) (bool, error) {
 	return true, nil
 }
 
-//ReadByName reads the metadata of a network identified by name
+// ReadByName reads the metadata of a network identified by name
 func (m *Host) ReadByName(name string) (bool, error) {
 	var host api.VM
 	found, err := m.folder.Read(ByNameFolderName, name, func(buf *bytes.Buffer) error {
@@ -126,7 +126,7 @@ func (m *Host) ReadByName(name string) (bool, error) {
 	return true, nil
 }
 
-//Delete updates the metadata corresponding to the network
+// Delete updates the metadata corresponding to the network
 func (m *Host) Delete() error {
 	err := m.folder.Delete(ByIDFolderName, m.host.ID)
 	if err != nil {
@@ -140,7 +140,7 @@ func (m *Host) Delete() error {
 	return nil
 }
 
-//Browse walks through vm folder and executes a callback for each entries
+// Browse walks through vm folder and executes a callback for each entries
 func (m *Host) Browse(callback func(*api.VM) error) error {
 	return m.folder.Browse(ByIDFolderName, func(buf *bytes.Buffer) error {
 		var vm api.VM
@@ -152,13 +152,13 @@ func (m *Host) Browse(callback func(*api.VM) error) error {
 	})
 }
 
-//SaveHost saves the VM definition in Object Storage
-func SaveHost(svc *providers.Service, vm *api.VM, netID string) error {
+// SaveHost saves the Host definition in Object Storage
+func SaveHost(svc *providers.Service, host *api.VM, netID string) error {
 	mh, err := NewHost(svc)
 	if err != nil {
 		return err
 	}
-	err = mh.Carry(vm).Write()
+	err = mh.Carry(host).Write()
 	if err != nil {
 		return err
 	}
@@ -171,13 +171,13 @@ func SaveHost(svc *providers.Service, vm *api.VM, netID string) error {
 		return err
 	}
 	if found {
-		return mn.AttachHost(vm)
+		return mn.AttachHost(host)
 	}
 	return nil
 }
 
-//RemoveHost removes the VM definition from Object Storage
-func RemoveHost(svc *providers.Service, vm *api.VM) error {
+// RemoveHost removes the host definition from Object Storage
+func RemoveHost(svc *providers.Service, host *api.VM) error {
 	// First, browse networks to delete links on the deleted host
 	mn, err := NewNetwork(svc)
 	if err != nil {
@@ -188,7 +188,7 @@ func RemoveHost(svc *providers.Service, vm *api.VM) error {
 		return err
 	}
 	err = mn.Browse(func(net *api.Network) error {
-		mnb.Carry(net).DetachHost(vm.ID)
+		mnb.Carry(net).DetachHost(host.ID)
 		return nil
 	})
 	if err != nil {
@@ -200,16 +200,16 @@ func RemoveHost(svc *providers.Service, vm *api.VM) error {
 	if err != nil {
 		return err
 	}
-	return mh.Carry(vm).Delete()
+	return mh.Carry(host).Delete()
 }
 
-//LoadHost gets the VM definition from Object Storage
-func LoadHost(svc *providers.Service, vmID string) (*Host, error) {
+// LoadHost gets the host definition from Object Storage
+func LoadHost(svc *providers.Service, hostID string) (*Host, error) {
 	m, err := NewHost(svc)
 	if err != nil {
 		return nil, err
 	}
-	found, err := m.ReadByID(vmID)
+	found, err := m.ReadByID(hostID)
 	if err != nil {
 		return nil, err
 	}

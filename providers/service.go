@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/VMState"
+	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
 	uuid "github.com/satori/go.uuid"
 )
@@ -141,8 +141,8 @@ type ServerRequest struct {
 	Gateway *VMAccess `json:"gateway,omitempty"`
 }
 
-//WaitVMState waits a vm achieve state
-func (srv *Service) WaitVMState(vmID string, state VMState.Enum, timeout time.Duration) (*api.VM, error) {
+//WaitHostState waits a vm achieve state
+func (srv *Service) WaitHostState(vmID string, state HostState.Enum, timeout time.Duration) (*api.VM, error) {
 	var vm *api.VM
 	var err error
 	timer := time.After(timeout)
@@ -153,7 +153,7 @@ func (srv *Service) WaitVMState(vmID string, state VMState.Enum, timeout time.Du
 			return nil, err
 		} else if vm.State == state {
 			return vm, err
-		} else if vm.State == VMState.ERROR {
+		} else if vm.State == HostState.ERROR {
 			return vm, fmt.Errorf("VM in error state")
 		}
 		select {
@@ -166,8 +166,8 @@ func (srv *Service) WaitVMState(vmID string, state VMState.Enum, timeout time.Du
 	return vm, err
 }
 
-//WaitVMState waits a vm achieve state
-// func (srv *Service) WaitVMState(vmID string, state VMState.Enum, timeout time.Duration) (*api.VM, error) {
+//WaitHostState waits a vm achieve state
+// func (srv *Service) WaitHostState(vmID string, state HostState.Enum, timeout time.Duration) (*api.VM, error) {
 // 	cout := make(chan int)
 // 	stop := make(chan bool)
 // 	vmc := make(chan *api.VM)
@@ -214,7 +214,7 @@ func (srv *Service) WaitVMState(vmID string, state VMState.Enum, timeout time.Du
 // 	fmt.Println("result sent ", res)
 // }
 
-// func pollVM(client api.ClientAPI, vmID string, state VMState.Enum, cout chan int, stop chan bool, vmc chan *api.VM) {
+// func pollVM(client api.ClientAPI, vmID string, state HostState.Enum, cout chan int, stop chan bool, vmc chan *api.VM) {
 // 	finish := false
 // 	fmt.Println("Start polling")
 // 	for !finish {
@@ -231,7 +231,7 @@ func (srv *Service) WaitVMState(vmID string, state VMState.Enum, timeout time.Du
 // 			res = 0
 // 		} else if vm.State == state {
 // 			res = 1
-// 		} else if vm.State == VMState.ERROR {
+// 		} else if vm.State == HostState.ERROR {
 // 			res = 0
 // 		} else {
 // 			res = 2

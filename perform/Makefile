@@ -1,21 +1,17 @@
 GO?=go
 EXEC:=perform
 
-all:	$(EXEC) cluster vet
+all:	$(EXEC)  vet
 
-.PHONY: cluster clean
+.PHONY: clean
 
 vet:
 	@$(GO) vet
-	@$(GO) vet ./cmd
+	@$(GO) vet ./cmds
 
-cluster:
-	@(cd cluster && $(MAKE))
-
-$(EXEC): cluster main.go cmd/*.go
+$(EXEC): main.go cmds/*.go
 	@$(GO) build -o $(EXEC)
 
 clean:
 	@$(RM) $(EXEC)
-	@(cd cluster && $(MAKE) $@)
 

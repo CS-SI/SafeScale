@@ -34,7 +34,7 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
-//toVM converts a Volume status returned by the OpenStack driver into VolumeState enum
+// toVM converts a Volume status returned by the OpenStack driver into VolumeState enum
 func toVolumeState(status string) VolumeState.Enum {
 	switch status {
 	case "creating":
@@ -80,10 +80,10 @@ func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 	return VolumeSpeed.HDD
 }
 
-//CreateVolume creates a block volume
-//- name is the name of the volume
-//- size is the size of the volume in GB
-//- volumeType is the type of volume to create, if volumeType is empty the driver use a default type
+// CreateVolume creates a block volume
+// - name is the name of the volume
+// - size is the size of the volume in GB
+// - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
 	vol, err := volumes.Create(client.Volume, volumes.CreateOpts{
 		Name:       request.Name,
@@ -103,7 +103,7 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 	return &v, nil
 }
 
-//GetVolume returns the volume identified by id
+// GetVolume returns the volume identified by id
 func (client *Client) GetVolume(id string) (*api.Volume, error) {
 	vol, err := volumes.Get(client.Volume, id).Extract()
 	if err != nil {
@@ -119,7 +119,7 @@ func (client *Client) GetVolume(id string) (*api.Volume, error) {
 	return &av, nil
 }
 
-//ListVolumes list available volumes
+// ListVolumes list available volumes
 func (client *Client) ListVolumes() ([]api.Volume, error) {
 	var vs []api.Volume
 	err := volumes.List(client.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
@@ -145,7 +145,7 @@ func (client *Client) ListVolumes() ([]api.Volume, error) {
 	return vs, nil
 }
 
-//DeleteVolume deletes the volume identified by id
+// DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(id string) error {
 	err := volumes.Delete(client.Volume, id).ExtractErr()
 	if err != nil {
@@ -154,10 +154,10 @@ func (client *Client) DeleteVolume(id string) error {
 	return nil
 }
 
-//CreateVolumeAttachment attaches a volume to a VM
-//- name the name of the volume attachment
-//- volume the volume to attach
-//- vm the VM on which the volume is attached
+// CreateVolumeAttachment attaches a volume to a VM
+// - name the name of the volume attachment
+// - volume the volume to attach
+// - vm the VM on which the volume is attached
 func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
 	va, err := volumeattach.Create(client.Compute, request.ServerID, volumeattach.CreateOpts{
 		VolumeID: request.VolumeID,
@@ -174,7 +174,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 	}, nil
 }
 
-//GetVolumeAttachment returns the volume attachment identified by id
+// GetVolumeAttachment returns the volume attachment identified by id
 func (client *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment, error) {
 	va, err := volumeattach.Get(client.Compute, serverID, id).Extract()
 	if err != nil {
@@ -188,7 +188,7 @@ func (client *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttac
 	}, nil
 }
 
-//ListVolumeAttachments lists available volume attachment
+// ListVolumeAttachments lists available volume attachment
 func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttachment, error) {
 	var vs []api.VolumeAttachment
 	err := volumeattach.List(client.Compute, serverID).EachPage(func(page pagination.Page) (bool, error) {
@@ -213,7 +213,7 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttach
 	return vs, nil
 }
 
-//DeleteVolumeAttachment deletes the volume attachment identifed by id
+// DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 	err := volumeattach.Delete(client.Compute, serverID, id).ExtractErr()
 	if err != nil {
@@ -222,7 +222,7 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 	return nil
 }
 
-//CreateContainer creates an object container
+// CreateContainer creates an object container
 func (client *Client) CreateContainer(name string) error {
 	opts := containers.CreateOpts{
 		//		Metadata: meta,
@@ -235,7 +235,7 @@ func (client *Client) CreateContainer(name string) error {
 	return nil
 }
 
-//DeleteContainer deletes an object container
+// DeleteContainer deletes an object container
 func (client *Client) DeleteContainer(name string) error {
 	_, err := containers.Delete(client.Container, name).Extract()
 	if err != nil {
@@ -244,7 +244,7 @@ func (client *Client) DeleteContainer(name string) error {
 	return err
 }
 
-//UpdateContainer updates an object container
+// UpdateContainer updates an object container
 func (client *Client) UpdateContainer(name string, meta map[string]string) error {
 	_, err := containers.Update(client.Container, name, containers.UpdateOpts{
 		Metadata: meta,
@@ -255,9 +255,9 @@ func (client *Client) UpdateContainer(name string, meta map[string]string) error
 	return nil
 }
 
-//GetContainerMetadata get an object container metadata
+// GetContainerMetadata get an object container metadata
 func (client *Client) GetContainerMetadata(name string) (map[string]string, error) {
-	meta, err := containers.Get(client.Container, name).ExtractMetadata()
+	meta, err := containers.Get(client.Container, name, containers.GetOpts{}).ExtractMetadata()
 	if err != nil {
 		return nil, fmt.Errorf("Error getting container %s: %s", name, errorString(err))
 	}
@@ -265,9 +265,9 @@ func (client *Client) GetContainerMetadata(name string) (map[string]string, erro
 
 }
 
-//GetContainer get container info
+// GetContainer get container info
 func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
-	meta, err := containers.Get(client.Container, name).ExtractMetadata()
+	meta, err := containers.Get(client.Container, name, containers.GetOpts{}).ExtractMetadata()
 	_ = meta
 
 	if err != nil {
@@ -282,7 +282,7 @@ func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
 
 }
 
-//ListContainers list object containers
+// ListContainers list object containers
 func (client *Client) ListContainers() ([]string, error) {
 	opts := &containers.ListOpts{Full: true}
 
@@ -308,7 +308,7 @@ func (client *Client) ListContainers() ([]string, error) {
 	return containerList, nil
 }
 
-//PutObject put an object into an object container
+// PutObject put an object into an object container
 func (client *Client) PutObject(container string, obj api.Object) error {
 	var ti time.Time
 	opts := objects.CreateOpts{
@@ -326,7 +326,7 @@ func (client *Client) PutObject(container string, obj api.Object) error {
 	return nil
 }
 
-//UpdateObjectMetadata update an object into an object container
+// UpdateObjectMetadata update an object into an object container
 func (client *Client) UpdateObjectMetadata(container string, obj api.Object) error {
 	var ti time.Time
 	opts := objects.UpdateOpts{
@@ -339,7 +339,7 @@ func (client *Client) UpdateObjectMetadata(container string, obj api.Object) err
 	return err
 }
 
-//GetObject get  object content from an object container
+// GetObject get  object content from an object container
 func (client *Client) GetObject(container string, name string, ranges []api.Range) (*api.Object, error) {
 	var rList []string
 	for _, r := range ranges {
@@ -395,7 +395,7 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 	}, nil
 }
 
-//GetObjectMetadata get  object metadata from an object container
+// GetObjectMetadata get  object metadata from an object container
 func (client *Client) GetObjectMetadata(container string, name string) (*api.Object, error) {
 
 	res := objects.Get(client.Container, container, name, objects.GetOpts{})
@@ -419,7 +419,7 @@ func (client *Client) GetObjectMetadata(container string, name string) (*api.Obj
 	}, nil
 }
 
-//ListObjects list objects of a container
+// ListObjects list objects of a container
 func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]string, error) {
 	// We have the option of filtering objects by their attributes
 	opts := &objects.ListOpts{
@@ -444,7 +444,7 @@ func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]
 	return objectList, nil
 }
 
-//CopyObject copies an object
+// CopyObject copies an object
 func (client *Client) CopyObject(containerSrc, objectSrc, objectDst string) error {
 
 	opts := &objects.CopyOpts{
@@ -460,7 +460,7 @@ func (client *Client) CopyObject(containerSrc, objectSrc, objectDst string) erro
 	return nil
 }
 
-//DeleteObject deleta an object from a container
+// DeleteObject deleta an object from a container
 func (client *Client) DeleteObject(container, object string) error {
 	_, err := objects.Delete(client.Container, container, object, objects.DeleteOpts{}).Extract()
 	if err != nil {

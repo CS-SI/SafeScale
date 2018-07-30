@@ -17,13 +17,11 @@
 package openstack
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -32,9 +30,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/api/VMState"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
@@ -48,7 +47,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-//ListImages lists available OS images
+// ListImages lists available OS images
 func (client *Client) ListImages() ([]api.Image, error) {
 	opts := images.ListOpts{}
 
@@ -78,7 +77,7 @@ func (client *Client) ListImages() ([]api.Image, error) {
 	return imgList, nil
 }
 
-//GetImage returns the Image referenced by id
+// GetImage returns the Image referenced by id
 func (client *Client) GetImage(id string) (*api.Image, error) {
 	img, err := images.Get(client.Compute, id).Extract()
 	if err != nil {
@@ -87,7 +86,7 @@ func (client *Client) GetImage(id string) (*api.Image, error) {
 	return &api.Image{ID: img.ID, Name: img.Name}, nil
 }
 
-//GetTemplate returns the Template referenced by id
+// GetTemplate returns the Template referenced by id
 func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
@@ -113,8 +112,8 @@ func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
 	}, nil
 }
 
-//ListTemplates lists available VM templates
-//VM templates are sorted using Dominant Resource Fairness Algorithm
+// ListTemplates lists available Host templates
+// Host templates are sorted using Dominant Resource Fairness Algorithm
 func (client *Client) ListTemplates() ([]api.VMTemplate, error) {
 	opts := flavors.ListOpts{}
 
@@ -153,7 +152,7 @@ func (client *Client) ListTemplates() ([]api.VMTemplate, error) {
 	return flvList, nil
 }
 
-//CreateKeyPair creates and import a key pair
+// CreateKeyPair creates and import a key pair
 func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := privateKey.PublicKey
@@ -177,7 +176,7 @@ func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
 	}, nil
 }
 
-//GetKeyPair returns the key pair identified by id
+// GetKeyPair returns the key pair identified by id
 func (client *Client) GetKeyPair(id string) (*api.KeyPair, error) {
 	kp, err := keypairs.Get(client.Compute, id).Extract()
 	if err != nil {
@@ -191,7 +190,7 @@ func (client *Client) GetKeyPair(id string) (*api.KeyPair, error) {
 	}, nil
 }
 
-//ListKeyPairs lists available key pairs
+// ListKeyPairs lists available key pairs
 func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
 
 	// Retrieve a pager (i.e. a paginated collection)
@@ -225,7 +224,7 @@ func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
 	return kpList, nil
 }
 
-//DeleteKeyPair deletes the key pair identified by id
+// DeleteKeyPair deletes the key pair identified by id
 func (client *Client) DeleteKeyPair(id string) error {
 	err := keypairs.Delete(client.Compute, id).ExtractErr()
 	if err != nil {
@@ -234,7 +233,7 @@ func (client *Client) DeleteKeyPair(id string) error {
 	return nil
 }
 
-//toVMSize converts flavor attributes returned by OpenStack driver into api.VM
+// toVMSize converts flavor attributes returned by OpenStack driver into api.VM
 func (client *Client) toVMSize(flavor map[string]interface{}) api.VMSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
@@ -253,23 +252,23 @@ func (client *Client) toVMSize(flavor map[string]interface{}) api.VMSize {
 	return api.VMSize{}
 }
 
-//toVMState converts VM status returned by OpenStack driver into VMState enum
-func toVMState(status string) VMState.Enum {
+// toHostState converts VM status returned by OpenStack driver into HostState enum
+func toHostState(status string) HostState.Enum {
 	switch status {
 	case "BUILD", "build", "BUILDING", "building":
-		return VMState.STARTING
+		return HostState.STARTING
 	case "ACTIVE", "active":
-		return VMState.STARTED
+		return HostState.STARTED
 	case "RESCUED", "rescued":
-		return VMState.STOPPING
+		return HostState.STOPPING
 	case "STOPPED", "stopped", "SHUTOFF", "shutoff":
-		return VMState.STOPPED
+		return HostState.STOPPED
 	default:
-		return VMState.ERROR
+		return HostState.ERROR
 	}
 }
 
-//convertAdresses converts adresses returned by the OpenStack driver arrange them by version in a map
+// convertAdresses converts adresses returned by the OpenStack driver arrange them by version in a map
 func (client *Client) convertAdresses(addresses map[string]interface{}) (map[IPVersion.Enum][]string, string, string) {
 	addrs := make(map[IPVersion.Enum][]string)
 	var AcccessIPv4 string
@@ -301,7 +300,7 @@ func (client *Client) convertAdresses(addresses map[string]interface{}) (map[IPV
 	return addrs, AcccessIPv4, AcccessIPv6
 }
 
-//toVM converts an OpenStack server into api VM
+// toVM converts an OpenStack server into api VM
 func (client *Client) toVM(server *servers.Server) *api.VM {
 	adresses, ipv4, ipv6 := client.convertAdresses(server.Addresses)
 	if ipv4 != "" {
@@ -319,7 +318,7 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 		AccessIPv4:   server.AccessIPv4,
 		AccessIPv6:   server.AccessIPv6,
 		Size:         client.toVMSize(server.Flavor),
-		State:        toVMState(server.Status),
+		State:        toHostState(server.Status),
 	}
 	m, err := metadata.LoadHost(providers.FromClient(client), server.ID)
 	if err == nil && m != nil {
@@ -337,72 +336,25 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 	return &vm
 }
 
-//Data structure to apply to userdata.sh template
+// userData is the structure to apply to userdata.sh template
 type userData struct {
-	//Name of the default user (api.DefaultUser)
+	// User is the name of the default user (api.DefaultUser)
 	User string
-	//Private key used to create the VM
+	// Key is the private key used to create the Host
 	Key string
-	//If true configure all interfaces to DHCP
+	// ConfIF, if set to true, configure all interfaces to DHCP
 	ConfIF bool
-	//If true activate IP frowarding
+	// IsGateway, if set to true, activate IP frowarding
 	IsGateway bool
-	//If true configure default gateway
+	// AddGateway, if set to true, configure default gateway
 	AddGateway bool
-	//Content of the /etc/resolv.conf of the Gateway
-	//Used only if IsGateway is true
-	ResolvConf string
-	//IP of the gateway
+	// DNSServers contains the list of DNS servers to use
+	// Used only if IsGateway is true
+	DNSServers []string
+	// GatewayIP is the IP of the gateway
 	GatewayIP string
-	//Password for the user gpac (for troubleshoot use, useable only in console)
+	// Password for the user gpac (for troubleshoot use, useable only in console)
 	Password string
-}
-
-//PrepareUserData prepares the initial configuration script
-func (client *Client) PrepareUserData(request api.VMRequest, isGateway bool, kp *api.KeyPair, gw *api.VM) ([]byte, error) {
-	dataBuffer := bytes.NewBufferString("")
-
-	var ResolvConf string
-	var err error
-	if !request.PublicIP {
-		var buffer bytes.Buffer
-		for _, dns := range client.Cfg.DNSList {
-			buffer.WriteString(fmt.Sprintf("nameserver %s\n", dns))
-		}
-		ResolvConf = buffer.String()
-	}
-
-	ip := ""
-	if gw != nil {
-		if len(gw.PrivateIPsV4) > 0 {
-			ip = gw.PrivateIPsV4[0]
-		} else if len(gw.PrivateIPsV6) > 0 {
-			ip = gw.PrivateIPsV6[0]
-		}
-	}
-
-	data := userData{
-		User:       api.DefaultUser,
-		Key:        strings.Trim(kp.PublicKey, "\n"),
-		ConfIF:     !client.Cfg.AutoVMNetworkInterfaces,
-		IsGateway:  isGateway && !client.Cfg.UseLayer3Networking,
-		AddGateway: !request.PublicIP && !client.Cfg.UseLayer3Networking,
-		ResolvConf: ResolvConf,
-		GatewayIP:  ip,
-	}
-	type finalUserData struct {
-		userData
-		Password string
-	}
-	finalData := finalUserData{
-		userData: data,
-		Password: "SafeScale",
-	}
-	err = client.UserDataTpl.Execute(dataBuffer, finalData)
-	if err != nil {
-		return nil, err
-	}
-	return dataBuffer.Bytes(), nil
 }
 
 func (client *Client) readGateway(networkID string) (*servers.Server, error) {
@@ -473,7 +425,11 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		}
 	}
 
-	userData, err := client.PrepareUserData(request, isGateway, kp, gw)
+	userData, err := userdata.Prepare(client, request, isGateway, kp, gw)
+	if err != nil {
+		return nil, err
+	}
+
 	//fmt.Println(string(userData))
 	//Create VM
 	srvOpts := servers.CreateOpts{
@@ -497,7 +453,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	service := providers.Service{
 		ClientAPI: client,
 	}
-	vm, err := service.WaitVMState(server.ID, VMState.STARTED, 120*time.Second)
+	vm, err := service.WaitHostState(server.ID, HostState.STARTED, 120*time.Second)
 	if err != nil {
 		servers.Delete(client.Compute, server.ID)
 		return nil, fmt.Errorf("Timeout creating VM: %s", errorString(err))

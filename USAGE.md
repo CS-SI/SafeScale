@@ -24,6 +24,7 @@ One section 'tenants' with specific authentication parameters for each tenant. S
    - ovh
    - cloudwatt
    - flexibleengine
+   - opentelekom
    - aws
  - `name` is a logical name representing the tenant
 
@@ -48,6 +49,19 @@ Region = "your_region"
 [[tenants]]
 client = "flexibleengine"
 name = "logical_name_for_this_flexibleengine_tenant"
+Username = "your_login"
+Password = "your_password"
+DomainName = "your_domaine_name"
+ProjectID = "your_project_id"
+Region = "your_region"
+VPCName = "your_VPC_name"
+VPCCIDR = "your_VPC_cidr"
+S3AccessKeyID = "your_S3_login"
+S3AccessKeyPassword = "your_S3_password"
+
+[[tenants]]
+client = "opentelekom"
+name = "logical_name_for_this_opentelekom_tenant"
 Username = "your_login"
 Password = "your_password"
 DomainName = "your_domaine_name"
