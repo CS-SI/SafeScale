@@ -16,12 +16,15 @@
 package utils
 
 import (
+	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
 
+// AbsPathify ...
 func AbsPathify(inPath string) string {
 	// TODO Use regular expression to handle ${HOME}
 	if strings.HasPrefix(inPath, "$HOME") {
@@ -55,4 +58,13 @@ func userHomeDir() string {
 		return home
 	}
 	return os.Getenv("HOME")
+}
+
+// UserConfirmed asks user to confirm
+func UserConfirmed(msg string) bool {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("%s ? (y/N): ", msg)
+	resp, _ := reader.ReadString('\n')
+	resp = strings.ToLower(strings.TrimSuffix(resp, "\n"))
+	return resp == "y"
 }
