@@ -19,22 +19,18 @@ package openstack
 import (
 	"fmt"
 	"log"
-	"text/template"
 
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 
 	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
-	"github.com/GeertJohan/go.rice"
 
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/gophercloud/gophercloud/pagination"
 )
-
-//go:generate rice embed-go
 
 /*AuthOptions fields are the union of those recognized by each identity implementation and
 provider.
@@ -105,8 +101,8 @@ type CfgOptions struct {
 	//if UseFloatingIP is true UseLayer3Networking must be true
 	UseLayer3Networking bool
 
-	//AutoVMNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
-	AutoVMNetworkInterfaces bool
+	//AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
+	AutoHostNetworkInterfaces bool
 
 	//VolumeSpeeds map volume types with volume speeds
 	VolumeSpeeds map[string]VolumeSpeed.Enum
@@ -177,18 +173,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s", errorString(err))
 	}
-	box, err := rice.FindBox("scripts")
-	if err != nil {
-		return nil, err
-	}
-	userDataStr, err := box.String("userdata.sh")
-	if err != nil {
-		return nil, err
-	}
-	tpl, err := template.New("user_data").Parse(userDataStr)
-	if err != nil {
-		return nil, err
-	}
 
 	if len(cfg.S3Protocol) == 0 {
 		cfg.S3Protocol = "swiftks"
@@ -203,8 +187,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Network:           network,
 		Volume:            blocstorage,
 		Container:         objectstorage,
-		ScriptBox:         box,
-		UserDataTpl:       tpl,
 		ProviderNetworkID: nID,
 	}
 
@@ -226,15 +208,13 @@ const defaultSecurityGroup string = "30ad3142-a5ec-44b5-9560-618bde3de1ef"
 
 //Client is the implementation of the openstack driver regarding to the api.ClientAPI
 type Client struct {
-	Opts        *AuthOptions
-	Cfg         *CfgOptions
-	Provider    *gc.ProviderClient
-	Compute     *gc.ServiceClient
-	Network     *gc.ServiceClient
-	Volume      *gc.ServiceClient
-	Container   *gc.ServiceClient
-	ScriptBox   *rice.Box
-	UserDataTpl *template.Template
+	Opts      *AuthOptions
+	Cfg       *CfgOptions
+	Provider  *gc.ProviderClient
+	Compute   *gc.ServiceClient
+	Network   *gc.ServiceClient
+	Volume    *gc.ServiceClient
+	Container *gc.ServiceClient
 
 	SecurityGroup     *secgroups.SecurityGroup
 	ProviderNetworkID string
@@ -403,10 +383,10 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 			FloatingIPPool:   FloatingIPPool,
 		},
 		CfgOptions{
-			ProviderNetwork:         "public",
-			UseFloatingIP:           true,
-			UseLayer3Networking:     true,
-			AutoVMNetworkInterfaces: true,
+			ProviderNetwork:           "public",
+			UseFloatingIP:             true,
+			UseLayer3Networking:       true,
+			AutoHostNetworkInterfaces: true,
 			VolumeSpeeds: map[string]VolumeSpeed.Enum{
 				"standard":   VolumeSpeed.COLD,
 				"performant": VolumeSpeed.HDD,
@@ -436,6 +416,8 @@ func (client *Client) GetCfgOpts() (api.Config, error) {
 
 	cfg.Set("DNSList", client.Cfg.DNSList)
 	cfg.Set("S3Protocol", client.Cfg.S3Protocol)
+	cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
+	cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
 
 	return cfg, nil
 }
