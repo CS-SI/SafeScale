@@ -33,7 +33,7 @@ type AuthOptions struct {
 	flexibleengine.AuthOptions
 }
 
-//CfgOptions configuration options
+// CfgOptions configuration options
 type CfgOptions struct {
 	flexibleengine.CfgOptions
 }
@@ -53,6 +53,7 @@ type Client struct {
 func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	var err error
 	client := &Client{}
+
 	client.feclt, err = flexibleengine.AuthenticatedClient(opts.AuthOptions, cfg.CfgOptions)
 	if err != nil {
 		return nil, err
@@ -71,6 +72,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	VPCName, _ := params["VPCName"].(string)
 	VPCCIDR, _ := params["VPCCIDR"].(string)
 	Region, _ := params["Region"].(string)
+	IdentityEndpoint, _ := params["IdentityEndpoint"].(string)
 	S3AccessKeyID, _ := params["S3AccessKeyID"].(string)
 	S3AccessKeyPassword, _ := params["S3AccessKeyPassword"].(string)
 	authOptions := AuthOptions{
@@ -83,6 +85,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 			AllowReauth:         true,
 			VPCName:             VPCName,
 			VPCCIDR:             VPCCIDR,
+			IdentityEndpoint:    IdentityEndpoint,
 			S3AccessKeyID:       S3AccessKeyID,
 			S3AccessKeyPassword: S3AccessKeyPassword,
 		},
@@ -104,25 +107,12 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 
 //GetAuthOpts returns the auth options
 func (client *Client) GetAuthOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
-
-	cfg.Set("DomainName", client.Opts.DomainName)
-	cfg.Set("Login", client.Opts.Username)
-	cfg.Set("Password", client.Opts.Password)
-	cfg.Set("AuthUrl", client.Opts.IdentityEndpoint)
-	cfg.Set("Region", client.Opts.Region)
-	cfg.Set("VPCName", client.Opts.VPCName)
-	return cfg, nil
+	return client.feclt.GetAuthOpts()
 }
 
-//GetCfgOpts return configuration parameters
+// GetCfgOpts return configuration parameters
 func (client *Client) GetCfgOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
-
-	cfg.Set("DNSList", client.Cfg.DNSList)
-	cfg.Set("S3Protocol", "s3")
-
-	return cfg, nil
+	return client.feclt.GetCfgOpts()
 }
 
 // init registers the opentelekom provider
