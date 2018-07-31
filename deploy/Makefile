@@ -1,9 +1,9 @@
 GO?=go
 EXEC:=deploy
 
-all:    $(EXEC)  vet
-
 .PHONY: clean vet
+
+all:    $(EXEC)
 
 vet:
 	@$(GO) vet

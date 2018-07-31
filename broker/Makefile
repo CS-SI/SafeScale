@@ -1,10 +1,9 @@
 GOPATH?=$(HOME)/go
 GO?=go
 
-
-all:	brokerd broker vet
-
 .PHONY:	sdk broker brokerd clean
+
+all:	brokerd broker
 
 vet:
 	@$(GO) vet

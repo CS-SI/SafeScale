@@ -1,9 +1,9 @@
 
 GO?=go
 
-all: generate vet
-
 .PHONY: vet generate clean
+
+all: generate
 
 SUBDIRS := $(sort $(dir $(wildcard */)))
 

@@ -2,10 +2,10 @@ GO?=go
 
 .PHONY:	generate clean
 
+all:	generate 
+
 vet:
 	@$(GO) vet
-
-all:	generate vet
 
 generate: *.go broker_scripts/*
 	@$(GO) generate

@@ -4,7 +4,7 @@ DIRECTORIES = $(filter-out tests/ metadata/, $(DIRECTORIES_))
 
 .PHONY:	api aws cloudwatt flexibleengine openstack opentelekom ovh clean
 
-all:	api aws cloudwatt flexibleengine openstack opentelekom ovh vet
+all:	api aws cloudwatt flexibleengine openstack opentelekom ovh
 
 vet:
 	@$(GO) vet
