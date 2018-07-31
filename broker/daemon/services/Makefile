@@ -7,7 +7,7 @@ all:	generate
 vet:
 	@$(GO) vet
 
-generate: *.go broker_scripts/*
+generate:
 	@$(GO) generate
 
 clean:
