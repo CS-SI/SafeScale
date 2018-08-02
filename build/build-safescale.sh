@@ -11,9 +11,11 @@ rm -rf SafeScale
 # ----------------------
 # Get source code
 # ----------------------
-BRANCHNAME=${BRANCHNAME:="develop"}
-echo "Cloning branch ${BRANCHNAME}"
-git clone file:///home/saime/Projects/safescale/dev/SafeScale -b ${BRANCHNAME} --depth=1
+BRANCH_NAME=${BRANCH_NAME:="develop"}
+echo "Cloning branch ${BRANCH_NAME}"
+
+GIT_REPO_URL=${GIT_REPO_URL:="https://github.com/CS-SI/SafeScale.git"}
+git clone ${GIT_REPO_URL} -b ${BRANCH_NAME} --depth=1
 
 cd SafeScale
 
