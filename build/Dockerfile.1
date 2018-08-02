@@ -1,0 +1,26 @@
+#FROM golang:1.10
+FROM ubuntu:artful
+LABEL maintainer="CS SI"
+
+ENV DEBIAN_FRONTEND noninteractive
+
+# -----------------
+# Standard packages
+# -----------------
+RUN apt-get update -y \
+&& apt-get install -y --allow-unauthenticated \
+vim \
+&& apt-get autoclean -y \
+&& apt-get autoremove -y \
+&& rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp
+
+
+ENV SHELL /bin/bash
+
+
+
+
+
+

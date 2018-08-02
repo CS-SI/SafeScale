@@ -3,7 +3,7 @@ EXEC:=broker
 
 .PHONY:	broker clean
 
-all:	broker vet
+all:	broker
 
 vet:
 	@$(GO) vet

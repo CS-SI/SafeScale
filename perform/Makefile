@@ -1,9 +1,9 @@
 GO?=go
 EXEC:=perform
 
-all:	$(EXEC)  vet
-
 .PHONY: clean
+
+all:	$(EXEC)
 
 vet:
 	@$(GO) vet

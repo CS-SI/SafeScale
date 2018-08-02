@@ -1,13 +1,14 @@
 GO?=go
 
-all: build nfs vet
+.PHONY: nfs clean
+
+all: build nfs
 
 build: *.go scripts/*
 	@$(GO) generate
+
 vet:
 	@$(GO) vet
-
-.PHONY: nfs clean
 
 nfs:
 	@(cd nfs && $(MAKE))

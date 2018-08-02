@@ -1,7 +1,8 @@
 GO?=go
+
 .PHONY: api components flavors tests clean mrproper
 
-all: api components flavors tests vet
+all: api components flavors tests
 
 vet:
 	@$(GO) vet

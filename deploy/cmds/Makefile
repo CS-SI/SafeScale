@@ -1,8 +1,8 @@
 GO?=go
 
-all:    ErrorCode vet
-
 .PHONY: clean vet
+
+all:    ErrorCode
 
 vet:
 	@$(GO) vet

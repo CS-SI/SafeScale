@@ -1,8 +1,8 @@
 GO?=go
 
-all: generate enums vet
-
 .PHONY: generate enums clean mrproper
+
+all: generate enums
 
 vet:
 	@$(GO) vet
