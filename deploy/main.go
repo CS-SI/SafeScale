@@ -17,13 +17,10 @@
 package main
 
 import (
-	"fmt"
-	"os"
 	"time"
 
 	"github.com/CS-SI/SafeScale/deploy/cmds"
-
-	cli "github.com/jawher/mow.cli"
+	"github.com/CS-SI/SafeScale/utils/cli"
 
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise provider cloudwatt
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise provider flexibleengine
@@ -35,38 +32,78 @@ const (
 	address           = "localhost:50051"
 	timeoutCtxDefault = 10 * time.Second
 	timeoutCtxVM      = 2 * time.Minute
+
+	globalOptions string = `
+Global options:
+  -v,--verbose  Enable verbosity
+  -d,--debug    Enable debug suplemental information
+`
+
+	completeUsage string = `
+Usage: deploy version
+       deploy [-vd] help (cluster|host)
+       deploy [-vd] (cluster|host) help <command>
+       deploy [-vd] (cluster|host) (list|ls)
+	   deploy [-vd] cluster <clustername> create -N <cidr> [-F <flavor>][-C <complexity][--os <os>][--ram <ram>][--disk <disk>][-k]
+	   deploy [-vd] cluster <clustername> (delete|destroy|remove|rm) [-y]
+       deploy [-vd] cluster help <command>
+       deploy [-vd] cluster <clustername> (start|stop|state|inspect)
+       deploy [-vd] cluster <clustername> expand [-n <count>][--os <os>][--ram <ram>][--disk <disk>]
+       deploy [-vd] cluster <clustername> shrink [-n <count>]
+	   deploy [-vd] cluster <clustername> -K <kind> (package|pkg) <pkgname> (add|install)
+	   deploy [-vd] cluster <clustername> -K <kind> (package|pkg) <pkgname> check
+	   deploy [-vd] cluster <clustername> -K <kind> (package|pkg) <pkgname> (delete|destroy|remove|rm|uninstall)
+	   deploy [-vd] cluster <clustername> (service|svc) <svcname> (add|install)
+	   deploy [-vd] cluster <clustername> (service|svc) <pkgname> (check|start|state|stop)
+	   deploy [-vd] cluster <clustername> (service|svc) <pkgname> (delete|destroy|remove|rm|uninstall)
+	   deploy [-vd] cluster <clustername> (dcos|marathon|kubectl) [-- <arg>...]
+	   deploy [-vd] host help <command>
+	   deploy [-vd] host (package | pkg) help <command>
+	   deploy [-vd] host <host name or id> (package|pkg) <pkgname> (add|install)
+	   deploy [-vd] host <host name or id> (package|pkg) <pkgname> check
+	   deploy [-vd] host <host name or id> (package|pkg) <pkgname> (delete|destroy|remove|rm|uninstall)
+	   deploy [-vd] host <host name or id> (service|svc) <svcname> (add|install)
+	   deploy [-vd] host <host name or id> (service|svc) <svcname> (check|start|state|stop)
+	   deploy [-vd] host <host name or id> (service|svc) <svcname> (delete|destroy|remove|rm|uninstall)
+
+Options:
+  -C --complexity <complexity>  Defines complexity
+  -d --debug                    Enable debug suplemental information
+  -F --flavor <flavor>          Defines flavor
+  -f --force                    Force action even when an error occured
+  -h --help                     Print help message
+  -K --kind <kind>              Defines kind of package manager
+  -k --keep-on-failure          Don't delete the resources on failure
+  -N --cidr <cidr>              Defines CIDR
+  -v --verbose                  Enable verbosity
+  -y --assume-yes               Automatically responds y to question
+  --cpu <cpu>                   Defines number of CPU of host
+  --disk <disk>                 Defines system disk size
+  --os <os>                     Defines Linux Operating System
+  --ram <ram>                   Defines ram size`
 )
 
 func main() {
-	app := cli.App("deploy", "SafeScale deploy")
-	//app.Version = "0.1.0"
-	/*app.Authors = []cli.Author{
-		cli.Author{
-			Name:  "CS-SI",
-			Email: "safescale@c-s.fr",
+	app := cli.NewApp(completeUsage, &cli.Command{
+		Keyword: "deploy",
+
+		Commands: []*cli.Command{
+			cmds.ClusterCommand,
+			cmds.HostCommand,
 		},
-	}
-	app.EnableBashCompletion = true*/
 
-	app.Command("cluster", "cluster management", cmds.ClusterCmd)
-	//app.Command("node", "Node management", cmd.NodeCmd)
-	//app.Command("command cmd", "cluster-wide commands", cmd.CommandCmd)
-
-	verbose := app.BoolOpt("verbose v", false, "Increase verbosity")
-	debug := app.BoolOpt("debug d", false, "Enable debug mode")
-	rebrand := app.StringOpt("rebrand", "", "Prefix to use when calling external commands")
-
-	app.Before = func() {
-		if *verbose {
-			fmt.Printf("Verbosity wanted.")
-		}
-		if *debug {
-			fmt.Printf("Debug enabled")
-		}
-		if *rebrand != "" {
-			cmds.RebrandingPrefix = *rebrand
-		}
-	}
-
-	app.Run(os.Args)
+		Help: &cli.HelpContent{
+			Usage: `
+Usage: {{.ProgName}} [options] <command>
+       {{.ProgName}} [options] <command>
+            `,
+			Commands: `
+  host     Deploy on host
+  cluster  Deploy on cluster`,
+			Options: []string{
+				globalOptions,
+			},
+		},
+	})
+	app.Run(nil)
 }
