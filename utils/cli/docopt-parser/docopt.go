@@ -11,47 +11,6 @@ import (
 	"strings"
 )
 
-// type Parser struct {
-// 	// HelpHandler is called when we encounter bad user input, or when the user
-// 	// asks for help.
-// 	// By default, this calls os.Exit(0) if it handled a built-in option such
-// 	// as -h, --help or --version. If the user errored with a wrong command or
-// 	// options, we exit with a return code of 1.
-// 	HelpHandler func(msg string)
-// 	// OptionsFirst requires that option flags always come before positional
-// 	// arguments; otherwise they can overlap.
-// 	OptionsFirst bool
-// 	// SkipHelpFlags tells the parser not to look for -h and --help flags and
-// 	// call the HelpHandler.
-// 	SkipHelpFlags bool
-// }
-
-// var PrintHelpAndExit = func(err error, usage string) {
-// 	if err != nil {
-// 		fmt.Fprintln(os.Stderr, usage)
-// 		os.Exit(1)
-// 	} else {
-// 		fmt.Println(usage)
-// 		os.Exit(0)
-// 	}
-// }
-
-// var PrintHelpOnly = func(err error, usage string) {
-// 	if err != nil {
-// 		fmt.Fprintln(os.Stderr, usage)
-// 	} else {
-// 		fmt.Println(usage)
-// 	}
-// }
-
-// var NoHelpHandler = func(err error, usage string) {}
-
-// var DefaultParser = &Parser{
-// 	HelpHandler:   PrintHelpAndExit,
-// 	OptionsFirst:  false,
-// 	SkipHelpFlags: true,
-// }
-
 // ParseDoc parses os.Args[1:] based on the interface described in doc, using the default parser options.
 func ParseDoc(doc string) (Opts, error) {
 	//return ParseArgs(doc, nil, "")
@@ -60,56 +19,10 @@ func ParseDoc(doc string) (Opts, error) {
 
 // ParseArgs parses custom arguments based on the interface described in doc. If you provide a non-empty version
 // string, then this will be displayed when the --version flag is found. This method uses the default parser options.
-//func ParseArgs(doc string, argv []string, version string) (Opts, error) {
 func ParseArgs(doc string, argv []string) (Opts, error) {
 	//return DefaultParser.ParseArgs(doc, argv, version)
 	return parse(doc, argv)
 }
-
-// // ParseArgs parses custom arguments based on the interface described in doc. If you provide a non-empty version
-// // string, then this will be displayed when the --version flag is found.
-// func (p *Parser) ParseArgs(doc string, argv []string, version string) (Opts, error) {
-// 	return p.parse(doc, argv, version)
-// }
-
-// // Deprecated: Parse is provided for backward compatibility with the original docopt.go package.
-// // Please rather make use of ParseDoc, ParseArgs, or use your own custom Parser.
-// func Parse(doc string, argv []string, help bool, version string, optionsFirst bool, exit ...bool) (map[string]interface{}, error) {
-// 	exitOk := true
-// 	if len(exit) > 0 {
-// 		exitOk = exit[0]
-// 	}
-// 	p := &Parser{
-// 		OptionsFirst:  optionsFirst,
-// 		SkipHelpFlags: !help,
-// 	}
-// 	if exitOk {
-// 		p.HelpHandler = PrintHelpAndExit
-// 	} else {
-// 		p.HelpHandler = PrintHelpOnly
-// 	}
-// 	return p.parse(doc, argv, version)
-// }
-
-// //func (p *Parser) parse(doc string, argv []string, version string) (map[string]interface{}, error) {
-// func (p *Parser) parse(doc string, argv []string) (map[string]interface{}, error) {
-// 	if argv == nil {
-// 		argv = os.Args[1:]
-// 	}
-// 	// if p.HelpHandler == nil {
-// 	// 	p.HelpHandler = DefaultParser.HelpHandler
-// 	// }
-// 	args, err := parse(doc, argv)
-// 	//args, output, err := parse(doc, argv, !p.SkipHelpFlags, version, p.OptionsFirst)
-// 	// if _, ok := err.(*UserError); ok {
-// 	// 	// the user gave us bad input
-// 	// 	p.HelpHandler(err, output)
-// 	// } else if len(output) > 0 && err == nil {
-// 	// 	// the user asked for help or --version
-// 	// 	p.HelpHandler(err, output)
-// 	// }
-// 	return args, err
-// }
 
 // -----------------------------------------------------------------------------
 
@@ -136,7 +49,6 @@ func parse(doc string, argv []string) (args Opts, err error) {
 	formal, innerErr := formalUsage(usage)
 	if innerErr != nil {
 		err = innerErr
-		//output = handleError(err, usage)
 		return
 	}
 
@@ -145,60 +57,34 @@ func parse(doc string, argv []string) (args Opts, err error) {
 	if innerErr != nil {
 		errors = append(errors, innerErr)
 	}
-	//if err != nil {
-	//	output = handleError(err, usage)
-	//	return
-	//}
 
-	//patternArgv, innerErr := parseArgv(newTokenList(argv, errorUser), &options, optionsFirst)
 	patternArgv, innerErr := parseArgv(newTokenList(argv, errorUser), &options)
 	if innerErr != nil {
 		errors = append(errors, innerErr)
 	}
-	//	if err != nil {
-	//		output = handleError(err, usage)
-	//		return
-	//	}
 	patFlat, innerErr := pat.flat(patternOption)
 	if err != nil {
 		errors = append(errors, innerErr)
 	}
-	//	if err != nil {
-	//		output = handleError(err, usage)
-	//		return
-	//	}
 	patternOptions := patFlat.unique()
 
 	patFlat, err = pat.flat(patternOptionSSHORTCUT)
 	if err != nil {
 		errors = append(errors, err)
 	}
-	//	if err != nil {
-	//		output = handleError(err, usage)
-	//		return
-	//	}
 	for _, optionsShortcut := range patFlat {
 		docOptions := parseDefaults(doc)
 		optionsShortcut.children = docOptions.unique().diff(patternOptions)
 	}
 
-	// if output = extras(help, version, patternArgv, doc); len(output) > 0 {
-	// 	return
-	// }
-
 	err = pat.fix()
 	if err != nil {
 		errors = append(errors, err)
 	}
-	//	if err != nil {
-	//		output = handleError(err, usage)
-	//		return
-	//	}
 	matched, left, collected := pat.match(&patternArgv, nil)
 	if matched && len(*left) == 0 {
 		patFlat, err = pat.flat(patternDefault)
 		if err != nil {
-			// output = handleError(err, usage)
 			return
 		}
 		args = append(patFlat, *collected...).dictionary()
@@ -215,16 +101,8 @@ func parse(doc string, argv []string) (args Opts, err error) {
 	} else {
 		err = newUserError("")
 	}
-	//output = handleError(err, usage)
 	return
 }
-
-// func handleError(err error, usage string) string {
-// 	if _, ok := err.(*UserError); ok {
-// 		return strings.TrimSpace(fmt.Sprintf("%s\n%s", err, usage))
-// 	}
-// 	return ""
-// }
 
 func parseSection(name, source string) []string {
 	p := regexp.MustCompile(`(?im)^([^\n]*` + name + `[^\n]*\n?(?:[ \t].*?(?:\n|$))*)`)
@@ -268,7 +146,6 @@ func parsePattern(source string, options *patternList) (*pattern, error) {
 	return newRequired(result...), nil
 }
 
-//func parseArgv(tokens *tokenList, options *patternList, optionsFirst bool) (patternList, error) {
 func parseArgv(tokens *tokenList, options *patternList) (patternList, error) {
 	/*
 		Parse command-line argument vector.
@@ -296,15 +173,9 @@ func parseArgv(tokens *tokenList, options *patternList) (patternList, error) {
 		} else if tokens.current().hasPrefix("-") && !tokens.current().eq("-") {
 			ps, err := parseShorts(tokens, options)
 			if err != nil {
-				//return nil, err
 				return parsed, err
 			}
 			parsed = append(parsed, ps...)
-			// } else if optionsFirst {
-			// 	for _, v := range tokens.tokens {
-			// 		parsed = append(parsed, newArgument("", v))
-			// 	}
-			// 	return parsed, nil
 		} else {
 			parsed = append(parsed, newArgument("", tokens.move().String()))
 		}
@@ -594,24 +465,6 @@ func formalUsage(section string) (string, error) {
 
 	return result, nil
 }
-
-// func extras(help bool, version string, options patternList, doc string) string {
-// 	if help {
-// 		for _, o := range options {
-// 			if (o.name == "-h" || o.name == "--help") && o.value == true {
-// 				return strings.Trim(doc, "\n")
-// 			}
-// 		}
-// 	}
-// 	if version != "" {
-// 		for _, o := range options {
-// 			if (o.name == "--version") && o.value == true {
-// 				return version
-// 			}
-// 		}
-// 	}
-// 	return ""
-// }
 
 func stringPartition(s, sep string) (string, string, string) {
 	sepPos := strings.Index(s, sep)
