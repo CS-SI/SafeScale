@@ -37,14 +37,14 @@ const (
 )
 
 var (
-	parseMap = map[string]Enum{
+	stringMap = map[string]Enum{
 		"dcos":       DCOS,
 		"kubernetes": Kubernetes,
 		"swarm":      Swarm,
 		"boh":        BOH,
 	}
 
-	stringMap = map[Enum]string{
+	enumMap = map[Enum]string{
 		DCOS:       "DCOS",
 		Kubernetes: "Kubernetes",
 		Swarm:      "Swarm",
@@ -52,19 +52,36 @@ var (
 	}
 )
 
-// Parse returns a Flavor.Enum corresponding to the string parameter
-func Parse(v string) (e Enum) {
-	var found bool
+// Parse returns a Enum corresponding to the string parameter
+// If the string doesn't correspond to any Enum, returns an error (nil otherwise)
+// This function is intended to be used to parse user input.
+func Parse(v string) (Enum, error) {
+	var (
+		e  Enum
+		ok bool
+	)
 	lowered := strings.ToLower(v)
-	if e, found = parseMap[lowered]; !found {
-		panic(fmt.Sprintf("Flavor.Enum '%s' doesn't exist!", v))
+	if e, ok = stringMap[lowered]; !ok {
+		return e, fmt.Errorf("failed to find a Flavor.Enum corresponding to '%s'", v)
+	}
+	return e, nil
+
+}
+
+// FromString returns a Enum corresponding to the string parameter
+// This method is intended to be used from validated input.
+func FromString(v string) (e Enum) {
+	e, err := Parse(v)
+	if err != nil {
+		panic(err.Error())
 	}
 	return
 }
 
+// String returns a string representaton of an Enum
 func (e Enum) String() string {
-	if str, found := stringMap[e]; found {
+	if str, found := enumMap[e]; found {
 		return str
 	}
-	panic(fmt.Sprintf("Flavor.Enum value '%d' doesn't have string match!", e))
+	panic(fmt.Sprintf("failed to find a Flavor.Enum string corresponding to value '%d'!", e))
 }

@@ -13,22 +13,25 @@ vet:
 api:
 	@(cd $@ && $(MAKE))
 
-aws:	api
+userdata:
 	@(cd $@ && $(MAKE))
 
-cloudwatt:	api openstack
+aws:	api userdata
 	@(cd $@ && $(MAKE))
 
-flexibleengine:	api openstack
+cloudwatt:	api userdata openstack
 	@(cd $@ && $(MAKE))
 
-opentelekom:	api flexibleengine
+flexibleengine:	api userdata openstack
 	@(cd $@ && $(MAKE))
 
-openstack:	api
+opentelekom:	api userdata flexibleengine
 	@(cd $@ && $(MAKE))
 
-ovh:	api openstack
+openstack:	api userdata
+	@(cd $@ && $(MAKE))
+
+ovh:	api userdata openstack
 	@(cd $@ && $(MAKE))
 
 clean:

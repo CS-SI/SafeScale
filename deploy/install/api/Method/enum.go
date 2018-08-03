@@ -16,6 +16,11 @@
 
 package Method
 
+import (
+	"fmt"
+	"strings"
+)
+
 type Enum uint8
 
 const (
@@ -27,8 +32,63 @@ const (
 	Yum
 	// Dnf is supported by target
 	Dnf
-	// Script is suported by target
+	// Script is supported by target
 	Script
+	// Ansible is supported by target
+	Ansible
+
 	// NextEnum marks the next value (or the max, depending the use)
 	NextEnum
 )
+
+var (
+	stringMap = map[string]Enum{
+		"apt":     Apt,
+		"yum":     Yum,
+		"dnf":     Dnf,
+		"script":  Script,
+		"ansible": Ansible,
+	}
+
+	enumMap = map[Enum]string{
+		Apt:     "Apt",
+		Yum:     "Yum",
+		Dnf:     "Dnf",
+		Script:  "Script",
+		Ansible: "Ansible",
+	}
+)
+
+// Parse returns a Enum corresponding to the string parameter
+// If the string doesn't correspond to any Enum, returns an error (nil otherwise)
+// This function is intended to be used to parse user input.
+func Parse(v string) (Enum, error) {
+	var (
+		e  Enum
+		ok bool
+	)
+	lowered := strings.ToLower(v)
+	if e, ok = stringMap[lowered]; !ok {
+		return e, fmt.Errorf("failed to find a Flavor.Enum corresponding to '%s'", v)
+	}
+	return e, nil
+
+}
+
+// FromString returns a Enum corresponding to the string parameter
+// This method is intended to be used from validated input.
+func FromString(v string) (e Enum) {
+	e, err := Parse(v)
+	if err != nil {
+		panic(err.Error())
+	}
+	return
+}
+
+// String returns a string representaton of an Enum
+func (e Enum) String() string {
+	if str, found := enumMap[e]; found {
+		return str
+	}
+	panic(fmt.Sprintf("failed to find a Flavor.Enum string corresponding to value '%d'!", e))
+}

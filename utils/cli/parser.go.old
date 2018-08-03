@@ -1,0 +1,149 @@
+/*
+ * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package cmds
+
+import (
+	"fmt"
+	"strings"
+
+	docopt "github.com/docopt/docopt-go"
+)
+
+var (
+	arguments       docopt.Opts
+	usageDefinition string
+)
+
+func defineUsage() {
+	usageDefinition = `deploy
+
+Usage:
+  deploy help [<command>...]
+  deploy version
+  deploy [options] host <hostname | hostid> package|pkg <pkgname> add
+  deploy [options] host <hostname | hostid> package|pkg <pkgname> check
+  deploy [options] host <hostname | hostid> package|pkg <pkgname> delete|destroy|remove|rm
+  deploy [options] host <hostname | hostid> service|svc list
+  deploy [options] host <hostname | hostid> service|svc  <svcname> add
+  deploy [options] host <hostname | hostid> service|svc <pkgname> check
+  deploy [options] host <hostname | hostid> service|svc <pkgname> delete|destroy|remove|rm
+  deploy [options] host <hostname | hostid> service|svc <pkgname> start
+  deploy [options] host <hostname | hostid> service|svc <pkgname> state
+  deploy [options] host <hostname | hostid> service|svc <pkgname> stop
+  deploy [options] cluster list
+  deploy [options] cluster <clustername> inspect
+  deploy [options] cluster <clustername> create [--complexity <complexity>] [--flavor <flavor>] [--cidr <cidr>] [--os <os>] [--cpu <cpu>] [--ram <ram>] [--disk <disk>] [--keep-on-failure]
+  deploy [options] cluster <clustername> delete [--force]
+  deploy [options] cluster <clustername> expand [--count <count>] [--public] [--os <os>] [--cpu <cpu>] [--ram <ram>] [--disk <disk>]
+  deploy [options] cluster <clustername> dcos [arg...]
+  deploy [options] cluster <clustername> marathon [arg...]
+  deploy [options] cluster <clustername> kubectl [arg...]
+  deploy [options] cluster <clustername> package|pkg <pkgname> add
+  deploy [options] cluster <clustername> package|pkg <pkgname> check
+  deploy [options] cluster <clustername> package|pkg <pkgname> delete|destroy|remove|rm
+  deploy [options] cluster <clustername> service|svc list|ls
+  deploy [options] cluster <clustername> service|svc <svcname> add
+  deploy [options] cluster <clustername> service|svc <pkgname> check
+  deploy [options] cluster <clustername> service|svc <pkgname> delete|destroy|remove|rm
+  deploy [options] cluster <clustername> service|svc <pkgname> start
+  deploy [options] cluster <clustername> service|svc <pkgname> state
+  deploy [options] cluster <clustername> service|svc <pkgname> stop
+
+options:
+  -v --verbose  Enable more verbosity
+  -d --debug    Enable debug mode
+  -r --rebrand  Prefix to use for SafeScale external command calls
+`
+	if RebrandingPrefix != "" {
+		usageDefinition = strings.Replace(usageDefinition, "deploy", RebrandingPrefix+"deploy", -1)
+	}
+}
+
+// Parse parses the arguments following the docopt description of commands
+func Parse() error {
+	version := "0.1.0"
+	parser := &docopt.Parser{
+		SkipHelpFlags: true,
+		HelpHandler:   helpHandler,
+	}
+
+	defineUsage()
+
+	var err error
+	arguments, err = parser.ParseArgs(usageDefinition, nil, version)
+	if err != nil {
+		return err
+	}
+
+	anon, ok := arguments["--version"]
+	if ok && anon != nil {
+		if anon.(bool) {
+			fmt.Printf("version: %s\n", version)
+		}
+	}
+
+	var helpWanted bool
+	anon, ok = arguments["--help"]
+	if !ok || anon == nil {
+		anon, ok = arguments["-h"]
+	}
+	if ok && anon != nil {
+		helpWanted = anon.(bool)
+	}
+	if helpWanted {
+		helpHandler(nil, "")
+	}
+
+	// Dispatch to execution code
+	if arguments["host"].(bool) {
+		hostCmd()
+	}
+	if arguments["cluster"].(bool) {
+		clusterCmd()
+	}
+	return nil
+
+	// //app.Authors = []cli.Author{
+	// //	cli.Author{
+	// //		Name:  "CS-SI",
+	// //		Email: "safescale@c-s.fr",
+	// //	},
+	// //}
+	// //app.EnableBashCompletion = true
+
+	// app.Command("cluster", "cluster management", cmds.ClusterCmd)
+	// //app.Command("node", "Node management", cmd.NodeCmd)
+	// //app.Command("command cmd", "cluster-wide commands", cmd.CommandCmd)
+
+	// verbose := app.BoolOpt("verbose v", false, "Increase verbosity")
+	// debug := app.BoolOpt("debug d", false, "Enable debug mode")
+	// rebrand := app.StringOpt("rebrand", "", "Prefix to use when calling external commands")
+
+	// app.Before = func() {
+	// 	if *verbose {
+	// 		fmt.Printf("Verbosity wanted.")
+	// 	}
+	// 	if *debug {
+	// 		fmt.Printf("Debug enabled")
+	// 	}
+	// 	if *rebrand != "" {
+	// 		cmds.RebrandingPrefix = *rebrand
+	// 	}
+	// }
+
+	// app.Run(os.Args)
+}

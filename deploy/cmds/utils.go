@@ -21,17 +21,19 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/cluster"
+	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
 )
 
 var (
-	pkgManagerKind     *string
-	clusterServiceName *string
+	pkgName        string
+	svcName        string
+	pkgManagerKind Method.Enum
 
-	// RebrandingPrefix ...
-	RebrandingPrefix string
+	verbose bool
+	debug   bool
 )
 
-func createNodes(clusterName string, public bool, count int, cpu int32, ram float32, disk int32) error {
+func createNodes(clusterName string, public bool, count int, os string, cpu int32, ram float32, disk int32) error {
 	instance, err := cluster.Get(clusterName)
 	if err != nil {
 		return err
@@ -56,6 +58,7 @@ func createNodes(clusterName string, public bool, count int, cpu int32, ram floa
 			CPUNumber: cpu,
 			Disk:      disk,
 			RAM:       ram,
+			ImageID:   os,
 		})
 		if err != nil {
 			return err
@@ -63,13 +66,4 @@ func createNodes(clusterName string, public bool, count int, cpu int32, ram floa
 	}
 	fmt.Printf("Added %d %s node%s to cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
 	return nil
-}
-
-// RebrandCommand allows to prefix a command with cmds.RebrandingPrefix
-// ie: with cmds.RebrandingPrefix == "safe "
-//     "deploy ..." becomes "safe deploy ..."
-//     with cmds.RebrandingPrefix == "my"
-//     "perform ..." becomes "myperform ..."
-func RebrandCommand(command string) string {
-	return fmt.Sprintf("%s%s", RebrandingPrefix, command)
 }
