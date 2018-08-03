@@ -21,9 +21,7 @@ import (
 	"strings"
 )
 
-//go:generate stringer -type=Enum
-
-//Enum represents the complexity of a cluster
+// Enum represents the complexity of a cluster
 type Enum int
 
 const (
@@ -36,17 +34,50 @@ const (
 	Volume Enum = 5
 )
 
-//FromString returns a Complexity.Enum corresponding to String
-func FromString(complexity string) (Enum, error) {
-	lowered := strings.ToLower(complexity)
-	if lowered == "dev" {
-		return Dev, nil
+var (
+	stringMap = map[string]Enum{
+		"dev":    Dev,
+		"normal": Normal,
+		"volume": Volume,
 	}
-	if lowered == "normal" {
-		return Normal, nil
+
+	enumMap = map[Enum]string{
+		Dev:    "Dev",
+		Normal: "Normal",
+		Volume: "Volume",
 	}
-	if lowered == "volume" {
-		return Volume, nil
+)
+
+// Parse returns a Enum corresponding to the string parameter
+// If the string doesn't correspond to any Enum, returns an error (nil otherwise)
+// This function is intended to be used to parse user input.
+func Parse(v string) (Enum, error) {
+	var (
+		e  Enum
+		ok bool
+	)
+	lowered := strings.ToLower(v)
+	if e, ok = stringMap[lowered]; !ok {
+		return e, fmt.Errorf("failed to find a Complexity.Enum corresponding to '%s'", v)
 	}
-	return 0, fmt.Errorf("incorrect complexity '%s'", complexity)
+	return e, nil
+
+}
+
+// FromString returns a Enum corresponding to the string parameter
+// This method is intended to be used from validated input.
+func FromString(v string) (e Enum) {
+	e, err := Parse(v)
+	if err != nil {
+		panic(err.Error())
+	}
+	return
+}
+
+// String returns a string representaton of an Enum
+func (e Enum) String() string {
+	if str, found := enumMap[e]; found {
+		return str
+	}
+	panic(fmt.Sprintf("failed to find a Complexity.Enum string corresponding to value '%d'!", e))
 }

@@ -3,6 +3,7 @@ package install
 import (
 	"fmt"
 
+	// installapi corresponds to deploy install package, reused by cluster install package
 	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 )
 
@@ -65,6 +66,7 @@ func init() {
 			"Helm":          helmService,
 			"MPICH":         mpichService,
 		},
+		"Ansible": map[string]installapi.ComponentAPI{}
 		"All": map[string]installapi.ComponentAPI{
 			"Docker":        dockerComponent,
 			"nVidiaDocker":  nVidiaDockerComponent,
@@ -79,7 +81,7 @@ func init() {
 // ListAvailables returns an array of availables components with the useable installers
 func ListAvailables() []string {
 	var output []string
-	for k, v := range availables["all"] {
+	for k, v := range availables["All"] {
 		line := k
 		installers := v.Installers()
 		if len > 0 {

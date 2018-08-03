@@ -16,6 +16,11 @@
 
 package Method
 
+import (
+	"fmt"
+	"strings"
+)
+
 type Enum uint8
 
 const (
@@ -27,6 +32,42 @@ const (
 	DCOS
 	// Script is supported by target cluster
 	Script
+	// Ansible is supporter by target cluster
+	Ansible
+
 	// NextEnum marks the next value (or the max, depending the use)
 	NextEnum
 )
+
+var (
+	stringMap = map[string]Enum{
+		"helm":    Helm,
+		"DCOS":    DCOS,
+		"script":  Script,
+		"ansible": Ansible,
+	}
+
+	enumMap = map[Enum]string{
+		Helm:    "Helm",
+		DCOS:    "DCOS",
+		Script:  "Script",
+		Ansible: "Ansible",
+	}
+)
+
+// Parse returns a Method.Enum corresponding to the string parameter
+func Parse(v string) (e Enum) {
+	var found bool
+	lowered := strings.ToLower(v)
+	if e, found = stringMap[lowered]; !found {
+		panic(fmt.Sprintf("Method.Enum '%s' doesn't exist!", v))
+	}
+	return
+}
+
+func (e Enum) String() string {
+	if str, found := enumMap[e]; found {
+		return str
+	}
+	panic(fmt.Sprintf("Method.Enum value '%d' doesn't have string match!", e))
+}
