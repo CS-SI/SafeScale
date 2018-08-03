@@ -37,6 +37,8 @@ const (
 	Run
 	// NotImplemented is returned when a function is not yet implemented
 	NotImplemented
+	// Duplicate is returned when resource already exists
+	Duplicate
 
 	//NextErrorCode is the next error code useable
 	NextErrorCode
