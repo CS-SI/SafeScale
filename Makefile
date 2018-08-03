@@ -55,6 +55,7 @@ STRINGER := golang.org/x/tools/cmd/stringer
 RICE := github.com/GeertJohan/go.rice github.com/GeertJohan/go.rice/rice
 #CLI parser
 URFAVE := github.com/urfave/cli
+MOW := github.com/jawher/mow.cli
 #Configuration file handler
 VIPER := github.com/spf13/viper
 #Data validation lib: at least used to validate host name for flexibleengine
@@ -80,6 +81,6 @@ AWS := github.com/aws/aws-sdk-go
 # Providers SDK
 PROVIDERS_SDK := $(GOPHERCLOUD) $(AWS)
 
-DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(PASSWORD) $(CRYPTO_SSH) $(GRPC_LIBS) $(PROVIDERS_SDK)
+DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(PASSWORD) $(CRYPTO_SSH) $(GRPC_LIBS) $(PROVIDERS_SDK) $(MOW)
 
 deps: ; $(GO) get -u $(DEPS)

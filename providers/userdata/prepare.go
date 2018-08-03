@@ -116,6 +116,11 @@ func Prepare(client api.ClientAPI, request api.VMRequest, isGateway bool, kp *ap
 }
 
 func initUserdataTemplate() error {
+	if userdataTemplate != nil {
+		// Already loaded
+		return nil
+	}
+
 	var (
 		err         error
 		box         *rice.Box
@@ -133,11 +138,4 @@ func initUserdataTemplate() error {
 		}
 	}
 	return err
-}
-
-func init() {
-	err := initUserdataTemplate()
-	if err != nil {
-		panic(fmt.Sprintf("providers.userdata.init(): %v", err))
-	}
 }

@@ -1,6 +1,6 @@
 GO?=go
 
-all: scanner vet
+all: scanner 
 
 vet:
 	@$(GO) vet

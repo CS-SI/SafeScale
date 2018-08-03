@@ -1,7 +1,8 @@
 GO?=go
+
 .PHONY: dcos boh tests clean mrproper
 
-all: dcos boh vet # tests
+all: dcos boh
 
 vet:
 

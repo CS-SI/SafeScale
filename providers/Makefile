@@ -2,9 +2,9 @@ GO?=go
 DIRECTORIES_ = $(sort $(dir $(wildcard */)))
 DIRECTORIES = $(filter-out tests/ metadata/, $(DIRECTORIES_))
 
-.PHONY:	api aws cloudwatt flexibleengine openstack opentelekom ovh clean
+.PHONY:	api aws cloudwatt flexibleengine openstack opentelekom ovh userdata clean
 
-all:	api aws cloudwatt flexibleengine openstack opentelekom ovh vet
+all:	api aws cloudwatt flexibleengine openstack opentelekom ovh userdata
 
 vet:
 	@$(GO) vet
@@ -32,6 +32,9 @@ openstack:	api userdata
 	@(cd $@ && $(MAKE))
 
 ovh:	api userdata openstack
+	@(cd $@ && $(MAKE))
+
+userdata:
 	@(cd $@ && $(MAKE))
 
 clean:
