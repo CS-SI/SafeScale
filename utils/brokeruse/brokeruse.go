@@ -29,7 +29,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-//GetConnection returns a connection to GRPC server
+// GetConnection returns a connection to GRPC server
 func GetConnection() *grpc.ClientConn {
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(utils.Address, grpc.WithInsecure())
@@ -39,13 +39,13 @@ func GetConnection() *grpc.ClientConn {
 	return conn
 }
 
-//GetContext return a context for grpc commands
+// GetContext return a context for grpc commands
 func GetContext(timeout time.Duration) (context.Context, context.CancelFunc) {
 	// Contact the server and print out its response.
 	return context.WithTimeout(context.Background(), timeout)
 }
 
-//GetCurrentTenant returns the string of the current tenant set by broker
+// GetCurrentTenant returns the string of the current tenant set by broker
 func GetCurrentTenant() (string, error) {
 	conn := GetConnection()
 	defer conn.Close()
@@ -57,12 +57,12 @@ func GetCurrentTenant() (string, error) {
 		return "", err
 	}
 	if tenant == nil || tenant.Name == "" {
-		return "", fmt.Errorf("Tenant must be set; use 'broker tenant set'.")
+		return "", fmt.Errorf("tenant must be set; use 'broker tenant set'.")
 	}
 	return tenant.Name, nil
 }
 
-//CreateNetwork creates a network using brokerd
+// CreateNetwork creates a network using brokerd
 func CreateNetwork(name string, cidr string, GWdef *pb.GatewayDefinition) (*pb.Network, error) {
 	conn := GetConnection()
 	defer conn.Close()
@@ -90,7 +90,7 @@ func CreateNetwork(name string, cidr string, GWdef *pb.GatewayDefinition) (*pb.N
 	return network, nil
 }
 
-//DeleteNetwork deletes a network using brokerd
+// DeleteNetwork deletes a network using brokerd
 func DeleteNetwork(id string) error {
 	conn := GetConnection()
 	defer conn.Close()
@@ -104,37 +104,37 @@ func DeleteNetwork(id string) error {
 	return nil
 }
 
-//CreateVM creates a VM using brokerd
-func CreateVM(req *pb.VMDefinition) (*pb.VM, error) {
+// CreateHost creates an host using brokerd
+func CreateHost(req *pb.HostDefinition) (*pb.Host, error) {
 	conn := GetConnection()
 	defer conn.Close()
-	ctx, cancel := GetContext(utils.TimeoutCtxVM)
+	ctx, cancel := GetContext(utils.TimeoutCtxHost)
 	defer cancel()
-	service := pb.NewVMServiceClient(conn)
-	vm, err := service.Create(ctx, req)
+	service := pb.NewHostServiceClient(conn)
+	host, err := service.Create(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server: %v", err)
 	}
-	return vm, nil
+	return host, nil
 }
 
-//DeleteVM deletes a VM using brokerd
-func DeleteVM(id string) error {
+// DeleteHost deletes an host using brokerd
+func DeleteHost(id string) error {
 	conn := GetConnection()
 	defer conn.Close()
-	ctx, cancel := GetContext(utils.TimeoutCtxVM)
+	ctx, cancel := GetContext(utils.TimeoutCtxHost)
 	defer cancel()
-	service := pb.NewVMServiceClient(conn)
+	service := pb.NewHostServiceClient(conn)
 	_, err := service.Delete(ctx, &pb.Reference{ID: id})
 	return err
 }
 
-//GetVM returns information about a VM
-func GetVM(id string) (*pb.VM, error) {
+// GetHost returns information about an host
+func GetHost(id string) (*pb.Host, error) {
 	conn := GetConnection()
 	defer conn.Close()
 	ctx, cancel := GetContext(utils.TimeoutCtxDefault)
 	defer cancel()
-	service := pb.NewVMServiceClient(conn)
+	service := pb.NewHostServiceClient(conn)
 	return service.Inspect(ctx, &pb.Reference{ID: id})
 }

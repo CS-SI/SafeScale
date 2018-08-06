@@ -54,7 +54,7 @@ func createNodes(clusterName string, public bool, count int, os string, cpu int3
 	fmt.Printf("Adding %d %s node%s to Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
 
 	for i := 0; i < count; i++ {
-		_, err = instance.AddNode(public, &pb.VMDefinition{
+		_, err = instance.AddNode(public, &pb.HostDefinition{
 			CPUNumber: cpu,
 			Disk:      disk,
 			RAM:       ram,

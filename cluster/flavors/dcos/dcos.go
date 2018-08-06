@@ -60,7 +60,7 @@ import (
 const (
 	dcosVersion string = "1.11.1"
 
-	timeoutCtxVM = 10 * time.Minute
+	timeoutCtxHost = 10 * time.Minute
 
 	shortTimeoutSSH = time.Minute
 	longTimeoutSSH  = 5 * time.Minute
@@ -99,13 +99,13 @@ var (
 // managerData defines the data needed by DCOS we want to keep in Object Storage
 type managerData struct {
 
-	// BootstrapID is the identifier of the VM acting as bootstrap/upgrade server
+	// BootstrapID is the identifier of the host acting as bootstrap/upgrade server
 	BootstrapID string
 
 	// BootstrapIP contains the IP of the bootstrap server reachable by all master and agents
 	BootstrapIP string
 
-	// MasterIDs is a slice of VMIDs of the master
+	// MasterIDs is a slice of hostIDs of the master
 	MasterIDs []string
 
 	// MasterIPs contains a list of IP of the master servers
@@ -194,11 +194,11 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		return nil, fmt.Errorf("failed to generate password for user cladm: %s", err.Error())
 	}
 
-	var nodesDef pb.VMDefinition
+	var nodesDef pb.HostDefinition
 	if req.NodesDef != nil {
 		nodesDef = *req.NodesDef
 	} else {
-		nodesDef = pb.VMDefinition{
+		nodesDef = pb.HostDefinition{
 			CPUNumber: 4,
 			RAM:       15.0,
 			Disk:      100,
@@ -233,7 +233,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		masterCount, privateNodeCount, retcode         int
 		kp                                             *providerapi.KeyPair
 		kpName                                         string
-		gw                                             *providerapi.VM
+		gw                                             *providerapi.Host
 		m                                              *providermetadata.Gateway
 		found                                          bool
 		bootstrapChannel, mastersChannel, nodesChannel chan error
@@ -406,16 +406,16 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 cleanNodes:
 	if !req.KeepOnFailure {
 		for _, id := range instance.Common.PublicNodeIDs {
-			brokeruse.DeleteVM(id)
+			brokeruse.DeleteHost(id)
 		}
 		for _, id := range instance.Common.PrivateNodeIDs {
-			brokeruse.DeleteVM(id)
+			brokeruse.DeleteHost(id)
 		}
 	}
 cleanMasters:
 	if !req.KeepOnFailure {
 		for _, id := range instance.manager.MasterIDs {
-			brokeruse.DeleteVM(id)
+			brokeruse.DeleteHost(id)
 		}
 	}
 cleanNetwork:
@@ -426,7 +426,7 @@ cleanNetwork:
 	return nil, err
 }
 
-func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.VMDefinition, done chan error) {
+func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.HostDefinition, done chan error) {
 	var countS string
 	if count > 1 {
 		countS = "s"
@@ -452,7 +452,7 @@ func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.VMDefinition,
 		go c.asyncCreateNode(
 			i,
 			nodeType,
-			&pb.VMDefinition{
+			&pb.HostDefinition{
 				CPUNumber: 4,
 				RAM:       16.0,
 				Disk:      100,
@@ -484,10 +484,10 @@ func (c *Cluster) asyncConfigurePrivateNodes(done chan error) {
 	fmt.Println("Configuring DCOS private Nodes...")
 
 	dones := []chan error{}
-	for i, vmID := range c.Common.PrivateNodeIDs {
+	for i, hostID := range c.Common.PrivateNodeIDs {
 		d := make(chan error)
 		dones = append(dones, d)
-		go c.asyncConfigureNode(i+1, vmID, NodeType.PrivateNode, d)
+		go c.asyncConfigureNode(i+1, hostID, NodeType.PrivateNode, d)
 	}
 
 	var state error
@@ -541,10 +541,10 @@ func (c *Cluster) asyncConfigureMasters(done chan error) {
 	fmt.Println("Configuring DCOS masters...")
 
 	dones := []chan error{}
-	for i, vmID := range c.manager.MasterIDs {
+	for i, hostID := range c.manager.MasterIDs {
 		d := make(chan error)
 		dones = append(dones, d)
-		go c.asyncConfigureMaster(i+1, vmID, d)
+		go c.asyncConfigureMaster(i+1, hostID, d)
 	}
 
 	var state error
@@ -564,7 +564,7 @@ func (c *Cluster) asyncConfigureMasters(done chan error) {
 }
 
 // createAndConfigureNode creates and configure a Node
-func (c *Cluster) createAndConfigureNode(public bool, req *pb.VMDefinition) (string, error) {
+func (c *Cluster) createAndConfigureNode(public bool, req *pb.HostDefinition) (string, error) {
 	var nodeType NodeType.Enum
 	if public {
 		nodeType = NodeType.PublicNode
@@ -604,7 +604,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 		return
 	}
 
-	masterVM, err := brokeruse.CreateVM(&pb.VMDefinition{
+	masterHost, err := brokeruse.CreateHost(&pb.HostDefinition{
 		Name:      name,
 		CPUNumber: 4,
 		RAM:       15.0,
@@ -621,8 +621,8 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 
 	// Registers the new Master in the cluster struct
 	c.metadata.Acquire()
-	c.manager.MasterIDs = append(c.manager.MasterIDs, masterVM.ID)
-	c.manager.MasterIPs = append(c.manager.MasterIPs, masterVM.PRIVATE_IP)
+	c.manager.MasterIDs = append(c.manager.MasterIDs, masterHost.ID)
+	c.manager.MasterIPs = append(c.manager.MasterIPs, masterHost.PRIVATE_IP)
 
 	// Update cluster definition in Object Storage
 	err = c.updateMetadata()
@@ -631,7 +631,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 		c.manager.MasterIDs = c.manager.MasterIDs[:len(c.manager.MasterIDs)-1]
 		c.manager.MasterIPs = c.manager.MasterIPs[:len(c.manager.MasterIPs)-1]
 		c.metadata.Release()
-		brokeruse.DeleteVM(masterVM.ID)
+		brokeruse.DeleteHost(masterHost.ID)
 
 		log.Printf("[Masters: #%d] creation failed: %s\n", index, err.Error())
 		done <- fmt.Errorf("failed to update Cluster definition: %s", err.Error())
@@ -640,7 +640,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 	c.metadata.Release()
 
 	// Installs DCOS requirements...
-	ssh, err := c.provider.GetSSHConfig(masterVM.ID)
+	ssh, err := c.provider.GetSSHConfig(masterHost.ID)
 	if err != nil {
 		done <- err
 		return
@@ -652,17 +652,17 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 	}
 	retcode, _, err := c.executeScript(ssh, "dcos_install_master.sh", map[string]interface{}{})
 	if err != nil {
-		log.Printf("[Masters: #%d (%s)] configuration failed: %s\n", index, masterVM.ID, err.Error())
+		log.Printf("[Masters: #%d (%s)] configuration failed: %s\n", index, masterHost.ID, err.Error())
 		done <- err
 		return
 	}
 	if retcode != 0 {
 		if retcode < int(ErrorCode.NextErrorCode) {
 			errcode := ErrorCode.Enum(retcode)
-			log.Printf("[Masters: #%d (%s)] installation failed:\nretcode=%d (%s)", index, masterVM.ID, errcode, errcode.String())
+			log.Printf("[Masters: #%d (%s)] installation failed:\nretcode=%d (%s)", index, masterHost.ID, errcode, errcode.String())
 			done <- fmt.Errorf("scripted Master installation failed with error code %d (%s)", errcode, errcode.String())
 		} else {
-			log.Printf("[Masters: #%d (%s)] installation failed:\nretcode=%d", index, masterVM.ID, retcode)
+			log.Printf("[Masters: #%d (%s)] installation failed:\nretcode=%d", index, masterHost.ID, retcode)
 			done <- fmt.Errorf("scripted Master installation failed with error code %d", retcode)
 		}
 		return
@@ -717,7 +717,7 @@ func (c *Cluster) asyncConfigureMaster(index int, masterID string, done chan err
 
 // asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
-func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMDefinition, result chan string, done chan error) {
+func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.HostDefinition, result chan string, done chan error) {
 	var publicIP bool
 	var nodeTypeStr string
 	if nodeType == NodeType.PublicNode {
@@ -741,7 +741,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 	req.Public = publicIP
 	req.Network = c.Common.NetworkID
 	req.ImageID = centos
-	node, err := brokeruse.CreateVM(req)
+	node, err := brokeruse.CreateHost(req)
 	if err != nil {
 		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -770,7 +770,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 			c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
 			c.manager.PrivateNodeIPs = c.manager.PrivateNodeIPs[:len(c.manager.PrivateNodeIPs)-1]
 		}
-		brokeruse.DeleteVM(node.ID)
+		brokeruse.DeleteHost(node.ID)
 		c.metadata.Release()
 		log.Printf("[Nodes: %s #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -820,7 +820,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 	done <- nil
 }
 
-// asyncConfigureNode installs and configure DCOS agent on targetVM
+// asyncConfigureNode installs and configure DCOS agent on tarGetHost
 func (c *Cluster) asyncConfigureNode(index int, nodeID string, nodeType NodeType.Enum, done chan error) {
 	var publicStr string
 	var nodeTypeStr string
@@ -1201,21 +1201,21 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 }
 
 // AddNode adds one node
-func (c *Cluster) AddNode(public bool, req *pb.VMDefinition) (string, error) {
-	vms, err := c.AddNodes(1, public, req)
+func (c *Cluster) AddNode(public bool, req *pb.HostDefinition) (string, error) {
+	hosts, err := c.AddNodes(1, public, req)
 	if err != nil {
 		return "", err
 	}
-	return vms[0], nil
+	return hosts[0], nil
 }
 
 // AddNodes adds <count> nodes
-func (c *Cluster) AddNodes(count int, public bool, req *pb.VMDefinition) ([]string, error) {
+func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]string, error) {
 	if c.Common.State != ClusterState.Created && c.Common.State != ClusterState.Nominal {
 		return nil, fmt.Errorf("The DCOS flavor of Cluster needs to be at least in state 'Created' to allow node addition.")
 	}
 
-	var vms []string
+	var hosts []string
 	var errors []string
 	var dones []chan error
 	var results []chan string
@@ -1225,20 +1225,20 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.VMDefinition) ([]stri
 		d := make(chan error)
 		dones = append(dones, d)
 		go func(result chan string, done chan error) {
-			vmID, err := c.createAndConfigureNode(public, req)
+			hostID, err := c.createAndConfigureNode(public, req)
 			if err != nil {
 				result <- ""
 				done <- err
 				return
 			}
-			result <- vmID
+			result <- hostID
 			done <- nil
 		}(r, d)
 	}
 	for i := range dones {
-		vm := <-results[i]
-		if vm != "" {
-			vms = append(vms, vm)
+		host := <-results[i]
+		if host != "" {
+			hosts = append(hosts, host)
 		}
 		err := <-dones[i]
 		if err != nil {
@@ -1247,15 +1247,15 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.VMDefinition) ([]stri
 
 	}
 	if len(errors) > 0 {
-		if len(vms) > 0 {
-			for _, vmID := range vms {
-				brokeruse.DeleteVM(vmID)
+		if len(hosts) > 0 {
+			for _, hostID := range hosts {
+				brokeruse.DeleteHost(hostID)
 			}
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
 	}
 
-	return vms, nil
+	return hosts, nil
 }
 
 // installKubernetes does the needed to have Kubernetes in DCOS
@@ -1442,7 +1442,7 @@ func (c *Cluster) uploadTemplateToFile(ssh *system.SSHConfig, tmplName string, f
 	return remotePath, nil
 }
 
-// executeScript executes the script template with the parameters on targetVM
+// executeScript executes the script template with the parameters on tarGetHost
 func (c *Cluster) executeScript(ssh *system.SSHConfig, script string, data map[string]interface{}) (int, *string, error) {
 	// Configures CommonTools template var
 	commonTools, err := c.getCommonTools()
@@ -1486,14 +1486,14 @@ func (c *Cluster) executeScript(ssh *system.SSHConfig, script string, data map[s
 
 // DeleteLastNode deletes the last Agent node added
 func (c *Cluster) DeleteLastNode(public bool) error {
-	var vmID string
+	var hostID string
 
 	if public {
-		vmID = c.Common.PublicNodeIDs[len(c.Common.PublicNodeIDs)-1]
+		hostID = c.Common.PublicNodeIDs[len(c.Common.PublicNodeIDs)-1]
 	} else {
-		vmID = c.Common.PrivateNodeIDs[len(c.Common.PrivateNodeIDs)-1]
+		hostID = c.Common.PrivateNodeIDs[len(c.Common.PrivateNodeIDs)-1]
 	}
-	err := brokeruse.DeleteVM(vmID)
+	err := brokeruse.DeleteHost(hostID)
 	if err != nil {
 		return nil
 	}
@@ -1518,7 +1518,7 @@ func (c *Cluster) DeleteSpecificNode(ID string) error {
 		return fmt.Errorf("host ID '%s' isn't a registered Node of the Cluster '%s'", ID, c.Common.Name)
 	}
 
-	err := brokeruse.DeleteVM(ID)
+	err := brokeruse.DeleteHost(ID)
 	if err != nil {
 		return err
 	}
@@ -1532,7 +1532,7 @@ func (c *Cluster) DeleteSpecificNode(ID string) error {
 }
 
 // ListMasters lists the master nodes in the cluster
-func (c *Cluster) ListMasters() ([]*pb.VM, error) {
+func (c *Cluster) ListMasters() ([]*pb.Host, error) {
 	return nil, fmt.Errorf("ListMasters not yet implemented")
 }
 
@@ -1545,7 +1545,7 @@ func (c *Cluster) ListNodes(public bool) []string {
 }
 
 // GetNode returns a node based on its ID
-func (c *Cluster) GetNode(ID string) (*pb.VM, error) {
+func (c *Cluster) GetNode(ID string) (*pb.Host, error) {
 	found, _ := contains(c.Common.PublicNodeIDs, ID)
 	if !found {
 		found, _ = contains(c.Common.PrivateNodeIDs, ID)
@@ -1553,7 +1553,7 @@ func (c *Cluster) GetNode(ID string) (*pb.VM, error) {
 	if !found {
 		return nil, fmt.Errorf("GetNode not yet implemented")
 	}
-	return brokeruse.GetVM(ID)
+	return brokeruse.GetHost(ID)
 }
 
 // contains ...
@@ -1570,7 +1570,7 @@ func contains(list []string, ID string) (bool, int) {
 	return found, idx
 }
 
-// SearchNode tells if a VM ID corresponds to a node of the cluster
+// SearchNode tells if an host ID corresponds to a node of the cluster
 func (c *Cluster) SearchNode(ID string, public bool) bool {
 	found, _ := contains(c.Common.PublicNodeIDs, ID)
 	if !found {
@@ -1612,7 +1612,7 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the public nodes
 	for _, n := range c.Common.PublicNodeIDs {
-		err := brokeruse.DeleteVM(n)
+		err := brokeruse.DeleteHost(n)
 		if err != nil {
 			return err
 		}
@@ -1620,7 +1620,7 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the private nodes
 	for _, n := range c.Common.PrivateNodeIDs {
-		err := brokeruse.DeleteVM(n)
+		err := brokeruse.DeleteHost(n)
 		if err != nil {
 			return err
 		}
@@ -1628,7 +1628,7 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the masters
 	for _, n := range c.manager.MasterIDs {
-		err := brokeruse.DeleteVM(n)
+		err := brokeruse.DeleteHost(n)
 		if err != nil {
 			return err
 		}

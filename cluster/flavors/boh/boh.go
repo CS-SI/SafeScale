@@ -53,7 +53,7 @@ import (
 )
 
 const (
-	timeoutCtxVM = 10 * time.Minute
+	timeoutCtxHost = 10 * time.Minute
 
 	shortTimeoutSSH = time.Minute
 	longTimeoutSSH  = 5 * time.Minute
@@ -159,13 +159,13 @@ func Load(data *metadata.Cluster) (clusterapi.ClusterAPI, error) {
 // Create creates the necessary infrastructure of cluster
 func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	var (
-		nodesDef         pb.VMDefinition
+		nodesDef         pb.HostDefinition
 		instance         Cluster
 		manager          *managerData
 		privateNodeCount int
 		kp               *providerapi.KeyPair
 		kpName           string
-		gw               *providerapi.VM
+		gw               *providerapi.Host
 		m                *providermetadata.Gateway
 		found            bool
 	)
@@ -179,7 +179,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	if req.NodesDef != nil {
 		nodesDef = *req.NodesDef
 	} else {
-		nodesDef = pb.VMDefinition{
+		nodesDef = pb.HostDefinition{
 			CPUNumber: 4,
 			RAM:       15.0,
 			Disk:      100,
@@ -310,7 +310,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 cleanNodes:
 	if !req.KeepOnFailure {
 		for _, id := range instance.Common.PrivateNodeIDs {
-			brokeruse.DeleteVM(id)
+			brokeruse.DeleteHost(id)
 		}
 	}
 cleanNetwork:
@@ -321,7 +321,7 @@ cleanNetwork:
 	return nil, err
 }
 
-func (c *Cluster) createNodes(count int, public bool, def *pb.VMDefinition) error {
+func (c *Cluster) createNodes(count int, public bool, def *pb.HostDefinition) error {
 	var countS string
 	if count > 1 {
 		countS = "s"
@@ -365,7 +365,7 @@ func (c *Cluster) createNodes(count int, public bool, def *pb.VMDefinition) erro
 
 // asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
-func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMDefinition, result chan string, done chan error) {
+func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.HostDefinition, result chan string, done chan error) {
 	var publicIP bool
 	var nodeTypeStr string
 	if nodeType == NodeType.PublicNode {
@@ -388,7 +388,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 	}
 	req.Public = publicIP
 	req.Network = c.Common.NetworkID
-	host, err := brokeruse.CreateVM(req)
+	host, err := brokeruse.CreateHost(req)
 	if err != nil {
 		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -417,7 +417,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.VMD
 			c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
 			c.manager.PrivateNodeIPs = c.manager.PrivateNodeIPs[:len(c.manager.PrivateNodeIPs)-1]
 		}
-		brokeruse.DeleteVM(host.ID)
+		brokeruse.DeleteHost(host.ID)
 		c.metadata.Release()
 		log.Printf("[Nodes: %s #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -520,16 +520,16 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 }
 
 // AddNode adds one node
-func (c *Cluster) AddNode(public bool, req *pb.VMDefinition) (string, error) {
-	vms, err := c.AddNodes(1, public, req)
+func (c *Cluster) AddNode(public bool, req *pb.HostDefinition) (string, error) {
+	hosts, err := c.AddNodes(1, public, req)
 	if err != nil {
 		return "", err
 	}
-	return vms[0], nil
+	return hosts[0], nil
 }
 
 // AddNodes adds <count> nodes
-func (c *Cluster) AddNodes(count int, public bool, req *pb.VMDefinition) ([]string, error) {
+func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]string, error) {
 	var nodeType NodeType.Enum
 
 	if public {
@@ -563,7 +563,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.VMDefinition) ([]stri
 	if len(errors) > 0 {
 		if len(hosts) > 0 {
 			for _, hostID := range hosts {
-				brokeruse.DeleteVM(hostID)
+				brokeruse.DeleteHost(hostID)
 			}
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
@@ -581,7 +581,7 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 	} else {
 		hostID = c.Common.PrivateNodeIDs[len(c.Common.PrivateNodeIDs)-1]
 	}
-	err := brokeruse.DeleteVM(hostID)
+	err := brokeruse.DeleteHost(hostID)
 	if err != nil {
 		return nil
 	}
@@ -606,7 +606,7 @@ func (c *Cluster) DeleteSpecificNode(hostID string) error {
 		return fmt.Errorf("host '%s' isn't a registered Node of the Cluster '%s'", hostID, c.Common.Name)
 	}
 
-	err := brokeruse.DeleteVM(hostID)
+	err := brokeruse.DeleteHost(hostID)
 	if err != nil {
 		return err
 	}
@@ -621,8 +621,8 @@ func (c *Cluster) DeleteSpecificNode(hostID string) error {
 
 // ListMasters lists the master nodes in the cluster
 // No masters in BOH...
-func (c *Cluster) ListMasters() ([]*pb.VM, error) {
-	return []*pb.VM{}, nil
+func (c *Cluster) ListMasters() ([]*pb.Host, error) {
+	return []*pb.Host{}, nil
 }
 
 // ListNodes lists the nodes in the cluster
@@ -634,7 +634,7 @@ func (c *Cluster) ListNodes(public bool) []string {
 }
 
 // GetNode returns a node based on its ID
-func (c *Cluster) GetNode(hostID string) (*pb.VM, error) {
+func (c *Cluster) GetNode(hostID string) (*pb.Host, error) {
 	found, _ := contains(c.Common.PublicNodeIDs, hostID)
 	if !found {
 		found, _ = contains(c.Common.PrivateNodeIDs, hostID)
@@ -642,7 +642,7 @@ func (c *Cluster) GetNode(hostID string) (*pb.VM, error) {
 	if !found {
 		return nil, fmt.Errorf("failed to find node '%s' in cluster '%s'", hostID, c.Common.Name)
 	}
-	return brokeruse.GetVM(hostID)
+	return brokeruse.GetHost(hostID)
 }
 
 func contains(list []string, hostID string) (bool, int) {
@@ -658,7 +658,7 @@ func contains(list []string, hostID string) (bool, int) {
 	return found, idx
 }
 
-// SearchNode tells if a host ID corresponds to a node of the cluster
+// SearchNode tells if an host ID corresponds to a node of the cluster
 func (c *Cluster) SearchNode(hostID string, public bool) bool {
 	found, _ := contains(c.Common.PublicNodeIDs, hostID)
 	if !found {
@@ -700,7 +700,7 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the public nodes
 	for _, n := range c.Common.PublicNodeIDs {
-		err := brokeruse.DeleteVM(n)
+		err := brokeruse.DeleteHost(n)
 		if err != nil {
 			return err
 		}
@@ -708,7 +708,7 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the private nodes
 	for _, n := range c.Common.PrivateNodeIDs {
-		err := brokeruse.DeleteVM(n)
+		err := brokeruse.DeleteHost(n)
 		if err != nil {
 			return err
 		}

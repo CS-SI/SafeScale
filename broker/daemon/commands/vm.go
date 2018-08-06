@@ -28,49 +28,49 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
-// broker vm create vm1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
-// broker vm list --all=false
-// broker vm inspect vm1
-// broker vm create vm2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
+// broker host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
+// broker host list --all=false
+// broker host inspect host1
+// broker host create host2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
 
-//VMServiceServer VM service server grpc
-type VMServiceServer struct{}
+// HostServiceServer host service server grpc
+type HostServiceServer struct{}
 
-//List available VMs
-func (s *VMServiceServer) List(ctx context.Context, in *pb.VMListRequest) (*pb.VMList, error) {
-	log.Printf("List VM called")
+// List available hosts
+func (s *HostServiceServer) List(ctx context.Context, in *pb.HostListRequest) (*pb.HostList, error) {
+	log.Printf("List hosts called")
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	vmAPI := services.NewVMService(currentTenant.Client)
+	hostAPI := services.NewHostService(currentTenant.Client)
 
-	vms, err := vmAPI.List(in.GetAll())
+	hosts, err := hostAPI.List(in.GetAll())
 	if err != nil {
 		return nil, err
 	}
 
-	var pbvm []*pb.VM
+	var pbhost []*pb.Host
 
-	// Map api.VM to pb.VM
-	for _, vm := range vms {
-		pbvm = append(pbvm, conv.ToPBVM(&vm))
+	// Map api.Host to pb.Host
+	for _, host := range hosts {
+		pbhost = append(pbhost, conv.ToPBHost(&host))
 	}
-	rv := &pb.VMList{VMs: pbvm}
-	log.Printf("End List VM")
+	rv := &pb.HostList{Hosts: pbhost}
+	log.Printf("End List hosts")
 	return rv, nil
 }
 
-//Create a new VM
-func (s *VMServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.VM, error) {
-	log.Printf("Create VM called")
+// Create a new host
+func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
+	log.Printf("Create host called")
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	vmService := services.NewVMService(currentTenant.Client)
-	vm, err := vmService.Create(in.GetName(), in.GetNetwork(),
+	hostService := services.NewHostService(currentTenant.Client)
+	host, err := hostService.Create(in.GetName(), in.GetNetwork(),
 		int(in.GetCPUNumber()), in.GetRAM(), int(in.GetDisk()), in.GetImageID(), in.GetPublic())
 
 	if err != nil {
@@ -78,13 +78,13 @@ func (s *VMServiceServer) Create(ctx context.Context, in *pb.VMDefinition) (*pb.
 		return nil, err
 	}
 
-	log.Printf("VM '%s' created", in.GetName())
-	return conv.ToPBVM(vm), nil
+	log.Printf("Host '%s' created", in.GetName())
+	return conv.ToPBHost(host), nil
 }
 
-//Inspect a VM
-func (s *VMServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM, error) {
-	log.Printf("Inspect VM called")
+// Inspect an host
+func (s *HostServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host, error) {
+	log.Printf("Inspect Host called")
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -95,19 +95,19 @@ func (s *VMServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VM
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	vmService := services.NewVMService(currentTenant.Client)
-	vm, err := vmService.Get(ref)
+	hostService := services.NewHostService(currentTenant.Client)
+	host, err := hostService.Get(ref)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("End Inspect VM: '%s'", in.GetName())
-	return conv.ToPBVM(vm), nil
+	log.Printf("End Inspect Host: '%s'", in.GetName())
+	return conv.ToPBHost(host), nil
 }
 
-//Delete a VM
-func (s *VMServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Delete VM called")
+// Delete an host
+func (s *HostServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
+	log.Printf("Delete Host called")
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -117,18 +117,18 @@ func (s *VMServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
-	vmService := services.NewVMService(currentTenant.Client)
-	err := vmService.Delete(ref)
+	hostService := services.NewHostService(currentTenant.Client)
+	err := hostService.Delete(ref)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("VM '%s' deleted", ref)
+	log.Printf("Host '%s' deleted", ref)
 	return &google_protobuf.Empty{}, nil
 }
 
-//SSH returns ssh parameters to access a VM
-func (s *VMServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
-	log.Printf("Ssh VM called")
+// SSH returns ssh parameters to access an host
+func (s *HostServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
+	log.Printf("Ssh Host called")
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -138,11 +138,11 @@ func (s *VMServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshCon
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
-	vmService := services.NewVMService(currentTenant.Client)
-	sshConfig, err := vmService.SSH(ref)
+	hostService := services.NewHostService(currentTenant.Client)
+	sshConfig, err := hostService.SSH(ref)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Got Ssh config for VM '%s'", ref)
+	log.Printf("Got Ssh config for host '%s'", ref)
 	return conv.ToPBSshconfig(sshConfig), nil
 }

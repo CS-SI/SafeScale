@@ -26,64 +26,64 @@ import (
 	"github.com/urfave/cli"
 )
 
-// VMCmd command
-var VMCmd = cli.Command{
-	Name:  "vm",
-	Usage: "vm COMMAND",
+// HostCmd command
+var HostCmd = cli.Command{
+	Name:  "host",
+	Usage: "host COMMAND",
 	Subcommands: []cli.Command{
-		vmList,
-		vmCreate,
-		vmDelete,
-		vmInspect,
-		vmSsh,
+		hostList,
+		hostCreate,
+		hostDelete,
+		hostInspect,
+		hostSsh,
 	},
 }
 
-var vmList = cli.Command{
+var hostList = cli.Command{
 	Name:  "list",
-	Usage: "List available VMs (created by SafeScale)",
+	Usage: "List available hosts (created by SafeScale)",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all",
-			Usage: "List all VMs on tenant (not only those created by SafeScale)",
+			Usage: "List all hosts on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
 		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
-		service := pb.NewVMServiceClient(conn)
-		vms, err := service.List(ctx, &pb.VMListRequest{
+		service := pb.NewHostServiceClient(conn)
+		hosts, err := service.List(ctx, &pb.HostListRequest{
 			All: c.Bool("all"),
 		})
 		if err != nil {
-			return fmt.Errorf("Could not get vm list: %v", err)
+			return fmt.Errorf("Could not get host list: %v", err)
 		}
-		out, _ := json.Marshal(vms.GetVMs())
+		out, _ := json.Marshal(hosts.GetHosts())
 		fmt.Println(string(out))
 
 		return nil
 	},
 }
 
-var vmInspect = cli.Command{
+var hostInspect = cli.Command{
 	Name:      "inspect",
-	Usage:     "inspect VM",
-	ArgsUsage: "<VM_name|VM_ID>",
+	Usage:     "inspect Host",
+	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <VM_name>")
+			fmt.Println("Missing mandatory argument <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("VM name or ID required")
+			return fmt.Errorf("host name or ID required")
 		}
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
 		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
-		service := pb.NewVMServiceClient(conn)
+		service := pb.NewHostServiceClient(conn)
 		resp, err := service.Inspect(ctx, &pb.Reference{Name: c.Args().First()})
 		if err != nil {
-			return fmt.Errorf("Could not inspect vm '%s': %v", c.Args().First(), err)
+			return fmt.Errorf("Could not inspect host '%s': %v", c.Args().First(), err)
 		}
 
 		out, _ := json.Marshal(resp)
@@ -93,34 +93,34 @@ var vmInspect = cli.Command{
 	},
 }
 
-var vmCreate = cli.Command{
+var hostCreate = cli.Command{
 	Name:      "create",
-	Usage:     "create a new VM",
-	ArgsUsage: "<VM_name>",
+	Usage:     "create a new host",
+	ArgsUsage: "<Host_name>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "net",
-			Usage: "Name or ID of the network to put the VM on",
+			Usage: "Name or ID of the network to put the host on",
 		},
 		cli.IntFlag{
 			Name:  "cpu",
 			Value: 1,
-			Usage: "Number of CPU for the VM",
+			Usage: "Number of CPU for the host",
 		},
 		cli.Float64Flag{
 			Name:  "ram",
 			Value: 1,
-			Usage: "RAM for the VM",
+			Usage: "RAM for the host",
 		},
 		cli.IntFlag{
 			Name:  "disk",
 			Value: 100,
-			Usage: "Disk space for the VM",
+			Usage: "Disk space for the host",
 		},
 		cli.StringFlag{
 			Name:  "os",
 			Value: "Ubuntu 16.04",
-			Usage: "Image name for the VM",
+			Usage: "Image name for the host",
 		},
 		cli.BoolFlag{
 			Name:  "private",
@@ -134,16 +134,16 @@ var vmCreate = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <VM_name>")
+			fmt.Println("Missing mandatory argument <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("VM name required")
+			return fmt.Errorf("host name required")
 		}
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
-		service := pb.NewVMServiceClient(conn)
-		resp, err := service.Create(ctx, &pb.VMDefinition{
+		service := pb.NewHostServiceClient(conn)
+		resp, err := service.Create(ctx, &pb.HostDefinition{
 			Name:      c.Args().First(),
 			CPUNumber: int32(c.Int("cpu")),
 			Disk:      int32(c.Float64("disk")),
@@ -153,7 +153,7 @@ var vmCreate = cli.Command{
 			RAM:       float32(c.Float64("ram")),
 		})
 		if err != nil {
-			return fmt.Errorf("Could not create vm '%s': %v", c.Args().First(), err)
+			return fmt.Errorf("Could not create host '%s': %v", c.Args().First(), err)
 		}
 
 		out, _ := json.Marshal(resp)
@@ -163,48 +163,48 @@ var vmCreate = cli.Command{
 	},
 }
 
-var vmDelete = cli.Command{
+var hostDelete = cli.Command{
 	Name:      "delete",
-	Usage:     "Delete VM",
-	ArgsUsage: "<VM_name|VM_ID>",
+	Usage:     "Delete host",
+	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <VM_name>")
+			fmt.Println("Missing mandatory argument <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("VM name or ID required")
+			return fmt.Errorf("host name or ID required")
 		}
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
 		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
-		service := pb.NewVMServiceClient(conn)
+		service := pb.NewHostServiceClient(conn)
 		_, err := service.Delete(ctx, &pb.Reference{Name: c.Args().First()})
 		if err != nil {
-			return fmt.Errorf("Could not delete vm '%s': %v", c.Args().First(), err)
+			return fmt.Errorf("Could not delete host '%s': %v", c.Args().First(), err)
 		}
-		fmt.Printf("VM '%s' deleted\n", c.Args().First())
+		fmt.Printf("Host '%s' deleted\n", c.Args().First())
 		return nil
 	},
 }
 
-var vmSsh = cli.Command{
+var hostSsh = cli.Command{
 	Name:      "ssh",
-	Usage:     "Get ssh config to connect to VM",
-	ArgsUsage: "<VM_name|VM_ID>",
+	Usage:     "Get ssh config to connect to host",
+	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <VM_name>")
+			fmt.Println("Missing mandatory argument <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("VM name or ID required")
+			return fmt.Errorf("host name or ID required")
 		}
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
 		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxDefault)
 		defer cancel()
-		service := pb.NewVMServiceClient(conn)
+		service := pb.NewHostServiceClient(conn)
 		resp, err := service.SSH(ctx, &pb.Reference{Name: c.Args().First()})
 		if err != nil {
-			return fmt.Errorf("Could not get ssh config for vm '%s': %v", c.Args().First(), err)
+			return fmt.Errorf("Could not get ssh config for host '%s': %v", c.Args().First(), err)
 		}
 		out, _ := json.Marshal(resp)
 		fmt.Println(string(out))

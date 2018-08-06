@@ -66,7 +66,7 @@ func ToPbVolume(in *api.Volume) *pb.Volume {
 func ToPbVolumeAttachment(in *api.VolumeAttachment) *pb.VolumeAttachment {
 	return &pb.VolumeAttachment{
 		Volume:    &pb.Reference{ID: in.VolumeID},
-		VM:        &pb.Reference{ID: in.ServerID},
+		Host:      &pb.Reference{ID: in.ServerID},
 		MountPath: in.MountPoint,
 		Device:    in.Device,
 	}
@@ -111,8 +111,8 @@ func ToPBContainerMountPoint(in *api.ContainerInfo) *pb.ContainerMountingPoint {
 	return &pb.ContainerMountingPoint{
 		Container: in.Name,
 		Path:      in.MountPoint,
-		VM: &pb.Reference{
-			Name: in.VM,
+		Host: &pb.Reference{
+			Name: in.Host,
 		},
 	}
 }
@@ -123,16 +123,16 @@ func ToPBNas(in *api.Nas) *pb.NasDefinition {
 		ID: in.ID,
 		Nas: &pb.NasName{
 			Name: in.Name},
-		VM: &pb.Reference{
+		Host: &pb.Reference{
 			Name: in.Host},
 		Path:     in.Path,
 		IsServer: in.IsServer,
 	}
 }
 
-// ToPBVM convert a VM from api to protocolbuffer format
-func ToPBVM(in *api.VM) *pb.VM {
-	return &pb.VM{
+// ToPBHost convert an host from api to protocolbuffer format
+func ToPBHost(in *api.Host) *pb.Host {
+	return &pb.Host{
 		CPU:        int32(in.Size.Cores),
 		Disk:       int32(in.Size.DiskSize),
 		GatewayID:  in.GatewayID,

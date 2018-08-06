@@ -30,26 +30,26 @@ import (
 
 //NasAPI defines API to manipulate NAS
 type NasAPI interface {
-	Create(name, vm, path string) (*api.Nas, error)
+	Create(name, host, path string) (*api.Nas, error)
 	Delete(name string) (*api.Nas, error)
 	List() ([]api.Nas, error)
-	Mount(name, vm, path string) (*api.Nas, error)
-	UMount(name, vm string) (*api.Nas, error)
+	Mount(name, host, path string) (*api.Nas, error)
+	UMount(name, host string) (*api.Nas, error)
 	Inspect(name string) ([]*api.Nas, error)
 }
 
-//NewNasService creates a NAS service
+// NewNasService creates a NAS service
 func NewNasService(api api.ClientAPI) NasAPI {
 	return &NasService{
-		provider:  providers.FromClient(api),
-		vmService: NewVMService(api),
+		provider:    providers.FromClient(api),
+		hostService: NewHostService(api),
 	}
 }
 
-//NasService nas service
+// NasService nas service
 type NasService struct {
-	provider  *providers.Service
-	vmService VMAPI
+	provider    *providers.Service
+	hostService HostAPI
 }
 
 func sanitize(in string) (string, error) {
@@ -61,7 +61,7 @@ func sanitize(in string) (string, error) {
 }
 
 //Create a nas
-func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
+func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 
 	// Check if a nas already exist with the same name
 	nas, err := srv.findNas(name)
@@ -78,12 +78,12 @@ func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 		return nil, fmt.Errorf("Invalid path to be exposed: '%s' : '%s'", path, err)
 	}
 
-	vm, err := srv.vmService.Get(vmName)
+	host, err := srv.hostService.Get(hostName)
 	if err != nil {
-		return nil, fmt.Errorf("No VM found with name or id '%s'", vmName)
+		return nil, fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
-	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (srv *NasService) Create(name, vmName, path string) (*api.Nas, error) {
 	nas = &api.Nas{
 		ID:       nasid.String(),
 		Name:     name,
-		Host:     vm.Name,
+		Host:     host.Name,
 		Path:     exportedPath,
 		IsServer: true,
 	}
@@ -126,23 +126,23 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 		return nil, providers.ResourceNotFoundError("Nas", name)
 	}
 	if len(nass) > 1 {
-		var vms []string
+		var hosts []string
 		for _, nas := range nass {
 			if !nas.IsServer {
-				vms = append(vms, nas.Host)
+				hosts = append(hosts, nas.Host)
 			}
 		}
-		return nil, fmt.Errorf("Cannot delete nas '%s' because it is mounted on VMs : %s", name, strings.Join(vms, " "))
+		return nil, fmt.Errorf("cannot delete nas '%s' because it is mounted on hosts : %s", name, strings.Join(hosts, " "))
 	}
 
 	nas := nass[0]
 
-	vm, err := srv.vmService.Get(nas.Host)
+	host, err := srv.hostService.Get(nas.Host)
 	if err != nil {
-		return nil, fmt.Errorf("No VM found with name or id '%s'", nas.Host)
+		return nil, fmt.Errorf("no host found with name or id '%s'", nas.Host)
 	}
 
-	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -178,8 +178,8 @@ func (srv *NasService) List() ([]api.Nas, error) {
 	return nass, nil
 }
 
-//Mount a directory exported by a nas on a local directory of a vm
-func (srv *NasService) Mount(name, vmName, path string) (*api.Nas, error) {
+//Mount a directory exported by a nas on a local directory of an host
+func (srv *NasService) Mount(name, hostName, path string) (*api.Nas, error) {
 	// Sanitize path
 	mountPath, err := sanitize(path)
 	if err != nil {
@@ -191,17 +191,17 @@ func (srv *NasService) Mount(name, vmName, path string) (*api.Nas, error) {
 		return nil, err
 	}
 
-	vm, err := srv.vmService.Get(vmName)
+	host, err := srv.hostService.Get(hostName)
 	if err != nil {
-		return nil, providers.ResourceNotFoundError("VM", vmName)
+		return nil, providers.ResourceNotFoundError("Host", hostName)
 	}
 
-	nfsServer, err := srv.vmService.Get(nas.Host)
+	nfsServer, err := srv.hostService.Get(nas.Host)
 	if err != nil {
-		return nil, providers.ResourceNotFoundError("VM", nas.Host)
+		return nil, providers.ResourceNotFoundError("Host", nas.Host)
 	}
 
-	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func (srv *NasService) Mount(name, vmName, path string) (*api.Nas, error) {
 	client := &api.Nas{
 		ID:       nasid.String(),
 		Name:     name,
-		Host:     vm.Name,
+		Host:     host.Name,
 		Path:     mountPath,
 		IsServer: false,
 	}
@@ -233,29 +233,29 @@ func (srv *NasService) Mount(name, vmName, path string) (*api.Nas, error) {
 	return client, err
 }
 
-//UMount a directory exported by a nas on a local directory of a vm
-func (srv *NasService) UMount(name, vmName string) (*api.Nas, error) {
+//UMount a directory exported by a nas on a local directory of an host
+func (srv *NasService) UMount(name, hostName string) (*api.Nas, error) {
 	nas, err := srv.findNas(name)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := srv.findClient(name, vmName)
+	client, err := srv.findClient(name, hostName)
 	if err != nil {
 		return nil, err
 	}
 
-	vm, err := srv.vmService.Get(vmName)
+	host, err := srv.hostService.Get(hostName)
 	if err != nil {
-		return nil, providers.ResourceNotFoundError("VM", vmName)
+		return nil, providers.ResourceNotFoundError("Host", hostName)
 	}
 
-	nfsServer, err := srv.vmService.Get(nas.Host)
+	nfsServer, err := srv.hostService.Get(nas.Host)
 	if err != nil {
-		return nil, providers.ResourceNotFoundError("VM", nas.Host)
+		return nil, providers.ResourceNotFoundError("Host", nas.Host)
 	}
 
-	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return nil, err
 	}

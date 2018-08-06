@@ -65,8 +65,8 @@ type KeyPair struct {
 	PublicKey  string `json:"public_key,omitempty"`
 }
 
-// VMSize represent Sizing elements of a VM
-type VMSize struct {
+// HostSize represent Sizing elements of an host
+type HostSize struct {
 	Cores     int     `json:"cores,omitempty"`
 	RAMSize   float32 `json:"ram_size,omitempty"`
 	DiskSize  int     `json:"disk_size,omitempty"`
@@ -74,14 +74,14 @@ type VMSize struct {
 	GPUType   string  `json:"gpu_type,omitempty"`
 }
 
-// VMTemplate represents a VM template
-type VMTemplate struct {
-	VMSize `json:"vm_size,omitempty"`
-	ID     string `json:"id,omitempty"`
-	Name   string `json:"name,omitempty"`
+// HostTemplate represents an host template
+type HostTemplate struct {
+	HostSize `json:"host_size,omitempty"`
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"name,omitempty"`
 }
 
-// SizingRequirements represents VM sizing requirements to fulfil
+// SizingRequirements represents host sizing requirements to fulfil
 type SizingRequirements struct {
 	MinCores    int     `json:"min_cores,omitempty"`
 	MinRAMSize  float32 `json:"min_ram_size,omitempty"`
@@ -91,15 +91,15 @@ type SizingRequirements struct {
 // HostAdditionalInfoType ...
 type HostAdditionalInfoType map[HostAdditionalInfo.Enum]interface{}
 
-// VM represents a virtual machine properties
-type VM struct {
+// Host represents a virtual machine properties
+type Host struct {
 	ID           string         `json:"id,omitempty"`
 	Name         string         `json:"name,omitempty"`
 	PrivateIPsV4 []string       `json:"private_ips_v4,omitempty"`
 	PrivateIPsV6 []string       `json:"private_ips_v6,omitempty"`
 	AccessIPv4   string         `json:"access_ip_v4,omitempty"`
 	AccessIPv6   string         `json:"access_ip_v6,omitempty"`
-	Size         VMSize         `json:"size,omitempty"`
+	Size         HostSize       `json:"size,omitempty"`
 	State        HostState.Enum `json:"state,omitempty"`
 	PrivateKey   string         `json:"private_key,omitempty"`
 	GatewayID    string         `json:"gateway_id,omitempty"`
@@ -108,52 +108,52 @@ type VM struct {
 	AdditionalInfo HostAdditionalInfoType `json:"additional_info,omitempty"`
 }
 
-// GetAccessIP computes access IP of the VM
-func (vm *VM) GetAccessIP() string {
-	ip := vm.AccessIPv4
+// GetAccessIP computes access IP of the host
+func (host *Host) GetAccessIP() string {
+	ip := host.AccessIPv4
 	if ip == "" {
-		ip = vm.AccessIPv6
+		ip = host.AccessIPv6
 	}
 	if ip == "" {
-		if len(vm.PrivateIPsV4) > 0 {
-			ip = vm.PrivateIPsV4[0]
+		if len(host.PrivateIPsV4) > 0 {
+			ip = host.PrivateIPsV4[0]
 		} else {
-			ip = vm.PrivateIPsV6[0]
+			ip = host.PrivateIPsV6[0]
 		}
 	}
 	return ip
 }
 
-//GetPublicIP computes public IP of the VM
-func (vm *VM) GetPublicIP() string {
-	ip := vm.AccessIPv4
+// GetPublicIP computes public IP of the host
+func (host *Host) GetPublicIP() string {
+	ip := host.AccessIPv4
 	if ip == "" {
-		ip = vm.AccessIPv6
+		ip = host.AccessIPv6
 	}
 	return ip
 }
 
-//GetPrivateIP computes private IP of the VM
-func (vm *VM) GetPrivateIP() string {
+// GetPrivateIP computes private IP of the host
+func (host *Host) GetPrivateIP() string {
 	ip := ""
-	if len(vm.PrivateIPsV4) > 0 {
-		ip = vm.PrivateIPsV4[0]
+	if len(host.PrivateIPsV4) > 0 {
+		ip = host.PrivateIPsV4[0]
 	} else {
-		if len(vm.PrivateIPsV6) > 0 {
-			ip = vm.PrivateIPsV6[0]
+		if len(host.PrivateIPsV6) > 0 {
+			ip = host.PrivateIPsV6[0]
 		}
 	}
 	return ip
 }
 
-//VMRequest represents requirements to create virtual machine properties
-type VMRequest struct {
+// HostRequest represents requirements to create virtual machine properties
+type HostRequest struct {
 	Name string `json:"name,omitempty"`
-	//NetworksIDs list of the network IDs the VM must be connected
+	//NetworksIDs list of the network IDs the host must be connected
 	NetworkIDs []string `json:"network_i_ds,omitempty"`
-	//PublicIP a flg telling if the VM must have a public IP is
+	//PublicIP a flg telling if the host must have a public IP is
 	PublicIP bool `json:"public_ip,omitempty"`
-	//TemplateID the UUID of the template used to size the VM (see SelectTemplates)
+	//TemplateID the UUID of the template used to size the host (see SelectTemplates)
 	TemplateID string `json:"template_id,omitempty"`
 	//ImageID  is the UUID of the image that contains the server's OS and initial state.
 	ImageID string   `json:"image_id,omitempty"`
@@ -163,7 +163,7 @@ type VMRequest struct {
 // GWRequest to create a Gateway into a network
 type GWRequest struct {
 	NetworkID string `json:"network_id,omitempty"`
-	//TemplateID the UUID of the template used to size the VM (see SelectTemplates)
+	//TemplateID the UUID of the template used to size the host (see SelectTemplates)
 	TemplateID string `json:"template_id,omitempty"`
 	//ImageID is the UUID of the image that contains the server's OS and initial state.
 	ImageID string   `json:"image_id,omitempty"`
@@ -193,7 +193,7 @@ type VolumeAttachment struct {
 	ID         string `json:"id,omitempty"`
 	Name       string `json:"name,omitempty"`
 	VolumeID   string `json:"volume,omitempty"`
-	ServerID   string `json:"vm,omitempty"`
+	ServerID   string `json:"host,omitempty"`
 	Device     string `json:"device,omitempty"`
 	MountPoint string `json:"mountpoint,omitempty"`
 	Format     string `json:"format,omitempty"`
@@ -203,14 +203,14 @@ type VolumeAttachment struct {
 type VolumeAttachmentRequest struct {
 	Name     string `json:"name,omitempty"`
 	VolumeID string `json:"volume,omitempty"`
-	ServerID string `json:"vm,omitempty"`
+	ServerID string `json:"host,omitempty"`
 }
 
 // Nas represents a nas definition
 type Nas struct {
 	ID       string `json:"id,omitempty"`
 	Name     string `json:"name,omitempty"`
-	Host     string `json:"vm,omitempty"`
+	Host     string `json:"host,omitempty"`
 	Path     string `json:"path,omitempty"`
 	IsServer bool   `json:"isServer,omitempty"`
 }
@@ -224,7 +224,7 @@ type Image struct {
 //ContainerInfo represents a container description
 type ContainerInfo struct {
 	Name       string `json:"name,omitempty"`
-	VM         string `json:"vm,omitempty"`
+	Host       string `json:"host,omitempty"`
 	MountPoint string `json:"mountPoint,omitempty"`
 	NbItems    int    `json:"nbitems,omitempty"`
 }
@@ -335,10 +335,10 @@ type ClientAPI interface {
 	GetImage(id string) (*Image, error)
 
 	// GetTemplate returns the Template referenced by id
-	GetTemplate(id string) (*VMTemplate, error)
-	// ListTemplates lists available VM templates
-	// VM templates are sorted using Dominant Resource Fairness Algorithm
-	ListTemplates() ([]VMTemplate, error)
+	GetTemplate(id string) (*HostTemplate, error)
+	// ListTemplates lists available host templates
+	// Host templates are sorted using Dominant Resource Fairness Algorithm
+	ListTemplates() ([]HostTemplate, error)
 
 	// CreateKeyPair creates and import a key pair
 	CreateKeyPair(name string) (*KeyPair, error)
@@ -362,19 +362,19 @@ type ClientAPI interface {
 	// DeleteGateway delete the public gateway of a private network
 	DeleteGateway(networkID string) error
 
-	// CreateVM creates a VM that fulfils the request
-	CreateVM(request VMRequest) (*VM, error)
-	// GetVM returns the VM identified by id
-	GetVM(id string) (*VM, error)
-	// ListVMs lists available VMs
-	ListVMs(all bool) ([]VM, error)
-	// DeleteVM deletes the VM identified by id
-	DeleteVM(id string) error
-	// StopVM stops the VM identified by id
-	StopVM(id string) error
-	// StartVM starts the VM identified by id
-	StartVM(id string) error
-	// GetSSHConfig creates SSHConfig from VM
+	// CreateHost creates an host that fulfils the request
+	CreateHost(request HostRequest) (*Host, error)
+	// GetHost returns the host identified by id
+	GetHost(id string) (*Host, error)
+	// ListHosts lists available hosts
+	ListHosts(all bool) ([]Host, error)
+	// DeleteHost deletes the host identified by id
+	DeleteHost(id string) error
+	// StopHost stops the host identified by id
+	StopHost(id string) error
+	// StartHost starts the host identified by id
+	StartHost(id string) error
+	// GetSSHConfig creates SSHConfig from host
 	GetSSHConfig(id string) (*system.SSHConfig, error)
 
 	// CreateVolume creates a block volume
@@ -389,10 +389,10 @@ type ClientAPI interface {
 	// DeleteVolume deletes the volume identified by id
 	DeleteVolume(id string) error
 
-	// CreateVolumeAttachment attaches a volume to a VM
-	//- name the name of the volume attachment
-	//- volume the volume to attach
-	//- vm the VM on which the volume is attached
+	// CreateVolumeAttachment attaches a volume to an host
+	//- name of the volume attachment
+	//- volume to attach
+	//- host on which the volume is attached
 	CreateVolumeAttachment(request VolumeAttachmentRequest) (*VolumeAttachment, error)
 	// GetVolumeAttachment returns the volume attachment identified by id
 	GetVolumeAttachment(serverID, id string) (*VolumeAttachment, error)

@@ -31,7 +31,7 @@ import (
 const (
 	address           = "localhost:50051"
 	timeoutCtxDefault = 10 * time.Second
-	timeoutCtxVM      = 2 * time.Minute
+	timeoutCtxHost    = 2 * time.Minute
 
 	globalOptions string = `
 Global options:

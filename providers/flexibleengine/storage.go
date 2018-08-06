@@ -29,10 +29,10 @@ import (
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 )
 
-// CreateVolumeAttachment attaches a volume to a VM
-//- name the name of the volume attachment
-//- volume the volume to attach
-//- vm the VM on which the volume is attached
+// CreateVolumeAttachment attaches a volume to an host
+//- 'name' of the volume attachment
+//- 'volume' to attach
+//- 'host' on which the volume is attached
 func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
 	return client.osclt.CreateVolumeAttachment(request)
 }
@@ -57,7 +57,7 @@ func (client *Client) DeleteVolume(id string) error {
 	return client.osclt.DeleteVolume(id)
 }
 
-// toVM converts a Volume status returned by the OpenStack driver into VolumeState enum
+// toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
 func toVolumeState(status string) VolumeState.Enum {
 	switch status {
 	case "creating":

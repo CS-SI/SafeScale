@@ -79,7 +79,7 @@ var networkDelete = cli.Command{
 		// Network
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
 		networkService := pb.NewNetworkServiceClient(conn)
 		_, err := networkService.Delete(ctx, &pb.Reference{Name: c.Args().First(), TenantID: "TestOvh"})
@@ -165,7 +165,7 @@ var networkCreate = cli.Command{
 		// Network
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
 		networkService := pb.NewNetworkServiceClient(conn)
 		netdef := &pb.NetworkDefinition{

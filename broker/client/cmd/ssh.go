@@ -41,8 +41,8 @@ var SSHCmd = cli.Command{
 
 var sshRun = cli.Command{
 	Name:      "run",
-	Usage:     "Run a command on the VM",
-	ArgsUsage: "<VM_name|VM_ID>",
+	Usage:     "Run a command on the host",
+	ArgsUsage: "<Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "c",
@@ -55,9 +55,9 @@ var sshRun = cli.Command{
 		}},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <VM_name>")
+			fmt.Println("Missing mandatory argument <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("VM name required")
+			return fmt.Errorf("host name required")
 		}
 
 		conn := brokeruse.GetConnection()
@@ -71,7 +71,7 @@ var sshRun = cli.Command{
 		service := pb.NewSshServiceClient(conn)
 
 		resp, err := service.Run(ctx, &pb.SshCommand{
-			VM:      &pb.Reference{Name: c.Args().Get(0)},
+			Host:    &pb.Reference{Name: c.Args().Get(0)},
 			Command: c.String("c"),
 		})
 
@@ -89,8 +89,8 @@ var sshRun = cli.Command{
 
 var sshCopy = cli.Command{
 	Name:      "copy",
-	Usage:     "Copy a local file/directory to a VM or copy from VM to local",
-	ArgsUsage: "from to  Ex: /my/local/file.txt vm1:/remote/path/",
+	Usage:     "Copy a local file/directory to an host or copy from host to local",
+	ArgsUsage: "from to  Ex: /my/local/file.txt host1:/remote/path/",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "timeout",
@@ -106,7 +106,7 @@ var sshCopy = cli.Command{
 
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		timeout := utils.TimeoutCtxVM
+		timeout := utils.TimeoutCtxHost
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
@@ -130,19 +130,19 @@ var sshCopy = cli.Command{
 
 var sshConnect = cli.Command{
 	Name:      "connect",
-	Usage:     "Connect to the VM with interactive shell",
-	ArgsUsage: "<VM_name|VM_ID>",
+	Usage:     "Connect to the host with interactive shell",
+	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <VM_name>")
+			fmt.Println("Missing mandatory argument <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("VM name required")
+			return fmt.Errorf("host name required")
 		}
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
-		service := pb.NewVMServiceClient(conn)
+		service := pb.NewHostServiceClient(conn)
 
 		sshConfig, err := service.SSH(ctx, &pb.Reference{
 			Name: c.Args().Get(0),

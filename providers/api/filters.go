@@ -17,10 +17,10 @@
 package api
 
 //TemplateFilter is a filter for template. It returns true if the template is filtered (not accepted)
-type TemplateFilter func(t VMTemplate) bool
+type TemplateFilter func(t HostTemplate) bool
 
 //AnyFilter returns true if the given template is filtered by any filter
-func AnyFilter(t VMTemplate, filters []TemplateFilter) bool {
+func AnyFilter(t HostTemplate, filters []TemplateFilter) bool {
 	for _, f := range filters {
 		if f(t) {
 			return true

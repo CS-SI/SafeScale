@@ -28,10 +28,10 @@ import (
 	convert "github.com/CS-SI/SafeScale/broker/utils"
 )
 
-// broker nas create nas1 vm1 --path="/shared/data"
+// broker nas create nas1 host1 --path="/shared/data"
 // broker nas delete nas1
-// broker nas mount nas1 vm2 --path="/data"
-// broker nas umount nas1 vm2
+// broker nas mount nas1 host2 --path="/data"
+// broker nas umount nas1 host2
 // broker nas list
 // broker nas inspect nas1
 
@@ -46,7 +46,7 @@ func (s *NasServiceServer) Create(ctx context.Context, in *pb.NasDefinition) (*p
 	}
 
 	nasService := services.NewNasService(currentTenant.Client)
-	nas, err := nasService.Create(in.GetNas().GetName(), in.GetVM().GetName(), in.GetPath())
+	nas, err := nasService.Create(in.GetNas().GetName(), in.GetHost().GetName(), in.GetPath())
 
 	if err != nil {
 		log.Println(err)
@@ -100,7 +100,7 @@ func (s *NasServiceServer) List(ctx context.Context, in *google_protobuf.Empty) 
 	return rv, nil
 }
 
-//Mount mount exported directory from nas on a local directory of the given vm
+//Mount mount exported directory from nas on a local directory of the given host
 func (s *NasServiceServer) Mount(ctx context.Context, in *pb.NasDefinition) (*pb.NasDefinition, error) {
 	log.Printf("Mount NAS called")
 	if GetCurrentTenant() == nil {
@@ -108,7 +108,7 @@ func (s *NasServiceServer) Mount(ctx context.Context, in *pb.NasDefinition) (*pb
 	}
 
 	nasService := services.NewNasService(currentTenant.Client)
-	nas, err := nasService.Mount(in.GetNas().GetName(), in.GetVM().GetName(), in.GetPath())
+	nas, err := nasService.Mount(in.GetNas().GetName(), in.GetHost().GetName(), in.GetPath())
 
 	if err != nil {
 		log.Println(err)
@@ -118,7 +118,7 @@ func (s *NasServiceServer) Mount(ctx context.Context, in *pb.NasDefinition) (*pb
 	return convert.ToPBNas(nas), err
 }
 
-//UMount umount exported directory from nas on a local directory of the given vm
+//UMount umount exported directory from nas on a local directory of the given host
 func (s *NasServiceServer) UMount(ctx context.Context, in *pb.NasDefinition) (*pb.NasDefinition, error) {
 	log.Printf("UMount NAS called")
 	if GetCurrentTenant() == nil {
@@ -126,7 +126,7 @@ func (s *NasServiceServer) UMount(ctx context.Context, in *pb.NasDefinition) (*p
 	}
 
 	nasService := services.NewNasService(currentTenant.Client)
-	nas, err := nasService.UMount(in.GetNas().GetName(), in.GetVM().GetName())
+	nas, err := nasService.UMount(in.GetNas().GetName(), in.GetHost().GetName())
 
 	if err != nil {
 		log.Println(err)

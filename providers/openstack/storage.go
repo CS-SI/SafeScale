@@ -36,7 +36,7 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
-// toVM converts a Volume status returned by the OpenStack driver into VolumeState enum
+// toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
 func toVolumeState(status string) VolumeState.Enum {
 	switch status {
 	case "creating":
@@ -191,10 +191,10 @@ func (client *Client) DeleteVolume(id string) error {
 	return nil
 }
 
-// CreateVolumeAttachment attaches a volume to a VM
-// - name the name of the volume attachment
-// - volume the volume to attach
-// - vm the VM on which the volume is attached
+// CreateVolumeAttachment attaches a volume to an host
+// - 'name' of the volume attachment
+// - 'volume' to attach
+// - 'host' on which the volume is attached
 func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
 	va, err := volumeattach.Create(client.Compute, request.ServerID, volumeattach.CreateOpts{
 		VolumeID: request.VolumeID,
@@ -341,7 +341,7 @@ func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
 	}
 	return &api.ContainerInfo{
 		Name:       name,
-		VM:         "TODO VM",
+		Host:       "TODO Host",
 		MountPoint: "TODO mountpoint",
 		NbItems:    -1,
 	}, nil

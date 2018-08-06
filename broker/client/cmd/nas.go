@@ -44,8 +44,8 @@ var NasCmd = cli.Command{
 
 var nasCreate = cli.Command{
 	Name:      "create",
-	Usage:     "Create a nfs server on a VM and expose a directory",
-	ArgsUsage: "<Nas_name> <VM_name|VM_ID>",
+	Usage:     "Create a nfs server on an host and expose a directory",
+	ArgsUsage: "<Nas_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
@@ -55,20 +55,20 @@ var nasCreate = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Nas_name> and/or <VM_name>")
+			fmt.Println("Missing mandatory argument <Nas_name> and/or <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Nas and VM name required")
+			return fmt.Errorf("Nas and Host name required")
 		}
 
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
 		_, err := service.Create(ctx, &pb.NasDefinition{
 			Nas:  &pb.NasName{Name: c.Args().Get(0)},
-			VM:   &pb.Reference{Name: c.Args().Get(1)},
+			Host: &pb.Reference{Name: c.Args().Get(1)},
 			Path: c.String("path"),
 		})
 
@@ -83,7 +83,7 @@ var nasCreate = cli.Command{
 
 var nasDelete = cli.Command{
 	Name:      "delete",
-	Usage:     "Delete a nfs server on a VM and expose a directory",
+	Usage:     "Delete a nfs server on an host and expose a directory",
 	ArgsUsage: "<Nas_name>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
@@ -94,7 +94,7 @@ var nasDelete = cli.Command{
 
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
@@ -115,7 +115,7 @@ var nasList = cli.Command{
 	Action: func(c *cli.Context) error {
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
@@ -133,8 +133,8 @@ var nasList = cli.Command{
 
 var nasMount = cli.Command{
 	Name:      "mount",
-	Usage:     "Mount an exported nfs directory on a VM",
-	ArgsUsage: "<Nas_name> <VM_name|VM_ID>",
+	Usage:     "Mount an exported nfs directory on an host",
+	ArgsUsage: "<Nas_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
@@ -144,20 +144,20 @@ var nasMount = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Nas_name> and/or <VM_name>")
+			fmt.Println("Missing mandatory argument <Nas_name> and/or <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Nas and VM name required")
+			return fmt.Errorf("Nas and Host name required")
 		}
 
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
 		_, err := service.Mount(ctx, &pb.NasDefinition{
 			Nas:  &pb.NasName{Name: c.Args().Get(0)},
-			VM:   &pb.Reference{Name: c.Args().Get(1)},
+			Host: &pb.Reference{Name: c.Args().Get(1)},
 			Path: c.String("path"),
 		})
 
@@ -170,24 +170,24 @@ var nasMount = cli.Command{
 }
 var nasUmount = cli.Command{
 	Name:      "umount",
-	Usage:     "UMount an exported nfs directory on a VM",
-	ArgsUsage: "<Nas_name> <VM_name|VM_ID>",
+	Usage:     "UMount an exported nfs directory on an host",
+	ArgsUsage: "<Nas_name> <Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Nas_name> and/or <VM_name>")
+			fmt.Println("Missing mandatory argument <Nas_name> and/or <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Nas and VM name required")
+			return fmt.Errorf("Nas and Host name required")
 		}
 
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 
 		_, err := service.UMount(ctx, &pb.NasDefinition{
-			Nas: &pb.NasName{Name: c.Args().Get(0)},
-			VM:  &pb.Reference{Name: c.Args().Get(1)},
+			Nas:  &pb.NasName{Name: c.Args().Get(0)},
+			Host: &pb.Reference{Name: c.Args().Get(1)},
 		})
 
 		if err != nil {
@@ -210,7 +210,7 @@ var nasInspect = cli.Command{
 
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
 		service := pb.NewNasServiceClient(conn)
 

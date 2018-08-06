@@ -53,7 +53,7 @@ type userData struct {
 var userdataTemplate *template.Template
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
-func Prepare(client api.ClientAPI, request api.VMRequest, isGateway bool, kp *api.KeyPair, gw *api.VM) ([]byte, error) {
+func Prepare(client api.ClientAPI, request api.HostRequest, isGateway bool, kp *api.KeyPair, gw *api.Host) ([]byte, error) {
 	// Generate password for user gpac
 	gpacPassword, err := utils.GeneratePassword(16)
 	if err != nil {

@@ -54,8 +54,8 @@ func Test_ListImages(t *testing.T) {
 	getTester().ListImages(t)
 }
 
-func Test_ListVMTemplates(t *testing.T) {
-	getTester().ListVMTemplates(t)
+func Test_ListHostTemplates(t *testing.T) {
+	getTester().ListHostTemplates(t)
 }
 
 func Test_CreateKeyPair(t *testing.T) {
@@ -74,12 +74,12 @@ func Test_Networks(t *testing.T) {
 	getTester().Networks(t)
 }
 
-func Test_VMs(t *testing.T) {
-	getTester().VMs(t)
+func Test_Hosts(t *testing.T) {
+	getTester().Hosts(t)
 }
 
-func Test_StartStopVM(t *testing.T) {
-	getTester().StartStopVM(t)
+func Test_StartStopHost(t *testing.T) {
+	getTester().StartStopHost(t)
 }
 
 func Test_Volume(t *testing.T) {

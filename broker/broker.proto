@@ -81,12 +81,12 @@ service NetworkService{
     rpc Delete(Reference) returns (google.protobuf.Empty){}
 }
 
-// broker vm create vm1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
-// broker vm list
-// broker vm inspect vm1
-// broker vm create vm2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
+// broker host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
+// broker host list
+// broker host inspect host1
+// broker host create host2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
 
-message VMDefinition{
+message HostDefinition{
     string Name = 2;
     string Network = 3;
     int32 CPUNumber = 4;
@@ -97,19 +97,19 @@ message VMDefinition{
 }
 
 enum HostState {
-    /*STOPPED VM is stopped*/
+    /*STOPPED host is stopped*/
 	STOPPED = 0;
-	/*STARTING VM is starting*/
+	/*STARTING host is starting*/
     STARTING = 1;
-	/*STARTED VM is started*/
+	/*STARTED host is started*/
 	STARTED = 2;
-	/*STOPPING VM is stopping*/
+	/*STOPPING host is stopping*/
 	STOPPING = 3;
-	/*ERROR VM is in error state*/
+	/*ERROR host is in error state*/
 	ERROR = 4;
   }
 
-message VM{
+message Host{
     string ID = 1;
     string Name = 2;
     int32 CPU = 3;
@@ -122,8 +122,8 @@ message VM{
     string GatewayID = 10;
 }
 
-message VMList{
-    repeated VM VMs= 1;
+message HostList{
+    repeated Host Hosts= 1;
 }
 
 message SshConfig{
@@ -135,20 +135,20 @@ message SshConfig{
 
 }
 
-message VMListRequest{
+message HostListRequest{
     bool All = 1;
 }
 
-service VMService{
-    rpc Create(VMDefinition) returns (VM){}
-    rpc Inspect(Reference) returns (VM){}
-    rpc List(VMListRequest) returns (VMList){}
+service HostService{
+    rpc Create(HostDefinition) returns (Host){}
+    rpc Inspect(Reference) returns (Host){}
+    rpc List(HostListRequest) returns (HostList){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
     rpc SSH(Reference) returns (SshConfig){}
 }
 
 // broker volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
-// broker volume attach v1 vm1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
+// broker volume attach v1 host1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
 // broker volume detach v1
 // broker volume delete v1
 // broker volume inspect v1
@@ -199,7 +199,7 @@ message VolumeList{
 
 message VolumeAttachment{
     Reference Volume = 2;
-    Reference VM = 3;
+    Reference Host = 3;
     string MountPath = 4;
     string Format = 5;
     string Device = 6;
@@ -207,7 +207,7 @@ message VolumeAttachment{
 
 message VolumeDetachment{
     Reference Volume = 1;
-    Reference VM = 2;
+    Reference Host = 2;
 }
 
 service VolumeService{
@@ -220,8 +220,8 @@ service VolumeService{
 }
 
 // broker container create c1
-// broker container mount c1 vm1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
-// broker container umount c1 vm1
+// broker container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
+// broker container umount c1 host1
 // broker container delete c1
 // broker container list
 // broker container inspect C1
@@ -236,7 +236,7 @@ message ContainerList{
 
 message ContainerMountingPoint{
     string Container = 1;
-    Reference VM = 2;
+    Reference Host = 2;
     string Path = 3;
 }
 
@@ -250,7 +250,7 @@ service ContainerService{
 }
 
 message SshCommand{
-    Reference VM = 1;
+    Reference Host = 1;
     string Command = 2;
 }
 message SshCopyCommand{
@@ -269,10 +269,10 @@ service SshService{
     rpc Copy(SshCopyCommand) returns (google.protobuf.Empty){}
 }
 
-// broker nas create nas1 vm1 --path="/shared/data"
+// broker nas create nas1 host1 --path="/shared/data"
 //broker nas delete nas1
-//broker nas mount nas1 vm2 --path="/data"
-//broker nas umount nas1 vm2
+//broker nas mount nas1 host2 --path="/data"
+//broker nas umount nas1 host2
 //broker nas list
 //broker nas inspect nas1
 
@@ -283,7 +283,7 @@ message NasName{
 message NasDefinition{
     string ID = 1;
     NasName Nas = 2;
-    Reference VM = 3;
+    Reference Host = 3;
     string path = 4;
     bool isServer = 5;
 }

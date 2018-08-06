@@ -32,7 +32,7 @@ import (
 const (
 	address           = "localhost:50051"
 	timeoutCtxDefault = 10 * time.Second
-	timeoutCtxVM      = 2 * time.Minute
+	timeoutCtxHost    = 2 * time.Minute
 )
 
 func getConnection() *grpc.ClientConn {
@@ -69,8 +69,8 @@ func main() {
 	app.Commands = append(app.Commands, cmd.TenantCmd)
 	sort.Sort(cli.CommandsByName(cmd.TenantCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.VMCmd)
-	sort.Sort(cli.CommandsByName(cmd.VMCmd.Subcommands))
+	app.Commands = append(app.Commands, cmd.HostCmd)
+	sort.Sort(cli.CommandsByName(cmd.HostCmd.Subcommands))
 
 	app.Commands = append(app.Commands, cmd.VolumeCmd)
 	sort.Sort(cli.CommandsByName(cmd.VolumeCmd.Subcommands))

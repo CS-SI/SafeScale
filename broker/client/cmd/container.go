@@ -142,8 +142,8 @@ var containerInspect = cli.Command{
 
 var containerMount = cli.Command{
 	Name:      "mount",
-	Usage:     "Mount a container on the filesytem of a VM",
-	ArgsUsage: "<Container_name> <VM_name>",
+	Usage:     "Mount a container on the filesytem of an host",
+	ArgsUsage: "<Container_name> <Host_name>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
@@ -153,19 +153,19 @@ var containerMount = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Container_name> and/or <VM_name>")
+			fmt.Println("Missing mandatory argument <Container_name> and/or <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Container and VM name required")
+			return fmt.Errorf("Container and Host name required")
 		}
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxVM)
+		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
 		defer cancel()
 		service := pb.NewContainerServiceClient(conn)
 
 		_, err := service.Mount(ctx, &pb.ContainerMountingPoint{
 			Container: c.Args().Get(0),
-			VM: &pb.Reference{
+			Host: &pb.Reference{
 				Name: c.Args().Get(1),
 			},
 			Path: c.String("path"),
@@ -173,20 +173,20 @@ var containerMount = cli.Command{
 		if err != nil {
 			return fmt.Errorf("Could not mount container '%s': %v\n", c.Args().Get(0), err)
 		}
-		fmt.Printf("Container '%s' mounted on '%s' on VM '%s'\n", c.Args().Get(0), c.String("path"), c.Args().Get(1))
+		fmt.Printf("Container '%s' mounted on '%s' on host '%s'\n", c.Args().Get(0), c.String("path"), c.Args().Get(1))
 		return nil
 	},
 }
 
 var containerUmount = cli.Command{
 	Name:      "umount",
-	Usage:     "UMount a container from the filesytem of a VM",
-	ArgsUsage: "<Container_name> <VM_name>",
+	Usage:     "UMount a container from the filesytem of an host",
+	ArgsUsage: "<Container_name> <Host_name>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Container_name> and/or <VM_name>")
+			fmt.Println("Missing mandatory argument <Container_name> and/or <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Container and VM name required")
+			return fmt.Errorf("Container and Host name required")
 		}
 		conn := brokeruse.GetConnection()
 		defer conn.Close()
@@ -196,14 +196,14 @@ var containerUmount = cli.Command{
 
 		_, err := service.UMount(ctx, &pb.ContainerMountingPoint{
 			Container: c.Args().Get(0),
-			VM: &pb.Reference{
+			Host: &pb.Reference{
 				Name: c.Args().Get(1),
 			},
 		})
 		if err != nil {
 			return fmt.Errorf("Could not umount container '%s': %v\n", c.Args().Get(0), err)
 		}
-		fmt.Printf("Container '%s' umounted from VM '%s'\n", c.Args().Get(0), c.Args().Get(1))
+		fmt.Printf("Container '%s' umounted from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 		return nil
 	},
 }

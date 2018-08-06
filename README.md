@@ -26,10 +26,10 @@ SafeScale Broker offers an API to completely abstract the IaaS services offered 
 It allows to:
 
 * Create / Destroy private networks, Create routers, Manage firewall
-* Create/Destroy Virtual Machine (VM),
+* Create/Destroy Virtual Machine (host),
 * Create / Destroy block and object storage,
 * Mount object storage on file system,
-* Create NAS, Connect/disconnect VM to NAS,
+* Create NAS, Connect/disconnect host to NAS,
 
 ![SafeScale Broker](img/SafeScale_Broker.png "SafeScale Broker")
 
@@ -59,10 +59,10 @@ The design of a SafeScale Security gateway can be depicted as bellow:
 SafeScale is currently under active development and does not yet offer all the features planned. However, we are already publishing it with the following features:
 * SafeScale Broker:
   * Create / Destroy private networks
-  * Create/Destroy Virtual Machine (VM),
+  * Create/Destroy Virtual Machine (host),
   * Create / Destroy block and object storage,
   * Mount object storage on file system,
-  * Create NAS, Connect/disconnect VM to NAS,
+  * Create NAS, Connect/disconnect host to NAS,
 
 * Providers addressed:
   * Generic OpenStack

@@ -30,7 +30,7 @@ import (
 )
 
 // broker volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
-// broker volume attach v1 vm1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
+// broker volume attach v1 host1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
 // broker volume detach v1
 // broker volume delete v1
 // broker volume inspect v1
@@ -83,7 +83,7 @@ func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 	return conv.ToPbVolume(vol), nil
 }
 
-//Attach a volume to a VM and create a mount point
+//Attach a volume to an host and create a mount point
 func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*google_protobuf.Empty, error) {
 	log.Println("Attach volume called")
 
@@ -93,7 +93,7 @@ func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachmen
 	}
 
 	service := services.NewVolumeService(currentTenant.Client)
-	err := service.Attach(in.GetVolume().GetName(), in.GetVM().GetName(), in.GetMountPath(), in.GetFormat())
+	err := service.Attach(in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat())
 
 	if err != nil {
 		log.Println(err)
@@ -103,7 +103,7 @@ func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachmen
 	return &google_protobuf.Empty{}, nil
 }
 
-//Detach a volume from a VM. It umount associated mountpoint
+//Detach a volume from an host. It umount associated mountpoint
 func (s *VolumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachment) (*google_protobuf.Empty, error) {
 	log.Println("Detach volume called")
 
@@ -113,14 +113,14 @@ func (s *VolumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachmen
 	}
 
 	service := services.NewVolumeService(currentTenant.Client)
-	err := service.Detach(in.GetVolume().GetName(), in.GetVM().GetName())
+	err := service.Detach(in.GetVolume().GetName(), in.GetHost().GetName())
 
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
 
-	log.Println(fmt.Sprintf("Volume '%s' detached from '%s'", in.GetVolume().GetName(), in.GetVM().GetName()))
+	log.Println(fmt.Sprintf("Volume '%s' detached from '%s'", in.GetVolume().GetName(), in.GetHost().GetName()))
 	return &google_protobuf.Empty{}, nil
 }
 

@@ -21,10 +21,10 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 )
 
-// broker vm create vm1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
-// broker vm list
-// broker vm inspect vm1
-// broker vm create vm2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
+// broker host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
+// broker host list
+// broker host inspect host1
+// broker host create host2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
 
 //ImageAPI defines API to manipulate images
 type ImageAPI interface {
@@ -40,7 +40,7 @@ func NewImageService(api api.ClientAPI) ImageAPI {
 	}
 }
 
-//ImageService vm service
+//ImageService host service
 type ImageService struct {
 	provider *providers.Service
 }

@@ -19,7 +19,7 @@ package VolumeState
 
 //go:generate stringer -type=Enum
 
-//Enum represents the state of a VM
+//Enum represents the state of an host
 type Enum int
 
 const (

@@ -26,34 +26,34 @@ import (
 	"github.com/CS-SI/SafeScale/system"
 )
 
-//VMAPI defines API to manipulate VMs
-type VMAPI interface {
-	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.VM, error)
-	List(all bool) ([]api.VM, error)
-	Get(ref string) (*api.VM, error)
+//HostAPI defines API to manipulate hosts
+type HostAPI interface {
+	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.Host, error)
+	List(all bool) ([]api.Host, error)
+	Get(ref string) (*api.Host, error)
 	Delete(ref string) error
 	SSH(ref string) (*system.SSHConfig, error)
 }
 
-//NewVMService creates a VM service
-func NewVMService(api api.ClientAPI) VMAPI {
-	return &VMService{
+// NewHostService creates an host service
+func NewHostService(api api.ClientAPI) HostAPI {
+	return &HostService{
 		provider: providers.FromClient(api),
 		network:  NewNetworkService(api),
 	}
 }
 
-//VMService vm service
-type VMService struct {
+// HostService host service
+type HostService struct {
 	provider *providers.Service
 	network  NetworkAPI
 }
 
 //Create creates a network
-func (srv *VMService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.VM, error) {
-	_vm, err := srv.Get(name)
-	if _vm != nil || (err != nil && !strings.Contains(err.Error(), "does not exist")) {
-		return nil, fmt.Errorf("VM '%s' already exists", name)
+func (srv *HostService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.Host, error) {
+	_host, err := srv.Get(name)
+	if _host != nil || (err != nil && !strings.Contains(err.Error(), "does not exist")) {
+		return nil, fmt.Errorf("host '%s' already exists", name)
 	}
 
 	n, err := srv.network.Get(net)
@@ -69,7 +69,7 @@ func (srv *VMService) Create(name string, net string, cpu int, ram float32, disk
 	if err != nil {
 		return nil, err
 	}
-	vmRequest := api.VMRequest{
+	hostRequest := api.HostRequest{
 		ImageID:    img.ID,
 		Name:       name,
 		TemplateID: tpls[0].ID,
@@ -77,21 +77,21 @@ func (srv *VMService) Create(name string, net string, cpu int, ram float32, disk
 		PublicIP:   public,
 		NetworkIDs: []string{n.ID},
 	}
-	vm, err := srv.provider.CreateVM(vmRequest)
+	host, err := srv.provider.CreateHost(hostRequest)
 	if err != nil {
 		return nil, err
 	}
-	return vm, nil
+	return host, nil
 
 }
 
-//List returns the network list
-func (srv *VMService) List(all bool) ([]api.VM, error) {
-	return srv.provider.ListVMs(all)
+// List returns the network list
+func (srv *HostService) List(all bool) ([]api.Host, error) {
+	return srv.provider.ListHosts(all)
 }
 
-//Get returns the VM identified by ref, ref can be the name or the id
-func (srv *VMService) Get(ref string) (*api.VM, error) {
+// Get returns the host identified by ref, ref can be the name or the id
+func (srv *HostService) Get(ref string) (*api.Host, error) {
 	m, err := metadata.NewHost(srv.provider)
 	if err != nil {
 		return nil, err
@@ -103,24 +103,24 @@ func (srv *VMService) Get(ref string) (*api.VM, error) {
 	if found {
 		return m.Get(), nil
 	}
-	return nil, fmt.Errorf("VM %s does not exist", ref)
+	return nil, fmt.Errorf("host %s does not exist", ref)
 }
 
-//Delete deletes VM referenced by ref
-func (srv *VMService) Delete(ref string) error {
-	vm, err := srv.Get(ref)
+// Delete deletes host referenced by ref
+func (srv *HostService) Delete(ref string) error {
+	host, err := srv.Get(ref)
 	if err != nil {
-		return fmt.Errorf("VM '%s' does not exist", ref)
+		return fmt.Errorf("host '%s' does not exist", ref)
 	}
-	return srv.provider.DeleteVM(vm.ID)
+	return srv.provider.DeleteHost(host.ID)
 }
 
-// SSH returns ssh parameters to access the vm referenced by ref
-func (srv *VMService) SSH(ref string) (*system.SSHConfig, error) {
-	vm, err := srv.Get(ref)
+// SSH returns ssh parameters to access the host referenced by ref
+func (srv *HostService) SSH(ref string) (*system.SSHConfig, error) {
+	host, err := srv.Get(ref)
 	if err != nil {
-		return nil, fmt.Errorf("VM '%s' does not exist", ref)
+		return nil, fmt.Errorf("host '%s' does not exist", ref)
 	}
 
-	return srv.provider.GetSSHConfig(vm.ID)
+	return srv.provider.GetSSHConfig(host.ID)
 }

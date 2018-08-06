@@ -41,17 +41,17 @@ func NewContainerService(api api.ClientAPI) ContainerAPI {
 	}
 }
 
-//ContainerService container service
+// ContainerService container service
 type ContainerService struct {
 	provider *providers.Service
 }
 
-//List retrieves all available containers
+// List retrieves all available containers
 func (srv *ContainerService) List() ([]string, error) {
 	return srv.provider.ListContainers()
 }
 
-//Create a container
+// Create a container
 func (srv *ContainerService) Create(name string) error {
 	container, _ := srv.provider.GetContainer(name)
 	if container != nil {
@@ -60,29 +60,29 @@ func (srv *ContainerService) Create(name string) error {
 	return srv.provider.CreateContainer(name)
 }
 
-//Delete a container
+// Delete a container
 func (srv *ContainerService) Delete(name string) error {
 	return srv.provider.DeleteContainer(name)
 }
 
-//Inspect a container
+// Inspect a container
 func (srv *ContainerService) Inspect(name string) (*api.ContainerInfo, error) {
 	return srv.provider.GetContainer(name)
 }
 
-//Mount a container on a VM on the given mount point
-func (srv *ContainerService) Mount(containerName, vmName, path string) error {
+// Mount a container on an host on the given mount point
+func (srv *ContainerService) Mount(containerName, hostName, path string) error {
 	// Check container existence
 	_, err := srv.Inspect(containerName)
 	if err != nil {
 		return err
 	}
 
-	// Get VM ID
-	vmService := NewVMService(srv.provider)
-	vm, err := vmService.Get(vmName)
+	// Get Host ID
+	hostService := NewHostService(srv.provider)
+	host, err := hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("No VM found with name or id '%s'", vmName)
+		return fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
 	// Create mount point
@@ -128,22 +128,22 @@ func (srv *ContainerService) Mount(containerName, vmName, path string) error {
 		S3Protocol: objStorageProtocol,
 	}
 
-	return exec("mount_object_storage.sh", data, vm.ID, srv.provider)
+	return exec("mount_object_storage.sh", data, host.ID, srv.provider)
 }
 
 //UMount a container
-func (srv *ContainerService) UMount(containerName, vmName string) error {
+func (srv *ContainerService) UMount(containerName, hostName string) error {
 	// Check container existence
 	_, err := srv.Inspect(containerName)
 	if err != nil {
 		return err
 	}
 
-	// Get VM ID
-	vmService := NewVMService(srv.provider)
-	vm, err := vmService.Get(vmName)
+	// Get Host ID
+	hostService := NewHostService(srv.provider)
+	host, err := hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("No VM found with name or id '%s'", vmName)
+		return fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
 	data := struct {
@@ -152,5 +152,5 @@ func (srv *ContainerService) UMount(containerName, vmName string) error {
 		Container: containerName,
 	}
 
-	return exec("umount_object_storage.sh", data, vm.ID, srv.provider)
+	return exec("umount_object_storage.sh", data, host.ID, srv.provider)
 }
