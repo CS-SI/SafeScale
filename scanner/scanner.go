@@ -158,9 +158,9 @@ type getCPUInfoResult struct {
 	CPUInfo *CPUInfo
 }
 
-func getCPUInfo(tenant string, service *providers.Service, tpl api.VMTemplate, img *api.Image, key *api.KeyPair, networkID string) (*CPUInfo, error) {
-	//fmt.Printf("[%s] VM %s: creating\n", tenant, tpl.Name)
-	vm, err := service.CreateVM(api.VMRequest{
+func getCPUInfo(tenant string, service *providers.Service, tpl api.HostTemplate, img *api.Image, key *api.KeyPair, networkID string) (*CPUInfo, error) {
+	//fmt.Printf("[%s] host %s: creating\n", tenant, tpl.Name)
+	host, err := service.CreateHost(api.HostRequest{
 		Name:       "scanhost",
 		PublicIP:   true,
 		ImageID:    img.ID,
@@ -169,15 +169,15 @@ func getCPUInfo(tenant string, service *providers.Service, tpl api.VMTemplate, i
 		NetworkIDs: []string{networkID},
 	})
 	if err != nil {
-		//fmt.Printf("[%s] VM %s: error creation: %s\n", tenant, tpl.Name, err.Error())
+		//fmt.Printf("[%s] host %s: error creation: %s\n", tenant, tpl.Name, err.Error())
 		return nil, err
 	}
-	defer service.DeleteVM(vm.ID)
+	defer service.DeleteHost(host.ID)
 
-	ssh, err := service.GetSSHConfig(vm.ID)
+	ssh, err := service.GetSSHConfig(host.ID)
 	//fmt.Println("Reading SSH Config")
 	if err != nil {
-		fmt.Printf("[%s] VM %s: error reading SSHConfig: %s\n", tenant, tpl.Name, err.Error())
+		fmt.Printf("[%s] host %s: error reading SSHConfig: %s\n", tenant, tpl.Name, err.Error())
 		return nil, err
 	}
 	ssh.WaitServerReady(60 * time.Second)
@@ -187,7 +187,7 @@ func getCPUInfo(tenant string, service *providers.Service, tpl api.VMTemplate, i
 	//fmt.Println(">>> CMD", cmd)
 	_, err = ssh.Command(cmd)
 	if err != nil {
-		fmt.Printf("[%s] VM %s: error scanning: %s\n", tenant, tpl.Name, err.Error())
+		fmt.Printf("[%s] host %s: error scanning: %s\n", tenant, tpl.Name, err.Error())
 		return nil, err
 	}
 	out, err := c.CombinedOutput()
