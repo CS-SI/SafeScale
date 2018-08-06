@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/cluster"
+	"github.com/CS-SI/SafeScale/deploy/cluster"
 	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
 )
 

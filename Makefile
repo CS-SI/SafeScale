@@ -6,7 +6,7 @@ EXECS=broker/client/broker broker/daemon/brokerd deploy/deploy perform/perform
 
 .PHONY: clean providers brokerd broker system deploy perform utils clean deps $(EXECS)
 
-all: utils providers system broker cluster deploy perform
+all: utils providers system broker deploy perform
 
 utils:
 	@(cd utils && $(MAKE))
@@ -20,10 +20,7 @@ system:
 broker: utils system providers
 	@(cd broker && $(MAKE))
 
-cluster: utils system providers broker
-	@(cd cluster && $(MAKE))
-
-deploy: utils system providers broker cluster
+deploy: utils system providers broker
 	@(cd deploy && $(MAKE))
 
 perform: utils system providers broker
@@ -33,7 +30,6 @@ clean:
 	@(cd providers && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
 	@(cd broker && $(MAKE) $@)
-	@(cd cluster && $(MAKE) $@)
 	@(cd deploy && $(MAKE) $@)
 	@(cd perform && $(MAKE) $@)
 

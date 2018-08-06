@@ -31,15 +31,15 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 
-	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
-	"github.com/CS-SI/SafeScale/cluster/api/AdditionalInfo"
-	"github.com/CS-SI/SafeScale/cluster/api/ClusterState"
-	"github.com/CS-SI/SafeScale/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/cluster/api/Flavor"
-	"github.com/CS-SI/SafeScale/cluster/api/NodeType"
-	"github.com/CS-SI/SafeScale/cluster/components"
-	"github.com/CS-SI/SafeScale/cluster/flavors/dcos/ErrorCode"
-	"github.com/CS-SI/SafeScale/cluster/metadata"
+	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/AdditionalInfo"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/ClusterState"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/NodeType"
+	"github.com/CS-SI/SafeScale/deploy/cluster/components"
+	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos/ErrorCode"
+	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 
 	"github.com/CS-SI/SafeScale/providers"
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
@@ -172,14 +172,14 @@ func Load(data *metadata.Cluster) (clusterapi.ClusterAPI, error) {
 	}
 
 	common := data.Get()
-	var manager *managerData
+	var manager managerData
 	anon := common.GetAdditionalInfo(AdditionalInfo.Flavor)
 	if anon != nil {
-		manager = anon.(*managerData)
+		manager = anon.(managerData)
 	}
 	instance := &Cluster{
 		Common:   common,
-		manager:  manager,
+		manager:  &manager,
 		metadata: data,
 		provider: svc,
 	}
@@ -1030,13 +1030,13 @@ func getSystemTemplateBox() (*rice.Box, error) {
 	var b *rice.Box
 	var found bool
 	var err error
-	if b, found = templateBoxes["../../../system/scripts"]; !found {
+	if b, found = templateBoxes["../../../../system/scripts"]; !found {
 		// Note: path MUST be literal for rice to work
-		b, err = rice.FindBox("../../../system/scripts")
+		b, err = rice.FindBox("../../../../system/scripts")
 		if err != nil {
 			return nil, err
 		}
-		templateBoxes["../../../system/scripts"] = b
+		templateBoxes["../../../../system/scripts"] = b
 	}
 	return b, nil
 }

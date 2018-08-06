@@ -96,6 +96,21 @@ func Prepare(client api.ClientAPI, request api.HostRequest, isGateway bool, kp *
 		dnsList = []string{"1.1.1.1"}
 	}
 
+	if userdataTemplate == nil {
+		b, err := rice.FindBox("../userdata/scripts")
+		if err != nil {
+			return nil, err
+		}
+		tmplString, err := b.String("userdata.sh")
+		if err != nil {
+			return nil, fmt.Errorf("error loading script template: %s", err.Error())
+		}
+		userdataTemplate, err = template.New("userdata").Parse(tmplString)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+		}
+	}
+
 	data := userData{
 		User:       api.DefaultUser,
 		Key:        strings.Trim(kp.PublicKey, "\n"),

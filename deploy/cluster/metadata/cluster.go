@@ -23,7 +23,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/metadata"
 
-	"github.com/CS-SI/SafeScale/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 
 	"github.com/CS-SI/SafeScale/utils/provideruse"
 )

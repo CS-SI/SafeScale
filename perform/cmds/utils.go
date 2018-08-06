@@ -19,8 +19,8 @@ package cmds
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/cluster"
-	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )

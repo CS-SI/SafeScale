@@ -19,7 +19,7 @@ package cmds
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/cluster"
+	"github.com/CS-SI/SafeScale/deploy/cluster"
 
 	cli "github.com/jawher/mow.cli"
 )

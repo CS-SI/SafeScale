@@ -25,10 +25,10 @@ import (
 
 //go:generate rice embed-go
 
-//commonToolsContent contains the content of the script common_tools, that will be injected inside scripts through parameter {{.CommonTools}}
+// commonToolsContent contains the content of the script common_tools, that will be injected inside scripts through parameter {{.CommonTools}}
 var commonToolsContent string
 
-//RealizeCommonTools generates the content of
+// RealizeCommonTools generates the content of
 func RealizeCommonTools() (string, error) {
 	if commonToolsContent == "" {
 		box, err := rice.FindBox("../system/scripts")

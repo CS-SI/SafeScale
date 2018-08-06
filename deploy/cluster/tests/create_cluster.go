@@ -21,10 +21,10 @@ import (
 	"log"
 	"runtime"
 
-	"github.com/CS-SI/SafeScale/cluster"
-	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
-	"github.com/CS-SI/SafeScale/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )
@@ -65,7 +65,7 @@ func Run() {
 	fmt.Printf("Cluster state: %s\n", state.String())
 
 	// Creates a Private Agent Node
-	_, err = instance.AddNode(false, &pb.VMDefinition{
+	_, err = instance.AddNode(false, &pb.HostDefinition{
 		CPUNumber: 2,
 		RAM:       8.0,
 		Disk:      60,

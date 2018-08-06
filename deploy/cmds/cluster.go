@@ -22,11 +22,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/CS-SI/SafeScale/cluster"
-	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
-	"github.com/CS-SI/SafeScale/cluster/api/ClusterState"
-	"github.com/CS-SI/SafeScale/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/ClusterState"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cmds/ErrorCode"
 	"github.com/davecgh/go-spew/spew"
 
@@ -328,13 +328,15 @@ var clusterDeleteCommand = &cli.Command{
 
 	Process: func(c *cli.Command) {
 		yes := c.Flag("-y,--assume-yes", false)
-		//force := c.Flag("-f,--force", false)
+		force := c.Flag("-f,--force", false)
 
 		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure to delete Cluster '%s'", clusterName)) {
 			fmt.Println("Aborted.")
 			os.Exit(0)
 		}
-		log.Println("'-f,--force' does nothing yet")
+		if force {
+			log.Println("'-f,--force' does nothing yet")
+		}
 
 		err := clusterInstance.Delete()
 		if err != nil {

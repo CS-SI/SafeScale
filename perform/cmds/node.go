@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/brokeruse"
 
-	"github.com/CS-SI/SafeScale/cluster"
+	"github.com/CS-SI/SafeScale/deploy/cluster"
 
 	cli "github.com/jawher/mow.cli"
 )
@@ -112,7 +112,7 @@ func nodeDelete(cmd *cli.Cmd) {
 			fmt.Printf("node '%s' isn't a node of the cluster '%s'\n", *nodeName, *clusterName)
 			return
 		}
-		host, err := brokeruse.GetVM(*nodeName)
+		host, err := brokeruse.GetHost(*nodeName)
 		if err != nil {
 			fmt.Printf("%v\n", err)
 			return

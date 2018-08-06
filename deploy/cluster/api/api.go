@@ -21,10 +21,10 @@ import (
 
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
 
-	"github.com/CS-SI/SafeScale/cluster/api/AdditionalInfo"
-	"github.com/CS-SI/SafeScale/cluster/api/ClusterState"
-	"github.com/CS-SI/SafeScale/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/AdditionalInfo"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/ClusterState"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )

@@ -22,12 +22,12 @@ import (
 
 	"github.com/CS-SI/SafeScale/utils/brokeruse"
 
-	clusterapi "github.com/CS-SI/SafeScale/cluster/api"
-	"github.com/CS-SI/SafeScale/cluster/api/Flavor"
-	"github.com/CS-SI/SafeScale/cluster/metadata"
+	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 
-	"github.com/CS-SI/SafeScale/cluster/flavors/boh"
-	"github.com/CS-SI/SafeScale/cluster/flavors/dcos"
+	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh"
+	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos"
 )
 
 //Get returns the ClusterAPI instance corresponding to the cluster named 'name'

@@ -63,7 +63,7 @@ func (m *master) Disable() error {
 // PrivateNode describes a private node in DCOS context
 type privateNode node
 
-func newPrivateNode(host *api.VM) *privateNode {
+func newPrivateNode(host *api.Host) *privateNode {
 	if host == nil {
 		panic("host is nil!")
 	}
@@ -73,7 +73,7 @@ func newPrivateNode(host *api.VM) *privateNode {
 	}
 }
 
-// Prepare "converts" a host describe in object to act as a Private Node
+// Prepare "converts" an host describe in object to act as a Private Node
 // ex:
 //     node := newPrivateNode(id)
 //     node.Prepare()
@@ -98,7 +98,7 @@ func (n *privateNode) Join(cluster *clusterapi.Cluster) error {
 // PublicNode describes a public node in DCOS context
 type publicNode node
 
-// Prepare "converts" a host describe in object to act as a Public Node
+// Prepare "converts" an host describe in object to act as a Public Node
 // ex:
 //     node := PublicNode{ID: id}
 //     err := node.Install()
