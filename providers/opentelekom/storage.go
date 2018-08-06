@@ -20,10 +20,10 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 )
 
-// CreateVolumeAttachment attaches a volume to a VM
-//- name the name of the volume attachment
-//- volume the volume to attach
-//- vm the VM on which the volume is attached
+// CreateVolumeAttachment attaches a volume to an host
+//- 'name' of the volume attachment
+//- 'volume' to attach
+//- 'host' on which the volume is attached
 func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
 	return client.feclt.CreateVolumeAttachment(request)
 }

@@ -142,7 +142,7 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	})
 }
 
-func addGPUCfg(tpl *api.VMTemplate) {
+func addGPUCfg(tpl *api.HostTemplate) {
 	if cfg, ok := gpuMap[tpl.Name]; ok {
 		tpl.GPUNumber = cfg.GPUNumber
 		tpl.GPUType = cfg.GPUType
@@ -150,7 +150,7 @@ func addGPUCfg(tpl *api.VMTemplate) {
 }
 
 //GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (c *Client) GetTemplate(id string) (*api.VMTemplate, error) {
+func (c *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 	tpl, err := c.Client.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
@@ -160,27 +160,27 @@ func (c *Client) GetTemplate(id string) (*api.VMTemplate, error) {
 
 // GetCfgOpts return configuration parameters
 func (client *Client) GetCfgOpts() (api.Config, error) {
-        cfg := api.ConfigMap{}
+	cfg := api.ConfigMap{}
 
-        cfg.Set("DNSList", client.Cfg.DNSList)
-        cfg.Set("S3Protocol", client.Cfg.S3Protocol)
-        cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
-        cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
+	cfg.Set("DNSList", client.Cfg.DNSList)
+	cfg.Set("S3Protocol", client.Cfg.S3Protocol)
+	cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
+	cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
 
-        return cfg, nil
+	return cfg, nil
 }
 
-func isWindowsTemplate(t api.VMTemplate) bool {
+func isWindowsTemplate(t api.HostTemplate) bool {
 	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
 }
-func isFlexTemplate(t api.VMTemplate) bool {
+func isFlexTemplate(t api.HostTemplate) bool {
 	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 
 var filters = []api.TemplateFilter{isWindowsTemplate, isFlexTemplate}
 
 //ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
+func (c *Client) ListTemplates() ([]api.HostTemplate, error) {
 	allTemplates, err := c.Client.ListTemplates()
 	if err != nil {
 		return nil, err
@@ -198,4 +198,3 @@ func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
 func init() {
 	providers.Register("ovh", &Client{})
 }
-

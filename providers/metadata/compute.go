@@ -35,10 +35,10 @@ const (
 //Host links Object Storage folder and Network
 type Host struct {
 	folder *metadata.Folder
-	host   *api.VM
+	host   *api.Host
 }
 
-//NewHost creates an instance of api.VM
+//NewHost creates an instance of api.Host
 func NewHost(svc *providers.Service) (*Host, error) {
 	f, err := metadata.NewFolder(svc, hostFolderName)
 	if err != nil {
@@ -50,8 +50,8 @@ func NewHost(svc *providers.Service) (*Host, error) {
 	}, nil
 }
 
-// Carry links a Host instance to the Metadata instance
-func (m *Host) Carry(host *api.VM) *Host {
+// Carry links an host instance to the Metadata instance
+func (m *Host) Carry(host *api.Host) *Host {
 	if host == nil {
 		panic("host parameter is nil!")
 	}
@@ -60,7 +60,7 @@ func (m *Host) Carry(host *api.VM) *Host {
 }
 
 // Get returns the Network instance linked to metadata
-func (m *Host) Get() *api.VM {
+func (m *Host) Get() *api.Host {
 	return m.host
 }
 
@@ -80,7 +80,7 @@ func (m *Host) Write() error {
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (m *Host) Reload() error {
 	if m.host == nil {
-		panic("Metadata isn't linked with a host!")
+		panic("Metadata isn't linked with an host!")
 	}
 	hostName := m.host.Name
 	found, err := m.ReadByID(m.host.ID)
@@ -96,7 +96,7 @@ func (m *Host) Reload() error {
 // ReadByID reads the metadata of a network identified by ID from Object Storage
 func (m *Host) ReadByID(id string) (bool, error) {
 
-	var host api.VM
+	var host api.Host
 	found, err := m.folder.Read(ByIDFolderName, id, func(buf *bytes.Buffer) error {
 		return gob.NewDecoder(buf).Decode(&host)
 	})
@@ -112,7 +112,7 @@ func (m *Host) ReadByID(id string) (bool, error) {
 
 // ReadByName reads the metadata of a network identified by name
 func (m *Host) ReadByName(name string) (bool, error) {
-	var host api.VM
+	var host api.Host
 	found, err := m.folder.Read(ByNameFolderName, name, func(buf *bytes.Buffer) error {
 		return gob.NewDecoder(buf).Decode(&host)
 	})
@@ -140,20 +140,20 @@ func (m *Host) Delete() error {
 	return nil
 }
 
-// Browse walks through vm folder and executes a callback for each entries
-func (m *Host) Browse(callback func(*api.VM) error) error {
+// Browse walks through host folder and executes a callback for each entries
+func (m *Host) Browse(callback func(*api.Host) error) error {
 	return m.folder.Browse(ByIDFolderName, func(buf *bytes.Buffer) error {
-		var vm api.VM
-		err := gob.NewDecoder(buf).Decode(&vm)
+		var host api.Host
+		err := gob.NewDecoder(buf).Decode(&host)
 		if err != nil {
 			return err
 		}
-		return callback(&vm)
+		return callback(&host)
 	})
 }
 
 // SaveHost saves the Host definition in Object Storage
-func SaveHost(svc *providers.Service, host *api.VM, netID string) error {
+func SaveHost(svc *providers.Service, host *api.Host, netID string) error {
 	mh, err := NewHost(svc)
 	if err != nil {
 		return err
@@ -177,7 +177,7 @@ func SaveHost(svc *providers.Service, host *api.VM, netID string) error {
 }
 
 // RemoveHost removes the host definition from Object Storage
-func RemoveHost(svc *providers.Service, host *api.VM) error {
+func RemoveHost(svc *providers.Service, host *api.Host) error {
 	// First, browse networks to delete links on the deleted host
 	mn, err := NewNetwork(svc)
 	if err != nil {

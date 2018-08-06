@@ -46,7 +46,7 @@ type Request struct {
 	// KeepOnFailure is set to True to keep resources on cluster creation failure
 	KeepOnFailure bool
 	// NodesDef count
-	NodesDef *pb.VMDefinition
+	NodesDef *pb.HostDefinition
 }
 
 //ClusterAPI is an interface of methods associated to Cluster-like structs
@@ -61,19 +61,19 @@ type ClusterAPI interface {
 	GetNetworkID() string
 
 	//AddNode adds a node
-	AddNode(bool, *pb.VMDefinition) (string, error)
+	AddNode(bool, *pb.HostDefinition) (string, error)
 	//AddNodes adds several nodes
-	AddNodes(int, bool, *pb.VMDefinition) ([]string, error)
+	AddNodes(int, bool, *pb.HostDefinition) ([]string, error)
 	//DeleteLastNode deletes a node
 	DeleteLastNode(bool) error
 	//DeleteSpecificNode deletes a node identified by its ID
 	DeleteSpecificNode(string) error
 	//ListNodes lists the nodes in the cluster
 	ListNodes(bool) []string
-	//FindNode tells if the ID of the VM passed as parameter is a node
+	//FindNode tells if the ID of the host passed as parameter is a node
 	SearchNode(string, bool) bool
 	//GetNode returns a node based on its ID
-	GetNode(string) (*pb.VM, error)
+	GetNode(string) (*pb.Host, error)
 	//CountNodes counts the nodes of the cluster
 	CountNodes(bool) uint
 
@@ -117,7 +117,7 @@ type Cluster struct {
 	// PublicIP is the IP address to reach the cluster (ie the public IP address of the network gateway)
 	PublicIP string
 	// NodesDef keeps the default node definition
-	NodesDef *pb.VMDefinition
+	NodesDef *pb.HostDefinition
 	// AdditionalInfo contains additional info about the cluster
 	AdditionalInfo AdditionalInfoType
 }

@@ -231,11 +231,11 @@ func (client *Client) DeleteFloatingIP(id string) error {
 	return err
 }
 
-//AssociateFloatingIP to VM
-func (client *Client) AssociateFloatingIP(vm *api.VM, id string) error {
+// AssociateFloatingIP to host
+func (client *Client) AssociateFloatingIP(host *api.Host, id string) error {
 	fip, err := client.GetFloatingIP(id)
 	if err != nil {
-		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, providerError(err))
+		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, providerError(err))
 	}
 
 	b := map[string]interface{}{
@@ -245,19 +245,19 @@ func (client *Client) AssociateFloatingIP(vm *api.VM, id string) error {
 	}
 
 	r := servers.ActionResult{}
-	_, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers", vm.ID, "action"), b, nil, nil)
+	_, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers", host.ID, "action"), b, nil, nil)
 	err = r.ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, providerError(err))
+		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, providerError(err))
 	}
 	return nil
 }
 
-//DissociateFloatingIP from VM
-func (client *Client) DissociateFloatingIP(vm *api.VM, id string) error {
+//DissociateFloatingIP from host
+func (client *Client) DissociateFloatingIP(host *api.Host, id string) error {
 	fip, err := client.GetFloatingIP(id)
 	if err != nil {
-		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, providerError(err))
+		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, providerError(err))
 	}
 
 	b := map[string]interface{}{
@@ -267,10 +267,10 @@ func (client *Client) DissociateFloatingIP(vm *api.VM, id string) error {
 	}
 
 	r := servers.ActionResult{}
-	_, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers", vm.ID, "action"), b, nil, nil)
+	_, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers", host.ID, "action"), b, nil, nil)
 	err = r.ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Failed to associate Floating IP id '%s' to VM '%s': %s", id, vm.Name, providerError(err))
+		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, providerError(err))
 	}
 	return nil
 }

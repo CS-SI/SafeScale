@@ -67,8 +67,8 @@ func (tester *ClientTester) ListImages(t *testing.T) {
 
 }
 
-//ListVMTemplates test
-func (tester *ClientTester) ListVMTemplates(t *testing.T) {
+//ListHostTemplates test
+func (tester *ClientTester) ListHostTemplates(t *testing.T) {
 	tpls, err := tester.Service.ListTemplates()
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
@@ -175,8 +175,8 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool
 	return network, keypair
 }
 
-//CreateVM creates a test VM
-func (tester *ClientTester) CreateVM(t *testing.T, name string, networkID string, public bool) (*api.VM, error) {
+// CreateHost creates a test host
+func (tester *ClientTester) CreateHost(t *testing.T, name string, networkID string, public bool) (*api.host, error) {
 	tpls, err := tester.Service.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  4,
@@ -185,14 +185,14 @@ func (tester *ClientTester) CreateVM(t *testing.T, name string, networkID string
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 16.04")
 	assert.Nil(t, err)
-	vmRequest := api.VMRequest{
+	hostRequest := api.HostRequest{
 		ImageID:    img.ID,
 		Name:       name,
 		TemplateID: tpls[0].ID,
 		NetworkIDs: []string{networkID},
 		PublicIP:   public,
 	}
-	return tester.Service.CreateVM(vmRequest)
+	return tester.Service.CreateHost(hostRequest)
 }
 
 //CreateGW creates a test GW
@@ -229,14 +229,14 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	defer tester.Service.DeleteKeyPair(kp1.ID)
 	defer tester.Service.DeleteNetwork(network1.ID)
 
-	vm, err := tester.Service.GetVMByName("gw_" + network1.Name)
+	host, err := tester.Service.GetHostByName("gw_" + network1.Name)
 	assert.Nil(t, err)
-	assert.True(t, vm.AccessIPv4 != "" || vm.AccessIPv6 != "")
-	assert.NotEmpty(t, vm.PrivateKey)
-	assert.Empty(t, vm.GatewayID)
-	fmt.Println(vm.AccessIPv4)
-	fmt.Println(vm.PrivateKey)
-	ssh, err := tester.Service.GetSSHConfig(vm.ID)
+	assert.True(t, host.AccessIPv4 != "" || host.AccessIPv6 != "")
+	assert.NotEmpty(t, host.PrivateKey)
+	assert.Empty(t, host.GatewayID)
+	fmt.Println(host.AccessIPv4)
+	fmt.Println(host.PrivateKey)
+	ssh, err := tester.Service.GetSSHConfig(host.ID)
 	assert.Nil(t, err)
 
 	//Waits sshd deamon is up
@@ -279,25 +279,25 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	assert.Equal(t, n1.Name, network1.Name)
 }
 
-//VMs test
-func (tester *ClientTester) VMs(t *testing.T) {
-	// Get initial number of VM
-	vms, err := tester.Service.ListVMs(false)
+//Hosts test
+func (tester *ClientTester) Hosts(t *testing.T) {
+	// Get initial number of hosts
+	hosts, err := tester.Service.ListHosts(false)
 	assert.NoError(t, err)
-	nbVMs := len(vms)
+	nbHosts := len(hosts)
 
 	// TODO: handle kp delete
 	network, kp := tester.CreateNetwork(t, "test_network", false)
 	defer tester.Service.DeleteNetwork(network.ID)
 	defer tester.Service.DeleteKeyPair(kp.ID)
 
-	vm, err := tester.CreateVM(t, "vm1", network.ID, true)
-	defer tester.Service.DeleteVM(vm.ID)
+	host, err := tester.CreateHost(t, "host1", network.ID, true)
+	defer tester.Service.DeleteHost(host.ID)
 
 	assert.NoError(t, err)
 	// time.Sleep(30 * time.Second)
 
-	ssh, err := tester.Service.GetSSHConfig(vm.ID)
+	ssh, err := tester.Service.GetSSHConfig(host.ID)
 	err = ssh.WaitServerReady(time.Minute)
 	assert.NoError(t, err)
 	cmd, err := ssh.Command("whoami")
@@ -319,16 +319,16 @@ func (tester *ClientTester) VMs(t *testing.T) {
 	err = cmd.Run()
 	assert.Nil(t, err)
 
-	_, err = tester.CreateVM(t, "vm2", network.ID, false)
+	_, err = tester.CreateHost(t, "host2", network.ID, false)
 	assert.Error(t, err)
 	err = tester.CreateGW(t, network.ID)
 	assert.NoError(t, err)
-	vm2, err := tester.CreateVM(t, "vm2", network.ID, false)
-	defer tester.Service.DeleteVM(vm2.ID)
+	host2, err := tester.CreateHost(t, "host2", network.ID, false)
+	defer tester.Service.DeleteHost(host2.ID)
 	assert.NoError(t, err)
 
 	// time.Sleep(30 * time.Second)
-	ssh2, err := tester.Service.GetSSHConfig(vm2.ID)
+	ssh2, err := tester.Service.GetSSHConfig(host2.ID)
 	err = ssh2.WaitServerReady(2 * time.Minute)
 	assert.NoError(t, err)
 	cmd2, err := ssh2.Command("whoami")
@@ -340,34 +340,34 @@ func (tester *ClientTester) VMs(t *testing.T) {
 
 	network, err = tester.Service.GetNetwork(network.ID)
 	assert.NoError(t, err)
-	vms, err = tester.Service.ListVMs(false)
-	assert.Equal(t, nbVMs+3, len(vms))
+	hosts, err = tester.Service.ListHosts(false)
+	assert.Equal(t, nbHosts+3, len(hosts))
 	found := 0
-	for _, v := range vms {
+	for _, v := range hosts {
 		if v.Name == "gw_"+network.Name {
 			found++
-		} else if v.ID == vm.ID {
+		} else if v.ID == host.ID {
 			found++
-		} else if v.ID == vm2.ID {
+		} else if v.ID == host2.ID {
 			found++
 		} else {
-			fmt.Printf("Unknown (preexisting?) VM %+v\n", v)
+			fmt.Printf("Unknown (preexisting?) host %+v\n", v)
 			continue
-			// t.Fatalf("Unknown VM %+v\n", v)
+			// t.Fatalf("Unknown host %+v\n", v)
 		}
 	}
 	assert.Equal(t, 3, found)
 
-	v, err := tester.Service.GetVM(vm.ID)
+	v, err := tester.Service.GetHost(host.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, v.AccessIPv4, vm.AccessIPv4)
-	assert.Equal(t, v.AccessIPv6, vm.AccessIPv6)
-	assert.Equal(t, v.GatewayID, vm.GatewayID)
-	assert.Equal(t, v.ID, vm.ID)
-	assert.Equal(t, v.Name, vm.Name)
-	assert.Equal(t, v.PrivateKey, vm.PrivateKey)
-	assert.Equal(t, v.Size, vm.Size)
-	assert.Equal(t, v.State, vm.State)
+	assert.Equal(t, v.AccessIPv4, host.AccessIPv4)
+	assert.Equal(t, v.AccessIPv6, host.AccessIPv6)
+	assert.Equal(t, v.GatewayID, host.GatewayID)
+	assert.Equal(t, v.ID, host.ID)
+	assert.Equal(t, v.Name, host.Name)
+	assert.Equal(t, v.PrivateKey, host.PrivateKey)
+	assert.Equal(t, v.Size, host.Size)
+	assert.Equal(t, v.State, host.State)
 
 	for _, addr := range v.PrivateIPsV4 {
 		fmt.Println(addr)
@@ -378,33 +378,33 @@ func (tester *ClientTester) VMs(t *testing.T) {
 	}
 }
 
-//StartStopVM test
-func (tester *ClientTester) StartStopVM(t *testing.T) {
+//StartStopHost test
+func (tester *ClientTester) StartStopHost(t *testing.T) {
 	// TODO: handle kp delete
 	net, kp := tester.CreateNetwork(t, "test_network", true)
 	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
-	vm, err := tester.Service.GetVMByName("gw_" + net.Name)
+	host, err := tester.Service.GetHostByName("gw_" + net.Name)
 	assert.NoError(t, err)
 	{
-		err := tester.Service.StopVM(vm.ID)
+		err := tester.Service.StopHost(host.ID)
 		assert.Nil(t, err)
 		start := time.Now()
-		vm, err = tester.Service.WaitHostState(vm.ID, HostState.STOPPED, 40*time.Second)
+		host, err = tester.Service.WaitHostState(host.ID, HostState.STOPPED, 40*time.Second)
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		assert.Equal(t, vm.State, HostState.STOPPED)
+		assert.Equal(t, host.State, HostState.STOPPED)
 	}
 	{
-		err := tester.Service.StartVM(vm.ID)
+		err := tester.Service.StartHost(host.ID)
 		assert.Nil(t, err)
 		start := time.Now()
-		vm, err = tester.Service.WaitHostState(vm.ID, HostState.STARTED, 40*time.Second)
+		host, err = tester.Service.WaitHostState(host.ID, HostState.STARTED, 40*time.Second)
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		assert.Equal(t, vm.State, HostState.STARTED)
+		assert.Equal(t, host.State, HostState.STARTED)
 	}
 
 }
@@ -460,8 +460,8 @@ func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	net, kp := tester.CreateNetwork(t, "test_network", true)
 	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
-	vm, err := tester.Service.GetVMByName("gw_" + net.Name)
-	defer tester.Service.DeleteVM(vm.ID)
+	host, err := tester.Service.GetHostByName("gw_" + net.Name)
+	defer tester.Service.DeleteHost(host.ID)
 	assert.NoError(t, err)
 
 	v, err := tester.Service.CreateVolume(api.VolumeRequest{
@@ -483,21 +483,21 @@ func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
 	va, err := tester.Service.CreateVolumeAttachment(api.VolumeAttachmentRequest{
 		Name:     "Attachment1",
-		ServerID: vm.ID,
+		ServerID: host.ID,
 		VolumeID: v.ID,
 	})
-	defer tester.Service.DeleteVolumeAttachment(vm.ID, va.ID)
+	defer tester.Service.DeleteVolumeAttachment(host.ID, va.ID)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, va.Device)
 	va2, err := tester.Service.CreateVolumeAttachment(api.VolumeAttachmentRequest{
 		Name:     "Attachment2",
-		ServerID: vm.ID,
+		ServerID: host.ID,
 		VolumeID: v2.ID,
 	})
-	defer tester.Service.DeleteVolumeAttachment(vm.ID, va2.ID)
+	defer tester.Service.DeleteVolumeAttachment(host.ID, va2.ID)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, va2.Device)
-	val, err := tester.Service.GetVolumeAttachment(vm.ID, v.ID)
+	val, err := tester.Service.GetVolumeAttachment(host.ID, v.ID)
 	assert.Nil(t, err)
 	assert.Equal(t, va.ID, val.ID)
 	assert.Equal(t, va.Name, val.Name)
@@ -505,7 +505,7 @@ func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	assert.Equal(t, va.ServerID, val.ServerID)
 	assert.Equal(t, va.VolumeID, val.VolumeID)
 	assert.Nil(t, err)
-	lst, err := tester.Service.ListVolumeAttachments(vm.ID)
+	lst, err := tester.Service.ListVolumeAttachments(host.ID)
 	assert.Equal(t, 2, len(lst))
 	for _, val := range lst {
 		if val.ID == va.ID {

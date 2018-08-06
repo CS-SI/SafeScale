@@ -27,15 +27,15 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
-// broker ssh connect vm2
-// broker ssh run vm2 -c "uname -a"
-// broker ssh copy /file/test.txt vm1://tmp
-// broker ssh copy vm1:/file/test.txt /tmp
+// broker ssh connect host2
+// broker ssh run host2 -c "uname -a"
+// broker ssh copy /file/test.txt host1://tmp
+// broker ssh copy host1:/file/test.txt /tmp
 
 //SSHServiceServer SSH service server grpc
 type SSHServiceServer struct{}
 
-//Run executes an ssh command an a VM
+//Run executes an ssh command an an host
 func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
 	log.Printf("Ssh run called")
 	if GetCurrentTenant() == nil {
@@ -43,7 +43,7 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 	}
 
 	service := services.NewSSHService(currentTenant.Client)
-	out, err := service.Run(in.GetVM().GetName(), in.GetCommand())
+	out, err := service.Run(in.GetHost().GetName(), in.GetCommand())
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 	}, nil
 }
 
-//Copy copy file from/to a VM
+//Copy copy file from/to an host
 func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*google_protobuf.Empty, error) {
 	log.Printf("Ssh copy called")
 	if GetCurrentTenant() == nil {

@@ -174,8 +174,8 @@ var volumeCreate = cli.Command{
 
 var volumeAttach = cli.Command{
 	Name:      "attach",
-	Usage:     "Attach a volume to a VM",
-	ArgsUsage: "<Volume_name|Volume_ID>, <VM_name|VM_ID>",
+	Usage:     "Attach a volume to an host",
+	ArgsUsage: "<Volume_name|Volume_ID>, <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
@@ -190,9 +190,9 @@ var volumeAttach = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Volume_name> and/or <VM_name>")
+			fmt.Println("Missing mandatory argument <Volume_name> and/or <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Volume and VM name required")
+			return fmt.Errorf("Volume and Host name required")
 		}
 
 		conn := brokeruse.GetConnection()
@@ -203,13 +203,13 @@ var volumeAttach = cli.Command{
 		_, err := service.Attach(ctx, &pb.VolumeAttachment{
 			Format:    c.String("format"),
 			MountPath: c.String("path"),
-			VM:        &pb.Reference{Name: c.Args().Get(1)},
+			Host:      &pb.Reference{Name: c.Args().Get(1)},
 			Volume:    &pb.Reference{Name: c.Args().Get(0)},
 		})
 		if err != nil {
-			return fmt.Errorf("Could not attach volume '%s' to VM '%s': %v", c.Args().Get(0), c.Args().Get(1), err)
+			return fmt.Errorf("could not attach volume '%s' to host '%s': %v", c.Args().Get(0), c.Args().Get(1), err)
 		}
-		fmt.Println(fmt.Sprintf("Volume '%s' attached to vm '%s'", c.Args().Get(0), c.Args().Get(1)))
+		fmt.Println(fmt.Sprintf("Volume '%s' attached to host '%s'", c.Args().Get(0), c.Args().Get(1)))
 
 		return nil
 	},
@@ -217,13 +217,13 @@ var volumeAttach = cli.Command{
 
 var volumeDetach = cli.Command{
 	Name:      "detach",
-	Usage:     "Detach a volume from a VM",
-	ArgsUsage: "<Volume_name|Volume_ID> <VM_name|VM_ID>",
+	Usage:     "Detach a volume from an host",
+	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Volume_name> and/or <VM_name>")
+			fmt.Println("Missing mandatory argument <Volume_name> and/or <Host_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Volume and VM name required")
+			return fmt.Errorf("volume and host names required")
 		}
 
 		conn := brokeruse.GetConnection()
@@ -234,12 +234,12 @@ var volumeDetach = cli.Command{
 
 		_, err := service.Detach(ctx, &pb.VolumeDetachment{
 			Volume: &pb.Reference{Name: c.Args().Get(0)},
-			VM:     &pb.Reference{Name: c.Args().Get(1)}})
+			Host:   &pb.Reference{Name: c.Args().Get(1)}})
 
 		if err != nil {
-			return fmt.Errorf("Could not detach volume '%s' from VM '%s': %v", c.Args().Get(0), c.Args().Get(1), err)
+			return fmt.Errorf("could not detach volume '%s' from host '%s': %v", c.Args().Get(0), c.Args().Get(1), err)
 		}
-		fmt.Println(fmt.Sprintf("Volume '%s' detached from VM '%s'", c.Args().Get(0), c.Args().Get(1)))
+		fmt.Println(fmt.Sprintf("Volume '%s' detached from host '%s'", c.Args().Get(0), c.Args().Get(1)))
 
 		return nil
 	},

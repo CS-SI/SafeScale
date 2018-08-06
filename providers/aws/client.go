@@ -342,7 +342,7 @@ func (c *Client) GetImage(id string) (*api.Image, error) {
 }
 
 //GetTemplate returns the Template referenced by id
-func (c *Client) GetTemplate(id string) (*api.VMTemplate, error) {
+func (c *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 	input := pricing.GetProductsInput{
 		Filters: []*pricing.Filter{
 			{
@@ -398,10 +398,10 @@ func (c *Client) GetTemplate(id string) (*api.VMTemplate, error) {
 				continue
 			}
 
-			tpl := api.VMTemplate{
+			tpl := api.HostTemplate{
 				ID:   price.Product.Attributes.InstanceType,
 				Name: price.Product.Attributes.InstanceType,
-				VMSize: api.VMSize{
+				HostSize: api.HostSize{
 					Cores:    cores,
 					DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
 					RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
@@ -455,9 +455,9 @@ func parseMemory(str string) float64 {
 	return size
 }
 
-//ListTemplates lists available VM templates
-//VM templates are sorted using Dominant Resource Fairness Algorithm
-func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
+//ListTemplates lists available host templates
+//Host templates are sorted using Dominant Resource Fairness Algorithm
+func (c *Client) ListTemplates() ([]api.HostTemplate, error) {
 	input := pricing.GetProductsInput{
 		Filters: []*pricing.Filter{
 			{
@@ -485,7 +485,7 @@ func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
 		MaxResults:    aws.Int64(100),
 		ServiceCode:   aws.String("AmazonEC2"),
 	}
-	tpls := []api.VMTemplate{}
+	tpls := []api.HostTemplate{}
 	//prices := map[string]interface{}{}
 	err := c.Pricing.GetProductsPages(&input,
 		func(p *pricing.GetProductsOutput, lastPage bool) bool {
@@ -506,10 +506,10 @@ func (c *Client) ListTemplates() ([]api.VMTemplate, error) {
 						continue
 					}
 
-					tpl := api.VMTemplate{
+					tpl := api.HostTemplate{
 						ID:   price.Product.Attributes.InstanceType,
 						Name: price.Product.Attributes.InstanceType,
-						VMSize: api.VMSize{
+						HostSize: api.HostSize{
 							Cores:    cores,
 							DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
 							RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
@@ -700,7 +700,7 @@ func (c *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
 	req.GWRequest.PublicIP = true
 	req.GWRequest.IsGateway = true
 	req.GWRequest.NetworkIDs = append(req.GWRequest.NetworkIDs, *vpcOut.Vpc.VpcId)
-	vm, err := c.CreateVM(req.GWRequest)
+	host, err := c.CreateHost(req.GWRequest)
 	if err != nil {
 		c.DeleteNetwork(*vpcOut.Vpc.VpcId)
 		return nil, wrapError("Error creating network", err)
@@ -710,7 +710,7 @@ func (c *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
 		ID:        pStr(vpcOut.Vpc.VpcId),
 		Name:      req.Name,
 		IPVersion: req.IPVersion,
-		GatewayID: vm.ID,
+		GatewayID: host.ID,
 	}
 	err = c.saveNetwork(net)
 	if err != nil {
@@ -761,7 +761,7 @@ func (c *Client) ListNetworks() ([]api.Network, error) {
 func (c *Client) DeleteNetwork(id string) error {
 	net, err := c.getNetwork(id)
 	if err == nil {
-		c.DeleteVM(net.GatewayID)
+		c.DeleteHost(net.GatewayID)
 		addrs, _ := c.EC2.DescribeAddresses(&ec2.DescribeAddressesInput{
 			Filters: []*ec2.Filter{
 				{
@@ -838,7 +838,7 @@ func getState(state *ec2.InstanceState) (HostState.Enum, error) {
 	//    * 80 : stopped
 	fmt.Println("State", state.Code)
 	if state == nil {
-		return HostState.ERROR, fmt.Errorf("Unexpected VM state")
+		return HostState.ERROR, fmt.Errorf("unexpected host state")
 	}
 	if *state.Code == 0 {
 		return HostState.STARTING, nil
@@ -858,14 +858,14 @@ func getState(state *ec2.InstanceState) (HostState.Enum, error) {
 	if *state.Code == 80 {
 		return HostState.STOPPED, nil
 	}
-	return HostState.ERROR, fmt.Errorf("Unexpected VM state")
+	return HostState.ERROR, fmt.Errorf("unexpected host state")
 }
 
 //Data structure to apply to userdata.sh template
 type userData struct {
 	//Name of the default user (api.DefaultUser)
 	User string
-	//Private key used to create the VM
+	//Private key used to create the host
 	Key string
 	//If true activate IP frowarding
 	IsGateway bool
@@ -878,7 +878,7 @@ type userData struct {
 	GatewayIP string
 }
 
-func (c *Client) prepareUserData(request api.VMRequest, kp *api.KeyPair, gw *api.VM) (string, error) {
+func (c *Client) prepareUserData(request api.HostRequest, kp *api.KeyPair, gw *api.Host) (string, error) {
 	dataBuffer := bytes.NewBufferString("")
 	var ResolvConf string
 	var err error
@@ -915,35 +915,35 @@ func (c *Client) prepareUserData(request api.VMRequest, kp *api.KeyPair, gw *api
 	return encBuffer.String(), nil
 }
 
-func (c *Client) saveVM(vm api.VM) error {
+func (c *Client) saveHost(host api.Host) error {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
-	err := enc.Encode(vm)
+	err := enc.Encode(host)
 	if err != nil {
 		return err
 	}
 	return c.PutObject("gpac.aws.wms", api.Object{
-		Name:    vm.ID,
+		Name:    host.ID,
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
 }
-func (c *Client) removeVM(vmID string) error {
-	return c.DeleteObject("gpac.aws.wms", vmID)
+func (c *Client) removeHost(hostID string) error {
+	return c.DeleteObject("gpac.aws.wms", hostID)
 }
-func (c *Client) readVM(vmID string) (*api.VM, error) {
-	o, err := c.GetObject("gpac.aws.wms", vmID, nil)
+func (c *Client) readHost(hostID string) (*api.host, error) {
+	o, err := c.GetObject("gpac.aws.wms", hostID, nil)
 	if err != nil {
 		return nil, err
 	}
 	var buffer bytes.Buffer
 	buffer.ReadFrom(o.Content)
 	enc := gob.NewDecoder(&buffer)
-	var vm api.VM
-	err = enc.Decode(&vm)
+	var host api.Host
+	err = enc.Decode(&host)
 	if err != nil {
 		return nil, err
 	}
-	return &vm, nil
+	return &host, nil
 }
 
 func (c *Client) createSecurityGroup(vpcID string, name string) (string, error) {
@@ -978,10 +978,10 @@ func (c *Client) createSecurityGroup(vpcID string, name string) (string, error) 
 	return *out.GroupId, nil
 }
 
-//CreateVM creates a VM that fulfils the request
-func (c *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
+//CreateHost creates an host that fulfils the request
+func (c *Client) CreateHost(request api.HostRequest) (*api.host, error) {
 
-	//If no KeyPair is supplied a temporay one is created
+	// If no KeyPair is supplied a temporay one is created
 	kp := request.KeyPair
 	if kp == nil {
 		kpTmp, err := c.CreateKeyPair(request.Name)
@@ -990,16 +990,16 @@ func (c *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 		}
 		kp = kpTmp
 	}
-	//If the VM is not a Gateway, get gateway of the first network
+	// If the host is not a Gateway, get gateway of the first network
 	gwID := ""
-	var gw *api.VM
+	var gw *api.Host
 	if !request.IsGateway {
 		net, err := c.getNetwork(request.NetworkIDs[0])
 		if err != nil {
 			return nil, err
 		}
 		gwID = net.GatewayID
-		gw, err = c.GetVM(gwID)
+		gw, err = c.GetHost(gwID)
 		if err != nil {
 			return nil, err
 		}
@@ -1076,7 +1076,7 @@ func (c *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 		},
 	})
 	if err != nil {
-		c.DeleteVM(*instance.InstanceId)
+		c.DeleteHost(*instance.InstanceId)
 		return nil, err
 	}
 
@@ -1084,10 +1084,10 @@ func (c *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 		Domain: aws.String("vpc"),
 	})
 	if err != nil {
-		c.DeleteVM(*instance.InstanceId)
+		c.DeleteHost(*instance.InstanceId)
 		return nil, err
 	}
-	//Wait that VM is started
+	//Wait that host is started
 	service := providers.Service{
 		ClientAPI: c,
 	}
@@ -1100,14 +1100,14 @@ func (c *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 		AllocationId:       addr.AllocationId,
 	})
 	if err != nil {
-		c.DeleteVM(*instance.InstanceId)
+		c.DeleteHost(*instance.InstanceId)
 		return nil, err
 	}
-	//Create api.VM
+	//Create api.Host
 
 	tpl, err := c.GetTemplate(*instance.InstanceType)
 	if err != nil {
-		c.DeleteVM(*instance.InstanceId)
+		c.DeleteHost(*instance.InstanceId)
 		return nil, err
 	}
 	v4IPs := []string{}
@@ -1120,26 +1120,26 @@ func (c *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
 	}
 	state, err := getState(instance.State)
 	if err != nil {
-		c.DeleteVM(*instance.InstanceId)
+		c.DeleteHost(*instance.InstanceId)
 		return nil, err
 	}
 
-	vm := api.VM{
+	host := api.Host{
 		ID:           pStr(instance.InstanceId),
 		Name:         request.Name,
-		Size:         tpl.VMSize,
+		Size:         tpl.HostSize,
 		PrivateIPsV4: v4IPs,
 		AccessIPv4:   accessAddr,
 		PrivateKey:   kp.PrivateKey,
 		State:        state,
 		GatewayID:    gwID,
 	}
-	c.saveVM(vm)
-	return &vm, nil
+	c.saveHost(host)
+	return &host, nil
 }
 
-//GetVM returns the VM identified by id
-func (c *Client) GetVM(id string) (*api.VM, error) {
+//GetHost returns the host identified by id
+func (c *Client) GetHost(id string) (*api.host, error) {
 
 	out, err := c.EC2.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{aws.String(id)},
@@ -1148,14 +1148,14 @@ func (c *Client) GetVM(id string) (*api.VM, error) {
 		return nil, err
 	}
 	instance := out.Reservations[0].Instances[0]
-	vm, err := c.readVM(id)
+	host, err := c.readHost(id)
 	if err != nil {
-		vm = &api.VM{
+		host = &api.Host{
 			ID: *instance.InstanceId,
 		}
 	}
 
-	vm.State, err = getState(instance.State)
+	host.State, err = getState(instance.State)
 	if err != nil {
 		return nil, err
 	}
@@ -1163,7 +1163,7 @@ func (c *Client) GetVM(id string) (*api.VM, error) {
 	if err != nil {
 		return nil, err
 	}
-	vm.Size = tpl.VMSize
+	host.Size = tpl.HostSize
 	v4IPs := []string{}
 	for _, nif := range instance.NetworkInterfaces {
 		v4IPs = append(v4IPs, *nif.PrivateIpAddress)
@@ -1172,20 +1172,20 @@ func (c *Client) GetVM(id string) (*api.VM, error) {
 	if instance.PublicIpAddress != nil {
 		accessAddr = *instance.PublicIpAddress
 	}
-	vm.PrivateIPsV4 = v4IPs
-	vm.AccessIPv4 = accessAddr
+	host.PrivateIPsV4 = v4IPs
+	host.AccessIPv4 = accessAddr
 
-	return vm, nil
+	return host, nil
 }
 
-//ListVMs lists available VMs
-func (c *Client) ListVMs() ([]api.VM, error) {
+// ListHosts lists available hosts
+func (c *Client) ListHosts() ([]api.host, error) {
 	panic("Not Implemented")
 }
 
-//DeleteVM deletes the VM identified by id
-func (c *Client) DeleteVM(id string) error {
-	c.removeVM(id)
+// DeleteHost deletes the host identified by id
+func (c *Client) DeleteHost(id string) error {
+	c.removeHost(id)
 	ips, err := c.EC2.DescribeAddresses(&ec2.DescribeAddressesInput{
 		Filters: []*ec2.Filter{
 			&ec2.Filter{
@@ -1208,8 +1208,8 @@ func (c *Client) DeleteVM(id string) error {
 
 }
 
-//StopVM stops the VM identified by id
-func (c *Client) StopVM(id string) error {
+//StopHost stops the host identified by id
+func (c *Client) StopHost(id string) error {
 	_, err := c.EC2.StopInstances(&ec2.StopInstancesInput{
 		Force:       aws.Bool(true),
 		InstanceIds: []*string{aws.String(id)},
@@ -1217,29 +1217,29 @@ func (c *Client) StopVM(id string) error {
 	return err
 }
 
-//StartVM starts the VM identified by id
-func (c *Client) StartVM(id string) error {
+//StartHost starts the host identified by id
+func (c *Client) StartHost(id string) error {
 	_, err := c.EC2.StartInstances(&ec2.StartInstancesInput{
 		InstanceIds: []*string{aws.String(id)},
 	})
 	return err
 }
 
-//GetSSHConfig creates SSHConfig from VM
-func (c *Client) GetSSHConfig(vmID string) (*system.SSHConfig, error) {
-	vm, err := c.GetVM(vmID)
+//GetSSHConfig creates SSHConfig from host
+func (c *Client) GetSSHConfig(hostID string) (*system.SSHConfig, error) {
+	host, err := c.GetHost(hostID)
 	if err != nil {
 		return nil, err
 	}
-	ip := vm.GetAccessIP()
+	ip := host.GetAccessIP()
 	sshConfig := system.SSHConfig{
-		PrivateKey: vm.PrivateKey,
+		PrivateKey: host.PrivateKey,
 		Port:       22,
 		Host:       ip,
 		User:       api.DefaultUser,
 	}
-	if vm.GatewayID != "" {
-		gw, err := c.GetVM(vm.GatewayID)
+	if host.GatewayID != "" {
+		gw, err := c.GetHost(host.GatewayID)
 		if err != nil {
 			return nil, err
 		}
@@ -1439,14 +1439,14 @@ func (c *Client) DeleteVolume(id string) error {
 // 	return c.DeleteObject("__volume_atachements__", id)
 // }
 
-// func vaID(vmID string, volumeID string) string {
-// 	return fmt.Sprintf("%s###%s", vmID, volumeID)
+// func vaID(hostID string, volumeID string) string {
+// 	return fmt.Sprintf("%s###%s", hostID, volumeID)
 // }
 
-//CreateVolumeAttachment attaches a volume to a VM
+//CreateVolumeAttachment attaches a volume to an host
 //- name the name of the volume attachment
 //- volume the volume to attach
-//- vm the VM on which the volume is attached
+//- host on which the volume is attached
 func (c *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
 	va, err := c.EC2.AttachVolume(&ec2.AttachVolumeInput{
 		InstanceId: aws.String(request.ServerID),

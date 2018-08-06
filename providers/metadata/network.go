@@ -151,7 +151,7 @@ func (m *Network) Browse(callback func(*api.Network) error) error {
 }
 
 //AttachHost links host ID to the network
-func (m *Network) AttachHost(host *api.VM) error {
+func (m *Network) AttachHost(host *api.Host) error {
 	if m.network == nil {
 		panic("m.network is nil!")
 	}
@@ -167,14 +167,14 @@ func (m *Network) DetachHost(hostID string) error {
 }
 
 //ListHosts returns the list of ID of hosts attached to the network (be careful: including gateway)
-func (m *Network) ListHosts() ([]*api.VM, error) {
+func (m *Network) ListHosts() ([]*api.Host, error) {
 	if m.network == nil {
 		panic("m.network is nil!")
 	}
 
-	var list []*api.VM
+	var list []*api.Host
 	err := m.folder.Browse(m.network.ID+"/host", func(buf *bytes.Buffer) error {
-		var host api.VM
+		var host api.Host
 		err := gob.NewDecoder(buf).Decode(&host)
 		if err != nil {
 			return err
@@ -240,7 +240,7 @@ func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, er
 type Gateway struct {
 	folder    *metadata.Folder
 	networkID string
-	host      *api.VM
+	host      *api.Host
 }
 
 // NewGateway creates an instance of metadata.Gateway
@@ -257,13 +257,13 @@ func NewGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 }
 
 //Carry links a Network instance to the Metadata instance
-func (m *Gateway) Carry(host *api.VM) *Gateway {
+func (m *Gateway) Carry(host *api.Host) *Gateway {
 	m.host = host
 	return m
 }
 
-// Get returns the *api.VM linked to the metadata
-func (m *Gateway) Get() *api.VM {
+// Get returns the *api.Host linked to the metadata
+func (m *Gateway) Get() *api.Host {
 	return m.host
 }
 
@@ -299,7 +299,7 @@ func (m *Gateway) Reload() error {
 
 //Read reads the metadata of a gateway of a network identified by ID from Object Storage
 func (m *Gateway) Read() (bool, error) {
-	var host api.VM
+	var host api.Host
 	found, err := m.folder.Read(m.networkID, gatewayObjectName, func(buf *bytes.Buffer) error {
 		return gob.NewDecoder(buf).Decode(&host)
 	})
@@ -335,7 +335,7 @@ func LoadGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 }
 
 //SaveGateway saves the metadata of a gateway
-func SaveGateway(svc *providers.Service, host *api.VM, networkID string) error {
+func SaveGateway(svc *providers.Service, host *api.Host, networkID string) error {
 	m, err := NewGateway(svc, networkID)
 	if err != nil {
 		return err

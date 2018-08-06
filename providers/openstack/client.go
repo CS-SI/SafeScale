@@ -325,7 +325,7 @@ func (client *Client) createICMPRules(groupID string) error {
 
 //initDefaultSecurityGroup create an open Security Group
 //The default security group opens all TCP, UDP, ICMP ports
-//Security is managed individually on each VM using a linux firewall
+//Security is managed individually on each host using a linux firewall
 func (client *Client) initDefaultSecurityGroup() error {
 	sg, err := client.getDefaultSecurityGroup()
 	if err != nil {

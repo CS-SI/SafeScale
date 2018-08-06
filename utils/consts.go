@@ -22,8 +22,8 @@ import (
 
 const (
 	Address = "localhost:50051"
-	//TimeoutCtxDefault default timeout for grpc command invocation
+	// TimeoutCtxDefault default timeout for grpc command invocation
 	TimeoutCtxDefault = 20 * time.Second
-	//TimeoutCtxVM timeout for grpc command relative to VM creation
-	TimeoutCtxVM = 2 * time.Minute
+	// TimeoutCtxHost timeout for grpc command relative to host creation
+	TimeoutCtxHost = 2 * time.Minute
 )

@@ -212,10 +212,10 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 			log.Print("gateway metadata not found")
 			return nil
 		}
-		gwvm := mgw.Get()
+		gwhost := mgw.Get()
 
 		// Update GatewayId field
-		net.GatewayID = gwvm.ID
+		net.GatewayID = gwhost.ID
 
 		netList = append(netList, *net)
 		return nil
@@ -232,24 +232,24 @@ func (client *Client) DeleteNetwork(networkID string) error {
 	if m == nil {
 		return fmt.Errorf("failed to find network '%s' metadata", networkID)
 	}
-	vms, err := m.ListHosts()
+	hosts, err := m.ListHosts()
 	if err != nil {
 		return err
 	}
 	gwID := m.Get().GatewayID
-	if len(vms) > 0 {
-		var allvms []string
-		for _, i := range vms {
+	if len(hosts) > 0 {
+		var allhosts []string
+		for _, i := range hosts {
 			if gwID != i.ID {
-				allvms = append(allvms, i.Name)
+				allhosts = append(allhosts, i.Name)
 			}
 		}
-		if len(allvms) > 0 {
+		if len(allhosts) > 0 {
 			var lenS string
-			if len(allvms) > 1 {
+			if len(allhosts) > 1 {
 				lenS = "s"
 			}
-			return fmt.Errorf("network '%s' has %d host%s attached (%s)", networkID, len(allvms), lenS, strings.Join(allvms, ","))
+			return fmt.Errorf("network '%s' has %d host%s attached (%s)", networkID, len(allhosts), lenS, strings.Join(allhosts, ","))
 		}
 	}
 
@@ -287,7 +287,7 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	if gwname == "" {
 		gwname = "gw-" + net.Name
 	}
-	vmReq := api.VMRequest{
+	hostReq := api.HostRequest{
 		ImageID:    req.ImageID,
 		KeyPair:    req.KeyPair,
 		Name:       gwname,
@@ -295,11 +295,11 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 		NetworkIDs: []string{req.NetworkID},
 		PublicIP:   true,
 	}
-	_, err = client.createVM(vmReq, true)
+	_, err = client.createHost(hostReq, true)
 	if err != nil {
 		return fmt.Errorf("error creating gateway : %s", errorString(err))
 	}
-	// Note: no metadata.SaveGateway(), it's done in client.createVM()
+	// Note: no metadata.SaveGateway(), it's done in client.CreateHost()
 	return nil
 }
 
@@ -313,10 +313,10 @@ func (client *Client) DeleteGateway(networkID string) error {
 		return nil
 	}
 
-	vm := m.Get()
-	client.DeleteVM(vm.ID)
-	// Loop waiting for effective deletion of the VM
-	for err = nil; err != nil; _, err = client.GetVM(vm.ID) {
+	host := m.Get()
+	client.DeleteHost(host.ID)
+	// Loop waiting for effective deletion of the host
+	for err = nil; err != nil; _, err = client.GetHost(host.ID) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	return m.Delete()

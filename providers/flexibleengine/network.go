@@ -311,24 +311,24 @@ func (client *Client) DeleteNetwork(id string) error {
 	if m == nil {
 		return fmt.Errorf("failed to find network '%s' metadata", id)
 	}
-	vms, err := m.ListHosts()
+	hosts, err := m.ListHosts()
 	if err != nil {
 		return err
 	}
 	gwID := m.Get().GatewayID
-	if len(vms) > 0 {
-		var allvms []string
-		for _, i := range vms {
+	if len(hosts) > 0 {
+		var allhosts []string
+		for _, i := range hosts {
 			if gwID != i.ID {
-				allvms = append(allvms, i.Name)
+				allhosts = append(allhosts, i.Name)
 			}
 		}
-		if len(allvms) > 0 {
+		if len(allhosts) > 0 {
 			var lenS string
-			if len(allvms) > 1 {
+			if len(allhosts) > 1 {
 				lenS = "s"
 			}
-			return fmt.Errorf("network '%s' still has %d host%s attached (%s)", id, len(allvms), lenS, strings.Join(allvms, ","))
+			return fmt.Errorf("network '%s' still has %d host%s attached (%s)", id, len(allhosts), lenS, strings.Join(allhosts, ","))
 		}
 	}
 
@@ -611,7 +611,7 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
-// to contain only one vmID
+// to contain only one hostID
 func (client *Client) CreateGateway(req api.GWRequest) error {
 	net, err := client.GetNetwork(req.NetworkID)
 	if err != nil {
@@ -621,7 +621,7 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	if gwname == "" {
 		gwname = "gw-" + net.Name
 	}
-	vmReq := api.VMRequest{
+	hostReq := api.HostRequest{
 		ImageID:    req.ImageID,
 		KeyPair:    req.KeyPair,
 		Name:       gwname,
@@ -629,24 +629,24 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 		NetworkIDs: []string{req.NetworkID},
 		PublicIP:   true,
 	}
-	vm, err := client.createVM(vmReq, true)
+	host, err := client.createHost(hostReq, true)
 	if err != nil {
 		return fmt.Errorf("error creating gateway : %s", providerError(err))
 	}
 	svc := providers.FromClient(client)
 	m, err := metadata.NewGateway(svc, req.NetworkID)
 	if err == nil {
-		err = m.Carry(vm).Write(svc)
+		err = m.Carry(host).Write(svc)
 	}
 	if err != nil {
-		client.DeleteVM(vm.ID)
+		client.DeleteHost(host.ID)
 		return fmt.Errorf("error creating gateway : %s", err.Error())
 	}
 	return nil
 }
 
 // GetGateway returns the name of the gateway of a network
-func (client *Client) GetGateway(networkID string) (*api.VM, error) {
+func (client *Client) GetGateway(networkID string) (*api.Host, error) {
 	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
 	if err != nil {
 		return nil, err
@@ -664,7 +664,7 @@ func (client *Client) DeleteGateway(networkID string) error {
 		return err
 	}
 	if m != nil {
-		err = client.DeleteVM(m.Get().ID)
+		err = client.DeleteHost(m.Get().ID)
 		if err != nil {
 			return err
 		}

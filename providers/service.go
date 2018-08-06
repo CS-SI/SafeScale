@@ -29,18 +29,18 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-//ResourceError resource error
+// ResourceError resource error
 type ResourceError struct {
 	Name         string
 	ResourceType string
 }
 
-//ResourceNotFound resource not found error
+// ResourceNotFound resource not found error
 type ResourceNotFound struct {
 	ResourceError
 }
 
-//ResourceNotFoundError creates a ResourceNotFound error
+// ResourceNotFoundError creates a ResourceNotFound error
 func ResourceNotFoundError(resource string, name string) ResourceNotFound {
 	return ResourceNotFound{
 		ResourceError{
@@ -53,12 +53,12 @@ func (e ResourceNotFound) Error() string {
 	return fmt.Sprintf("Unable to find %s '%s'", e.ResourceType, e.Name)
 }
 
-//ResourceAlreadyExists resource already exists error
+// ResourceAlreadyExists resource already exists error
 type ResourceAlreadyExists struct {
 	ResourceError
 }
 
-//ResourceAlreadyExistsError creates a ResourceAlreadyExists error
+// ResourceAlreadyExistsError creates a ResourceAlreadyExists error
 func ResourceAlreadyExistsError(resource string, name string) ResourceAlreadyExists {
 	return ResourceAlreadyExists{
 		ResourceError{
@@ -72,12 +72,12 @@ func (e ResourceAlreadyExists) Error() string {
 	return fmt.Sprintf("%s %s alredy exists", e.ResourceType, e.Name)
 }
 
-//Service Client High level service
+// Service Client High level service
 type Service struct {
 	api.ClientAPI
 }
 
-//FromClient contructs a Service instance from a ClientAPI
+// FromClient contructs a Service instance from a ClientAPI
 func FromClient(clt api.ClientAPI) *Service {
 	return &Service{
 		ClientAPI: clt,
@@ -93,88 +93,88 @@ const (
 	DiskDRFWeight float32 = 1.0 / 16.0
 )
 
-//RankDRF computes the Dominant Resource Fairness Rank of a VM template
-func RankDRF(t *api.VMTemplate) float32 {
+// RankDRF computes the Dominant Resource Fairness Rank of an host template
+func RankDRF(t *api.HostTemplate) float32 {
 	fc := float32(t.Cores)
 	fr := t.RAMSize
 	fd := float32(t.DiskSize)
 	return fc*CoreDRFWeight + fr*RAMDRFWeight + fd*DiskDRFWeight
 }
 
-// ByRankDRF implements sort.Interface for []VMTemplate based on
+// ByRankDRF implements sort.Interface for []HostTemplate based on
 // the Dominant Resource Fairness
-type ByRankDRF []api.VMTemplate
+type ByRankDRF []api.HostTemplate
 
 func (a ByRankDRF) Len() int           { return len(a) }
 func (a ByRankDRF) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByRankDRF) Less(i, j int) bool { return RankDRF(&a[i]) < RankDRF(&a[j]) }
 
-//VMAccess a VM and the SSH Key Pair
-type VMAccess struct {
-	VM      *api.VM
+// HostAccess an host and the SSH Key Pair
+type HostAccess struct {
+	Host    *api.Host
 	Key     *api.KeyPair
 	User    string
-	Gateway *VMAccess
+	Gateway *HostAccess
 }
 
-//GetAccessIP returns the access IP
-func (access *VMAccess) GetAccessIP() string {
-	ip := access.VM.AccessIPv4
+// GetAccessIP returns the access IP
+func (access *HostAccess) GetAccessIP() string {
+	ip := access.Host.AccessIPv4
 	if len(ip) == 0 {
-		ip = access.VM.AccessIPv6
+		ip = access.Host.AccessIPv6
 	}
 	return ip
 }
 
-//ServerRequest used to create a server
+// ServerRequest used to create a server
 type ServerRequest struct {
 	Name string `json:"name,omitempty"`
-	//NetworksIDs list of the network IDs the VM must be connected
+	// NetworksIDs list of the network IDs the host must be connected
 	Networks []api.Network `json:"networks,omitempty"`
-	//PublicIP a flg telling if the VM must have a public IP is
+	// PublicIP a flg telling if the host must have a public IP is
 	PublicIP bool `json:"public_ip,omitempty"`
-	//TemplateID the UUID of the template used to size the VM (see SelectTemplates)
-	Template api.VMTemplate `json:"sizing,omitempty"`
-	//ImageID  is the UUID of the image that contains the server's OS and initial state.
+	// TemplateID the UUID of the template used to size the host (see SelectTemplates)
+	Template api.HostTemplate `json:"sizing,omitempty"`
+	// ImageID  is the UUID of the image that contains the server's OS and initial state.
 	OSName string `json:"os_name,omitempty"`
-	//Gateway through which the server can be connected
-	Gateway *VMAccess `json:"gateway,omitempty"`
+	// Gateway through which the server can be connected
+	Gateway *HostAccess `json:"gateway,omitempty"`
 }
 
-//WaitHostState waits a vm achieve state
-func (srv *Service) WaitHostState(vmID string, state HostState.Enum, timeout time.Duration) (*api.VM, error) {
-	var vm *api.VM
+//WaitHostState waits an host achieve state
+func (srv *Service) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) (*api.Host, error) {
+	var host *api.Host
 	var err error
 	timer := time.After(timeout)
 	next := true
 	for next {
-		vm, err = srv.GetVM(vmID)
-		if vm == nil {
+		host, err = srv.GetHost(hostID)
+		if host == nil {
 			return nil, err
-		} else if vm.State == state {
-			return vm, err
-		} else if vm.State == HostState.ERROR {
-			return vm, fmt.Errorf("VM in error state")
+		} else if host.State == state {
+			return host, err
+		} else if host.State == HostState.ERROR {
+			return host, fmt.Errorf("host in error state")
 		}
 		select {
 		case <-timer:
-			return vm, fmt.Errorf("timeout waiting host '%s' to reach state '%s'", vm.Name, state.String())
+			return host, fmt.Errorf("timeout waiting host '%s' to reach state '%s'", host.Name, state.String())
 		default:
 			time.Sleep(1)
 		}
 	}
-	return vm, err
+	return host, err
 }
 
-//WaitHostState waits a vm achieve state
-// func (srv *Service) WaitHostState(vmID string, state HostState.Enum, timeout time.Duration) (*api.VM, error) {
+//WaitHostState waits an host achieve state
+// func (srv *Service) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) (*api.host, error) {
 // 	cout := make(chan int)
 // 	stop := make(chan bool)
-// 	vmc := make(chan *api.VM)
+// 	hostc := make(chan *api.Host)
 // 	fmt.Println(timeout)
-// 	var vm *api.VM
+// 	var host *api.Host
 // 	var err error
-// 	go pollVM(srv, vmID, state, cout, stop, vmc)
+// 	go pollHost(srv, hostID, state, cout, stop, hostc)
 // 	stop <- false
 // 	timer := time.After(timeout)
 // 	finish := false
@@ -183,14 +183,14 @@ func (srv *Service) WaitHostState(vmID string, state HostState.Enum, timeout tim
 // 		case res := <-cout:
 // 			if res == 0 {
 // 				stop <- true
-// 				err = fmt.Errorf("VM in error state")
+// 				err = fmt.Errorf("host in error state")
 // 				finish = true
 // 			}
 // 			if res == 1 {
 // 				fmt.Println("State achieved")
 // 				stop <- true
-// 				vm = <-vmc
-// 				fmt.Println("VM received")
+// 				host = <-hostc
+// 				fmt.Println("host received")
 // 				finish = true
 // 			}
 // 			if res == 2 {
@@ -206,7 +206,7 @@ func (srv *Service) WaitHostState(vmID string, state HostState.Enum, timeout tim
 // 	fmt.Println("receive result")
 // 	<-cout
 // 	fmt.Println("End of wait")
-// 	return vm, err
+// 	return host, err
 // }
 
 // func sendResul(cout chan int, res int) {
@@ -214,7 +214,7 @@ func (srv *Service) WaitHostState(vmID string, state HostState.Enum, timeout tim
 // 	fmt.Println("result sent ", res)
 // }
 
-// func pollVM(client api.ClientAPI, vmID string, state HostState.Enum, cout chan int, stop chan bool, vmc chan *api.VM) {
+// func pollHost(client api.ClientAPI, hostID string, state HostState.Enum, cout chan int, stop chan bool, hostc chan *api.Host) {
 // 	finish := false
 // 	fmt.Println("Start polling")
 // 	for !finish {
@@ -224,30 +224,30 @@ func (srv *Service) WaitHostState(vmID string, state HostState.Enum, timeout tim
 // 		}
 // 		finish = <-stop
 
-// 		fmt.Println("Get VM")
-// 		vm, err := client.GetVM(vmID)
+// 		fmt.Println("Get host")
+// 		host, err := client.GetHost(hostID)
 // 		if err != nil {
 // 			log.Print(err)
 // 			res = 0
-// 		} else if vm.State == state {
+// 		} else if host.State == state {
 // 			res = 1
-// 		} else if vm.State == HostState.ERROR {
+// 		} else if host.State == HostState.ERROR {
 // 			res = 0
 // 		} else {
 // 			res = 2
 // 		}
-// 		fmt.Println(vm.State)
+// 		fmt.Println(host.State)
 // 		sendResul(cout, res)
 
 // 		if res == 1 {
-// 			fmt.Println("send vm")
-// 			vmc <- vm
+// 			fmt.Println("send host")
+// 			hostc <- host
 // 		}
 // 		fmt.Println("end")
 // 	}
 // }
 
-//WaitVolumeState waits a vm achieve state
+//WaitVolumeState waits an host achieve state
 func (srv *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*api.Volume, error) {
 	cout := make(chan int)
 	next := make(chan bool)
@@ -259,7 +259,7 @@ func (srv *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 		case res := <-cout:
 			if res == 0 {
 				//next <- false
-				return nil, fmt.Errorf("Error getting vm state")
+				return nil, fmt.Errorf("Error getting host state")
 			}
 			if res == 1 {
 				//next <- false
@@ -270,12 +270,12 @@ func (srv *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 			}
 		case <-time.After(timeout):
 			next <- false
-			return nil, &api.TimeoutError{Message: "Wait vm state timeout"}
+			return nil, &api.TimeoutError{Message: "Wait host state timeout"}
 		}
 	}
 }
 
-func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, cout chan int, next chan bool, vmc chan *api.Volume) {
+func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, cout chan int, next chan bool, hostc chan *api.Volume) {
 	for {
 
 		v, err := client.GetVolume(volumeID)
@@ -286,7 +286,7 @@ func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, c
 		}
 		if v.State == state {
 			cout <- 1
-			vmc <- v
+			hostc <- v
 			return
 		}
 		cout <- 2
@@ -298,9 +298,9 @@ func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, c
 
 //SelectTemplatesBySize select templates satisfying sizing requirements
 //returned list is ordered by size fitting
-func (srv *Service) SelectTemplatesBySize(sizing api.SizingRequirements) ([]api.VMTemplate, error) {
+func (srv *Service) SelectTemplatesBySize(sizing api.SizingRequirements) ([]api.HostTemplate, error) {
 	tpls, err := srv.ListTemplates()
-	var selectedTpls []api.VMTemplate
+	var selectedTpls []api.HostTemplate
 	if err != nil {
 		return nil, err
 	}
@@ -396,11 +396,11 @@ func (srv *Service) ListNetworksByName() (map[string]api.Network, error) {
 
 }
 
-//CreateVMWithKeyPair creates a VM
-func (srv *Service) CreateVMWithKeyPair(request api.VMRequest) (*api.VM, *api.KeyPair, error) {
-	_, err := srv.GetVMByName(request.Name)
+//CreateHostWithKeyPair creates an host
+func (srv *Service) CreateHostWithKeyPair(request api.HostRequest) (*api.Host, *api.KeyPair, error) {
+	_, err := srv.GetHostByName(request.Name)
 	if err == nil {
-		return nil, nil, ResourceAlreadyExistsError("VM", request.Name)
+		return nil, nil, ResourceAlreadyExistsError("Host", request.Name)
 	}
 
 	//Create temporary key pair
@@ -412,8 +412,8 @@ func (srv *Service) CreateVMWithKeyPair(request api.VMRequest) (*api.VM, *api.Ke
 	}
 	//defer srv.DeleteKeyPair(kpName)
 
-	//Create VM
-	vmReq := api.VMRequest{
+	//Create host
+	hostReq := api.HostRequest{
 		Name:       request.Name,
 		ImageID:    request.ImageID,
 		KeyPair:    kp,
@@ -421,37 +421,37 @@ func (srv *Service) CreateVMWithKeyPair(request api.VMRequest) (*api.VM, *api.Ke
 		NetworkIDs: request.NetworkIDs,
 		TemplateID: request.TemplateID,
 	}
-	vm, err := srv.CreateVM(vmReq)
+	host, err := srv.CreateHost(hostReq)
 	if err != nil {
 		return nil, nil, err
 	}
-	return vm, kp, nil
+	return host, kp, nil
 }
 
-//ListVMsByName list VMs by name
-func (srv *Service) ListVMsByName() (map[string]api.VM, error) {
-	vms, err := srv.ListVMs(false)
+//ListHostsByName list hosts by name
+func (srv *Service) ListHostsByName() (map[string]api.Host, error) {
+	hosts, err := srv.ListHosts(false)
 	if err != nil {
 		return nil, err
 	}
-	vmMap := make(map[string]api.VM)
-	for _, vm := range vms {
-		vmMap[vm.Name] = vm
+	hostMap := make(map[string]api.Host)
+	for _, host := range hosts {
+		hostMap[host.Name] = host
 	}
-	return vmMap, nil
+	return hostMap, nil
 }
 
-//GetVMByName returns VM corresponding to name
-func (srv *Service) GetVMByName(name string) (*api.VM, error) {
-	vms, err := srv.ListVMsByName()
+// GetHostByName returns host corresponding to name
+func (srv *Service) GetHostByName(name string) (*api.Host, error) {
+	hosts, err := srv.ListHostsByName()
 	if err != nil {
 		return nil, err
 	}
-	vm, ok := vms[name]
+	host, ok := hosts[name]
 	if !ok {
-		return nil, ResourceNotFoundError("VM", name)
+		return nil, ResourceNotFoundError("Host", name)
 	}
-	return &vm, nil
+	return &host, nil
 }
 
 func runeIndexes(s string, r rune) []int {

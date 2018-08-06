@@ -30,8 +30,8 @@ import (
 )
 
 // broker container create c1
-// broker container mount c1 vm1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
-// broker container umount c1 vm1
+// broker container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
+// broker container umount c1 host1
 // broker container delete c1
 // broker container list
 // broker container inspect C1
@@ -107,7 +107,7 @@ func (s *ContainerServiceServer) Inspect(ctx context.Context, in *pb.Container) 
 	return conv.ToPBContainerMountPoint(resp), nil
 }
 
-//Mount a container on the filesystem of the VM
+//Mount a container on the filesystem of the host
 func (s *ContainerServiceServer) Mount(ctx context.Context, in *pb.ContainerMountingPoint) (*google_protobuf.Empty, error) {
 	log.Printf("Mount container called")
 	if GetCurrentTenant() == nil {
@@ -115,13 +115,13 @@ func (s *ContainerServiceServer) Mount(ctx context.Context, in *pb.ContainerMoun
 	}
 
 	service := services.NewContainerService(currentTenant.Client)
-	err := service.Mount(in.GetContainer(), in.GetVM().GetName(), in.GetPath())
+	err := service.Mount(in.GetContainer(), in.GetHost().GetName(), in.GetPath())
 
 	log.Println("End Mount container")
 	return &google_protobuf.Empty{}, err
 }
 
-//UMount a container from the filesystem of the VM
+//UMount a container from the filesystem of the host
 func (s *ContainerServiceServer) UMount(ctx context.Context, in *pb.ContainerMountingPoint) (*google_protobuf.Empty, error) {
 	log.Printf("UMount container called")
 	if GetCurrentTenant() == nil {
@@ -129,7 +129,7 @@ func (s *ContainerServiceServer) UMount(ctx context.Context, in *pb.ContainerMou
 	}
 
 	service := services.NewContainerService(currentTenant.Client)
-	err := service.UMount(in.GetContainer(), in.GetVM().GetName())
+	err := service.UMount(in.GetContainer(), in.GetHost().GetName())
 
 	log.Println("End UMount container")
 	return &google_protobuf.Empty{}, err

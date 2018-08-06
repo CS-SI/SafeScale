@@ -27,15 +27,15 @@ import (
 	"github.com/CS-SI/SafeScale/system/nfs"
 )
 
-//VolumeAPI defines API to manipulate VMs
+//VolumeAPI defines API to manipulate hosts
 type VolumeAPI interface {
 	Delete(ref string) error
 	Get(ref string) (*api.Volume, error)
 	Inspect(ref string) (*api.Volume, *api.VolumeAttachment, error)
 	List(all bool) ([]api.Volume, error)
 	Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error)
-	Attach(volume string, vm string, path string, format string) error
-	Detach(volume string, vm string) error
+	Attach(volume string, host string, path string, format string) error
+	Detach(volume string, host string) error
 }
 
 //NewVolumeService creates a Volume service
@@ -113,24 +113,24 @@ func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) 
 	return volume, nil
 }
 
-// Attach a volume to a VM
-func (srv *VolumeService) Attach(volumename, vmname, path, format string) error {
+// Attach a volume to an host
+func (srv *VolumeService) Attach(volumename, hostName, path, format string) error {
 	// Get volume ID
 	volume, err := srv.Get(volumename)
 	if err != nil {
-		return fmt.Errorf("No volume found with name or id '%s'", volumename)
+		return fmt.Errorf("no volume found with name or id '%s'", volumename)
 	}
 
-	// Get VM ID
-	vmService := NewVMService(srv.provider)
-	vm, err := vmService.Get(vmname)
+	// Get Host ID
+	hostService := NewHostService(srv.provider)
+	host, err := hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("No VM found with name or id '%s'", vmname)
+		return fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
 	volatt, err := srv.provider.CreateVolumeAttachment(api.VolumeAttachmentRequest{
-		Name:     fmt.Sprintf("%s-%s", volume.Name, vm.Name),
-		ServerID: vm.ID,
+		Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
+		ServerID: host.ID,
 		VolumeID: volume.ID,
 	})
 	if err != nil {
@@ -144,7 +144,7 @@ func (srv *VolumeService) Attach(volumename, vmname, path, format string) error 
 		mountPoint = api.DefaultVolumeMountPoint + volume.Name
 	}
 
-	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (srv *VolumeService) Attach(volumename, vmname, path, format string) error 
 	err = server.MountBlockDevice(volatt.Device, mountPoint, format)
 
 	if err != nil {
-		srv.Detach(volumename, vmname)
+		srv.Detach(volumename, hostName)
 		return err
 	}
 
@@ -173,25 +173,25 @@ func (srv *VolumeService) Attach(volumename, vmname, path, format string) error 
 }
 
 //Detach detach the volume identified by ref, ref can be the name or the id
-func (srv *VolumeService) Detach(volumename string, vmname string) error {
+func (srv *VolumeService) Detach(volumename string, hostName string) error {
 	vol, err := srv.Get(volumename)
 	if err != nil {
 		return fmt.Errorf("No volume found with name or id '%s'", volumename)
 	}
 
-	// Get VM ID
-	vmService := NewVMService(srv.provider)
-	vm, err := vmService.Get(vmname)
+	// Get Host ID
+	hostService := NewHostService(srv.provider)
+	host, err := hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("No VM found with name or id '%s'", vmname)
+		return fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
-	volatt, err := srv.provider.GetVolumeAttachment(vm.ID, vol.ID)
+	volatt, err := srv.provider.GetVolumeAttachment(host.ID, vol.ID)
 	if err != nil {
-		return fmt.Errorf("Error getting volume attachment: %s", err)
+		return fmt.Errorf("error getting volume attachment: %s", err)
 	}
 
-	sshConfig, err := srv.provider.GetSSHConfig(vm.ID)
+	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return err
 	}
@@ -206,5 +206,5 @@ func (srv *VolumeService) Detach(volumename string, vmname string) error {
 	}
 
 	// Finaly delete the attachment
-	return srv.provider.DeleteVolumeAttachment(vm.ID, vol.ID)
+	return srv.provider.DeleteVolumeAttachment(host.ID, vol.ID)
 }

@@ -48,10 +48,10 @@ func (m *MyMockedVolService) Delete(name string) error {
 func (m *MyMockedVolService) List() ([]api.Volume, error) {
 	return nil, nil
 }
-func (m *MyMockedVolService) Attach(volume string, vm string, path string, format string) error {
+func (m *MyMockedVolService) Attach(volume string, host string, path string, format string) error {
 	return nil
 }
-func (m *MyMockedVolService) Detach(volume string, vm string) error {
+func (m *MyMockedVolService) Detach(volume string, host string) error {
 	return nil
 }
 func (m *MyMockedVolService) Get(ref string) (*api.Volume, error) {

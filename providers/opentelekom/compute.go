@@ -21,27 +21,27 @@ import (
 	"github.com/CS-SI/SafeScale/system"
 )
 
-// CreateVM creates a new VM
-func (client *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
-	return client.feclt.CreateVM(request)
+// CreateHost creates a new host
+func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
+	return client.feclt.CreateHost(request)
 }
 
-// GetVM returns the VM identified by id
-func (client *Client) GetVM(id string) (*api.VM, error) {
-	return client.feclt.GetVM(id)
+// GetHost returns the host identified by id
+func (client *Client) GetHost(id string) (*api.Host, error) {
+	return client.feclt.GetHost(id)
 }
 
-// ListVMs lists available VMs
-func (client *Client) ListVMs(all bool) ([]api.VM, error) {
-	return client.feclt.ListVMs(all)
+// ListHosts lists available hosts
+func (client *Client) ListHosts(all bool) ([]api.Host, error) {
+	return client.feclt.ListHosts(all)
 }
 
-// DeleteVM deletes the VM identified by id
-func (client *Client) DeleteVM(id string) error {
-	return client.feclt.DeleteVM(id)
+// DeleteHost deletes the host identified by id
+func (client *Client) DeleteHost(id string) error {
+	return client.feclt.DeleteHost(id)
 }
 
-// GetSSHConfig creates SSHConfig to connect a VM by its ID
+// GetSSHConfig creates SSHConfig to connect an host by its ID
 func (client *Client) GetSSHConfig(id string) (*system.SSHConfig, error) {
 	return client.feclt.GetSSHConfig(id)
 }
@@ -77,22 +77,22 @@ func (client *Client) ListImages() ([]api.Image, error) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
+func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 	return client.feclt.GetTemplate(id)
 }
 
-// ListTemplates lists available VM templates
-// VM templates are sorted using Dominant Resource Fairness Algorithm
-func (client *Client) ListTemplates() ([]api.VMTemplate, error) {
+// ListTemplates lists available host templates
+// Host templates are sorted using Dominant Resource Fairness Algorithm
+func (client *Client) ListTemplates() ([]api.HostTemplate, error) {
 	return client.feclt.ListTemplates()
 }
 
-// StopVM stops the VM identified by id
-func (client *Client) StopVM(id string) error {
-	return client.feclt.StopVM(id)
+// StopHost stops the host identified by id
+func (client *Client) StopHost(id string) error {
+	return client.feclt.StopHost(id)
 }
 
-// StartVM starts the VM identified by id
-func (client *Client) StartVM(id string) error {
-	return client.feclt.StartVM(id)
+// StartHost starts the host identified by id
+func (client *Client) StartHost(id string) error {
+	return client.feclt.StartHost(id)
 }

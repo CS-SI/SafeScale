@@ -57,15 +57,15 @@ func getBoxContent(script string, data interface{}) (string, error) {
 	return tplcmd, nil
 }
 
-// Execute the given script (embeded in a rice-box) wit the given data on the VM identified by vmid
-func exec(script string, data interface{}, vmid string, provider *providers.Service) error {
+// Execute the given script (embeded in a rice-box) wit the given data on the host identified by hostid
+func exec(script string, data interface{}, hostid string, provider *providers.Service) error {
 	scriptCmd, err := getBoxContent(script, data)
 	if err != nil {
 		// TODO Use more explicit error
 		return err
 	}
 	// retrieve ssh config to perform some commands
-	ssh, err := provider.GetSSHConfig(vmid)
+	ssh, err := provider.GetSSHConfig(hostid)
 	if err != nil {
 		// TODO Use more explicit error
 		return err

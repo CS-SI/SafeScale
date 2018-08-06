@@ -26,36 +26,36 @@ import (
 
 const protocolSeparator = ":"
 
-//SSHAPI defines ssh management API
+// SSHAPI defines ssh management API
 type SSHAPI interface {
 	Connect(name string) error
 	Run(cmd string) (string, error)
 	Copy(from string, to string)
 }
 
-//NewSSHService creates a SSH service
+// NewSSHService creates a SSH service
 func NewSSHService(api api.ClientAPI) *SSHService {
 	return &SSHService{
-		provider:  providers.FromClient(api),
-		vmService: NewVMService(api),
+		provider:    providers.FromClient(api),
+		hostService: NewHostService(api),
 	}
 }
 
-//SSHService SSH service
+// SSHService SSH service
 type SSHService struct {
-	provider  *providers.Service
-	vmService VMAPI
+	provider    *providers.Service
+	hostService HostAPI
 }
 
-//Run execute command on the VM
-func (srv *SSHService) Run(vmName, cmd string) (string, error) {
-	vm, err := srv.vmService.Get(vmName)
+//Run execute command on the host
+func (srv *SSHService) Run(hostName, cmd string) (string, error) {
+	host, err := srv.hostService.Get(hostName)
 	if err != nil {
-		return "", fmt.Errorf("No VM found with name or id '%s'", vmName)
+		return "", fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
+	ssh, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return "", err
 	}
@@ -72,22 +72,22 @@ func (srv *SSHService) Run(vmName, cmd string) (string, error) {
 	return string(out[:]), nil
 }
 
-func extractVMName(in string) (string, error) {
+func extracthostName(in string) (string, error) {
 	parts := strings.Split(in, protocolSeparator)
 	if len(parts) == 1 {
 		return "", nil
 	}
 	if len(parts) > 2 {
-		return "", fmt.Errorf("Too many parts in path")
+		return "", fmt.Errorf("too many parts in path")
 	}
-	vmName := strings.TrimSpace(parts[0])
+	hostName := strings.TrimSpace(parts[0])
 	for _, protocol := range []string{"file", "http", "https", "ftp"} {
-		if strings.ToLower(vmName) == protocol {
-			return "", fmt.Errorf("No protocol expected. Only VM name")
+		if strings.ToLower(hostName) == protocol {
+			return "", fmt.Errorf("no protocol expected. Only host name")
 		}
 	}
 
-	return vmName, nil
+	return hostName, nil
 }
 
 func extractPath(in string) (string, error) {
@@ -96,9 +96,9 @@ func extractPath(in string) (string, error) {
 		return in, nil
 	}
 	if len(parts) > 2 {
-		return "", fmt.Errorf("Too many parts in path")
+		return "", fmt.Errorf("too many parts in path")
 	}
-	_, err := extractVMName(in)
+	_, err := extracthostName(in)
 	if err != nil {
 		return "", err
 	}
@@ -108,25 +108,25 @@ func extractPath(in string) (string, error) {
 
 //Copy copy file/directory
 func (srv *SSHService) Copy(from, to string) error {
-	vmName := ""
+	hostName := ""
 	var upload bool
 	var localPath, remotePath string
-	// Try exctract vm
-	vmFrom, err := extractVMName(from)
+	// Try extract host
+	hostFrom, err := extracthostName(from)
 	if err != nil {
 		return err
 	}
-	vmTo, err := extractVMName(to)
+	hostTo, err := extracthostName(to)
 	if err != nil {
 		return err
 	}
 
-	// Vm checks
-	if vmFrom != "" && vmTo != "" {
-		return fmt.Errorf("Copy between 2 VM is not supported yet")
+	// Host checks
+	if hostFrom != "" && hostTo != "" {
+		return fmt.Errorf("copy between 2 hosts is not supported yet")
 	}
-	if vmFrom == "" && vmTo == "" {
-		return fmt.Errorf("No VM name specified neither in from nor to")
+	if hostFrom == "" && hostTo == "" {
+		return fmt.Errorf("no host name specified neither in from nor to")
 	}
 
 	fromPath, err := extractPath(from)
@@ -138,25 +138,25 @@ func (srv *SSHService) Copy(from, to string) error {
 		return err
 	}
 
-	if vmFrom != "" {
-		vmName = vmFrom
+	if hostFrom != "" {
+		hostName = hostFrom
 		remotePath = fromPath
 		localPath = toPath
 		upload = false
 	} else {
-		vmName = vmTo
+		hostName = hostTo
 		remotePath = toPath
 		localPath = fromPath
 		upload = true
 	}
 
-	vm, err := srv.vmService.Get(vmName)
+	host, err := srv.hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("No VM found with name or id '%s'", vmName)
+		return fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(vm.ID)
+	ssh, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return err
 	}

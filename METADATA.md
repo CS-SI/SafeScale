@@ -12,7 +12,7 @@ Each object in this container/bucket is stored as a gob representation of Go str
 
 The host informations are stored in folder ``0.safescale/host``.
 
-Inside this folder, the metadata of a host is stored in object named with its ID in subfolder ``byID``,
+Inside this folder, the metadata of an host is stored in object named with its ID in subfolder ``byID``,
 and in object named with its name in subfolder ``byName``.
 
 ### SafeScale Networks
@@ -41,7 +41,7 @@ The metadata for volume informations are stored in ``0.safescale/volume``.
 Inside this folder, the metadata of a volume are stored in an object named with its ID in subfolder ``byID``,
 and in an object named with its name in subfolder ``byName``.
 
-Besides the folders ``byID`` and ``byName`` will be find a folder named with the uid of the volume containing an object named with the id of the host that is currently mounting the volume, and 2 folders named ``attached`` and ``detached`` that will contain volume objects named by uid attached to a host for the former and not attach to a host for the latter.
+Besides the folders ``byID`` and ``byName`` will be find a folder named with the uid of the volume containing an object named with the id of the host that is currently mounting the volume, and 2 folders named ``attached`` and ``detached`` that will contain volume objects named by uid attached to an host for the former and not attach to an host for the latter.
 
 ### SafeScale Clusters
 

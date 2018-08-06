@@ -87,7 +87,7 @@ func (client *Client) GetImage(id string) (*api.Image, error) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
+func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
 	err := retry.WhileUnsuccessfulDelay1Second(
@@ -101,8 +101,8 @@ func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error getting template: %s", errorString(err))
 	}
-	return &api.VMTemplate{
-		VMSize: api.VMSize{
+	return &api.HostTemplate{
+		HostSize: api.HostSize{
 			Cores:    flv.VCPUs,
 			RAMSize:  float32(flv.RAM) / 1000.0,
 			DiskSize: flv.Disk,
@@ -114,13 +114,13 @@ func (client *Client) GetTemplate(id string) (*api.VMTemplate, error) {
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (client *Client) ListTemplates() ([]api.VMTemplate, error) {
+func (client *Client) ListTemplates() ([]api.HostTemplate, error) {
 	opts := flavors.ListOpts{}
 
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := flavors.ListDetail(client.Compute, opts)
 
-	var flvList []api.VMTemplate
+	var flvList []api.HostTemplate
 
 	// Define an anonymous function to be executed on each page's iteration
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -131,8 +131,8 @@ func (client *Client) ListTemplates() ([]api.VMTemplate, error) {
 
 		for _, flv := range flavorList {
 
-			flvList = append(flvList, api.VMTemplate{
-				VMSize: api.VMSize{
+			flvList = append(flvList, api.HostTemplate{
+				HostSize: api.HostSize{
 					Cores:    flv.VCPUs,
 					RAMSize:  float32(flv.RAM) / 1000.0,
 					DiskSize: flv.Disk,
@@ -233,26 +233,26 @@ func (client *Client) DeleteKeyPair(id string) error {
 	return nil
 }
 
-// toVMSize converts flavor attributes returned by OpenStack driver into api.VM
-func (client *Client) toVMSize(flavor map[string]interface{}) api.VMSize {
+// toHostSize converts flavor attributes returned by OpenStack driver into api.Host
+func (client *Client) toHostSize(flavor map[string]interface{}) api.HostSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
 		tpl, err := client.GetTemplate(fid)
 		if err == nil {
-			return tpl.VMSize
+			return tpl.HostSize
 		}
 	}
 	if _, ok := flavor["vcpus"]; ok {
-		return api.VMSize{
+		return api.HostSize{
 			Cores:    flavor["vcpus"].(int),
 			DiskSize: flavor["disk"].(int),
 			RAMSize:  flavor["ram"].(float32) / 1000.0,
 		}
 	}
-	return api.VMSize{}
+	return api.HostSize{}
 }
 
-// toHostState converts VM status returned by OpenStack driver into HostState enum
+// toHostState converts host status returned by OpenStack driver into HostState enum
 func toHostState(status string) HostState.Enum {
 	switch status {
 	case "BUILD", "build", "BUILDING", "building":
@@ -300,8 +300,8 @@ func (client *Client) convertAdresses(addresses map[string]interface{}) (map[IPV
 	return addrs, AcccessIPv4, AcccessIPv6
 }
 
-// toVM converts an OpenStack server into api VM
-func (client *Client) toVM(server *servers.Server) *api.VM {
+// toHost converts an OpenStack server into api Host
+func (client *Client) toHost(server *servers.Server) *api.Host {
 	adresses, ipv4, ipv6 := client.convertAdresses(server.Addresses)
 	if ipv4 != "" {
 		server.AccessIPv4 = ipv4
@@ -310,30 +310,30 @@ func (client *Client) toVM(server *servers.Server) *api.VM {
 		server.AccessIPv6 = ipv6
 	}
 
-	vm := api.VM{
+	host := api.Host{
 		ID:           server.ID,
 		Name:         server.Name,
 		PrivateIPsV4: adresses[IPVersion.IPv4],
 		PrivateIPsV6: adresses[IPVersion.IPv6],
 		AccessIPv4:   server.AccessIPv4,
 		AccessIPv6:   server.AccessIPv6,
-		Size:         client.toVMSize(server.Flavor),
+		Size:         client.toHostSize(server.Flavor),
 		State:        toHostState(server.Status),
 	}
 	m, err := metadata.LoadHost(providers.FromClient(client), server.ID)
 	if err == nil && m != nil {
-		vmDef := m.Get()
-		vm.GatewayID = vmDef.GatewayID
-		vm.PrivateKey = vmDef.PrivateKey
+		hostDef := m.Get()
+		host.GatewayID = hostDef.GatewayID
+		host.PrivateKey = hostDef.PrivateKey
 		//Floating IP management
-		if vm.AccessIPv4 == "" {
-			vm.AccessIPv4 = vmDef.AccessIPv4
+		if host.AccessIPv4 == "" {
+			host.AccessIPv4 = hostDef.AccessIPv4
 		}
-		if vm.AccessIPv6 == "" {
-			vm.AccessIPv6 = vmDef.AccessIPv6
+		if host.AccessIPv6 == "" {
+			host.AccessIPv6 = hostDef.AccessIPv6
 		}
 	}
-	return &vm
+	return &host
 }
 
 // userData is the structure to apply to userdata.sh template
@@ -369,20 +369,21 @@ func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 
 	gw, err := servers.Get(client.Compute, m.Get().ID).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating VM: Unable to get gateway: %s", errorString(err))
+		return nil, fmt.Errorf("Error creating Host: Unable to get gateway: %s", errorString(err))
 	}
 	return gw, nil
 }
 
-// CreateVM creates a VM satisfying request
-func (client *Client) CreateVM(request api.VMRequest) (*api.VM, error) {
-	return client.createVM(request, false)
+// CreateHost creates an host satisfying request
+func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
+	return client.createHost(request, false)
 }
 
-func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, error) {
+// createHost ...
+func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.Host, error) {
 	// Optional network gateway
-	var gw *api.VM
-	// If the VM is not public it has to be created on a network owning a Gateway
+	var gw *api.Host
+	// If the host is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
 		gwServer, err := client.readGateway(request.NetworkIDs[0])
 		if err != nil {
@@ -398,8 +399,8 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 
 	var nets []servers.Network
-	// If floating IPs are not used and VM is public
-	// then add provider network to VM networks
+	// If floating IPs are not used and host is public
+	// then add provider network to host networks
 	if !client.Cfg.UseFloatingIP && request.PublicIP {
 		nets = append(nets, servers.Network{
 			UUID: client.ProviderNetworkID,
@@ -421,7 +422,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		name := fmt.Sprintf("%s_%s", request.Name, id)
 		kp, err = client.CreateKeyPair(name)
 		if err != nil {
-			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+			return nil, fmt.Errorf("Error creating Host: %s", errorString(err))
 		}
 	}
 
@@ -431,7 +432,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	}
 
 	//fmt.Println(string(userData))
-	// Create VM
+	// Create host
 	srvOpts := servers.CreateOpts{
 		Name:           request.Name,
 		SecurityGroups: []string{client.SecurityGroup.Name},
@@ -447,7 +448,7 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		if server != nil {
 			servers.Delete(client.Compute, server.ID)
 		}
-		return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+		return nil, fmt.Errorf("Error creating Host: %s", errorString(err))
 	}
 	// Wait that Host is started
 	service := providers.Service{
@@ -456,9 +457,9 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 	host, err := service.WaitHostState(server.ID, HostState.STARTED, 120*time.Second)
 	if err != nil {
 		servers.Delete(client.Compute, server.ID)
-		return nil, fmt.Errorf("Timeout creating VM: %s", errorString(err))
+		return nil, fmt.Errorf("Timeout creating Host: %s", errorString(err))
 	}
-	// Add gateway ID to VM definition
+	// Add gateway ID to Host definition
 	var gwID string
 	if gw != nil {
 		gwID = gw.ID
@@ -474,17 +475,17 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		}).Extract()
 		if err != nil {
 			servers.Delete(client.Compute, host.ID)
-			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+			return nil, fmt.Errorf("Error creating Host: %s", errorString(err))
 		}
 
-		// Associate floating IP to VM
+		// Associate floating IP to host
 		err = floatingips.AssociateInstance(client.Compute, host.ID, floatingips.AssociateOpts{
 			FloatingIP: ip.IP,
 		}).ExtractErr()
 		if err != nil {
 			floatingips.Delete(client.Compute, ip.ID)
 			servers.Delete(client.Compute, host.ID)
-			return nil, fmt.Errorf("Error creating VM: %s", errorString(err))
+			return nil, fmt.Errorf("Error creating Host: %s", errorString(err))
 		}
 
 		if IPVersion.IPv4.Is(ip.IP) {
@@ -500,23 +501,23 @@ func (client *Client) createVM(request api.VMRequest, isGateway bool) (*api.VM, 
 		err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
 	}
 	if err != nil {
-		client.DeleteVM(host.ID)
+		client.DeleteHost(host.ID)
 		return nil, fmt.Errorf("error creating host: %s", errorString(err))
 	}
 	return host, nil
 }
 
-//GetVM returns the VM identified by id
-func (client *Client) GetVM(id string) (*api.VM, error) {
+// GetHost returns the host identified by id
+func (client *Client) GetHost(id string) (*api.Host, error) {
 	server, err := servers.Get(client.Compute, id).Extract()
 	if err != nil {
 		return nil, fmt.Errorf("Error getting host: %s", errorString(err))
 	}
-	return client.toVM(server), nil
+	return client.toHost(server), nil
 }
 
-//ListVMs lists available VMs
-func (client *Client) ListVMs(all bool) ([]api.VM, error) {
+//ListHosts lists available hosts
+func (client *Client) ListHosts(all bool) ([]api.Host, error) {
 	if all {
 		return client.listAllHosts()
 	}
@@ -524,9 +525,9 @@ func (client *Client) ListVMs(all bool) ([]api.VM, error) {
 }
 
 // listAllHosts lists available hosts
-func (client *Client) listAllHosts() ([]api.VM, error) {
+func (client *Client) listAllHosts() ([]api.Host, error) {
 	pager := servers.List(client.Compute, servers.ListOpts{})
-	var hosts []api.VM
+	var hosts []api.Host
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := servers.ExtractServers(page)
 		if err != nil {
@@ -534,24 +535,24 @@ func (client *Client) listAllHosts() ([]api.VM, error) {
 		}
 
 		for _, srv := range list {
-			hosts = append(hosts, *client.toVM(&srv))
+			hosts = append(hosts, *client.toHost(&srv))
 		}
 		return true, nil
 	})
 	if len(hosts) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing vms : %s", errorString(err))
+		return nil, fmt.Errorf("error listing hosts : %s", errorString(err))
 	}
 	return hosts, nil
 }
 
-// listMonitoredHosts lists available VMs created by SafeScale (ie registered in object storage)
-func (client *Client) listMonitoredHosts() ([]api.VM, error) {
-	var hosts []api.VM
+// listMonitoredHosts lists available hosts created by SafeScale (ie registered in object storage)
+func (client *Client) listMonitoredHosts() ([]api.Host, error) {
+	var hosts []api.Host
 	m, err := metadata.NewHost(providers.FromClient(client))
 	if err != nil {
 		return hosts, err
 	}
-	err = m.Browse(func(host *api.VM) error {
+	err = m.Browse(func(host *api.Host) error {
 		hosts = append(hosts, *host)
 		return nil
 	})
@@ -562,7 +563,7 @@ func (client *Client) listMonitoredHosts() ([]api.VM, error) {
 }
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
-// By convention only one floating IP is allocated to a host
+// By convention only one floating IP is allocated to an host
 func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
 	pager := floatingips.List(client.Compute)
 	var fips []floatingips.FloatingIP
@@ -592,9 +593,9 @@ func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, err
 	return &fips[0], nil
 }
 
-// DeleteVM deletes the VM identified by id
-func (client *Client) DeleteVM(id string) error {
-	vm, err := client.GetVM(id)
+// DeleteHost deletes the host identified by id
+func (client *Client) DeleteHost(id string) error {
+	host, err := client.GetHost(id)
 	if err != nil {
 		return err
 	}
@@ -606,11 +607,11 @@ func (client *Client) DeleteVM(id string) error {
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("error deleting VM %s : %s", vm.Name, errorString(err))
+					return fmt.Errorf("error deleting host %s : %s", host.Name, errorString(err))
 				}
 				err = floatingips.Delete(client.Compute, fip.ID).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("error deleting VM %s : %s", vm.Name, errorString(err))
+					return fmt.Errorf("error deleting host %s : %s", host.Name, errorString(err))
 				}
 			}
 		}
@@ -618,43 +619,43 @@ func (client *Client) DeleteVM(id string) error {
 
 	err = servers.Delete(client.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting VM %s : %s", vm.Name, errorString(err))
+		return fmt.Errorf("error deleting host %s : %s", host.Name, errorString(err))
 	}
 
-	metadata.RemoveHost(providers.FromClient(client), vm)
+	metadata.RemoveHost(providers.FromClient(client), host)
 
 	return nil
 }
 
-//StopVM stops the VM identified by id
-func (client *Client) StopVM(id string) error {
+// StopHost stops the host identified by id
+func (client *Client) StopHost(id string) error {
 	err := startstop.Stop(client.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error stoping VM : %s", errorString(err))
+		return fmt.Errorf("error stopping host : %s", errorString(err))
 	}
 	return nil
 }
 
-//StartVM starts the VM identified by id
-func (client *Client) StartVM(id string) error {
+// StartHost starts the host identified by id
+func (client *Client) StartHost(id string) error {
 	err := startstop.Start(client.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error stoping VM : %s", errorString(err))
+		return fmt.Errorf("error stopping host : %s", errorString(err))
 	}
 	return nil
 }
 
-func (client *Client) getSSHConfig(vm *api.VM) (*system.SSHConfig, error) {
+func (client *Client) getSSHConfig(host *api.Host) (*system.SSHConfig, error) {
 
-	ip := vm.GetAccessIP()
+	ip := host.GetAccessIP()
 	sshConfig := system.SSHConfig{
-		PrivateKey: vm.PrivateKey,
+		PrivateKey: host.PrivateKey,
 		Port:       22,
 		Host:       ip,
 		User:       api.DefaultUser,
 	}
-	if vm.GatewayID != "" {
-		gw, err := client.GetVM(vm.GatewayID)
+	if host.GatewayID != "" {
+		gw, err := client.GetHost(host.GatewayID)
 		if err != nil {
 			return nil, err
 		}
@@ -672,11 +673,11 @@ func (client *Client) getSSHConfig(vm *api.VM) (*system.SSHConfig, error) {
 
 }
 
-//GetSSHConfig creates SSHConfig to connect a VM
+//GetSSHConfig creates SSHConfig to connect an host
 func (client *Client) GetSSHConfig(id string) (*system.SSHConfig, error) {
-	vm, err := client.GetVM(id)
+	host, err := client.GetHost(id)
 	if err != nil {
 		return nil, err
 	}
-	return client.getSSHConfig(vm)
+	return client.getSSHConfig(host)
 }

@@ -18,7 +18,7 @@ package HostAdditionalInfo
 
 //go:generate stringer -type=Enum
 
-// Enum represents the type of additional info for a host
+// Enum represents the type of additional info for an host
 type Enum uint8
 
 const (

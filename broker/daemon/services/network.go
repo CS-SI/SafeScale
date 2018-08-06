@@ -34,20 +34,20 @@ type NetworkAPI interface {
 	Delete(ref string) error
 }
 
-//NetworkService an instance of NetworkAPI
+// NetworkService an instance of NetworkAPI
 type NetworkService struct {
 	provider  *providers.Service
 	ipVersion IPVersion.Enum
 }
 
-//NewNetworkService Creates new Network service
+// NewNetworkService Creates new Network service
 func NewNetworkService(api api.ClientAPI) NetworkAPI {
 	return &NetworkService{
 		provider: providers.FromClient(api),
 	}
 }
 
-//Create creates a network
+// Create creates a network
 func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*api.Network, error) {
 	// Check that no network with same name already exists
 	_net, err := srv.Get(net)
