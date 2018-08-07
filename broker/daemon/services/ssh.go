@@ -18,7 +18,10 @@ package services
 
 import (
 	"fmt"
+	"io/ioutil"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/system"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -29,7 +32,7 @@ const protocolSeparator = ":"
 // SSHAPI defines ssh management API
 type SSHAPI interface {
 	Connect(name string) error
-	Run(cmd string) (string, error)
+	Run(cmd string) (string, string, int, error)
 	Copy(from string, to string)
 }
 
@@ -48,28 +51,51 @@ type SSHService struct {
 }
 
 //Run execute command on the host
-func (srv *SSHService) Run(hostName, cmd string) (string, error) {
+func (srv *SSHService) Run(hostName, cmd string) (string, string, int, error) {
 	host, err := srv.hostService.Get(hostName)
 	if err != nil {
-		return "", fmt.Errorf("no host found with name or id '%s'", hostName)
+		return "", "", 1, fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
 	// retrieve ssh config to perform some commands
 	ssh, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		return "", err
+		return "", "", 1, err
 	}
 
+	// Create the command
 	sshcmd, err := ssh.Command(cmd)
 	if err != nil {
-		return "", err
-	}
-	out, err := sshcmd.Output()
-	if err != nil {
-		return "", err
+		return "", "", 1, err
 	}
 
-	return string(out[:]), nil
+	// Set up the outputs (std and err)
+	stdOut, err := sshcmd.StdoutPipe()
+	if err != nil {
+		return "", "", 1, err
+	}
+	stderr, err := sshcmd.StderrPipe()
+	if err != nil {
+		return "", "", 1, err
+	}
+
+	// Launch the command and wait for its execution
+	if err = sshcmd.Start(); err != nil {
+		return "", "", 1, err
+	}
+
+	msgOut, _ := ioutil.ReadAll(stdOut)
+	msgErr, _ := ioutil.ReadAll(stderr)
+
+	if err = sshcmd.Wait(); err != nil {
+		msgError, retCode, erro := system.ExtractRetCode(err)
+		if erro != nil {
+			return "", "", 1, err
+		}
+		return string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), retCode, nil
+	}
+
+	return string(msgOut[:]), string(msgErr[:]), 0, nil
 }
 
 func extracthostName(in string) (string, error) {

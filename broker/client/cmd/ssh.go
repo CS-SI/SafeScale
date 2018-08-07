@@ -75,14 +75,14 @@ var sshRun = cli.Command{
 			Command: c.String("c"),
 		})
 
-		// TODO output result to stdout
 		if err != nil {
 			return fmt.Errorf("Could not execute ssh command: %v", err)
 		}
-		fmt.Print(fmt.Sprintf(resp.GetOutput()))
-		fmt.Fprint(os.Stderr, fmt.Sprintf(resp.GetErr()))
-		// fmt.Println(fmt.Sprintf(string(resp.GetStatus())))
 
+		fmt.Print(fmt.Sprintf(resp.GetOutputStd()))
+		fmt.Fprint(os.Stderr, fmt.Sprintf(resp.GetOutputErr()))
+
+		os.Exit(int(resp.GetStatus()))
 		return nil
 	},
 }

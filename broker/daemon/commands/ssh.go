@@ -43,17 +43,14 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 	}
 
 	service := services.NewSSHService(currentTenant.Client)
-	out, err := service.Run(in.GetHost().GetName(), in.GetCommand())
-	if err != nil {
-		return nil, err
-	}
+	msgStd, msgErr, retCode, err := service.Run(in.GetHost().GetName(), in.GetCommand())
 
 	log.Println("End ssh run")
 	return &pb.SshResponse{
-		Status: 0,
-		Output: out,
-		Err:    "",
-	}, nil
+		Status:    int32(retCode),
+		OutputStd: msgStd,
+		OutputErr: msgErr,
+	}, err
 }
 
 //Copy copy file from/to an host

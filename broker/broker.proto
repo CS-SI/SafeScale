@@ -259,9 +259,9 @@ message SshCopyCommand{
 }
 
 message SshResponse{
-    string output = 1;
-    string err = 2;
-    int32 status = 3;
+    string OutputStd = 1;
+    string OutputErr = 2;
+    int32 Status = 3;
 }
 
 service SshService{
