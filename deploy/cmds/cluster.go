@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
@@ -28,9 +30,9 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cmds/ErrorCode"
-	"github.com/davecgh/go-spew/spew"
 
 	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	cli "github.com/CS-SI/SafeScale/utils/cli"
 )
 
@@ -742,10 +744,9 @@ var clusterDcosCommand = &cli.Command{
 			os.Exit(int(ErrorCode.NotApplicable))
 		}
 		args := c.StringSliceArgument("<arg>", []string{})
-		spew.Dump(args)
 
-		fmt.Println("clusterDcosCommand not yet implemented")
-		os.Exit(int(ErrorCode.NotImplemented))
+		cmdStr := "sudo -u cladm -i dcos " + strings.Join(args, " ")
+		executeCommand(cmdStr)
 	},
 
 	Help: &cli.HelpContent{
@@ -762,10 +763,9 @@ var clusterKubectlCommand = &cli.Command{
 
 	Process: func(c *cli.Command) {
 		args := c.StringSliceArgument("<arg>", []string{})
-		spew.Dump(args)
 
-		fmt.Println("clusterKubectlCommand not yet implemented")
-		os.Exit(int(ErrorCode.NotImplemented))
+		cmdStr := "sudo -u cladm -i kubectl " + strings.Join(args, " ")
+		executeCommand(cmdStr)
 	},
 
 	Help: &cli.HelpContent{
@@ -782,10 +782,9 @@ var clusterMarathonCommand = &cli.Command{
 
 	Process: func(c *cli.Command) {
 		args := c.StringSliceArgument("<arg>", []string{})
-		spew.Dump(args)
 
-		fmt.Println("clusterMarathonCommand not yet implemented")
-		os.Exit(int(ErrorCode.NotImplemented))
+		cmdStr := "sudo -u cladm -i marathon " + strings.Join(args, " ")
+		executeCommand(cmdStr)
 	},
 
 	Help: &cli.HelpContent{
@@ -816,4 +815,27 @@ Usage: {{.ProgName}} [options] cluster list,ls
   inspect
   delete,destroy,remove,rm  Delete the cluster`,
 	},
+}
+
+func executeCommand(command string) (int, string, string, error) {
+	masters, err := clusterInstance.GetMasters()
+	if err != nil {
+		fmt.Printf("Failed to get masters for the cluster '%s': %s", clusterInstance.GetName(), err.Error())
+		os.Exit(int(ErrorCode.Run))
+	}
+	var ok bool
+	for _, m := range masters {
+		err := brokeruse.SSHRun(m, command, 5*time.Minute)
+		if err == nil {
+			ok = true
+			break
+		}
+	}
+	if ok {
+		os.Exit(int(ErrorCode.OK))
+	}
+	fmt.Println("failed to find an available master server to execute the command")
+	os.Exit(int(ErrorCode.RPC))
+
+	return 0, "", "", nil
 }
