@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/deploy/cmds"
+
 	"github.com/CS-SI/SafeScale/utils/cli"
 
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise provider cloudwatt
