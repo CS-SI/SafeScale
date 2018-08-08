@@ -18,214 +18,244 @@ package cmds
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
-	cli "github.com/jawher/mow.cli"
+	"github.com/CS-SI/SafeScale/deploy/cmds/ErrorCode"
+
+	"github.com/CS-SI/SafeScale/utils/cli"
 )
 
-// InspectCmd ...
-func InspectCmd(c *cli.Cmd) {
-	c.Spec = "CLUSTERNAME"
-
-	clusterName = c.StringArg("CLUSTERNAME", "", "Name of the cluster")
-
-	c.Action = func() {
-		if *clusterName == "" {
-			fmt.Println("Invalid empty argument CLUSTERNAME")
-			return
-		}
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster inspect %s", *clusterName))
-		fmt.Println(cmdStr)
+func populateClusterName(c *cli.Command) {
+	clusterName := c.StringArgument("<clustername>", "")
+	if clusterName == "" {
+		fmt.Println("Invalid argument <clustername>")
+		os.Exit(int(ErrorCode.InvalidArgument))
 	}
+
 }
 
-// CreateCmd ...
-func CreateCmd(cmd *cli.Cmd) {
-	//cmd.Spec = "CLUSTERNAME -F [-C] [-N] [-k]"
-	cmd.Spec = "CLUSTERNAME [-F][-C][-N][-k][--os][--cpu][--ram][--disk]"
+// ClusterInspectCommand handles 'perform <clustername inspect'
+var ClusterInspectCommand = &cli.Command{
+	Keyword: "inspect",
 
-	clusterName := cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
-	flavorStr := cmd.StringOpt("F flavor", "", "Flavor of Cluster; can be DCOS, BOH (Bunch Of Hosts)")
-	complexityStr := cmd.StringOpt("C complexity", "Normal", "Complexity of the cluster; can be DEV, NORMAL (default), VOLUME")
-	cidr := cmd.StringOpt("N cidr", "192.168.0.0/24", "CIDR of the network (default: 192.168.0.0/24)")
-	keep := cmd.BoolOpt("k keep-on-failure", false, "if set, don't delete resources on failure (default: false)")
-	os := cmd.StringOpt("os", "", "operating system (if supported by flavor")
-	cpu := cmd.StringOpt("cpu", "", "Number of CPU of the Nodes")
-	ram := cmd.StringOpt("ram", "", "Ram size of the nodes (in GB)")
-	disk := cmd.StringOpt("disk", "", "Disk size of system disk (in GB)")
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s inspect", clusterName))
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
 
-	cmd.Action = func() {
-		if *clusterName == "" {
-			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
-			return
-		}
+	Help: &cli.HelpContent{},
+}
 
-		cmdStr := fmt.Sprintf("deploy cluster create %s", *clusterName)
-		if *flavorStr == "" {
-			*flavorStr = "DCOS"
-		}
-		cmdStr += fmt.Sprintf(" -F %s", *flavorStr)
+// ClusterCreateCommand handles 'perform <clustername> create"
+var ClusterCreateCommand = &cli.Command{
+	Keyword: "create",
 
-		if *complexityStr != "" {
-			cmdStr += fmt.Sprintf(" -C %s", *complexityStr)
-		}
-		if *cidr != "" {
-			cmdStr += fmt.Sprintf(" -N %s", *cidr)
-		}
-		if *keep {
-			cmdStr += fmt.Sprintf(" -k")
-		}
-		if *os != "" {
-			cmdStr += fmt.Sprintf(" --os %s", *os)
-		}
-		if *cpu != "" {
-			cmdStr += fmt.Sprintf(" --cpu %s", *cpu)
-		}
-		if *ram != "" {
-			cmdStr += fmt.Sprintf(" --ram %s", *ram)
-		}
-		if *disk != "" {
-			cmdStr += fmt.Sprintf(" --disk %s", *disk)
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
+
+		complexityStr := c.StringOption("C complexity", "<complexity>", "Normal")
+		cidr := c.StringOption("N cidr", "<cidr>", "192.168.0.0/24")
+		keep := c.Flag("k keep-on-failure", false)
+		cpu := c.IntOption("cpu", "<cpu>", 4)
+		ram := c.FloatOption("ram", "<ram>", 7.0)
+		disk := c.IntOption("disk", "<disk>", 100)
+
+		cmdStr := fmt.Sprintf("deploy cluster %s create -F DCOS -C %s -N %s --cpu %d --ram %f --disk %d",
+			clusterName, complexityStr, cidr, cpu, ram, disk)
+		if keep {
+			cmdStr += " -k"
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-	}
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{
+		Usage: `
+Usage: deploy [options] cluster <clustername> state`,
+		Description: `
+Gets the state of the cluster <clustername>.`,
+	},
 }
 
-// DeleteCmd ...
-func DeleteCmd(cmd *cli.Cmd) {
-	cmd.Spec = "CLUSTERNAME [-f]"
+// ClusterDeleteCommand handles 'perform <clustername> delete'
+var ClusterDeleteCommand = &cli.Command{
+	Keyword: "delete",
+	Aliases: []string{"destroy", "remove", "rm"},
 
-	clusterName := cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
-	force := cmd.BoolOpt("f force", false, "Force deletion")
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
 
-	cmd.Action = func() {
-		if *clusterName == "" {
-			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
-			return
-		}
-		cmdStr := fmt.Sprintf("deploy cluster delete %s", *clusterName)
-		if *force {
-			cmdStr += fmt.Sprintf(" -f")
+		force := c.Flag("f force", false)
+
+		cmdStr := fmt.Sprintf("deploy cluster %s delete", clusterName)
+		if force {
+			cmdStr += " -f"
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-	}
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
 }
 
-// StopCmd ...
-func StopCmd(cmd *cli.Cmd) {
-	cmd.Spec = "CLUSTERNAME"
+// ClusterStopCommand handles 'perform <clustername> stop'
+var ClusterStopCommand = &cli.Command{
+	Keyword: "stop",
+	Aliases: []string{"freeze"},
 
-	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
 
-	cmd.Action = func() {
-		if *clusterName == "" {
-			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
-			return
-		}
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster stop %s", *clusterName))
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s stop", clusterName))
 		fmt.Println(cmdStr)
-	}
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
 }
 
-// StartCmd ...
-func StartCmd(cmd *cli.Cmd) {
-	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+// ClusterStartCommand handles 'perform <clustername> start'
+var ClusterStartCommand = &cli.Command{
+	Keyword: "start",
+	Aliases: []string{"unfreeze"},
 
-	cmd.Action = func() {
-		if *clusterName == "" {
-			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
-			return
-		}
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster start %s", *clusterName))
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
+
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s start", clusterName))
 		fmt.Println(cmdStr)
-	}
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
 }
 
-// StateCmd ...
-func StateCmd(cmd *cli.Cmd) {
-	cmd.Spec = "CLUSTERNAME"
+// ClusterStateCommand handles 'perform <clustername> state'
+var ClusterStateCommand = &cli.Command{
+	Keyword: "state",
 
-	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
 
-	cmd.Action = func() {
-		if *clusterName == "" {
-			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
-			return
-		}
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster state %s", *clusterName))
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s state", clusterName))
 		fmt.Println(cmdStr)
-	}
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
 }
 
-// ExpandCmd ...
-func ExpandCmd(cmd *cli.Cmd) {
-	//cmd.Spec = "CLUSTERNAME [-n] [-p] [-c] [-r] [-d] [-g]"
-	cmd.Spec = "CLUSTERNAME [-n] [-p] [-c] [-r] [-d]"
+// ClusterExpandCommand handles 'perform <clustername> expand'
+var ClusterExpandCommand = &cli.Command{
+	Keyword: "expand",
 
-	clusterName := cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
-	count := cmd.IntOpt("n count", 1, "Number of nodes to create")
-	public := cmd.BoolOpt("p public", false, "Attach public IP address to node (default: false)")
-	os := cmd.StringOpt("os", "", "Operating System")
-	cpu := cmd.StringOpt("cpu", "", "Number of CPU for the Host (default: 2)")
-	ram := cmd.StringOpt("ram", "", "RAM for the host (default: 7 GB)")
-	disk := cmd.StringOpt("disk", "", "System disk size for the host (default: 100 GB)")
-	//gpu := cmd.BoolOpt("g gpu", false, "With GPU")
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
 
-	cmd.Action = func() {
-		if *clusterName == "" {
-			fmt.Println("Missing or invalid mandatory argument CLUSTERNAME")
-			return
-		}
-		cmdStr := fmt.Sprintf("%sdeploy cluster expand %s", RebrandingPrefix, *clusterName)
-		if *count > 1 {
-			cmdStr += fmt.Sprintf(" -n %d", *count)
-		}
-		if *public {
+		count := c.IntOption("n count", "<count>", 1)
+		public := c.Flag("p public", false)
+		cpu := c.IntOption("cpu", "<cpu>", 4)
+		ram := c.FloatOption("ram", "<ram>", 7.0)
+		disk := c.IntOption("disk", "<disk>", 100)
+		//gpu := c.Flag("g gpu", false)
+
+		cmdStr := fmt.Sprintf("deploy cluster %s expand -n %d --cpu %d --ram %f --disk %d",
+			clusterName, count, cpu, ram, disk)
+		if public {
 			cmdStr += " -p"
-		}
-		if *cpu != "" {
-			cmdStr += " --cpu " + *cpu
-		}
-		if *ram != "" {
-			cmdStr += " --ram " + *ram
-		}
-		if *disk != "" {
-			cmdStr += " --disk " + *disk
-		}
-		if *os != "" {
-			cmdStr += " --os " + *os
 		}
 		// if *gpu {
 		// 	cmdStr += " --gpu"
 		// }
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-	}
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
 }
 
-// ShrinkCmd ...
-func ShrinkCmd(cmd *cli.Cmd) {
-	cmd.Spec = "CLUSTERNAME [-n] [-p]"
+// ClusterShrinkCommand handles 'perform <clustername> shrink'
+var ClusterShrinkCommand = &cli.Command{
+	Keyword: "shrink",
 
-	clusterName := cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
-	count := cmd.IntOpt("n count", 1, "Number of node(s) to delete (default: 1)")
-	public := cmd.BoolOpt("p public", false, "Delete a public node if set (default: false)")
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
 
-	cmd.Action = func() {
-		if *clusterName == "" {
-			fmt.Println("Invalid empty argument CLUSTERNAME")
-			return
-		}
+		count := c.IntOption("n count", "<count>", 1)
+		public := c.Flag("p public", false)
 
-		cmdStr := fmt.Sprintf("deploy cluster shrink %s", *clusterName)
-		if *public {
+		cmdStr := fmt.Sprintf("deploy cluster %s shrink -n %d", clusterName, count)
+		if public {
 			cmdStr += " -p"
-		}
-		if *count > 1 {
-			cmdStr += fmt.Sprintf(" -n %d", *count)
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-	}
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// ClusterDcosCommand handles 'perform <clustername> dcos'
+var ClusterDcosCommand = &cli.Command{
+	Keyword: "dcos",
+
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
+
+		args := c.StringSliceArgument("<arg>", []string{})
+		cmdStr := fmt.Sprintf("deploy cluster %s dcos", clusterName)
+		if len(args) > 0 {
+			cmdStr += " -- " + strings.Join(args, " ")
+		}
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// ClusterKubectlCommand handles 'perform <clustername> kubectl'
+var ClusterKubectlCommand = &cli.Command{
+	Keyword: "kubectl",
+
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
+
+		args := c.StringSliceArgument("<arg>", []string{})
+		cmdStr := fmt.Sprintf("deploy cluster %s kubectl", clusterName)
+		if len(args) > 0 {
+			cmdStr += " -- " + strings.Join(args, " ")
+		}
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// ClusterMarathonCommand handles 'perform <clustername> marathon'
+var ClusterMarathonCommand = &cli.Command{
+	Keyword: "marathon",
+
+	Process: func(c *cli.Command) {
+		populateClusterName(c)
+
+		args := c.StringSliceArgument("<arg>", []string{})
+		cmdStr := fmt.Sprintf("deploy cluster %s marathon", clusterName)
+		if len(args) > 0 {
+			cmdStr += " -- " + strings.Join(args, " ")
+		}
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
 }

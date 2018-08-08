@@ -18,81 +18,91 @@ package cmds
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster"
+	"github.com/CS-SI/SafeScale/deploy/cmds/ErrorCode"
 
-	cli "github.com/jawher/mow.cli"
+	"github.com/CS-SI/SafeScale/utils/cli"
 )
 
-// DeployCmd command
-func DeployCmd(cmd *cli.Cmd) {
-	cmd.Spec = "CLUSTERNAME"
+// PackageCommand ...
+var PackageCommand = &cli.Command{
+	Keyword: "package",
+	Aliases: []string{"pkg"},
 
-	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+	Commands: []*cli.Command{
+		deployPackageCheckCommand,
+	},
 
-	cmd.Command("package pkg", "Deploy an operating system package on all nodes", deployPackageCmd)
-	cmd.Command("service svc", "Deploy a service on the cluster", deployServiceCmd)
-	cmd.Command("application app", "Deploy an application on the cluster", deployApplicationCmd)
-
-	cmd.Before = func() {
-		if *clusterName == "" {
-			fmt.Println("Missing or invalid mandatory option --cluster,-c <cluster name>")
-			//cli.ShowSubcommandHelp(c)
-			return
-		}
+	Before: func(c *cli.Command) {
 		var err error
-		clusterInstance, err = cluster.Get(*clusterName)
+		clusterInstance, err = cluster.Get(clusterName)
 		if err != nil {
-			fmt.Printf("failed to get cluster '%s' information: %s\n", *clusterName, err.Error())
-			return
+			fmt.Printf("failed to get cluster '%s' information: %s\n", clusterName, err.Error())
+			os.Exit(int(ErrorCode.RPC))
 		}
 		if clusterInstance == nil {
-			fmt.Printf("cluster '%s' not found\n", *clusterName)
-			return
+			fmt.Printf("cluster '%s' not found\n", clusterName)
+			os.Exit(int(ErrorCode.NotFound))
 		}
-	}
-}
 
-// deployPackageCmd ...
-func deployPackageCmd(cmd *cli.Cmd) {
-	cmd.Spec = "-k"
-
-	pkgManagerKind = cmd.StringOpt("kind k", "", "Kind of package manager; can be apt, yum, dnf")
-
-	cmd.Command("check c", "Check if a package is installed on cluster nodes", deployPackageCheckCmd)
-
-	cmd.Before = func() {
-		if *pkgManagerKind == "" {
-			fmt.Println("Invalid empty option --kind,-k")
-			return
+		pkgManagerKind = c.StringOption("kind k", "<kind>", "")
+		if pkgManagerKind == "" {
+			fmt.Println("Invalid empty option -k,--kind")
+			os.Exit(int(ErrorCode.InvalidOption))
 		}
-	}
+	},
+
+	Help: &cli.HelpContent{},
 }
 
 // deployPackageCheckCmd
-func deployPackageCheckCmd(cmd *cli.Cmd) {
-	cmd.Spec = "PKGNAME [-t]"
+var deployPackageCheckCommand = &cli.Command{
+	Keyword: "check",
 
-	pkgname := cmd.StringArg("PKGNAME", "", "Name of the package")
+	Process: func(c *cli.Command) {
+		pkgname := c.StringArgument("<pkgname>", "")
 
-	cmd.Action = func() {
-		if *pkgname == "" {
+		if pkgname == "" {
 			fmt.Println("Invalid empty argument PKGNAME")
-			return
+			os.Exit(int(ErrorCode.InvalidArgument))
 		}
-		fmt.Println("deployPackageCmd not yet implemented")
-	}
+		fmt.Println("deployPackageCheckCommand not yet implemented")
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
 }
 
-// deployServiceCmd ...
-func deployServiceCmd(cmd *cli.Cmd) {
-	cmd.Action = func() {
-		fmt.Println("deployServiceCmd not yet implemented")
-	}
+// ServiceCommand handles "perform <clustername> service <svcname>"
+var ServiceCommand = &cli.Command{
+	Keyword: "service",
+	Aliases: []string{"svc"},
+
+	Commands: []*cli.Command{
+		deployServiceCheckCommand,
+	},
+
+	Before: func(c *cli.Command) {
+		serviceName = c.StringArgument("<svcname>", "")
+		if serviceName == "" {
+			fmt.Println("Invalid argument <svcname>")
+			os.Exit(int(ErrorCode.NotImplemented))
+		}
+	},
+
+	Help: &cli.HelpContent{},
 }
 
-func deployApplicationCmd(cmd *cli.Cmd) {
-	cmd.Action = func() {
-		fmt.Println("deployApplicationCmd not yet implemented")
-	}
+// deployServiceCheckCommand ...
+var deployServiceCheckCommand = &cli.Command{
+	Keyword: "check",
+
+	Process: func(c *cli.Command) {
+		fmt.Println("deployServiceCheckCommand not yet implemented")
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
 }

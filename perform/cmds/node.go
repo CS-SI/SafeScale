@@ -17,220 +17,161 @@
 package cmds
 
 import (
-	"encoding/json"
 	"fmt"
-	"strconv"
+	"os"
 
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
+	"github.com/CS-SI/SafeScale/deploy/cmds/ErrorCode"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster"
-
-	cli "github.com/jawher/mow.cli"
+	"github.com/CS-SI/SafeScale/utils/cli"
 )
 
-// NodeCmd configures arguments for command "perform node"
-func NodeCmd(cmd *cli.Cmd) {
-	cmd.Spec = "CLUSTERNAME"
+// nodeCommand configures arguments for command "perform <clustername> node"
+var nodeCommand = &cli.Command{
+	Keyword: "node",
 
-	clusterName = cmd.StringArg("CLUSTERNAME", "", "Name of the cluster")
+	Commands: []*cli.Command{
+		nodeListCommand,
+		nodeCreateCommand,
+		nodeInspectCommand,
+		nodeStopCommand,
+		nodeStartCommand,
+		nodeStateCommand,
+		nodeDeleteCommand,
+	},
 
-	cmd.Command("list ls", "List nodes", nodeList)
-	cmd.Command("create", "Create a new node", nodeCreate)
-	cmd.Command("inspect show", "Inspect a node", nodeInspect)
-	cmd.Command("stop", "Stop a node", nodeStop)
-	cmd.Command("start", "Start a node", nodeStart)
-	cmd.Command("state", "Get state of a node", nodeState)
-	cmd.Command("delete rm destroy", "Delete a specific node from cluster", nodeDelete)
+	Before: func(c *cli.Command) {
+		if !c.IsKeywordSet("list,ls") {
+			nodeName := c.StringArgument("<node name or id>", "")
 
-	cmd.Before = func() {
-		if *clusterName == "" {
-			fmt.Println("Invalid empty argument CLUSTERNAME")
-			//cli.ShowSubcommandHelp(c)
-			return
-		}
-		var err error
-		clusterInstance, err = cluster.Get(*clusterName)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-			return
-		}
-		if clusterInstance == nil {
-			fmt.Printf("cluster '%s' not found.", *clusterName)
-			return
-		}
-	}
-}
-
-func nodeCreate(cmd *cli.Cmd) {
-	cmd.Spec = "NODENAME [-n] [-p] [-C] [-R] [-D] [--gpu]"
-
-	nodeName := cmd.StringArg("NODENAME", "", "Name of the node")
-	count := cmd.IntOpt("count n", 1, "How many nodes to create")
-	public := cmd.BoolOpt("public p", false, "Attach public IP address to node")
-	cpu := cmd.IntOpt("cpu C", 2, "Number of CPU for the host")
-	ram := cmd.StringOpt("ram R", "7.0", "RAM for the host")
-	disk := cmd.IntOpt("disk D", 100, "Disk space for the host")
-	//gpu := cmd.BoolOpt("gpu", false, "With GPU")
-
-	cmd.Action = func() {
-		if *nodeName == "" {
-			fmt.Printf("Invalid empty argument NODENAME")
-			return
-		}
-		ramF, err := strconv.ParseFloat(*ram, 32)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-			return
-		}
-		finalCPU := int32(*cpu)
-		finalDisk := int32(*disk)
-		finalRAM := float32(ramF)
-		err = createNodes(*clusterName, *public, *count, finalCPU, finalRAM, finalDisk)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-		}
-	}
-}
-
-func nodeDelete(cmd *cli.Cmd) {
-	cmd.Spec = "NODENAME"
-
-	nodeName := cmd.StringArg("NODENAME", "", "Name or ID of the node to delete")
-
-	cmd.Action = func() {
-		if *nodeName == "" {
-			fmt.Printf("Invalid empty argument NODENAME")
-			return
-		}
-
-		found := clusterInstance.SearchNode(*nodeName, true)
-		if !found {
-			found = clusterInstance.SearchNode(*nodeName, false)
-		}
-		if !found {
-			fmt.Printf("node '%s' isn't a node of the cluster '%s'\n", *nodeName, *clusterName)
-			return
-		}
-		host, err := brokeruse.GetHost(*nodeName)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-			return
-		}
-
-		msg := fmt.Sprintf("Are you sure to delete Cluster Node identified by '%s' in Cluster '%s'", *nodeName, *clusterName)
-		if !utils.UserConfirmed(msg) {
-			fmt.Println("Aborted.")
-			return
-		}
-		err = clusterInstance.DeleteSpecificNode(*nodeName)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-			return
-		}
-		fmt.Printf("Node '%s' of cluster '%s' deleted.", host.Name, *clusterName)
-	}
-}
-
-func nodeList(cmd *cli.Cmd) {
-	public := cmd.BoolOpt("public p", false, "If used, lists Public nodes; otherwise lists private nodes")
-
-	cmd.Action = func() {
-		list := clusterInstance.ListNodes(*public)
-		out, _ := json.Marshal(list)
-		fmt.Println(string(out))
-	}
-}
-
-func nodeInspect(cmd *cli.Cmd) {
-	cmd.Spec = "NODENAME"
-
-	nodeName := cmd.StringArg("NODENAME", "", "Name of the node")
-
-	cmd.Action = func() {
-		node, err := clusterInstance.GetNode(*nodeName)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-			return
-		}
-		byteOutput, err := json.Marshal(node)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-			return
-		}
-		fmt.Println(string(byteOutput))
-	}
-}
-
-func nodeStop(cmd *cli.Cmd) {
-	cmd.Spec = "NODENAME"
-
-	//nodeName := cmd.StringArg("NODENAME", "", "Name or ID of the node")
-
-	cmd.Action = func() {
-		/*	node, err := instance.GetNode(*nodeName)
-			if err != nil {
-				return err
-			}
-			err = node.Stop()
-			if err != nil {
-				return err
-			}
-			fmt.Printf("Node '%s' of cluster '%s' stopped.\n", *nodeName, *clusterName)
-		*/
-		fmt.Println("Not yet implemented")
-	}
-}
-
-func nodeStart(cmd *cli.Cmd) {
-	cmd.Spec = "NODENAME"
-
-	//nodeName := cmd.StringArg("NODENAME", "", "Name or ID of the node")
-
-	cmd.Action = func() {
-		/*
-			if *nodeName == "" {
-				fmt.Println("Invalid empty value for argument NODENAME")
+			if nodeName == "" {
+				fmt.Println("Invalid argument <node name or id>")
 				//cli.ShowSubcommandHelp(c)
-				return
+				os.Exit(int(ErrorCode.InvalidArgument))
 			}
-			node, err := instance.GetNode(*nodeName)
-			if err != nil {
-				return err
-			}
-			err = node.Start()
-			if err != nil {
-				return err
-			}
+		}
+	},
 
-			fmt.Printf("Node '%s' of cluster '%s' started.\n", *nodeName, *clusterName)
-		*/
-		fmt.Println("not yet implemented")
-	}
+	Help: &cli.HelpContent{},
 }
 
-func nodeState(cmd *cli.Cmd) {
-	cmd.Spec = "NODENAME"
+// nodeCreateCommand ...
+var nodeCreateCommand = &cli.Command{
+	Keyword: "create",
 
-	//nodeName := cmd.StringArg("NODENAME", "", "Name or ID of the node")
+	Process: func(c *cli.Command) {
+		count := c.IntOption("count n", "<count>", 1)
+		public := c.Flag("public p", false)
+		cpu := c.IntOption("cpu C", "<cpu>", 2)
+		ram := c.FloatOption("ram R", "<ram>", 7.0)
+		disk := c.IntOption("disk D", "<disk>", 100)
+		//gpu := c.Flag("gpu", false, "With GPU")
 
-	cmd.Action = func() {
-		/*if *nodeName == "" {
-			fmt.Println("Invalid empty value for argument NODENAME")
-			//cli.ShowSubcommandHelp(c)
-			return
+		cmdStr := fmt.Sprintf("deploy cluster %s expand -n %d --cpu %d --ram %f --disk %d",
+			clusterName, count, int32(cpu), float32(ram), int32(disk))
+		if public {
+			cmdStr += " -p"
 		}
-		node, err := instance.GetNode(*nodeName)
-		if err != nil {
-			return err
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// nodeDeleteCommand ...
+var nodeDeleteCommand = &cli.Command{
+	Keyword: "delete",
+	Aliases: []string{"destroy", "remove", "rm"},
+
+	Process: func(c *cli.Command) {
+		yes := c.Flag("y assume-yes", false)
+		cmdStr := fmt.Sprintf("deploy cluster %s node %s delete", clusterName, nodeName)
+		if yes {
+			cmdStr += " -y"
 		}
-		if node == nil {
-			return fmt.Errorf("Node '%s' not found in cluster '%s'", *nodeName, *clusterName)
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// nodeListCommand ...
+var nodeListCommand = &cli.Command{
+	Keyword: "list",
+	Aliases: []string{"ls"},
+
+	Process: func(c *cli.Command) {
+		public := c.Flag("public p", false)
+
+		cmdStr := fmt.Sprintf("deploy cluster %s node list", clusterName)
+		if public {
+			cmdStr += " -p"
 		}
-		state, err := node.GetState()
-		out, _ := json.Marshal(map[string]string{"state": state.String()})
-		fmt.Println(string(out))
-		*/
-		fmt.Println("not yet implemented")
-	}
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// nodeInspectCommand ...
+var nodeInspectCommand = &cli.Command{
+	Keyword: "inspect",
+
+	Process: func(c *cli.Command) {
+		cmdStr := fmt.Sprintf("deploy cluster %s node %s inspect", clusterName, nodeName)
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.OK))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// nodeStopCommand ...
+var nodeStopCommand = &cli.Command{
+	Keyword: "stop",
+	Aliases: []string{"freeze"},
+
+	Process: func(c *cli.Command) {
+		cmdStr := fmt.Sprintf("deploy cluster %s node %s stop", clusterName, nodeName)
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// nodeStartCommand ...
+var nodeStartCommand = &cli.Command{
+	Keyword: "start",
+	Aliases: []string{"unfreeze"},
+
+	Process: func(c *cli.Command) {
+		cmdStr := fmt.Sprintf("deploy cluster %s node %s start", clusterName, nodeName)
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// nodeStateCommand ...
+var nodeStateCommand = &cli.Command{
+	Keyword: "state",
+
+	Process: func(c *cli.Command) {
+		cmdStr := fmt.Sprintf("deploy cluster %s node %s state", clusterName, nodeName)
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+		os.Exit(int(ErrorCode.NotImplemented))
+	},
+
+	Help: &cli.HelpContent{},
 }

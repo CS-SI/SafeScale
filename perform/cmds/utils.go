@@ -26,9 +26,11 @@ import (
 )
 
 var (
-	clusterName     *string
+	clusterName     string
 	clusterInstance clusterapi.ClusterAPI
-	pkgManagerKind  *string
+	pkgManagerKind  string
+	nodeName        string
+	serviceName     string
 
 	// RebrandingPrefix is used to store the optional prefix to use when calling external SafeScale commands
 	RebrandingPrefix string
