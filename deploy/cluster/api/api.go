@@ -49,38 +49,39 @@ type Request struct {
 	NodesDef *pb.HostDefinition
 }
 
-//ClusterAPI is an interface of methods associated to Cluster-like structs
+// ClusterAPI is an interface of methods associated to Cluster-like structs
 type ClusterAPI interface {
-	//Start starts the cluster
+	// GetName returns the name of the cluster
+	GetName() string
+	// Start starts the cluster
 	Start() error
-	//Stop stops the cluster
+	// Stop stops the cluster
 	Stop() error
-	//GetState returns the current state of the cluster
+	// GetState returns the current state of the cluster
 	GetState() (ClusterState.Enum, error)
-	//GetNetworkID returns the ID of the network used by the cluster
+	// GetNetworkID returns the ID of the network used by the cluster
 	GetNetworkID() string
-
-	//AddNode adds a node
+	// GetMasters returns a list of master server IDs (if there is such masters in the flavor...)
+	GetMasters() ([]string, error)
+	// AddNode adds a node
 	AddNode(bool, *pb.HostDefinition) (string, error)
-	//AddNodes adds several nodes
+	// AddNodes adds several nodes
 	AddNodes(int, bool, *pb.HostDefinition) ([]string, error)
-	//DeleteLastNode deletes a node
+	// DeleteLastNode deletes a node
 	DeleteLastNode(bool) error
-	//DeleteSpecificNode deletes a node identified by its ID
+	// DeleteSpecificNode deletes a node identified by its ID
 	DeleteSpecificNode(string) error
-	//ListNodes lists the nodes in the cluster
+	// ListNodes lists the nodes in the cluster
 	ListNodes(bool) []string
-	//FindNode tells if the ID of the host passed as parameter is a node
+	// FindNode tells if the ID of the host passed as parameter is a node
 	SearchNode(string, bool) bool
-	//GetNode returns a node based on its ID
+	// GetNode returns a node based on its ID
 	GetNode(string) (*pb.Host, error)
-	//CountNodes counts the nodes of the cluster
+	// CountNodes counts the nodes of the cluster
 	CountNodes(bool) uint
-
-	//Delete allows to destroy infrastructure of cluster
+	// Delete allows to destroy infrastructure of cluster
 	Delete() error
-
-	//GetConfig ...
+	// GetConfig ...
 	GetConfig() Cluster
 	// GetAdditionalInfo returns additional info about parameter
 	GetAdditionalInfo(AdditionalInfo.Enum) interface{}
@@ -122,7 +123,12 @@ type Cluster struct {
 	AdditionalInfo AdditionalInfoType
 }
 
-//GetNetworkID returns the ID of the Network used by the cluster
+// GetName returns the name of the cluster
+func (c *Cluster) GetName() string {
+	return c.Name
+}
+
+// GetNetworkID returns the ID of the Network used by the cluster
 func (c *Cluster) GetNetworkID() string {
 	return c.NetworkID
 }
