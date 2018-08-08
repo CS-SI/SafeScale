@@ -71,15 +71,15 @@ type Command struct {
 	app *App
 }
 
-// IsCommandSet tells if a specific command is set
-func (c *Command) IsCommandSet(str string) bool {
+// IsKeywordSet tells if a specific keyword is set
+func (c *Command) IsKeywordSet(keyword string) bool {
 	if docoptArguments == nil {
 		panic("docopt not called yet!")
 	}
 
 	var ok bool
 	var anon interface{}
-	splitted := strings.Split(str, ",")
+	splitted := strings.Split(keyword, ",")
 	for _, v := range splitted {
 		if anon, ok = docoptArguments[v]; ok {
 			if anon.(bool) {
