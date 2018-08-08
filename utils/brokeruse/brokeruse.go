@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -137,4 +138,31 @@ func GetHost(id string) (*pb.Host, error) {
 	defer cancel()
 	service := pb.NewHostServiceClient(conn)
 	return service.Inspect(ctx, &pb.Reference{ID: id})
+}
+
+// SSHRun executes a command on an host
+func SSHRun(id string, command string, timeout time.Duration) error {
+	conn := GetConnection()
+	defer conn.Close()
+	if timeout == 0 {
+		timeout = utils.TimeoutCtxDefault
+	}
+	ctx, cancel := GetContext(timeout)
+	defer cancel()
+	service := pb.NewSshServiceClient(conn)
+
+	resp, err := service.Run(ctx, &pb.SshCommand{
+		Host:    &pb.Reference{Name: id},
+		Command: command,
+	})
+
+	// TODO output result to stdout
+	if err != nil {
+		return fmt.Errorf("Could not execute ssh command: %v", err)
+	}
+	fmt.Print(fmt.Sprintf(resp.GetOutput()))
+	fmt.Fprint(os.Stderr, fmt.Sprintf(resp.GetErr()))
+	// fmt.Println(fmt.Sprintf(string(resp.GetStatus())))
+
+	return nil
 }
