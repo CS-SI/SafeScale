@@ -30,13 +30,13 @@ import (
 )
 
 const (
-	//ContainerNamePrefix is the name of the Object Storage Container/Bucket used to store metadata
+	// containerNamePrefix is the name of the Object Storage Container/Bucket used to store metadata
 	containerNamePrefix string = "0.safescale"
 )
 
 var containerName string
 
-//InitializeContainer creates the Object Storage Container/Bucket that will store the metadata
+// InitializeContainer creates the Object Storage Container/Bucket that will store the metadata
 func InitializeContainer(client api.ClientAPI) error {
 	svc := providers.FromClient(client)
 	err := svc.CreateContainer(containerName)
@@ -46,17 +46,17 @@ func InitializeContainer(client api.ClientAPI) error {
 	return err
 }
 
-//Folder describes a metadata folder
+// Folder describes a metadata folder
 type Folder struct {
 	//path contains the base path where to read/write record in Object Storage
 	path string
 	svc  *providers.Service
 }
 
-//DecoderCallback is the prototype of the function that will decode data read from Metadata
+// DecoderCallback is the prototype of the function that will decode data read from Metadata
 type DecoderCallback func(buf *bytes.Buffer) error
 
-//NewFolder creates a new Metadata Folder object, ready to help access the metadata inside it
+// NewFolder creates a new Metadata Folder object, ready to help access the metadata inside it
 func NewFolder(svc *providers.Service, path string) (*Folder, error) {
 	return &Folder{
 		path: strings.Trim(path, "/"),
@@ -64,12 +64,12 @@ func NewFolder(svc *providers.Service, path string) (*Folder, error) {
 	}, nil
 }
 
-//GetPath returns the base path of the folder
+// GetPath returns the base path of the folder
 func (f *Folder) GetPath() string {
 	return f.path
 }
 
-//absolutePath returns the fullpath to reach the 'path'+'name' starting from the folder path
+// absolutePath returns the fullpath to reach the 'path'+'name' starting from the folder path
 func (f *Folder) absolutePath(path ...string) string {
 	for len(path) > 0 && (path[0] == "" || path[0] == ".") {
 		path = path[1:]
@@ -83,7 +83,7 @@ func (f *Folder) absolutePath(path ...string) string {
 	return strings.Join([]string{f.path, strings.Trim(relativePath, "/")}, "/")
 }
 
-//Search tells if the object named 'name' is inside the ObjectStorage folder
+// Search tells if the object named 'name' is inside the ObjectStorage folder
 func (f *Folder) Search(path string, name string) (bool, error) {
 	absPath := strings.Trim(f.absolutePath(path), "/")
 	list, err := f.svc.ListObjects(containerName, api.ObjectFilter{
@@ -105,7 +105,7 @@ func (f *Folder) Search(path string, name string) (bool, error) {
 	return found, nil
 }
 
-//Delete removes metadata passed as parameter
+// Delete removes metadata passed as parameter
 func (f *Folder) Delete(path string, name string) error {
 	err := f.svc.DeleteObject(containerName, f.absolutePath(path, name))
 	if err != nil {
@@ -114,7 +114,7 @@ func (f *Folder) Delete(path string, name string) error {
 	return nil
 }
 
-//Read loads the content of the object stored in metadata container
+// Read loads the content of the object stored in metadata container
 // returns false, nil if the object is not found
 // returns false, err if an error occured
 // returns true, nil if the object has been found
@@ -139,7 +139,7 @@ func (f *Folder) Read(path string, name string, callback DecoderCallback) (bool,
 	return false, nil
 }
 
-//Write writes the content in Object Storage
+// Write writes the content in Object Storage
 func (f *Folder) Write(path string, name string, content interface{}) error {
 	var buffer bytes.Buffer
 	err := gob.NewEncoder(&buffer).Encode(content)
@@ -153,7 +153,7 @@ func (f *Folder) Write(path string, name string, content interface{}) error {
 	})
 }
 
-//Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
+// Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
 func (f *Folder) Browse(path string, callback DecoderCallback) error {
 	list, err := f.svc.ListObjects(containerName, api.ObjectFilter{
 		Path: strings.Trim(f.absolutePath(path), "/"),
