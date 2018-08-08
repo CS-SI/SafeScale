@@ -20,7 +20,7 @@
 
 {{.CommonTools}}
 
-echo "Install Docker"
+echo "Installing Docker"
 
 case $LINUX_KIND in
     debian|ubuntu)
@@ -30,7 +30,7 @@ case $LINUX_KIND in
         curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -
         add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable"
         wait_for_apt && apt update
-        wait_for_apt && apt-get install -qqy  docker-ce
+        wait_for_apt && apt-get install -qqy docker-ce
         ;;
     centos|rhel)
         yum install -y yum-utils device-mapper-persistent-data lvm2

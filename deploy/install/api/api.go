@@ -17,21 +17,18 @@
 package api
 
 import (
-	"fmt"
-
-	"github.com/CS-SI/SafeScale/deploy/install/Method"
-	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
 )
 
 // TargetAPI is an interface that target must satisfy to be able to install something
 // on it
 type TargetAPI interface {
-	// GetName returns the name of the InstallTarget
+	// GetName returns the name of the installation target
 	GetName() string
-	// GetKinds returns a list of package kinds useable on the target
+	// GetKinds returns a list of packaging managers useable on the target
 	GetKinds() []Method.Enum
 	// GetSSHConfig returns a system.SSHConfig to access target
-	GetSSHConfig() (system.SSHConfig, error)
+	//GetSSHConfig() (system.SSHConfig, error)
 	// List returns a list of installed component
 	List() []string
 }
@@ -41,21 +38,16 @@ type InstallerAPI interface {
 	// GetName returns the name of the Installer
 	GetName() string
 	// Add executes installation of component
-	Add(TargetAPI, ComponentAPI) error
+	Add(TargetAPI) error
 	// Remove executes deletion of component
-	Remove(TargetAPI, ComponentAPI) error
+	Remove(TargetAPI) error
 }
 
-// Installer contains the information about an Installer
-type Installer struct {
-	// Name of the Installer
-	Name string
-}
+// InstallerParameters defines the parameters a Installer may need
+type InstallerParameters map[string]interface{}
 
-// GetName ...
-func (s *Installer) GetName() string {
-	return s.Name
-}
+// InstallerMap keeps a map of available installer by Method
+type InstallerMap map[Method.Enum]InstallerAPI
 
 // ComponentAPI defines the API of an installable component
 type ComponentAPI interface {
@@ -65,59 +57,6 @@ type ComponentAPI interface {
 	Applyable(TargetAPI) bool
 	// Install ...
 	Add(TargetAPI) error
-	// Delete ...
-	Delete(TargetAPI) error
-	// State ...
-	State(TargetAPI) error
-	// Start ...
-	Start(TargetAPI) error
-	// Stop ...
-	Stop(TargetAPI) error
-}
-
-// Component contains the information about an installable component
-type Component struct {
-	// Name is the name of the service
-	Name string
-	// Installers defines the installers available for the component
-	Installers []InstallerAPI
-	// Dependencies lists other component(s) (by name) needed by this one
-	Dependencies []string
-}
-
-// GetName ...
-func (s *Component) GetName() string {
-	return s.Name
-}
-
-// Add ...
-func (s *Component) Add(target TargetAPI) error {
-	kinds := target.GetKinds()
-	var installer InstallerAPI
-	var found bool
-	for _, k := range kinds {
-		if installer, found = availables["All"][k]; found {
-			break
-		}
-	}
-	if installer == nil {
-		return fmt.Errorf("failed to find a way to install '%s' on '%s'", s.Name, target.GetName())
-	}
-	return installer.Install(target, *s)
-}
-
-// Remove ...
-func (s *Component) Remove(target TargetAPI) error {
-	kinds := target.GetKinds()
-	var installer InstallerAPI
-	var found bool
-	for _, k := range kinds {
-		if installer, found = availables["All"][k]; found {
-			break
-		}
-	}
-	if installer == nil {
-		return fmt.Errorf("failed to find a way to install '%s' on '%s'", s.Name, target.GetName())
-	}
-	return installer.Delete(target, *s)
+	// Remove ...
+	Remove(TargetAPI) error
 }
