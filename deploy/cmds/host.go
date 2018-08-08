@@ -40,7 +40,7 @@ var HostCommand = &cli.Command{
 	},
 
 	Before: func(c *cli.Command) {
-		if !c.IsCommandSet("list,ls") {
+		if !c.IsKeywordSet("list,ls") {
 			hostName = c.StringArgument("<host name or id>", "")
 			if hostName == "" {
 				fmt.Println("Invalid argument <host name or id>")

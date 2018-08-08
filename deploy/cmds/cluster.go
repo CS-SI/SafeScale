@@ -63,7 +63,7 @@ var ClusterCommand = &cli.Command{
 	},
 
 	Process: func(c *cli.Command) {
-		if !c.IsCommandSet("list,ls") {
+		if !c.IsKeywordSet("list,ls") {
 			clusterName = c.StringArgument("<clustername>", "")
 			if clusterName == "" {
 				fmt.Println("Invalid argument <clustername>")
@@ -76,7 +76,7 @@ var ClusterCommand = &cli.Command{
 				fmt.Printf("%v\n", err)
 				os.Exit(int(ErrorCode.RPC))
 			}
-			if !c.IsCommandSet("create") {
+			if !c.IsKeywordSet("create") {
 				if clusterInstance == nil {
 					fmt.Printf("Cluster '%s' not found.\n", clusterName)
 					os.Exit(int(ErrorCode.NotFound))
