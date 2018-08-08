@@ -9,14 +9,34 @@ import (
 
 var availables map[string]map[string]ComponentAPI
 
-var (
-	kubernetesComponent = &installapi.Component{
+// kubernetesService ...
+func kubernetesService() *Component {
+	addS, err := getScript("install_kubernetes.sh", emptyParams)
+	if err != nil {
+		panic(fmt.Errorf("failed to load script: %s", err.Error()))
+	}
+	rmS, err := getScript("uninstall_kubernetes.sh", emptyParams)
+	if err != nil {
+		panic(fmt.Errorf("failed to load script: %s", err.Error()))
+	}
+
+	si := NewScriptInstaller("Kubernetes", InstallerParameters{
+		"AddScript":    addS,
+		"RemoveScript": rmS,
+	})
+	di := NewDCOSPackageInstaller("kubernetes", dcosPackageInstallerParameters{
+		AddCommand:    "dcos package install kubernetes",
+		DeleteCommand: "dcos package remove kubernetes",
+	})
+
+	return &Component{
 		Name: "Kubernetes",
-		Installers: []installapi.InstallerAPI{
-			installapi.NewDCOSPackageInstaller("kubernetes"),
-			installapi.NewScriptInstaller("kubernetes"),
+		Installers: map[Method.Enum]api.InstallerAPI{
+			Method.Script: si,
+			Method.DCOS:   di,
 		},
 	}
+}
 
 	nexusComponent = &installapi.Component{
 		Name: "Nexus",
@@ -48,36 +68,6 @@ var (
 	}
 )
 
-func init() {
-	availables = map[string]map[string]installapi.ComponentAPI{
-		"DCOS": map[string]installapi.ComponentAPI{
-			"Kubernetes":    kubernetesService,
-			"ElasticSearch": elasticSearchService,
-			"Helm":          helmService,
-		},
-		"Helm": map[string]installapi.ComponentAPI{
-			"ElasticSearch": elasticSearchService,
-		},
-		"Script": map[string]installapi.ComponentAPI{
-			"Docker":        dockerComponent,
-			"nVidiaDocker":  nVidiaDockerComponent,
-			"Kubernetes":    kubernetesComponent,
-			"ElasticSearch": elasticSearchService,
-			"Helm":          helmService,
-			"MPICH":         mpichService,
-		},
-		"Ansible": map[string]installapi.ComponentAPI{}
-		"All": map[string]installapi.ComponentAPI{
-			"Docker":        dockerComponent,
-			"nVidiaDocker":  nVidiaDockerComponent,
-			"Kubernetes":    kubernetesComponent,
-			"ElasticSearch": elasticSearchComponent,
-			"Helm":          helmComponent,
-			"MPICH":         mpichComponent,
-		},
-	}
-}
-
 // ListAvailables returns an array of availables components with the useable installers
 func ListAvailables() []string {
 	var output []string
@@ -97,4 +87,35 @@ func ListAvailables() []string {
 		output = append(output, fmt.Sprintf("%s"))
 	}
 	return output
+}
+
+func init() {
+	availables = map[string]map[string]installapi.ComponentAPI{
+		"DCOS": map[string]installapi.ComponentAPI{
+			"Kubernetes":    kubernetesService,
+			"ElasticSearch": elasticSearchService,
+			"Helm":          helmService,
+		},
+		"Helm": map[string]installapi.ComponentAPI{
+			"ElasticSearch": elasticSearchService,
+		},
+		"Script": map[string]installapi.ComponentAPI{
+			"Docker":        dockerComponent,
+			"nVidiaDocker":  nVidiaDockerComponent,
+			"Kubernetes":    kubernetesComponent,
+			"ElasticSearch": elasticSearchService,
+			"Helm":          helmService,
+			"MPICH":         mpichService,
+		},
+		"Ansible": map[string]installapi.ComponentAPI{},
+	}
+	allAvailables = map[string]installapi.ComponentAPI{
+			"Docker":        dockerComponent,
+			"nVidiaDocker":  nVidiaDockerComponent,
+			"Kubernetes":    kubernetesComponent,
+			"ElasticSearch": elasticSearchComponent,
+			"Helm":          helmComponent,
+			"MPICH":         mpichComponent,
+		},
+	}
 }
