@@ -1,0 +1,80 @@
+/*
+ * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package service
+
+import (
+	"fmt"
+
+	"github.com/CS-SI/SafeScale/deploy/service/api"
+)
+
+// dockerComponent ...
+var (
+	managerList = map[string]api.Manager{
+		"Docker": api.Manager{
+			StartScript: "systemctl start docker",
+			StopScript:  "systemctl stop docker",
+			StateScript: "systemctl status docker",
+		},
+		"nVidiaDocker": api.Manager{
+			StartScript: "systemctl start nvidia-docker",
+			StopScript:  "systemctl stop nvidia-docker",
+			StateScript: "systemctl status nvidia-docker",
+		},
+		"Kubernetes": api.Manager{
+			StateScript: "",
+			StartScript: "",
+			StopScript:  "",
+		},
+		"Nexus": api.Manager{
+			StateScript: "",
+			StartScript: "",
+			StopScript:  "",
+		},
+		"ElasticSearch": api.Manager{
+			StateScript: "",
+			StartScript: "",
+			StopScript:  "",
+		},
+		"Helm": api.Manager{
+			StateScript: "",
+			StartScript: "",
+			StopScript:  "",
+		},
+		"ReverseProxy": api.Manager{
+			StateScript: "docker container ls | grep reverse-proxy",
+			StopScript:  "docker-compose -f /opt/SafeScale/docker-compose.yml down reverse-proxy",
+			StartScript: "docker-compose -f /opt/SafeScale/docker-compose.yml up -d reverse-proxy",
+		},
+		"RemoteDesktop": api.Manager{
+			StateScript: "docker container ls | grep guacamole",
+			StopScript:  "docker-compose -f /opt/SafeScale/docker-compose.yml down guacamole",
+			StartScript: "docker-compose -f /opt/SafeScale/docker-compose.yml up -d guacamole",
+		},
+	}
+)
+
+// RegisterManager ...
+func RegisterManager(name string, m api.Manager, replace bool) error {
+	var ok bool
+	_, ok = managerList[name]
+	if replace || !ok {
+		managerList[name] = m
+		return nil
+	}
+	return fmt.Errorf("can't replace manager '%s'", name)
+}
