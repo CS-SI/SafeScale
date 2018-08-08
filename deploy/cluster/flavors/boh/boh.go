@@ -472,6 +472,11 @@ func (c *Cluster) GetName() string {
 	return c.Common.Name
 }
 
+// GetMasters returns a list of master servers
+func (c *Cluster) GetMasters() ([]string, error) {
+	return nil, fmt.Errorf("cluster of flavor 'BOH' doesn't have a master")
+}
+
 // Start starts the cluster named 'name'
 // In BOH, cluster state is logical, there is no way to stop a BOH cluster (except by stopping the hosts)
 func (c *Cluster) Start() error {

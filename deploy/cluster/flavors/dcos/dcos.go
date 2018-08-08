@@ -98,7 +98,6 @@ var (
 
 // managerData defines the data needed by DCOS we want to keep in Object Storage
 type managerData struct {
-
 	// BootstrapID is the identifier of the host acting as bootstrap/upgrade server
 	BootstrapID string
 
@@ -156,7 +155,7 @@ func (c *Cluster) GetNetworkID() string {
 
 // GetAdditionalInfo returns additional info corresponding to 'ctx'
 func (c *Cluster) GetAdditionalInfo(ctx AdditionalInfo.Enum) interface{} {
-	return c.Common.GetAdditionalInfo(ctx)
+	return c.GetAdditionalInfo(ctx)
 }
 
 // CountNodes returns the number of public or private nodes in the cluster
@@ -1106,6 +1105,11 @@ func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 		installCommonRequirementsContent = &result
 	}
 	return installCommonRequirementsContent, nil
+}
+
+// GetMasters returns a list of masters
+func (c *Cluster) GetMasters() ([]string, error) {
+	return c.manager.MasterIDs, nil
 }
 
 // Start starts the cluster named 'name'
