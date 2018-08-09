@@ -17,6 +17,7 @@
 package system
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -31,6 +32,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"text/template"
 	"time"
 
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -339,46 +341,6 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 
 }
 
-func createDownloadCmd(sshConfig *SSHConfig, remotePath, localPath string) (string, *os.File, error) {
-	f, err := createTempFile(sshConfig.PrivateKey)
-	if err != nil {
-		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
-	}
-	//defer os.Remove(f.Name())
-	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
-
-	sshCmdString := fmt.Sprintf("scp -i %s -P %d %s %s@%s:%s %s",
-		f.Name(),
-		sshConfig.Port,
-		options,
-		sshConfig.User,
-		sshConfig.Host,
-		remotePath,
-		localPath,
-	)
-	return sshCmdString, f, nil
-}
-
-func createUploadCmd(sshConfig *SSHConfig, remotePath, localPath string) (string, *os.File, error) {
-	f, err := createTempFile(sshConfig.PrivateKey)
-	if err != nil {
-		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
-	}
-	//defer os.Remove(f.Name())
-	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
-
-	sshCmdString := fmt.Sprintf("scp -i %s -P %d %s %s %s@%s:%s",
-		f.Name(),
-		sshConfig.Port,
-		options,
-		localPath,
-		sshConfig.User,
-		sshConfig.Host,
-		remotePath,
-	)
-	return sshCmdString, f, nil
-}
-
 // Command returns the Cmd struct to execute cmdString remotely
 func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
 	return ssh.command(cmdString, false)
@@ -423,42 +385,54 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 	return nil
 }
 
-//Download dowloads remotePath into localPath
-func (ssh *SSHConfig) Download(remotePath, localPath string) error {
+//Copy copy a file/directory from/to local to/from remote
+func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) error {
 	tunnels, sshConfig, err := ssh.createTunnels()
 	if err != nil {
-		return fmt.Errorf("Unable to create command : %s", err.Error())
+		return fmt.Errorf("Unable to create tunnels : %s", err.Error())
 	}
-	sshCmdString, keyFile, err := createDownloadCmd(sshConfig, remotePath, localPath)
-	if err != nil {
-		return fmt.Errorf("Unable to create command : %s", err.Error())
-	}
-	cmd := exec.Command("bash", "-c", sshCmdString)
-	//log.Println("cmd", sshCmdString)
-	sshCommand := SSHCommand{
-		cmd:     cmd,
-		tunnels: tunnels,
-		keyFile: keyFile,
-	}
-	return sshCommand.Run()
-}
 
-// Upload uploads localPath into remotePath
-func (ssh *SSHConfig) Upload(remotePath, localPath string) error {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	identityfile, err := createTempFile(sshConfig.PrivateKey)
 	if err != nil {
-		return fmt.Errorf("Unable to create command : %s", err.Error())
+		return fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
-	sshCmdString, keyFile, err := createUploadCmd(sshConfig, remotePath, localPath)
+
+	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}{{.LocalPath}} {{.User}}@{{.Host}}:{{.RemotePath}}{{else}}{{.User}}@{{.Host}}:{{.RemotePath}} {{.LocalPath}}{{end}}")
 	if err != nil {
-		return fmt.Errorf("Unable to create command : %s", err.Error())
+		return fmt.Errorf("Error parsing command template: %s", err.Error())
 	}
+
+	var copyCommand bytes.Buffer
+	if err := cmdTemplate.Execute(&copyCommand, struct {
+		IdentityFile string
+		Port         int
+		Options      string
+		User         string
+		Host         string
+		RemotePath   string
+		LocalPath    string
+		IsUpload     bool
+	}{
+		IdentityFile: identityfile.Name(),
+		Port:         sshConfig.Port,
+		Options:      "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no",
+		User:         sshConfig.User,
+		Host:         sshConfig.Host,
+		RemotePath:   remotePath,
+		LocalPath:    localPath,
+		IsUpload:     isUpload,
+	}); err != nil {
+		return fmt.Errorf("Error executing template: %s", err.Error())
+	}
+
+	sshCmdString := copyCommand.String()
+
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	//log.Println("cmd", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
 		tunnels: tunnels,
-		keyFile: keyFile,
+		keyFile: identityfile,
 	}
 	return sshCommand.Run()
 }
@@ -469,7 +443,7 @@ func (ssh *SSHConfig) UploadString(remotePath, content string) error {
 	if err != nil {
 		return err
 	}
-	err = ssh.Upload(remotePath, f.Name())
+	err = ssh.Copy(remotePath, f.Name(), true)
 	os.Remove(f.Name())
 	return err
 }

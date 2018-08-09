@@ -207,8 +207,5 @@ func (srv *SSHService) Copy(from, to string) error {
 		return err
 	}
 
-	if upload {
-		return ssh.Upload(remotePath, localPath)
-	}
-	return ssh.Download(remotePath, localPath)
+	return ssh.Copy(remotePath, localPath, upload)
 }
