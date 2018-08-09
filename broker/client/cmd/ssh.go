@@ -81,8 +81,7 @@ var sshRun = cli.Command{
 		}
 
 		fmt.Print(fmt.Sprintf(resp.GetOutputStd()))
-		fmt.Fprint(os.Stderr, fmt.Sprintf(resp.GetOutputErr()))
-
+		fmt.Fprint(os.Stderr, fmt.Sprintf("%s\n", resp.GetOutputErr()))
 		os.Exit(int(resp.GetStatus()))
 		return nil
 	},

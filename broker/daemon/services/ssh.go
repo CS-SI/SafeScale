@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"time"
+
+	"github.com/CS-SI/SafeScale/utils/retry"
 
 	"github.com/CS-SI/SafeScale/system"
 
@@ -52,6 +55,23 @@ type SSHService struct {
 
 //Run execute command on the host
 func (srv *SSHService) Run(hostName, cmd string) (string, string, int, error) {
+	var stdOut, stdErr string
+	var retCode int
+	var err error
+
+	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
+		func() error {
+			stdOut, stdErr, retCode, err = srv.run(hostName, cmd)
+			return err
+		},
+		1*time.Minute,
+		retry.NotifyByLog)
+
+	return stdOut, stdErr, retCode, err
+}
+
+//run execute command on the host
+func (srv *SSHService) run(hostName, cmd string) (string, string, int, error) {
 	host, err := srv.hostService.Get(hostName)
 	if err != nil {
 		return "", "", 1, fmt.Errorf("no host found with name or id '%s'", hostName)
