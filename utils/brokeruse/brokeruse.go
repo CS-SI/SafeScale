@@ -160,8 +160,8 @@ func SSHRun(id string, command string, timeout time.Duration) error {
 	if err != nil {
 		return fmt.Errorf("Could not execute ssh command: %v", err)
 	}
-	fmt.Print(fmt.Sprintf(resp.GetOutput()))
-	fmt.Fprint(os.Stderr, fmt.Sprintf(resp.GetErr()))
+	fmt.Print(fmt.Sprintf(resp.GetOutputStd()))
+	fmt.Fprint(os.Stderr, fmt.Sprintf(resp.GetOutputErr()))
 	// fmt.Println(fmt.Sprintf(string(resp.GetStatus())))
 
 	return nil
