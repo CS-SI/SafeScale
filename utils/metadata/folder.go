@@ -21,7 +21,16 @@ import (
 	"fmt"
 	"strings"
 
+<<<<<<< develop:utils/metadata/folder.go
 	log "github.com/sirupsen/logrus"
+||||||| ancestor
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+=======
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/object"
+>>>>>>> Update object storage management:metadata/metadata.go
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 
@@ -29,7 +38,48 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 )
 
+<<<<<<< develop:utils/metadata/folder.go
 // Folder describes a metadata folder
+||||||| ancestor
+var containerName string
+
+// InitializeContainer creates the Object Storage Container/Bucket that will store the metadata
+func InitializeContainer(client api.ClientAPI) error {
+	svc := providers.FromClient(client)
+	err := svc.CreateContainer(containerName)
+	if err != nil {
+		fmt.Printf("failed to create Object Container %s: %s\n", containerName, err.Error())
+	}
+	return err
+}
+
+// Folder describes a metadata folder
+=======
+var containerName string
+
+/*
+// InitializeContainer creates the Object Storage Container/Bucket that will store the metadata
+func InitializeContainer(client *object.Location) error {
+	svc := providers.FromClientObject(client)
+	err := svc.CreateContainer(containerName)
+	if err != nil {
+		fmt.Printf("failed to create Object Container %s: %s\n", containerName, err.Error())
+	}
+	return err
+}
+*/
+
+//InitContainer InitContainer creates the Object Storage Container/Bucket that will store the metadata
+func InitContainer(Location object.Location) error {
+	err := Location.Create(containerName)
+	if err != nil {
+		fmt.Printf("failed to create Object Container %s: %s\n", containerName, err.Error())
+	}
+	return err
+}
+
+//Folder describes a metadata folder
+>>>>>>> Update object storage management:metadata/metadata.go
 type Folder struct {
 	//path contains the base path where to read/write record in Object Storage
 	path       string

@@ -48,7 +48,13 @@ func (s *ContainerServiceServer) List(ctx context.Context, in *google_protobuf.E
 		return nil, fmt.Errorf("Cannot list containers : No tenant set")
 	}
 
+<<<<<<< develop:broker/server/commands/container.go
 	service := services.NewContainerService(providers.FromClient(currentTenant.Client))
+||||||| ancestor
+	service := services.NewContainerService(currentTenant.Client)
+=======
+	service := services.NewContainerServiceObject(currentTenant.Location)
+>>>>>>> Update object storage management:broker/daemon/commands/container.go
 	containers, err := service.List()
 	if err != nil {
 		tbr := errors.Wrap(err, "Cannot list containers")
@@ -65,7 +71,13 @@ func (s *ContainerServiceServer) Create(ctx context.Context, in *pb.Container) (
 		return nil, fmt.Errorf("Can't create container: no tenant set")
 	}
 
+<<<<<<< develop:broker/server/commands/container.go
 	service := services.NewContainerService(providers.FromClient(currentTenant.Client))
+||||||| ancestor
+	service := services.NewContainerService(currentTenant.Client)
+=======
+	service := services.NewContainerServiceObject(currentTenant.Location)
+>>>>>>> Update object storage management:broker/daemon/commands/container.go
 	err := service.Create(in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "Can't create container")
@@ -82,7 +94,13 @@ func (s *ContainerServiceServer) Delete(ctx context.Context, in *pb.Container) (
 		return nil, fmt.Errorf("Can't delete container: no tenant set")
 	}
 
+<<<<<<< develop:broker/server/commands/container.go
 	service := services.NewContainerService(providers.FromClient(currentTenant.Client))
+||||||| ancestor
+	service := services.NewContainerService(currentTenant.Client)
+=======
+	service := services.NewContainerServiceObject(currentTenant.Location)
+>>>>>>> Update object storage management:broker/daemon/commands/container.go
 	err := service.Delete(in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "Can't delete container")
