@@ -18,13 +18,21 @@ package flexibleengine
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+<<<<<<< develop
 	provmetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+||||||| ancestor
+	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+=======
+	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/object"
+>>>>>>> Update object storage management
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	// Gophercloud OpenStack API
@@ -73,6 +81,22 @@ type AuthOptions struct {
 	S3AccessKeyID string
 	// Password of the previous identifier
 	S3AccessKeyPassword string
+	//OstUsername
+	OstUsername string
+	//OstPassword
+	OstPassword string
+	//OstDomainName
+	OstDomainName string
+	//OstProjectID
+	OstProjectID string
+	//OstAuth
+	OstAuth string
+	//OstRegion
+	OstRegion string
+	//OstSecretKey
+	OstSecretKey string
+	//OstTypes
+	OstTypes string
 }
 
 const (
@@ -264,11 +288,49 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 		return nil, err
 	}
 
+<<<<<<< develop
 	// Creates metadata Object Storage container
 	err = providers.InitializeBucket(&clt)
+||||||| ancestor
+	// Creates metadata Object Storage container
+	err = metadata.InitializeContainer(&clt)
+=======
+	//*** modif PC
+	var Config object.Config
+	var ConfigObject object.Config
+
+	Config.Types = "s3"
+	Config.Domain = clt.Opts.DomainName
+	Config.Tenant = clt.Opts.ProjectID
+	Config.Region = clt.Opts.Region
+	Config.Key = clt.Opts.S3AccessKeyID
+	Config.Secretkey = clt.Opts.S3AccessKeyPassword
+	Config.Endpoint = endpoint
+
+	ConfigObject.Domain = "default"
+	ConfigObject.Auth = clt.Opts.OstAuth
+	ConfigObject.Endpoint = clt.Opts.OstAuth
+	ConfigObject.User = clt.Opts.OstUsername
+	ConfigObject.Tenant = clt.Opts.OstProjectID
+	ConfigObject.Region = clt.Opts.OstRegion
+	ConfigObject.Secretkey = clt.Opts.OstSecretKey
+	ConfigObject.Key = clt.Opts.OstPassword
+	ConfigObject.Types = clt.Opts.OstTypes
+	log.Println("config container set to : ", Config.Endpoint)
+	log.Println("object storage set to  : ", ConfigObject.Auth)
+	err = clt.LocforConfig.Connect(Config)
+>>>>>>> Update object storage management
+	if err != nil {
+		log.Println("Erreur Connection  stow  : ", err)
+		return nil, err
+	}
+	//err = metadata.InitializeContainer(&clt)
+	err = metadata.InitContainer(clt.LocforConfig)
 	if err != nil {
 		return nil, err
 	}
+	err = clt.LocforStore.Connect(ConfigObject)
+
 	return &clt, nil
 }
 
@@ -288,6 +350,9 @@ type Client struct {
 	defaultSecurityGroup string
 	// SecurityGroup is an instance of the default security group
 	SecurityGroup *secgroups.SecGroup
+	// modif PC
+	LocforConfig object.Location
+	LocforStore  object.Location
 }
 
 // Build build a new Client from configuration parameter
@@ -301,7 +366,19 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	Region, _ := params["Region"].(string)
 	S3AccessKeyID, _ := params["S3AccessKeyID"].(string)
 	S3AccessKeyPassword, _ := params["S3AccessKeyPassword"].(string)
+<<<<<<< develop
 
+||||||| ancestor
+=======
+	OstUsername, _ := params["OstUsername"].(string)
+	OstPassword, _ := params["OstPassword"].(string)
+	OstDomainName, _ := params["OstDomainName"].(string)
+	OstProjectID, _ := params["OstProjectID"].(string)
+	OstAuth, _ := params["OstAuth"].(string)
+	OstRegion, _ := params["OstRegion"].(string)
+	OstSecretKey, _ := params["OstSecretKey"].(string)
+	OstTypes, _ := params["OstTypes"].(string)
+>>>>>>> Update object storage management
 	return AuthenticatedClient(AuthOptions{
 		Username:            Username,
 		Password:            Password,
@@ -313,7 +390,21 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 		VPCCIDR:             VPCCIDR,
 		S3AccessKeyID:       S3AccessKeyID,
 		S3AccessKeyPassword: S3AccessKeyPassword,
+<<<<<<< develop
 	}, openstack.CfgOptions{
+||||||| ancestor
+	}, CfgOptions{
+=======
+		OstUsername:         OstUsername,
+		OstPassword:         OstPassword,
+		OstDomainName:       OstDomainName,
+		OstProjectID:        OstProjectID,
+		OstAuth:             OstAuth,
+		OstRegion:           OstRegion,
+		OstSecretKey:        OstSecretKey,
+		OstTypes:            OstTypes,
+	}, CfgOptions{
+>>>>>>> Update object storage management
 		DNSList:             []string{"100.125.0.41", "100.126.0.41"},
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,

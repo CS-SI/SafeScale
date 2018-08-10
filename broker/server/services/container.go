@@ -21,7 +21,14 @@ import (
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/providers"
+<<<<<<< develop:broker/server/services/container.go
 	"github.com/CS-SI/SafeScale/providers/model"
+||||||| ancestor
+	"github.com/CS-SI/SafeScale/providers/api"
+=======
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/object"
+>>>>>>> Update object storage management:broker/daemon/services/container.go
 )
 
 //go:generate mockgen -destination=../mocks/mock_containerapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services ContainerAPI
@@ -45,28 +52,71 @@ func NewContainerService(api *providers.Service) ContainerAPI {
 	}
 }
 
+//NewContainerServiceObject creates a Container service
+func NewContainerServiceObject(location *object.Location) ContainerAPI {
+	return &ContainerService{
+		provider: providers.FromClientObject(location),
+	}
+}
+
 // ContainerService container service
 type ContainerService struct {
 	provider *providers.Service
 }
 
 // List retrieves all available containers
+<<<<<<< develop:broker/server/services/container.go
 func (svc *ContainerService) List() ([]string, error) {
 	return svc.provider.ListContainers()
+||||||| ancestor
+func (srv *ContainerService) List() ([]string, error) {
+	return srv.provider.ListContainers()
+=======
+func (srv *ContainerService) List() ([]string, error) {
+	fmt.Println("ooooooo List")
+	fmt.Println("ooooooo List", srv.provider.Location)
+	return srv.provider.Location.ListContainers()
+>>>>>>> Update object storage management:broker/daemon/services/container.go
 }
 
 // Create a container
+<<<<<<< develop:broker/server/services/container.go
 func (svc *ContainerService) Create(name string) error {
 	container, _ := svc.provider.GetContainer(name)
 	if container != nil {
 		return model.ResourceAlreadyExistsError("Container", name)
 	}
 	return svc.provider.CreateContainer(name)
+||||||| ancestor
+func (srv *ContainerService) Create(name string) error {
+	container, _ := srv.provider.GetContainer(name)
+	if container != nil {
+		return providers.ResourceAlreadyExistsError("Container", name)
+	}
+	return srv.provider.CreateContainer(name)
+=======
+func (srv *ContainerService) Create(name string) error {
+	fmt.Println("ooooooo Create ")
+	fmt.Println("ooooooo Create", srv.provider.Location)
+	/*	container, _ := srv.provider.GetContainer(name)
+		if container != nil {
+			return providers.ResourceAlreadyExistsError("Container", name)
+		}*/
+	return srv.provider.Location.Create(name)
+>>>>>>> Update object storage management:broker/daemon/services/container.go
 }
 
 // Delete a container
+<<<<<<< develop:broker/server/services/container.go
 func (svc *ContainerService) Delete(name string) error {
 	return svc.provider.DeleteContainer(name)
+||||||| ancestor
+func (srv *ContainerService) Delete(name string) error {
+	return srv.provider.DeleteContainer(name)
+=======
+func (srv *ContainerService) Delete(name string) error {
+	return srv.provider.Location.Remove(name)
+>>>>>>> Update object storage management:broker/daemon/services/container.go
 }
 
 // Inspect a container
@@ -83,7 +133,13 @@ func (svc *ContainerService) Mount(containerName, hostName, path string) error {
 	}
 
 	// Get Host ID
+<<<<<<< develop:broker/server/services/container.go
 	hostService := NewHostService(svc.provider)
+||||||| ancestor
+	hostService := NewHostService(srv.provider)
+=======
+	hostService := NewHostService(srv.provider.ClientAPI)
+>>>>>>> Update object storage management:broker/daemon/services/container.go
 	host, err := hostService.Get(hostName)
 	if err != nil {
 		return srvLogMessage(err, fmt.Sprintf("no host found with name or id '%s'", hostName))
@@ -144,7 +200,13 @@ func (svc *ContainerService) UMount(containerName, hostName string) error {
 	}
 
 	// Get Host ID
+<<<<<<< develop:broker/server/services/container.go
 	hostService := NewHostService(svc.provider)
+||||||| ancestor
+	hostService := NewHostService(srv.provider)
+=======
+	hostService := NewHostService(srv.provider.ClientAPI)
+>>>>>>> Update object storage management:broker/daemon/services/container.go
 	host, err := hostService.Get(hostName)
 	if err != nil {
 		return fmt.Errorf("no host found with name or id '%s'", hostName)

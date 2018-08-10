@@ -42,11 +42,19 @@ import (
 // Service Client High level service
 type Service struct {
 	api.ClientAPI
+	*object.Location
 }
 
 // FromClient contructs a Service instance from a ClientAPI
 func FromClient(clt api.ClientAPI) *Service {
 	return &Service{ClientAPI: clt}
+}
+
+// FromClient contructs a Service instance from a ClientAPI
+func FromClientObject(clt *object.Location) *Service {
+	return &Service{
+		Location: clt,
+	}
 }
 
 const (
@@ -218,7 +226,13 @@ func (svc *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 	next := make(chan bool)
 	vc := make(chan *model.Volume)
 
+<<<<<<< develop
 	go pollVolume(svc, volumeID, state, cout, next, vc)
+||||||| ancestor
+	go pollVolume(srv, volumeID, state, cout, next, vc)
+=======
+	go pollVolume(srv.ClientAPI, volumeID, state, cout, next, vc)
+>>>>>>> Update object storage management
 	for {
 		select {
 		case res := <-cout:

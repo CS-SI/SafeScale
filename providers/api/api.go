@@ -102,13 +102,14 @@ type ClientAPI interface {
 	ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error)
 	// DeleteVolumeAttachment deletes the volume attachment identifed by id
 	DeleteVolumeAttachment(serverID, id string) error
-
-	// CreateContainer creates an object container
-	CreateContainer(name string) error
-	// DeleteContainer deletes an object container
-	DeleteContainer(name string) error
-	// ListContainers list object containers
-	ListContainers() ([]string, error)
+	/*
+		// CreateContainer creates an object container
+		CreateContainer(name string) error
+		// DeleteContainer deletes an object container
+		DeleteContainer(name string) error
+		// ListContainers list object containers
+		ListContainers() ([]string, error)
+	*/
 	// Getcontainer returns info of the container
 	GetContainer(name string) (*model.ContainerInfo, error)
 

@@ -37,6 +37,22 @@ type AuthOptions struct {
 	Password   string
 	TenantName string
 	Region     string
+	//OstUsername
+	OstUsername string
+	//OstPassword
+	OstPassword string
+	//OstDomainName
+	OstDomainName string
+	//OstProjectID
+	OstProjectID string
+	//OstAuth
+	OstAuth string
+	//OstRegion
+	OstRegion string
+	//OstSecretKey
+	OstSecretKey string
+	//OstTypes
+	OstTypes string
 }
 
 // func parseOpenRC(openrc string) (*openstack.AuthOptions, error) {
@@ -54,6 +70,16 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 		TenantName:     opts.TenantName,
 		Region:         opts.Region,
 		FloatingIPPool: "public",
+		/*
+			OstUsername:    opts.OstUsername,
+			OstPassword:    opts.OstPassword,
+			OstDomainName:  opts.OstDomainName,
+			OstProjectID:   opts.OstProjectID,
+			OstAuth:        opts.OstAuth,
+			OstRegion:      opts.OstRegion,
+			OstSecretKey:   opts.OstSecretKey,
+			OstTypes:       opts.OstTypes,
+		*/
 	},
 		openstack.CfgOptions{
 			ProviderNetwork:           "public",
@@ -92,11 +118,31 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	Password, _ := params["Password"].(string)
 	TenantName, _ := params["TenantName"].(string)
 	Region, _ := params["Region"].(string)
+	/*
+		OstUsername, _ := params["OstUsername"].(string)
+		OstPassword, _ := params["OstPassword"].(string)
+		OstDomainName, _ := params["OstDomainName"].(string)
+		OstProjectID, _ := params["OstProjectID"].(string)
+		OstAuth, _ := params["OstAuth"].(string)
+		OstRegion, _ := params["OstRegion"].(string)
+		OstSecretKey, _ := params["OstSecretKey"].(string)
+		OstTypes, _ := params["OstTypes"].(string)
+	*/
 	return AuthenticatedClient(AuthOptions{
 		Username:   Username,
 		Password:   Password,
 		TenantName: TenantName,
 		Region:     Region,
+		/*
+			OstUsername:   OstUsername,
+			OstPassword:   OstPassword,
+			OstDomainName: OstDomainName,
+			OstProjectID:  OstProjectID,
+			OstAuth:       OstAuth,
+			OstRegion:     OstRegion,
+			OstSecretKey:  OstSecretKey,
+			OstTypes:      OstTypes,
+		*/
 	})
 }
 

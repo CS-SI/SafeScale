@@ -82,6 +82,7 @@ type AuthOptions struct {
 // AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	client := &Client{}
+<<<<<<< develop
 	osclt, err := openstack.AuthenticatedClient(
 		openstack.AuthOptions{
 			IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
@@ -93,6 +94,47 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 			Region:      opts.Region,
 			AllowReauth: true,
 		},
+||||||| ancestor
+	//	c, err := ovh.NewClient(opts.Endpoint, opts.ApplicationName, opts.ApplicationKey, opts.ConsumerKey)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	//client.ovh = c
+	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
+		IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
+		//UserID:           opts.OpenstackID,
+		Username:   opts.OpenstackID,
+		Password:   opts.OpenstackPassword,
+		TenantID:   opts.ApplicationKey,
+		TenantName: opts.ProjectName,
+		Region:     opts.Region,
+	},
+=======
+	//	c, err := ovh.NewClient(opts.Endpoint, opts.ApplicationName, opts.ApplicationKey, opts.ConsumerKey)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	//client.ovh = c
+	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
+		IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
+		//UserID:           opts.OpenstackID,
+		Username:   opts.OpenstackID,
+		Password:   opts.OpenstackPassword,
+		TenantID:   opts.ApplicationKey,
+		TenantName: opts.ProjectName,
+		Region:     opts.Region,
+		/*
+			OstUsername:   opts.OstUsername,
+			OstPassword:   opts.OstPassword,
+			OstDomainName: opts.OstDomainName,
+			OstProjectID:  opts.OstProjectID,
+			OstAuth:       opts.OstAuth,
+			OstRegion:     opts.OstRegion,
+			OstSecretKey:  opts.OstSecretKey,
+			OstTypes:      opts.OstTypes,
+		*/
+	},
+>>>>>>> Update object storage management
 		openstack.CfgOptions{
 			ProviderNetwork:           ProviderNetwork,
 			UseFloatingIP:             false,
@@ -131,6 +173,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	OpenstackPassword, _ := params["OpenstackPassword"].(string)
 	Region, _ := params["Region"].(string)
 	ProjectName, _ := params["ProjectName"].(string)
+<<<<<<< develop
 
 	Context, ok := params["Context"].(string)
 	if !ok {
