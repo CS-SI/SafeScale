@@ -123,16 +123,6 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 		TenantID:   opts.ApplicationKey,
 		TenantName: opts.ProjectName,
 		Region:     opts.Region,
-		/*
-			OstUsername:   opts.OstUsername,
-			OstPassword:   opts.OstPassword,
-			OstDomainName: opts.OstDomainName,
-			OstProjectID:  opts.OstProjectID,
-			OstAuth:       opts.OstAuth,
-			OstRegion:     opts.OstRegion,
-			OstSecretKey:  opts.OstSecretKey,
-			OstTypes:      opts.OstTypes,
-		*/
 	},
 >>>>>>> Update object storage management
 		openstack.CfgOptions{
@@ -173,6 +163,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	OpenstackPassword, _ := params["OpenstackPassword"].(string)
 	Region, _ := params["Region"].(string)
 	ProjectName, _ := params["ProjectName"].(string)
+<<<<<<< develop
 <<<<<<< develop
 
 	Context, ok := params["Context"].(string)
