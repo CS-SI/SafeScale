@@ -68,15 +68,10 @@ func GetService(tenantName string) (*Service, error) {
 		tenant, _ := t.(map[string]interface{})
 		tenantconfig, _ := tenant["config"].(map[string]interface{})
 		tenantobject, _ := tenant["object"].(map[string]interface{})
-		// Merge tenantconfig and tenantobject
-		for k, v := range tenantconfig {
-			tenantobject[k] = v
-		}
-		tenantmerged := tenantobject
 		if name, ok := tenantconfig["name"].(string); ok {
 			if name == tenantName {
 				tenantInCfg = true
-				if provider, ok := tenantmerged["client"].(string); ok {
+				if provider, ok := tenantconfig["client"].(string); ok {
 					clientProvider = provider
 					if client, ok := providers[provider]; ok {
 <<<<<<< develop
@@ -87,8 +82,14 @@ func GetService(tenantName string) (*Service, error) {
 						location := new(object.Location)
 						Config := setConfig(tenantobject)
 						err = location.Connect(Config)
+<<<<<<< develop
 						service, err := client.Build(tenantmerged)
 >>>>>>> Update object storage management
+||||||| ancestor
+						service, err := client.Build(tenantmerged)
+=======
+						service, err := client.Build(tenantconfig)
+>>>>>>> object storage
 						if err != nil {
 							return nil, fmt.Errorf("Error creating tenant %s on provider %s: %s", tenantName, provider, err.Error())
 						}
@@ -118,16 +119,16 @@ func setConfig(tenant map[string]interface{}) object.Config {
 
 	var Config object.Config
 	Config.Domain = "default"
-	Config.Auth = tenant["OstAuth"].(string)
-	Config.Endpoint = tenant["OstAuth"].(string)
-	Config.User = tenant["OstUsername"].(string)
-	Config.Tenant = tenant["OstProjectID"].(string)
-	Config.Region = tenant["OstRegion"].(string)
-	if tenant["OstSecretKey"] != nil {
-		Config.Secretkey = tenant["OstSecretKey"].(string)
+	Config.Auth = tenant["Auth"].(string)
+	Config.Endpoint = tenant["Auth"].(string)
+	Config.User = tenant["Username"].(string)
+	Config.Tenant = tenant["ProjectID"].(string)
+	Config.Region = tenant["Region"].(string)
+	if tenant["SecretKey"] != nil {
+		Config.Secretkey = tenant["SecretKey"].(string)
 	}
-	Config.Key = tenant["OstPassword"].(string)
-	Config.Types = tenant["OstTypes"].(string)
+	Config.Key = tenant["Password"].(string)
+	Config.Types = tenant["Types"].(string)
 	return Config
 }
 

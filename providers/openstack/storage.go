@@ -288,6 +288,7 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 	return nil
 }
 
+/*
 //CreateContainer creates an object container
 func (client *Client) CreateContainer(name string) error {
 
@@ -298,7 +299,7 @@ func (client *Client) CreateContainer(name string) error {
 
 	return nil
 }
-
+*/
 /*
 //
 //CreateContainer creates an object container
@@ -314,6 +315,7 @@ func (client *Client) CreateContainer(name string) error {
 	return nil
 }
 */
+/*
 //DeleteContainer deletes an object container
 func (client *Client) DeleteContainer(name string) error {
 	//*** modif PC
@@ -324,6 +326,7 @@ func (client *Client) DeleteContainer(name string) error {
 
 	return err
 }
+*/
 
 // UpdateContainer updates an object container
 func (client *Client) UpdateContainer(name string, meta map[string]string) error {
@@ -363,6 +366,7 @@ func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
 
 }
 
+/*
 // ListContainers list object containers
 func (client *Client) ListContainers() ([]string, error) {
 	//*** modif PC
@@ -374,6 +378,7 @@ func (client *Client) ListContainers() ([]string, error) {
 	}
 	return containerList, nil
 }
+*/
 
 // PutObject put an object into an object container
 func (client *Client) PutObject(container string, obj api.Object) error {

@@ -34,8 +34,13 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+<<<<<<< develop
 	"github.com/CS-SI/SafeScale/providers/object"
 >>>>>>> Update object storage management
+||||||| ancestor
+	"github.com/CS-SI/SafeScale/providers/object"
+=======
+>>>>>>> object storage
 
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -102,24 +107,6 @@ type AuthOptions struct {
 	//FloatingIPPool name of the floating IP pool
 	//Necessary only if UseFloatingIP is true
 	FloatingIPPool string
-	/*
-		//OstUsername
-		OstUsername string
-		//OstPassword
-		OstPassword string
-		//OstDomainName
-		OstDomainName string
-		//OstProjectID
-		OstProjectID string
-		//OstAuth
-		OstAuth string
-		//OstRegion
-		OstRegion string
-		//OstSecretKey
-		OstSecretKey string
-		//OstTypes
-		OstTypes string
-	*/
 }
 
 // CfgOptions configuration options
@@ -318,6 +305,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	}
 =======
 
+<<<<<<< develop
 	//*** modif PC
 	// connection STOW for containers management
 	/*
@@ -360,6 +348,50 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		//	clt.CreateContainer(api.NasContainerName)
 	*/
 >>>>>>> Update object storage management
+||||||| ancestor
+	//*** modif PC
+	// connection STOW for containers management
+	/*
+		var Config object.Config
+		var ConfigObject object.Config
+		Config.Auth = clt.Opts.IdentityEndpoint
+		Config.Tenant = clt.Opts.TenantName
+		Config.Key = clt.Opts.Password
+		Config.User = clt.Opts.Username
+		Config.Region = clt.Opts.Region
+		Config.Types = "swift"
+
+		ConfigObject.Domain = "default"
+		ConfigObject.Auth = clt.Opts.OstAuth
+		ConfigObject.Endpoint = clt.Opts.OstAuth
+		ConfigObject.User = clt.Opts.OstUsername
+		ConfigObject.Tenant = clt.Opts.OstProjectID
+		ConfigObject.Region = clt.Opts.OstRegion
+		ConfigObject.Secretkey = clt.Opts.OstSecretKey
+		ConfigObject.Key = clt.Opts.OstPassword
+		ConfigObject.Types = clt.Opts.OstTypes
+		log.Println("config container set to : ", Config.Auth)
+		log.Println("object storage set to  : ", ConfigObject.Auth)
+		err = clt.LocforConfig.Connect(Config)
+		if err != nil {
+			log.Println("Erreur Connection  stow LocforConfig : ", err)
+			return nil, err
+		}
+		err = metadata.InitContainer(clt.LocforConfig)
+		if err != nil {
+			log.Println("Erreur InitContainer    : ", err)
+			return nil, err
+		}
+		err = clt.LocforStore.Connect(ConfigObject)
+		if err != nil {
+			log.Println("Erreur Connection  stow LocforStore : ", err)
+			return nil, err
+		}
+
+		//	clt.CreateContainer(api.NasContainerName)
+	*/
+=======
+>>>>>>> object storage
 	return &clt, nil
 }
 
@@ -378,9 +410,6 @@ type Client struct {
 
 	SecurityGroup     *secgroups.SecurityGroup
 	ProviderNetworkID string
-	// modif PC
-	LocforConfig object.Location
-	LocforStore  object.Location
 }
 
 // getDefaultSecurityGroup returns the default security group
@@ -536,16 +565,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	TenantName, _ := params["TenantName"].(string)
 	Region, _ := params["Region"].(string)
 	FloatingIPPool, _ := params["FloatingIPPool"].(string)
-	/*
-		OstUsername, _ := params["OstUsername"].(string)
-		OstPassword, _ := params["OstPassword"].(string)
-		OstDomainName, _ := params["OstDomainName"].(string)
-		OstProjectID, _ := params["OstProjectID"].(string)
-		OstAuth, _ := params["OstAuth"].(string)
-		OstRegion, _ := params["OstRegion"].(string)
-		OstSecretKey, _ := params["OstSecretKey"].(string)
-		OstTypes, _ := params["OstTypes"].(string)
-	*/
+
 	return AuthenticatedClient(
 		AuthOptions{
 			IdentityEndpoint: IdentityEndpoint,
@@ -554,16 +574,6 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 			TenantName:       TenantName,
 			Region:           Region,
 			FloatingIPPool:   FloatingIPPool,
-			/*
-				OstUsername:      OstUsername,
-				OstPassword:      OstPassword,
-				OstDomainName:    OstDomainName,
-				OstProjectID:     OstProjectID,
-				OstAuth:          OstAuth,
-				OstRegion:        OstRegion,
-				OstSecretKey:     OstSecretKey,
-				OstTypes:         OstTypes,
-			*/
 		},
 		CfgOptions{
 			ProviderNetwork:           "public",
