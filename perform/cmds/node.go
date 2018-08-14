@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CS-SI/SafeScale/deploy/cmds/ErrorCode"
-
 	"github.com/CS-SI/SafeScale/utils/cli"
+	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
 )
 
 // nodeCommand configures arguments for command "perform <clustername> node"
@@ -46,7 +45,7 @@ var nodeCommand = &cli.Command{
 			if nodeName == "" {
 				fmt.Println("Invalid argument <node name or id>")
 				//cli.ShowSubcommandHelp(c)
-				os.Exit(int(ErrorCode.InvalidArgument))
+				os.Exit(int(ExitCode.InvalidArgument))
 			}
 		}
 	},
@@ -73,7 +72,7 @@ var nodeCreateCommand = &cli.Command{
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -92,7 +91,7 @@ var nodeDeleteCommand = &cli.Command{
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -112,7 +111,7 @@ var nodeListCommand = &cli.Command{
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -126,7 +125,7 @@ var nodeInspectCommand = &cli.Command{
 		cmdStr := fmt.Sprintf("deploy cluster %s node %s inspect", clusterName, nodeName)
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.OK))
+		os.Exit(int(ExitCode.OK))
 	},
 
 	Help: &cli.HelpContent{},
@@ -141,7 +140,7 @@ var nodeStopCommand = &cli.Command{
 		cmdStr := fmt.Sprintf("deploy cluster %s node %s stop", clusterName, nodeName)
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -156,7 +155,7 @@ var nodeStartCommand = &cli.Command{
 		cmdStr := fmt.Sprintf("deploy cluster %s node %s start", clusterName, nodeName)
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -170,7 +169,7 @@ var nodeStateCommand = &cli.Command{
 		cmdStr := fmt.Sprintf("deploy cluster %s node %s state", clusterName, nodeName)
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},

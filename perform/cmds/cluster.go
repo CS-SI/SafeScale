@@ -21,16 +21,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/deploy/cmds/ErrorCode"
-
 	"github.com/CS-SI/SafeScale/utils/cli"
+	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
 )
 
 func populateClusterName(c *cli.Command) {
 	clusterName := c.StringArgument("<clustername>", "")
 	if clusterName == "" {
 		fmt.Println("Invalid argument <clustername>")
-		os.Exit(int(ErrorCode.InvalidArgument))
+		os.Exit(int(ExitCode.InvalidArgument))
 	}
 
 }
@@ -43,7 +42,7 @@ var ClusterInspectCommand = &cli.Command{
 		populateClusterName(c)
 		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s inspect", clusterName))
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -70,7 +69,12 @@ var ClusterCreateCommand = &cli.Command{
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+
+		cmdStr = fmt.Sprintf("deploy cluster %s pkg -K DCOS kubernetes", clusterName)
+		cmdStr = RebrandCommand(cmdStr)
+		fmt.Println(cmdStr)
+
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{
@@ -97,7 +101,7 @@ var ClusterDeleteCommand = &cli.Command{
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -113,7 +117,7 @@ var ClusterStopCommand = &cli.Command{
 
 		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s stop", clusterName))
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 }
 
@@ -127,7 +131,7 @@ var ClusterStartCommand = &cli.Command{
 
 		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s start", clusterName))
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -142,7 +146,7 @@ var ClusterStateCommand = &cli.Command{
 
 		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s state", clusterName))
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -172,7 +176,7 @@ var ClusterExpandCommand = &cli.Command{
 		// }
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -194,7 +198,7 @@ var ClusterShrinkCommand = &cli.Command{
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -214,7 +218,7 @@ var ClusterDcosCommand = &cli.Command{
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -234,7 +238,7 @@ var ClusterKubectlCommand = &cli.Command{
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -254,7 +258,7 @@ var ClusterMarathonCommand = &cli.Command{
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},

@@ -192,11 +192,8 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 	var netList []api.Network
 
-	m, err := metadata.NewNetwork(providers.FromClient(client))
-	if err != nil {
-		return netList, err
-	}
-	err = m.Browse(func(net *api.Network) error {
+	m := metadata.NewNetwork(providers.FromClient(client))
+	err := m.Browse(func(net *api.Network) error {
 		// Get info about the gateway associated to this network
 		mgw, err := metadata.NewGateway(providers.FromClient(client), net.ID)
 		if err != nil {
@@ -206,11 +203,11 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 		ok, err := mgw.Read()
 		if err != nil {
 			log.Print(err.Error())
-			return nil
+			return fmt.Errorf("failed to read gateway metadata for network '%s': %s", net.ID, err.Error())
 		}
 		if !ok {
 			log.Print("gateway metadata not found")
-			return nil
+			return fmt.Errorf("failed to find gateway metadata for network '%s'", net.ID)
 		}
 		gwhost := mgw.Get()
 
@@ -277,7 +274,7 @@ func (client *Client) DeleteNetwork(networkID string) error {
 	return nil
 }
 
-//CreateGateway creates a public Gateway for a private network
+// CreateGateway creates a public Gateway for a private network
 func (client *Client) CreateGateway(req api.GWRequest) error {
 	net, err := client.GetNetwork(req.NetworkID)
 	if err != nil {
@@ -295,15 +292,14 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 		NetworkIDs: []string{req.NetworkID},
 		PublicIP:   true,
 	}
-	_, err = client.createHost(hostReq, true)
+	host, err := client.createHost(hostReq, true)
 	if err != nil {
 		return fmt.Errorf("error creating gateway : %s", errorString(err))
 	}
-	// Note: no metadata.SaveGateway(), it's done in client.CreateHost()
-	return nil
+	return metadata.SaveGateway(providers.FromClient(client), host, req.NetworkID)
 }
 
-//DeleteGateway delete the public gateway of a private network
+// DeleteGateway delete the public gateway of a private network
 func (client *Client) DeleteGateway(networkID string) error {
 	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
 	if err != nil {
@@ -320,7 +316,6 @@ func (client *Client) DeleteGateway(networkID string) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 	return m.Delete()
-
 }
 
 func toGopherIPversion(v IPVersion.Enum) gc.IPVersion {

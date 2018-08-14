@@ -1,9 +1,9 @@
 GOPATH?=$(HOME)/go
 GO?=go
 
-.PHONY:	sdk broker brokerd clean
+.PHONY:	sdk cli clean
 
-all:	brokerd broker
+all:	cli
 
 vet:
 	@$(GO) vet
@@ -12,13 +12,9 @@ vet:
 sdk:	broker.proto
 	@protoc -I. -I$(GOPATH)/src --go_out=plugins=grpc:. broker.proto
 
-brokerd:	sdk
-	@(cd daemon && $(MAKE) $@)
-
-broker:	sdk
-	@(cd client && $(MAKE) $@)
+cli:	sdk
+	@(cd cli && $(MAKE))
 
 clean:
-	@(cd client && $(MAKE) $@)
-	@(cd daemon && $(MAKE) $@)
+	@(cd cli && $(MAKE) $@)
 	@($(RM) broker_pb2.py broker.pb.go)

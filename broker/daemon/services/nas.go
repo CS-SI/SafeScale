@@ -164,11 +164,8 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 //List return the list of all created nas
 func (srv *NasService) List() ([]api.Nas, error) {
 	var nass []api.Nas
-	m, err := metadata.NewNas(srv.provider)
-	if err != nil {
-		return nass, err
-	}
-	err = m.Browse(func(nas *api.Nas) error {
+	m := metadata.NewNas(srv.provider)
+	err := m.Browse(func(nas *api.Nas) error {
 		nass = append(nass, *nas)
 		return nil
 	})
@@ -307,11 +304,7 @@ func (srv *NasService) readNasDefinition(nasName string) (*api.Nas, error) {
 }
 
 func (srv *NasService) findNas(name string) (*api.Nas, error) {
-	mn, err := metadata.NewNas(srv.provider)
-	if err != nil {
-		return nil, err
-	}
-
+	mn := metadata.NewNas(srv.provider)
 	found, err := mn.ReadByName(name)
 	if err != nil {
 		return nil, err

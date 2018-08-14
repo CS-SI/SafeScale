@@ -29,7 +29,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/deploy/cmds/ErrorCode"
+	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
 	docopt "github.com/CS-SI/SafeScale/utils/cli/docopt-parser"
 )
 
@@ -166,7 +166,7 @@ func (c *Command) FloatOption(option string, parameter string, def float64) floa
 		value, err := strconv.ParseFloat(anon.(string), 64)
 		if err != nil {
 			fmt.Println(err.Error())
-			os.Exit(int(ErrorCode.Run))
+			os.Exit(int(ExitCode.Run))
 		}
 		return value
 	}

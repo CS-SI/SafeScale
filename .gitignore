@@ -50,3 +50,5 @@ deploy/deploy
 cluster/tests/create_cluster
 
 deploy/cluster/tests/create_cluster
+
+*.new

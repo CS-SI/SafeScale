@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -141,7 +140,7 @@ func GetHost(id string) (*pb.Host, error) {
 }
 
 // SSHRun executes a command on an host
-func SSHRun(id string, command string, timeout time.Duration) error {
+func SSHRun(id string, command string, timeout time.Duration) (int, string, string, error) {
 	conn := GetConnection()
 	defer conn.Close()
 	if timeout == 0 {
@@ -156,13 +155,31 @@ func SSHRun(id string, command string, timeout time.Duration) error {
 		Command: command,
 	})
 
-	// TODO output result to stdout
 	if err != nil {
-		return fmt.Errorf("Could not execute ssh command: %v", err)
+		return 0, "", "", fmt.Errorf("Could not execute ssh command: %s", err.Error())
 	}
-	fmt.Print(fmt.Sprintf(resp.GetOutputStd()))
-	fmt.Fprint(os.Stderr, fmt.Sprintf(resp.GetOutputErr()))
-	// fmt.Println(fmt.Sprintf(string(resp.GetStatus())))
 
+	// No submission error, command executed, returns retcode, stdout and stderr
+	return int(resp.GetStatus()), resp.GetOutputStd(), resp.GetOutputErr(), nil
+}
+
+// SSHCopy copy a file from 'from' to 'to' using SSH
+func SSHCopy(from, to string, timeout time.Duration) error {
+	conn := GetConnection()
+	defer conn.Close()
+	if timeout == 0 {
+		timeout = utils.TimeoutCtxDefault
+	}
+	ctx, cancel := GetContext(timeout)
+	defer cancel()
+	service := pb.NewSshServiceClient(conn)
+
+	_, err := service.Copy(ctx, &pb.SshCopyCommand{
+		Source:      from,
+		Destination: to,
+	})
+	if err != nil {
+		return fmt.Errorf("Could not copy %s to %s: %s", from, to, err.Error())
+	}
 	return nil
 }

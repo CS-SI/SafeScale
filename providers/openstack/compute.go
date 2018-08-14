@@ -548,11 +548,8 @@ func (client *Client) listAllHosts() ([]api.Host, error) {
 // listMonitoredHosts lists available hosts created by SafeScale (ie registered in object storage)
 func (client *Client) listMonitoredHosts() ([]api.Host, error) {
 	var hosts []api.Host
-	m, err := metadata.NewHost(providers.FromClient(client))
-	if err != nil {
-		return hosts, err
-	}
-	err = m.Browse(func(host *api.Host) error {
+	m := metadata.NewHost(providers.FromClient(client))
+	err := m.Browse(func(host *api.Host) error {
 		hosts = append(hosts, *host)
 		return nil
 	})

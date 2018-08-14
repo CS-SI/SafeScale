@@ -30,9 +30,11 @@ Commands:
 {{- .Commands }}
 {{ end }}
 
+{{- if .Options}}
 {{- range .Options }}
 {{ . }}
 
+{{- end }}
 {{- end }}
 
 {{- if .Description }}

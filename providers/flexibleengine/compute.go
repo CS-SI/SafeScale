@@ -411,11 +411,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		}
 	}
 
-	if isGateway {
-		err = metadata.SaveGateway(providers.FromClient(client), host, request.NetworkIDs[0])
-	} else {
-		err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
-	}
+	err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
 	if err != nil {
 		client.DeleteHost(host.ID)
 		return nil, fmt.Errorf("failed to create Host: %s", providerError(err))
@@ -513,11 +509,8 @@ func (client *Client) listallhosts() ([]api.Host, error) {
 // because client.ListObjects() is different (Swift for openstack, S3 for flexibleengine).
 func (client *Client) listMonitoredHosts() ([]api.Host, error) {
 	var hosts []api.Host
-	m, err := metadata.NewHost(providers.FromClient(client))
-	if err != nil {
-		return hosts, err
-	}
-	err = m.Browse(func(host *api.Host) error {
+	m := metadata.NewHost(providers.FromClient(client))
+	err := m.Browse(func(host *api.Host) error {
 		hosts = append(hosts, *host)
 		return nil
 	})

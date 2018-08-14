@@ -19,13 +19,12 @@ package metadata
 import (
 	"bytes"
 	"encoding/gob"
-	"sync"
+	"fmt"
 
-	"github.com/CS-SI/SafeScale/metadata"
+	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/provideruse"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
-
-	"github.com/CS-SI/SafeScale/utils/provideruse"
 )
 
 const (
@@ -35,9 +34,8 @@ const (
 
 // Cluster is the cluster definition stored in ObjectStorage
 type Cluster struct {
-	folder *metadata.Folder
-	data   *api.Cluster
-	lock   sync.Mutex
+	item *metadata.Item
+	name string
 }
 
 // NewCluster creates a new Cluster metadata
@@ -46,70 +44,75 @@ func NewCluster() (*Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := metadata.NewFolder(svc, clusterFolderName)
-	if err != nil {
-		return nil, err
-	}
 	return &Cluster{
-		folder: f,
-		data:   nil,
+		item: metadata.NewItem(svc, clusterFolderName),
 	}, nil
 }
 
 // Carry links metadata with cluster struct
 func (m *Cluster) Carry(cluster *api.Cluster) *Cluster {
-	m.data = cluster
+	m.item.Carry(cluster)
+	m.name = cluster.GetName()
 	return m
 }
 
 // Delete removes a cluster metadata
 func (m *Cluster) Delete() error {
-	if m.data == nil {
-		panic("m.data is nil!")
-	}
-	err := m.folder.Delete(".", m.data.Name)
-	if err != nil {
-		return err
-	}
-	return nil
+	return m.item.Delete(m.name)
 }
 
 // Read reads metadata of cluster named 'name' from Object Storage
 func (m *Cluster) Read(name string) (bool, error) {
 	var data api.Cluster
-	found, err := m.folder.Read(".", name, func(buf *bytes.Buffer) error {
+	found, err := m.item.Read(name, func(buf *bytes.Buffer) (interface{}, error) {
 		err := gob.NewDecoder(buf).Decode(&data)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		return nil
+		return &data, nil
 	})
 	if err != nil {
 		return false, err
 	}
 	if !found {
-		return false, nil
+		return false, fmt.Errorf("failed to find a cluster named '%s'", name)
 	}
-	m.data = &data
+	m.name = data.Name
 	return true, nil
 }
 
 // Write saves the content of m to the Object Storage
 func (m *Cluster) Write() error {
-	return m.folder.Write("/", m.data.Name, m.data)
+	return m.item.Write(m.name)
+}
+
+// Reload reloads the metadata from ObjectStorage
+// It's a good idea to do that just after a Acquire() to be sure to have the latest data
+func (m *Cluster) Reload() error {
+	if m.item == nil {
+		panic("m.nil is nil!")
+	}
+	found, err := m.Read(m.name)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return fmt.Errorf("metadata of cluster '%s' vanished", m.name)
+	}
+	return nil
 }
 
 // Get returns the content of the metadata
 func (m *Cluster) Get() *api.Cluster {
-	if m.data == nil {
-		panic("m.data is nil!")
+	if m.item == nil {
+		panic("m.item is nil!")
 	}
-	return m.data
+	return m.item.Get().(*api.Cluster)
 }
 
 // Browse walks through cluster folder and executes a callback for each entries
 func (m *Cluster) Browse(callback func(c *api.Cluster) error) error {
-	return m.folder.Browse(".", func(buf *bytes.Buffer) error {
+	return m.item.Browse(func(buf *bytes.Buffer) error {
 		var data api.Cluster
 		err := gob.NewDecoder(buf).Decode(&data)
 		if err != nil {
@@ -121,10 +124,10 @@ func (m *Cluster) Browse(callback func(c *api.Cluster) error) error {
 
 // Acquire waits until the write lock is available, then locks the metadata
 func (m *Cluster) Acquire() {
-	m.lock.Lock()
+	m.item.Acquire()
 }
 
 // Release unlocks the metadata
 func (m *Cluster) Release() {
-	m.lock.Unlock()
+	m.item.Release()
 }

@@ -92,7 +92,8 @@ func getFreePort() (int, error) {
 	return port, nil
 }
 
-func createTempFile(content string) (*os.File, error) {
+// Create a tempory file containing 'content'
+func CreateTempFileFromString(content string) (*os.File, error) {
 	f, err := ioutil.TempFile("/tmp", "")
 	if err != nil {
 		return nil, err
@@ -116,7 +117,7 @@ func isTunnelReady(port int) bool {
 
 //CreateTunnel create SSH from local host to remote host throw gateway
 func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
-	f, err := createTempFile(cfg.GatewayConfig.PrivateKey)
+	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +314,7 @@ func (ssh *SSHConfig) createTunnels() ([]*sshTunnel, *SSHConfig, error) {
 }
 
 func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string, *os.File, error) {
-	f, err := createTempFile(sshConfig.PrivateKey)
+	f, err := CreateTempFileFromString(sshConfig.PrivateKey)
 	if err != nil {
 		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
@@ -370,7 +371,7 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 	return &sshCommand, nil
 }
 
-//WaitServerReady waits until the SSH server is ready
+// WaitServerReady waits until the SSH server is ready
 func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
@@ -439,7 +440,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) error {
 
 // UploadString uploads a string into a remote file
 func (ssh *SSHConfig) UploadString(remotePath, content string) error {
-	f, err := createTempFile(content)
+	f, err := CreateTempFileFromString(content)
 	if err != nil {
 		return err
 	}
@@ -448,7 +449,7 @@ func (ssh *SSHConfig) UploadString(remotePath, content string) error {
 	return err
 }
 
-//Exec executes the cmd using ssh
+// Exec executes the cmd using ssh
 func (ssh *SSHConfig) Exec(cmdString string) error {
 	tunnels, sshConfig, err := ssh.createTunnels()
 	if err != nil {
@@ -554,7 +555,7 @@ func (ssh *SSHConfig) CommandContext(ctx context.Context, cmdString string) (*SS
 	return &sshCommand, nil
 }
 
-//CreateKeyPair creates a key pair
+// CreateKeyPair creates a key pair
 func CreateKeyPair() (publicKeyBytes []byte, privateKeyBytes []byte, err error) {
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := privateKey.PublicKey
@@ -575,7 +576,7 @@ func CreateKeyPair() (publicKeyBytes []byte, privateKeyBytes []byte, err error) 
 	return publicKeyBytes, privateKeyBytes, nil
 }
 
-//ExtractRetCode extracts info from the error
+// ExtractRetCode extracts info from the error
 func ExtractRetCode(err error) (string, int, error) {
 	retCode := -1
 	msg := "__ NO MESSAGE __"
@@ -591,5 +592,4 @@ func ExtractRetCode(err error) (string, int, error) {
 		return msg, retCode, nil
 	}
 	return msg, retCode, fmt.Errorf("Error is not an 'ExitError'")
-
 }

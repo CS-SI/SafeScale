@@ -288,15 +288,12 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 // listMonitoredNetworks lists available networks created by SafeScale (ie those registered in object storage)
 func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 	var netList []api.Network
-	m, err := metadata.NewNetwork(providers.FromClient(client))
-	if err != nil {
-		return netList, err
-	}
-	err = m.Browse(func(net *api.Network) error {
+	m := metadata.NewNetwork(providers.FromClient(client))
+	err := m.Browse(func(net *api.Network) error {
 		netList = append(netList, *net)
 		return nil
 	})
-	if len(netList) == 0 && err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("Error listing networks: %s", providerError(err))
 	}
 	return netList, nil
@@ -636,7 +633,7 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	svc := providers.FromClient(client)
 	m, err := metadata.NewGateway(svc, req.NetworkID)
 	if err == nil {
-		err = m.Carry(host).Write(svc)
+		err = m.Carry(host).Write()
 	}
 	if err != nil {
 		client.DeleteHost(host.ID)

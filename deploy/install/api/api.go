@@ -18,6 +18,7 @@ package api
 
 import (
 	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
+	"github.com/spf13/viper"
 )
 
 // TargetAPI is an interface that target must satisfy to be able to install something
@@ -25,8 +26,8 @@ import (
 type TargetAPI interface {
 	// GetName returns the name of the installation target
 	GetName() string
-	// GetKinds returns a list of packaging managers useable on the target
-	GetKinds() []Method.Enum
+	// GetMethods returns a list of installation methods useable on the target
+	GetMethods() []Method.Enum
 	// GetSSHConfig returns a system.SSHConfig to access target
 	//GetSSHConfig() (system.SSHConfig, error)
 	// List returns a list of installed component
@@ -37,10 +38,12 @@ type TargetAPI interface {
 type InstallerAPI interface {
 	// GetName returns the name of the Installer
 	GetName() string
+	// Check checks if the component is installed
+	Check(ComponentAPI, TargetAPI) (bool, error)
 	// Add executes installation of component
-	Add(TargetAPI) error
+	Add(ComponentAPI, TargetAPI) error
 	// Remove executes deletion of component
-	Remove(TargetAPI) error
+	Remove(ComponentAPI, TargetAPI) error
 }
 
 // InstallerParameters defines the parameters a Installer may need
@@ -53,8 +56,12 @@ type InstallerMap map[Method.Enum]InstallerAPI
 type ComponentAPI interface {
 	// GetName ...
 	GetName() string
-	// Applyable if the service is installable on the target
+	// GetSpecs ...
+	GetSpecs() *viper.Viper
+	// Applyable if the component is installable on the target
 	Applyable(TargetAPI) bool
+	// Check if a component is installed
+	Check(TargetAPI) (bool, error)
 	// Install ...
 	Add(TargetAPI) error
 	// Remove ...

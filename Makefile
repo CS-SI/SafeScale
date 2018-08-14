@@ -2,7 +2,7 @@ GO?=go
 GOBIN?=~/go/bin
 CP?=cp
 
-EXECS=broker/client/broker broker/daemon/brokerd deploy/deploy perform/perform
+EXECS=broker/cli/broker/broker broker/cli/brokerd/brokerd deploy/cli/deploy perform/perform
 
 .PHONY: clean providers brokerd broker system deploy perform utils clean deps $(EXECS)
 
@@ -37,7 +37,7 @@ broker/client/broker: broker
 
 broker/daemon/brokerd: broker
 
-deploy/deploy: deploy
+deploy/cli/deploy: deploy
 
 perform/perform: perform
 

@@ -22,9 +22,9 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/providers"
-
-	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers/api"
+
+	"github.com/CS-SI/SafeScale/utils/metadata"
 )
 
 const (
@@ -32,73 +32,70 @@ const (
 	hostFolderName = "host"
 )
 
-//Host links Object Storage folder and Network
+// Host links Object Storage folder and Network
 type Host struct {
-	folder *metadata.Folder
-	host   *api.Host
+	item *metadata.Item
+	name string
+	id   string
 }
 
-//NewHost creates an instance of api.Host
-func NewHost(svc *providers.Service) (*Host, error) {
-	f, err := metadata.NewFolder(svc, hostFolderName)
-	if err != nil {
-		return nil, err
-	}
+// NewHost creates an instance of api.Host
+func NewHost(svc *providers.Service) *Host {
 	return &Host{
-		folder: f,
-		host:   nil,
-	}, nil
+		item: metadata.NewItem(svc, hostFolderName),
+	}
 }
 
 // Carry links an host instance to the Metadata instance
 func (m *Host) Carry(host *api.Host) *Host {
 	if host == nil {
-		panic("host parameter is nil!")
+		panic("host is nil!")
 	}
-	m.host = host
+
+	m.item.Carry(host)
+	m.name = host.Name
+	m.id = host.ID
 	return m
 }
 
 // Get returns the Network instance linked to metadata
 func (m *Host) Get() *api.Host {
-	return m.host
+	if m.item == nil {
+		panic("m.item is nil!")
+	}
+
+	if h, ok := m.item.Get().(*api.Host); ok {
+		return h
+	}
+	panic(fmt.Sprintf("invalid content in metadata of host '%s'!", m.name))
 }
 
 // Write updates the metadata corresponding to the host in the Object Storage
 func (m *Host) Write() error {
-	if m.host == nil {
-		panic("m.host is nil!")
+	if m.item == nil {
+		panic("m.item is nil!")
 	}
 
-	err := m.folder.Write(ByIDFolderName, m.host.ID, m.host)
+	err := m.item.WriteInto(ByNameFolderName, m.name)
 	if err != nil {
 		return err
 	}
-	return m.folder.Write(ByNameFolderName, m.host.Name, m.host)
-}
-
-// Reload reloads the content of the Object Storage, overriding what is in the metadata instance
-func (m *Host) Reload() error {
-	if m.host == nil {
-		panic("Metadata isn't linked with an host!")
-	}
-	hostName := m.host.Name
-	found, err := m.ReadByID(m.host.ID)
-	if err != nil {
-		return err
-	}
-	if !found {
-		return fmt.Errorf("metadata of host '%s' doesn't exist anymore", hostName)
-	}
-	return nil
+	return m.item.WriteInto(ByIDFolderName, m.id)
 }
 
 // ReadByID reads the metadata of a network identified by ID from Object Storage
 func (m *Host) ReadByID(id string) (bool, error) {
+	if m.item == nil {
+		panic("m.item is nil!")
+	}
 
-	var host api.Host
-	found, err := m.folder.Read(ByIDFolderName, id, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&host)
+	var data api.Host
+	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf *bytes.Buffer) (interface{}, error) {
+		err := gob.NewDecoder(buf).Decode(&data)
+		if err != nil {
+			return nil, err
+		}
+		return &data, nil
 	})
 	if err != nil {
 		return false, err
@@ -106,15 +103,24 @@ func (m *Host) ReadByID(id string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.host = &host
+	m.id = id
+	m.name = data.Name
 	return true, nil
 }
 
 // ReadByName reads the metadata of a network identified by name
 func (m *Host) ReadByName(name string) (bool, error) {
-	var host api.Host
-	found, err := m.folder.Read(ByNameFolderName, name, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&host)
+	if m.item == nil {
+		panic("m.item is nil!")
+	}
+
+	var data api.Host
+	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf *bytes.Buffer) (interface{}, error) {
+		err := gob.NewDecoder(buf).Decode(&data)
+		if err != nil {
+			return nil, err
+		}
+		return &data, nil
 	})
 	if err != nil {
 		return false, err
@@ -122,27 +128,31 @@ func (m *Host) ReadByName(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.host = &host
+	m.name = name
+	m.id = data.ID
 	return true, nil
 }
 
 // Delete updates the metadata corresponding to the network
 func (m *Host) Delete() error {
-	err := m.folder.Delete(ByIDFolderName, m.host.ID)
+	if m.item == nil {
+		panic("m.item is nil!")
+	}
+
+	err := m.item.DeleteFrom(ByIDFolderName, m.id)
 	if err != nil {
 		return err
 	}
-	err = m.folder.Delete(ByNameFolderName, m.host.Name)
+	err = m.item.DeleteFrom(ByNameFolderName, m.name)
 	if err != nil {
 		return err
 	}
-	m.host = nil
 	return nil
 }
 
 // Browse walks through host folder and executes a callback for each entries
 func (m *Host) Browse(callback func(*api.Host) error) error {
-	return m.folder.Browse(ByIDFolderName, func(buf *bytes.Buffer) error {
+	return m.item.BrowseInto(ByIDFolderName, func(buf *bytes.Buffer) error {
 		var host api.Host
 		err := gob.NewDecoder(buf).Decode(&host)
 		if err != nil {
@@ -154,18 +164,11 @@ func (m *Host) Browse(callback func(*api.Host) error) error {
 
 // SaveHost saves the Host definition in Object Storage
 func SaveHost(svc *providers.Service, host *api.Host, netID string) error {
-	mh, err := NewHost(svc)
+	err := NewHost(svc).Carry(host).Write()
 	if err != nil {
 		return err
 	}
-	err = mh.Carry(host).Write()
-	if err != nil {
-		return err
-	}
-	mn, err := NewNetwork(svc)
-	if err != nil {
-		return err
-	}
+	mn := NewNetwork(svc)
 	found, err := mn.ReadByID(netID)
 	if err != nil {
 		return err
@@ -179,24 +182,15 @@ func SaveHost(svc *providers.Service, host *api.Host, netID string) error {
 // RemoveHost removes the host definition from Object Storage
 func RemoveHost(svc *providers.Service, host *api.Host) error {
 	// First, browse networks to delete links on the deleted host
-	mn, err := NewNetwork(svc)
-	if err != nil {
-		return err
-	}
-	mnb, err := NewNetwork(svc)
-	if err != nil {
-		return err
-	}
-	err = mn.Browse(func(net *api.Network) error {
-		mnb.Carry(net).DetachHost(host.ID)
+	mn := NewNetwork(svc)
+	mnb := NewNetwork(svc)
+	err := mn.Browse(func(network *api.Network) error {
+		mnb.Carry(network).DetachHost(host.ID)
 		return nil
 	})
-	if err != nil {
-		return err
-	}
 
 	// Second deletes host metadata
-	mh, err := NewHost(svc)
+	mh := NewHost(svc)
 	if err != nil {
 		return err
 	}
@@ -205,10 +199,7 @@ func RemoveHost(svc *providers.Service, host *api.Host) error {
 
 // LoadHost gets the host definition from Object Storage
 func LoadHost(svc *providers.Service, hostID string) (*Host, error) {
-	m, err := NewHost(svc)
-	if err != nil {
-		return nil, err
-	}
+	m := NewHost(svc)
 	found, err := m.ReadByID(hostID)
 	if err != nil {
 		return nil, err
@@ -217,4 +208,14 @@ func LoadHost(svc *providers.Service, hostID string) (*Host, error) {
 		return nil, nil
 	}
 	return m, nil
+}
+
+// Acquire waits until the write lock is available, then locks the metadata
+func (m *Host) Acquire() {
+	m.item.Acquire()
+}
+
+// Release unlocks the metadata
+func (m *Host) Release() {
+	m.item.Release()
 }

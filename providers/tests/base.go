@@ -176,7 +176,7 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool
 }
 
 // CreateHost creates a test host
-func (tester *ClientTester) CreateHost(t *testing.T, name string, networkID string, public bool) (*api.host, error) {
+func (tester *ClientTester) CreateHost(t *testing.T, name string, networkID string, public bool) (*api.Host, error) {
 	tpls, err := tester.Service.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  4,

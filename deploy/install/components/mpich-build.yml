@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+#
+# Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# install_docker.sh
+#
+# Installs Docker
+
+---
+component:
+    name: mpich-build
+    installers:
+        script:
+            check: |
+                which mpich &>/dev/null
+
+            install: |
+                case $LINUX_KIND in
+                    redhat|centos)
+                        yum makecache fast
+                        yum groupinstall -y "Development Tools"
+                        ;;
+                    debian|ubuntu)
+                        apt update
+                        apt install -y build-essential
+                        ;;
+                    *)
+                        echo "Unsupported operating system '$LINUX_KIND'"
+                        exit 1
+                        ;;
+                esac
+                cd /var/tmp
+                wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz || exit 2
+                tar -zxvf mpich-3.2.1.tar.gz
+                cd mpich-3.2.1
+                ./configure --disable-fortran
+                make || exit 3
+                make install || exit 4
+                rm -rf mpich-3.2.1*
+                exit 0
+
+            uninstall: |
+                exit 1

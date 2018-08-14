@@ -750,6 +750,8 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 
 	// Registers the new Agent in the cluster struct
 	c.metadata.Acquire()
+	// TODO:reload the metadata content to be sure to update the last revision of it
+
 	if nodeType == NodeType.PublicNode {
 		c.Common.PublicNodeIDs = append(c.Common.PublicNodeIDs, node.ID)
 		c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, node.PRIVATE_IP)
@@ -981,6 +983,8 @@ func (c *Cluster) buildHostname(core string, nodeType NodeType.Enum) (string, er
 	}
 
 	c.metadata.Acquire()
+	// TODO: Reload the metadata content to be sure to update the last revision of it
+	c.metadata.Reload()
 	switch nodeType {
 	case NodeType.PublicNode:
 		c.manager.PublicLastIndex++
@@ -992,7 +996,6 @@ func (c *Cluster) buildHostname(core string, nodeType NodeType.Enum) (string, er
 		c.manager.MasterLastIndex++
 		index = c.manager.MasterLastIndex
 	}
-
 	// Update cluster definition in Object Storage
 	err := c.metadata.Write()
 	if err != nil {

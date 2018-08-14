@@ -135,7 +135,7 @@ func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
 
 }
 
-//ListVolumes list available volumes
+// ListVolumes list available volumes
 func (client *Client) listAllVolumes() ([]api.Volume, error) {
 	var vs []api.Volume
 	err := volumes.List(client.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
@@ -161,14 +161,10 @@ func (client *Client) listAllVolumes() ([]api.Volume, error) {
 	return vs, nil
 }
 
-//listMonitoredVolumess lists available Volumes created by SafeScale (ie registered in object storage)
+// listMonitoredVolumess lists available Volumes created by SafeScale (ie registered in object storage)
 func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
 	var vols []api.Volume
-	m, err := metadata.NewVolume(providers.FromClient(client))
-	if err != nil {
-		return vols, err
-	}
-	err = m.Browse(func(vol *api.Volume) error {
+	err := metadata.NewVolume(providers.FromClient(client)).Browse(func(vol *api.Volume) error {
 		vols = append(vols, *vol)
 		return nil
 	})

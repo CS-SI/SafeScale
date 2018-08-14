@@ -23,10 +23,10 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"regexp"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/CS-SI/SafeScale/metadata"

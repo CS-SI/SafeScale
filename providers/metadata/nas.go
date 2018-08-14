@@ -22,83 +22,79 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/providers"
-
-	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers/api"
+
+	"github.com/CS-SI/SafeScale/utils/metadata"
 )
 
 const (
-	//nasFolderName is the technical name of the container used to store nas info
+	// nasFolderName is the technical name of the container used to store nas info
 	nasFolderName = "nas"
 )
 
-//Nas links Object Storage folder and Network
+// Nas links Object Storage folder and Network
 type Nas struct {
-	folder *metadata.Folder
-	nas    *api.Nas
+	item *metadata.Item
+	name string
+	id   string
 }
 
-//NewNas creates an instance of metadata.Nas
-func NewNas(svc *providers.Service) (*Nas, error) {
-	f, err := metadata.NewFolder(svc, nasFolderName)
-	if err != nil {
-		return nil, err
-	}
+// NewNas creates an instance of metadata.Nas
+func NewNas(svc *providers.Service) *Nas {
 	return &Nas{
-		folder: f,
-		nas:    nil,
-	}, nil
+		item: metadata.NewItem(svc, nasFolderName),
+	}
 }
 
-//Carry links a Nas instance to the Metadata instance
+// Carry links a Nas instance to the Metadata instance
 func (m *Nas) Carry(nas *api.Nas) *Nas {
 	if nas == nil {
-		panic("nas parameter is nil!")
+		panic("nas is nil!")
 	}
-	m.nas = nas
+	if m.item == nil {
+		panic("m.item is nil!")
+	}
+	m.item.Carry(nas)
+	m.name = nas.Name
+	m.id = nas.ID
 	return m
 }
 
-//Get returns the Nas instance linked to metadata
+// Get returns the Nas instance linked to metadata
 func (m *Nas) Get() *api.Nas {
-	return m.nas
+	if m.item == nil {
+		panic("m.item is nil!")
+	}
+	if n, ok := m.item.Get().(*api.Nas); ok {
+		return n
+	}
+	panic("invalid content in metadata!")
 }
 
-//Write updates the metadata corresponding to the nas in the Object Storage
+// Write updates the metadata corresponding to the nas in the Object Storage
 func (m *Nas) Write() error {
-	if m.nas == nil {
-		panic("m.nas is nil!")
+	if m.item == nil {
+		panic("m.item is nil!")
 	}
-
-	err := m.folder.Write(ByIDFolderName, m.nas.ID, m.nas)
+	err := m.item.WriteInto(ByIDFolderName, m.id)
 	if err != nil {
 		return err
 	}
-	return m.folder.Write(ByNameFolderName, m.nas.Name, m.nas)
+	return m.item.WriteInto(ByNameFolderName, m.name)
 }
 
-//Reload reloads the content of the Object Storage, overriding what is in the metadata instance
-func (m *Nas) Reload() error {
-	if m.nas == nil {
-		panic("Metadata isn't linked with a nas!")
-	}
-	nasName := m.nas.Name
-	found, err := m.ReadByID(m.nas.ID)
-	if err != nil {
-		return err
-	}
-	if !found {
-		return fmt.Errorf("metadata of nas '%s' doesn't exist anymore", nasName)
-	}
-	return nil
-}
-
-//ReadByID reads the metadata of a nas identified by ID from Object Storage
+// ReadByID reads the metadata of a nas identified by ID from Object Storage
 func (m *Nas) ReadByID(id string) (bool, error) {
-
-	var nas api.Nas
-	found, err := m.folder.Read(ByIDFolderName, id, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&nas)
+	if m.item == nil {
+		panic("m.item is nil!")
+	}
+	var data api.Nas
+	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf *bytes.Buffer) (interface{}, error) {
+		err := gob.NewDecoder(buf).Decode(&data)
+		if err != nil {
+			return nil, err
+		}
+		return &data, nil
 	})
 	if err != nil {
 		return false, err
@@ -106,15 +102,23 @@ func (m *Nas) ReadByID(id string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.nas = &nas
+	m.id = id
+	m.name = data.Name
 	return true, nil
 }
 
-//ReadByName reads the metadata of a nas identified by name
+// ReadByName reads the metadata of a nas identified by name
 func (m *Nas) ReadByName(name string) (bool, error) {
-	var nas api.Nas
-	found, err := m.folder.Read(ByNameFolderName, name, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&nas)
+	if m.item == nil {
+		panic("m.name is nil!")
+	}
+	var data api.Nas
+	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf *bytes.Buffer) (interface{}, error) {
+		err := gob.NewDecoder(buf).Decode(&data)
+		if err != nil {
+			return nil, err
+		}
+		return &data, nil
 	})
 	if err != nil {
 		return false, err
@@ -122,28 +126,23 @@ func (m *Nas) ReadByName(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.nas = &nas
+	m.name = name
+	m.id = data.ID
 	return true, nil
 }
 
-//Delete updates the metadata corresponding to the nas
+// Delete updates the metadata corresponding to the nas
 func (m *Nas) Delete() error {
-	err := m.folder.Delete(ByIDFolderName, m.nas.ID)
+	err := m.item.DeleteFrom(ByIDFolderName, m.id)
 	if err != nil {
 		return err
 	}
-
-	err = m.folder.Delete(ByNameFolderName, m.nas.Name)
-	if err != nil {
-		return err
-	}
-	m.nas = nil
-	return nil
+	return m.item.DeleteFrom(ByNameFolderName, m.name)
 }
 
-//Browse walks through nas folder and executes a callback for each entries
+// Browse walks through nas folder and executes a callback for each entries
 func (m *Nas) Browse(callback func(*api.Nas) error) error {
-	return m.folder.Browse(ByNameFolderName, func(buf *bytes.Buffer) error {
+	return m.item.BrowseInto(ByNameFolderName, func(buf *bytes.Buffer) error {
 		var nas api.Nas
 		err := gob.NewDecoder(buf).Decode(&nas)
 		if err != nil {
@@ -153,24 +152,20 @@ func (m *Nas) Browse(callback func(*api.Nas) error) error {
 	})
 }
 
-//AddClient adds a client to the Nas definition in Object Storage
+// AddClient adds a client to the Nas definition in Object Storage
 func (m *Nas) AddClient(nas *api.Nas) error {
-	return m.folder.Write(m.nas.ID, nas.ID, nas)
+	return m.item.WriteInto(m.id, nas.ID)
 }
 
 //RemoveClient removes a client to the Nas definition in Object Storage
 func (m *Nas) RemoveClient(nas *api.Nas) error {
-	return m.folder.Delete(m.nas.ID, nas.ID)
+	return m.item.DeleteFrom(m.id, nas.ID)
 }
 
 //Listclients returns the list of ID of hosts clients of the NAS server
 func (m *Nas) Listclients() ([]*api.Nas, error) {
-	if m.nas == nil {
-		panic("m.nas is nil!")
-	}
-
 	var list []*api.Nas
-	err := m.folder.Browse(m.nas.ID, func(buf *bytes.Buffer) error {
+	err := m.item.BrowseInto(m.id, func(buf *bytes.Buffer) error {
 		var nas api.Nas
 		err := gob.NewDecoder(buf).Decode(&nas)
 		if err != nil {
@@ -184,12 +179,8 @@ func (m *Nas) Listclients() ([]*api.Nas, error) {
 
 //FindClient returns the client hosted by the Host whose name is given
 func (m *Nas) FindClient(hostName string) (*api.Nas, error) {
-	if m.nas == nil {
-		panic("m.nas is nil!")
-	}
-
 	var client *api.Nas
-	err := m.folder.Browse(m.nas.ID, func(buf *bytes.Buffer) error {
+	err := m.item.BrowseInto(m.id, func(buf *bytes.Buffer) error {
 		var nas api.Nas
 		err := gob.NewDecoder(buf).Decode(&nas)
 		if err != nil {
@@ -205,44 +196,38 @@ func (m *Nas) FindClient(hostName string) (*api.Nas, error) {
 		return nil, err
 	}
 	if client == nil {
-		return nil, fmt.Errorf("No client found for nas '%s' on host '%s'", m.nas.Name, hostName)
+		return nil, fmt.Errorf("No client found for nas '%s' on host '%s'", m.name, hostName)
 	}
 	return client, nil
 }
 
-//SaveNas saves the Nas definition in Object Storage
+// Acquire waits until the write lock is available, then locks the metadata
+func (m *Nas) Acquire() {
+	m.item.Acquire()
+}
+
+// Release unlocks the metadata
+func (m *Nas) Release() {
+	m.item.Release()
+}
+
+// SaveNas saves the Nas definition in Object Storage
 func SaveNas(svc *providers.Service, nas *api.Nas) error {
-	mn, err := NewNas(svc)
-	if err != nil {
-		return err
-	}
-	err = mn.Carry(nas).Write()
+	err := NewNas(svc).Carry(nas).Write()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-//RemoveNas removes the Nas definition from Object Storage
+// RemoveNas removes the Nas definition from Object Storage
 func RemoveNas(svc *providers.Service, nas *api.Nas) error {
-	mn, err := NewNas(svc)
-	if err != nil {
-		return err
-	}
-
-	err = mn.Carry(nas).Delete()
-	if err != nil {
-		return err
-	}
-	return nil
+	return NewNas(svc).Carry(nas).Delete()
 }
 
-//LoadNas gets the Nas definition from Object Storage
+// LoadNas gets the Nas definition from Object Storage
 func LoadNas(svc *providers.Service, ref string) (*Nas, error) {
-	m, err := NewNas(svc)
-	if err != nil {
-		return nil, err
-	}
+	m := NewNas(svc)
 	found, err := m.ReadByID(ref)
 	if err != nil {
 		return nil, err
@@ -260,20 +245,12 @@ func LoadNas(svc *providers.Service, ref string) (*Nas, error) {
 	return m, nil
 }
 
-//MountNas add the client nas to the Nas definition from Object Storage
+// MountNas add the client nas to the Nas definition from Object Storage
 func MountNas(svc *providers.Service, client *api.Nas, nas *api.Nas) error {
-	m, err := NewNas(svc)
-	if err != nil {
-		return err
-	}
-	return m.Carry(nas).AddClient(client)
+	return NewNas(svc).Carry(nas).AddClient(client)
 }
 
-//UmountNas remove the client nas to the Nas definition from Object Storage
+// UmountNas remove the client nas to the Nas definition from Object Storage
 func UmountNas(svc *providers.Service, client *api.Nas, nas *api.Nas) error {
-	m, err := NewNas(svc)
-	if err != nil {
-		return err
-	}
-	return m.Carry(nas).RemoveClient(client)
+	return NewNas(svc).Carry(nas).RemoveClient(client)
 }

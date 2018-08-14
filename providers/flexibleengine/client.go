@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/CS-SI/SafeScale/metadata"
+	"github.com/CS-SI/SafeScale/utils/metadata"
+
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"

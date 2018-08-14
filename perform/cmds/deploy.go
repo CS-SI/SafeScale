@@ -21,9 +21,9 @@ import (
 	"os"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster"
-	"github.com/CS-SI/SafeScale/deploy/cmds/ErrorCode"
 
 	"github.com/CS-SI/SafeScale/utils/cli"
+	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
 )
 
 // PackageCommand ...
@@ -40,17 +40,11 @@ var PackageCommand = &cli.Command{
 		clusterInstance, err = cluster.Get(clusterName)
 		if err != nil {
 			fmt.Printf("failed to get cluster '%s' information: %s\n", clusterName, err.Error())
-			os.Exit(int(ErrorCode.RPC))
+			os.Exit(int(ExitCode.RPC))
 		}
 		if clusterInstance == nil {
 			fmt.Printf("cluster '%s' not found\n", clusterName)
-			os.Exit(int(ErrorCode.NotFound))
-		}
-
-		pkgManagerKind = c.StringOption("kind k", "<kind>", "")
-		if pkgManagerKind == "" {
-			fmt.Println("Invalid empty option -k,--kind")
-			os.Exit(int(ErrorCode.InvalidOption))
+			os.Exit(int(ExitCode.NotFound))
 		}
 	},
 
@@ -66,10 +60,10 @@ var deployPackageCheckCommand = &cli.Command{
 
 		if pkgname == "" {
 			fmt.Println("Invalid empty argument PKGNAME")
-			os.Exit(int(ErrorCode.InvalidArgument))
+			os.Exit(int(ExitCode.InvalidArgument))
 		}
 		fmt.Println("deployPackageCheckCommand not yet implemented")
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
@@ -88,7 +82,7 @@ var ServiceCommand = &cli.Command{
 		serviceName = c.StringArgument("<svcname>", "")
 		if serviceName == "" {
 			fmt.Println("Invalid argument <svcname>")
-			os.Exit(int(ErrorCode.NotImplemented))
+			os.Exit(int(ExitCode.NotImplemented))
 		}
 	},
 
@@ -101,7 +95,7 @@ var deployServiceCheckCommand = &cli.Command{
 
 	Process: func(c *cli.Command) {
 		fmt.Println("deployServiceCheckCommand not yet implemented")
-		os.Exit(int(ErrorCode.NotImplemented))
+		os.Exit(int(ExitCode.NotImplemented))
 	},
 
 	Help: &cli.HelpContent{},
