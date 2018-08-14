@@ -22,6 +22,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
 // ssh is the part of the broker client that handles SSH stuff
@@ -69,5 +70,11 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 		return err
 	}
 	sshCfg := conv.ToAPISshConfig(sshConfig)
-	return sshCfg.Enter()
+
+	return retry.WhileUnsuccessfulDelay5SecondsWithNotify(
+		func() error {
+			return sshCfg.Enter()
+		},
+		2*time.Minute,
+		retry.NotifyByLog)
 }
