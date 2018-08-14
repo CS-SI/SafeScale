@@ -52,3 +52,7 @@ cluster/tests/create_cluster
 deploy/cluster/tests/create_cluster
 
 *.new
+
+broker/cli/broker/broker
+
+broker/cli/brokerd/brokerd
