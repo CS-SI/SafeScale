@@ -92,7 +92,7 @@ func getFreePort() (int, error) {
 	return port, nil
 }
 
-// Create a tempory file containing 'content'
+// CreateTempFileFromString creates a tempory file containing 'content'
 func CreateTempFileFromString(content string) (*os.File, error) {
 	f, err := ioutil.TempFile("/tmp", "")
 	if err != nil {
@@ -393,7 +393,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) error {
 		return fmt.Errorf("Unable to create tunnels : %s", err.Error())
 	}
 
-	identityfile, err := createTempFile(sshConfig.PrivateKey)
+	identityfile, err := CreateTempFileFromString(sshConfig.PrivateKey)
 	if err != nil {
 		return fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
