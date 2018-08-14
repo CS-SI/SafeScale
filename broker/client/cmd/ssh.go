@@ -25,6 +25,7 @@ import (
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/utils/brokeruse"
+	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/urfave/cli"
 )
 
@@ -80,8 +81,7 @@ var sshRun = cli.Command{
 		}
 
 		fmt.Print(fmt.Sprintf(resp.GetOutputStd()))
-		fmt.Fprint(os.Stderr, fmt.Sprintf(resp.GetOutputErr()))
-
+		fmt.Fprint(os.Stderr, fmt.Sprintf("%s\n", resp.GetOutputErr()))
 		os.Exit(int(resp.GetStatus()))
 		return nil
 	},
@@ -153,6 +153,11 @@ var sshConnect = cli.Command{
 
 		sshCfg := conv.ToAPISshConfig(sshConfig)
 
-		return sshCfg.Enter()
+		return retry.WhileUnsuccessfulDelay5SecondsWithNotify(
+			func() error {
+				return sshCfg.Enter()
+			},
+			2*time.Minute,
+			retry.NotifyByLog)
 	},
 }
