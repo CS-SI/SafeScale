@@ -35,7 +35,15 @@ case $LINUX_KIND in
 
     rhel|centos)
         yum make-cache fast
-        yum install -y nfs-kernel-server nfs-common
+        yum install -y nfs-utils
+        systemctl enable rpcbind
+        systemctl enable nfs-server
+        systemctl enable nfs-lock
+        systemctl enable nfs-idmap
+        systemctl start rpcbind
+        systemctl start nfs-server
+        systemctl start nfs-lock
+        systemctl start nfs-idmap
         ;;
 
     *)
