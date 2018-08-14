@@ -24,13 +24,6 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
-<<<<<<< Updated upstream:broker/client/cmd/ssh.go
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
-	"github.com/CS-SI/SafeScale/utils/retry"
-||||||| ancestor
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
-=======
->>>>>>> Stashed changes:broker/cli/broker/cmd/ssh.go
 	"github.com/urfave/cli"
 )
 
@@ -78,18 +71,9 @@ var sshRun = cli.Command{
 			return fmt.Errorf("Could not execute ssh command: %v", err)
 		}
 
-<<<<<<< Updated upstream:broker/client/cmd/ssh.go
-		fmt.Print(fmt.Sprintf(resp.GetOutputStd()))
-		fmt.Fprint(os.Stderr, fmt.Sprintf("%s\n", resp.GetOutputErr()))
-||||||| ancestor
-		fmt.Print(fmt.Sprintf(resp.GetOutputStd()))
-		fmt.Fprint(os.Stderr, fmt.Sprintf(resp.GetOutputErr()))
-
-=======
 		fmt.Print(resp.GetOutputStd())
 		fmt.Fprint(os.Stderr, resp.GetOutputErr())
 
->>>>>>> Stashed changes:broker/cli/broker/cmd/ssh.go
 		os.Exit(int(resp.GetStatus()))
 		return nil
 	},
@@ -138,47 +122,6 @@ var sshConnect = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name required")
 		}
-<<<<<<< Updated upstream:broker/client/cmd/ssh.go
-		conn := brokeruse.GetConnection()
-		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
-		defer cancel()
-		service := pb.NewHostServiceClient(conn)
-
-		sshConfig, err := service.SSH(ctx, &pb.Reference{
-			Name: c.Args().Get(0),
-		})
-		if err != nil {
-			return fmt.Errorf("Could not connect to %s: %v", c.Args().Get(0), err)
-		}
-
-		sshCfg := conv.ToAPISshConfig(sshConfig)
-
-		return retry.WhileUnsuccessfulDelay5SecondsWithNotify(
-			func() error {
-				return sshCfg.Enter()
-			},
-			2*time.Minute,
-			retry.NotifyByLog)
-||||||| ancestor
-		conn := brokeruse.GetConnection()
-		defer conn.Close()
-		ctx, cancel := brokeruse.GetContext(utils.TimeoutCtxHost)
-		defer cancel()
-		service := pb.NewHostServiceClient(conn)
-
-		sshConfig, err := service.SSH(ctx, &pb.Reference{
-			Name: c.Args().Get(0),
-		})
-		if err != nil {
-			return fmt.Errorf("Could not connect to %s: %v", c.Args().Get(0), err)
-		}
-
-		sshCfg := conv.ToAPISshConfig(sshConfig)
-
-		return sshCfg.Enter()
-=======
 		return client.New().Ssh.Connect(c.Args().Get(0), 0)
->>>>>>> Stashed changes:broker/cli/broker/cmd/ssh.go
 	},
 }
