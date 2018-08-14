@@ -35,8 +35,8 @@ scanner/Test*
 scanner/scanner
 
 # ignore binaries from broker
-broker/daemon/brokerd
-broker/client/broker
+broker/cli/broker/broker
+broker/cli/brokerd/brokerd
 
 # ignore binaries from perform
 perform/perform
@@ -44,15 +44,10 @@ perform/cluster/tests/deploy
 
 # ignore binaries from deploy
 deploy/deploy
+deploy/cluster/tests/create_cluster
 
 *.code-workspace
 
-cluster/tests/create_cluster
-
-deploy/cluster/tests/create_cluster
 
 *.new
 
-broker/cli/broker/broker
-
-broker/cli/brokerd/brokerd
