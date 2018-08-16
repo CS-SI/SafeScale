@@ -268,7 +268,16 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 
 // CreateHost creates a new host
 func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
-	return client.createHost(request, false)
+	host, err := client.createHost(request, false)
+	if err != nil {
+		return nil, err
+	}
+	err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
+	if err != nil {
+		client.DeleteHost(host.ID)
+		return nil, fmt.Errorf("failed to create Host: %s", providerError(err))
+	}
+	return host, nil
 }
 
 // CreateHost creates a new host and configure it as gateway for the network if isGateway is true
@@ -409,12 +418,6 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 				return nil, fmt.Errorf("error enabling gateway mode of host '%s': %s", request.Name, providerError(err))
 			}
 		}
-	}
-
-	err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
-	if err != nil {
-		client.DeleteHost(host.ID)
-		return nil, fmt.Errorf("failed to create Host: %s", providerError(err))
 	}
 
 	return host, nil

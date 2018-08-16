@@ -376,7 +376,18 @@ func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 
 // CreateHost creates an host satisfying request
 func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
-	return client.createHost(request, false)
+	host, err := client.createHost(request, false)
+	if err != nil {
+		return nil, err
+	}
+
+	err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
+	if err != nil {
+		client.DeleteHost(host.ID)
+		return nil, fmt.Errorf("error creating host: %s", errorString(err))
+	}
+
+	return host, nil
 }
 
 // createHost ...
@@ -493,16 +504,6 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		} else if IPVersion.IPv6.Is(ip.IP) {
 			host.AccessIPv6 = ip.IP
 		}
-	}
-
-	if isGateway {
-		err = metadata.SaveGateway(providers.FromClient(client), host, request.NetworkIDs[0])
-	} else {
-		err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
-	}
-	if err != nil {
-		client.DeleteHost(host.ID)
-		return nil, fmt.Errorf("error creating host: %s", errorString(err))
 	}
 	return host, nil
 }
