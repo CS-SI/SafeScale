@@ -109,14 +109,23 @@ wait_for_userdata() {
 }
 
 save_iptables_rules() {
-   case $LINUX_KIND in
-       rhel|centos) iptables-save >/etc/sysconfig/iptables ;;
-       debian|ubuntu) iptables-save >/etc/iptables/rules.v4 ;;
-   esac
+    case $LINUX_KIND in
+        rhel|centos) iptables-save >/etc/sysconfig/iptables ;;
+        debian|ubuntu) iptables-save >/etc/iptables/rules.v4 ;;
+    esac
 }
 
 detect_facts() {
-   local -g LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
-   local -g VERSION_ID=$(cat /etc/os-release | grep "^VERSION_ID=" | cut -d= -f2 | sed 's/"//g')
+    declare -gA FACTS
+    FACTS["linux kind"]=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
+    local -g LINUX_KIND=${FACTS["linux kind"]}
+    FACTS["version id"]=$(cat /etc/os-release | grep "^VERSION_ID=" | cut -d= -f2 | sed 's/"//g')
+    local -g VERSION_ID=${FACTS["version id"]}
+    FACTS["sockets"]=$(LANG=C lscpu | grep "Socket(s)" | cut -d: -f2 | sed 's/"//g')
+    FACTS["cores per socket"]=$(LANG=C lscpu | grep "Core(s) per socket" | cut -d: -f2 | sed 's/"//g')
+    FACTS["cores"]=$(( ${FACTS["sockets"]} * ${FACTS["cores per socket"]} ))
+    FACTS["threads per core"]=$(LANG=C lscpu | grep "Thread(s) per core" | cut -d: -f2 | sed 's/"//g')
+    FACTS["threads"]=$(( ${FACTS["cores"]} * ${FACTS["threads per core"]} ))
+    FACTS["2 3rd of threads"]=$(( ${FACTS["threads"]} * 2 / 3 ))
 }
 detect_facts
