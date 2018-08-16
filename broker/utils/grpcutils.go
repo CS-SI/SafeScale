@@ -28,13 +28,13 @@ import (
 
 const (
 	address = "localhost:50051"
-	//TimeoutCtxDefault default timeout for grpc command invocation
+	// TimeoutCtxDefault default timeout for grpc command invocation
 	TimeoutCtxDefault = 1 * time.Minute
-	//timeoutCtxHost timeout for grpc command relative to host creation
+	// TimeoutCtxHost timeout for grpc command relative to host creation
 	TimeoutCtxHost = 5 * time.Minute
 )
 
-//GetConnection returns a connection to GRPC server
+// GetConnection returns a connection to GRPC server
 func GetConnection() *grpc.ClientConn {
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
@@ -44,13 +44,13 @@ func GetConnection() *grpc.ClientConn {
 	return conn
 }
 
-//GetContext return a context for grpc commands
+// GetContext return a context for grpc commands
 func GetContext(timeout time.Duration) (context.Context, context.CancelFunc) {
 	// Contact the server and print out its response.
 	return context.WithTimeout(context.Background(), timeout)
 }
 
-//GetReference return a reference from the name or id given in the pb.Reference
+// GetReference return a reference from the name or id given in the pb.Reference
 func GetReference(in *pb.Reference) string {
 	var ref string
 	name := in.GetName()

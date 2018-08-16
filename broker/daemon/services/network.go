@@ -48,9 +48,9 @@ func NewNetworkService(api api.ClientAPI) NetworkAPI {
 }
 
 // Create creates a network
-func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*api.Network, error) {
+func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*api.Network, error) {
 	// Check that no network with same name already exists
-	_net, err := srv.Get(net)
+	_net, err := svc.Get(net)
 	if _net != nil {
 		return nil, fmt.Errorf("Network %s already exists", net)
 	}
@@ -59,7 +59,7 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 
 	// Create the network
-	network, err := srv.provider.CreateNetwork(api.NetworkRequest{
+	network, err := svc.provider.CreateNetwork(api.NetworkRequest{
 		Name:      net,
 		IPVersion: ipVersion,
 		CIDR:      cidr,
@@ -69,23 +69,23 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 
 	// Create a gateway
-	tpls, err := srv.provider.SelectTemplatesBySize(api.SizingRequirements{
+	tpls, err := svc.provider.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    cpu,
 		MinRAMSize:  ram,
 		MinDiskSize: disk,
 	})
-	img, err := srv.provider.SearchImage(os)
+	img, err := svc.provider.SearchImage(os)
 	if err != nil {
-		srv.provider.DeleteNetwork(network.ID)
+		svc.provider.DeleteNetwork(network.ID)
 		return nil, err
 	}
 
 	keypairName := "kp_" + network.Name
 	// Makes sure keypair doesn't exist
-	srv.provider.DeleteKeyPair(keypairName)
-	keypair, err := srv.provider.CreateKeyPair(keypairName)
+	svc.provider.DeleteKeyPair(keypairName)
+	keypair, err := svc.provider.CreateKeyPair(keypairName)
 	if err != nil {
-		srv.provider.DeleteNetwork(network.ID)
+		svc.provider.DeleteNetwork(network.ID)
 		return nil, err
 	}
 
@@ -97,27 +97,27 @@ func (srv *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		GWName:     gwname,
 	}
 
-	err = srv.provider.CreateGateway(gwRequest)
+	err = svc.provider.CreateGateway(gwRequest)
 	if err != nil {
-		srv.provider.DeleteNetwork(network.ID)
+		svc.provider.DeleteNetwork(network.ID)
 		return nil, err
 	}
 
-	rv, err := srv.Get(net)
+	rv, err := svc.Get(net)
 	return rv, err
 }
 
 //List returns the network list
-func (srv *NetworkService) List(all bool) ([]api.Network, error) {
+func (svc *NetworkService) List(all bool) ([]api.Network, error) {
 
-	return srv.provider.ListNetworks(all)
+	return svc.provider.ListNetworks(all)
 }
 
 //Get returns the network identified by ref, ref can be the name or the id
-func (srv *NetworkService) Get(ref string) (*api.Network, error) {
+func (svc *NetworkService) Get(ref string) (*api.Network, error) {
 
 	// We first try looking for network by ID
-	m, err := metadata.LoadNetwork(srv.provider, ref)
+	m, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (srv *NetworkService) Get(ref string) (*api.Network, error) {
 	}
 
 	// If not found, we try looking for network by name
-	m, err = metadata.LoadNetworkByName(srv.provider, ref)
+	m, err = metadata.LoadNetworkByName(svc.provider, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (srv *NetworkService) Get(ref string) (*api.Network, error) {
 	}
 
 	// If not found, we look for network any network from provider
-	nets, err := srv.List(true)
+	nets, err := svc.List(true)
 	if err != nil {
 		return nil, err
 	}
@@ -148,10 +148,10 @@ func (srv *NetworkService) Get(ref string) (*api.Network, error) {
 }
 
 //Delete deletes network referenced by ref
-func (srv *NetworkService) Delete(ref string) error {
-	n, err := srv.Get(ref)
+func (svc *NetworkService) Delete(ref string) error {
+	n, err := svc.Get(ref)
 	if err != nil {
 		return fmt.Errorf("Network %s does not exist", ref)
 	}
-	return srv.provider.DeleteNetwork(n.ID)
+	return svc.provider.DeleteNetwork(n.ID)
 }

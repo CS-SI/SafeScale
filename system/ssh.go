@@ -386,7 +386,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 	return nil
 }
 
-//Copy copy a file/directory from/to local to/from remote
+// Copy copy a file/directory from/to local to/from remote
 func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) error {
 	tunnels, sshConfig, err := ssh.createTunnels()
 	if err != nil {
