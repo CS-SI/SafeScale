@@ -46,7 +46,7 @@ func (n *network) Delete(name string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout <= 0 {
-		timeout = utils.TimeoutCtxDefault
+		timeout = utils.TimeoutCtxHost
 	}
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
@@ -73,7 +73,7 @@ func (n *network) Create(def pb.NetworkDefinition, timeout time.Duration) (*pb.N
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout <= 0 {
-		timeout = utils.TimeoutCtxDefault
+		timeout = utils.TimeoutCtxHost
 	}
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()

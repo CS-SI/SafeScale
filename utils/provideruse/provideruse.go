@@ -17,17 +17,18 @@
 package provideruse
 
 import (
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
 )
 
 //GetProviderService returns the service provider corresponding to the current Tenant
 func GetProviderService() (*providers.Service, error) {
-	tenant, err := brokeruse.GetCurrentTenant()
+	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultTimeout)
 	if err != nil {
 		return nil, err
 	}
-	svc, err := providers.GetService(tenant)
+	svc, err := providers.GetService(tenant.Name)
 	if err != nil {
 		return nil, err
 	}

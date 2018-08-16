@@ -132,7 +132,7 @@ var containerMount = cli.Command{
 		}
 		err := client.New().Container.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), 0)
 		if err != nil {
-			return fmt.Errorf("could not mount container '%s': %v\n", c.Args().Get(0), err)
+			return fmt.Errorf("could not mount container '%s': %v", c.Args().Get(0), err)
 		}
 		fmt.Printf("Container '%s' mounted on '%s' on host '%s'\n", c.Args().Get(0), c.String("path"), c.Args().Get(1))
 		return nil
@@ -151,7 +151,7 @@ var containerUmount = cli.Command{
 		}
 		err := client.New().Container.Unmount(c.Args().Get(0), c.Args().Get(1), 0)
 		if err != nil {
-			return fmt.Errorf("could not umount container '%s': %v\n", c.Args().Get(0), err)
+			return fmt.Errorf("could not umount container '%s': %v", c.Args().Get(0), err)
 		}
 		fmt.Printf("Container '%s' umounted from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 		return nil

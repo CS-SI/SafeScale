@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	svcapi "github.com/CS-SI/SafeScale/deploy/service/api"
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
 
 	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 )
@@ -63,17 +62,17 @@ func (s *Service) GetComponent() installapi.ComponentAPI {
 
 // State ...
 func (s *Service) State(target installapi.TargetAPI) error {
-	return brokeruse.SSHRun(target.GetName(), s.manager.StateScript)
+	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.StateScript, brokerclient.DefaultTimeout)
 }
 
 // Start ...
 func (s *Service) Start(target installapi.TargetAPI) error {
-	return brokeruse.SSHRun(target.GetName(), s.manager.StartScript)
+	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.StartScript, brokerclient.DefaultTimeout)
 }
 
 // Stop ...
 func (s *Service) Stop(target installapi.TargetAPI) error {
-	return brokeruse.SSHRun(target.GetName(), s.manager.StopScript)
+	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.StopScript, brokerclient.DefaultTimeout)
 }
 
 // Restart ...
@@ -83,4 +82,14 @@ func (s *Service) Restart(target installapi.TargetAPI) error {
 		return err
 	}
 	return s.Start(target)
+}
+
+// Pause ...
+func (s *Service) Pause(target installapi.TargetAPI) error {
+	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.PauseScript, brokerclient.DefaultTimeout)
+}
+
+// Resume ...
+func (s *Service) Resume(target installapi.TargetAPI) error {
+	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.ResumeScript, brokerclient.DefaultTimeout)
 }

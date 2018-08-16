@@ -19,6 +19,7 @@ package dcos
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os/exec"
@@ -48,11 +49,11 @@ import (
 	"github.com/CS-SI/SafeScale/system"
 
 	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 )
 
 //go:generate rice embed-go
@@ -70,6 +71,8 @@ const (
 	tempFolder = "/var/tmp/"
 
 	centos = "CentOS 7.3"
+
+	adminCmd = "sudo -u cladm -i"
 )
 
 var (
@@ -213,12 +216,17 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	log.Printf("Creating Network 'net-%s'", req.Name)
 	req.Name = strings.ToLower(req.Name)
 	networkName := "net-" + req.Name
-	network, err := brokeruse.CreateNetwork(networkName, req.CIDR, &pb.GatewayDefinition{
-		CPU:     4,
-		RAM:     32.0,
-		Disk:    120,
-		ImageID: centos,
-	})
+	def := pb.NetworkDefinition{
+		Name: networkName,
+		CIDR: req.CIDR,
+		Gateway: &pb.GatewayDefinition{
+			CPU:     4,
+			RAM:     32.0,
+			Disk:    120,
+			ImageID: centos,
+		},
+	}
+	network, err := brokerclient.New().Network.Create(def, 5*time.Minute)
 	if err != nil {
 		err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
 		return nil, err
@@ -405,21 +413,21 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 cleanNodes:
 	if !req.KeepOnFailure {
 		for _, id := range instance.Common.PublicNodeIDs {
-			brokeruse.DeleteHost(id)
+			brokerclient.New().Host.Delete(id, brokerclient.DefaultTimeout)
 		}
 		for _, id := range instance.Common.PrivateNodeIDs {
-			brokeruse.DeleteHost(id)
+			brokerclient.New().Host.Delete(id, brokerclient.DefaultTimeout)
 		}
 	}
 cleanMasters:
 	if !req.KeepOnFailure {
 		for _, id := range instance.manager.MasterIDs {
-			brokeruse.DeleteHost(id)
+			brokerclient.New().Host.Delete(id, brokerclient.DefaultTimeout)
 		}
 	}
 cleanNetwork:
 	if !req.KeepOnFailure {
-		brokeruse.DeleteNetwork(instance.Common.NetworkID)
+		brokerclient.New().Host.Delete(instance.Common.NetworkID, brokerclient.DefaultTimeout)
 		instance.metadata.Delete()
 	}
 	return nil, err
@@ -603,7 +611,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 		return
 	}
 
-	masterHost, err := brokeruse.CreateHost(&pb.HostDefinition{
+	masterHost, err := brokerclient.New().Host.Create(pb.HostDefinition{
 		Name:      name,
 		CPUNumber: 4,
 		RAM:       15.0,
@@ -611,7 +619,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 		ImageID:   centos,
 		Network:   c.Common.NetworkID,
 		Public:    false,
-	})
+	}, brokerclient.DefaultTimeout)
 	if err != nil {
 		log.Printf("[Masters: #%d] creation failed: %s\n", index, err.Error())
 		done <- fmt.Errorf("failed to create Master server %d: %s", index, err.Error())
@@ -630,7 +638,7 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 		c.manager.MasterIDs = c.manager.MasterIDs[:len(c.manager.MasterIDs)-1]
 		c.manager.MasterIPs = c.manager.MasterIPs[:len(c.manager.MasterIPs)-1]
 		c.metadata.Release()
-		brokeruse.DeleteHost(masterHost.ID)
+		brokerclient.New().Host.Delete(masterHost.ID, brokerclient.DefaultTimeout)
 
 		log.Printf("[Masters: #%d] creation failed: %s\n", index, err.Error())
 		done <- fmt.Errorf("failed to update Cluster definition: %s", err.Error())
@@ -740,7 +748,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 	req.Public = publicIP
 	req.Network = c.Common.NetworkID
 	req.ImageID = centos
-	node, err := brokeruse.CreateHost(req)
+	node, err := brokerclient.New().Host.Create(*req, brokerclient.DefaultTimeout)
 	if err != nil {
 		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -771,7 +779,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 			c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
 			c.manager.PrivateNodeIPs = c.manager.PrivateNodeIPs[:len(c.manager.PrivateNodeIPs)-1]
 		}
-		brokeruse.DeleteHost(node.ID)
+		brokerclient.New().Host.Delete(node.ID, brokerclient.DefaultTimeout)
 		c.metadata.Release()
 		log.Printf("[Nodes: %s #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -1256,7 +1264,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 	if len(errors) > 0 {
 		if len(hosts) > 0 {
 			for _, hostID := range hosts {
-				brokeruse.DeleteHost(hostID)
+				brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
 			}
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
@@ -1288,24 +1296,55 @@ func (c *Cluster) installKubernetes() (int, error) {
 	}
 	cmd := fmt.Sprintf("sudo -u cladm -i dcos package install --yes kubernetes --options=%s ; rm -f %s", optionsPath, optionsPath)
 
-	cmdResult, err := ssh.Command(cmd)
+	retcode, stdout, stderr, err := brokerclient.New().Ssh.Run(ssh.Host, cmd, 0)
 	if err != nil {
 		return 0, fmt.Errorf("failed to execute command to install Kubernetes: %s", err.Error())
 	}
-	retcode := 0
-	out, err := cmdResult.CombinedOutput()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-				retcode = status.ExitStatus()
+	if retcode > 0 {
+		return retcode, fmt.Errorf("%s\n%s", stdout, stderr)
+	}
+
+	// Wait for kubernetes readyness
+	cmd = "sudo -u cladm -i dcos kubernetes plan show deploy --json jq .status"
+	err = retry.WhileUnsuccessful(
+		func() error {
+			retcode, stdout, stderr, err := brokerclient.New().Ssh.Run(ssh.Host, cmd, 0)
+			if err != nil {
+				return err
 			}
-		} else {
-			return 0, fmt.Errorf("failed to fetch output of Kubernetes installation: %s", err.Error())
-		}
+			if retcode > 0 {
+				return fmt.Errorf("command failed on master with return code %d: %s", retcode, stderr)
+			}
+			var status string
+			err = json.Unmarshal([]byte(stdout), &status)
+			if err != nil {
+				return err
+			}
+			if status == "COMPLETE" {
+				return nil
+			}
+			return fmt.Errorf("status in %s", status)
+		},
+		1*time.Minute,
+		10*time.Minute)
+	if err != nil {
+		return 0, fmt.Errorf("timeout waiting kubernetes to be ready: %s", err.Error())
+	}
+
+	// Finalize kubernetes configuration, especially kubectl
+	cmd = `
+   sudo -u cladm -i dcos kubernetes kubeconfig \
+                         --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 \
+&& sudo -u cladm -i kubectl config set-cluster kubernetes \
+                         --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443`
+	retcode, _, stderr, err = brokerclient.New().Ssh.Run(ssh.Host, cmd, 0)
+	if err != nil {
+		return 0, err
 	}
 	if retcode > 0 {
-		return retcode, fmt.Errorf(string(out))
+		return 0, fmt.Errorf("failed to finalize kubernetes configuration: %s", stderr)
 	}
+
 	return 0, nil
 }
 
@@ -1500,7 +1539,7 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 	} else {
 		hostID = c.Common.PrivateNodeIDs[len(c.Common.PrivateNodeIDs)-1]
 	}
-	err := brokeruse.DeleteHost(hostID)
+	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
 	if err != nil {
 		return nil
 	}
@@ -1525,7 +1564,7 @@ func (c *Cluster) DeleteSpecificNode(ID string) error {
 		return fmt.Errorf("host ID '%s' isn't a registered Node of the Cluster '%s'", ID, c.Common.Name)
 	}
 
-	err := brokeruse.DeleteHost(ID)
+	err := brokerclient.New().Host.Delete(ID, brokerclient.DefaultTimeout)
 	if err != nil {
 		return err
 	}
@@ -1560,7 +1599,7 @@ func (c *Cluster) GetNode(ID string) (*pb.Host, error) {
 	if !found {
 		return nil, fmt.Errorf("GetNode not yet implemented")
 	}
-	return brokeruse.GetHost(ID)
+	return brokerclient.New().Host.Inspect(ID, brokerclient.DefaultTimeout)
 }
 
 // contains ...
@@ -1617,9 +1656,11 @@ func (c *Cluster) Delete() error {
 		return err
 	}
 
+	broker := brokerclient.New()
+
 	// Deletes the public nodes
 	for _, n := range c.Common.PublicNodeIDs {
-		err := brokeruse.DeleteHost(n)
+		err := broker.Host.Delete(n, brokerclient.DefaultTimeout)
 		if err != nil {
 			return err
 		}
@@ -1627,7 +1668,7 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the private nodes
 	for _, n := range c.Common.PrivateNodeIDs {
-		err := brokeruse.DeleteHost(n)
+		err := broker.Host.Delete(n, brokerclient.DefaultTimeout)
 		if err != nil {
 			return err
 		}
@@ -1635,14 +1676,14 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the masters
 	for _, n := range c.manager.MasterIDs {
-		err := brokeruse.DeleteHost(n)
+		err := broker.Host.Delete(n, brokerclient.DefaultTimeout)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Deletes the network and gateway
-	err = brokeruse.DeleteNetwork(c.Common.NetworkID)
+	err = broker.Network.Delete(c.Common.NetworkID, brokerclient.DefaultTimeout)
 	if err != nil {
 		return err
 	}

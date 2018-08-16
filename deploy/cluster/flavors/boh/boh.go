@@ -30,6 +30,8 @@ import (
 	"text/template"
 	"time"
 
+	rice "github.com/GeertJohan/go.rice"
+
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/AdditionalInfo"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/ClusterState"
@@ -38,18 +40,17 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/NodeType"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos/ErrorCode"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
-	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/providers"
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
 
 	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 )
 
 const (
@@ -193,12 +194,17 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	log.Printf("Creating Network 'net-%s'", req.Name)
 	req.Name = strings.ToLower(req.Name)
 	networkName := "net-" + req.Name
-	network, err := brokeruse.CreateNetwork(networkName, req.CIDR, &pb.GatewayDefinition{
-		CPU:     nodesDef.CPUNumber,
-		RAM:     nodesDef.RAM,
-		Disk:    nodesDef.Disk,
-		ImageID: nodesDef.ImageID,
-	})
+	def := pb.NetworkDefinition{
+		Name: networkName,
+		CIDR: req.CIDR,
+		Gateway: &pb.GatewayDefinition{
+			CPU:     nodesDef.CPUNumber,
+			RAM:     nodesDef.RAM,
+			Disk:    nodesDef.Disk,
+			ImageID: nodesDef.ImageID,
+		},
+	}
+	network, err := brokerclient.New().Network.Create(def, brokerclient.DefaultTimeout)
 	if err != nil {
 		err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
 		return nil, err
@@ -310,12 +316,12 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 cleanNodes:
 	if !req.KeepOnFailure {
 		for _, id := range instance.Common.PrivateNodeIDs {
-			brokeruse.DeleteHost(id)
+			brokerclient.New().Host.Delete(id, 0)
 		}
 	}
 cleanNetwork:
 	if !req.KeepOnFailure {
-		brokeruse.DeleteNetwork(instance.Common.NetworkID)
+		brokerclient.New().Network.Delete(instance.Common.NetworkID, 0)
 		instance.metadata.Delete()
 	}
 	return nil, err
@@ -388,7 +394,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 	}
 	req.Public = publicIP
 	req.Network = c.Common.NetworkID
-	host, err := brokeruse.CreateHost(req)
+	host, err := brokerclient.New().Host.Create(*req, 0)
 	if err != nil {
 		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -417,7 +423,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 			c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
 			c.manager.PrivateNodeIPs = c.manager.PrivateNodeIPs[:len(c.manager.PrivateNodeIPs)-1]
 		}
-		brokeruse.DeleteHost(host.ID)
+		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultTimeout)
 		c.metadata.Release()
 		log.Printf("[Nodes: %s #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
@@ -568,7 +574,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 	if len(errors) > 0 {
 		if len(hosts) > 0 {
 			for _, hostID := range hosts {
-				brokeruse.DeleteHost(hostID)
+				brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
 			}
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
@@ -586,7 +592,7 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 	} else {
 		hostID = c.Common.PrivateNodeIDs[len(c.Common.PrivateNodeIDs)-1]
 	}
-	err := brokeruse.DeleteHost(hostID)
+	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
 	if err != nil {
 		return nil
 	}
@@ -611,7 +617,7 @@ func (c *Cluster) DeleteSpecificNode(hostID string) error {
 		return fmt.Errorf("host '%s' isn't a registered Node of the Cluster '%s'", hostID, c.Common.Name)
 	}
 
-	err := brokeruse.DeleteHost(hostID)
+	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
 	if err != nil {
 		return err
 	}
@@ -647,7 +653,7 @@ func (c *Cluster) GetNode(hostID string) (*pb.Host, error) {
 	if !found {
 		return nil, fmt.Errorf("failed to find node '%s' in cluster '%s'", hostID, c.Common.Name)
 	}
-	return brokeruse.GetHost(hostID)
+	return brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultTimeout)
 }
 
 func contains(list []string, hostID string) (bool, int) {
@@ -703,9 +709,11 @@ func (c *Cluster) Delete() error {
 		return err
 	}
 
+	broker := brokerclient.New()
+
 	// Deletes the public nodes
 	for _, n := range c.Common.PublicNodeIDs {
-		err := brokeruse.DeleteHost(n)
+		err := broker.Host.Delete(n, brokerclient.DefaultTimeout)
 		if err != nil {
 			return err
 		}
@@ -713,14 +721,14 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the private nodes
 	for _, n := range c.Common.PrivateNodeIDs {
-		err := brokeruse.DeleteHost(n)
+		err := broker.Host.Delete(n, brokerclient.DefaultTimeout)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Deletes the network and gateway
-	err = brokeruse.DeleteNetwork(c.Common.NetworkID)
+	err = broker.Network.Delete(c.Common.NetworkID, brokerclient.DefaultTimeout)
 	if err != nil {
 		return err
 	}

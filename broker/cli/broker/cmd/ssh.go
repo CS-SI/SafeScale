@@ -21,7 +21,6 @@ import (
 	"os"
 	"time"
 
-	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/urfave/cli"
@@ -58,23 +57,19 @@ var sshRun = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name required")
 		}
-		command := pb.SshCommand{
-			Host:    &pb.Reference{Name: c.Args().Get(0)},
-			Command: c.String("c"),
-		}
 		timeout := utils.TimeoutCtxHost
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
-		resp, err := client.New().Ssh.Run(command, timeout)
+		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), timeout)
 		if err != nil {
 			return fmt.Errorf("Could not execute ssh command: %v", err)
 		}
 
-		fmt.Print(resp.GetOutputStd())
-		fmt.Fprint(os.Stderr, resp.GetOutputErr())
+		fmt.Print(stdout)
+		fmt.Fprint(os.Stderr, stderr)
 
-		os.Exit(int(resp.GetStatus()))
+		os.Exit(retcode)
 		return nil
 	},
 }
@@ -95,15 +90,11 @@ var sshCopy = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("2 arguments (from and to) are required")
 		}
-		command := pb.SshCopyCommand{
-			Source:      c.Args().Get(0),
-			Destination: c.Args().Get(1),
-		}
 		timeout := utils.TimeoutCtxHost
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
-		err := client.New().Ssh.Copy(command, timeout)
+		err := client.New().Ssh.Copy(c.Args().Get(0), c.Args().Get(1), timeout)
 		if err != nil {
 			return fmt.Errorf("Could not copy %s to %s: %v", c.Args().Get(0), c.Args().Get(1), err)
 		}

@@ -19,12 +19,13 @@ package install
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/CS-SI/SafeScale/deploy/install/api"
 	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
+
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+
 	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
 
 	"github.com/spf13/viper"
 )
@@ -38,9 +39,9 @@ func NewComponent(name string) (api.ComponentAPI, error) {
 
 	v := viper.New()
 	v.AddConfigPath(".")
-	v.AddConfigPath("$HOME/.safescale/pkgs")
-	v.AddConfigPath("$HOME/.config/safescale/pkgs")
-	v.AddConfigPath("/etc/safescale/pkgs")
+	v.AddConfigPath("$HOME/.safescale/components")
+	v.AddConfigPath("$HOME/.config/safescale/components")
+	v.AddConfigPath("/etc/safescale/components")
 	v.SetConfigName(name)
 
 	err := v.ReadInConfig()
@@ -213,7 +214,7 @@ func uploadStringToTargetFile(content string, target api.TargetAPI, filename str
 		return err
 	}
 	to := fmt.Sprintf("%s:%s", target.GetName(), filename)
-	err = brokeruse.SSHCopy(f.Name(), to, 5*time.Minute)
+	err = brokerclient.New().Ssh.Copy(f.Name(), to, brokerclient.DefaultTimeout)
 	os.Remove(f.Name())
 	return err
 }

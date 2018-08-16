@@ -6,10 +6,10 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/CS-SI/SafeScale/broker/client"
+
 	"github.com/CS-SI/SafeScale/deploy/install/api"
 	"github.com/CS-SI/SafeScale/system"
-
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
 )
 
 const (
@@ -85,16 +85,12 @@ func (i *scriptInstaller) Check(c api.ComponentAPI, t api.TargetAPI) (bool, erro
 			if err != nil {
 				return false, err
 			}
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(),
-				fmt.Sprintf("sudo bash %s ; #sudo rm -f %s", filename, filename),
-				30*time.Minute)
+			cmd := fmt.Sprintf("sudo bash %s ; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmd, 0)
 			if err != nil {
 				return false, err
 			}
-			if retcode != 0 {
-				return false, fmt.Errorf("install script for component '%s' failed, retcode=%d", c.GetName(), retcode)
-			}
-			return true, nil
+			return retcode == 0, nil
 		}
 		return false, fmt.Errorf("syntax error in component '%s' specification file: 'check' is empty", c.GetName())
 	}
@@ -120,9 +116,12 @@ func (i *scriptInstaller) Add(c api.ComponentAPI, t api.TargetAPI) error {
 			if err != nil {
 				return err
 			}
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(),
-				fmt.Sprintf("sudo bash %s; #sudo rm -f %s", filename, filename),
-				30*time.Minute)
+			cmd := fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
+			duration := specs.GetInt("component.installers.script.duration")
+			if duration == 0 {
+				duration = 5
+			}
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmd, time.Duration(duration)*time.Minute)
 			if err != nil {
 				return err
 			}
@@ -155,9 +154,13 @@ func (i *scriptInstaller) Remove(c api.ComponentAPI, t api.TargetAPI) error {
 			if err != nil {
 				return err
 			}
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(),
-				fmt.Sprintf("sudo bash %s; #sudo rm -f %s", filename, filename),
-				30*time.Minute)
+
+			cmd := fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
+			duration := specs.GetInt("component.installers.script.duration")
+			if duration == 0 {
+				duration = 5
+			}
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmd, time.Duration(duration)*time.Minute)
 			if err != nil {
 				return err
 			}
@@ -190,7 +193,7 @@ func (i *aptInstaller) Check(c api.ComponentAPI, t api.TargetAPI) (bool, error) 
 		packageName := specs.GetString("component.installers.apt.package")
 		if len(packageName) > 0 {
 			cmdStr := fmt.Sprintf("sudo dpkg-query -s '%s' &>/dev/null", packageName)
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(), cmdStr, 30*time.Minute)
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmdStr, 0)
 			if err != nil {
 				return false, err
 			}
@@ -211,7 +214,11 @@ func (i *aptInstaller) Add(c api.ComponentAPI, t api.TargetAPI) error {
 		packageName := specs.GetString("component.installers.apt.package")
 		if len(packageName) > 0 {
 			cmdStr := fmt.Sprintf("sudo apt-get update -y; sudo apt-get install -y '%s'", packageName)
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(), cmdStr, 30*time.Minute)
+			duration := specs.GetInt("component.installers.script.duration")
+			if duration == 0 {
+				duration = 5
+			}
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmdStr, time.Duration(duration)*time.Minute)
 			if err != nil {
 				return err
 			}
@@ -232,7 +239,11 @@ func (i *aptInstaller) Remove(c api.ComponentAPI, t api.TargetAPI) error {
 		packageName := specs.GetString("component.installers.apt.package")
 		if len(packageName) > 0 {
 			cmdStr := fmt.Sprintf("sudo apt-get remove -y '%s'", packageName)
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(), cmdStr, 30*time.Minute)
+			duration := specs.GetInt("component.installers.script.duration")
+			if duration == 0 {
+				duration = 5
+			}
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmdStr, time.Duration(duration)*time.Minute)
 			if err != nil {
 				return err
 			}
@@ -265,7 +276,7 @@ func (i *yumInstaller) Check(c api.ComponentAPI, t api.TargetAPI) (bool, error) 
 		packageName := specs.GetString("component.installers.yum.package")
 		if len(packageName) > 0 {
 			cmdStr := fmt.Sprintf("sudo rpm -q %s &>/dev/null", packageName)
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(), cmdStr, 30*time.Minute)
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmdStr, 0)
 			if err != nil {
 				return false, err
 			}
@@ -286,7 +297,11 @@ func (i *yumInstaller) Add(c api.ComponentAPI, t api.TargetAPI) error {
 		packageName := specs.GetString("component.installers.yum.package")
 		if len(packageName) > 0 {
 			cmdStr := fmt.Sprintf("sudo yum makecache fast; sudo yum install -y %s", packageName)
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(), cmdStr, 30*time.Minute)
+			duration := specs.GetInt("component.installers.script.duration")
+			if duration == 0 {
+				duration = 5
+			}
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmdStr, time.Duration(duration)*time.Minute)
 			if err != nil {
 				return err
 			}
@@ -307,7 +322,11 @@ func (i *yumInstaller) Remove(c api.ComponentAPI, t api.TargetAPI) error {
 		packageName := specs.GetString("component.installers.yum.package")
 		if len(packageName) > 0 {
 			cmdStr := fmt.Sprintf("sudo yum remove -y %s", packageName)
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(), cmdStr, 30*time.Minute)
+			duration := specs.GetInt("component.installers.script.duration")
+			if duration == 0 {
+				duration = 5
+			}
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmdStr, time.Duration(duration)*time.Minute)
 			if err != nil {
 				return err
 			}
@@ -340,7 +359,7 @@ func (i *dnfInstaller) Check(c api.ComponentAPI, t api.TargetAPI) (bool, error) 
 		packageName := specs.GetString("component.installers.dnf.package")
 		if len(packageName) > 0 {
 			cmdStr := fmt.Sprintf("sudo dnf list installed %s &>/dev/null", packageName)
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(), cmdStr, 30*time.Minute)
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmdStr, 0)
 			if err != nil {
 				return false, err
 			}
@@ -361,7 +380,11 @@ func (i *dnfInstaller) Add(c api.ComponentAPI, t api.TargetAPI) error {
 		packageName := specs.GetString("component.installers.dnf.package")
 		if len(packageName) > 0 {
 			cmdStr := fmt.Sprintf("sudo dnf install -y %s", packageName)
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(), cmdStr, 30*time.Minute)
+			duration := specs.GetInt("component.installers.script.duration")
+			if duration == 0 {
+				duration = 5
+			}
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmdStr, time.Duration(duration)*time.Minute)
 			if err != nil {
 				return err
 			}
@@ -382,7 +405,11 @@ func (i *dnfInstaller) Remove(c api.ComponentAPI, t api.TargetAPI) error {
 		packageName := specs.GetString("component.installers.dnf.package")
 		if len(packageName) > 0 {
 			cmdStr := fmt.Sprintf("sudo dnf uninstall -y %s", packageName)
-			retcode, _, _, err := brokeruse.SSHRun(t.GetName(), cmdStr, 30*time.Minute)
+			duration := specs.GetInt("component.installers.script.duration")
+			if duration == 0 {
+				duration = 5
+			}
+			retcode, _, _, err := client.New().Ssh.Run(t.GetName(), cmdStr, time.Duration(duration)*time.Minute)
 			if err != nil {
 				return err
 			}

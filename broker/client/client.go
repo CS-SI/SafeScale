@@ -29,6 +29,8 @@ type Client struct {
 
 var client = Client{}
 
+const DefaultTimeout = 0
+
 // New returns an instance of broker Client
 func New() *Client {
 	return &client

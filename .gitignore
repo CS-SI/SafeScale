@@ -51,3 +51,5 @@ deploy/cluster/tests/create_cluster
 
 *.new
 
+
+deploy/cli/deploy

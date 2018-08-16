@@ -24,15 +24,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster"
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
+	"github.com/CS-SI/SafeScale/deploy/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 
 	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
 	cli "github.com/CS-SI/SafeScale/utils/cli"
 	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
 )
@@ -63,7 +63,7 @@ var ClusterCommand = &cli.Command{
 		clusterMarathonCommand,
 	},
 
-	Process: func(c *cli.Command) {
+	Before: func(c *cli.Command) {
 		if !c.IsKeywordSet("list,ls") {
 			clusterName = c.StringArgument("<clustername>", "")
 			if clusterName == "" {
@@ -74,7 +74,7 @@ var ClusterCommand = &cli.Command{
 			var err error
 			clusterInstance, err = cluster.Get(clusterName)
 			if err != nil {
-				fmt.Printf("%v\n", err)
+				fmt.Printf("%s\n", err.Error())
 				os.Exit(int(ExitCode.RPC))
 			}
 			if !c.IsKeywordSet("create") {
@@ -818,7 +818,7 @@ func executeCommand(command string) (int, string, string, error) {
 		os.Exit(int(ExitCode.Run))
 	}
 	for i, m := range masters {
-		retcode, _, stderr, err := brokeruse.SSHRun(m, command, 5*time.Minute)
+		retcode, stdout, stderr, err := brokerclient.New().Ssh.Run(m, command, 5*time.Minute)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {
@@ -826,9 +826,10 @@ func executeCommand(command string) (int, string, string, error) {
 			}
 		}
 		if retcode != 0 {
-			fmt.Fprintf(os.Stderr, "Command failed on master #%d: %s", i+1, stderr)
+			fmt.Fprintf(os.Stderr, "%s\n%s\n", i+1, stdout, stderr)
 			os.Exit(int(ExitCode.RPC))
 		}
+		fmt.Println(stdout)
 		os.Exit(int(ExitCode.OK))
 	}
 

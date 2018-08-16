@@ -29,7 +29,7 @@ import (
 type ssh struct{}
 
 // Run ...
-func (s *ssh) Run(command pb.SshCommand, timeout time.Duration) (*pb.SshResponse, error) {
+func (s *ssh) Run(hostName, command string, timeout time.Duration) (int, string, string, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout <= 0 {
@@ -38,11 +38,18 @@ func (s *ssh) Run(command pb.SshCommand, timeout time.Duration) (*pb.SshResponse
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
 	service := pb.NewSshServiceClient(conn)
-	return service.Run(ctx, &command)
+	resp, err := service.Run(ctx, &pb.SshCommand{
+		Host:    &pb.Reference{Name: hostName},
+		Command: command,
+	})
+	if err != nil {
+		return -1, "", "", err
+	}
+	return int(resp.GetStatus()), resp.GetOutputStd(), resp.GetOutputErr(), nil
 }
 
 // Copy ...
-func (s *ssh) Copy(command pb.SshCopyCommand, timeout time.Duration) error {
+func (s *ssh) Copy(from, to string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout <= 0 {
@@ -51,6 +58,10 @@ func (s *ssh) Copy(command pb.SshCopyCommand, timeout time.Duration) error {
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
 	service := pb.NewSshServiceClient(conn)
+	command := pb.SshCopyCommand{
+		Source:      from,
+		Destination: to,
+	}
 	_, err := service.Copy(ctx, &command)
 	return err
 }

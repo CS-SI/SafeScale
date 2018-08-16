@@ -5,8 +5,6 @@ import (
 
 	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
-
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 )
@@ -128,7 +126,7 @@ func (i *dcosInstaller) GetName() {
 func (i *dcosInstaller) Add(t api.TargetAPI) error {
 	if i.AddCommand != "" {
 		cmdStr := "sudo -u cladm -i " + i.AddCommand
-		return brokeruse.SSHRun(h.ID, cmdStr)
+		return brokerclient.New().Ssh.Run(h.ID, cmdStr, brokerclient.DefaultTimeout)
 	}
 	return fmt.Errorf("no command to add component found")
 }
@@ -137,7 +135,7 @@ func (i *dcosInstaller) Add(t api.TargetAPI) error {
 func (i *dcosInstaller) Remove(t api.TargetAPI) error {
 	if i.RemoveCommand != "" {
 		cmdStr := "sudo -u cladm -i " + i.AddCommand
-		return brokeruse.SSHRun(h.ID, cmdStr)
+		return brokerclient.New().Ssh.Run(h.ID, cmdStr, brokerclient.DefaultTimeout)
 	}
 	return fmt.Errorf("no command to remove component found")
 }

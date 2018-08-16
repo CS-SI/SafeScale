@@ -20,14 +20,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/CS-SI/SafeScale/utils/brokeruse"
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
-	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
-
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos"
+	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 )
 
 //Get returns the ClusterAPI instance corresponding to the cluster named 'name'
@@ -80,20 +79,20 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 
 	log.Printf("Creating infrastructure for cluster '%s'", req.Name)
 
-	tenant, err := brokeruse.GetCurrentTenant()
+	tenant, err := brokerclient.New().Tenant.Get(0)
 	if err != nil {
 		return nil, err
 	}
 
 	switch req.Flavor {
 	case Flavor.DCOS:
-		req.Tenant = tenant
+		req.Tenant = tenant.Name
 		instance, err = dcos.Create(req)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.BOH:
-		req.Tenant = tenant
+		req.Tenant = tenant.Name
 		instance, err = boh.Create(req)
 		if err != nil {
 			return nil, err
