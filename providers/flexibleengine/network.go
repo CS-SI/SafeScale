@@ -329,10 +329,7 @@ func (client *Client) DeleteNetwork(id string) error {
 		}
 	}
 
-	err = client.DeleteGateway(id)
-	if err != nil {
-		return fmt.Errorf("failed to delete gateway of network '%s': %s", m.Get().Name, providerError(err))
-	}
+	client.DeleteGateway(id)
 	err = client.deleteSubnet(id)
 	if err != nil {
 		return err

@@ -220,7 +220,7 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 	return netList, err
 }
 
-//DeleteNetwork deletes the network identified by id
+// DeleteNetwork deletes the network identified by id
 func (client *Client) DeleteNetwork(networkID string) error {
 	m, err := metadata.LoadNetwork(providers.FromClient(client), networkID)
 	if err != nil {
