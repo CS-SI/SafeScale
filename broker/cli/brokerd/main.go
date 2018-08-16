@@ -21,7 +21,7 @@ import (
 	"net"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/cli/brokerd/commands"
+	"github.com/CS-SI/SafeScale/broker/daemon/commands"
 
 	"github.com/CS-SI/SafeScale/providers"
 

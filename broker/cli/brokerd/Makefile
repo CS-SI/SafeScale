@@ -7,9 +7,8 @@ all:	brokerd
 
 vet:
 	@$(GO) vet
-	@$(GO) vet ./commands
 
-brokerd: main.go commands/*.go ../../daemon/services/*.go ../../utils/*.go ../../broker.pb.go
+brokerd: main.go ../../daemon/services/*.go ../../daemon/commands/*.go ../../utils/*.go ../../broker.pb.go
 	@$(GO) build -o $(EXEC)
 
 clean:
