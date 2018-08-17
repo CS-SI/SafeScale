@@ -14,27 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# install_docker.sh
-#
-# Installs Docker
 
 ---
 component:
     name: mpich-build
     installers:
         script:
+            duration: 15
             check: |
-                which mpich &>/dev/null
+                which /usr/local/bin/mpiexec &>/dev/null
 
             install: |
                 case $LINUX_KIND in
                     redhat|centos)
                         yum makecache fast
                         yum groupinstall -y "Development Tools"
+                        yum install -y wget
                         ;;
                     debian|ubuntu)
                         apt update
-                        apt install -y build-essential
+                        apt install -y build-essential wget
                         ;;
                     *)
                         echo "Unsupported operating system '$LINUX_KIND'"
@@ -46,10 +45,11 @@ component:
                 tar -zxvf mpich-3.2.1.tar.gz
                 cd mpich-3.2.1
                 ./configure --disable-fortran
-                make || exit 3
+                make -j${FACTS["2 3rd of threads"]} || exit 3
                 make install || exit 4
                 rm -rf mpich-3.2.1*
                 exit 0
 
             uninstall: |
-                exit 1
+                rm -rf /usr/local/bin/mpiexec
+                exit 0

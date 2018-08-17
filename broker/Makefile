@@ -1,7 +1,7 @@
 GOPATH?=$(HOME)/go
 GO?=go
 
-.PHONY:	sdk cli clean
+.PHONY:	sdk clean
 
 all:	cli
 

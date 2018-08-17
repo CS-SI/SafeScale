@@ -75,7 +75,7 @@ func (m *Cluster) Read(name string) (bool, error) {
 		return false, err
 	}
 	if !found {
-		return false, fmt.Errorf("failed to find a cluster named '%s'", name)
+		return false, nil
 	}
 	m.name = data.Name
 	return true, nil

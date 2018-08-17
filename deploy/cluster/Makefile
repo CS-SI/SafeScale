@@ -27,4 +27,5 @@ clean:
 
 mrproper: clean
 	@(cd tests && rm -f debug)
-	@($(RM) dcos/rice-box.go)
+	@($(RM) flavors/dcos/rice-box.go)
+	@($(RM) flavors/boh/rice-box.go)

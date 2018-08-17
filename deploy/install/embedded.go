@@ -19,10 +19,13 @@ package install
 import (
 	"bytes"
 	"fmt"
-	"text/template"
+
+	txttmpl "text/template"
 
 	"github.com/CS-SI/SafeScale/deploy/install/api"
 	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
+	"github.com/CS-SI/SafeScale/utils/template"
+
 	"github.com/spf13/viper"
 
 	rice "github.com/GeertJohan/go.rice"
@@ -51,7 +54,7 @@ func loadSpecFile(name string, params map[string]interface{}) (*viper.Viper, err
 	if err != nil {
 		panic(fmt.Sprintf("failed to read embedded component speficication file '%s': %s", name, err.Error()))
 	}
-	tmplPrepared, err := template.New(name).Parse(tmplString)
+	tmplPrepared, err := txttmpl.New(name).Funcs(template.FuncMap).Parse(tmplString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse embedded component specification file '%s': %s", name, err.Error())
 	}
@@ -309,11 +312,13 @@ func init() {
 	allEmbedded = []api.ComponentAPI{
 		dockerComponent(),
 		nVidiaDockerComponent(),
+		mpichOsPkgComponent(),
+		mpichBuildComponent(),
+		remoteDesktopComponent(),
+		//reverseProxyComponent(),
 		//		kubernetesComponent(),
 		//		elasticSearchComponent(),
 		//		helmComponent(),
-		mpichOsPkgComponent(),
-		mpichBuildComponent(),
 	}
 
 	for _, item := range allEmbedded {

@@ -19,7 +19,6 @@ package dcos
 import (
 	"bytes"
 	"encoding/gob"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os/exec"
@@ -27,10 +26,13 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"text/template"
 	"time"
 
+	txttmpl "text/template"
+
 	rice "github.com/GeertJohan/go.rice"
+
+	"github.com/CS-SI/SafeScale/utils/template"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/AdditionalInfo"
@@ -84,12 +86,8 @@ var (
 	//installCommonRequirementsContent contains the script to install/configure common components
 	installCommonRequirementsContent *string
 
-	//funcMap defines the custome functions to be used in templates
-	funcMap = template.FuncMap{
-		// The name "inc" is what the function will be called in the template text.
-		"inc": func(i int) int {
-			return i + 1
-		},
+	// funcMap defines the custom functions to be used in templates
+	funcMap = txttmpl.FuncMap{
 		"errcode": func(msg string) int {
 			if code, ok := ErrorCode.ErrorCodes[msg]; ok {
 				return int(code)
@@ -228,7 +226,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	}
 	network, err := brokerclient.New().Network.Create(def, 5*time.Minute)
 	if err != nil {
-		err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
+		err = fmt.Errorf("failed to create Network '%s': %s", networkName, err.Error())
 		return nil, err
 	}
 	req.NetworkID = network.ID
@@ -237,7 +235,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	var (
 		instance                                       Cluster
 		manager                                        *managerData
-		masterCount, privateNodeCount, retcode         int
+		masterCount, privateNodeCount                  int
 		kp                                             *providerapi.KeyPair
 		kpName                                         string
 		gw                                             *providerapi.Host
@@ -401,13 +399,13 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		goto cleanNodes
 	}
 	// If DCOS is ready, install Kubernetes
-	retcode, err = instance.installKubernetes()
-	if err != nil {
-		goto cleanNodes
-	}
-	if retcode != 0 {
-		err = fmt.Errorf("failed to install Kubernetes: retcode=%d", retcode)
-	}
+	//retcode, err = instance.installKubernetes()
+	//if err != nil {
+	//	goto cleanNodes
+	//}
+	//if retcode != 0 {
+	//	err = fmt.Errorf("failed to install Kubernetes: retcode=%d", retcode)
+	//}
 	return &instance, nil
 
 cleanNodes:
@@ -647,17 +645,8 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 	c.metadata.Release()
 
 	// Installs DCOS requirements...
-	ssh, err := c.provider.GetSSHConfig(masterHost.ID)
-	if err != nil {
-		done <- err
-		return
-	}
-	err = ssh.WaitServerReady(longTimeoutSSH)
-	if err != nil {
-		done <- err
-		return
-	}
-	retcode, _, err := c.executeScript(ssh, "dcos_install_master.sh", map[string]interface{}{})
+
+	retcode, _, _, err := c.executeScript(masterHost.ID, "dcos_install_master.sh", map[string]interface{}{})
 	if err != nil {
 		log.Printf("[Masters: #%d (%s)] configuration failed: %s\n", index, masterHost.ID, err.Error())
 		done <- err
@@ -688,12 +677,8 @@ func (c *Cluster) asyncConfigureMaster(index int, masterID string, done chan err
 		done <- err
 		return
 	}
-	err = ssh.WaitServerReady(longTimeoutSSH)
-	if err != nil {
-		done <- err
-		return
-	}
-	retcode, _, err := c.executeScript(ssh, "dcos_configure_master.sh", map[string]interface{}{
+
+	retcode, _, _, err := c.executeScript(masterID, "dcos_configure_master.sh", map[string]interface{}{
 		"BootstrapIP":   c.manager.BootstrapIP,
 		"BootstrapPort": bootstrapHTTPPort,
 		"ClusterName":   c.Common.Name,
@@ -789,19 +774,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 	c.metadata.Release()
 
 	// Installs DCOS requirements
-	ssh, err := c.provider.GetSSHConfig(node.ID)
-	if err != nil {
-		result <- ""
-		done <- err
-		return
-	}
-	err = ssh.WaitServerReady(longTimeoutSSH)
-	if err != nil {
-		result <- ""
-		done <- err
-		return
-	}
-	retcode, _, err := c.executeScript(ssh, "dcos_install_node.sh", map[string]interface{}{
+	retcode, _, _, err := c.executeScript(node.ID, "dcos_install_node.sh", map[string]interface{}{
 		"BootstrapIP":   c.manager.BootstrapIP,
 		"BootstrapPort": bootstrapHTTPPort,
 	})
@@ -843,17 +816,7 @@ func (c *Cluster) asyncConfigureNode(index int, nodeID string, nodeType NodeType
 
 	log.Printf("[Nodes: %s #%d (%s)] starting configuration...\n", nodeTypeStr, index, nodeID)
 
-	ssh, err := c.provider.GetSSHConfig(nodeID)
-	if err != nil {
-		done <- err
-		return
-	}
-	err = ssh.WaitServerReady(shortTimeoutSSH)
-	if err != nil {
-		done <- err
-		return
-	}
-	retcode, _, err := c.executeScript(ssh, "dcos_configure_node.sh", map[string]interface{}{
+	retcode, _, _, err := c.executeScript(nodeID, "dcos_configure_node.sh", map[string]interface{}{
 		"PublicNode":    publicStr,
 		"BootstrapIP":   c.manager.BootstrapIP,
 		"BootstrapPort": bootstrapHTTPPort,
@@ -883,17 +846,7 @@ func (c *Cluster) asyncConfigureNode(index int, nodeID string, nodeType NodeType
 func (c *Cluster) asyncPrepareBootstrap(done chan error) {
 	log.Printf("[Bootstrap] starting preparation...")
 
-	ssh, err := c.provider.GetSSHConfig(c.manager.BootstrapID)
-	if err != nil {
-		done <- err
-		return
-	}
-	err = ssh.WaitServerReady(longTimeoutSSH)
-	if err != nil {
-		done <- err
-		return
-	}
-	retcode, _, err := c.executeScript(ssh, "dcos_prepare_bootstrap.sh", map[string]interface{}{
+	retcode, _, _, err := c.executeScript(c.manager.BootstrapID, "dcos_prepare_bootstrap.sh", map[string]interface{}{
 		"DCOSVersion": dcosVersion,
 	})
 	if err != nil {
@@ -942,7 +895,7 @@ func (c *Cluster) asyncConfigureBootstrap(done chan error) {
 	if err == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
-	retcode, _, err := c.executeScript(ssh, "dcos_configure_bootstrap.sh", map[string]interface{}{
+	retcode, _, _, err := c.executeScript(c.manager.BootstrapID, "dcos_configure_bootstrap.sh", map[string]interface{}{
 		"BootstrapIP":   c.manager.BootstrapIP,
 		"BootstrapPort": bootstrapHTTPPort,
 		"ClusterName":   c.Common.Name,
@@ -1068,7 +1021,7 @@ func (c *Cluster) getCommonTools() (*string, error) {
 		}
 
 		// parse then execute the template
-		tmplPrepared, err := template.New("common_tools").Funcs(funcMap).Parse(tmplString)
+		tmplPrepared, err := txttmpl.New("common_tools").Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
 		}
@@ -1100,7 +1053,7 @@ func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 		}
 
 		// parse then execute the template
-		tmplPrepared, err := template.New("install_requirements").Funcs(funcMap).Parse(tmplString)
+		tmplPrepared, err := txttmpl.New("install_requirements").Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
 		}
@@ -1285,18 +1238,18 @@ func (c *Cluster) installKubernetes() (int, error) {
 		options = "dcos_kubernetes_options_prod.conf"
 	}
 
-	ssh, err := c.findAvailableMaster()
+	hostID, err := c.findAvailableMaster()
 	if err != nil {
 		return 0, err
 	}
 
-	optionsPath, err := c.uploadTemplateToFile(ssh, options, options, map[string]interface{}{})
+	optionsPath, err := c.uploadTemplateToFile(hostID, options, options, map[string]interface{}{})
 	if err != nil {
 		return 0, err
 	}
 	cmd := fmt.Sprintf("sudo -u cladm -i dcos package install --yes kubernetes --options=%s ; rm -f %s", optionsPath, optionsPath)
 
-	retcode, stdout, stderr, err := brokerclient.New().Ssh.Run(ssh.Host, cmd, 0)
+	retcode, stdout, stderr, err := brokerclient.New().Ssh.Run(hostID, cmd, 5*time.Minute)
 	if err != nil {
 		return 0, fmt.Errorf("failed to execute command to install Kubernetes: %s", err.Error())
 	}
@@ -1305,25 +1258,17 @@ func (c *Cluster) installKubernetes() (int, error) {
 	}
 
 	// Wait for kubernetes readyness
-	cmd = "sudo -u cladm -i dcos kubernetes plan show deploy --json jq .status"
+	cmd = "sudo -u cladm -i dcos kubernetes plan show deploy --json jq .status | grep COMPLETE"
 	err = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, err := brokerclient.New().Ssh.Run(ssh.Host, cmd, 0)
+			retcode, _, _, err := brokerclient.New().Ssh.Run(hostID, cmd, brokerclient.DefaultTimeout)
 			if err != nil {
 				return err
 			}
 			if retcode > 0 {
-				return fmt.Errorf("command failed on master with return code %d: %s", retcode, stderr)
+				return fmt.Errorf("kubernetes not in state 'COMPLETE'")
 			}
-			var status string
-			err = json.Unmarshal([]byte(stdout), &status)
-			if err != nil {
-				return err
-			}
-			if status == "COMPLETE" {
-				return nil
-			}
-			return fmt.Errorf("status in %s", status)
+			return nil
 		},
 		1*time.Minute,
 		10*time.Minute)
@@ -1337,7 +1282,7 @@ func (c *Cluster) installKubernetes() (int, error) {
                          --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 \
 && sudo -u cladm -i kubectl config set-cluster kubernetes \
                          --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443`
-	retcode, _, stderr, err = brokerclient.New().Ssh.Run(ssh.Host, cmd, 0)
+	retcode, _, stderr, err = brokerclient.New().Ssh.Run(hostID, cmd, 0)
 	if err != nil {
 		return 0, err
 	}
@@ -1348,27 +1293,26 @@ func (c *Cluster) installKubernetes() (int, error) {
 	return 0, nil
 }
 
-func (c *Cluster) findAvailableMaster() (*system.SSHConfig, error) {
-	var ssh *system.SSHConfig
-	var err error
-	for _, masterID := range c.manager.MasterIDs {
-		ssh, err = c.provider.GetSSHConfig(masterID)
+func (c *Cluster) findAvailableMaster() (string, error) {
+	var masterID string
+	for _, masterID = range c.manager.MasterIDs {
+		ssh, err := c.provider.GetSSHConfig(masterID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read SSH config: %s", err.Error())
+			return "", fmt.Errorf("failed to read SSH config: %s", err.Error())
 		}
 		err = ssh.WaitServerReady(shortTimeoutSSH)
 		if err != nil {
 			if _, ok := err.(retry.TimeoutError); ok {
 				continue
 			}
-			return nil, err
+			return "", err
 		}
 		break
 	}
-	if ssh == nil {
-		return nil, fmt.Errorf("failed to find available master")
+	if masterID == "" {
+		return "", fmt.Errorf("failed to find available master")
 	}
-	return ssh, nil
+	return masterID, nil
 }
 
 func uploadTemplateAsFile(ssh *system.SSHConfig, name string, path string) error {
@@ -1389,56 +1333,35 @@ func uploadTemplateAsFile(ssh *system.SSHConfig, name string, path string) error
 
 // installSpark does the needed to have Spark installed in DCOS
 func (c *Cluster) installSpark() (int, error) {
-	ssh, err := c.findAvailableMaster()
+	hostID, err := c.findAvailableMaster()
 	if err != nil {
 		return 0, nil
 	}
 
-	cmdResult, err := ssh.Command("sudo -u cladm -i dcos package install spark")
+	cmd := "sudo -u cladm -i dcos package install spark"
+	retcode, _, stderr, err := brokerclient.New().Ssh.Run(hostID, cmd, brokerclient.DefaultTimeout)
 	if err != nil {
 		return 0, fmt.Errorf("failed to execute spark package installation: %s", err.Error())
 	}
-	retcode := 0
-	out, err := cmdResult.CombinedOutput()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-				retcode = status.ExitStatus()
-			}
-		} else {
-			return 0, fmt.Errorf("failed to fetch output of spark package installation: %s", err.Error())
-		}
-	}
 	if retcode != 0 {
-		return retcode, fmt.Errorf("execution of spark package installation failed: %s", string(out))
+		return retcode, fmt.Errorf("execution of spark package installation failed: %s", stderr)
 	}
 	return 0, nil
 }
 
 // installElastic does the needed to have Spark installed in DCOS
 func (c *Cluster) installElastic() (int, error) {
-	ssh, err := c.findAvailableMaster()
+	hostID, err := c.findAvailableMaster()
 	if err != nil {
 		return 0, nil
 	}
-
-	cmdResult, err := ssh.Command("sudo -u cladm -i dcos package install elastic")
+	cmd := "sudo -u cladm -i dcos package install elastic"
+	retcode, _, stderr, err := brokerclient.New().Ssh.Run(hostID, cmd, brokerclient.DefaultTimeout)
 	if err != nil {
 		return 0, fmt.Errorf("failed to execute elastic package installation: %s", err.Error())
 	}
-	retcode := 0
-	out, err := cmdResult.CombinedOutput()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-				retcode = status.ExitStatus()
-			}
-		} else {
-			return 0, fmt.Errorf("failed to fetch output of elastic package installation: %s", err.Error())
-		}
-	}
 	if retcode != 0 {
-		return retcode, fmt.Errorf("execution of elasticsearch pâckage installation failed: %s", string(out))
+		return retcode, fmt.Errorf("execution of elasticsearch pâckage installation failed: %s", stderr)
 	}
 	return 0, nil
 }
@@ -1461,7 +1384,12 @@ func (c *Cluster) uploadDockerImageBuildScripts(ssh *system.SSHConfig) error {
 	return nil
 }
 
-func (c *Cluster) uploadTemplateToFile(ssh *system.SSHConfig, tmplName string, fileName string, data map[string]interface{}) (string, error) {
+func (c *Cluster) uploadTemplateToFile(hostID string, tmplName string, fileName string, data map[string]interface{}) (string, error) {
+	ssh, err := c.provider.GetSSHConfig(hostID)
+	if err != nil {
+		return "", err
+	}
+
 	b, err := getDCOSTemplateBox()
 	if err != nil {
 		return "", err
@@ -1470,7 +1398,7 @@ func (c *Cluster) uploadTemplateToFile(ssh *system.SSHConfig, tmplName string, f
 	if err != nil {
 		return "", fmt.Errorf("failed to load template: %s", err.Error())
 	}
-	tmplCmd, err := template.New(fileName).Funcs(funcMap).Parse(tmplString)
+	tmplCmd, err := txttmpl.New(fileName).Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %s", err.Error())
 	}
@@ -1481,6 +1409,7 @@ func (c *Cluster) uploadTemplateToFile(ssh *system.SSHConfig, tmplName string, f
 	}
 	cmd := dataBuffer.String()
 	remotePath := tempFolder + fileName
+
 	err = ssh.UploadString(remotePath, cmd)
 	if err != nil {
 		return "", err
@@ -1489,45 +1418,26 @@ func (c *Cluster) uploadTemplateToFile(ssh *system.SSHConfig, tmplName string, f
 }
 
 // executeScript executes the script template with the parameters on tarGetHost
-func (c *Cluster) executeScript(ssh *system.SSHConfig, script string, data map[string]interface{}) (int, *string, error) {
+func (c *Cluster) executeScript(hostID string, script string, data map[string]interface{}) (int, string, string, error) {
 	// Configures CommonTools template var
 	commonTools, err := c.getCommonTools()
 	if err != nil {
-		return 0, nil, err
+		return 0, "", "", err
 	}
 	data["CommonTools"] = *commonTools
 
 	// Configures InstallCommonRequirements template var
 	installCommonRequirements, err := c.getInstallCommonRequirements()
 	if err != nil {
-		return 0, nil, err
+		return 0, "", "", err
 	}
 	data["InstallCommonRequirements"] = *installCommonRequirements
 
-	path, err := c.uploadTemplateToFile(ssh, script, script, data)
+	path, err := c.uploadTemplateToFile(hostID, script, script, data)
 	if err != nil {
-		return 0, nil, err
+		return 0, "", "", err
 	}
-	cmdResult, err := ssh.SudoCommand(fmt.Sprintf("chmod a+rx %s; %s", path, path))
-	//	cmdResult, err := ssh.SudoCommand(fmt.Sprintf("chmod a+rx %s; %s; #rm -f %s", path, path, path))
-
-	if err != nil {
-		return 0, nil, fmt.Errorf("failed to execute script '%s': %s", script, err.Error())
-	}
-	retcode := 0
-	out, err := cmdResult.CombinedOutput()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-				retcode = status.ExitStatus()
-			}
-		} else {
-			return 0, nil, fmt.Errorf("failed to fetch output of script '%s': %s", script, err.Error())
-		}
-	}
-
-	strOut := string(out)
-	return retcode, &strOut, nil
+	return brokerclient.New().Ssh.Run(hostID, fmt.Sprintf("chmod a+rx %s; %s", path, path), brokerclient.DefaultTimeout)
 }
 
 // DeleteLastNode deletes the last Agent node added
