@@ -24,13 +24,16 @@ import (
 )
 
 // host is the broker client part handling hosts
-type host struct{}
+type host struct {
+	// session is not used currently
+	session *Session
+}
 
 // List ...
 func (h *host) List(all bool, timeout time.Duration) (*pb.HostList, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -43,7 +46,7 @@ func (h *host) List(all bool, timeout time.Duration) (*pb.HostList, error) {
 func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -56,7 +59,7 @@ func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
 func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -69,7 +72,7 @@ func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, e
 func (h *host) Delete(name string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
 	ctx, cancel := utils.GetContext(timeout)

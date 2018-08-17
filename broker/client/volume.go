@@ -24,13 +24,16 @@ import (
 )
 
 // volume is the part of broker client handing volumes
-type volume struct{}
+type volume struct {
+	// session is not used currently
+	session *Session
+}
 
 // List ...
 func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -45,7 +48,7 @@ func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
 func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -58,7 +61,7 @@ func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, er
 func (v *volume) Delete(name string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -72,7 +75,7 @@ func (v *volume) Delete(name string, timeout time.Duration) error {
 func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Volume, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -85,7 +88,7 @@ func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Vol
 func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -99,7 +102,7 @@ func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
 func (v *volume) Detach(volumeName string, hostName string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)

@@ -16,22 +16,36 @@
 
 package client
 
-// Client units the different resources proposed by brokerd as broker client
-type Client struct {
-	Container container
-	Host      host
-	Nas       nas
-	Network   network
-	Ssh       ssh
-	Tenant    tenant
-	Volume    volume
+// Session units the different resources proposed by brokerd as broker client
+type Session struct {
+	Container *container
+	Host      *host
+	Nas       *nas
+	Network   *network
+	Ssh       *ssh
+	Tenant    *tenant
+	Volume    *volume
+
+	// For future use...
+	brokerdAddress string
+	brokerdPort    uint16
+	tenantName     string
 }
 
-var client = Client{}
+// Client is a instance of Session used temporarily until the session logic in brokerd is implemented
+type Client *Session
 
 const DefaultTimeout = 0
 
 // New returns an instance of broker Client
-func New() *Client {
-	return &client
+func New() Client {
+	s := &Session{}
+	s.Container = &container{session: s}
+	s.Host = &host{session: s}
+	s.Nas = &nas{session: s}
+	s.Network = &network{session: s}
+	s.Ssh = &ssh{session: s}
+	s.Tenant = &tenant{session: s}
+	s.Volume = &volume{session: s}
+	return s
 }

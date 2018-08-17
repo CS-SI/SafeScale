@@ -24,13 +24,16 @@ import (
 )
 
 // network is the part of broker client handling Network
-type network struct{}
+type network struct {
+	// session is not used currently
+	session *Session
+}
 
 // List ...
 func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -45,7 +48,7 @@ func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error)
 func (n *network) Delete(name string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -59,7 +62,7 @@ func (n *network) Delete(name string, timeout time.Duration) error {
 func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -72,7 +75,7 @@ func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, erro
 func (n *network) Create(def pb.NetworkDefinition, timeout time.Duration) (*pb.Network, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
 	ctx, cancel := utils.GetContext(timeout)

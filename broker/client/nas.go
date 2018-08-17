@@ -27,13 +27,16 @@ import (
 
 // nas is the part of the broker client handing Nas
 // VPL: shouldn't it be called 'share' ?
-type nas struct{}
+type nas struct {
+	// Session is not used currently
+	session *Session
+}
 
 // Create ...
 func (n *nas) Create(def pb.NasDefinition, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -48,7 +51,10 @@ func (n *nas) Create(def pb.NasDefinition, timeout time.Duration) error {
 func (n *nas) Delete(name string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	ctx, cancel := utils.GetContext(utils.TimeoutCtxHost)
+	if timeout < utils.TimeoutCtxHost {
+		timeout = utils.TimeoutCtxHost
+	}
+	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
 	service := pb.NewNasServiceClient(conn)
 
@@ -60,7 +66,7 @@ func (n *nas) Delete(name string, timeout time.Duration) error {
 func (n *nas) List(timeout time.Duration) (*pb.NasList, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -73,7 +79,7 @@ func (n *nas) List(timeout time.Duration) (*pb.NasList, error) {
 func (n *nas) Mount(nasName, hostName, mountPoint string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -93,7 +99,10 @@ func (n *nas) Mount(nasName, hostName, mountPoint string, timeout time.Duration)
 func (n *nas) Unmount(nasName, hostName string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	ctx, cancel := utils.GetContext(utils.TimeoutCtxHost)
+	if timeout < utils.TimeoutCtxDefault {
+		timeout = utils.TimeoutCtxDefault
+	}
+	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
 	service := pb.NewNasServiceClient(conn)
 	_, err := service.UMount(ctx, &pb.NasDefinition{
@@ -107,7 +116,7 @@ func (n *nas) Unmount(nasName, hostName string, timeout time.Duration) error {
 func (n *nas) Inspect(name string, timeout time.Duration) (*pb.NasList, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)

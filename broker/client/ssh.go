@@ -26,13 +26,16 @@ import (
 )
 
 // ssh is the part of the broker client that handles SSH stuff
-type ssh struct{}
+type ssh struct {
+	// session is not used currently
+	session *Session
+}
 
 // Run ...
 func (s *ssh) Run(hostName, command string, timeout time.Duration) (int, string, string, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -52,7 +55,7 @@ func (s *ssh) Run(hostName, command string, timeout time.Duration) (int, string,
 func (s *ssh) Copy(from, to string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -70,7 +73,7 @@ func (s *ssh) Copy(from, to string, timeout time.Duration) error {
 func (s *ssh) Connect(name string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
 	ctx, cancel := utils.GetContext(timeout)

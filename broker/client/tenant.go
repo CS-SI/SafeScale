@@ -26,13 +26,16 @@ import (
 )
 
 // tenant is the part of broker client handling tenants
-type tenant struct{}
+type tenant struct {
+	// session is not used currently
+	session *Session
+}
 
 // List ...
 func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -45,7 +48,7 @@ func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
 func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)
@@ -58,7 +61,7 @@ func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
 func (t *tenant) Set(name string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
-	if timeout <= 0 {
+	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
 	ctx, cancel := utils.GetContext(timeout)

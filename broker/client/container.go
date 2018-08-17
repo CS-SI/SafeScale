@@ -26,7 +26,10 @@ import (
 
 // container is the part of the broker client handling containers
 // VPL: shouldn't it be called Bucket ? Container will conflict with Docker synonym...
-type container struct{}
+type container struct {
+	// session is not used currently.
+	session *Session
+}
 
 // List ...
 func (c *container) List(timeout time.Duration) (*pb.ContainerList, error) {
