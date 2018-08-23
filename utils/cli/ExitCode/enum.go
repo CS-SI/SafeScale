@@ -35,6 +35,8 @@ const (
 	InvalidOption
 	// NotFound is returned when resource is not found
 	NotFound
+	// Timeout is returned when something timed out
+	Timeout
 	// RPC is returned when an RPC call fails
 	RPC
 	// NotApplicable is returned when the command can't be honored in the context
