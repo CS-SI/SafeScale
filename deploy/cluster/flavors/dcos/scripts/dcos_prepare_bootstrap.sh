@@ -79,13 +79,13 @@ download_kubectl_bin() {
 }
 export -f download_kubectl_bin
 
-# Lauch downloads in parallel
 mkdir -p /usr/local/dcos/genconf/serve/docker && \
 cd /usr/local/dcos && \
 yum makecache fast && \
-yum install -y wget time
+yum install -y time
 [ $? -ne 0 ] && exit {{ errcode "ToolsInstall" }}
 
+# Lauch downloads in parallel
 bg_start DDCG 15m bash -c download_dcos_config_generator
 bg_start DDB 10m bash -c download_dcos_bin
 bg_start DKB 10m bash -c download_kubectl_bin

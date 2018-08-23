@@ -40,7 +40,7 @@ install_common_requirements() {
 
     # Disables installation of docker-python from yum and adds some requirements
     yum remove -y python-docker-py &>/dev/null
-    yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils && \
+    yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils jq && \
     yum versionlock exclude python-docker-py
     [ $? -ne 0 ] && exit {{ errcode "ToolsInstall" }}
 
