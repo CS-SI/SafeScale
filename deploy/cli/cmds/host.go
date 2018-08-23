@@ -31,7 +31,7 @@ import (
 
 var (
 	hostName      string
-	host          *pb.Host
+	hostInstance  *pb.Host
 	componentName string
 )
 
@@ -52,7 +52,7 @@ var HostCommand = &cli.Command{
 				os.Exit(int(ExitCode.InvalidArgument))
 			}
 			var err error
-			host, err = brokerclient.New().Host.Inspect(hostName, 0)
+			hostInstance, err = brokerclient.New().Host.Inspect(hostName, 0)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Failed to get definition of host '%s': %s\n", hostName, err.Error())
 				os.Exit(int(ExitCode.RPC))
@@ -122,14 +122,20 @@ var hostComponentAddCommand = &cli.Command{
 			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
 			os.Exit(int(ExitCode.NotFound))
 		}
-		target := install.NewHostTarget(hostName)
-		err = component.Add(target)
+		target := install.NewHostTarget(hostInstance)
+		ok, results, err := component.Add(target, install.EmptyValues)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error installing component '%s' on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
-		fmt.Printf("Component '%s' installed successfully on '%s'\n", componentName, hostName)
-		os.Exit(int(ExitCode.OK))
+		if ok {
+			fmt.Printf("Component '%s' installed successfully on '%s'\n", componentName, hostName)
+			os.Exit(int(ExitCode.OK))
+		}
+
+		fmt.Printf("Failed to install component '%s' on host '%s'\n", componentName, hostName)
+		fmt.Println(results.Errors())
+		os.Exit(int(ExitCode.Run))
 	},
 
 	Help: &cli.HelpContent{},
@@ -150,8 +156,8 @@ var hostComponentCheckCommand = &cli.Command{
 			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
 			os.Exit(int(ExitCode.NotFound))
 		}
-		target := install.NewHostTarget(hostName)
-		found, err := component.Check(target)
+		target := install.NewHostTarget(hostInstance)
+		found, results, err := component.Check(target)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
@@ -160,8 +166,11 @@ var hostComponentCheckCommand = &cli.Command{
 			fmt.Printf("Component '%s' is installed on '%s'\n", componentName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
-
 		fmt.Printf("Component '%s' is not installed on '%s'\n", componentName, hostName)
+		msg := results.Errors()
+		if msg != "" {
+			fmt.Println(msg)
+		}
 		os.Exit(int(ExitCode.NotFound))
 	},
 
@@ -183,14 +192,22 @@ var hostComponentDeleteCommand = &cli.Command{
 			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
 			os.Exit(int(ExitCode.NotFound))
 		}
-		target := install.NewHostTarget(hostName)
-		err = component.Remove(target)
+		target := install.NewHostTarget(hostInstance)
+		ok, results, err := component.Remove(target)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
-		fmt.Printf("Component '%s' uninstalled successfully on '%s'\n", componentName, hostName)
-		os.Exit(int(ExitCode.OK))
+		if ok {
+			fmt.Printf("Component '%s' uninstalled successfully on '%s'\n", componentName, hostName)
+			os.Exit(int(ExitCode.OK))
+		}
+		fmt.Printf("Failed to uninstall component '%s' from host '%s':\n", componentName, hostName)
+		msg := results.Errors()
+		if msg != "" {
+			fmt.Println(msg)
+		}
+		os.Exit(int(ExitCode.Run))
 	},
 
 	Help: &cli.HelpContent{},
