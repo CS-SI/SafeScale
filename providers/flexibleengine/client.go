@@ -97,16 +97,6 @@ type CfgOptions struct {
 	VolumeSpeeds map[string]VolumeSpeed.Enum
 }
 
-// errorString creates an error string from flexibleengine api error
-func providerError(err error) string {
-	switch e := err.(type) {
-	default:
-		return e.Error()
-	case *gc.ErrUnexpectedResponseCode:
-		return fmt.Sprintf("code: %d reason: %s", e.Actual, string(e.Body[:]))
-	}
-}
-
 const (
 	defaultUser string = "cloud"
 
@@ -176,13 +166,13 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	}
 	err = gcos.AuthenticateV3(provider, &authOptions, gc.EndpointOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("%s", providerError(err))
+		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
 
 	//Identity API
 	identity, err := gcos.NewIdentityV3(provider, gc.EndpointOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("%s", providerError(err))
+		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
 
 	// Recover Project ID of region
@@ -192,22 +182,22 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	}
 	allPages, err := projects.List(identity, listOpts).AllPages()
 	if err != nil {
-		return nil, fmt.Errorf("failed to query project ID corresponding to region '%s': %s", opts.Region, providerError(err))
+		return nil, fmt.Errorf("failed to query project ID corresponding to region '%s': %s", opts.Region, openstack.ProviderErrorToString(err))
 	}
 	allProjects, err := projects.ExtractProjects(allPages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load project ID corresponding to region '%s': %s", opts.Region, providerError(err))
+		return nil, fmt.Errorf("failed to load project ID corresponding to region '%s': %s", opts.Region, openstack.ProviderErrorToString(err))
 	}
 	if len(allProjects) > 0 {
 		opts.ProjectID = allProjects[0].ID
 	} else {
-		return nil, fmt.Errorf("failed to found project ID corresponding to region '%s': %s", opts.Region, providerError(err))
+		return nil, fmt.Errorf("failed to found project ID corresponding to region '%s': %s", opts.Region, openstack.ProviderErrorToString(err))
 	}
 
 	//Compute API
 	compute, err := gcos.NewComputeV2(provider, gc.EndpointOpts{})
 	if err != nil {
-		return nil, fmt.Errorf("%s", providerError(err))
+		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
 
 	//Network API
@@ -216,7 +206,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Region: opts.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%s", providerError(err))
+		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
 
 	// Storage API
@@ -225,7 +215,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Region: opts.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%s", providerError(err))
+		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
 
 	// Need to get Endpoint URL for ObjectStorage, that will be used with AWS S3 protocol
@@ -234,7 +224,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Region: opts.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%s", providerError(err))
+		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
 	// Fix URL of ObjectStorage for FlexibleEngine...
 	u, _ := url.Parse(objectStorage.Endpoint)
@@ -384,7 +374,7 @@ func (client *Client) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error listing routers: %s", providerError(err))
+		return nil, fmt.Errorf("Error listing routers: %s", openstack.ProviderErrorToString(err))
 	}
 	if len(sgList) == 0 {
 		return nil, nil
@@ -585,7 +575,7 @@ func (client *Client) initDefaultSecurityGroup() error {
 	}
 	group, err := secgroups.Create(client.osclt.Network, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Failed to create Security Group '%s': %s", client.defaultSecurityGroup, providerError(err))
+		return fmt.Errorf("Failed to create Security Group '%s': %s", client.defaultSecurityGroup, openstack.ProviderErrorToString(err))
 	}
 	err = client.createTCPRules(group.ID)
 	if err == nil {
@@ -620,7 +610,7 @@ func (client *Client) initVPC() error {
 		CIDR: client.Opts.VPCCIDR,
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to initialize VPC '%s': %s", client.Opts.VPCName, providerError(err))
+		return fmt.Errorf("Failed to initialize VPC '%s': %s", client.Opts.VPCName, openstack.ProviderErrorToString(err))
 	}
 	client.vpc = vpc
 	return nil
@@ -632,7 +622,7 @@ func (client *Client) findVPCID() (*string, error) {
 	found := false
 	routers, err := client.osclt.ListRouter()
 	if err != nil {
-		return nil, fmt.Errorf("Error listing routers: %s", providerError(err))
+		return nil, fmt.Errorf("Error listing routers: %s", openstack.ProviderErrorToString(err))
 	}
 	for _, r := range routers {
 		if r.Name == client.Opts.VPCName {

@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -275,7 +276,7 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 	err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
 	if err != nil {
 		client.DeleteHost(host.ID)
-		return nil, fmt.Errorf("failed to create Host: %s", providerError(err))
+		return nil, fmt.Errorf("failed to create Host: %s", openstack.ProviderErrorToString(err))
 	}
 	return host, nil
 }
@@ -288,7 +289,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 
 	// Validating name of the host
 	if ok, err := validatehostName(request); !ok {
-		return nil, fmt.Errorf("name '%s' is invalid for a FlexibleEngine Host: %s", request.Name, providerError(err))
+		return nil, fmt.Errorf("name '%s' is invalid for a FlexibleEngine Host: %s", request.Name, openstack.ProviderErrorToString(err))
 	}
 
 	//Eventual network gateway
@@ -321,7 +322,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		name := fmt.Sprintf("%s_%s", request.Name, id)
 		kp, err = client.CreateKeyPair(name)
 		if err != nil {
-			return nil, fmt.Errorf("error creating key pair for host '%s': %s", request.Name, providerError(err))
+			return nil, fmt.Errorf("error creating key pair for host '%s': %s", request.Name, openstack.ProviderErrorToString(err))
 		}
 	}
 
@@ -333,7 +334,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	// Determine system disk size based on vcpus count
 	template, err := client.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get image: %s", providerError(err))
+		return nil, fmt.Errorf("Failed to get image: %s", openstack.ProviderErrorToString(err))
 	}
 
 	var diskSize int
@@ -372,7 +373,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	}
 	b, err := bdOpts.ToServerCreateMap()
 	if err != nil {
-		return nil, fmt.Errorf("failed to build query to create host '%s': %s", request.Name, providerError(err))
+		return nil, fmt.Errorf("failed to build query to create host '%s': %s", request.Name, openstack.ProviderErrorToString(err))
 	}
 	r := servers.CreateResult{}
 	var httpResp *http.Response
@@ -384,14 +385,14 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		if server != nil {
 			servers.Delete(client.osclt.Compute, server.ID)
 		}
-		return nil, fmt.Errorf("query to create host '%s' failed: %s (HTTP return code: %d)", request.Name, providerError(err), httpResp.StatusCode)
+		return nil, fmt.Errorf("query to create host '%s' failed: %s (HTTP return code: %d)", request.Name, openstack.ProviderErrorToString(err), httpResp.StatusCode)
 	}
 
 	// Wait that host is started
 	host, err := client.WaitHostReady(server.ID, time.Minute*5)
 	if err != nil {
 		client.DeleteHost(server.ID)
-		return nil, fmt.Errorf("timeout waiting host '%s' ready: %s", request.Name, providerError(err))
+		return nil, fmt.Errorf("timeout waiting host '%s' ready: %s", request.Name, openstack.ProviderErrorToString(err))
 	}
 
 	// Fixes the size of bootdisk, FlexibleEngine is used to not give one...
@@ -408,14 +409,14 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		fip, err := client.attachFloatingIP(host)
 		if err != nil {
 			client.DeleteHost(host.ID)
-			return nil, fmt.Errorf("error attaching public IP for host '%s': %s", request.Name, providerError(err))
+			return nil, fmt.Errorf("error attaching public IP for host '%s': %s", request.Name, openstack.ProviderErrorToString(err))
 		}
 		if isGateway {
 			err = client.enableHostRouterMode(host)
 			if err != nil {
 				client.DeleteHost(host.ID)
 				client.DeleteFloatingIP(fip.ID)
-				return nil, fmt.Errorf("error enabling gateway mode of host '%s': %s", request.Name, providerError(err))
+				return nil, fmt.Errorf("error enabling gateway mode of host '%s': %s", request.Name, openstack.ProviderErrorToString(err))
 			}
 		}
 	}
@@ -473,7 +474,7 @@ func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.
 func (client *Client) GetHost(id string) (*api.Host, error) {
 	server, err := servers.Get(client.osclt.Compute, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting Host: %s", providerError(err))
+		return nil, fmt.Errorf("Error getting Host '%s': %s", id, openstack.ProviderErrorToString(err))
 	}
 	host := client.toHost(server)
 	return host, nil
@@ -502,7 +503,7 @@ func (client *Client) listallhosts() ([]api.Host, error) {
 		return true, nil
 	})
 	if len(hosts) == 0 && err != nil {
-		return nil, fmt.Errorf("error listing hosts : %s", providerError(err))
+		return nil, fmt.Errorf("error listing hosts : %s", openstack.ProviderErrorToString(err))
 	}
 	return hosts, nil
 }
@@ -518,7 +519,7 @@ func (client *Client) listMonitoredHosts() ([]api.Host, error) {
 		return nil
 	})
 	if len(hosts) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing hosts : %s", providerError(err))
+		return nil, fmt.Errorf("Error listing hosts : %s", openstack.ProviderErrorToString(err))
 	}
 	return hosts, nil
 }
@@ -542,18 +543,18 @@ func (client *Client) DeleteHost(id string) error {
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("error deleting host %s : %s", id, providerError(err))
+					return fmt.Errorf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
 				}
 				err = floatingips.Delete(client.osclt.Compute, fip.ID).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("error deleting host %s : %s", id, providerError(err))
+					return fmt.Errorf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
 				}
 			}
 		}
 	}
 	err = servers.Delete(client.osclt.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("error deleting host %s : %s", host.Name, providerError(err))
+		return fmt.Errorf("error deleting host %s : %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 
 	// In FlexibleEngine, volumes may not be always automatically removed, so take care of them
@@ -641,7 +642,7 @@ func (client *Client) getFloatingIPOfHost(hostID string) (*floatingips.FloatingI
 	})
 	if len(fips) == 0 {
 		if err != nil {
-			return nil, fmt.Errorf("no floating IP found for host '%s': %s", hostID, providerError(err))
+			return nil, fmt.Errorf("no floating IP found for host '%s': %s", hostID, openstack.ProviderErrorToString(err))
 		}
 		return nil, fmt.Errorf("no floating IP found for host '%s'", hostID)
 
@@ -656,13 +657,13 @@ func (client *Client) getFloatingIPOfHost(hostID string) (*floatingips.FloatingI
 func (client *Client) attachFloatingIP(host *api.Host) (*FloatingIP, error) {
 	fip, err := client.CreateFloatingIP()
 	if err != nil {
-		return nil, fmt.Errorf("failed to attach Floating IP on host '%s': %s", host.Name, providerError(err))
+		return nil, fmt.Errorf("failed to attach Floating IP on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 
 	err = client.AssociateFloatingIP(host, fip.ID)
 	if err != nil {
 		client.DeleteFloatingIP(fip.ID)
-		return nil, fmt.Errorf("failed to attach Floating IP to host '%s': %s", host.Name, providerError(err))
+		return nil, fmt.Errorf("failed to attach Floating IP to host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 
 	updateAccessIPsOfHost(host, fip.PublicIPAddress)
@@ -683,7 +684,7 @@ func updateAccessIPsOfHost(host *api.Host, ip string) {
 func (client *Client) enableHostRouterMode(host *api.Host) error {
 	portID, err := client.getOpenstackPortID(host)
 	if err != nil {
-		return fmt.Errorf("failed to enable Router Mode on host '%s': %s", host.Name, providerError(err))
+		return fmt.Errorf("failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 
 	pairs := []ports.AddressPair{
@@ -694,7 +695,7 @@ func (client *Client) enableHostRouterMode(host *api.Host) error {
 	opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
 	_, err = ports.Update(client.osclt.Network, *portID, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Failed to enable Router Mode on host '%s': %s", host.Name, providerError(err))
+		return fmt.Errorf("Failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -703,13 +704,13 @@ func (client *Client) enableHostRouterMode(host *api.Host) error {
 func (client *Client) disableHostRouterMode(host *api.Host) error {
 	portID, err := client.getOpenstackPortID(host)
 	if err != nil {
-		return fmt.Errorf("Failed to disable Router Mode on host '%s': %s", host.Name, providerError(err))
+		return fmt.Errorf("Failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 
 	opts := ports.UpdateOpts{AllowedAddressPairs: nil}
 	_, err = ports.Update(client.osclt.Network, *portID, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Failed to disable Router Mode on host '%s': %s", host.Name, providerError(err))
+		return fmt.Errorf("Failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -746,7 +747,7 @@ func (client *Client) getOpenstackPortID(host *api.Host) (*string, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error browsing Openstack Interfaces of host '%s': %s", host.Name, providerError(err))
+		return nil, fmt.Errorf("error browsing Openstack Interfaces of host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 	if found {
 		return &nic.PortID, nil

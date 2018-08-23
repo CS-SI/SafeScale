@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
 	"github.com/CS-SI/SafeScale/providers/aws/s3"
+	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	v2_vol "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 
@@ -126,7 +127,7 @@ func (client *Client) ExCreateVolume(request api.VolumeRequest, imageID string) 
 	}
 	vol, err := v2_vol.Create(client.osclt.Volume, opts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume : %s", providerError(err))
+		return nil, fmt.Errorf("Error creating volume : %s", openstack.ProviderErrorToString(err))
 	}
 	v := api.Volume{
 		ID:    vol.ID,
