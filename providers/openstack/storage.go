@@ -93,7 +93,7 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 		VolumeType: client.getVolumeType(request.Speed),
 	}).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume : %s", errorString(err))
+		return nil, fmt.Errorf("Error creating volume : %s", ProviderErrorToString(err))
 	}
 	v := api.Volume{
 		ID:    vol.ID,
@@ -105,7 +105,7 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 	err = metadata.SaveVolume(providers.FromClient(client), &v)
 	if err != nil {
 		client.DeleteVolume(v.ID)
-		return nil, fmt.Errorf("Error creating volume : %s", errorString(err))
+		return nil, fmt.Errorf("Error creating volume : %s", ProviderErrorToString(err))
 	}
 
 	return &v, nil
@@ -115,7 +115,7 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 func (client *Client) GetVolume(id string) (*api.Volume, error) {
 	vol, err := volumes.Get(client.Volume, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting volume: %s", errorString(err))
+		return nil, fmt.Errorf("Error getting volume: %s", ProviderErrorToString(err))
 	}
 	av := api.Volume{
 		ID:    vol.ID,
@@ -156,7 +156,7 @@ func (client *Client) listAllVolumes() ([]api.Volume, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error listing volume types: %s", errorString(err))
+		return nil, fmt.Errorf("Error listing volume types: %s", ProviderErrorToString(err))
 	}
 	return vs, nil
 }
@@ -178,11 +178,11 @@ func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
 func (client *Client) DeleteVolume(id string) error {
 	err := volumes.Delete(client.Volume, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting volume: %s", errorString(err))
+		return fmt.Errorf("Error deleting volume: %s", ProviderErrorToString(err))
 	}
 	err = metadata.RemoveVolume(providers.FromClient(client), id)
 	if err != nil {
-		return fmt.Errorf("Error deleting volume: %s", errorString(err))
+		return fmt.Errorf("Error deleting volume: %s", ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -196,7 +196,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		VolumeID: request.VolumeID,
 	}).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, errorString(err))
+		return nil, fmt.Errorf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, ProviderErrorToString(err))
 	}
 
 	vaapi := &api.VolumeAttachment{
@@ -224,7 +224,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 func (client *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment, error) {
 	va, err := volumeattach.Get(client.Compute, serverID, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting volume attachment %s: %s", id, errorString(err))
+		return nil, fmt.Errorf("Error getting volume attachment %s: %s", id, ProviderErrorToString(err))
 	}
 	return &api.VolumeAttachment{
 		ID:       va.ID,
@@ -254,7 +254,7 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttach
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error listing volume types: %s", errorString(err))
+		return nil, fmt.Errorf("Error listing volume types: %s", ProviderErrorToString(err))
 	}
 	return vs, nil
 }
@@ -263,22 +263,22 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttach
 func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 	va, err := client.GetVolumeAttachment(serverID, id)
 	if err != nil {
-		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, ProviderErrorToString(err))
 	}
 
 	err = volumeattach.Delete(client.Compute, serverID, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, ProviderErrorToString(err))
 	}
 
 	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), id)
 	if err != nil {
-		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, ProviderErrorToString(err))
 	}
 
 	err = mtdVol.Detach(va)
 	if err != nil {
-		return fmt.Errorf("Error deleting volume attachment %s: %s", id, errorString(err))
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, ProviderErrorToString(err))
 	}
 
 	return nil
@@ -291,7 +291,7 @@ func (client *Client) CreateContainer(name string) error {
 	}
 	_, err := containers.Create(client.Container, name, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Error creating container %s: %s", name, errorString(err))
+		return fmt.Errorf("Error creating container %s: %s", name, ProviderErrorToString(err))
 	}
 
 	return nil
@@ -301,7 +301,7 @@ func (client *Client) CreateContainer(name string) error {
 func (client *Client) DeleteContainer(name string) error {
 	_, err := containers.Delete(client.Container, name).Extract()
 	if err != nil {
-		return fmt.Errorf("Error deleting container %s: %s", name, errorString(err))
+		return fmt.Errorf("Error deleting container %s: %s", name, ProviderErrorToString(err))
 	}
 	return err
 }
@@ -312,7 +312,7 @@ func (client *Client) UpdateContainer(name string, meta map[string]string) error
 		Metadata: meta,
 	}).Extract()
 	if err != nil {
-		return fmt.Errorf("Error updating container %s: %s", name, errorString(err))
+		return fmt.Errorf("Error updating container %s: %s", name, ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -321,7 +321,7 @@ func (client *Client) UpdateContainer(name string, meta map[string]string) error
 func (client *Client) GetContainerMetadata(name string) (map[string]string, error) {
 	meta, err := containers.Get(client.Container, name, containers.GetOpts{}).ExtractMetadata()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting container %s: %s", name, errorString(err))
+		return nil, fmt.Errorf("Error getting container %s: %s", name, ProviderErrorToString(err))
 	}
 	return meta, nil
 
@@ -333,7 +333,7 @@ func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
 	_ = meta
 
 	if err != nil {
-		return nil, fmt.Errorf("Error getting container %s: %s", name, errorString(err))
+		return nil, fmt.Errorf("Error getting container %s: %s", name, ProviderErrorToString(err))
 	}
 	return &api.ContainerInfo{
 		Name:       name,
@@ -365,7 +365,7 @@ func (client *Client) ListContainers() ([]string, error) {
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error listing containers: %s", errorString(err))
+		return nil, fmt.Errorf("Error listing containers: %s", ProviderErrorToString(err))
 	}
 	return containerList, nil
 }
@@ -383,7 +383,7 @@ func (client *Client) PutObject(container string, obj api.Object) error {
 	}
 	_, err := objects.Create(client.Container, container, obj.Name, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Error creating object %s in container %s : %s", obj.Name, container, errorString(err))
+		return fmt.Errorf("Error creating object %s in container %s : %s", obj.Name, container, ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -413,7 +413,7 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 	})
 	content, err := res.ExtractContent()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting object %s from %s : %s", name, container, errorString(err))
+		return nil, fmt.Errorf("Error getting object %s from %s : %s", name, container, ProviderErrorToString(err))
 	}
 	metadata := make(map[string]string)
 	for k, v := range res.Header {
@@ -424,7 +424,7 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 	}
 	header, err := res.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting object %s from %s : %s", name, container, errorString(err))
+		return nil, fmt.Errorf("Error getting object %s from %s : %s", name, container, ProviderErrorToString(err))
 	}
 
 	if len(ranges) > 1 {
@@ -464,11 +464,11 @@ func (client *Client) GetObjectMetadata(container string, name string) (*api.Obj
 	meta, err := res.ExtractMetadata()
 
 	if err != nil {
-		return nil, fmt.Errorf("Error getting object content: %s", errorString(err))
+		return nil, fmt.Errorf("Error getting object content: %s", ProviderErrorToString(err))
 	}
 	header, err := res.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting object content: %s", errorString(err))
+		return nil, fmt.Errorf("Error getting object content: %s", ProviderErrorToString(err))
 	}
 
 	return &api.Object{
@@ -501,7 +501,7 @@ func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error listing objects of container '%s': %s", container, errorString(err))
+		return nil, fmt.Errorf("Error listing objects of container '%s': %s", container, ProviderErrorToString(err))
 	}
 	return objectList, nil
 }
@@ -517,7 +517,7 @@ func (client *Client) CopyObject(containerSrc, objectSrc, objectDst string) erro
 
 	_, err := result.Extract()
 	if err != nil {
-		return fmt.Errorf("Error copying object %s into %s from container %s : %s", objectSrc, objectDst, containerSrc, errorString(err))
+		return fmt.Errorf("Error copying object %s into %s from container %s : %s", objectSrc, objectDst, containerSrc, ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -526,7 +526,7 @@ func (client *Client) CopyObject(containerSrc, objectSrc, objectDst string) erro
 func (client *Client) DeleteObject(container, object string) error {
 	_, err := objects.Delete(client.Container, container, object, objects.DeleteOpts{}).Extract()
 	if err != nil {
-		return fmt.Errorf("Error deleting objects %s of container %s: %s", object, container, errorString(err))
+		return fmt.Errorf("Error deleting objects %s of container %s: %s", object, container, ProviderErrorToString(err))
 	}
 	return nil
 

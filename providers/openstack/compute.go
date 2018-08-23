@@ -71,7 +71,7 @@ func (client *Client) ListImages() ([]api.Image, error) {
 	})
 	if len(imgList) == 0 {
 		if err != nil {
-			return nil, fmt.Errorf("Error listing images: %s", errorString(err))
+			return nil, fmt.Errorf("Error listing images: %s", ProviderErrorToString(err))
 		}
 	}
 	return imgList, nil
@@ -81,7 +81,7 @@ func (client *Client) ListImages() ([]api.Image, error) {
 func (client *Client) GetImage(id string) (*api.Image, error) {
 	img, err := images.Get(client.Compute, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting image: %s", errorString(err))
+		return nil, fmt.Errorf("Error getting image: %s", ProviderErrorToString(err))
 	}
 	return &api.Image{ID: img.ID, Name: img.Name}, nil
 }
@@ -99,7 +99,7 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 		10*time.Second,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error getting template: %s", errorString(err))
+		return nil, fmt.Errorf("error getting template: %s", ProviderErrorToString(err))
 	}
 	return &api.HostTemplate{
 		HostSize: api.HostSize{
@@ -228,7 +228,7 @@ func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
 func (client *Client) DeleteKeyPair(id string) error {
 	err := keypairs.Delete(client.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting key pair: %s", errorString(err))
+		return fmt.Errorf("Error deleting key pair: %s", ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -369,7 +369,7 @@ func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 
 	gw, err := servers.Get(client.Compute, m.Get().ID).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating Host: Unable to get gateway: %s", errorString(err))
+		return nil, fmt.Errorf("Error creating Host: Unable to get gateway: %s", ProviderErrorToString(err))
 	}
 	return gw, nil
 }
@@ -384,7 +384,7 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 	err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
 	if err != nil {
 		client.DeleteHost(host.ID)
-		return nil, fmt.Errorf("error creating host: %s", errorString(err))
+		return nil, fmt.Errorf("error creating host: %s", ProviderErrorToString(err))
 	}
 
 	return host, nil
@@ -433,7 +433,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		name := fmt.Sprintf("%s_%s", request.Name, id)
 		kp, err = client.CreateKeyPair(name)
 		if err != nil {
-			return nil, fmt.Errorf("Error creating Host: %s", errorString(err))
+			return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
 		}
 	}
 
@@ -459,7 +459,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		if server != nil {
 			servers.Delete(client.Compute, server.ID)
 		}
-		return nil, fmt.Errorf("Error creating Host: %s", errorString(err))
+		return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
 	}
 	// Wait that Host is started
 	service := providers.Service{
@@ -468,7 +468,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	host, err := service.WaitHostState(server.ID, HostState.STARTED, 120*time.Second)
 	if err != nil {
 		servers.Delete(client.Compute, server.ID)
-		return nil, fmt.Errorf("Timeout creating Host: %s", errorString(err))
+		return nil, fmt.Errorf("Timeout creating Host: %s", ProviderErrorToString(err))
 	}
 	// Add gateway ID to Host definition
 	var gwID string
@@ -486,7 +486,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		}).Extract()
 		if err != nil {
 			servers.Delete(client.Compute, host.ID)
-			return nil, fmt.Errorf("Error creating Host: %s", errorString(err))
+			return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
 		}
 
 		// Associate floating IP to host
@@ -496,7 +496,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		if err != nil {
 			floatingips.Delete(client.Compute, ip.ID)
 			servers.Delete(client.Compute, host.ID)
-			return nil, fmt.Errorf("Error creating Host: %s", errorString(err))
+			return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
 		}
 
 		if IPVersion.IPv4.Is(ip.IP) {
@@ -512,7 +512,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 func (client *Client) GetHost(id string) (*api.Host, error) {
 	server, err := servers.Get(client.Compute, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting host: %s", errorString(err))
+		return nil, fmt.Errorf("Error getting host '%s': %s", id, ProviderErrorToString(err))
 	}
 	return client.toHost(server), nil
 }
@@ -541,7 +541,7 @@ func (client *Client) listAllHosts() ([]api.Host, error) {
 		return true, nil
 	})
 	if len(hosts) == 0 && err != nil {
-		return nil, fmt.Errorf("error listing hosts : %s", errorString(err))
+		return nil, fmt.Errorf("error listing hosts : %s", ProviderErrorToString(err))
 	}
 	return hosts, nil
 }
@@ -580,7 +580,7 @@ func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, err
 	})
 	if len(fips) == 0 {
 		if err != nil {
-			return nil, fmt.Errorf("No floating IP found for host '%s': %s", hostID, errorString(err))
+			return nil, fmt.Errorf("No floating IP found for host '%s': %s", hostID, ProviderErrorToString(err))
 		}
 		return nil, fmt.Errorf("No floating IP found for host '%s'", hostID)
 
@@ -605,11 +605,11 @@ func (client *Client) DeleteHost(id string) error {
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("error deleting host %s : %s", host.Name, errorString(err))
+					return fmt.Errorf("error deleting host %s : %s", host.Name, ProviderErrorToString(err))
 				}
 				err = floatingips.Delete(client.Compute, fip.ID).ExtractErr()
 				if err != nil {
-					return fmt.Errorf("error deleting host %s : %s", host.Name, errorString(err))
+					return fmt.Errorf("error deleting host %s : %s", host.Name, ProviderErrorToString(err))
 				}
 			}
 		}
@@ -617,7 +617,7 @@ func (client *Client) DeleteHost(id string) error {
 
 	err = servers.Delete(client.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("error deleting host %s : %s", host.Name, errorString(err))
+		return fmt.Errorf("error deleting host %s : %s", host.Name, ProviderErrorToString(err))
 	}
 
 	metadata.RemoveHost(providers.FromClient(client), host)
@@ -629,7 +629,7 @@ func (client *Client) DeleteHost(id string) error {
 func (client *Client) StopHost(id string) error {
 	err := startstop.Stop(client.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("error stopping host : %s", errorString(err))
+		return fmt.Errorf("error stopping host : %s", ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -638,7 +638,7 @@ func (client *Client) StopHost(id string) error {
 func (client *Client) StartHost(id string) error {
 	err := startstop.Start(client.Compute, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("error stopping host : %s", errorString(err))
+		return fmt.Errorf("error stopping host : %s", ProviderErrorToString(err))
 	}
 	return nil
 }

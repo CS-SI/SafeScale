@@ -111,13 +111,13 @@ type CfgOptions struct {
 	S3Protocol string
 }
 
-//errorString creates an error string from openstack api error
-func errorString(err error) string {
+// ProviderErrorToString creates an error string from openstack api error
+func ProviderErrorToString(err error) string {
 	switch e := err.(type) {
+	case *gc.ErrUnexpectedResponseCode:
+		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
 	default:
 		return e.Error()
-	case *gc.ErrUnexpectedResponseCode:
-		return fmt.Sprintf("code : %d reason ; %s", e.Actual, string(e.Body[:]))
 	}
 }
 
@@ -139,7 +139,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	//Openstack client
 	pClient, err := openstack.AuthenticatedClient(gcOpts)
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
 
 	//Compute API
@@ -148,7 +148,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
 
 	//Network API
@@ -156,11 +156,11 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Region: opts.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
 	nID, err := networks.IDFromName(network, cfg.ProviderNetwork)
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
 	//Storage API
 	blocstorage, err := openstack.NewBlockStorageV1(pClient, gc.EndpointOpts{
@@ -171,7 +171,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Region: opts.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%s", errorString(err))
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
 
 	if len(cfg.S3Protocol) == 0 {
