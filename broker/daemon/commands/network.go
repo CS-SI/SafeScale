@@ -33,10 +33,10 @@ import (
 // broker network delete net1
 // broker network inspect net1
 
-//NetworkServiceServer network service server grpc
+// NetworkServiceServer network service server grpc
 type NetworkServiceServer struct{}
 
-//Create a new network
+// Create a new network
 func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
 	log.Println("Create Network called")
 
@@ -61,7 +61,7 @@ func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 	}, nil
 }
 
-//List existing networks
+// List existing networks
 func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (*pb.NetworkList, error) {
 	log.Printf("List Network called")
 
@@ -91,7 +91,7 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (
 	return rv, nil
 }
 
-//Inspect returns infos on a network
+// Inspect returns infos on a network
 func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
 	log.Printf("Inspect Network called")
 
@@ -119,7 +119,7 @@ func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 	}, nil
 }
 
-//Delete a network
+// Delete a network
 func (s *NetworkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Delete Network called for network '%s'", in.GetName())
 

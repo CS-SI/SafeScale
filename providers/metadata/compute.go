@@ -19,7 +19,6 @@ package metadata
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -63,11 +62,7 @@ func (m *Host) Get() *api.Host {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-
-	if h, ok := m.item.Get().(*api.Host); ok {
-		return h
-	}
-	panic(fmt.Sprintf("invalid content in metadata of host '%s'!", m.name))
+	return m.item.Get().(*api.Host)
 }
 
 // Write updates the metadata corresponding to the host in the Object Storage

@@ -278,7 +278,6 @@ func (a *App) Run(args []string) {
 
 	// Parses the cli arguments and validates them to docopt usage
 	var err error
-	//docoptArguments, err = a.parser.ParseArgs(a.usage, args, "")
 	docoptArguments, err = docopt.ParseArgs(a.usage, args)
 	if err != nil {
 		msg := err.Error()

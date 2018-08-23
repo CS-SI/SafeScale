@@ -25,9 +25,9 @@ import (
 
 // Item is an entry in the ObjectStorage
 type Item struct {
-	data   interface{}
-	folder *Folder
-	lock   sync.Mutex
+	payload interface{}
+	folder  *Folder
+	lock    sync.Mutex
 }
 
 // ItemDecoderCallback ...
@@ -36,8 +36,8 @@ type ItemDecoderCallback func(buf *bytes.Buffer) (interface{}, error)
 // NewItem creates a new item with 'name' and in 'path'
 func NewItem(svc *providers.Service, path string) *Item {
 	return &Item{
-		folder: NewFolder(svc, path),
-		data:   nil,
+		folder:  NewFolder(svc, path),
+		payload: nil,
 	}
 }
 
@@ -53,15 +53,17 @@ func (i *Item) GetPath() string {
 
 // Carry links metadata with cluster struct
 func (i *Item) Carry(data interface{}) *Item {
-	i.data = data
+	i.payload = data
 	return i
+}
+
+// Get returns payload in item
+func (i *Item) Get() interface{} {
+	return i.payload
 }
 
 // DeleteFrom removes a metadata from a folder
 func (i *Item) DeleteFrom(path string, name string) error {
-	if i.data == nil {
-		panic("m.data is nil!")
-	}
 	if name == "" {
 		panic("name is empty!")
 	}
@@ -91,7 +93,7 @@ func (i *Item) ReadFrom(path string, name string, callback ItemDecoderCallback) 
 	if !found {
 		return false, nil
 	}
-	i.data = data
+	i.payload = data
 	return true, nil
 }
 
@@ -102,20 +104,12 @@ func (i *Item) Read(name string, callback ItemDecoderCallback) (bool, error) {
 
 // WriteInto saves the content of Item in a subfolder to the Object Storage
 func (i *Item) WriteInto(path string, name string) error {
-	return i.folder.Write(path, name, i.data)
+	return i.folder.Write(path, name, i.payload)
 }
 
 // Write saves the content of Item to the Object Storage
 func (i *Item) Write(name string) error {
 	return i.WriteInto(".", name)
-}
-
-// Get returns the content of the metadata
-func (i *Item) Get() interface{} {
-	if i.data == nil {
-		panic("i.data is nil!")
-	}
-	return i.data
 }
 
 // BrowseInto walks through a subfolder ogf item folder and executes a callback for each entry
