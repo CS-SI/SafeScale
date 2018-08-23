@@ -61,8 +61,6 @@ type ClusterAPI interface {
 	GetState() (ClusterState.Enum, error)
 	// GetNetworkID returns the ID of the network used by the cluster
 	GetNetworkID() string
-	// GetMasters returns a list of master server IDs (if there is such masters in the flavor...)
-	GetMasters() ([]string, error)
 	// AddNode adds a node
 	AddNode(bool, *pb.HostDefinition) (string, error)
 	// AddNodes adds several nodes
@@ -71,9 +69,19 @@ type ClusterAPI interface {
 	DeleteLastNode(bool) error
 	// DeleteSpecificNode deletes a node identified by its ID
 	DeleteSpecificNode(string) error
-	// ListNodes lists the nodes in the cluster
-	ListNodes(bool) []string
-	// FindNode tells if the ID of the host passed as parameter is a node
+	// ListMasterIDs lists the IDs of masters (if there is such masters in the flavor...)
+	ListMasterIDs() []string
+	// ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
+	ListMasterIPs() []string
+	// FindAvailableMaster returns ID of the first master available to execute order
+	FindAvailableMaster() (string, error)
+	// ListNodeIDs lists IDs of the nodes in the cluster
+	ListNodeIDs(bool) []string
+	// ListNodeIPs lists the IPs of the nodes in the cluster
+	ListNodeIPs(bool) []string
+	// FindAvailableNode returns ID of the first node available to execute order
+	FindAvailableNode(bool) (string, error)
+	// SearchNode tells if the ID of the host passed as parameter is a node
 	SearchNode(string, bool) bool
 	// GetNode returns a node based on its ID
 	GetNode(string) (*pb.Host, error)
@@ -85,12 +93,19 @@ type ClusterAPI interface {
 	GetConfig() Cluster
 	// GetAdditionalInfo returns additional info about parameter
 	GetAdditionalInfo(AdditionalInfo.Enum) interface{}
+	// SetAdditionalInfo sets the content of additional info
+	SetAdditionalInfo(AdditionalInfo.Enum, interface{})
 }
 
-// AdditionalInfoType ...
-type AdditionalInfoType map[AdditionalInfo.Enum]interface{}
+// AdditionalInfoAPI defines the interface to handle additional info
+type AdditionalInfoAPI interface {
+	Value() interface{}
+}
 
-//Cluster contains the bare minimum information about a cluster
+// AdditionalInfoMap ...
+type AdditionalInfoMap map[AdditionalInfo.Enum]interface{}
+
+// Cluster contains the bare minimum information about a cluster
 type Cluster struct {
 	// Name is the name of the cluster
 	Name string
@@ -119,8 +134,8 @@ type Cluster struct {
 	PublicIP string
 	// NodesDef keeps the default node definition
 	NodesDef *pb.HostDefinition
-	// AdditionalInfo contains additional info about the cluster
-	AdditionalInfo AdditionalInfoType
+	// Infos contains additional info about the cluster
+	Infos AdditionalInfoMap
 }
 
 // GetName returns the name of the cluster
@@ -135,10 +150,20 @@ func (c *Cluster) GetNetworkID() string {
 
 // GetAdditionalInfo returns the additional info requested
 func (c *Cluster) GetAdditionalInfo(ctx AdditionalInfo.Enum) interface{} {
-	if info, ok := c.AdditionalInfo[ctx]; ok {
-		return info
+	if c.Infos != nil {
+		if info, ok := c.Infos[ctx]; ok {
+			return info
+		}
 	}
 	return nil
+}
+
+// SetAdditionalInfo ...
+func (c *Cluster) SetAdditionalInfo(ctx AdditionalInfo.Enum, info interface{}) {
+	if c.Infos == nil {
+		c.Infos = map[AdditionalInfo.Enum]interface{}{}
+	}
+	c.Infos[ctx] = info
 }
 
 //CountNodes returns the number of public or private nodes in the cluster
