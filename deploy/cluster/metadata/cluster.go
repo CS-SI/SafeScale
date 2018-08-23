@@ -51,6 +51,9 @@ func NewCluster() (*Cluster, error) {
 
 // Carry links metadata with cluster struct
 func (m *Cluster) Carry(cluster *api.Cluster) *Cluster {
+	if m.item == nil {
+		panic("m.item is nil!")
+	}
 	m.item.Carry(cluster)
 	m.name = cluster.GetName()
 	return m
@@ -58,18 +61,36 @@ func (m *Cluster) Carry(cluster *api.Cluster) *Cluster {
 
 // Delete removes a cluster metadata
 func (m *Cluster) Delete() error {
+	if m.item == nil {
+		panic("m.item is nil!")
+	}
 	return m.item.Delete(m.name)
 }
 
 // Read reads metadata of cluster named 'name' from Object Storage
 func (m *Cluster) Read(name string) (bool, error) {
-	var data api.Cluster
+	var (
+		target api.Cluster
+		ptr    *api.Cluster
+		ok     bool
+	)
+	// If m.item is already carrying data, overwrites it
+	// Otherwise, allocates new memory
+	anon := m.item.Get()
+	if anon == nil {
+		ptr = &target
+	} else {
+		ptr, ok = anon.(*api.Cluster)
+		if !ok {
+			ptr = &target
+		}
+	}
 	found, err := m.item.Read(name, func(buf *bytes.Buffer) (interface{}, error) {
-		err := gob.NewDecoder(buf).Decode(&data)
+		err := gob.NewDecoder(buf).Decode(ptr)
 		if err != nil {
 			return nil, err
 		}
-		return &data, nil
+		return ptr, nil
 	})
 	if err != nil {
 		return false, err
@@ -77,7 +98,7 @@ func (m *Cluster) Read(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.name = data.Name
+	m.name = ptr.Name
 	return true, nil
 }
 
@@ -90,7 +111,7 @@ func (m *Cluster) Write() error {
 // It's a good idea to do that just after a Acquire() to be sure to have the latest data
 func (m *Cluster) Reload() error {
 	if m.item == nil {
-		panic("m.nil is nil!")
+		panic("m.item is nil!")
 	}
 	found, err := m.Read(m.name)
 	if err != nil {
@@ -107,7 +128,10 @@ func (m *Cluster) Get() *api.Cluster {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	return m.item.Get().(*api.Cluster)
+	if p, ok := m.item.Get().(*api.Cluster); ok {
+		return p
+	}
+	panic("invalid cluster content in metadata")
 }
 
 // Browse walks through cluster folder and executes a callback for each entries
