@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/install"
 
 	"github.com/CS-SI/SafeScale/utils"
 	cli "github.com/CS-SI/SafeScale/utils/cli"
@@ -61,6 +62,7 @@ var ClusterCommand = &cli.Command{
 		clusterDcosCommand,
 		clusterKubectlCommand,
 		clusterMarathonCommand,
+		clusterComponentCommand,
 	},
 
 	Before: func(c *cli.Command) {
@@ -163,7 +165,7 @@ func formatClusterConfig(value interface{}) map[string]interface{} {
 	item["StateLabel"] = s.String()
 
 	if !Debug {
-		delete(item, "AdditionalInfo")
+		delete(item, "Infos")
 		delete(item, "PrivateNodeIDs")
 		delete(item, "PublicNodeIDs")
 		delete(item, "Keypair")
@@ -812,9 +814,9 @@ Usage: {{.ProgName}} [options] cluster list,ls
 }
 
 func executeCommand(command string) (int, string, string, error) {
-	masters, err := clusterInstance.GetMasters()
-	if err != nil {
-		fmt.Printf("Failed to get masters for the cluster '%s': %s", clusterInstance.GetName(), err.Error())
+	masters := clusterInstance.ListMasterIPs()
+	if len(masters) <= 0 {
+		fmt.Printf("No masters found for the cluster '%s'", clusterInstance.GetName())
 		os.Exit(int(ExitCode.Run))
 	}
 	for i, m := range masters {
@@ -826,7 +828,7 @@ func executeCommand(command string) (int, string, string, error) {
 			}
 		}
 		if retcode != 0 {
-			fmt.Fprintf(os.Stderr, "%s\n%s\n", i+1, stdout, stderr)
+			fmt.Fprintf(os.Stderr, "master #%d: retcode=%d\n%s\n%s\n", i+1, retcode, stdout, stderr)
 			os.Exit(int(ExitCode.RPC))
 		}
 		fmt.Println(stdout)
@@ -837,4 +839,142 @@ func executeCommand(command string) (int, string, string, error) {
 	os.Exit(int(ExitCode.RPC))
 
 	return 0, "", "", nil
+}
+
+// clusterComponentCommand handles 'deploy cluster <host name or id> component'
+var clusterComponentCommand = &cli.Command{
+	Keyword: "component",
+	Aliases: []string{"package", "pkg"},
+
+	Commands: []*cli.Command{
+		clusterComponentCheckCommand,
+		clusterComponentAddCommand,
+		clusterComponentDeleteCommand,
+	},
+
+	Before: func(c *cli.Command) {
+		componentName = c.StringArgument("<pkgname>", "")
+		if componentName == "" {
+			fmt.Fprintln(os.Stderr, "Invalid argument <pkgname>")
+			//helpHandler(nil, "")
+			os.Exit(int(ExitCode.InvalidArgument))
+		}
+	},
+
+	Help: &cli.HelpContent{
+		Usage: `
+Usage: {{.ProgName}} [options] cluster <host name or id> component,package,pkg <pkgname> COMMAND`,
+		Commands: `
+  add,install                         Installs the package on the host
+  check                               Tells if the package is installed
+  delete,destroy,remove,rm,uninstall  Uninstall the package of the host`,
+		Description: `
+Manages components (SafeScale packages) on a cluster.`,
+	},
+}
+
+// clusterComponentAddCommand handles 'deploy cluster <host name or id> package <pkgname> add'
+var clusterComponentAddCommand = &cli.Command{
+	Keyword: "add",
+	Aliases: []string{"install"},
+
+	Process: func(c *cli.Command) {
+		component, err := install.NewComponent(componentName)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(int(ExitCode.Run))
+		}
+		if component == nil {
+			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
+			os.Exit(int(ExitCode.NotFound))
+		}
+		target := install.NewClusterTarget(clusterInstance)
+		ok, results, err := component.Add(target, install.EmptyValues)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error installing component '%s' on '%s': %s\n", componentName, clusterName, err.Error())
+			os.Exit(int(ExitCode.RPC))
+		}
+		if ok {
+			fmt.Printf("Component '%s' installed successfully on '%s'\n", componentName, clusterName)
+			os.Exit(int(ExitCode.OK))
+		}
+
+		fmt.Printf("Failed to install component '%s' on host '%s'\n", componentName, clusterName)
+		fmt.Println(results.Errors())
+		os.Exit(int(ExitCode.Run))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// clusterComponentCheckCommand handles 'deploy host <host name or id> package <pkgname> check'
+var clusterComponentCheckCommand = &cli.Command{
+	Keyword: "check",
+	Aliases: []string{"verify"},
+
+	Process: func(c *cli.Command) {
+		component, err := install.NewComponent(componentName)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(int(ExitCode.Run))
+		}
+		if component == nil {
+			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
+			os.Exit(int(ExitCode.NotFound))
+		}
+		target := install.NewClusterTarget(clusterInstance)
+		found, results, err := component.Check(target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, clusterName, err.Error())
+			os.Exit(int(ExitCode.RPC))
+		}
+		if found {
+			fmt.Printf("Component '%s' is installed on cluster '%s'\n", componentName, clusterName)
+			os.Exit(int(ExitCode.OK))
+		}
+		fmt.Printf("Component '%s' is not installed on cluster '%s'\n", componentName, clusterName)
+		msg := results.Errors()
+		if msg != "" {
+			fmt.Println(msg)
+		}
+		os.Exit(int(ExitCode.NotFound))
+	},
+
+	Help: &cli.HelpContent{},
+}
+
+// clusterComponentDeleteCommand handles 'deploy host <host name or id> package <pkgname> delete'
+var clusterComponentDeleteCommand = &cli.Command{
+	Keyword: "delete",
+	Aliases: []string{"destroy", "remove", "rm", "uninstall"},
+
+	Process: func(c *cli.Command) {
+		component, err := install.NewComponent(componentName)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(int(ExitCode.Run))
+		}
+		if component == nil {
+			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
+			os.Exit(int(ExitCode.NotFound))
+		}
+		target := install.NewClusterTarget(clusterInstance)
+		ok, results, err := component.Remove(target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, clusterName, err.Error())
+			os.Exit(int(ExitCode.RPC))
+		}
+		if ok {
+			fmt.Printf("Component '%s' uninstalled successfully from cluster '%s'\n", componentName, clusterName)
+			os.Exit(int(ExitCode.OK))
+		}
+		fmt.Printf("Failed to uninstall component '%s' from cluster '%s':\n", componentName, clusterName)
+		msg := results.Errors()
+		if msg != "" {
+			fmt.Println(msg)
+		}
+		os.Exit(int(ExitCode.Run))
+	},
+
+	Help: &cli.HelpContent{},
 }
