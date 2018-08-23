@@ -36,6 +36,10 @@ const (
 	Script
 	// Ansible is supported by target
 	Ansible
+	// DCOS packager is supported by cluster target
+	DCOS
+	// Helm is supported by cluster target
+	Helm
 
 	// NextEnum marks the next value (or the max, depending the use)
 	NextEnum
@@ -48,6 +52,8 @@ var (
 		"dnf":     Dnf,
 		"script":  Script,
 		"ansible": Ansible,
+		"dcos":    DCOS,
+		"helm":    Helm,
 	}
 
 	enumMap = map[Enum]string{
@@ -56,6 +62,8 @@ var (
 		Dnf:     "Dnf",
 		Script:  "Script",
 		Ansible: "Ansible",
+		DCOS:    "DCOS",
+		Helm:    "Helm",
 	}
 )
 

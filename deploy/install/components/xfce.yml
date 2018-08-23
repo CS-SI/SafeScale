@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+#
+# Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# install_docker.sh
+#
+# Installs Docker
+
+---
+component:
+    name: xfce
+    targeting:
+        host: no
+        cluster:
+            master: all
+            node:
+                private: no
+                public: no
+    installing:
+        script:
+            check: |
+                case $LINUX_KIND in
+                    centos|redhat)
+                        yum grouplist installed Xfce &>/dev/null
+                        ;;
+                    debian|ubuntu)
+                        dpkg-query -s xfce4 &>/dev/null
+                        ;;
+                    *)
+                        echo "unsupported OS type '$LINUX_KIND'"
+                        exit 1;;
+                esac
+
+            install: |
+                case $LINUX_KIND in
+                    centos|redhat)
+                        yum install -y epel-release && \
+                        yum make-cache fast && \
+                        yum groupinstall -y -t "X Window system" && \
+                        yum groupinstall -y -t Xfce && \
+                        yum install -y -t xorg-x11-fonts-Type1 firefox
+                        ;;
+                    debian|ubuntu)
+                        wait_for_apt && apt update && \
+                        wait_for_apt && apt install -y xfce4 xorg-x11-fonts-Type1 firefox
+                        ;;
+                    *)
+                        echo "unsupported OS type '$LINUX_KIND'"
+                        exit 1;;
+                esac
+
+            uninstall: |
+                case $LINUX_KIND in
+                    centos|redhat)
+                        yum groupremive -y -t Xfce
+                        ;;
+                    debian|ubuntu)
+                        wait_for_apt && apt remove -y xfce4
+                        ;;
+                    *)
+                        echo "unsupported OS type '$LINUX_KIND'"
+                        exit 1;;
+                esac

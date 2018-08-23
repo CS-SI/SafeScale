@@ -18,21 +18,40 @@ package install
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/CS-SI/SafeScale/deploy/install/api"
 	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
 
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-
-	"github.com/CS-SI/SafeScale/system"
-
 	"github.com/spf13/viper"
 )
 
+var (
+	// EmptyValues corresponds to no values for the component
+	EmptyValues = map[string]interface{}{}
+)
+
+// component contains the information about an installable component
+type component struct {
+	// displayName is the name of the service
+	displayName string
+	// fileName is the name of the specification file
+	fileName string
+	// embedded tells if the component is embedded in deploy
+	embedded bool
+	// Installers defines the installers available for the component
+	installers map[Method.Enum]api.Installer
+	// Dependencies lists other component(s) (by name) needed by this one
+	dependencies []string
+	// Management contains a string map of data that could be used to manage the component (if it makes sense)
+	// This could be used to explain to Service object how to manage the component, to react as a service
+	//Management map[string]interface{}
+	// specs is the Viper instance containing component specification
+	specs *viper.Viper
+}
+
 // NewComponent searches for a spec file name 'name' and initializes a new Component object
 // with its content
-func NewComponent(name string) (api.ComponentAPI, error) {
+func NewComponent(name string) (api.Component, error) {
 	if name == "" {
 		panic("name is empty!")
 	}
@@ -46,10 +65,14 @@ func NewComponent(name string) (api.ComponentAPI, error) {
 
 	err := v.ReadInConfig()
 	if err == nil {
+		if !v.IsSet("component.name") {
+			return nil, fmt.Errorf("syntax error in specification file: missing key 'name'")
+		}
 		if v.IsSet("component") {
-			return &Component{
-				Name:  name,
-				specs: v,
+			return &component{
+				fileName:    name + ".yml",
+				displayName: v.GetString("Name"),
+				specs:       v,
 			}, nil
 		}
 	}
@@ -61,84 +84,9 @@ func NewComponent(name string) (api.ComponentAPI, error) {
 	return nil, fmt.Errorf("failed to find a component named '%s'", name)
 }
 
-// Component contains the information about an installable component
-type Component struct {
-	// Name is the name of the service
-	Name string
-	// AdminTool is the name of the admin tool (if there is one)
-	AdminTool string
-	// Installers defines the installers available for the component
-	Installers map[Method.Enum]api.InstallerAPI
-	// Dependencies lists other component(s) (by name) needed by this one
-	//Dependencies []string
-	// Management contains a string map of data that could be used to manage the component (if it makes sense)
-	// This could be used to explain to Service object how to manage the component, to react as a service
-	//Management map[string]interface{}
-
-	// specs is the Viper instance containing component specification
-	specs *viper.Viper
-}
-
-// GetName returns the name of the component
-func (c *Component) GetName() string {
-	return c.Name
-}
-
-// GetSpecs returns the data from the spec file
-func (c *Component) GetSpecs() *viper.Viper {
-	return c.specs
-}
-
-// Applyable tells if the component is installable on the target
-func (c *Component) Applyable(target api.TargetAPI) bool {
-	kinds := target.GetMethods()
-	var found bool
-	for _, k := range kinds {
-		if _, found = c.Installers[k]; found {
-			return true
-		}
-	}
-	return false
-}
-
-// Check if component is installed on target
-func (c *Component) Check(target api.TargetAPI) (bool, error) {
-	methods := target.GetMethods()
-	var installer api.InstallerAPI
-	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.installers.%s", method.String())) {
-			installer = getInstaller(method)
-			if installer != nil {
-				break
-			}
-		}
-	}
-	if installer == nil {
-		return false, fmt.Errorf("failed to find a way to check '%s' on '%s'", c.Name, target.GetName())
-	}
-	return installer.Check(c, target)
-}
-
-// Add installs the component on the target
-func (c *Component) Add(target api.TargetAPI) error {
-	methods := target.GetMethods()
-	var installer api.InstallerAPI
-	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.installers.%s", method.String())) {
-			installer = getInstaller(method)
-			if installer != nil {
-				break
-			}
-		}
-	}
-	if installer == nil {
-		return fmt.Errorf("failed to find a way to install '%s' on '%s'", c.Name, target.GetName())
-	}
-	return installer.Add(c, target)
-}
-
-func getInstaller(method Method.Enum) api.InstallerAPI {
-	var installer api.InstallerAPI
+// installerOfMethod instanciates the right installer corresponding to the method
+func (c *component) installerOfMethod(method Method.Enum) api.Installer {
+	var installer api.Installer
 	switch method {
 	case Method.Script:
 		installer = NewScriptInstaller()
@@ -148,24 +96,103 @@ func getInstaller(method Method.Enum) api.InstallerAPI {
 		installer = NewYumInstaller()
 	case Method.Dnf:
 		installer = NewDnfInstaller()
+	case Method.DCOS:
+		installer = NewDcosInstaller()
+		//	case Method.Ansible:
+		//		installer = NewAnsibleInstaller()
+		//	case Method.Helm:
+		//		installer = NewHelmInstaller()
 	}
 	return installer
 }
 
-// Remove uninstalls the component from the target
-func (c *Component) Remove(target api.TargetAPI) error {
+// DisplayName returns the name of the component
+func (c *component) DisplayName() string {
+	return c.displayName
+}
+
+// ShortFileName returns the name of the component specification file without '.yml'
+func (c *component) ShortFileName() string {
+	return c.fileName
+}
+
+// FullFileName returns the full file name, with [embedded] added at the end if the
+// component is embedded.
+func (c *component) FullFileName() string {
+	filename := c.fileName + ".yml"
+	if c.embedded {
+		filename += " [embedded]"
+	}
+	return filename
+}
+
+// Specs returns the data from the spec file
+func (c *component) Specs() *viper.Viper {
+	return c.specs
+}
+
+// Applyable tells if the component is installable on the target
+func (c *component) Applyable(target api.Target) bool {
 	methods := target.GetMethods()
-	var installer api.InstallerAPI
+	for _, k := range methods {
+		installer := c.installerOfMethod(k)
+		if installer != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// Check if component is installed on target
+func (c *component) Check(target api.Target) (bool, api.CheckResults, error) {
+	methods := target.GetMethods()
+	var installer api.Installer
 	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.installers.%s", method.String())) {
-			installer = getInstaller(method)
+		if c.specs.IsSet(fmt.Sprintf("component.installing.%s", method.String())) {
+			installer = c.installerOfMethod(method)
 			if installer != nil {
 				break
 			}
 		}
 	}
 	if installer == nil {
-		return fmt.Errorf("failed to find a way to uninstall '%s' on '%s'", c.Name, target.GetName())
+		return false, api.CheckResults{}, fmt.Errorf("failed to find a way to check '%s'", c.DisplayName())
+	}
+	return installer.Check(c, target)
+}
+
+// Add installs the component on the target
+func (c *component) Add(target api.Target, values map[string]interface{}) (bool, api.AddResults, error) {
+	methods := target.GetMethods()
+	var installer api.Installer
+	for _, method := range methods {
+		if c.specs.IsSet(fmt.Sprintf("component.installing.%s", method.String())) {
+			installer = c.installerOfMethod(method)
+			if installer != nil {
+				break
+			}
+		}
+	}
+	if installer == nil {
+		return false, api.AddResults{}, fmt.Errorf("failed to find a way to install '%s'", c.DisplayName())
+	}
+	return installer.Add(c, target, values)
+}
+
+// Remove uninstalls the component from the target
+func (c *component) Remove(target api.Target) (bool, api.RemoveResults, error) {
+	methods := target.GetMethods()
+	var installer api.Installer
+	for _, method := range methods {
+		if c.specs.IsSet(fmt.Sprintf("component.installing.%s", method.String())) {
+			installer = c.installerOfMethod(method)
+			if installer != nil {
+				break
+			}
+		}
+	}
+	if installer == nil {
+		return false, api.RemoveResults{}, fmt.Errorf("failed to find a way to uninstall '%s'", c.DisplayName())
 	}
 	return installer.Remove(c, target)
 }
@@ -175,46 +202,29 @@ func (c *Component) Remove(target api.TargetAPI) error {
 // The goal is to be able to mark a component installed even if not installed by the package (because
 // it's a requirement for a cluster management tool for example)
 type FakeComponent struct {
-	component Component
+	real component
 }
 
 // NewFakeComponent returns a fake component
 func NewFakeComponent(name string) *FakeComponent {
 	return &FakeComponent{
-		component: Component{
-			Name: name,
+		real: component{
+			displayName: name,
 		},
 	}
 }
 
 // Add errors the component can't be installed
-func (c *FakeComponent) Add(target api.TargetAPI) error {
+func (c *FakeComponent) Add(target api.Target) error {
 	return fmt.Errorf("component can't be installed")
 }
 
 // Remove errors the component can't be removed
-func (c *FakeComponent) Remove(target api.TargetAPI) error {
+func (c *FakeComponent) Remove(target api.Target) error {
 	return fmt.Errorf("component can't be uninstalled")
 }
 
 // Applyable ...
-func (c *FakeComponent) Applyable(target api.TargetAPI) bool {
-	return c.component.Applyable(target)
-}
-
-func uploadStringToTargetFile(content string, target api.TargetAPI, filename string) error {
-	if content == "" {
-		panic("content is nil!")
-	}
-	if filename == "" {
-		panic("filename is nil!")
-	}
-	f, err := system.CreateTempFileFromString(content)
-	if err != nil {
-		return err
-	}
-	to := fmt.Sprintf("%s:%s", target.GetName(), filename)
-	err = brokerclient.New().Ssh.Copy(f.Name(), to, brokerclient.DefaultTimeout)
-	os.Remove(f.Name())
-	return err
+func (c *FakeComponent) Applyable(target api.Target) bool {
+	return c.real.Applyable(target)
 }

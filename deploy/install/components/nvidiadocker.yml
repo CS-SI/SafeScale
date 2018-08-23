@@ -17,7 +17,14 @@
 ---
 component:
     name: nVidia-Docker
-    installers:
+    targeting:
+        host: yes
+        cluster:
+            master: no
+            node:
+                private: no
+                public: no
+    installing:
         script:
             check: |
                 case $LINUX_KIND in
@@ -83,7 +90,7 @@ component:
                         ;;
                 esac
 
-    manager:
+    servicing:
         start: |
             systemctl start docker-ce
 

@@ -17,7 +17,14 @@
 ---
 component:
     name: Docker
-    installers:
+    targeting:
+        host: yes
+        cluster:
+            master: all
+            node:
+                private: all
+                public: all
+    installing:
         script:
             check: |
                 case $LINUX_KIND in
@@ -83,7 +90,7 @@ component:
                         ;;
                 esac
 
-    manager:
+    servicing:
         start: |
             systemctl start docker-ce
 

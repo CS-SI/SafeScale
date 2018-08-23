@@ -17,15 +17,22 @@
 package api
 
 import (
+	"strings"
+
 	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
 	"github.com/spf13/viper"
 )
 
-// TargetAPI is an interface that target must satisfy to be able to install something
+const (
+	// ComponentPresent is the value returned by a check to tell the component is installed
+	ComponentPresent = "present"
+	// ComponentAbsent us the value returned by a check to tell the component is not installed
+	ComponentAbsent = "absent"
+)
+
+// Target is an interface that target must satisfy to be able to install something
 // on it
-type TargetAPI interface {
-	// GetName returns the name of the installation target
-	GetName() string
+type Target interface {
 	// GetMethods returns a list of installation methods useable on the target
 	GetMethods() []Method.Enum
 	// GetSSHConfig returns a system.SSHConfig to access target
@@ -34,36 +41,103 @@ type TargetAPI interface {
 	List() []string
 }
 
-// InstallerAPI defines the API of an Installer
-type InstallerAPI interface {
+// CheckResults contains the result of a component Check
+// In single host mode, the results are stored in PrivateNodes
+// In cluster mode, all results are stored in appropriate fields
+type CheckResults struct {
+	Masters      map[string]string
+	PrivateNodes map[string]string
+	PublicNodes  map[string]string
+}
+
+func (r CheckResults) Errors() string {
+	errors := []string{}
+	for _, i := range r.Masters {
+		if i != ComponentPresent && i != ComponentAbsent {
+			errors = append(errors, i)
+		}
+	}
+	for _, i := range r.PrivateNodes {
+		if i != ComponentPresent && i != ComponentAbsent {
+			errors = append(errors, i)
+		}
+	}
+	for _, i := range r.PublicNodes {
+		if i != ComponentPresent && i != ComponentAbsent {
+			errors = append(errors, i)
+		}
+	}
+	return strings.Join(errors, "\n")
+}
+
+// AddResults contains the result of a component addition
+type AddResults struct {
+	Masters      map[string]error
+	PrivateNodes map[string]error
+	PublicNodes  map[string]error
+}
+
+// Errors returned all the errors contained in AddResults as a string
+// one error per line
+func (r AddResults) Errors() string {
+	errors := []string{}
+	for _, i := range r.Masters {
+		if i != nil {
+			errors = append(errors, i.Error())
+		}
+	}
+	for _, i := range r.PrivateNodes {
+		if i != nil {
+			errors = append(errors, i.Error())
+		}
+	}
+	for _, i := range r.PublicNodes {
+		if i != nil {
+			errors = append(errors, i.Error())
+		}
+	}
+	return strings.Join(errors, "\n")
+}
+
+// RemoveResults contains the result of a component removal
+type RemoveResults struct {
+	AddResults
+}
+
+// Installer defines the API of an Installer
+type Installer interface {
 	// GetName returns the name of the Installer
 	GetName() string
 	// Check checks if the component is installed
-	Check(ComponentAPI, TargetAPI) (bool, error)
+	Check(Component, Target) (bool, CheckResults, error)
 	// Add executes installation of component
-	Add(ComponentAPI, TargetAPI) error
+	Add(Component, Target, map[string]interface{}) (bool, AddResults, error)
 	// Remove executes deletion of component
-	Remove(ComponentAPI, TargetAPI) error
+	Remove(Component, Target) (bool, RemoveResults, error)
 }
 
 // InstallerParameters defines the parameters a Installer may need
 type InstallerParameters map[string]interface{}
 
 // InstallerMap keeps a map of available installer by Method
-type InstallerMap map[Method.Enum]InstallerAPI
+type InstallerMap map[Method.Enum]Installer
 
-// ComponentAPI defines the API of an installable component
-type ComponentAPI interface {
-	// GetName ...
-	GetName() string
-	// GetSpecs ...
-	GetSpecs() *viper.Viper
+// Component defines the API of an installable component
+type Component interface {
+	// DisplayName ...
+	DisplayName() string
+	// ShortFileName ...
+	ShortFileName() string
+	// FullFileName ...
+	FullFileName() string
+	// Specs ...
+	Specs() *viper.Viper
 	// Applyable if the component is installable on the target
-	Applyable(TargetAPI) bool
+	Applyable(Target) bool
 	// Check if a component is installed
-	Check(TargetAPI) (bool, error)
+	Check(Target) (bool, CheckResults, error)
 	// Install ...
-	Add(TargetAPI) error
+	Add(Target, map[string]interface{}) (bool, AddResults, error)
 	// Remove ...
-	Remove(TargetAPI) error
+	Remove(Target) (bool, RemoveResults, error)
 }

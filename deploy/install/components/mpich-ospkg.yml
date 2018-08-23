@@ -21,7 +21,14 @@
 ---
 component:
     name: mpich-ospkg
-    installers:
+    targeting:
+        host: yes
+        cluster:
+            master: all
+            node:
+                private: all
+                public: all
+    installing:
         yum:
             package: mpich
 

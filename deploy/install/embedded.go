@@ -35,9 +35,9 @@ var (
 	templateBox *rice.Box
 	emptyParams = map[string]interface{}{}
 
-	availableEmbeddedMap = map[Method.Enum]map[string]api.ComponentAPI{}
-	allEmbeddedMap       = map[string]api.ComponentAPI{}
-	allEmbedded          = []api.ComponentAPI{}
+	availableEmbeddedMap = map[Method.Enum]map[string]api.Component{}
+	allEmbeddedMap       = map[string]api.Component{}
+	allEmbedded          = []api.Component{}
 )
 
 // loadSpecFile returns the content of the spec file of the component named 'name'
@@ -82,207 +82,168 @@ func loadSpecFile(name string, params map[string]interface{}) (*viper.Viper, err
 	if v.GetString("component.name") == "" {
 		return nil, fmt.Errorf("syntax error in component specification file '%s': name' can't be empty", name)
 	}
-	if !v.IsSet("component.installers") {
-		return nil, fmt.Errorf("syntax error in component specification file '%s': missing 'installers'", name)
+	if !v.IsSet("component.installing") {
+		return nil, fmt.Errorf("syntax error in component specification file '%s': missing 'installing'", name)
 	}
-	if len(v.GetStringMap("component.installers")) <= 0 {
-		return nil, fmt.Errorf("syntax error in component specification file '%s': 'installers' defines no method", name)
+	if len(v.GetStringMap("component.installing")) <= 0 {
+		return nil, fmt.Errorf("syntax error in component specification file '%s': 'installing' defines no method", name)
 	}
 	return v, nil
 }
 
 // dockerComponent ...
-func dockerComponent() *Component {
+func dockerComponent() *component {
 	specs, err := loadSpecFile("docker", emptyParams)
 	if err != nil {
 		panic(err.Error())
 	}
-
-	// si := install.NewScriptInstaller("Docker", api.InstallerParameters{
-	// 	"AddScript":    getScript("install_Component_docker.sh", emptyParams),
-	// 	"RemoveScript": getScript("uninstall_Component_docker.sh", emptyParams),
-	// 	"StartCommand": "systemctl start docker",
-	// 	"StopCommand":  "systemctl stop docker",
-	// 	"StateCommand": "systemctl status docker",
-	// })
-
-	return &Component{
-		Name:  specs.GetString("component.name"),
-		specs: specs,
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "docker",
+		specs:       specs,
 	}
 }
 
 // nVidiaDockerComponent ...
-func nVidiaDockerComponent() *Component {
+func nVidiaDockerComponent() *component {
 	specs, err := loadSpecFile("nvidiadocker", emptyParams)
 	if err != nil {
 		panic(err.Error())
 	}
-	// si := install.NewScriptInstaller("nVidiaDocker", api.InstallerParameters{
-	// 	"AddScript":    getScript("install_Component_nvidia_docker.sh", emptyParams),
-	// 	"RemoveScript": getScript("uninstall_nvidia_docker.sh", emptyParams),
-	// 	"StartCommand": "systemctl start nvidia-docker",
-	// 	"StopCommand":  "systemctl stop nvidia-docker",
-	// 	"StateCommand": "systemctl status nvidia-docker",
-	// })
-	return &Component{
-		Name:  specs.GetString("component.name"),
-		specs: specs,
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "nvidiadocker",
+		specs:       specs,
 	}
 }
 
 // kubernetesComponent ...
-func kubernetesComponent() *Component {
+func kubernetesComponent() *component {
 	specs, err := loadSpecFile("kubernetes", emptyParams)
 	if err != nil {
 		panic(err.Error())
 	}
-	// si := install.NewScriptInstaller("Kubernetes", api.InstallerParameters{
-	// 	"AddScript":    getScript("install_kubernetes.sh", emptyParams),
-	// 	"RemoveScript": getScript("uninstall_kubernetes.sh", emptyParams),
-	// 	"State":        "",
-	// 	"Start":        "",
-	// 	"Stop":         "",
-	// })
-
-	return &Component{
-		Name:  specs.GetString("component.name"),
-		specs: specs,
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "kubernetes",
+		specs:       specs,
 	}
 }
 
 // nexusComponent ...
-func nexusComponent() *Component {
+func nexusComponent() *component {
 	specs, err := loadSpecFile("nexus", emptyParams)
 	if err != nil {
 		panic(err.Error())
 	}
-
-	// si := install.NewScriptInstaller("Nexus", api.InstallerParameters{
-	// 	"AddScript":    getScript("install_nexus.sh", emptyParams),
-	// 	"RemoveScript": getScript("uninstall_nexus.sh", emptyParams),
-	// 	"StateCommand": "",
-	// 	"StartCommand": "",
-	// 	"StopCommand":  "",
-	// })
-
-	return &Component{
-		Name:  specs.GetString("name"),
-		specs: specs,
+	return &component{
+		displayName: specs.GetString("name"),
+		fileName:    "nexus",
+		specs:       specs,
 	}
 }
 
 // elasticSearchComponent ...
-func elasticSearchComponent() *Component {
+func elasticSearchComponent() *component {
 	specs, err := loadSpecFile("elasticsearch", emptyParams)
 	if err != nil {
 		panic(err.Error())
 	}
-	// si := install.NewScriptInstaller("ElasticSearch", api.InstallerParameters{
-	// 	"AddScript":    getScript("install_elastic_search.sh", emptyParams),
-	// 	"RemoveScript": getScript("uninstall_elastic_search.sh", emptyParams),
-	// 	"State":        "",
-	// 	"Start":        "",
-	// 	"Stop":         "",
-	// })
-
-	return &Component{
-		Name:  specs.GetString("component.name"),
-		specs: specs,
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "elasticsearch",
+		specs:       specs,
 	}
 }
 
 // helmComponent ...
-func helmComponent() *Component {
+func helmComponent() *component {
 	specs, err := loadSpecFile("helm", emptyParams)
 	if err != nil {
 		panic(err.Error())
 	}
-	// si := install.NewScriptInstaller("Helm", api.InstallerParameters{
-	// 	"AddScript":    getScript("install_helm.sh", emptyParams),
-	// 	"RemoveScript": getScript("uninstall_helm.sh", emptyParams),
-	// 	"State":        "",
-	// 	"Start":        "",
-	// 	"Stop":         "",
-	// })
-
-	return &Component{
-		Name:  specs.GetString("component.name"),
-		specs: specs,
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "helm",
+		specs:       specs,
 	}
 }
 
 // reverseProxyComponent ...
-func reverseProxyComponent() *Component {
+func reverseProxyComponent() *component {
 	specs, err := loadSpecFile("reverseproxy", emptyParams)
 	if err != nil {
 		panic(err.Error())
 	}
-	// si := install.NewScriptInstaller("ReverseProxy", api.InstallerParameters{
-	// 	"AddScript":    getScript("install_Component_reverse_proxy.sh", emptyParams),
-	// 	"RemoveScript": getScript("uninstall_Component_reverse_proxy.sh", emptyParams),
-	// 	"State":        "docker container ls | grep reverse-proxy",
-	// 	"Stop":         "docker-compose -f /opt/SafeScale/docker-compose.yml down reverse-proxy",
-	// 	"Start":        "docker-compose -f /opt/SafeScale/docker-compose.yml up -d reverse-proxy",
-	// })
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "reverseproxy",
+		specs:       specs,
+	}
+}
 
-	return &Component{
-		Name:  specs.GetString("component.name"),
-		specs: specs,
+// xfceComponent ...
+func xfceComponent() *component {
+	specs, err := loadSpecFile("xfce", emptyParams)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "xfce",
+		specs:       specs,
+	}
+}
+
+// tigervncComponent ...
+func tigervncComponent() *component {
+	specs, err := loadSpecFile("tigervnc", emptyParams)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "tigervnc",
+		specs:       specs,
 	}
 }
 
 // remoteDesktopComponent ...
-func remoteDesktopComponent() *Component {
+func remoteDesktopComponent() *component {
 	specs, err := loadSpecFile("remotedesktop", emptyParams)
 	if err != nil {
 		panic(err.Error())
 	}
-	// si := install.NewScriptInstaller("RemoteDesktop", api.InstallerParameters{
-	// 	"AddScript":    getScript("install_remote_desktop.sh", emptyParams),
-	// 	"RemoveScript": getScript("uninstall_remote_desktop.sh", emptyParams),
-	// 	"State":        "docker container ls | grep guacamole",
-	// 	"Stop":         "docker-compose -f /opt/SafeScale/docker-compose.yml down guacamole",
-	// 	"Start":        "docker-compose -f /opt/SafeScale/docker-compose.yml up -d guacamole",
-	// })
-
-	return &Component{
-		Name:  specs.GetString("component.name"),
-		specs: specs,
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "remotedesktop",
+		specs:       specs,
 	}
 }
 
 // mpichOsPkgComponent ...
-func mpichOsPkgComponent() *Component {
+func mpichOsPkgComponent() *component {
 	specs, err := loadSpecFile("mpich-ospkg", emptyParams)
 	if err != nil {
 		panic(err.Error())
 	}
-	// si := install.NewScriptInstaller("MPICH", api.InstallerParameters{
-	// 	"AddScript":    getScript("install_mpich.sh", emptyParams),
-	// 	"RemoveScript": getScript("uninstall_mpich.sh", emptyParams),
-	// })
-
-	return &Component{
-		Name:  specs.GetString("component.name"),
-		specs: specs,
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "mpich-ospkg",
+		specs:       specs,
 	}
 }
 
 // mpichBuildComponent ...
-func mpichBuildComponent() *Component {
+func mpichBuildComponent() *component {
 	specs, err := loadSpecFile("mpich-build", emptyParams)
 	if err != nil {
 		panic(err.Error())
 	}
-	// si := install.NewScriptInstaller("MPICH", api.InstallerParameters{
-	// 	"AddScript":    getScript("install_mpich.sh", emptyParams),
-	// 	"RemoveScript": getScript("uninstall_mpich.sh", emptyParams),
-	// })
-
-	return &Component{
-		Name:  specs.GetString("component.name"),
-		specs: specs,
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "mpich-build",
+		specs:       specs,
 	}
 }
 
@@ -309,11 +270,13 @@ func mpichBuildComponent() *Component {
 
 func init() {
 
-	allEmbedded = []api.ComponentAPI{
+	allEmbedded = []api.Component{
 		dockerComponent(),
 		nVidiaDockerComponent(),
 		mpichOsPkgComponent(),
 		mpichBuildComponent(),
+		xfceComponent(),
+		tigervncComponent(),
 		remoteDesktopComponent(),
 		//reverseProxyComponent(),
 		//		kubernetesComponent(),
@@ -322,20 +285,23 @@ func init() {
 	}
 
 	for _, item := range allEmbedded {
-		allEmbeddedMap[item.GetName()] = item
-		installers := item.GetSpecs().GetStringMap("component.installers")
+		allEmbeddedMap[item.ShortFileName()] = item
+		allEmbeddedMap[item.DisplayName()] = item
+		installers := item.Specs().GetStringMap("component.installing")
 		for k := range installers {
 			method, err := Method.Parse(k)
 			if err != nil {
-				panic(fmt.Sprintf("syntax error in component '%s' specification file! installer method '%s' unknown!",
-					item.GetName(), k))
+				panic(fmt.Sprintf("syntax error in component '%s' specification file (%s)! installing method '%s' unknown!",
+					item.DisplayName(), item.FullFileName(), k))
 			}
 			if _, found := availableEmbeddedMap[method]; !found {
-				availableEmbeddedMap[method] = map[string]api.ComponentAPI{
-					item.GetName(): item,
+				availableEmbeddedMap[method] = map[string]api.Component{
+					item.DisplayName():   item,
+					item.ShortFileName(): item,
 				}
 			} else {
-				availableEmbeddedMap[method][item.GetName()] = item
+				availableEmbeddedMap[method][item.DisplayName()] = item
+				availableEmbeddedMap[method][item.ShortFileName()] = item
 			}
 		}
 	}

@@ -19,27 +19,30 @@ package install
 import (
 	"github.com/CS-SI/SafeScale/deploy/install/api"
 	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
+
+	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
+
+	pb "github.com/CS-SI/SafeScale/broker"
 )
 
 // HostTarget defines a target of type Host, satisfying TargetAPI
 type HostTarget struct {
-	Name string
+	host *pb.Host
 }
 
 // NewHostTarget ...
-func NewHostTarget(name string) api.TargetAPI {
-	if name == "" {
-		panic("name is empty!")
+func NewHostTarget(host *pb.Host) api.Target {
+	if host == nil {
+		panic("host is nil!")
 	}
 
-	return &HostTarget{
-		Name: name,
-	}
+	return &HostTarget{host: host}
 }
 
 // GetName returns the name of the Target
 func (t *HostTarget) GetName() string {
-	return t.Name
+	return t.host.GetName()
 }
 
 // GetMethods returns a list of packaging managers useable on the target
@@ -52,8 +55,55 @@ func (t *HostTarget) GetMethods() []Method.Enum {
 	return methods
 }
 
-// List returns a list of installed component
+// List returns a list of installed components
 func (t *HostTarget) List() []string {
 	var list []string
 	return list
+}
+
+// ClusterTarget defines a target of type Host, satisfying TargetAPI
+type ClusterTarget struct {
+	cluster clusterapi.ClusterAPI
+}
+
+// NewClusterTarget ...
+func NewClusterTarget(cluster clusterapi.ClusterAPI) api.Target {
+	if cluster == nil {
+		panic("cluster is nil!")
+	}
+	return &ClusterTarget{
+		cluster: cluster,
+	}
+}
+
+// GetMethods returns a list of packaging managers useable on the target
+func (t *ClusterTarget) GetMethods() []Method.Enum {
+	methods := []Method.Enum{
+		Method.Script,
+	}
+	if t.cluster.GetConfig().Flavor == Flavor.DCOS {
+		methods = append(methods, Method.DCOS)
+	}
+	return methods
+}
+
+// List returns a list of installed component
+func (t *ClusterTarget) List() []string {
+	var list []string
+	return list
+}
+
+// NodeTarget defines a target of type Node of cluster, including a master
+type NodeTarget struct {
+	*HostTarget
+}
+
+// NewNodeTarget ...
+func NewNodeTarget(host *pb.Host) api.Target {
+	if host == nil {
+		panic("host is nil!")
+	}
+	return &NodeTarget{
+		HostTarget: &HostTarget{host: host},
+	}
 }

@@ -18,7 +18,14 @@
 ---
 component:
     name: mpich-build
-    installers:
+    targeting:
+        host: yes
+        cluster:
+            master: all
+            node:
+                private: all
+                public: all
+    installing:
         script:
             duration: 15
             check: |

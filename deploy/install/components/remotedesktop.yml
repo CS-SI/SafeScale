@@ -16,10 +16,17 @@
 component:
     name: RemoteDesktop
     requirements:
-        - Docker
-        - X11
-        - TigerVNC
-    installers:
+        - docker
+        - xfce
+        - tigervnc
+    targeting:
+        host: no
+        cluster:
+            master: all
+            node:
+                private: no
+                public: no
+    installing:
         script:
             install: |
                 ###########################################################
@@ -217,17 +224,18 @@ component:
             check: |
                 docker image ls | grep remotedesktop &>/dev/null
 
-            start: |
-                docker run --rm -d --hostname remotedesktop --name remotedesktop remotedesktop:latest
+    servicing:
+        start: |
+            docker run --rm -d --hostname remotedesktop --name remotedesktop remotedesktop:latest
 
-            pause: |
-                docker stop remotedesktop
+        pause: |
+            docker stop remotedesktop
 
-            resume: |
-                docker start remotedesktop
+        resume: |
+            docker start remotedesktop
 
-            stop: |
-                docker rm -f remotedesktop
+        stop: |
+            docker rm -f remotedesktop
 
-            status: |
-                docker ps | grep remotedesktop
+        status: |
+            docker ps | grep remotedesktop

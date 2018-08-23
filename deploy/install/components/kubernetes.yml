@@ -1,0 +1,65 @@
+# Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+component:
+    name: Kubernetes
+    targeting:
+        host: no
+        cluster:
+            master: any
+            node:
+                private: no
+                public: no
+    installing:
+        dcos:
+            options:
+                dev: |
+                    {
+                        "kubernetes": {
+                            "node_count": 1,
+                            "reserved_resources": {
+                                "kube_cpus": 1,
+                                "kube_mem": 1024,
+                                "kube_disk": 512
+                            }
+                        }
+                    }
+
+                normal: |
+                    {
+                        "kubernetes": {
+                            "high_availability": true,
+                            "node_count": 3,
+                            "reserved_resources": {
+                                "kube_cpus": 1,
+                                "kube_mem": 1024,
+                                "kube_disk": 512
+                            }
+                        }
+                    }
+
+            check: |
+                {{.dcos}} kubernetes plan show deploy --json | jq .status | grep COMPLETE
+
+            install: |
+                {{.dcos}} package install --yes kubernetes --cli
+
+            post-install: |
+                {{.dcos}} kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
+                {{.dcos}} kubectl config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443`
+
+            uninstall: |
+                {{.dcos}} package remove --yes kubernetes
+...
