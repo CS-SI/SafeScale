@@ -45,42 +45,48 @@ Usage: deploy version
        deploy [-vd] help (cluster|host)
        deploy [-vd] (cluster|host) help <command>
        deploy [-vd] (cluster|host) (list|ls)
+       deploy [-vd] cluster help <command>
 	   deploy [-vd] cluster <clustername> create -N <cidr> [-F <flavor>][-C <complexity][--os <os>][--ram <ram>][--disk <disk>][-k]
 	   deploy [-vd] cluster <clustername> (delete|destroy|remove|rm) [-y]
-       deploy [-vd] cluster help <command>
        deploy [-vd] cluster <clustername> (start|stop|state|inspect)
        deploy [-vd] cluster <clustername> expand [-n <count>][--os <os>][--ram <ram>][--disk <disk>]
        deploy [-vd] cluster <clustername> shrink [-n <count>]
-	   deploy [-vd] cluster <clustername> -K <kind> (package|pkg) <pkgname> (add|install)
-	   deploy [-vd] cluster <clustername> -K <kind> (package|pkg) <pkgname> check
-	   deploy [-vd] cluster <clustername> -K <kind> (package|pkg) <pkgname> (delete|destroy|remove|rm|uninstall)
-	   deploy [-vd] cluster <clustername> (service|svc) <svcname> (add|install)
-	   deploy [-vd] cluster <clustername> (service|svc) <pkgname> (check|start|state|stop)
-	   deploy [-vd] cluster <clustername> (service|svc) <pkgname> (delete|destroy|remove|rm|uninstall)
+	   deploy [-vd] cluster <clustername> component <pkgname> (add|install) [--no-master][--no-node]
+	   deploy [-vd] cluster <clustername> component <pkgname> check
+	   deploy [-vd] cluster <clustername> component <pkgname> (delete|destroy|remove|rm|uninstall)
+	   deploy [-vd] cluster <clustername> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
 	   deploy [-vd] cluster <clustername> (dcos|marathon|kubectl) [-- <arg>...]
+	   deploy [-vd] cluster <clustername> nas <nasname> create [-u <storage unit size>][-n <storage unit count>]
+	   deploy [-vd] cluster <clustername> nas <nasname> (expand|shrink) [-n <storage unit count>]
+	   deploy [-vd] cluster <clustername> nas <nasname> (delete|destroy|remove|rm) [-y]
+	   deploy [-vd] cluster <clustername> nas <nasname> share <sharename> create [--acl <acls>]
+	   deploy [-vd] cluster <clustername> nas <nasname> share <sharename> (delete|destroy|remove|rm)
+	   deploy [-vd] cluster <clustername> nas <nasname> share <sharename> mount <mountpoint>
+	   deploy [-vd] cluster <clustername> nas <nasname> share <sharename> (umount|unmount)
 	   deploy [-vd] host help <command>
 	   deploy [-vd] host <host name or id> component <pkgname> (add|install)
 	   deploy [-vd] host <host name or id> component <pkgname> check
 	   deploy [-vd] host <host name or id> component <pkgname> (delete|destroy|remove|rm|uninstall)
-	   deploy [-vd] host <host name or id> (service|svc) <svcname> (add|install)
-	   deploy [-vd] host <host name or id> (service|svc) <svcname> (check|start|state|stop)
-	   deploy [-vd] host <host name or id> (service|svc) <svcname> (delete|destroy|remove|rm|uninstall)
+	   deploy [-vd] host <host name or id> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
 
 Options:
-  -C --complexity <complexity>  Defines complexity
-  -d --debug                    Enable debug suplemental information
-  -F --flavor <flavor>          Defines flavor
-  -f --force                    Force action even when an error occured
-  -h --help                     Print help message
-  -K --kind <kind>              Defines kind of package manager
-  -k --keep-on-failure          Don't delete the resources on failure
-  -N --cidr <cidr>              Defines CIDR
-  -v --verbose                  Enable verbosity
-  -y --assume-yes               Automatically responds y to question
-  --cpu <cpu>                   Defines number of CPU of host
-  --disk <disk>                 Defines system disk size
-  --os <os>                     Defines Linux Operating System
-  --ram <ram>                   Defines ram size`
+  -C --complexity <complexity>          Defines complexity
+  -d --debug                            Enable debug suplemental information
+  -F --flavor <flavor>                  Defines flavor
+  -f --force                            Force action even when an error occured
+  -h --help                             Print help message
+  -k --keep-on-failure                  Don't delete the resources on failure
+  -N --cidr <cidr>                      Defines CIDR
+  -n --unit-count <storage unit count>  Defines the number of storage units
+  -u --unit-size <storage unit size>    Defines the size in GB of a storage unit size for the nas
+  -v --verbose                          Enable verbosity
+  -y --assume-yes                       Automatically responds y to question
+  --cpu <cpu>                           Defines number of CPU of host
+  --disk <disk>                         Defines system disk size
+  --os <os>                             Defines Linux Operating System
+  --ram <ram>                           Defines ram size
+  --no-master                           Disables component installation on master(s)
+  --no-node                             Disables component installation on node(s)`
 )
 
 func main() {
