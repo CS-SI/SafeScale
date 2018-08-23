@@ -93,13 +93,13 @@ func getFreePort() (int, error) {
 }
 
 // CreateTempFileFromString creates a tempory file containing 'content'
-func CreateTempFileFromString(content string) (*os.File, error) {
+func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, error) {
 	f, err := ioutil.TempFile("/tmp", "")
 	if err != nil {
 		return nil, err
 	}
 	f.WriteString(content)
-	f.Chmod(0400)
+	f.Chmod(filemode)
 	f.Close()
 	return f, nil
 }
@@ -117,7 +117,7 @@ func isTunnelReady(port int) bool {
 
 //CreateTunnel create SSH from local host to remote host throw gateway
 func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
-	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey)
+	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +314,7 @@ func (ssh *SSHConfig) createTunnels() ([]*sshTunnel, *SSHConfig, error) {
 }
 
 func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string, *os.File, error) {
-	f, err := CreateTempFileFromString(sshConfig.PrivateKey)
+	f, err := CreateTempFileFromString(sshConfig.PrivateKey, 0400)
 	if err != nil {
 		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
@@ -393,7 +393,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) error {
 		return fmt.Errorf("Unable to create tunnels : %s", err.Error())
 	}
 
-	identityfile, err := CreateTempFileFromString(sshConfig.PrivateKey)
+	identityfile, err := CreateTempFileFromString(sshConfig.PrivateKey, 0400)
 	if err != nil {
 		return fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
@@ -440,7 +440,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) error {
 
 // UploadString uploads a string into a remote file
 func (ssh *SSHConfig) UploadString(remotePath, content string) error {
-	f, err := CreateTempFileFromString(content)
+	f, err := CreateTempFileFromString(content, 0400)
 	if err != nil {
 		return err
 	}
