@@ -53,55 +53,54 @@ type SSHService struct {
 	hostService HostAPI
 }
 
-//Run execute command on the host
-func (srv *SSHService) Run(hostName, cmd string) (string, string, int, error) {
+// Run tries to execute command 'cmd' on the host
+func (svc *SSHService) Run(hostName, cmd string) (string, string, int, error) {
 	var stdOut, stdErr string
 	var retCode int
 	var err error
 
+	// retrieve ssh config to perform some commands
+	ssh, err := svc.provider.GetSSHConfig(hostName)
+	if err != nil {
+		return "", "", 0, err
+	}
+	err = ssh.WaitServerReady(2 * time.Minute)
+	if err != nil {
+		return "", "", 0, err
+	}
+
 	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			stdOut, stdErr, retCode, err = srv.run(hostName, cmd)
+			retCode, stdOut, stdErr, err = svc.run(ssh, cmd)
 			return err
 		},
-		1*time.Minute,
+		2*time.Minute,
 		retry.NotifyByLog)
 
 	return stdOut, stdErr, retCode, err
 }
 
-//run execute command on the host
-func (srv *SSHService) run(hostName, cmd string) (string, string, int, error) {
-	host, err := srv.hostService.Get(hostName)
-	if err != nil {
-		return "", "", 1, fmt.Errorf("no host found with name or id '%s'", hostName)
-	}
-
-	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(host.ID)
-	if err != nil {
-		return "", "", 1, err
-	}
-
+// run executes command on the host
+func (svc *SSHService) run(ssh *system.SSHConfig, cmd string) (int, string, string, error) {
 	// Create the command
 	sshcmd, err := ssh.Command(cmd)
 	if err != nil {
-		return "", "", 1, err
+		return 0, "", "", err
 	}
 
 	// Set up the outputs (std and err)
 	stdOut, err := sshcmd.StdoutPipe()
 	if err != nil {
-		return "", "", 1, err
+		return 0, "", "", err
 	}
 	stderr, err := sshcmd.StderrPipe()
 	if err != nil {
-		return "", "", 1, err
+		return 0, "", "", err
 	}
 
 	// Launch the command and wait for its execution
 	if err = sshcmd.Start(); err != nil {
-		return "", "", 1, err
+		return 0, "", "", err
 	}
 
 	msgOut, _ := ioutil.ReadAll(stdOut)
@@ -110,12 +109,12 @@ func (srv *SSHService) run(hostName, cmd string) (string, string, int, error) {
 	if err = sshcmd.Wait(); err != nil {
 		msgError, retCode, erro := system.ExtractRetCode(err)
 		if erro != nil {
-			return "", "", 1, err
+			return 0, "", "", err
 		}
-		return string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), retCode, nil
+		return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
 	}
 
-	return string(msgOut[:]), string(msgErr[:]), 0, nil
+	return 0, string(msgOut[:]), string(msgErr[:]), nil
 }
 
 func extracthostName(in string) (string, error) {
@@ -153,7 +152,7 @@ func extractPath(in string) (string, error) {
 }
 
 //Copy copy file/directory
-func (srv *SSHService) Copy(from, to string) error {
+func (svc *SSHService) Copy(from, to string) error {
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -196,13 +195,13 @@ func (srv *SSHService) Copy(from, to string) error {
 		upload = true
 	}
 
-	host, err := srv.hostService.Get(hostName)
+	host, err := svc.hostService.Get(hostName)
 	if err != nil {
 		return fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := srv.provider.GetSSHConfig(host.ID)
+	ssh, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return err
 	}
