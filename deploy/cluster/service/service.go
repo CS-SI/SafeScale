@@ -61,22 +61,22 @@ func (s *Service) GetComponent() installapi.ComponentAPI {
 }
 
 // State ...
-func (s *Service) State(target installapi.TargetAPI) error {
+func (s *Service) State(target installapi.Target) error {
 	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.StateScript, brokerclient.DefaultTimeout)
 }
 
 // Start ...
-func (s *Service) Start(target installapi.TargetAPI) error {
+func (s *Service) Start(target installapi.Target) error {
 	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.StartScript, brokerclient.DefaultTimeout)
 }
 
 // Stop ...
-func (s *Service) Stop(target installapi.TargetAPI) error {
+func (s *Service) Stop(target installapi.Target) error {
 	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.StopScript, brokerclient.DefaultTimeout)
 }
 
 // Restart ...
-func (s *Service) Restart(target installapi.TargetAPI) error {
+func (s *Service) Restart(target installapi.Target) error {
 	err := s.Stop(target)
 	if err != nil {
 		return err
@@ -85,11 +85,11 @@ func (s *Service) Restart(target installapi.TargetAPI) error {
 }
 
 // Pause ...
-func (s *Service) Pause(target installapi.TargetAPI) error {
+func (s *Service) Pause(target installapi.Target) error {
 	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.PauseScript, brokerclient.DefaultTimeout)
 }
 
 // Resume ...
-func (s *Service) Resume(target installapi.TargetAPI) error {
+func (s *Service) Resume(target installapi.Target) error {
 	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.ResumeScript, brokerclient.DefaultTimeout)
 }

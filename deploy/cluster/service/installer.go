@@ -14,7 +14,7 @@ type dcosPackageInstaller struct {
 }
 
 // Add ...
-func (i *dcosPackageInstaller) Add(t installapi.TargetAPI) error {
+func (i *dcosPackageInstaller) Add(t installapi.Target) error {
 	c, ok := t.(clusterapi.ClusterAPI)
 	if !ok {
 		panic("cluster.install.dcosPackageInstaller.Add() applied on non-cluster target!")
@@ -27,7 +27,7 @@ func (i *dcosPackageInstaller) Add(t installapi.TargetAPI) error {
 }
 
 // Remove ...
-func (i *dcosPackageInstaller) Remove(t installapi.TargetAPI) error {
+func (i *dcosPackageInstaller) Remove(t installapi.Target) error {
 	c, ok := t.(clusterapi.ClusterAPI)
 	if !ok {
 		panic("cluster.install.dcosPackageInstaller.Remove() applied on non-cluster target!")
@@ -53,7 +53,7 @@ type helmInstaller struct {
 	installer installapi.Installer
 }
 
-func (i *helmInstaller) Add(t installapi.TargetAPI) error {
+func (i *helmInstaller) Add(t installapi.Target) error {
 	c, ok := t.(clusterapi.ClusterAPI)
 	if !ok {
 		panic("cluster.install.helmInstaller.Add() applied on non-cluster target!")
@@ -61,7 +61,7 @@ func (i *helmInstaller) Add(t installapi.TargetAPI) error {
 	return fmt.Errorf("helmInstaller.Add() not yet implemented")
 }
 
-func (i *helmInstaller) Remove(t installapi.TargetAPI) error {
+func (i *helmInstaller) Remove(t installapi.Target) error {
 	c, ok := t.(clusterapi.ClusterAPI)
 	if !ok {
 		panic("cluster.install.helmInstaller.Remove() applied on non-cluster target!")
@@ -85,7 +85,7 @@ type scriptInstaller struct {
 }
 
 // Add ...
-func (i *scriptInstaller) Add(t installapi.TargetAPI) error {
+func (i *scriptInstaller) Add(t installapi.Target) error {
 	c, ok := t.(clusterapi.ClusterAPI)
 	if !ok {
 		panic("cluster.install.scriptInstaller.Add() applied on non-cluster target!")
@@ -95,7 +95,7 @@ func (i *scriptInstaller) Add(t installapi.TargetAPI) error {
 }
 
 // Remove ...
-func (i *scriptInstaller) Remove(t installapi.TargetAPI) error {
+func (i *scriptInstaller) Remove(t installapi.Target) error {
 	c, ok := t.(clusterapi.ClusterAPI)
 	if !ok {
 		panic("cluster.install.scriptInstaller.Remove() applied on non-cluster target!")
@@ -123,7 +123,7 @@ func (i *dcosInstaller) GetName() {
 }
 
 // Add installs the component using DCOS
-func (i *dcosInstaller) Add(t api.TargetAPI) error {
+func (i *dcosInstaller) Add(t api.Target) error {
 	if i.AddCommand != "" {
 		cmdStr := "sudo -u cladm -i " + i.AddCommand
 		return brokerclient.New().Ssh.Run(h.ID, cmdStr, brokerclient.DefaultTimeout)
@@ -132,7 +132,7 @@ func (i *dcosInstaller) Add(t api.TargetAPI) error {
 }
 
 // Remove uninstalls the component using the RemoveScript script
-func (i *dcosInstaller) Remove(t api.TargetAPI) error {
+func (i *dcosInstaller) Remove(t api.Target) error {
 	if i.RemoveCommand != "" {
 		cmdStr := "sudo -u cladm -i " + i.AddCommand
 		return brokerclient.New().Ssh.Run(h.ID, cmdStr, brokerclient.DefaultTimeout)
