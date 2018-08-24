@@ -334,18 +334,6 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		goto cleanNetwork
 	}
 
-	switch req.Complexity {
-	case Complexity.Dev:
-		masterCount = 1
-		privateNodeCount = 1
-	case Complexity.Normal:
-		masterCount = 3
-		privateNodeCount = 3
-	case Complexity.Volume:
-		masterCount = 5
-		privateNodeCount = 3
-	}
-
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Step 1: starts masters and nodes creations

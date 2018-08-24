@@ -19,6 +19,7 @@ package openstack
 import (
 	"fmt"
 	"log"
+	"reflect"
 
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
@@ -113,6 +114,7 @@ type CfgOptions struct {
 
 // ProviderErrorToString creates an error string from openstack api error
 func ProviderErrorToString(err error) string {
+	log.Println("ProviderErrorToString(%s)", reflect.TypeOf(err))
 	switch e := err.(type) {
 	case *gc.ErrUnexpectedResponseCode:
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
