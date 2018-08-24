@@ -26,6 +26,7 @@ component:
                 public: all
     installing:
         script:
+            estimated_execution_time: 15
             check: |
                 case $LINUX_KIND in
                     debian|ubuntu)
