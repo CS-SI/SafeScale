@@ -263,21 +263,10 @@ var clusterCreateCommand = &cli.Command{
 			if clusterInstance != nil {
 				clusterInstance.Delete()
 			}
-			fmt.Printf("failed to create cluster: %s", err.Error())
+			fmt.Printf("failed to create cluster: %s\n", err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
 
-		// jsoned, err := json.Marshal(clusterInstance.GetConfig())
-		// if err != nil {
-		// 	fmt.Printf("%v\n", err)
-		// 	os.Exit(int(ExitCode.Run))
-		// }
-		// var toFormat map[string]interface{}
-		// err = json.Unmarshal(jsoned, &toFormat)
-		// if err != nil {
-		// 	fmt.Printf("%v\n", err)
-		// 	os.Exit(int(ExitCode.Run))
-		// }
 		toFormat, err := convertStructToMap(clusterInstance.GetConfig())
 		if err != nil {
 			fmt.Printf("%v\n", err)
