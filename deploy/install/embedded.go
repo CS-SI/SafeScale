@@ -285,23 +285,23 @@ func init() {
 	}
 
 	for _, item := range allEmbedded {
-		allEmbeddedMap[item.ShortFileName()] = item
+		allEmbeddedMap[item.BaseFilename()] = item
 		allEmbeddedMap[item.DisplayName()] = item
 		installers := item.Specs().GetStringMap("component.installing")
 		for k := range installers {
 			method, err := Method.Parse(k)
 			if err != nil {
 				panic(fmt.Sprintf("syntax error in component '%s' specification file (%s)! installing method '%s' unknown!",
-					item.DisplayName(), item.FullFileName(), k))
+					item.DisplayName(), item.DisplayFilename(), k))
 			}
 			if _, found := availableEmbeddedMap[method]; !found {
 				availableEmbeddedMap[method] = map[string]api.Component{
-					item.DisplayName():   item,
-					item.ShortFileName(): item,
+					item.DisplayName():  item,
+					item.BaseFilename(): item,
 				}
 			} else {
 				availableEmbeddedMap[method][item.DisplayName()] = item
-				availableEmbeddedMap[method][item.ShortFileName()] = item
+				availableEmbeddedMap[method][item.BaseFilename()] = item
 			}
 		}
 	}

@@ -111,14 +111,14 @@ func (c *component) DisplayName() string {
 	return c.displayName
 }
 
-// ShortFileName returns the name of the component specification file without '.yml'
-func (c *component) ShortFileName() string {
+// BaseFilename returns the name of the component specification file without '.yml'
+func (c *component) BaseFilename() string {
 	return c.fileName
 }
 
-// FullFileName returns the full file name, with [embedded] added at the end if the
+// DisplayFilename returns the full file name, with [embedded] added at the end if the
 // component is embedded.
-func (c *component) FullFileName() string {
+func (c *component) DisplayFilename() string {
 	filename := c.fileName + ".yml"
 	if c.embedded {
 		filename += " [embedded]"

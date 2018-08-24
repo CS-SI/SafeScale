@@ -27,11 +27,11 @@ type ServiceAPI interface {
 	// GetComponent ...
 	GetComponent() installapi.ComponentAPI
 	// State ...
-	State(installapi.TargetAPI) error
+	State(installapi.Target) error
 	// Start ...
-	Start(installapi.TargetAPI) error
+	Start(installapi.Target) error
 	// Stop ...
-	Stop(installapi.TargetAPI) error
+	Stop(installapi.Target) error
 }
 
 // Manager defines the data needed for the service object to manage a component that have to react as a service

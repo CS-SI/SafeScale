@@ -2,25 +2,27 @@ GO?=go
 
 .PHONY: clean cluster install service cli vet
 
-all:    cluster install service cli
+all:    cluster install cli #service
 
 vet:
 	@$(GO) vet
 	@$(GO) vet ./cmds
 
-cli:	cluster install service
+cli:	cluster install #service
 	@(cd cli && $(MAKE))
 
 cluster:
 	@(cd cluster && $(MAKE))
 
 install:
-	@(cd cluster && $(MAKE))
+	@(cd install && $(MAKE))
 
 service:
-	@(cd cluster && $(MAKE))
+	@(cd service && $(MAKE))
 
 clean:
+	@(cd cli && $(MAKE) $(@))
 	@(cd cluster && $(MAKE) $(@))
-	@$(RM) $(EXEC)
+	@(cd install && $(MAKE) $(@))
+	#@(cd service && $(MAKE) $(@))
 
