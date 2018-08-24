@@ -27,7 +27,7 @@ component:
                 public: all
     installing:
         script:
-            duration: 15
+            estimated_execution_time: 15
             check: |
                 which /usr/local/bin/mpiexec &>/dev/null
 
