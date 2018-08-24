@@ -41,41 +41,30 @@ type Target interface {
 	List() []string
 }
 
-// CheckState contains the result of a component check on one host
-type CheckState struct {
-	// Success tells if the check was successful
-	Success bool
-	// Present tells if the component is installed
-	Present bool
-	// Error contains the error message if Success==false
-	Error string
-}
-
 // CheckResults contains the result of a component Check
 // In single host mode, the results are stored in PrivateNodes
 // In cluster mode, all results are stored in appropriate fields
 type CheckResults struct {
-	Masters      map[string]CheckState
-	PrivateNodes map[string]CheckState
-	PublicNodes  map[string]CheckState
+	Masters      map[string]string
+	PrivateNodes map[string]string
+	PublicNodes  map[string]string
 }
 
-// Errors concatenates all errors found in CheckResults
 func (r CheckResults) Errors() string {
 	errors := []string{}
 	for _, i := range r.Masters {
-		if !i.Success {
-			errors = append(errors, i.Error)
+		if i != ComponentPresent && i != ComponentAbsent {
+			errors = append(errors, i)
 		}
 	}
 	for _, i := range r.PrivateNodes {
-		if !i.Success {
-			errors = append(errors, i.Error)
+		if i != ComponentPresent && i != ComponentAbsent {
+			errors = append(errors, i)
 		}
 	}
 	for _, i := range r.PublicNodes {
-		if !i.Success {
-			errors = append(errors, i.Error)
+		if i != ComponentPresent && i != ComponentAbsent {
+			errors = append(errors, i)
 		}
 	}
 	return strings.Join(errors, "\n")
@@ -137,10 +126,10 @@ type InstallerMap map[Method.Enum]Installer
 type Component interface {
 	// DisplayName ...
 	DisplayName() string
-	// BaseFilename ...
-	BaseFilename() string
-	// DisplayFilename ...
-	DisplayFilename() string
+	// ShortFileName ...
+	ShortFileName() string
+	// FullFileName ...
+	FullFileName() string
 	// Specs ...
 	Specs() *viper.Viper
 	// Applyable if the component is installable on the target
