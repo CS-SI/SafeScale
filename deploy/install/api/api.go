@@ -23,13 +23,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-const (
-	// ComponentPresent is the value returned by a check to tell the component is installed
-	ComponentPresent = "present"
-	// ComponentAbsent us the value returned by a check to tell the component is not installed
-	ComponentAbsent = "absent"
-)
-
 // Target is an interface that target must satisfy to be able to install something
 // on it
 type Target interface {
@@ -41,30 +34,37 @@ type Target interface {
 	List() []string
 }
 
+// CheckState ...
+type CheckState struct {
+	Success bool
+	Present bool
+	Error   string
+}
+
 // CheckResults contains the result of a component Check
 // In single host mode, the results are stored in PrivateNodes
 // In cluster mode, all results are stored in appropriate fields
 type CheckResults struct {
-	Masters      map[string]string
-	PrivateNodes map[string]string
-	PublicNodes  map[string]string
+	Masters      map[string]CheckState
+	PrivateNodes map[string]CheckState
+	PublicNodes  map[string]CheckState
 }
 
 func (r CheckResults) Errors() string {
 	errors := []string{}
 	for _, i := range r.Masters {
-		if i != ComponentPresent && i != ComponentAbsent {
-			errors = append(errors, i)
+		if !i.Success {
+			errors = append(errors, i.Error)
 		}
 	}
 	for _, i := range r.PrivateNodes {
-		if i != ComponentPresent && i != ComponentAbsent {
-			errors = append(errors, i)
+		if !i.Success {
+			errors = append(errors, i.Error)
 		}
 	}
 	for _, i := range r.PublicNodes {
-		if i != ComponentPresent && i != ComponentAbsent {
-			errors = append(errors, i)
+		if !i.Success {
+			errors = append(errors, i.Error)
 		}
 	}
 	return strings.Join(errors, "\n")
@@ -127,9 +127,9 @@ type Component interface {
 	// DisplayName ...
 	DisplayName() string
 	// ShortFileName ...
-	ShortFileName() string
-	// FullFileName ...
-	FullFileName() string
+	BaseFilename() string
+	// FullFilename ...
+	DisplayFilename() string
 	// Specs ...
 	Specs() *viper.Viper
 	// Applyable if the component is installable on the target
