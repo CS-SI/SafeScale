@@ -17,8 +17,6 @@ component:
     name: RemoteDesktop
     requirements:
         - docker
-        - xfce
-        - tigervnc
     targeting:
         host: no
         cluster:
@@ -28,7 +26,70 @@ component:
                 public: no
     installing:
         script:
+            estimated_execution_time: 15
             install: |
+                ###########################################################
+                # Install xfce + tigervnc                                 #
+                ###########################################################
+
+                # Configure Xvnc parameters
+                mkdir -p ~cladm/.vnc
+                cat >~cladm/.vnc/xstartup <<-'EOF'
+                #!/bin/sh
+                unset SESSION_MANAGER
+                unset DBUS_SESSION_BUS_ADDRESS
+                export DISPLAY=:0
+                exec startxfce4
+                EOF
+                chmod u+rx ~cladm/.vnc/xstartup
+
+                cat >~cladm/.vnc/config <<-'EOF'
+                screen=0 1600x900x24
+                geometry=1600x900
+                desktop={{ .ClusterName }}-master-{{ .MasterIndex }}
+                passwordfile=
+                extension=GLX
+                noreset
+                SecurityTypes=None
+                ZlibLevel=0
+                EOF
+                chown -R cladm:cladm ~cladm/.vnc
+
+                case $LINUX_KIND in
+                    centos|redhat)
+                        yum install -y epel-release && \
+                        yum make-cache fast && \
+                        yum groupinstall -y -t "X Window system" && \
+                        yum groupinstall -y -t Xfce && \
+                        yum install -y -t xorg-x11-fonts-Type1 firefox tigervnc-server && \
+                        cp -s /lib/systemd/system/vncserver\@.service /etc/systemd/system/vncserver\@:0.service && \
+                        sed -i -e "s/<USER>/{{ .Username }}/g" /etc/systemd/system/vncserver\@:0.service && \
+                        systemctl daemon-reload && \
+                        systemctl enable vncserver\@:0.service && \
+                        systemctl restart vncserver\@:0.service
+
+                        ;;
+                    debian|ubuntu)
+                        wait_for_apt && apt update && \
+                        wait_for_apt && apt install -y xfce4 firefox
+                        if "$VERSION_ID" = "16.04" ]; then
+                            wget -O tigervnc.tar.gz https://bintray.com/tigervnc/stable/download_file?file_path=tigervnc-1.9.0.x86_64.tar.gz && \
+                            tar --strip-components=1 -zxvf tigervnc.tar.gz -C / || exit $?
+                            rm -rf tigervnc.tar.gz
+                        else
+                            wait_for_apt && apt install -y tigervnc-standalone-server || exit $?
+                        fi
+                        cp -s /lib/systemd/system/vncserver\@.service /etc/systemd/system/vncserver\@:0.service && \
+                        sed -i -e "s/<USER>/{{ .Username }}/g" /etc/systemd/system/vncserver\@:0.service && \
+                        systemctl daemon-reload && \
+                        systemctl enable vncserver\@:0.service && \
+                        systemctl restart vncserver\@:0.service
+                        ;;
+                    *)
+                        echo "unsupported OS type '$LINUX_KIND'"
+                        exit 1;;
+                esac
+
                 ###########################################################
                 # Prepares remotedesktop docker image, based on guacamole #
                 ###########################################################
@@ -216,6 +277,11 @@ component:
 
                 docker build -t remotedesktop:latest . && \
                 cd .. && rm -rf remotedesktop.image
+
+                ###########################################################
+                # Starts remotedesktop container                          #
+                ###########################################################
+                docker run --rm -d --hostname remotedesktop --name remotedesktop remotedesktop:latest
 
             uninstall: |
                 docker rm -f remotedesktop
