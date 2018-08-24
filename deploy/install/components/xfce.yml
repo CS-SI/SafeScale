@@ -54,7 +54,7 @@ component:
                         ;;
                     debian|ubuntu)
                         wait_for_apt && apt update && \
-                        wait_for_apt && apt install -y xfce4 xorg-x11-fonts-Type1 firefox
+                        wait_for_apt && apt install -y xfce4 firefox
                         ;;
                     *)
                         echo "unsupported OS type '$LINUX_KIND'"
