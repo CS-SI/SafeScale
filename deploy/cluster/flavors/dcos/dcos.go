@@ -43,6 +43,8 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/components"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos/ErrorCode"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
+	"github.com/CS-SI/SafeScale/deploy/install"
+	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 
 	"github.com/CS-SI/SafeScale/providers"
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
@@ -256,16 +258,18 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 
 	// Saving cluster parameters, with status 'Creating'
 	var (
-		instance                                       Cluster
-		manager                                        *managerData
-		masterCount, privateNodeCount                  int
-		kp                                             *providerapi.KeyPair
-		kpName                                         string
+		instance                      Cluster
+		masterCount, privateNodeCount int
+		// kp                                             *providerapi.KeyPair
+		// kpName                                         string
 		gw                                             *providerapi.Host
 		m                                              *providermetadata.Gateway
-		found                                          bool
+		ok                                             bool
 		bootstrapChannel, mastersChannel, nodesChannel chan error
 		bootstrapStatus, mastersStatus, nodesStatus    error
+		results                                        installapi.AddResults
+		target                                         installapi.Target
+		component                                      installapi.Component
 	)
 
 	svc, err := provideruse.GetProviderService()
@@ -273,53 +277,57 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		goto cleanNetwork
 	}
 
-	// Create a KeyPair for the cluster
-	kpName = "cluster_" + req.Name + "_key"
-	svc.DeleteKeyPair(kpName)
-	kp, err = svc.CreateKeyPair(kpName)
-	if err != nil {
-		err = fmt.Errorf("failed to create Key Pair: %s", err.Error())
-		goto cleanNetwork
-	}
-	defer svc.DeleteKeyPair(kpName)
-
-	m, err = providermetadata.NewGateway(svc, req.NetworkID)
-	if err != nil {
-		goto cleanNetwork
-	}
-	found, err = m.Read()
-	if err != nil {
-		goto cleanNetwork
-	}
-	if !found {
-		err = fmt.Errorf("failed to load gateway metadata")
-		goto cleanNetwork
-	}
-	gw = m.Get()
-
-	// Saving cluster parameters, with status 'Creating'
-	manager = &managerData{
-		BootstrapID: gw.ID,
-		BootstrapIP: gw.PrivateIPsV4[0],
-	}
+	// Saving cluster metadata, with status 'Creating'
 	instance = Cluster{
 		Common: &clusterapi.Cluster{
-			Name:          req.Name,
-			CIDR:          req.CIDR,
-			Flavor:        Flavor.DCOS,
-			State:         ClusterState.Creating,
-			Complexity:    req.Complexity,
-			Tenant:        req.Tenant,
-			NetworkID:     req.NetworkID,
-			Keypair:       kp,
+			Name:       req.Name,
+			CIDR:       req.CIDR,
+			Flavor:     Flavor.DCOS,
+			State:      ClusterState.Creating,
+			Complexity: req.Complexity,
+			Tenant:     req.Tenant,
+			NetworkID:  req.NetworkID,
+			//Keypair:       kp,
 			AdminPassword: cladmPassword,
 			PublicIP:      gw.GetAccessIP(),
 			NodesDef:      &nodesDef,
 		},
 		provider: svc,
-		manager:  manager,
+		manager:  &managerData{},
 	}
-	instance.SetAdditionalInfo(AdditionalInfo.Flavor, manager)
+	instance.SetAdditionalInfo(AdditionalInfo.Flavor, instance.manager)
+	err = instance.updateMetadata()
+	if err != nil {
+		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
+		goto cleanNetwork
+	}
+
+	// // Create a KeyPair for the cluster
+	// kpName = "cluster_" + req.Name + "_key"
+	// svc.DeleteKeyPair(kpName)
+	// kp, err = svc.CreateKeyPair(kpName)
+	// if err != nil {
+	// 	err = fmt.Errorf("failed to create Key Pair: %s", err.Error())
+	// 	goto cleanNetwork
+	// }
+	// defer svc.DeleteKeyPair(kpName)
+
+	m, err = providermetadata.NewGateway(svc, req.NetworkID)
+	if err != nil {
+		goto cleanNetwork
+	}
+	ok, err = m.Read()
+	if err != nil {
+		goto cleanNetwork
+	}
+	if !ok {
+		err = fmt.Errorf("failed to load gateway metadata")
+		goto cleanNetwork
+	}
+	gw = m.Get()
+	instance.Common.PublicIP = gw.GetAccessIP()
+	instance.manager.BootstrapID = gw.ID
+	instance.manager.BootstrapIP = gw.PrivateIPsV4[0]
 	err = instance.updateMetadata()
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
@@ -390,6 +398,40 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	}
 	if nodesStatus != nil {
 		err = nodesStatus
+		goto cleanNodes
+	}
+
+	// Installs remotedesktop component
+	target = install.NewClusterTarget(&instance)
+	component, err = install.NewComponent("remotedesktop")
+	if err != nil {
+		log.Printf("[Master] failed to remotely install component 'RemoteDesktop': %s\n", err.Error())
+		goto cleanNodes
+	}
+	ok, results, err = component.Add(target, map[string]interface{}{})
+	if err != nil {
+		goto cleanNodes
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[Master] installation script of component 'RemoteDesktop' failed: %s\n", msg)
+		err = fmt.Errorf(msg)
+		goto cleanNodes
+	}
+	// Installing kubernetes component
+	component, err = install.NewComponent("kubernetes")
+	if err != nil {
+		log.Printf("[Master] failed to remotely install component 'Kubernetes': %s\n", err.Error())
+		goto cleanNodes
+	}
+	ok, results, err = component.Add(target, map[string]interface{}{})
+	if err != nil {
+		goto cleanNodes
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[Master] installation script of component 'RemoteDesktop' failed: %s\n", msg)
+		err = fmt.Errorf(msg)
 		goto cleanNodes
 	}
 

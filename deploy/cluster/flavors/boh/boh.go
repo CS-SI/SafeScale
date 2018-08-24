@@ -38,10 +38,11 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/NodeType"
-	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos/ErrorCode"
+	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh/ErrorCode"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 
 	"github.com/CS-SI/SafeScale/deploy/install"
+	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 
 	"github.com/CS-SI/SafeScale/providers"
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
@@ -104,7 +105,7 @@ type managerData struct {
 	PublicLastIndex int
 }
 
-// Cluster is the object describing a cluster created by ClusterManagerAPI.CreateCluster
+// Cluster is the object describing a cluster
 type Cluster struct {
 	// common cluster data
 	Common *clusterapi.Cluster
@@ -187,13 +188,16 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	var (
 		nodesDef         pb.HostDefinition
 		instance         Cluster
-		manager          *managerData
 		privateNodeCount int
 		gw               *providerapi.Host
 		m                *providermetadata.Gateway
-		found            bool
-		masterChannel    chan error
-		nodesStatus      error
+		//found            bool
+		//masterChannel    chan error
+		nodesStatus error
+		ok          bool
+		results     installapi.AddResults
+		target      installapi.Target
+		component   installapi.Component
 	)
 
 	// Generate needed password for account cladm
@@ -241,45 +245,43 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		goto cleanNetwork
 	}
 
-	m, err = providermetadata.NewGateway(svc, req.NetworkID)
-	if err != nil {
-		goto cleanNetwork
-	}
-	found, err = m.Read()
-	if err != nil {
-		goto cleanNetwork
-	}
-	if !found {
-		err = fmt.Errorf("failed to load gateway metadata")
-		goto cleanNetwork
-	}
-	gw = m.Get()
-
 	// Saving cluster parameters, with status 'Creating'
-	manager = &managerData{}
 	instance = Cluster{
 		Common: &clusterapi.Cluster{
-			Name:       req.Name,
-			CIDR:       req.CIDR,
-			Flavor:     Flavor.BOH,
-			State:      ClusterState.Creating,
-			Complexity: req.Complexity,
-			Tenant:     req.Tenant,
-			NetworkID:  req.NetworkID,
-			//Keypair:       kp,
+			Name:          req.Name,
+			CIDR:          req.CIDR,
+			Flavor:        Flavor.BOH,
+			State:         ClusterState.Creating,
+			Complexity:    req.Complexity,
+			Tenant:        req.Tenant,
+			NetworkID:     req.NetworkID,
 			AdminPassword: cladmPassword,
-			PublicIP:      gw.GetAccessIP(),
 			NodesDef:      &nodesDef,
 		},
-		manager:  manager,
+		manager:  &managerData{},
 		provider: svc,
 	}
-	instance.SetAdditionalInfo(AdditionalInfo.Flavor, manager)
+	instance.SetAdditionalInfo(AdditionalInfo.Flavor, instance.manager)
 	err = instance.updateMetadata()
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
 		goto cleanNetwork
 	}
+
+	m, err = providermetadata.NewGateway(svc, req.NetworkID)
+	if err != nil {
+		goto cleanNetwork
+	}
+	ok, err = m.Read()
+	if err != nil {
+		goto cleanNetwork
+	}
+	if !ok {
+		err = fmt.Errorf("failed to load gateway metadata")
+		goto cleanNetwork
+	}
+	gw = m.Get()
+	instance.Common.PublicIP = gw.GetAccessIP()
 
 	switch req.Complexity {
 	case Complexity.Dev:
@@ -299,21 +301,31 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 	}
 
 	// step 2: configure master asynchronously
-	masterChannel = make(chan error)
-	go instance.asyncConfigureMaster(masterChannel)
+	//	masterChannel = make(chan error)
+	//	go instance.asyncConfigureMaster(masterChannel)
 
-	// Step 3: starts node creation
+	// Step 3: starts node creation in parallel
 	nodesStatus = instance.createNodes(privateNodeCount, false, &nodesDef)
+	if nodesStatus != nil {
+		err = nodesStatus
+		goto cleanNodes
+	}
 
-	// step 4: waits master configuration end
-	err = <-masterChannel
-
-	// step 5: reacts on error(s)
+	// Installs components
+	target = install.NewClusterTarget(&instance)
+	component, err = install.NewComponent("remotedesktop")
+	if err != nil {
+		log.Printf("[Master] failed to remotely install component 'RemoteDesktop': %s\n", err.Error())
+		goto cleanNodes
+	}
+	ok, results, err = component.Add(target, map[string]interface{}{})
 	if err != nil {
 		goto cleanNodes
 	}
-	if nodesStatus != nil {
-		err = nodesStatus
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[Master] installation script of component 'RemoteDesktop' failed: %s\n", msg)
+		err = fmt.Errorf(msg)
 		goto cleanNodes
 	}
 
@@ -559,12 +571,7 @@ func (c *Cluster) buildHostname(core string, nodeType NodeType.Enum) (string, er
 func (c *Cluster) asyncConfigureMaster(done chan error) {
 	log.Println("[Master] starting configuration...")
 
-	host, err := brokerclient.New().Host.Inspect(c.manager.MasterID, brokerclient.DefaultTimeout)
-	if err != nil {
-		done <- err
-		return
-	}
-	target := install.NewHostTarget(host)
+	target := install.NewClusterTarget(c)
 
 	// Installing component RemoteDesktop on master host
 	component, err := install.NewComponent("remotedesktop")
@@ -882,6 +889,12 @@ func (c *Cluster) Delete() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// Delete the Master
+	err = broker.Host.Delete(c.manager.MasterID, brokerclient.DefaultTimeout)
+	if err != nil {
+		return err
 	}
 
 	// Deletes the network and gateway
