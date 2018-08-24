@@ -39,18 +39,18 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target) (bool, api.CheckRes
 	if !specs.IsSet("component.installing.dcos.check") {
 		msg := `syntax error in component '%s' specification file (%s):
 				no key 'component.installing.dcos.check' found`
-		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 	checkScript := specs.GetString("component.installing.dcos.check")
 	if strings.TrimSpace(checkScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
 				key 'component.installing.dcos.check' is empty`
-		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
 	cluster := specializedTarget.cluster
 	values := map[string]interface{}{
-		"reserved_Name":    c.ShortFileName(),
+		"reserved_Name":    c.BaseFilename(),
 		"reserved_Content": checkScript,
 		"reserved_Action":  "check",
 		"MasterIDs":        cluster.ListMasterIDs(),
@@ -71,13 +71,13 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target) (bool, api.CheckRes
 	if err != nil {
 		return false, api.CheckResults{}, err
 	}
-	filename := fmt.Sprintf("/var/tmp/%s_check.sh", c.ShortFileName())
+	filename := fmt.Sprintf("/var/tmp/%s_check.sh", c.BaseFilename())
 	err = uploadStringToTargetFile(cmdStr, host, filename)
 	if err != nil {
 		return false, api.CheckResults{}, err
 	}
 	cmd := fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
-	duration := specs.GetInt("component.installing.dcos.duration")
+	duration := specs.GetInt("component.installing.dcos.estimated_execution_time")
 	if duration == 0 {
 		duration = 5
 	}
@@ -86,14 +86,13 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target) (bool, api.CheckRes
 	if err != nil {
 		return false, api.CheckResults{}, err
 	}
-	status := api.ComponentPresent
 	ok = retcode == 0
-	if !ok {
-		status = api.ComponentAbsent
-	}
 	return ok, api.CheckResults{
-		Masters: map[string]string{
-			host.Name: status,
+		Masters: map[string]api.CheckState{
+			host.Name: api.CheckState{
+				Success: true,
+				Present: ok,
+			},
 		},
 	}, nil
 }
@@ -113,17 +112,17 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, values map[string]int
 	if !specs.IsSet("component.installing.dcos.install") {
 		msg := `syntax error in component '%s' specification file (%s):
 				no key 'component.installing.dcos.install' found`
-		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 	addScript := specs.GetString("component.installing.dcos.install")
 	if strings.TrimSpace(addScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
 				key 'component.installing.dcos.install' is empty`
-		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
 	cluster := clusterTarget.cluster
-	values["reserved_Name"] = c.ShortFileName()
+	values["reserved_Name"] = c.BaseFilename()
 	values["reserved_Content"] = addScript
 	values["reserved_Action"] = "install"
 	values["MasterIDs"] = cluster.ListMasterIDs()
@@ -144,13 +143,13 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, values map[string]int
 	if err != nil {
 		return false, api.AddResults{}, err
 	}
-	filename := fmt.Sprintf("/var/tmp/%s_install.sh", c.ShortFileName())
+	filename := fmt.Sprintf("/var/tmp/%s_install.sh", c.BaseFilename())
 	err = uploadStringToTargetFile(cmdStr, host, filename)
 	if err != nil {
 		return false, api.AddResults{}, err
 	}
 	cmd := fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
-	duration := specs.GetInt("component.installing.dcos.duration")
+	duration := specs.GetInt("component.installing.dcos.estimated_execution_time")
 	if duration == 0 {
 		duration = 5
 	}
@@ -192,18 +191,18 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target) (bool, api.RemoveR
 	if !specs.IsSet("component.installing.dcos.uninstall") {
 		msg := `syntax error in component '%s' specification file (%s):
 				no key 'component.installing.dcos.uninstall' found`
-		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 	removeScript := specs.GetString("component.installing.dcos.uninstall")
 	if strings.TrimSpace(removeScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
 				key 'component.installing.dcos.uninstall' is empty`
-		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
 	cluster := specializedTarget.cluster
 	values := map[string]interface{}{
-		"reserved_Name":    c.ShortFileName(),
+		"reserved_Name":    c.BaseFilename(),
 		"reserved_Content": removeScript,
 		"reserved_Action":  "uninstall",
 		"MasterIDs":        cluster.ListMasterIDs(),
@@ -224,13 +223,13 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target) (bool, api.RemoveR
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}
-	filename := fmt.Sprintf("/var/tmp/%s_uninstall.sh", c.ShortFileName())
+	filename := fmt.Sprintf("/var/tmp/%s_uninstall.sh", c.BaseFilename())
 	err = uploadStringToTargetFile(cmdStr, host, filename)
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}
 	cmd := fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
-	duration := specs.GetInt("component.installing.dcos.duration")
+	duration := specs.GetInt("component.installing.dcos.estimated_execution_time")
 	if duration == 0 {
 		duration = 5
 	}

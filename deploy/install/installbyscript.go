@@ -56,7 +56,7 @@ func (i *scriptInstaller) Check(c api.Component, t api.Target) (bool, api.CheckR
 	if !specs.IsSet("component.installing.script.check") {
 		msg := `syntax error in component '%s' specification file (%s):
 				no key 'component.installing.script.check' found`
-		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
 	hostTarget, clusterTarget, nodeTarget := determineContext(t)
@@ -91,17 +91,17 @@ func (i *scriptInstaller) checkOnHost(
 	if strings.TrimSpace(checkScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
 				key 'component.installing.script.check' is empty`
-		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 	cmdStr, err := realizeScript(map[string]interface{}{
-		"reserved_Name":    c.ShortFileName(),
+		"reserved_Name":    c.BaseFilename(),
 		"reserved_Content": checkScript,
 		"reserved_Action":  "check",
 	})
 	if err != nil {
 		return false, api.CheckResults{}, err
 	}
-	filename := fmt.Sprintf("/var/tmp/%s_check.sh", c.ShortFileName())
+	filename := fmt.Sprintf("/var/tmp/%s_check.sh", c.BaseFilename())
 	err = uploadStringToTargetFile(cmdStr, host, filename)
 	if err != nil {
 		return false, api.CheckResults{}, err
@@ -111,14 +111,10 @@ func (i *scriptInstaller) checkOnHost(
 	if err != nil {
 		return false, api.CheckResults{}, err
 	}
-	status := api.ComponentPresent
 	ok := retcode == 0
-	if !ok {
-		status = api.ComponentAbsent
-	}
 	return ok, api.CheckResults{
-		PrivateNodes: map[string]string{
-			host.Name: status,
+		PrivateNodes: map[string]api.CheckState{
+			host.Name: api.CheckState{Success: true, Present: ok},
 		},
 	}, nil
 }
@@ -131,29 +127,29 @@ func (i *scriptInstaller) checkOnCluster(c api.Component, cluster clusterapi.Clu
 	}
 
 	var (
-		mastersChannel   chan map[string]string
-		privnodesChannel chan map[string]string
-		pubnodesChannel  chan map[string]string
-		mastersStatus        = map[string]string{}
-		privnodesStatus      = map[string]string{}
-		pubnodesStatus       = map[string]string{}
-		checked          int = 0
+		mastersChannel   chan map[string]api.CheckState
+		privnodesChannel chan map[string]api.CheckState
+		pubnodesChannel  chan map[string]api.CheckState
+		mastersStatus    = map[string]api.CheckState{}
+		privnodesStatus  = map[string]api.CheckState{}
+		pubnodesStatus   = map[string]api.CheckState{}
+		checked          int
 	)
 
 	if masterT != "0" {
-		mastersChannel = make(chan map[string]string)
+		mastersChannel = make(chan map[string]api.CheckState)
 		list := cluster.ListMasterIDs()
 		checked += len(list)
 		go asyncCheckHosts(list, c, mastersChannel)
 	}
 	if privnodeT != "0" {
-		privnodesChannel = make(chan map[string]string)
+		privnodesChannel = make(chan map[string]api.CheckState)
 		list := cluster.ListNodeIDs(false)
 		checked += len(list)
 		go asyncCheckHosts(list, c, privnodesChannel)
 	}
 	if pubnodeT != "0" {
-		pubnodesChannel = make(chan map[string]string)
+		pubnodesChannel = make(chan map[string]api.CheckState)
 		list := cluster.ListNodeIDs(true)
 		checked += len(list)
 		go asyncCheckHosts(list, c, pubnodesChannel)
@@ -163,7 +159,7 @@ func (i *scriptInstaller) checkOnCluster(c api.Component, cluster clusterapi.Clu
 	if masterT != "0" {
 		mastersStatus = <-mastersChannel
 		for _, k := range mastersStatus {
-			if k != api.ComponentPresent && k != api.ComponentAbsent {
+			if !k.Success || !k.Present {
 				ok = false
 				break
 			}
@@ -172,7 +168,7 @@ func (i *scriptInstaller) checkOnCluster(c api.Component, cluster clusterapi.Clu
 	if privnodeT != "0" {
 		privnodesStatus = <-privnodesChannel
 		for _, k := range privnodesStatus {
-			if k != api.ComponentPresent && k != api.ComponentAbsent {
+			if !k.Success || !k.Present {
 				ok = false
 				break
 			}
@@ -181,7 +177,7 @@ func (i *scriptInstaller) checkOnCluster(c api.Component, cluster clusterapi.Clu
 	if pubnodeT != "0" {
 		pubnodesStatus = <-pubnodesChannel
 		for _, k := range pubnodesStatus {
-			if k != api.ComponentPresent && k != api.ComponentAbsent {
+			if !k.Success || !k.Present {
 				ok = false
 				break
 			}
@@ -201,17 +197,18 @@ func (i *scriptInstaller) checkOnCluster(c api.Component, cluster clusterapi.Clu
 // Add installs the component using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
 func (i *scriptInstaller) Add(c api.Component, t api.Target, v map[string]interface{}) (bool, api.AddResults, error) {
+	specs := c.Specs()
 	// If component is installed, do nothing but responds with success
 	ok, _, err := i.Check(c, t)
 	if err != nil {
 		return false, api.AddResults{}, err
 	}
 	if ok {
+		fmt.Printf("Component '%s' is already installed.", c.DisplayName())
 		return true, api.AddResults{}, nil
 	}
 
 	// Installs first dependencies if there is any
-	specs := c.Specs()
 	err = installRequirements(specs, t, v)
 	if err != nil {
 		return false, api.AddResults{}, err
@@ -221,7 +218,7 @@ func (i *scriptInstaller) Add(c api.Component, t api.Target, v map[string]interf
 	if !specs.IsSet("component.installing.script.install") {
 		msg := `syntax error in component '%s' specification file (%s):
 				no key 'component.installing.script.install' found`
-		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
 	hostTarget, clusterTarget, nodeTarget := determineContext(t)
@@ -255,16 +252,16 @@ func (i *scriptInstaller) addOnHost(
 	if strings.TrimSpace(addScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
 				key 'component.installing.script.install' is empty`
-		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
-	v["reserved_Name"] = c.ShortFileName()
+	v["reserved_Name"] = c.BaseFilename()
 	v["reserved_Content"] = addScript
 	v["reserved_Action"] = "install"
 	cmdStr, err := realizeScript(v)
 	if err != nil {
 		return false, api.AddResults{}, err
 	}
-	filename := fmt.Sprintf("/var/tmp/%s_install.sh", c.ShortFileName())
+	filename := fmt.Sprintf("/var/tmp/%s_install.sh", c.BaseFilename())
 	err = uploadStringToTargetFile(cmdStr, host, filename)
 	if err != nil {
 		return false, api.AddResults{}, err
@@ -276,7 +273,7 @@ func (i *scriptInstaller) addOnHost(
 	} else {
 		cmd = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
 	}
-	duration := specs.GetInt("component.installing.script.duration")
+	duration := specs.GetInt("component.installing.script.estimated_execution_time")
 	if duration == 0 {
 		duration = 5
 	}
@@ -313,10 +310,10 @@ func (i *scriptInstaller) addOnCluster(
 		privnodesChannel chan map[string]error
 		pubnodesChannel  chan map[string]error
 		list             []string
-		mastersStatus        = map[string]error{}
-		privnodesStatus      = map[string]error{}
-		pubnodesStatus       = map[string]error{}
-		checked          int = 0
+		mastersStatus    = map[string]error{}
+		privnodesStatus  = map[string]error{}
+		pubnodesStatus   = map[string]error{}
+		checked          int
 	)
 
 	v["MasterIDs"] = cluster.ListMasterIDs()
@@ -413,7 +410,7 @@ func (i *scriptInstaller) Remove(c api.Component, t api.Target) (bool, api.Remov
 	if !specs.IsSet("component.installing.script.uninstall") {
 		msg := `syntax error in component '%s' specification file (%s):
 				no key 'component.installing.script.uninstall' found`
-		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
 	hostTarget, clusterTarget, nodeTarget := determineContext(t)
@@ -443,24 +440,24 @@ func (i *scriptInstaller) removeFromHost(c api.Component, host *pb.Host) (bool, 
 	if strings.TrimSpace(removeScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
 		        key 'component.installing.script.uninstall' is empty`
-		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.FullFileName())
+		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 	cmdStr, err := realizeScript(map[string]interface{}{
-		"reserved_Name":    c.ShortFileName(),
+		"reserved_Name":    c.BaseFilename(),
 		"reserved_Content": removeScript,
 		"reserved_Action":  "uninstall",
 	})
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}
-	filename := fmt.Sprintf("/var/tmp/%s_uninstall.sh", c.ShortFileName())
+	filename := fmt.Sprintf("/var/tmp/%s_uninstall.sh", c.BaseFilename())
 	err = uploadStringToTargetFile(cmdStr, host, filename)
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}
 
 	cmd := fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
-	duration := specs.GetInt("component.installing.script.duration")
+	duration := specs.GetInt("component.installing.script.estimated_execution_time")
 	if duration == 0 {
 		duration = 5
 	}
@@ -494,10 +491,10 @@ func (i *scriptInstaller) removeFromCluster(c api.Component, cluster clusterapi.
 		mastersChannel   chan map[string]error
 		privnodesChannel chan map[string]error
 		pubnodesChannel  chan map[string]error
-		mastersStatus        = map[string]error{}
-		privnodesStatus      = map[string]error{}
-		pubnodesStatus       = map[string]error{}
-		checked          int = 0
+		mastersStatus    = map[string]error{}
+		privnodesStatus  = map[string]error{}
+		pubnodesStatus   = map[string]error{}
+		checked          int
 	)
 
 	var list []string

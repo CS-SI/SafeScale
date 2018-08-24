@@ -7,24 +7,24 @@ import (
 )
 
 // asyncCheckHosts ...
-func asyncCheckHosts(hostIDs []string, c api.Component, done chan map[string]string) {
-	states := map[string]string{}
-	dones := map[string]chan string{}
+func asyncCheckHosts(hostIDs []string, c api.Component, done chan map[string]api.CheckState) {
+	states := map[string]api.CheckState{}
+	dones := map[string]chan api.CheckState{}
 	broker := brokerclient.New()
 	for _, hostID := range hostIDs {
 		host, err := broker.Host.Inspect(hostID, 0)
 		if err != nil {
-			states[hostID] = err.Error()
+			states[hostID] = api.CheckState{Success: false, Error: err.Error()}
 			continue
 		}
-		d := make(chan string)
-		dones[host.GetName()] = d
+		d := make(chan api.CheckState)
+		dones[host.Name] = d
 		go func() {
-			_, result, err := c.Check(NewNodeTarget(host))
+			_, results, err := c.Check(NewNodeTarget(host))
 			if err != nil {
-				d <- err.Error()
+				d <- api.CheckState{Success: false, Error: err.Error()}
 			} else {
-				d <- result.PrivateNodes[host.GetID()]
+				d <- results.PrivateNodes[host.Name]
 			}
 		}()
 	}
@@ -53,7 +53,7 @@ func asyncAddOnHosts(list []string, c api.Component, v map[string]interface{}, d
 			if err != nil {
 				d <- err
 			} else {
-				d <- result.PrivateNodes[host.GetID()]
+				d <- result.PrivateNodes[host.Name]
 			}
 		}()
 	}
@@ -81,7 +81,7 @@ func asyncRemoveFromHosts(list []string, c api.Component, done chan map[string]e
 			if err != nil {
 				d <- err
 			} else {
-				d <- result.PrivateNodes[host.GetName()]
+				d <- result.PrivateNodes[host.Name]
 			}
 		}()
 	}
