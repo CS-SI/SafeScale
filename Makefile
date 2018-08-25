@@ -63,6 +63,16 @@ TESTIFY := github.com/stretchr/testify
 PASSWORD := github.com/sethvargo/go-password/password
 CRYPTO_SSH := golang.org/x/crypto/ssh
 
+#Golang Object Relationnal Mapper needed by pckage security
+GORM := github.com/jinzhu/gorm
+MSSQL := github.com/denisenkom/go-mssqldb
+MYSQL := github.com/go-sql-driver/mysql
+POSTGRES := github.com/lib/pq
+SQLITE := github.com/mattn/go-sqlite3
+GORM_LIBS := $(GORM) $(MSSQL) $(MYSQL) $(POSTGRES) $(SQLITE)
+
+#glob matching
+GLOB := github.com/gobwas/glob
 # GRPC LIBS
 CONTEXT := golang.org/x/net/context
 GRPC := google.golang.org/grpc
@@ -77,6 +87,6 @@ AWS := github.com/aws/aws-sdk-go
 # Providers SDK
 PROVIDERS_SDK := $(GOPHERCLOUD) $(AWS)
 
-DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(PASSWORD) $(CRYPTO_SSH) $(GRPC_LIBS) $(PROVIDERS_SDK) $(MOW)
+DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(PASSWORD) $(CRYPTO_SSH) $(GORM_LIBS) $(GLOB) $(GRPC_LIBS) $(PROVIDERS_SDK) $(MOW)
 
 deps: ; $(GO) get -u $(DEPS)
