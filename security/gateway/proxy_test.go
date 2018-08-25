@@ -13,6 +13,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/security/model"
 	oidc "github.com/coreos/go-oidc"
+	"github.com/gorilla/websocket"
 	"golang.org/x/oauth2"
 
 	"github.com/CS-SI/SafeScale/security/gateway"
@@ -72,9 +73,50 @@ func runTestService() {
 		log.Fatal(err)
 	}
 
+	srv2 := model.Service{
+		BaseURL: "ws://localhost:10000/date",
+		Name:    "TESTWS",
+	}
+	if err := db.Create(&srv2).Error; err != nil {
+		log.Fatal()
+	}
+	perm2 := model.AccessPermission{
+		Action:          "WS",
+		ResourcePattern: "*",
+	}
+
+	if err := db.Create(&perm2).Error; err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.Model(&srv2).Association("Roles").Append(role1).Error; err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.Model(&role1).Association("AccessPermissions").Append(perm2).Error; err != nil {
+		log.Fatal(err)
+	}
+
 	mux := http.NewServeMux()
+	var upgrader = websocket.Upgrader{} // use default options
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if websocket.IsWebSocketUpgrade(r) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			}
+			go func() {
+				defer conn.Close()
+				for i := 0; i < 10; i++ {
+					now := time.Now()
+					text, _ := now.MarshalText()
+					conn.WriteMessage(websocket.TextMessage, text)
+					time.Sleep(1 * time.Second)
+				}
+
+			}()
+		}
 		now := time.Now()
 		text, _ := now.MarshalText()
 		dump, err := httputil.DumpRequest(r, true)
@@ -142,6 +184,18 @@ func TestGateway(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("%s", dump)
+	fmt.Println(string(dump))
 
+	websocket.DefaultDialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	header := http.Header{}
+	header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	ws, _, err := websocket.DefaultDialer.Dial("wss://localhost:4443/TESTWS", header)
+	assert.Nil(t, err)
+
+	for i := 0; i < 10; i++ {
+		_, buffer, err := ws.ReadMessage()
+		assert.Nil(t, err)
+		println(string(buffer))
+	}
+	ws.Close()
 }
