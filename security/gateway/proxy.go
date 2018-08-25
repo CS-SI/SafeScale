@@ -111,7 +111,7 @@ func getServiceURL(service, resource string) (*url.URL, error) {
 	return url.Parse(surl)
 }
 
-func forward(w http.ResponseWriter, req *http.Request, url *url.URL) {
+func httpForward(w http.ResponseWriter, req *http.Request, url *url.URL) {
 	// create the reverse proxy
 	proxy := httputil.NewSingleHostReverseProxy(url)
 
@@ -122,8 +122,13 @@ func forward(w http.ResponseWriter, req *http.Request, url *url.URL) {
 
 	req.Host = url.Host
 
+	//add CORS to the respoonse header
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
+
 	// Note that ServeHttp is non blocking and uses a go routine under the hood
 	proxy.ServeHTTP(w, req)
+
 }
 
 //httpProxyFunc forward authorized request to pr++++++++++++otected service
@@ -157,23 +162,14 @@ func httpProxyFunc(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	forward(w, req, url)
+	httpForward(w, req, url)
 
 }
 
-func proxify(next http.Handler) http.Handler {
+func proxify() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("proxifyFunc")
 		httpProxyFunc(w, r)
-		next.ServeHTTP(w, r)
-	})
-}
-
-func addCORS() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("addCORS")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "X-Requested-With")
 	})
 }
 
@@ -244,7 +240,7 @@ func Start(bindingURL string) {
 
 	//http.Handle("/", proxify(addCORS()))
 
-	err = http.ListenAndServeTLS(bindingURL, cfg.Certificate, cfg.PrivateKey, proxify(addCORS()))
+	err = http.ListenAndServeTLS(bindingURL, cfg.Certificate, cfg.PrivateKey, proxify())
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}

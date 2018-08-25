@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"testing"
 	"time"
 
@@ -76,6 +77,12 @@ func runTestService() {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		text, _ := now.MarshalText()
+		dump, err := httputil.DumpRequest(r, true)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("%s", dump)
 		w.Write(text)
 	})
 	http.ListenAndServe(":10000", mux)
@@ -130,11 +137,11 @@ func TestGateway(t *testing.T) {
 	client := http.Client{}
 	resp, err = client.Do(req)
 	assert.Nil(t, err)
-	text, err = ioutil.ReadAll(resp.Body)
-	assert.Nil(t, err)
-	fmt.Println(string(text))
-	for k, v := range resp.Header {
-		fmt.Println(k, v)
+	dump, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	fmt.Printf("%s", dump)
 
 }
