@@ -48,7 +48,7 @@ func NewNetworkService(api api.ClientAPI) NetworkAPI {
 }
 
 // Create creates a network
-func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*api.Network, error) {
+func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (apinetwork *api.Network, err error) {
 	// Check that no network with same name already exists
 	_net, err := svc.Get(net)
 	if _net != nil {
@@ -68,16 +68,33 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		return nil, err
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			svc.provider.DeleteNetwork(network.ID)
+			switch t := r.(type) {
+			case string:
+				err = fmt.Errorf("%q", t)
+			case error:
+				err = t
+			}
+		}
+	}()
+
 	// Create a gateway
 	tpls, err := svc.provider.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    cpu,
 		MinRAMSize:  ram,
 		MinDiskSize: disk,
 	})
+	if err != nil {
+		panic(err)
+	}
+	if len(tpls) < 1 {
+		panic(fmt.Sprintf("No template found for %v cpu, %v ram, %v disk", cpu, ram, disk))
+	}
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
-		svc.provider.DeleteNetwork(network.ID)
-		return nil, err
+		panic(err)
 	}
 
 	keypairName := "kp_" + network.Name
@@ -85,8 +102,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	svc.provider.DeleteKeyPair(keypairName)
 	keypair, err := svc.provider.CreateKeyPair(keypairName)
 	if err != nil {
-		svc.provider.DeleteNetwork(network.ID)
-		return nil, err
+		panic(err)
 	}
 
 	gwRequest := api.GWRequest{
@@ -99,8 +115,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 
 	err = svc.provider.CreateGateway(gwRequest)
 	if err != nil {
-		svc.provider.DeleteNetwork(network.ID)
-		return nil, err
+		panic(err)
 	}
 
 	rv, err := svc.Get(net)
