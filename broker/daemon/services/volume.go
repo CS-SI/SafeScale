@@ -18,7 +18,6 @@ package services
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -71,7 +70,7 @@ func (srv *VolumeService) Get(ref string) (*api.Volume, error) {
 		return nil, err
 	}
 	if m == nil {
-		return nil, fmt.Errorf("Volume %s does not exist", ref)
+		return nil, nil
 	}
 	return m.Get(), nil
 }
@@ -83,7 +82,7 @@ func (srv *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachmen
 		return nil, nil, err
 	}
 	if mtdvol == nil {
-		return nil, nil, fmt.Errorf("Volume %s does not exist", ref)
+		return nil, nil, nil
 	}
 
 	va, err := mtdvol.GetAttachment()
@@ -98,7 +97,10 @@ func (srv *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachmen
 func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error) {
 	// Check if a volume already exist with the same name
 	volume, err := srv.Get(name)
-	if volume != nil || (err != nil && !strings.Contains(err.Error(), "does not exist")) {
+	if err != nil {
+		return nil, err
+	}
+	if volume != nil {
 		return nil, fmt.Errorf("Volume '%s' already exists", name)
 	}
 

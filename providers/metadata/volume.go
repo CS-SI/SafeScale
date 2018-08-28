@@ -223,7 +223,7 @@ func LoadVolume(svc *providers.Service, ref string) (*Volume, error) {
 		}
 	}
 	if !found {
-		return nil, fmt.Errorf("failed to find metadata for volume '%s'", ref)
+		return nil, nil
 	}
 	return m, nil
 }

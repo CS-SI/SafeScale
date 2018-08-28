@@ -165,6 +165,9 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 	if err != nil {
 		return nil, err
 	}
+	if volume == nil {
+		return nil, fmt.Errorf("No volume %s found!", ref)
+	}
 
 	log.Printf("End Inspect volume: '%s'", ref)
 	return conv.ToPbVolumeInfo(volume, volattach), nil
