@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -107,7 +108,7 @@ func (svc *SSHService) run(ssh *system.SSHConfig, cmd string) (int, string, stri
 	msgErr, _ := ioutil.ReadAll(stderr)
 
 	if err = sshcmd.Wait(); err != nil {
-		msgError, retCode, erro := system.ExtractRetCode(err)
+		msgError, retCode, erro := utils.ExtractRetCode(err)
 		if erro != nil {
 			return 0, "", "", err
 		}

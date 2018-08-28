@@ -85,8 +85,10 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 	}
 	sshCfg := conv.ToAPISshConfig(sshConfig)
 
-	return retry.WhileUnsuccessfulDelay5SecondsWithNotify(
+	return retry.WhileUnsuccessful255Delay5SecondsWithNotify(
 		func() error {
+			//cmd := exec.Command("/tmp/exit255.sh")
+			//return cmd.Run()
 			return sshCfg.Enter()
 		},
 		2*time.Minute,
