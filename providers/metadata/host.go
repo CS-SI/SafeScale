@@ -183,17 +183,17 @@ func RemoveHost(svc *providers.Service, host *api.Host) error {
 		mnb.Carry(network).DetachHost(host.ID)
 		return nil
 	})
-
-	// Second deletes host metadata
-	mh := NewHost(svc)
 	if err != nil {
 		return err
 	}
+
+	// Second deletes host metadata
+	mh := NewHost(svc)
 	return mh.Carry(host).Delete()
 }
 
-// LoadHost gets the host definition from Object Storage
-func LoadHost(svc *providers.Service, hostID string) (*Host, error) {
+// LoadHostByID gets the host definition from Object Storage
+func LoadHostByID(svc *providers.Service, hostID string) (*Host, error) {
 	m := NewHost(svc)
 	found, err := m.ReadByID(hostID)
 	if err != nil {
@@ -203,6 +203,42 @@ func LoadHost(svc *providers.Service, hostID string) (*Host, error) {
 		return nil, nil
 	}
 	return m, nil
+}
+
+// LoadHostByName gets the Network definition from Object Storage
+func LoadHostByName(svc *providers.Service, hostName string) (*Host, error) {
+	m := NewHost(svc)
+	found, err := m.ReadByName(hostName)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return m, nil
+}
+
+// LoadHost gets the host definition from Object Storage
+func LoadHost(svc *providers.Service, ref string) (*Host, error) {
+	// We first try looking for host by ID from metadata
+	m, err := LoadHostByID(svc, ref)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return m, nil
+	}
+
+	// If not found, we try looking for host by name from metadata
+	m, err = LoadHostByName(svc, ref)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return m, nil
+	}
+
+	return nil, nil
 }
 
 // Acquire waits until the write lock is available, then locks the metadata

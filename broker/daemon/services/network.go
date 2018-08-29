@@ -18,7 +18,6 @@ package services
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -49,15 +48,6 @@ func NewNetworkService(api api.ClientAPI) NetworkAPI {
 
 // Create creates a network
 func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (apinetwork *api.Network, err error) {
-	// Check that no network with same name already exists
-	_net, err := svc.Get(net)
-	if _net != nil {
-		return nil, fmt.Errorf("Network %s already exists", net)
-	}
-	if err != nil && !strings.Contains(err.Error(), "does not exist") {
-		return nil, fmt.Errorf("Network %s already exists", net)
-	}
-
 	// Create the network
 	network, err := svc.provider.CreateNetwork(api.NetworkRequest{
 		Name:      net,
@@ -124,42 +114,12 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 
 //List returns the network list
 func (svc *NetworkService) List(all bool) ([]api.Network, error) {
-
 	return svc.provider.ListNetworks(all)
 }
 
 //Get returns the network identified by ref, ref can be the name or the id
 func (svc *NetworkService) Get(ref string) (*api.Network, error) {
-
-	// We first try looking for network by ID
-	m, err := metadata.LoadNetwork(svc.provider, ref)
-	if err != nil {
-		return nil, err
-	}
-	if m != nil {
-		return m.Get(), nil
-	}
-
-	// If not found, we try looking for network by name
-	m, err = metadata.LoadNetworkByName(svc.provider, ref)
-	if err != nil {
-		return nil, err
-	}
-	if m != nil {
-		return m.Get(), nil
-	}
-
-	// If not found, we look for network any network from provider
-	nets, err := svc.List(true)
-	if err != nil {
-		return nil, err
-	}
-	for _, n := range nets {
-		if n.ID == ref || n.Name == ref {
-			return &n, err
-		}
-	}
-	return nil, fmt.Errorf("Network '%s' does not exist", ref)
+	return svc.provider.GetNetwork(ref)
 }
 
 //Delete deletes network referenced by ref

@@ -18,11 +18,9 @@ package services
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system"
 )
 
@@ -51,11 +49,6 @@ type HostService struct {
 
 // Create creates a host
 func (srv *HostService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.Host, error) {
-	_host, err := srv.Get(name)
-	if _host != nil || (err != nil && !strings.Contains(err.Error(), "failed to find host")) {
-		return nil, fmt.Errorf("host '%s' already exists", name)
-	}
-
 	n, err := srv.network.Get(net)
 	if err != nil {
 		return nil, err
@@ -92,21 +85,7 @@ func (srv *HostService) List(all bool) ([]api.Host, error) {
 
 // Get returns the host identified by ref, ref can be the name or the id
 func (srv *HostService) Get(ref string) (*api.Host, error) {
-	m := metadata.NewHost(srv.provider)
-	found, err := m.ReadByName(ref)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		found, err = m.ReadByID(ref)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if !found {
-		return nil, fmt.Errorf("failed to find host '%s'", ref)
-	}
-	return m.Get(), nil
+	return srv.provider.GetHost(ref)
 }
 
 // Delete deletes host referenced by ref

@@ -69,7 +69,7 @@ var networkDelete = cli.Command{
 		}
 		err := client.New().Network.Delete(c.Args().First(), 0)
 		if err != nil {
-			return fmt.Errorf("Could not delete network %s: %v", c.Args().First(), err)
+			return fmt.Errorf("Could not delete network '%s': %v", c.Args().First(), err)
 		}
 		fmt.Println(fmt.Sprintf("Network '%s' deleted", c.Args().First()))
 
@@ -154,7 +154,7 @@ var networkCreate = cli.Command{
 		}
 		network, err := client.New().Network.Create(netdef, 0)
 		if err != nil {
-			return fmt.Errorf("Could not get network list: %v", err)
+			return fmt.Errorf("Could not create network: '%v'", err)
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))

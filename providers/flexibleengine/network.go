@@ -239,8 +239,9 @@ func validateNetworkName(req api.NetworkRequest) (bool, error) {
 }
 
 // GetNetwork returns the network identified by id
-func (client *Client) GetNetwork(id string) (*api.Network, error) {
-	m, err := metadata.LoadNetwork(providers.FromClient(client), id)
+func (client *Client) GetNetwork(ref string) (*api.Network, error) {
+	// We first try looking for network from metadata
+	m, err := metadata.LoadNetwork(providers.FromClient(client), ref)
 	if err != nil {
 		return nil, err
 	}
@@ -248,16 +249,35 @@ func (client *Client) GetNetwork(id string) (*api.Network, error) {
 		return m.Get(), nil
 	}
 
-	subnet, err := client.getSubnet(id)
+	subnet, err := client.getSubnet(ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed getting network id '%s': %s", id, openstack.ProviderErrorToString(err))
+		if !strings.Contains(err.Error(), ref) {
+			return nil, fmt.Errorf("failed getting network id '%s': %s", ref, openstack.ProviderErrorToString(err))
+		}
 	}
-	return &api.Network{
-		ID:        subnet.ID,
-		Name:      subnet.Name,
-		CIDR:      subnet.CIDR,
-		IPVersion: fromIntIPVersion(subnet.IPVersion),
-	}, nil
+	if subnet != nil && subnet.ID != "" {
+		return &api.Network{
+			ID:        subnet.ID,
+			Name:      subnet.Name,
+			CIDR:      subnet.CIDR,
+			IPVersion: fromIntIPVersion(subnet.IPVersion),
+		}, nil
+
+	}
+
+	// Last chance, we look at all network
+	nets, err := client.listAllNetworks()
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range nets {
+		if n.ID == ref || n.Name == ref {
+			return &n, err
+		}
+	}
+
+	// At this point, no network has been found with given reference
+	return nil, nil
 }
 
 // ListNetworks lists available networks

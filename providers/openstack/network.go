@@ -63,6 +63,15 @@ type Subnet struct {
 
 //CreateNetwork creates a network named name
 func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
+	// We 1st check if name is not aleready used
+	_net, err := client.GetNetwork(req.Name)
+	if err != nil {
+		return nil, err
+	}
+	if _net != nil {
+		return nil, fmt.Errorf("A network already exist with name '%s'", req.Name)
+	}
+
 	// We specify a name and that it should forward packets
 	state := true
 	opts := networks.CreateOpts{
@@ -96,9 +105,10 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	return net, nil
 }
 
-//GetNetwork returns the network identified by id
-func (client *Client) GetNetwork(id string) (*api.Network, error) {
-	m, err := metadata.LoadNetwork(providers.FromClient(client), id)
+//GetNetwork returns the network identified by ref (id or name)
+func (client *Client) GetNetwork(ref string) (*api.Network, error) {
+	// We first try looking for network from metadata
+	m, err := metadata.LoadNetwork(providers.FromClient(client), ref)
 	if err != nil {
 		return nil, err
 	}
@@ -106,29 +116,50 @@ func (client *Client) GetNetwork(id string) (*api.Network, error) {
 		return m.Get(), nil
 	}
 
-	network, err := networks.Get(client.Network, id).Extract()
+	// If not found, we look for any network from provider
+	// 1st try with id
+	network, err := networks.Get(client.Network, ref).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
+		if _, ok := err.(gc.ErrDefault404); !ok {
+			return nil, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
+		}
 	}
-	sns, err := client.listSubnets(id)
+	if network != nil && network.ID != "" {
+
+		sns, err := client.listSubnets(ref)
+		if err != nil {
+			return nil, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
+		}
+		if len(sns) != 1 {
+			return nil, fmt.Errorf("Bad configuration, each network should have exactly one subnet")
+		}
+		sn := sns[0]
+		// gwID, _ := client.getGateway(id)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("Bad configuration, no gateway associated to this network")
+		// }
+		return &api.Network{
+			ID:        network.ID,
+			Name:      network.Name,
+			CIDR:      sn.Mask,
+			IPVersion: sn.IPVersion,
+			// GatewayID: network.GatewayId,
+		}, nil
+	}
+
+	// Last chance, we look at all network
+	nets, err := client.listAllNetworks()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
+		return nil, err
 	}
-	if len(sns) != 1 {
-		return nil, fmt.Errorf("Bad configuration, each network should have exactly one subnet")
+	for _, n := range nets {
+		if n.ID == ref || n.Name == ref {
+			return &n, err
+		}
 	}
-	sn := sns[0]
-	// gwID, _ := client.getGateway(id)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("Bad configuration, no gateway associated to this network")
-	// }
-	return &api.Network{
-		ID:        network.ID,
-		Name:      network.Name,
-		CIDR:      sn.Mask,
-		IPVersion: sn.IPVersion,
-		// GatewayID: network.GatewayId,
-	}, nil
+
+	// At this point, no network has been found with given reference
+	return nil, nil
 }
 
 //ListNetworks lists available networks
@@ -276,9 +307,13 @@ func (client *Client) DeleteNetwork(networkID string) error {
 
 // CreateGateway creates a public Gateway for a private network
 func (client *Client) CreateGateway(req api.GWRequest) error {
+	// Ensure network exists
 	net, err := client.GetNetwork(req.NetworkID)
 	if err != nil {
 		return fmt.Errorf("Network %s not found %s", req.NetworkID, ProviderErrorToString(err))
+	}
+	if net == nil {
+		return fmt.Errorf("Network %s not found", req.NetworkID)
 	}
 	gwname := req.GWName
 	if gwname == "" {

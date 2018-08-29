@@ -37,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
+	gc "github.com/gophercloud/gophercloud"
 
 	uuid "github.com/satori/go.uuid"
 
@@ -293,6 +294,15 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		return nil, fmt.Errorf("name '%s' is invalid for a FlexibleEngine Host: %s", request.Name, openstack.ProviderErrorToString(err))
 	}
 
+	// Check name availability
+	host, err := client.GetHost(request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if host != nil {
+		return nil, fmt.Errorf("A host already exist with name '%s'", request.Name)
+	}
+
 	//Eventual network gateway
 	var gw *api.Host
 	// If the host is not public it has to be created on a network owning a Gateway
@@ -316,7 +326,6 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 
 	// Prepare key pair
 	kp := request.KeyPair
-	var err error
 	// If no key pair is supplied create one
 	if kp == nil {
 		id, _ := uuid.NewV4()
@@ -390,7 +399,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	}
 
 	// Wait that host is started
-	host, err := client.WaitHostReady(server.ID, time.Minute*5)
+	host, err = client.WaitHostReady(server.ID, time.Minute*5)
 	if err != nil {
 		client.DeleteHost(server.ID)
 		return nil, fmt.Errorf("timeout waiting host '%s' ready: %s", request.Name, openstack.ProviderErrorToString(err))
@@ -471,26 +480,54 @@ func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.
 	return client.toHost(server), nil
 }
 
-// GetHost returns the host identified by id
-func (client *Client) GetHost(id string) (*api.Host, error) {
-	server, err := servers.Get(client.osclt.Compute, id).Extract()
+// GetHost returns the host identified by ref (id or name)
+func (client *Client) GetHost(ref string) (*api.Host, error) {
+	// We first try looking for host from metadata
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting Host '%s': %s", id, openstack.ProviderErrorToString(err))
+		return nil, err
 	}
-	host := client.toHost(server)
-	return host, nil
+	if m != nil {
+		return m.Get(), nil
+	}
+
+	// If not found, we look for any host from provider
+	// 1st try with id
+	server, err := servers.Get(client.osclt.Compute, ref).Extract()
+	if err != nil {
+		if _, ok := err.(gc.ErrDefault404); !ok {
+			return nil, fmt.Errorf("Error getting Host '%s': %s", ref, openstack.ProviderErrorToString(err))
+		}
+	}
+	if server != nil && server.ID != "" {
+		return client.toHost(server), nil
+	}
+
+	// Last chance, we look at all network
+	hosts, err := client.listAllHosts()
+	if err != nil {
+		return nil, err
+	}
+	for _, host := range hosts {
+		if host.ID == ref || host.Name == ref {
+			return &host, err
+		}
+	}
+
+	// At this point, no network has been found with given reference
+	return nil, nil
 }
 
 // ListHosts lists available hosts
 func (client *Client) ListHosts(all bool) ([]api.Host, error) {
 	if all {
-		return client.listallhosts()
+		return client.listAllHosts()
 	}
 	return client.listMonitoredHosts()
 }
 
 // listallhosts lists available hosts
-func (client *Client) listallhosts() ([]api.Host, error) {
+func (client *Client) listAllHosts() ([]api.Host, error) {
 	pager := servers.List(client.osclt.Compute, servers.ListOpts{})
 	var hosts []api.Host
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -902,8 +939,6 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 	}
 	return tpl, err
 }
-
-var filters = []api.TemplateFilter{}
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm

@@ -290,8 +290,8 @@ func RemoveNetwork(svc *providers.Service, net *api.Network) error {
 	return NewNetwork(svc).Carry(net).Delete()
 }
 
-// LoadNetwork gets the Network definition from Object Storage
-func LoadNetwork(svc *providers.Service, networkID string) (*Network, error) {
+// LoadNetworkById gets the Network definition from Object Storage
+func LoadNetworkByID(svc *providers.Service, networkID string) (*Network, error) {
 	m := NewNetwork(svc)
 	found, err := m.ReadByID(networkID)
 	if err != nil {
@@ -314,6 +314,26 @@ func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, er
 		return nil, nil
 	}
 	return m, nil
+}
+
+// LoadNetwork gets the Network definition from Object Storage
+func LoadNetwork(svc *providers.Service, ref string) (*Network, error) {
+	m, err := LoadNetworkByID(svc, ref)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return m, nil
+	}
+
+	m, err = LoadNetworkByName(svc, ref)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return m, nil
+	}
+	return nil, nil
 }
 
 // Gateway links Object Storage folder and Network

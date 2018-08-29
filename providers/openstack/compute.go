@@ -36,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
 
+	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
@@ -392,6 +393,15 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 
 // createHost ...
 func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.Host, error) {
+	// Check name is not already used
+	host, err := client.GetHost(request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if host != nil {
+		return nil, fmt.Errorf("A host already exist with name '%s'", request.Name)
+	}
+
 	// Optional network gateway
 	var gw *api.Host
 	// If the host is not public it has to be created on a network owning a Gateway
@@ -426,7 +436,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 
 	// Prepare key pair
 	kp := request.KeyPair
-	var err error
+
 	//If no key pair is supplied create one
 	if kp == nil {
 		id, _ := uuid.NewV4()
@@ -465,7 +475,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	service := providers.Service{
 		ClientAPI: client,
 	}
-	host, err := service.WaitHostState(server.ID, HostState.STARTED, 120*time.Second)
+	host, err = service.WaitHostState(server.ID, HostState.STARTED, 120*time.Second)
 	if err != nil {
 		servers.Delete(client.Compute, server.ID)
 		return nil, fmt.Errorf("Timeout creating Host: %s", ProviderErrorToString(err))
@@ -509,12 +519,40 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 }
 
 // GetHost returns the host identified by id
-func (client *Client) GetHost(id string) (*api.Host, error) {
-	server, err := servers.Get(client.Compute, id).Extract()
+func (client *Client) GetHost(ref string) (*api.Host, error) {
+	// We first try looking for host by ID from metadata
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting host '%s': %s", id, ProviderErrorToString(err))
+		return nil, err
 	}
-	return client.toHost(server), nil
+	if m != nil {
+		return m.Get(), nil
+	}
+
+	// If not found, we look for any host from provider
+	// 1st try with id
+	server, err := servers.Get(client.Compute, ref).Extract()
+	if err != nil {
+		if _, ok := err.(gc.ErrDefault404); !ok {
+			return nil, fmt.Errorf("Error getting host '%s': %s", ref, ProviderErrorToString(err))
+		}
+	}
+	if server != nil && server.ID != "" {
+		return client.toHost(server), nil
+	}
+	// Last chance, we look at all network
+	hosts, err := client.listAllHosts()
+	if err != nil {
+		return nil, err
+	}
+	for _, host := range hosts {
+		if host.ID == ref || host.Name == ref {
+			return &host, err
+		}
+	}
+
+	// At this point, no network has been found with given reference
+	return nil, nil
 }
 
 //ListHosts lists available hosts
