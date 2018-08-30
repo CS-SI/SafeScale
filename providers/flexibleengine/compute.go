@@ -883,7 +883,6 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 	}
 
 	imageFilter := filters.NewFilter(isWindowsImage).Not().And(filters.NewFilter(isBMSImage).Not())
-
 	return filters.FilterImages(images, imageFilter), nil
 
 }
@@ -903,6 +902,8 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 	}
 	return tpl, err
 }
+
+var filters = []api.TemplateFilter{}
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm

@@ -46,7 +46,7 @@ var templateList = cli.Command{
 		if err != nil {
 			return fmt.Errorf("Could not get tempalte list: %v", err)
 		}
-		out, _ := json.Marshal(templates)
+		out, _ := json.Marshal(templates.GetTemplates())
 		fmt.Println(string(out))
 		return nil
 	},
