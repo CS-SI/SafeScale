@@ -132,7 +132,7 @@ func parseOutput(output []byte) (*CPUInfo, error) {
 }
 
 func scanImages(tenant string, service *providers.Service, c chan error) {
-	images, err := service.ListImages()
+	images, err := service.ListImages(false)
 	fmt.Println(tenant, "images:", len(images))
 	if err != nil {
 		c <- err
@@ -199,7 +199,7 @@ func getCPUInfo(tenant string, service *providers.Service, tpl api.HostTemplate,
 }
 
 func scanTemplates(tenant string, service *providers.Service, c chan error) {
-	tpls, err := service.ListTemplates()
+	tpls, err := service.ListTemplates(false)
 	total := len(tpls)
 	fmt.Println(tenant, "Templates:", total)
 	if err != nil {

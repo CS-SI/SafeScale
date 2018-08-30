@@ -48,7 +48,7 @@ type ClientTester struct {
 //ListImages test
 func (tester *ClientTester) ListImages(t *testing.T) {
 
-	images, err := tester.Service.ListImages()
+	images, err := tester.Service.ListImages(false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, images)
 	for _, i := range images {
@@ -69,7 +69,7 @@ func (tester *ClientTester) ListImages(t *testing.T) {
 
 //ListHostTemplates test
 func (tester *ClientTester) ListHostTemplates(t *testing.T) {
-	tpls, err := tester.Service.ListTemplates()
+	tpls, err := tester.Service.ListTemplates(false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
 	for _, f := range tpls {

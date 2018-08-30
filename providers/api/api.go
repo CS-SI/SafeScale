@@ -330,7 +330,7 @@ type ClientAPI interface {
 	Build(map[string]interface{}) (ClientAPI, error)
 
 	// ListImages lists available OS images
-	ListImages() ([]Image, error)
+	ListImages(all bool) ([]Image, error)
 	// GetImage returns the Image referenced by id
 	GetImage(id string) (*Image, error)
 
@@ -338,7 +338,7 @@ type ClientAPI interface {
 	GetTemplate(id string) (*HostTemplate, error)
 	// ListTemplates lists available host templates
 	// Host templates are sorted using Dominant Resource Fairness Algorithm
-	ListTemplates() ([]HostTemplate, error)
+	ListTemplates(all bool) ([]HostTemplate, error)
 
 	// CreateKeyPair creates and import a key pair
 	CreateKeyPair(name string) (*KeyPair, error)

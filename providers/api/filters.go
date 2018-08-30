@@ -28,3 +28,13 @@ func AnyFilter(t HostTemplate, filters []TemplateFilter) bool {
 	}
 	return false
 }
+
+// func Not(filter TemplateFilter) TemplateFilter {
+// 	return func(t HostTemplate) bool {
+// 		return !filter(t)
+// 	}
+// }
+
+// func AcceptAll(t HostTemplate) bool {
+// 	return true
+// }

@@ -72,8 +72,8 @@ func (client *Client) GetImage(id string) (*api.Image, error) {
 }
 
 // ListImages lists available OS images
-func (client *Client) ListImages() ([]api.Image, error) {
-	return client.feclt.ListImages()
+func (client *Client) ListImages(all bool) ([]api.Image, error) {
+	return client.feclt.ListImages(all)
 }
 
 // GetTemplate returns the Template referenced by id
@@ -83,8 +83,8 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (client *Client) ListTemplates() ([]api.HostTemplate, error) {
-	return client.feclt.ListTemplates()
+func (client *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
+	return client.feclt.ListTemplates(all)
 }
 
 // StopHost stops the host identified by id

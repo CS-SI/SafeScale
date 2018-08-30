@@ -103,6 +103,8 @@ func main() {
 	pb.RegisterSshServiceServer(s, &commands.SSHServiceServer{})
 	pb.RegisterContainerServiceServer(s, &commands.ContainerServiceServer{})
 	pb.RegisterNasServiceServer(s, &commands.NasServiceServer{})
+	pb.RegisterImageServiceServer(s, &commands.ImageServiceServer{})
+	pb.RegisterTemplateServiceServer(s, &commands.TempalteServiceServer{})
 
 	// log.Println("Initializing service factory")
 	// commands.InitServiceFactory()

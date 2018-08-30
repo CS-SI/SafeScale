@@ -864,8 +864,8 @@ func (client *Client) GetImage(id string) (*api.Image, error) {
 }
 
 // ListImages lists available OS images
-func (client *Client) ListImages() ([]api.Image, error) {
-	return client.osclt.ListImages()
+func (client *Client) ListImages(all bool) ([]api.Image, error) {
+	return client.osclt.ListImages(all)
 }
 
 func addGPUCfg(tpl *api.HostTemplate) {
@@ -884,10 +884,12 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 	return tpl, err
 }
 
+var filters = []api.TemplateFilter{}
+
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (client *Client) ListTemplates() ([]api.HostTemplate, error) {
-	allTemplates, err := client.osclt.ListTemplates()
+func (client *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
+	allTemplates, err := client.osclt.ListTemplates(all)
 	if err != nil {
 		return nil, err
 	}
