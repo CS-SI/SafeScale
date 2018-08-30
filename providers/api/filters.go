@@ -38,3 +38,48 @@ func AnyFilter(t HostTemplate, filters []TemplateFilter) bool {
 // func AcceptAll(t HostTemplate) bool {
 // 	return true
 // }
+
+//ImageFilter ...
+type ImageFilter func(in Image) bool
+
+//Not ...
+func NotFilter(f ImageFilter) ImageFilter {
+	return func(in Image) bool {
+		return !f(in)
+	}
+}
+
+//Or ..
+func OrFilter(filters []ImageFilter) ImageFilter {
+	return func(in Image) bool {
+		for _, f := range filters {
+			if f(in) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+//And ...
+func AndFilter(filters []ImageFilter) ImageFilter {
+	return func(in Image) bool {
+		for _, f := range filters {
+			if !f(in) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+//FilterImages ...
+func FilterImages(images []Image, f ImageFilter) []Image {
+	res := make([]Image, 0)
+	for _, img := range images {
+		if f(img) {
+			res = append(res, img)
+		}
+	}
+	return res
+}

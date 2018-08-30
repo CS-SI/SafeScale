@@ -863,9 +863,25 @@ func (client *Client) GetImage(id string) (*api.Image, error) {
 	return client.osclt.GetImage(id)
 }
 
+func isWindowsImage(img api.Image) bool {
+	return strings.Contains(strings.ToLower(img.Name), "windows")
+}
+func isBMSImage(img api.Image) bool {
+	return strings.HasPrefix(strings.ToUpper(img.Name), "OBS-BMS") ||
+		strings.HasPrefix(strings.ToUpper(img.Name), "OBS_BMS")
+}
+
 // ListImages lists available OS images
 func (client *Client) ListImages(all bool) ([]api.Image, error) {
-	return client.osclt.ListImages(all)
+	images, err := client.osclt.ListImages(all)
+	if err != nil {
+		return nil, err
+	}
+	if all {
+		return images, nil
+	}
+	return api.FilterImages(images, api.AndFilter([]api.ImageFilter{api.NotFilter(isWindowsImage), api.NotFilter(isBMSImage)})), nil
+
 }
 
 func addGPUCfg(tpl *api.HostTemplate) {
@@ -883,8 +899,6 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 	}
 	return tpl, err
 }
-
-var filters = []api.TemplateFilter{}
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
