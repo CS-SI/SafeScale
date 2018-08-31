@@ -408,6 +408,19 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 			gw = m.Get()
 		}
 	}
+	// If a gateway is created, we need the CIDR for the userdata
+	var cidr string
+	if isGateway {
+		m, err := metadata.LoadNetwork(providers.FromClient(client), request.NetworkIDs[0])
+		if err != nil {
+			return nil, err
+		}
+		if m == nil {
+			return nil, fmt.Errorf("failed to load metadata of network '%s'", request.NetworkIDs[0])
+		}
+		network := m.Get()
+		cidr = network.CIDR
+	}
 
 	var nets []servers.Network
 	// If floating IPs are not used and host is public
@@ -437,7 +450,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		}
 	}
 
-	userData, err := userdata.Prepare(client, request, isGateway, kp, gw)
+	userData, err := userdata.Prepare(client, request, isGateway, kp, gw, cidr)
 	if err != nil {
 		return nil, err
 	}
@@ -461,11 +474,8 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		}
 		return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
 	}
-	// Wait that Host is started
-	service := providers.Service{
-		ClientAPI: client,
-	}
-	host, err := service.WaitHostState(server.ID, HostState.STARTED, 120*time.Second)
+	// Wait that Host is ready
+	host, err := client.WaitHostReady(server.ID, 5*time.Minute)
 	if err != nil {
 		servers.Delete(client.Compute, server.ID)
 		return nil, fmt.Errorf("Timeout creating Host: %s", ProviderErrorToString(err))
@@ -480,7 +490,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 
 	// if Floating IP are not used or no public address is requested
 	if client.Cfg.UseFloatingIP && request.PublicIP {
-		//Create the floating IP
+		// Create the floating IP
 		ip, err := floatingips.Create(client.Compute, floatingips.CreateOpts{
 			Pool: client.Opts.FloatingIPPool,
 		}).Extract()
@@ -506,6 +516,30 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		}
 	}
 	return host, nil
+}
+
+// WaitHostReady waits an host achieve ready state
+func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.Host, error) {
+	var server *servers.Server
+	var err error
+
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			server, err = servers.Get(client.Compute, hostID).Extract()
+			if err != nil {
+				return err
+			}
+			if server.Status != "ACTIVE" {
+				return fmt.Errorf("host in '%s' state", server.Status)
+			}
+			return nil
+		},
+		timeout,
+	)
+	if retryErr != nil {
+		return nil, retryErr
+	}
+	return client.toHost(server), nil
 }
 
 // GetHost returns the host identified by id
@@ -615,14 +649,44 @@ func (client *Client) DeleteHost(id string) error {
 		}
 	}
 
-	err = servers.Delete(client.Compute, id).ExtractErr()
+	// Try to remove host for 1 minute, with 5 seconds between each try
+	err = retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			// 1st, send delete host order
+			err = servers.Delete(client.Compute, id).ExtractErr()
+			// if it fails, try again in 5 seconds
+			if err != nil {
+				return fmt.Errorf("failed to submit host '%s' deletion: %s", host.Name, ProviderErrorToString(err))
+			}
+			// 2nd, check host status every second until it changes to ERROR or
+			// until check failed. On Error, stops the retry without error; if check
+			// failed, retry the whole thing in 5 seconds
+			retry.WhileUnsuccessfulDelay1Second(
+				func() error {
+					host, err := servers.Get(client.Compute, id).Extract()
+					if err == nil {
+						if toHostState(host.Status) == HostState.ERROR {
+							return nil
+						}
+					}
+					return err
+				},
+				5,
+			)
+			// At last, if the check of the host failed, host is deleted properly...
+			if _, err := servers.Get(client.Compute, id).Extract(); err == nil {
+				return nil
+			}
+			// ... otherwise, do it again in 5 seconds
+			return fmt.Errorf("failed to acknowledge host '%s' deletion", host.Name)
+		},
+		1*time.Minute,
+	)
 	if err != nil {
-		return fmt.Errorf("error deleting host %s : %s", host.Name, ProviderErrorToString(err))
+		return err
 	}
 
-	metadata.RemoveHost(providers.FromClient(client), host)
-
-	return nil
+	return metadata.RemoveHost(providers.FromClient(client), host)
 }
 
 // StopHost stops the host identified by id
