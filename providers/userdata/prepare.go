@@ -44,16 +44,22 @@ type userData struct {
 	// DNSServers contains the list of DNS servers to use
 	// Used only if IsGateway is true
 	DNSServers []string
+	//CIDR contains the cidr of the network
+	CIDR string
 	// GatewayIP is the IP of the gateway
 	GatewayIP string
 	// Password for the user gpac (for troubleshoot use, useable only in console)
 	Password string
+	// HostName contains the name wanted as host name (default == name of the Cloud resource)
+	HostName string
 }
 
 var userdataTemplate *template.Template
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
-func Prepare(client api.ClientAPI, request api.HostRequest, isGateway bool, kp *api.KeyPair, gw *api.Host) ([]byte, error) {
+func Prepare(
+	client api.ClientAPI, request api.HostRequest, isGateway bool, kp *api.KeyPair, gw *api.Host, cidr string,
+) ([]byte, error) {
 	// Generate password for user gpac
 	gpacPassword, err := utils.GeneratePassword(16)
 	if err != nil {
@@ -118,8 +124,10 @@ func Prepare(client api.ClientAPI, request api.HostRequest, isGateway bool, kp *
 		IsGateway:  isGateway && !useLayer3Networking,
 		AddGateway: !request.PublicIP && !useLayer3Networking,
 		DNSServers: dnsList,
+		CIDR:       cidr,
 		GatewayIP:  ip,
 		Password:   gpacPassword,
+		//HostName:   request.Name,
 	}
 
 	dataBuffer := bytes.NewBufferString("")
