@@ -49,8 +49,8 @@ type Request struct {
 	NodesDef *pb.HostDefinition
 }
 
-// ClusterAPI is an interface of methods associated to Cluster-like structs
-type ClusterAPI interface {
+// Cluster is an interface of methods associated to Cluster-like structs
+type Cluster interface {
 	// GetName returns the name of the cluster
 	GetName() string
 	// Start starts the cluster
@@ -90,7 +90,7 @@ type ClusterAPI interface {
 	// Delete allows to destroy infrastructure of cluster
 	Delete() error
 	// GetConfig ...
-	GetConfig() Cluster
+	GetConfig() ClusterCore
 	// GetAdditionalInfo returns additional info about parameter
 	GetAdditionalInfo(AdditionalInfo.Enum) interface{}
 	// SetAdditionalInfo sets the content of additional info
@@ -105,8 +105,8 @@ type AdditionalInfoAPI interface {
 // AdditionalInfoMap ...
 type AdditionalInfoMap map[AdditionalInfo.Enum]interface{}
 
-// Cluster contains the bare minimum information about a cluster
-type Cluster struct {
+// ClusterCore contains the bare minimum information about a cluster
+type ClusterCore struct {
 	// Name is the name of the cluster
 	Name string
 	// CIDR is the network CIDR wanted for the Network
@@ -139,17 +139,17 @@ type Cluster struct {
 }
 
 // GetName returns the name of the cluster
-func (c *Cluster) GetName() string {
+func (c *ClusterCore) GetName() string {
 	return c.Name
 }
 
 // GetNetworkID returns the ID of the Network used by the cluster
-func (c *Cluster) GetNetworkID() string {
+func (c *ClusterCore) GetNetworkID() string {
 	return c.NetworkID
 }
 
 // GetAdditionalInfo returns the additional info requested
-func (c *Cluster) GetAdditionalInfo(ctx AdditionalInfo.Enum) interface{} {
+func (c *ClusterCore) GetAdditionalInfo(ctx AdditionalInfo.Enum) interface{} {
 	if c.Infos != nil {
 		if info, ok := c.Infos[ctx]; ok {
 			return info
@@ -159,15 +159,15 @@ func (c *Cluster) GetAdditionalInfo(ctx AdditionalInfo.Enum) interface{} {
 }
 
 // SetAdditionalInfo ...
-func (c *Cluster) SetAdditionalInfo(ctx AdditionalInfo.Enum, info interface{}) {
+func (c *ClusterCore) SetAdditionalInfo(ctx AdditionalInfo.Enum, info interface{}) {
 	if c.Infos == nil {
 		c.Infos = map[AdditionalInfo.Enum]interface{}{}
 	}
 	c.Infos[ctx] = info
 }
 
-//CountNodes returns the number of public or private nodes in the cluster
-func (c *Cluster) CountNodes(public bool) uint {
+// CountNodes returns the number of public or private nodes in the cluster
+func (c *ClusterCore) CountNodes(public bool) uint {
 	if public {
 		return uint(len(c.PublicNodeIDs))
 	}
@@ -175,5 +175,5 @@ func (c *Cluster) CountNodes(public bool) uint {
 }
 
 func init() {
-	gob.Register(Cluster{})
+	gob.Register(ClusterCore{})
 }

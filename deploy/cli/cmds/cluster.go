@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/install"
+	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 
 	"github.com/CS-SI/SafeScale/utils"
 	cli "github.com/CS-SI/SafeScale/utils/cli"
@@ -45,7 +46,7 @@ const (
 var (
 	clusterName        string
 	clusterServiceName *string
-	clusterInstance    clusterapi.ClusterAPI
+	clusterInstance    clusterapi.Cluster
 )
 
 // ClusterCommand handles 'deploy cluster'
@@ -132,7 +133,8 @@ var clusterListCommand = &cli.Command{
 		}
 		var formatted []interface{}
 		for _, value := range toFormat {
-			formatted = append(formatted, formatClusterConfig(value))
+			core := value.(map[string]interface{})["Core"]
+			formatted = append(formatted, formatClusterConfig(core))
 		}
 		jsoned, err = json.Marshal(formatted)
 		if err != nil {
@@ -153,25 +155,24 @@ List available clusters.`,
 
 // formatClusterConfig...
 func formatClusterConfig(value interface{}) map[string]interface{} {
-	item := value.(map[string]interface{})
+	core := value.(map[string]interface{})
+	e := Flavor.Enum(int(core["Flavor"].(float64)))
+	core["FlavorLabel"] = e.String()
 
-	e := Flavor.Enum(int(item["Flavor"].(float64)))
-	item["FlavorLabel"] = e.String()
+	c := Complexity.Enum(int(core["Complexity"].(float64)))
+	core["ComplexityLabel"] = c.String()
 
-	c := Complexity.Enum(int(item["Complexity"].(float64)))
-	item["ComplexityLabel"] = c.String()
-
-	s := ClusterState.Enum(int(item["State"].(float64)))
-	item["StateLabel"] = s.String()
+	s := ClusterState.Enum(int(core["State"].(float64)))
+	core["StateLabel"] = s.String()
 
 	if !Debug {
-		delete(item, "Infos")
-		delete(item, "PrivateNodeIDs")
-		delete(item, "PublicNodeIDs")
-		delete(item, "Keypair")
+		delete(core, "Infos")
+		delete(core, "PrivateNodeIDs")
+		delete(core, "PublicNodeIDs")
+		delete(core, "Keypair")
 	}
 
-	return item
+	return core
 }
 
 // clusterInspectCmd handles 'deploy cluster <clustername> inspect'
@@ -248,8 +249,7 @@ var clusterCreateCommand = &cli.Command{
 
 		cidr := c.StringOption("-N,--cidr", "<cidr>", "")
 		if cidr == "" {
-			fmt.Printf("Invalid option -N,--cidr\n")
-			os.Exit(int(ExitCode.InvalidOption))
+			cidr = "192.168.0.0/16"
 		}
 
 		clusterInstance, err = cluster.Create(clusterapi.Request{
@@ -292,7 +292,7 @@ Usage: {{.ProgName}} [options] cluster <clustername> create {cluster options} {h
 		Options: []string{
 			`
 cluster options:
-  -N,--cidr <cidr>                To specify the CIDR of the associated network created with cluster
+  [-N,--cidr <cidr>]              To specify the CIDR of the associated network created with cluster (default: 192.168.0.0/16)
   [-F,--flavor <flavor>]          To specify the management of cluster; can be DCOS or BOH (Bunch Of Hosts) (default: BOH)
   [-C,--complexity <complexity>]  To fix the cluster complexity; can be Dev, Normal, Volume (default: Normal)
   [-k,--keep-on-failure]          Keep resources on failure`,
@@ -793,12 +793,7 @@ var clusterRunCommand = &cli.Command{
 	Help: &cli.HelpContent{
 		Usage: `
 Usage: {{.ProgName}} [options] cluster list,ls
-       {{.ProgName}} [options] cluster <clustername> COMMAND`,
-		Commands: `
-  list,ls
-  create
-  inspect
-  delete,destroy,remove,rm  Delete the cluster`,
+       {{.ProgName}} [options] cluster <clustername> run args[,args...]`,
 	},
 }
 
@@ -912,7 +907,7 @@ var clusterComponentCheckCommand = &cli.Command{
 			os.Exit(int(ExitCode.NotFound))
 		}
 		target := install.NewClusterTarget(clusterInstance)
-		found, results, err := component.Check(target)
+		found, results, err := component.Check(target, installapi.Variables{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
@@ -948,7 +943,7 @@ var clusterComponentDeleteCommand = &cli.Command{
 			os.Exit(int(ExitCode.NotFound))
 		}
 		target := install.NewClusterTarget(clusterInstance)
-		ok, results, err := component.Remove(target)
+		ok, results, err := component.Remove(target, installapi.Variables{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))

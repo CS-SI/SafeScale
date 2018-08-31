@@ -41,7 +41,7 @@ type component struct {
 	// Installers defines the installers available for the component
 	installers map[Method.Enum]api.Installer
 	// Dependencies lists other component(s) (by name) needed by this one
-	dependencies []string
+	//dependencies []string
 	// Management contains a string map of data that could be used to manage the component (if it makes sense)
 	// This could be used to explain to Service object how to manage the component, to react as a service
 	//Management map[string]interface{}
@@ -88,8 +88,8 @@ func NewComponent(name string) (api.Component, error) {
 func (c *component) installerOfMethod(method Method.Enum) api.Installer {
 	var installer api.Installer
 	switch method {
-	case Method.Script:
-		installer = NewScriptInstaller()
+	case Method.Bash:
+		installer = NewBashInstaller()
 	case Method.Apt:
 		installer = NewAptInstaller()
 	case Method.Yum:
@@ -132,8 +132,8 @@ func (c *component) Specs() *viper.Viper {
 }
 
 // Applyable tells if the component is installable on the target
-func (c *component) Applyable(target api.Target) bool {
-	methods := target.GetMethods()
+func (c *component) Applyable(t api.Target) bool {
+	methods := t.GetMethods()
 	for _, k := range methods {
 		installer := c.installerOfMethod(k)
 		if installer != nil {
@@ -144,11 +144,11 @@ func (c *component) Applyable(target api.Target) bool {
 }
 
 // Check if component is installed on target
-func (c *component) Check(target api.Target) (bool, api.CheckResults, error) {
-	methods := target.GetMethods()
+func (c *component) Check(t api.Target, v api.Variables) (bool, api.CheckResults, error) {
+	methods := t.GetMethods()
 	var installer api.Installer
 	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.installing.%s", method.String())) {
+		if c.specs.IsSet(fmt.Sprintf("component.install.%s", method.String())) {
 			installer = c.installerOfMethod(method)
 			if installer != nil {
 				break
@@ -158,15 +158,15 @@ func (c *component) Check(target api.Target) (bool, api.CheckResults, error) {
 	if installer == nil {
 		return false, api.CheckResults{}, fmt.Errorf("failed to find a way to check '%s'", c.DisplayName())
 	}
-	return installer.Check(c, target)
+	return installer.Check(c, t, v)
 }
 
 // Add installs the component on the target
-func (c *component) Add(target api.Target, values map[string]interface{}) (bool, api.AddResults, error) {
-	methods := target.GetMethods()
+func (c *component) Add(t api.Target, v api.Variables) (bool, api.AddResults, error) {
+	methods := t.GetMethods()
 	var installer api.Installer
 	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.installing.%s", method.String())) {
+		if c.specs.IsSet(fmt.Sprintf("component.install.%s", method.String())) {
 			installer = c.installerOfMethod(method)
 			if installer != nil {
 				break
@@ -176,15 +176,15 @@ func (c *component) Add(target api.Target, values map[string]interface{}) (bool,
 	if installer == nil {
 		return false, api.AddResults{}, fmt.Errorf("failed to find a way to install '%s'", c.DisplayName())
 	}
-	return installer.Add(c, target, values)
+	return installer.Add(c, t, v)
 }
 
 // Remove uninstalls the component from the target
-func (c *component) Remove(target api.Target) (bool, api.RemoveResults, error) {
-	methods := target.GetMethods()
+func (c *component) Remove(t api.Target, v api.Variables) (bool, api.RemoveResults, error) {
+	methods := t.GetMethods()
 	var installer api.Installer
 	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.installing.%s", method.String())) {
+		if c.specs.IsSet(fmt.Sprintf("component.install.%s", method.String())) {
 			installer = c.installerOfMethod(method)
 			if installer != nil {
 				break
@@ -194,7 +194,7 @@ func (c *component) Remove(target api.Target) (bool, api.RemoveResults, error) {
 	if installer == nil {
 		return false, api.RemoveResults{}, fmt.Errorf("failed to find a way to uninstall '%s'", c.DisplayName())
 	}
-	return installer.Remove(c, target)
+	return installer.Remove(c, t, v)
 }
 
 // FakeComponent is a component already installed; it's used to tell if a specific component

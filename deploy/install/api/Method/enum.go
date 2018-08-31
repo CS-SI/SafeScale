@@ -32,8 +32,8 @@ const (
 	Yum
 	// Dnf is supported by target
 	Dnf
-	// Script is supported by target
-	Script
+	// Bash is supported by target
+	Bash
 	// Ansible is supported by target
 	Ansible
 	// DCOS packager is supported by cluster target
@@ -50,7 +50,7 @@ var (
 		"apt":     Apt,
 		"yum":     Yum,
 		"dnf":     Dnf,
-		"script":  Script,
+		"bash":    Bash,
 		"ansible": Ansible,
 		"dcos":    DCOS,
 		"helm":    Helm,
@@ -60,7 +60,7 @@ var (
 		Apt:     "Apt",
 		Yum:     "Yum",
 		Dnf:     "Dnf",
-		Script:  "Script",
+		Bash:    "Bash",
 		Ansible: "Ansible",
 		DCOS:    "DCOS",
 		Helm:    "Helm",

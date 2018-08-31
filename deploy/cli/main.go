@@ -43,26 +43,26 @@ Global options:
 	completeUsage string = `
 Usage: deploy version
        deploy [-vd] help (cluster|host)
-       deploy [-vd] (cluster|host) help <command>
-       deploy [-vd] (cluster|host) (list|ls)
-       deploy [-vd] cluster help <command>
-	   deploy [-vd] cluster <clustername> create -N <cidr> [-F <flavor>][-C <complexity][--os <os>][--ram <ram>][--disk <disk>][-k]
-	   deploy [-vd] cluster <clustername> (delete|destroy|remove|rm) [-y]
-       deploy [-vd] cluster <clustername> (start|stop|state|inspect)
-       deploy [-vd] cluster <clustername> expand [-n <count>][--os <os>][--ram <ram>][--disk <disk>]
-       deploy [-vd] cluster <clustername> shrink [-n <count>]
-	   deploy [-vd] cluster <clustername> component <pkgname> (add|install) [--no-master][--no-node]
-	   deploy [-vd] cluster <clustername> component <pkgname> check
-	   deploy [-vd] cluster <clustername> component <pkgname> (delete|destroy|remove|rm|uninstall)
-	   deploy [-vd] cluster <clustername> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
-	   deploy [-vd] cluster <clustername> (dcos|marathon|kubectl) [-- <arg>...]
-	   deploy [-vd] cluster <clustername> nas <nasname> create [-u <storage unit size>][-n <storage unit count>]
-	   deploy [-vd] cluster <clustername> nas <nasname> (expand|shrink) [-n <storage unit count>]
-	   deploy [-vd] cluster <clustername> nas <nasname> (delete|destroy|remove|rm) [-y]
-	   deploy [-vd] cluster <clustername> nas <nasname> share <sharename> create [--acl <acls>]
-	   deploy [-vd] cluster <clustername> nas <nasname> share <sharename> (delete|destroy|remove|rm)
-	   deploy [-vd] cluster <clustername> nas <nasname> share <sharename> mount <mountpoint>
-	   deploy [-vd] cluster <clustername> nas <nasname> share <sharename> (umount|unmount)
+       deploy [-vd] (cluster|datacenter|dc|host) help <command>
+       deploy [-vd] (cluster|datacenter|dc|host) (list|ls)
+       deploy [-vd] (cluster|datacenter|dc) help <command>
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> create [-N <cidr>][-F <flavor>][-C <complexity][--os <os>][--ram <ram>][--disk <disk>][-k]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> (delete|destroy|remove|rm) [-y]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> (start|stop|state|inspect)
+       deploy [-vd] (cluster|datacenter|dc) <clustername> expand [-n <count>][--os <os>][--ram <ram>][--disk <disk>]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> shrink [-n <count>]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> component <pkgname> (add|install) [--no-master][--no-node]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> component <pkgname> check
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> component <pkgname> (delete|destroy|remove|rm|uninstall)
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> (dcos|marathon|kubectl) [-- <arg>...]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> create [-u <storage unit size>][-n <storage unit count>]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> (expand|shrink) [-n <storage unit count>]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> (delete|destroy|remove|rm) [-y]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> create [--acl <acls>]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> (delete|destroy|remove|rm)
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> mount <mountpoint>
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> (umount|unmount)
 	   deploy [-vd] host help <command>
 	   deploy [-vd] host <host name or id> component <pkgname> (add|install)
 	   deploy [-vd] host <host name or id> component <pkgname> check

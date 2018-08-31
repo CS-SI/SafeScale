@@ -50,7 +50,7 @@ func NewCluster() (*Cluster, error) {
 }
 
 // Carry links metadata with cluster struct
-func (m *Cluster) Carry(cluster *api.Cluster) *Cluster {
+func (m *Cluster) Carry(cluster *api.ClusterCore) *Cluster {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
@@ -70,8 +70,8 @@ func (m *Cluster) Delete() error {
 // Read reads metadata of cluster named 'name' from Object Storage
 func (m *Cluster) Read(name string) (bool, error) {
 	var (
-		target api.Cluster
-		ptr    *api.Cluster
+		target api.ClusterCore
+		ptr    *api.ClusterCore
 		ok     bool
 	)
 	// If m.item is already carrying data, overwrites it
@@ -80,7 +80,7 @@ func (m *Cluster) Read(name string) (bool, error) {
 	if anon == nil {
 		ptr = &target
 	} else {
-		ptr, ok = anon.(*api.Cluster)
+		ptr, ok = anon.(*api.ClusterCore)
 		if !ok {
 			ptr = &target
 		}
@@ -98,7 +98,7 @@ func (m *Cluster) Read(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.name = ptr.Name
+	m.name = ptr.GetName()
 	return true, nil
 }
 
@@ -124,25 +124,30 @@ func (m *Cluster) Reload() error {
 }
 
 // Get returns the content of the metadata
-func (m *Cluster) Get() *api.Cluster {
+func (m *Cluster) Get() *api.ClusterCore {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	if p, ok := m.item.Get().(*api.Cluster); ok {
+	if p, ok := m.item.Get().(*api.ClusterCore); ok {
 		return p
 	}
 	panic("invalid cluster content in metadata")
 }
 
-// Browse walks through cluster folder and executes a callback for each entries
-func (m *Cluster) Browse(callback func(c *api.Cluster) error) error {
+// Browse walks through cluster folder and executes a callback for each entry
+func (m *Cluster) Browse(callback func(*Cluster) error) error {
 	return m.item.Browse(func(buf *bytes.Buffer) error {
-		var data api.Cluster
+		var data api.ClusterCore
 		err := gob.NewDecoder(buf).Decode(&data)
 		if err != nil {
 			return err
 		}
-		return callback(&data)
+		cm, err := NewCluster()
+		if err != nil {
+			return nil
+		}
+		cm.Carry(&data)
+		return callback(cm)
 	})
 }
 

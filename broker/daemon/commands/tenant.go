@@ -80,9 +80,10 @@ func (s *TenantServiceServer) Get(ctx context.Context, in *google_protobuf.Empty
 	return &pb.TenantName{Name: tenant.name}, nil
 }
 
+// GetCurrentTenant contains the current tenant
 var GetCurrentTenant = getCurrentTenant
 
-//GetCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
+// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
 func getCurrentTenant() *Tenant {
 	if currentTenant == nil {
 		tenants, err := providers.Tenants()

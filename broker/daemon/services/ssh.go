@@ -18,7 +18,6 @@ package services
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 	"time"
 
@@ -54,7 +53,7 @@ type SSHService struct {
 }
 
 // Run tries to execute command 'cmd' on the host
-func (svc *SSHService) Run(hostName, cmd string) (string, string, int, error) {
+func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 	var stdOut, stdErr string
 	var retCode int
 	var err error
@@ -62,11 +61,7 @@ func (svc *SSHService) Run(hostName, cmd string) (string, string, int, error) {
 	// retrieve ssh config to perform some commands
 	ssh, err := svc.provider.GetSSHConfig(hostName)
 	if err != nil {
-		return "", "", 0, err
-	}
-	err = ssh.WaitServerReady(2 * time.Minute)
-	if err != nil {
-		return "", "", 0, err
+		return 0, "", "", err
 	}
 
 	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
@@ -77,44 +72,17 @@ func (svc *SSHService) Run(hostName, cmd string) (string, string, int, error) {
 		2*time.Minute,
 		retry.NotifyByLog)
 
-	return stdOut, stdErr, retCode, err
+	return retCode, stdOut, stdErr, err
 }
 
 // run executes command on the host
 func (svc *SSHService) run(ssh *system.SSHConfig, cmd string) (int, string, string, error) {
 	// Create the command
-	sshcmd, err := ssh.Command(cmd)
+	sshCmd, err := ssh.Command(cmd)
 	if err != nil {
 		return 0, "", "", err
 	}
-
-	// Set up the outputs (std and err)
-	stdOut, err := sshcmd.StdoutPipe()
-	if err != nil {
-		return 0, "", "", err
-	}
-	stderr, err := sshcmd.StderrPipe()
-	if err != nil {
-		return 0, "", "", err
-	}
-
-	// Launch the command and wait for its execution
-	if err = sshcmd.Start(); err != nil {
-		return 0, "", "", err
-	}
-
-	msgOut, _ := ioutil.ReadAll(stdOut)
-	msgErr, _ := ioutil.ReadAll(stderr)
-
-	if err = sshcmd.Wait(); err != nil {
-		msgError, retCode, erro := system.ExtractRetCode(err)
-		if erro != nil {
-			return 0, "", "", err
-		}
-		return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
-	}
-
-	return 0, string(msgOut[:]), string(msgErr[:]), nil
+	return sshCmd.Run()
 }
 
 func extracthostName(in string) (string, error) {
@@ -151,36 +119,36 @@ func extractPath(in string) (string, error) {
 	return strings.TrimSpace(parts[1]), nil
 }
 
-//Copy copy file/directory
-func (svc *SSHService) Copy(from, to string) error {
+// Copy copy file/directory
+func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
 	// Try extract host
 	hostFrom, err := extracthostName(from)
 	if err != nil {
-		return err
+		return 0, "", "", err
 	}
 	hostTo, err := extracthostName(to)
 	if err != nil {
-		return err
+		return 0, "", "", err
 	}
 
 	// Host checks
 	if hostFrom != "" && hostTo != "" {
-		return fmt.Errorf("copy between 2 hosts is not supported yet")
+		return 0, "", "", fmt.Errorf("copy between 2 hosts is not supported yet")
 	}
 	if hostFrom == "" && hostTo == "" {
-		return fmt.Errorf("no host name specified neither in from nor to")
+		return 0, "", "", fmt.Errorf("no host name specified neither in from nor to")
 	}
 
 	fromPath, err := extractPath(from)
 	if err != nil {
-		return err
+		return 0, "", "", err
 	}
 	toPath, err := extractPath(to)
 	if err != nil {
-		return err
+		return 0, "", "", err
 	}
 
 	if hostFrom != "" {
@@ -197,13 +165,13 @@ func (svc *SSHService) Copy(from, to string) error {
 
 	host, err := svc.hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("no host found with name or id '%s'", hostName)
+		return 0, "", "", fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
 	// retrieve ssh config to perform some commands
 	ssh, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		return err
+		return 0, "", "", err
 	}
 
 	return ssh.Copy(remotePath, localPath, upload)

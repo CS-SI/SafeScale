@@ -27,7 +27,7 @@ import (
 
 var (
 	clusterName     string
-	clusterInstance clusterapi.ClusterAPI
+	clusterInstance clusterapi.Cluster
 	pkgManagerKind  string
 	nodeName        string
 	serviceName     string

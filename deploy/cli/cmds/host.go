@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
 
 	"github.com/CS-SI/SafeScale/deploy/install"
+	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 )
 
 var (
@@ -157,7 +158,7 @@ var hostComponentCheckCommand = &cli.Command{
 			os.Exit(int(ExitCode.NotFound))
 		}
 		target := install.NewHostTarget(hostInstance)
-		found, results, err := component.Check(target)
+		found, results, err := component.Check(target, installapi.Variables{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
@@ -193,7 +194,7 @@ var hostComponentDeleteCommand = &cli.Command{
 			os.Exit(int(ExitCode.NotFound))
 		}
 		target := install.NewHostTarget(hostInstance)
-		ok, results, err := component.Remove(target)
+		ok, results, err := component.Remove(target, installapi.Variables{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))

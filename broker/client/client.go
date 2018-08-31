@@ -35,6 +35,7 @@ type Session struct {
 // Client is a instance of Session used temporarily until the session logic in brokerd is implemented
 type Client *Session
 
+// DefaultTimeout tells to use the timeout by default depending on context
 const DefaultTimeout = 0
 
 // New returns an instance of broker Client

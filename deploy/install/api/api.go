@@ -109,15 +109,15 @@ type Installer interface {
 	// GetName returns the name of the Installer
 	GetName() string
 	// Check checks if the component is installed
-	Check(Component, Target) (bool, CheckResults, error)
+	Check(Component, Target, Variables) (bool, CheckResults, error)
 	// Add executes installation of component
-	Add(Component, Target, map[string]interface{}) (bool, AddResults, error)
+	Add(Component, Target, Variables) (bool, AddResults, error)
 	// Remove executes deletion of component
-	Remove(Component, Target) (bool, RemoveResults, error)
+	Remove(Component, Target, Variables) (bool, RemoveResults, error)
 }
 
-// InstallerParameters defines the parameters a Installer may need
-type InstallerParameters map[string]interface{}
+// Variables defines the parameters a Installer may need
+type Variables map[string]interface{}
 
 // InstallerMap keeps a map of available installer by Method
 type InstallerMap map[Method.Enum]Installer
@@ -135,9 +135,9 @@ type Component interface {
 	// Applyable if the component is installable on the target
 	Applyable(Target) bool
 	// Check if a component is installed
-	Check(Target) (bool, CheckResults, error)
+	Check(Target, Variables) (bool, CheckResults, error)
 	// Install ...
-	Add(Target, map[string]interface{}) (bool, AddResults, error)
+	Add(Target, Variables) (bool, AddResults, error)
 	// Remove ...
-	Remove(Target) (bool, RemoveResults, error)
+	Remove(Target, Variables) (bool, RemoveResults, error)
 }

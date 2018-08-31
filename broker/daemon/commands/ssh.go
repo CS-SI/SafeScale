@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/CS-SI/SafeScale/system"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	services "github.com/CS-SI/SafeScale/broker/daemon/services"
 
@@ -32,10 +34,10 @@ import (
 // broker ssh copy /file/test.txt host1://tmp
 // broker ssh copy host1:/file/test.txt /tmp
 
-//SSHServiceServer SSH service server grpc
+// SSHServiceServer SSH service server grpc
 type SSHServiceServer struct{}
 
-//Run executes an ssh command an an host
+// Run executes an ssh command an an host
 func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
 	log.Printf("Ssh run called")
 	if GetCurrentTenant() == nil {
@@ -43,9 +45,9 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 	}
 
 	service := services.NewSSHService(currentTenant.Client)
-	msgStd, msgErr, retCode, err := service.Run(in.GetHost().GetName(), in.GetCommand())
+	retCode, msgStd, msgErr, err := service.Run(in.GetHost().GetName(), in.GetCommand())
 
-	log.Println("End ssh run")
+	//log.Println("End ssh run")
 	return &pb.SshResponse{
 		Status:    int32(retCode),
 		OutputStd: msgStd,
@@ -53,19 +55,24 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 	}, err
 }
 
-//Copy copy file from/to an host
+// Copy copy file from/to an host
 func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*google_protobuf.Empty, error) {
-	log.Printf("Ssh copy called")
+	//log.Printf("Ssh copy called")
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
 	service := services.NewSSHService(currentTenant.Client)
-	err := service.Copy(in.GetSource(), in.GetDestination())
+	retcode, _, stderr, err := service.Copy(in.GetSource(), in.GetDestination())
 	if err != nil {
 		return nil, err
 	}
-
-	log.Println("End ssh copy")
+	if retcode != 0 {
+		return nil, fmt.Errorf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
+	}
+	if err != nil {
+		return nil, err
+	}
+	//log.Println("End ssh copy")
 	return &google_protobuf.Empty{}, nil
 }

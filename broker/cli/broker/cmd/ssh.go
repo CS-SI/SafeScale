@@ -66,8 +66,8 @@ var sshRun = cli.Command{
 			return fmt.Errorf("Could not execute ssh command: %v", err)
 		}
 
-		fmt.Print(stdout)
-		fmt.Fprint(os.Stderr, stderr)
+		fmt.Println(stdout)
+		fmt.Fprintln(os.Stderr, stderr)
 
 		os.Exit(retcode)
 		return nil

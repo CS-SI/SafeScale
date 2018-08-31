@@ -51,10 +51,10 @@ func NewNetworkService(api api.ClientAPI) NetworkAPI {
 func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*api.Network, error) {
 	// Check that no network with same name already exists
 	_net, err := svc.Get(net)
-	if _net != nil {
+	if err != nil && !strings.Contains(err.Error(), "does not exist") {
 		return nil, fmt.Errorf("Network %s already exists", net)
 	}
-	if err != nil && !strings.Contains(err.Error(), "does not exist") {
+	if _net != nil {
 		return nil, fmt.Errorf("Network %s already exists", net)
 	}
 

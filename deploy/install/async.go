@@ -7,7 +7,7 @@ import (
 )
 
 // asyncCheckHosts ...
-func asyncCheckHosts(hostIDs []string, c api.Component, done chan map[string]api.CheckState) {
+func asyncCheckHosts(hostIDs []string, c api.Component, v map[string]interface{}, done chan map[string]api.CheckState) {
 	states := map[string]api.CheckState{}
 	dones := map[string]chan api.CheckState{}
 	broker := brokerclient.New()
@@ -20,7 +20,7 @@ func asyncCheckHosts(hostIDs []string, c api.Component, done chan map[string]api
 		d := make(chan api.CheckState)
 		dones[host.Name] = d
 		go func() {
-			_, results, err := c.Check(NewNodeTarget(host))
+			_, results, err := c.Check(NewNodeTarget(host), v)
 			if err != nil {
 				d <- api.CheckState{Success: false, Error: err.Error()}
 			} else {
@@ -64,7 +64,7 @@ func asyncAddOnHosts(list []string, c api.Component, v map[string]interface{}, d
 	done <- states
 }
 
-func asyncRemoveFromHosts(list []string, c api.Component, done chan map[string]error) {
+func asyncRemoveFromHosts(list []string, c api.Component, v map[string]interface{}, done chan map[string]error) {
 	states := map[string]error{}
 	dones := map[string]chan error{}
 	broker := brokerclient.New()
@@ -77,7 +77,7 @@ func asyncRemoveFromHosts(list []string, c api.Component, done chan map[string]e
 		d := make(chan error)
 		dones[host.GetName()] = d
 		go func() {
-			_, result, err := c.Remove(NewNodeTarget(host))
+			_, result, err := c.Remove(NewNodeTarget(host), v)
 			if err != nil {
 				d <- err
 			} else {

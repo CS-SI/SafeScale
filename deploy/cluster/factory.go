@@ -29,8 +29,8 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 )
 
-//Get returns the ClusterAPI instance corresponding to the cluster named 'name'
-func Get(name string) (clusterapi.ClusterAPI, error) {
+//Get returns the Cluster instance corresponding to the cluster named 'name'
+func Get(name string) (clusterapi.Cluster, error) {
 	m, err := metadata.NewCluster()
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func Get(name string) (clusterapi.ClusterAPI, error) {
 		return nil, nil
 	}
 
-	var instance clusterapi.ClusterAPI
+	var instance clusterapi.Cluster
 	common := m.Get()
 	switch common.Flavor {
 	case Flavor.DCOS:
@@ -66,7 +66,7 @@ func Get(name string) (clusterapi.ClusterAPI, error) {
 }
 
 //Create creates a cluster following the parameters of the request
-func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
+func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	// Validates parameters
 	if req.Name == "" {
 		panic("req.Name is empty!")
@@ -75,7 +75,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		panic("req.CIDR is empty!")
 	}
 
-	var instance clusterapi.ClusterAPI
+	var instance clusterapi.Cluster
 
 	log.Printf("Creating infrastructure for cluster '%s'", req.Name)
 
@@ -121,15 +121,36 @@ func Delete(name string) error {
 	return instance.Delete()
 }
 
-//List lists the clusters already created
+// List lists the clusters already created
 func List() ([]clusterapi.Cluster, error) {
 	var clusterList []clusterapi.Cluster
 	m, err := metadata.NewCluster()
 	if err != nil {
 		return clusterList, err
 	}
-	err = m.Browse(func(c *clusterapi.Cluster) error {
-		clusterList = append(clusterList, *c)
+	var instance clusterapi.Cluster
+	err = m.Browse(func(cm *metadata.Cluster) error {
+		cluster := cm.Get()
+		switch cluster.Flavor {
+		case Flavor.DCOS:
+			instance, err = dcos.Load(cm)
+			if err != nil {
+				return err
+			}
+		case Flavor.BOH:
+			instance, err = boh.Load(cm)
+			if err != nil {
+				return err
+			}
+		case Flavor.OHPC:
+			fallthrough
+		case Flavor.Swarm:
+			fallthrough
+		case Flavor.Kubernetes:
+			return fmt.Errorf("cluster Flavor '%s' not yet implemented", cluster.Flavor.String())
+		}
+
+		clusterList = append(clusterList, instance)
 		return nil
 	})
 	return clusterList, err

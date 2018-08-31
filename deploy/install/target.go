@@ -48,7 +48,7 @@ func (t *HostTarget) GetName() string {
 // GetMethods returns a list of packaging managers useable on the target
 func (t *HostTarget) GetMethods() []Method.Enum {
 	methods := []Method.Enum{
-		Method.Script,
+		Method.Bash,
 	}
 	// TODO: défines the managers available for a host to be able to get it there
 	methods = append(methods, Method.Apt) // hardcoded, bad !
@@ -63,11 +63,11 @@ func (t *HostTarget) List() []string {
 
 // ClusterTarget defines a target of type Host, satisfying TargetAPI
 type ClusterTarget struct {
-	cluster clusterapi.ClusterAPI
+	cluster clusterapi.Cluster
 }
 
 // NewClusterTarget ...
-func NewClusterTarget(cluster clusterapi.ClusterAPI) api.Target {
+func NewClusterTarget(cluster clusterapi.Cluster) api.Target {
 	if cluster == nil {
 		panic("cluster is nil!")
 	}
@@ -79,7 +79,7 @@ func NewClusterTarget(cluster clusterapi.ClusterAPI) api.Target {
 // GetMethods returns a list of packaging managers useable on the target
 func (t *ClusterTarget) GetMethods() []Method.Enum {
 	methods := []Method.Enum{
-		Method.Script,
+		Method.Bash,
 	}
 	if t.cluster.GetConfig().Flavor == Flavor.DCOS {
 		methods = append(methods, Method.DCOS)
