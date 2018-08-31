@@ -46,7 +46,7 @@ var imageList = cli.Command{
 		if err != nil {
 			return fmt.Errorf("Could not get image list: %v", err)
 		}
-		out, _ := json.Marshal(images)
+		out, _ := json.Marshal(images.GetImages())
 		fmt.Println(string(out))
 		return nil
 	},

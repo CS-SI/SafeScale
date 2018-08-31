@@ -30,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
+	filters "github.com/CS-SI/SafeScale/providers/api/filters/images"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
@@ -863,9 +864,28 @@ func (client *Client) GetImage(id string) (*api.Image, error) {
 	return client.osclt.GetImage(id)
 }
 
+func isWindowsImage(image api.Image) bool {
+	return strings.Contains(strings.ToLower(image.Name), "windows")
+}
+func isBMSImage(image api.Image) bool {
+	return strings.HasPrefix(strings.ToUpper(image.Name), "OBS-BMS") ||
+		strings.HasPrefix(strings.ToUpper(image.Name), "OBS_BMS")
+}
+
 // ListImages lists available OS images
 func (client *Client) ListImages(all bool) ([]api.Image, error) {
-	return client.osclt.ListImages(all)
+	images, err := client.osclt.ListImages(all)
+	if err != nil {
+		return nil, err
+	}
+	if all {
+		return images, nil
+	}
+
+	imageFilter := filters.NewFilter(isWindowsImage).Not().And(filters.NewFilter(isBMSImage).Not())
+
+	return filters.FilterImages(images, imageFilter), nil
+
 }
 
 func addGPUCfg(tpl *api.HostTemplate) {
@@ -883,8 +903,6 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 	}
 	return tpl, err
 }
-
-var filters = []api.TemplateFilter{}
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
