@@ -18,15 +18,85 @@ package templates
 
 import "github.com/CS-SI/SafeScale/providers/api"
 
-//TemplateFilter is a filter for template. It returns true if the template is filtered (not accepted)
-type TemplateFilter func(t api.HostTemplate) bool
+//Filter ...
+type Filter struct {
+	filter Predicate
+}
 
-//AnyFilter returns true if the given template is filtered by any filter
-func AnyFilter(t api.HostTemplate, filters []TemplateFilter) bool {
-	for _, f := range filters {
-		if f(t) {
-			return true
+//Predicate ...
+type Predicate func(img api.HostTemplate) bool
+
+//NewFilter creates a new filter with the given predicate
+func NewFilter(predicate Predicate) *Filter {
+	return &Filter{filter: predicate}
+}
+
+//Not ...
+func (f *Filter) Not() *Filter {
+	oldFilter := f.filter
+	f.filter = func(in api.HostTemplate) bool {
+		return !oldFilter(in)
+	}
+	return f
+}
+
+//And ...
+func (f *Filter) And(other *Filter) *Filter {
+	oldFilter := f.filter
+	f.filter = func(in api.HostTemplate) bool {
+		return oldFilter(in) && (*other).filter(in)
+	}
+	return f
+}
+
+//Or ...
+func (f *Filter) Or(other *Filter) *Filter {
+	oldFilter := f.filter
+	f.filter = func(in api.HostTemplate) bool {
+		return oldFilter(in) || (*other).filter(in)
+	}
+	return f
+}
+
+//NotFilter ...
+func Not(f Predicate) Predicate {
+	return func(in api.HostTemplate) bool {
+		return !f(in)
+	}
+}
+
+//OrFilter ..
+func OrFilter(filters ...Predicate) Predicate {
+	return func(in api.HostTemplate) bool {
+		for _, f := range filters {
+			if f(in) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+//AndFilter ...
+func AndFilter(filters ...Predicate) Predicate {
+	return func(in api.HostTemplate) bool {
+		for _, f := range filters {
+			if !f(in) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+//FilterImages ...
+func FilterTemplates(templates []api.HostTemplate, f *Filter) []api.HostTemplate {
+	res := make([]api.HostTemplate, 0)
+	for _, template := range templates {
+
+		if f.filter(template) {
+			res = append(res, template)
 		}
 	}
-	return false
+	return res
 }

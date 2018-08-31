@@ -884,8 +884,7 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 
 	imageFilter := filters.NewFilter(isWindowsImage).Not().And(filters.NewFilter(isBMSImage).Not())
 
-	res := filters.FilterImages(images, imageFilter)
-	return res, nil
+	return filters.FilterImages(images, imageFilter), nil
 
 }
 

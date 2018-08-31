@@ -177,22 +177,19 @@ func isFlexTemplate(t api.HostTemplate) bool {
 	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 
-var filters_ = []filters.TemplateFilter{isWindowsTemplate, isFlexTemplate}
-
 //ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (c *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 	allTemplates, err := c.Client.ListTemplates(all)
 	if err != nil {
 		return nil, err
 	}
-	tpls := allTemplates[:0]
-	for _, tpl := range allTemplates {
-		if all || !filters.AnyFilter(tpl, filters_) {
-			addGPUCfg(&tpl)
-			tpls = append(tpls, tpl)
-		}
+	if all {
+		return allTemplates, nil
 	}
-	return tpls, nil
+
+	filter := filters.NewFilter(isWindowsTemplate).Not().And(filters.NewFilter(isFlexTemplate).Not())
+
+	return filters.FilterTemplates(allTemplates, filter), nil
 }
 
 func init() {
