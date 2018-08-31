@@ -863,12 +863,12 @@ func (client *Client) GetImage(id string) (*api.Image, error) {
 	return client.osclt.GetImage(id)
 }
 
-func isWindowsImage(img api.Image) bool {
-	return strings.Contains(strings.ToLower(img.Name), "windows")
+func isWindowsImage(image api.Image) bool {
+	return strings.Contains(strings.ToLower(image.Name), "windows")
 }
-func isBMSImage(img api.Image) bool {
-	return strings.HasPrefix(strings.ToUpper(img.Name), "OBS-BMS") ||
-		strings.HasPrefix(strings.ToUpper(img.Name), "OBS_BMS")
+func isBMSImage(image api.Image) bool {
+	return strings.HasPrefix(strings.ToUpper(image.Name), "OBS-BMS") ||
+		strings.HasPrefix(strings.ToUpper(image.Name), "OBS_BMS")
 }
 
 // ListImages lists available OS images
@@ -880,7 +880,12 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 	if all {
 		return images, nil
 	}
-	return api.FilterImages(images, api.AndFilter([]api.ImageFilter{api.NotFilter(isWindowsImage), api.NotFilter(isBMSImage)})), nil
+
+	imageFilter := api.NewFilter(isWindowsImage).Not().And(api.NewFilter(isBMSImage).Not())
+	// imageFilter := api.AndFilter(api.NotFilter(isWindowsImage), api.NotFilter(isBMSImage))
+
+	res := api.FilterImages(images, imageFilter)
+	return res, nil
 
 }
 

@@ -29,28 +29,61 @@ func AnyFilter(t HostTemplate, filters []TemplateFilter) bool {
 	return false
 }
 
-// func Not(filter TemplateFilter) TemplateFilter {
-// 	return func(t HostTemplate) bool {
-// 		return !filter(t)
-// 	}
-// }
+type IImageFilter interface {
+	Filter(img Image) bool
+	Not() *IImageFilter
+	And(imf *IImageFilter) *IImageFilter
+	Or(imf *IImageFilter) *IImageFilter
+}
 
-// func AcceptAll(t HostTemplate) bool {
-// 	return true
-// }
+//Filter ...
+type Filter struct {
+	filter Predicate
+}
 
-//ImageFilter ...
-type ImageFilter func(in Image) bool
+func NewFilter(predicate Predicate) *Filter {
+	return &Filter{filter: predicate}
+}
+
+//Predicate ...
+type Predicate func(img Image) bool
 
 //Not ...
-func NotFilter(f ImageFilter) ImageFilter {
+func (f *Filter) Not() *Filter {
+	oldFilter := f.filter
+	f.filter = func(in Image) bool {
+		return !oldFilter(in)
+	}
+	return f
+}
+
+//And ...
+func (f *Filter) And(other *Filter) *Filter {
+	oldFilter := f.filter
+	f.filter = func(in Image) bool {
+		return oldFilter(in) && (*other).filter(in)
+	}
+	return f
+}
+
+//Or ...
+func (f *Filter) Or(other *Filter) *Filter {
+	oldFilter := f.filter
+	f.filter = func(in Image) bool {
+		return oldFilter(in) || (*other).filter(in)
+	}
+	return f
+}
+
+//NotFilter ...
+func NotFilter(f Predicate) Predicate {
 	return func(in Image) bool {
 		return !f(in)
 	}
 }
 
-//Or ..
-func OrFilter(filters []ImageFilter) ImageFilter {
+//OrFilter ..
+func OrFilter(filters ...Predicate) Predicate {
 	return func(in Image) bool {
 		for _, f := range filters {
 			if f(in) {
@@ -61,8 +94,8 @@ func OrFilter(filters []ImageFilter) ImageFilter {
 	}
 }
 
-//And ...
-func AndFilter(filters []ImageFilter) ImageFilter {
+//AndFilter ...
+func AndFilter(filters ...Predicate) Predicate {
 	return func(in Image) bool {
 		for _, f := range filters {
 			if !f(in) {
@@ -74,12 +107,35 @@ func AndFilter(filters []ImageFilter) ImageFilter {
 }
 
 //FilterImages ...
-func FilterImages(images []Image, f ImageFilter) []Image {
+func FilterImages(images []Image, f *Filter) []Image {
 	res := make([]Image, 0)
 	for _, img := range images {
-		if f(img) {
+
+		if f.filter(img) {
 			res = append(res, img)
 		}
 	}
 	return res
 }
+
+//FilterImages ...
+// func FilterSAE(items []Filterable, f *Filter) []Filterable {
+// 	res := make([]Filterable, 0, len(items))
+// 	for _, item := range items {
+// 		if (*f).filter(item) {
+// 			res = append(res, item)
+// 		}
+// 	}
+// 	return res
+// }
+
+// //FilterImages ...
+// func FilterImages(images []Image, f ImagePredicate) []Image {
+// 	res := make([]Image, 0)
+// 	for _, img := range images {
+// 		if f(img) {
+// 			res = append(res, img)
+// 		}
+// 	}
+// 	return res
+// }
