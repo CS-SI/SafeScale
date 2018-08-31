@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -39,7 +40,54 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-//SSHConfig helper to manage ssh session
+var (
+	sshErrorMap = map[int]string{
+		1:  "Malformed configuration or invalid cli options",
+		2:  "Connection failed",
+		65: "Host not allowed to connect",
+		66: "General error in ssh protocol",
+		67: "Key exchange failed",
+		69: "MAC error",
+		70: "Compression error",
+		71: "Service not available",
+		72: "Protocol version not supported",
+		73: "Host key not verifiable",
+		74: "Connection failed",
+		75: "Disconnected by application",
+		76: "Too many connections",
+		77: "Authentication cancelled by user",
+		78: "No more authentication methods available",
+		79: "Invalid user name",
+	}
+	scpErrorMap = map[int]string{
+		1:  "General error in file copy",
+		2:  "Destination is not directory, but it should be",
+		3:  "Maximum symlink level exceeded",
+		4:  "Connecting to host failed",
+		5:  "Connection broken",
+		6:  "File does not exist",
+		7:  "No permission to access file",
+		8:  "General error in sftp protocol",
+		9:  "File transfer protocol mismatch",
+		10: "No file matches a given criteria",
+		65: "Host not allowed to connect",
+		66: "General error in ssh protocol",
+		67: "Key exchange failed",
+		69: "MAC error",
+		70: "Compression error",
+		71: "Service not available",
+		72: "Protocol version not supported",
+		73: "Host key not verifiable",
+		74: "Connection failed",
+		75: "Disconnected by application",
+		76: "Too many connections",
+		77: "Authentication cancelled by user",
+		78: "No more authentication methods available",
+		79: "Invalid user name",
+	}
+)
+
+// SSHConfig helper to manage ssh session
 type SSHConfig struct {
 	User          string
 	Host          string
@@ -49,7 +97,7 @@ type SSHConfig struct {
 	cmdTpl        string
 }
 
-//SSHTunnel a SSH tunnel
+// SSHTunnel a SSH tunnel
 type sshTunnel struct {
 	port      int
 	cmd       *exec.Cmd
@@ -57,7 +105,23 @@ type sshTunnel struct {
 	keyFile   *os.File
 }
 
-//Close close ssh tunnel
+// SSHErrorString returns if possible the string corresponding to SSH execution
+func SSHErrorString(retcode int) string {
+	if msg, ok := sshErrorMap[retcode]; ok {
+		return msg
+	}
+	return "Unqualified error"
+}
+
+// SCPErrorString returns if possible the string corresponding to SCP execution
+func SCPErrorString(retcode int) string {
+	if msg, ok := scpErrorMap[retcode]; ok {
+		return msg
+	}
+	return "Unqualified error"
+}
+
+// Close close ssh tunnel
 func (tunnel *sshTunnel) Close() error {
 	defer os.Remove(tunnel.keyFile.Name())
 
@@ -81,7 +145,7 @@ func (tunnel *sshTunnel) Close() error {
 	return nil
 }
 
-//GetFreePort get a frre port
+// GetFreePort get a frre port
 func getFreePort() (int, error) {
 	listener, err := net.Listen("tcp", ":0")
 	defer listener.Close()
@@ -115,7 +179,7 @@ func isTunnelReady(port int) bool {
 
 }
 
-//CreateTunnel create SSH from local host to remote host throw gateway
+// CreateTunnel create SSH from local host to remote host throw gateway
 func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
@@ -154,7 +218,7 @@ func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 	}, nil
 }
 
-//SSHCommand defines a SSH command
+// SSHCommand defines a SSH command
 type SSHCommand struct {
 	cmd     *exec.Cmd
 	tunnels []*sshTunnel
@@ -183,16 +247,16 @@ func (c *SSHCommand) Wait() error {
 
 }
 
-//Kill kills SSHCommand process and releases any resources associated with the SSHCommand.
+// Kill kills SSHCommand process and releases any resources associated with the SSHCommand.
 func (c *SSHCommand) Kill() error {
 	err := c.cmd.Process.Kill()
 	c.end()
 	return err
 }
 
-//StdoutPipe returns a pipe that will be connected to the command's standard output when the command starts.
-//Wait will close the pipe after seeing the command exit, so most callers need not close the pipe themselves; however, an implication is that it is incorrect to call Wait before all reads from the pipe have completed.
-//For the same reason, it is incorrect to call Run when using StdoutPipe.
+// StdoutPipe returns a pipe that will be connected to the command's standard output when the command starts.
+// Wait will close the pipe after seeing the command exit, so most callers need not close the pipe themselves; however, an implication is that it is incorrect to call Wait before all reads from the pipe have completed.
+// For the same reason, it is incorrect to call Run when using StdoutPipe.
 func (c *SSHCommand) StdoutPipe() (io.ReadCloser, error) {
 	return c.cmd.StdoutPipe()
 }
@@ -203,10 +267,10 @@ func (c *SSHCommand) StderrPipe() (io.ReadCloser, error) {
 	return c.cmd.StderrPipe()
 }
 
-//StdinPipe returns a pipe that will be connected to the command's standard input when the command starts.
-//The pipe will be closed automatically after Wait sees the command exit.
+// StdinPipe returns a pipe that will be connected to the command's standard input when the command starts.
+// The pipe will be closed automatically after Wait sees the command exit.
 // A caller need only call Close to force the pipe to close sooner.
-//For example, if the command being run will not exit until standard input is closed, the caller must close the pipe.
+// For example, if the command being run will not exit until standard input is closed, the caller must close the pipe.
 func (c *SSHCommand) StdinPipe() (io.WriteCloser, error) {
 	return c.cmd.StdinPipe()
 }
@@ -244,10 +308,41 @@ func (c *SSHCommand) Start() error {
 //
 // If the command starts but does not complete successfully, the error is of
 // type *ExitError. Other error types may be returned for other situations.
-func (c *SSHCommand) Run() error {
-	err := c.cmd.Run()
+func (c *SSHCommand) Run() (int, string, string, error) {
+	//	err := c.cmd.Run()
+	//	c.end()
+	//	return err
+
+	// Set up the outputs (std and err)
+	stdOut, err := c.StdoutPipe()
+	if err != nil {
+		return 0, "", "", err
+	}
+	stderr, err := c.StderrPipe()
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	// Launch the command and wait for its execution
+	if err = c.Start(); err != nil {
+		return 0, "", "", err
+	}
+
+	msgOut, _ := ioutil.ReadAll(stdOut)
+	msgErr, _ := ioutil.ReadAll(stderr)
+
+	err = c.Wait()
 	c.end()
-	return err
+	if err != nil {
+		msgError, retCode, erro := ExtractRetCode(err)
+		if erro != nil {
+			return 0, "", "", err
+		}
+		return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
+	}
+
+	return 0, string(msgOut[:]), string(msgErr[:]), nil
+
 }
 
 func (c *SSHCommand) end() error {
@@ -372,35 +467,49 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 }
 
 // WaitServerReady waits until the SSH server is ready
-func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
+// the 'timeout' parameter is in minutes
+func (ssh *SSHConfig) WaitServerReady(timeout uint8) error {
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			cmd, _ := ssh.Command("whoami")
-			return cmd.Run()
+			retcode, _, stderr, err := cmd.Run()
+			if err != nil {
+				return err
+			}
+			if retcode != 0 {
+				if retcode == 255 {
+					return fmt.Errorf("ssh not ready")
+				}
+				log.Printf("WaitServerReady() on %s: %s", ssh.Host, stderr)
+				return fmt.Errorf("%s", stderr)
+			}
+			return nil
 		},
-		timeout,
+		time.Duration(timeout)*time.Minute,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to wait SSH ready on server '%s': %s", ssh.Host, err.Error())
+		log.Printf("SSH server on host '%s' not ready after %d mn", ssh.Host, timeout)
+		return fmt.Errorf("failed to get response from SSH on server '%s': %s", ssh.Host, err.Error())
 	}
+	log.Printf("SSH server on Host '%s' ready.\n", ssh.Host)
 	return nil
 }
 
 // Copy copy a file/directory from/to local to/from remote
-func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) error {
+func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, string, string, error) {
 	tunnels, sshConfig, err := ssh.createTunnels()
 	if err != nil {
-		return fmt.Errorf("Unable to create tunnels : %s", err.Error())
+		return 0, "", "", fmt.Errorf("Unable to create tunnels : %s", err.Error())
 	}
 
 	identityfile, err := CreateTempFileFromString(sshConfig.PrivateKey, 0400)
 	if err != nil {
-		return fmt.Errorf("Unable to create temporary key file: %s", err.Error())
+		return 0, "", "", fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
 
 	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}{{.LocalPath}} {{.User}}@{{.Host}}:{{.RemotePath}}{{else}}{{.User}}@{{.Host}}:{{.RemotePath}} {{.LocalPath}}{{end}}")
 	if err != nil {
-		return fmt.Errorf("Error parsing command template: %s", err.Error())
+		return 0, "", "", fmt.Errorf("Error parsing command template: %s", err.Error())
 	}
 
 	var copyCommand bytes.Buffer
@@ -423,7 +532,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) error {
 		LocalPath:    localPath,
 		IsUpload:     isUpload,
 	}); err != nil {
-		return fmt.Errorf("Error executing template: %s", err.Error())
+		return 0, "", "", fmt.Errorf("Error executing template: %s", err.Error())
 	}
 
 	sshCmdString := copyCommand.String()
@@ -435,18 +544,8 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) error {
 		tunnels: tunnels,
 		keyFile: identityfile,
 	}
-	return sshCommand.Run()
-}
 
-// UploadString uploads a string into a remote file
-func (ssh *SSHConfig) UploadString(remotePath, content string) error {
-	f, err := CreateTempFileFromString(content, 0400)
-	if err != nil {
-		return err
-	}
-	err = ssh.Copy(remotePath, f.Name(), true)
-	os.Remove(f.Name())
-	return err
+	return sshCommand.Run()
 }
 
 // Exec executes the cmd using ssh
