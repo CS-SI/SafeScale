@@ -18,6 +18,8 @@
 
 {{.CommonTools}}
 
+wait_for_userdata
+
 echo "Install NFS client"
 case $LINUX_KIND in
     debian|ubuntu)

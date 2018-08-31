@@ -20,6 +20,8 @@
 
 {{.CommonTools}}
 
+wait_for_userdata
+
 echo "Install NFS server"
 
 case $LINUX_KIND in
@@ -28,8 +30,6 @@ case $LINUX_KIND in
         touch /var/log/lastlog
         chgrp utmp /var/log/lastlog
         chmod 664 /var/log/lastlog
-
-        # VPL: I encountered the case where apt is locked between update and install... (!)
         wait_for_apt && apt-get update && wait_for_apt && apt-get install -qqy nfs-common nfs-kernel-server
         ;;
 
