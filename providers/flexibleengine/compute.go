@@ -19,7 +19,6 @@ package flexibleengine
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -34,8 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils/retry"
-	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 
 	uuid "github.com/satori/go.uuid"
 
@@ -292,7 +289,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		return nil, fmt.Errorf("name '%s' is invalid for a FlexibleEngine Host: %s", request.Name, openstack.ProviderErrorToString(err))
 	}
 
-	//Eventual network gateway
+	// Eventual network gateway
 	var gw *api.Host
 	// If the host is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
@@ -304,9 +301,22 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 			gw = m.Get()
 		}
 	}
+	// If a gateway is created, we need the CIDR for the userdata
+	var cidr string
+	if isGateway {
+		m, err := metadata.LoadNetwork(providers.FromClient(client), request.NetworkIDs[0])
+		if err != nil {
+			return nil, err
+		}
+		if m == nil {
+			return nil, fmt.Errorf("failed to load metadata of network '%s'", request.NetworkIDs[0])
+		}
+		network := m.Get()
+		cidr = network.CIDR
+	}
 
 	var nets []servers.Network
-	//Add private networks
+	// Add private networks
 	for _, n := range request.NetworkIDs {
 		nets = append(nets, servers.Network{
 			UUID: n,
@@ -326,7 +336,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		}
 	}
 
-	userData, err := userdata.Prepare(client, request, isGateway, kp, gw)
+	userData, err := userdata.Prepare(client, request, isGateway, kp, gw, cidr)
 	if err != nil {
 		return nil, err
 	}
@@ -388,8 +398,8 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		return nil, fmt.Errorf("query to create host '%s' failed: %s (HTTP return code: %d)", request.Name, openstack.ProviderErrorToString(err), httpResp.StatusCode)
 	}
 
-	// Wait that host is started
-	host, err := client.WaitHostReady(server.ID, time.Minute*5)
+	// Wait that host is ready, not just started
+	host, err := client.osclt.WaitHostReady(server.ID, time.Minute*5)
 	if err != nil {
 		client.DeleteHost(server.ID)
 		return nil, fmt.Errorf("timeout waiting host '%s' ready: %s", request.Name, openstack.ProviderErrorToString(err))
@@ -444,30 +454,6 @@ func validatehostName(req api.HostRequest) (bool, error) {
 		return false, fmt.Errorf(strings.Join(errs, " + "))
 	}
 	return true, nil
-}
-
-// WaitHostReady waits an host achieve ready state
-func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.Host, error) {
-	var server *servers.Server
-	var err error
-
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
-		func() error {
-			server, err = servers.Get(client.osclt.Compute, hostID).Extract()
-			if err != nil {
-				return err
-			}
-			if server.Status != "ACTIVE" {
-				return fmt.Errorf("host in '%s' state", server.Status)
-			}
-			return nil
-		},
-		timeout,
-	)
-	if retryErr != nil {
-		return nil, retryErr
-	}
-	return client.toHost(server), nil
 }
 
 // GetHost returns the host identified by id
@@ -531,31 +517,8 @@ func (client *Client) DeleteHost(id string) error {
 	if err != nil {
 		return err
 	}
-	host, err := client.GetHost(id)
-	if err != nil {
-		return err
-	}
-	if client.Cfg.UseFloatingIP {
-		fip, err := client.getFloatingIPOfHost(id)
-		if err == nil {
-			if fip != nil {
-				err = floatingips.DisassociateInstance(client.osclt.Compute, id, floatingips.DisassociateOpts{
-					FloatingIP: fip.IP,
-				}).ExtractErr()
-				if err != nil {
-					return fmt.Errorf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
-				}
-				err = floatingips.Delete(client.osclt.Compute, fip.ID).ExtractErr()
-				if err != nil {
-					return fmt.Errorf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
-				}
-			}
-		}
-	}
-	err = servers.Delete(client.osclt.Compute, id).ExtractErr()
-	if err != nil {
-		return fmt.Errorf("error deleting host %s : %s", host.Name, openstack.ProviderErrorToString(err))
-	}
+
+	err = client.osclt.DeleteHost(id)
 
 	// In FlexibleEngine, volumes may not be always automatically removed, so take care of them
 	for _, va := range volumeAttachments {
@@ -566,25 +529,7 @@ func (client *Client) DeleteHost(id string) error {
 		client.DeleteVolume(volume.ID)
 	}
 
-	metadata.RemoveHost(providers.FromClient(client), host)
-
-	// FlexibleEngine may take time to remove host, preventing for example DeleteNetwork to work if called to soon
-	// So we wait host is effectively removed before returning
-	return client.waitHostRemoved(id, 120*time.Second)
-}
-
-// waitHostDeleted waits
-func (client *Client) waitHostRemoved(hostID string, timeout time.Duration) error {
-	return retry.WhileSuccessfulDelay1SecondWithNotify(
-		func() error {
-			_, err := servers.Get(client.osclt.Compute, hostID).Extract()
-			return err
-		},
-		timeout,
-		func(try retry.Try, verdict Verdict.Enum) {
-			log.Printf("Client.waitHostRemoved(%s): try #%d: verdict=%s, err=%v", hostID, try.Count, verdict.String(), try.Err)
-		},
-	)
+	return err
 }
 
 // GetSSHConfig creates SSHConfig to connect an host by its ID
