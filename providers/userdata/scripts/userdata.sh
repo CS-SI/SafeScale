@@ -181,23 +181,6 @@ EOF
                          /COMMIT/ { print $0; }' | iptables-restore
 }
 
-install_squid() {
-    case $LINUX_KIND in
-        rhel|centos)
-            yum install -y squid;;
-        debian|ubuntu)
-            apt-get install -y squid;;
-    esac
-
-    for IF in lo $PR_IF; do
-        iptables -t nat -A PREROUTING -i $IF -p tcp -m multiport --dport 80,443 -j REDIRECT --to-port 3128
-        fw_i_accept -m state --state NEW,ESTABLISHED,RELATED -i $IF -p tcp --dport 3128
-    done
-    #iptables -A OUTPUT -j ACCEPT -m state --state NEW,ESTABLISHED,RELATED -o $PU_IF -p tcp --dport 80
-    fw_i_accept -m state --state ESTABLISHED,RELATED $i_PU_IF -p tcp -m multiport --sport 80,443
-    #iptables -A OUTPUT -j ACCEPT -m state --state ESTABLISHED,RELATED -o $PR_IF -p tcp --sport 80
-}
-
 configure_as_gateway() {
     echo "Configuring host as gateway..."
 
@@ -217,15 +200,13 @@ configure_as_gateway() {
     PU_IF=${PU_IF%%:}
 
     for IF in $(ls /sys/class/net); do
-        if [ ${IF} != "lo" ] && [ ${IF} != "${PU_IF}" ]; then
-            PR_IP=$(ip a |grep ${IF} | grep inet | awk '{print $2}' | cut -d '/' -f1)
+        if [ "$IF" != "lo" ] && [ "$IF" != "$PU_IF" ]; then
+            PR_IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1)
+            PR_IF=$IF
         fi
     done
 
     [ -z ${PR_IP} ] && return 1
-
-    PR_IF=$(netstat -ie | grep -B1 ${PR_IP} | head -n1 | awk '{print $1}')
-    PR_IF=${PR_IF%%:}
 
     if [ ! -z $PR_IF ]; then
         # Enable forwarding
@@ -241,11 +222,9 @@ configure_as_gateway() {
         i_PR_IF="-i $PR_IF"
         [ ! -z $PU_IF ] && o_PU_IF="-o $PU_IF" && i_PU_IF="-i $PU_IF"
         iptables -t nat -A POSTROUTING -j MASQUERADE $o_PU_IF
-        fw_f_accept $i_PR_IF $o_PU_IF
+        fw_f_accept $i_PR_IF $o_PU_IF -s {{ .CIDR }}
         fw_f_accept $i_PU_IF $o_PR_IF -m state --state RELATED,ESTABLISHED
     fi
-
-    #install_squid
 
     save_iptables_rules
 
@@ -304,7 +283,7 @@ configure_gateway() {
 
     reset_iptables
 
-    route del -net default
+    route del -net default &>/dev/null
 
     cat <<-'EOF' > /sbin/gateway
 #!/bin/sh -
@@ -361,5 +340,5 @@ case $LINUX_KIND in
         ;;
 esac
 
->/var/tmp/userdata.done
+>/var/tmp/user_data.done
 exit 0
