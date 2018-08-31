@@ -114,11 +114,21 @@ type CfgOptions struct {
 
 // ProviderErrorToString creates an error string from openstack api error
 func ProviderErrorToString(err error) string {
-	log.Println("ProviderErrorToString(%s)", reflect.TypeOf(err))
 	switch e := err.(type) {
+	case gc.ErrDefault401:
+		return fmt.Sprintf("code: 401, reason: %s", string(e.Body[:]))
+	case *gc.ErrDefault401:
+		return fmt.Sprintf("code: 401, reason: %s", string(e.Body[:]))
+	case gc.ErrDefault404:
+		return fmt.Sprintf("code: 404, reason: %s", string(e.Body[:]))
+	case *gc.ErrDefault404:
+		return fmt.Sprintf("code: 404, reason: %s", string(e.Body[:]))
+	case gc.ErrUnexpectedResponseCode:
+		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
 	case *gc.ErrUnexpectedResponseCode:
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
 	default:
+		log.Printf("ProviderErrorToString(%s)\n", reflect.TypeOf(err))
 		return e.Error()
 	}
 }
