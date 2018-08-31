@@ -102,7 +102,7 @@ bg_wait() {
 # Waits the completion of the execution of userdata
 wait_for_userdata() {
     while true; do
-        [ -f /var/tmp/userdata.done ] && break
+        [ -f /var/tmp/user_data.done ] && break
         echo "Waiting userdata finished..."
         sleep 5
     done
@@ -117,15 +117,20 @@ save_iptables_rules() {
 
 detect_facts() {
     declare -gA FACTS
-    FACTS["linux kind"]=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
-    local -g LINUX_KIND=${FACTS["linux kind"]}
-    FACTS["version id"]=$(cat /etc/os-release | grep "^VERSION_ID=" | cut -d= -f2 | sed 's/"//g')
-    local -g VERSION_ID=${FACTS["version id"]}
-    FACTS["sockets"]=$(LANG=C lscpu | grep "Socket(s)" | cut -d: -f2 | sed 's/"//g')
-    FACTS["cores per socket"]=$(LANG=C lscpu | grep "Core(s) per socket" | cut -d: -f2 | sed 's/"//g')
-    FACTS["cores"]=$(( ${FACTS["sockets"]} * ${FACTS["cores per socket"]} ))
-    FACTS["threads per core"]=$(LANG=C lscpu | grep "Thread(s) per core" | cut -d: -f2 | sed 's/"//g')
-    FACTS["threads"]=$(( ${FACTS["cores"]} * ${FACTS["threads per core"]} ))
-    FACTS["2 3rd of threads"]=$(( ${FACTS["threads"]} * 2 / 3 ))
+    [ -f /etc/os-release ] && {
+        . /etc/os-release
+        FACTS["linux kind"]=$ID
+        local -g LINUX_KIND=$ID
+        FACTS["version id"]=$VERSION_ID
+        local -g VERSION_ID=$VERSION_ID
+        FACTS["sockets"]=$(LANG=C lscpu | grep "Socket(s)" | cut -d: -f2 | sed 's/"//g')
+        FACTS["cores per socket"]=$(LANG=C lscpu | grep "Core(s) per socket" | cut -d: -f2 | sed 's/"//g')
+        FACTS["cores"]=$(( ${FACTS["sockets"]} * ${FACTS["cores per socket"]} ))
+        FACTS["threads per core"]=$(LANG=C lscpu | grep "Thread(s) per core" | cut -d: -f2 | sed 's/"//g')
+        FACTS["threads"]=$(( ${FACTS["cores"]} * ${FACTS["threads per core"]} ))
+        FACTS["2 3rd of threads"]=$(( ${FACTS["threads"]} * 2 / 3 ))
+        FACTS["nVidia GPU"]=$(lspci | grep nvidia 2>/dev/null)
+        return
+    }
 }
 detect_facts
