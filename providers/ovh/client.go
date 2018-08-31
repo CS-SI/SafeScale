@@ -21,9 +21,9 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/openstack"
-
 	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	filters "github.com/CS-SI/SafeScale/providers/api/filters/templates"
+	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
 //ProviderNetwork name of ovh external network
@@ -177,7 +177,7 @@ func isFlexTemplate(t api.HostTemplate) bool {
 	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 
-var filters = []api.TemplateFilter{isWindowsTemplate, isFlexTemplate}
+var filters_ = []filters.TemplateFilter{isWindowsTemplate, isFlexTemplate}
 
 //ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (c *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
@@ -187,7 +187,7 @@ func (c *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 	}
 	tpls := allTemplates[:0]
 	for _, tpl := range allTemplates {
-		if all || !api.AnyFilter(tpl, filters) {
+		if all || !filters.AnyFilter(tpl, filters_) {
 			addGPUCfg(&tpl)
 			tpls = append(tpls, tpl)
 		}

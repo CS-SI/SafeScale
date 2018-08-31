@@ -30,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/HostState"
 	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
+	filters "github.com/CS-SI/SafeScale/providers/api/filters/images"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
@@ -881,10 +882,9 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 		return images, nil
 	}
 
-	imageFilter := api.NewFilter(isWindowsImage).Not().And(api.NewFilter(isBMSImage).Not())
-	// imageFilter := api.AndFilter(api.NotFilter(isWindowsImage), api.NotFilter(isBMSImage))
+	imageFilter := filters.NewFilter(isWindowsImage).Not().And(filters.NewFilter(isBMSImage).Not())
 
-	res := api.FilterImages(images, imageFilter)
+	res := filters.FilterImages(images, imageFilter)
 	return res, nil
 
 }
