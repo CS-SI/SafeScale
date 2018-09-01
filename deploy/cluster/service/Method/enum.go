@@ -43,7 +43,7 @@ var (
 	stringMap = map[string]Enum{
 		"helm":    Helm,
 		"DCOS":    DCOS,
-		"script":  Script,
+		"bash":    Script,
 		"ansible": Ansible,
 	}
 
