@@ -21,13 +21,14 @@ package boh
  */
 
 import (
+	"bytes"
 	"encoding/gob"
 	"fmt"
 	"log"
 	"runtime"
 	"strconv"
 	"strings"
-	"text/template"
+	txttmpl "text/template"
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
@@ -39,8 +40,8 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/NodeType"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh/ErrorCode"
+	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
-
 	"github.com/CS-SI/SafeScale/deploy/install"
 	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 
@@ -51,9 +52,11 @@ import (
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/utils/template"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 )
 
 const (
@@ -66,14 +69,11 @@ const (
 )
 
 var (
-	// templateBox is the rice box to use in this package
-	templateBoxes = map[string]*rice.Box{}
-
-	// commonToolsContent contains the script containing commons tools
-	commonToolsContent *string
+	// bohTemplateBox is the rice box to use in this package
+	bohTemplateBox *rice.Box
 
 	//funcMap defines the custome functions to be used in templates
-	funcMap = template.FuncMap{
+	funcMap = txttmpl.FuncMap{
 		// The name "inc" is what the function will be called in the template text.
 		"inc": func(i int) int {
 			return i + 1
@@ -85,14 +85,16 @@ var (
 			return 1023
 		},
 	}
+
+	installCommonRequirementsContent *string
 )
 
 // managerData defines the data used by the manager of cluster we want to keep in Object Storage
 type managerData struct {
-	// MasterID contains the ID of the host acting as a master
-	MasterID string
-	// Master IP contains the IP if the host acting as a master
-	MasterIP string
+	// MasterIDs contains the ID of the masters
+	MasterIDs []string
+	// MasterIPs contains the IP of the masters
+	MasterIPs []string
 	// PublicNodeIPs contains a list of IP of the Public Agent nodes
 	PublicNodeIPs []string
 	// PrivateAvgentIPs contains a list of IP of the Private Agent Nodes
@@ -107,8 +109,8 @@ type managerData struct {
 
 // Cluster is the object describing a cluster
 type Cluster struct {
-	// common cluster data
-	Common *clusterapi.Cluster
+	// Core cluster data
+	Core *clusterapi.ClusterCore
 
 	// manager contains data specific to the cluster management
 	manager *managerData
@@ -125,51 +127,51 @@ type Cluster struct {
 
 // GetNetworkID returns the ID of the network used by the cluster
 func (c *Cluster) GetNetworkID() string {
-	return c.Common.GetNetworkID()
+	return c.Core.GetNetworkID()
 }
 
 // CountNodes returns the number of public or private nodes in the cluster
 func (c *Cluster) CountNodes(public bool) uint {
-	return c.Common.CountNodes(public)
+	return c.Core.CountNodes(public)
 }
 
 // GetAdditionalInfo returns additional info of the cluster
 func (c *Cluster) GetAdditionalInfo(ctx AdditionalInfo.Enum) interface{} {
-	return c.Common.GetAdditionalInfo(ctx)
+	return c.Core.GetAdditionalInfo(ctx)
 }
 
 // SetAdditionalInfo returns additional info of the cluster
 func (c *Cluster) SetAdditionalInfo(ctx AdditionalInfo.Enum, info interface{}) {
-	c.Common.SetAdditionalInfo(ctx, info)
+	c.Core.SetAdditionalInfo(ctx, info)
 }
 
 // Load loads the internals of an existing cluster from metadata
-func Load(data *metadata.Cluster) (clusterapi.ClusterAPI, error) {
+func Load(data *metadata.Cluster) (clusterapi.Cluster, error) {
 	svc, err := provideruse.GetProviderService()
 	if err != nil {
 		return nil, err
 	}
 
-	common := data.Get()
+	core := data.Get()
 	instance := &Cluster{
-		Common:   common,
+		Core:     core,
 		metadata: data,
 		provider: svc,
 	}
-	instance.resetAdditionalInfos(common)
+	instance.resetAdditionalInfos(core)
 	return instance, nil
 }
 
-func (c *Cluster) resetAdditionalInfos(common *clusterapi.Cluster) {
-	if common == nil {
+func (c *Cluster) resetAdditionalInfos(core *clusterapi.ClusterCore) {
+	if core == nil {
 		return
 	}
-	anon := common.GetAdditionalInfo(AdditionalInfo.Flavor)
+	anon := core.GetAdditionalInfo(AdditionalInfo.Flavor)
 	if anon != nil {
 		manager := anon.(managerData)
 		c.manager = &manager
 		// Note: On Load(), need to replace AdditionalInfos that are structs to pointers to struct
-		common.SetAdditionalInfo(AdditionalInfo.Flavor, &manager)
+		core.SetAdditionalInfo(AdditionalInfo.Flavor, &manager)
 	}
 }
 
@@ -184,20 +186,19 @@ func (c *Cluster) Reload() error {
 }
 
 // Create creates the necessary infrastructure of cluster
-func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
+func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	var (
 		nodesDef         pb.HostDefinition
 		instance         Cluster
 		privateNodeCount int
 		gw               *providerapi.Host
 		m                *providermetadata.Gateway
-		//found            bool
-		//masterChannel    chan error
-		nodesStatus error
-		ok          bool
-		results     installapi.AddResults
-		target      installapi.Target
-		component   installapi.Component
+		masterChannel    chan error
+		masterStatus     error
+		rpChannel        chan error
+		rpStatus         error
+		nodesStatus      error
+		ok               bool
 	)
 
 	// Generate needed password for account cladm
@@ -247,7 +248,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 
 	// Saving cluster parameters, with status 'Creating'
 	instance = Cluster{
-		Common: &clusterapi.Cluster{
+		Core: &clusterapi.ClusterCore{
 			Name:          req.Name,
 			CIDR:          req.CIDR,
 			Flavor:        Flavor.BOH,
@@ -262,7 +263,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		provider: svc,
 	}
 	instance.SetAdditionalInfo(AdditionalInfo.Flavor, instance.manager)
-	err = instance.updateMetadata()
+	err = instance.updateMetadata(nil)
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
 		goto cleanNetwork
@@ -281,7 +282,7 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 		goto cleanNetwork
 	}
 	gw = m.Get()
-	instance.Common.PublicIP = gw.GetAccessIP()
+	instance.Core.PublicIP = gw.GetAccessIP()
 
 	switch req.Complexity {
 	case Complexity.Dev:
@@ -294,44 +295,46 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	// Step 1: starts master creation and nodes creation
+	// step 1: Launching reverseproxy installation on gateway, in parallel
+	rpChannel = make(chan error)
+	go instance.asyncInstallReverseProxy(gw, rpChannel)
+
+	// Step 2: starts master creation and nodes creation
 	err = instance.createMaster(&nodesDef)
 	if err != nil {
 		goto cleanNetwork
 	}
 
 	// step 2: configure master asynchronously
-	//	masterChannel = make(chan error)
-	//	go instance.asyncConfigureMaster(masterChannel)
+	masterChannel = make(chan error)
+	go instance.asyncConfigureMasters(masterChannel)
 
-	// Step 3: starts node creation in parallel
+	// Step 3: starts node creation asynchronously
 	nodesStatus = instance.createNodes(privateNodeCount, false, &nodesDef)
 	if nodesStatus != nil {
 		err = nodesStatus
 		goto cleanNodes
 	}
 
-	// Installs components
-	target = install.NewClusterTarget(&instance)
-	component, err = install.NewComponent("remotedesktop")
-	if err != nil {
-		log.Printf("[Master] failed to remotely install component 'RemoteDesktop': %s\n", err.Error())
+	// Waits reverseproxy installation ended
+	rpStatus = <-rpChannel
+	if rpStatus != nil {
+		err = rpStatus
 		goto cleanNodes
 	}
-	ok, results, err = component.Add(target, map[string]interface{}{})
-	if err != nil {
-		goto cleanNodes
-	}
-	if !ok {
-		msg := results.Errors()
-		log.Printf("[Master] installation script of component 'RemoteDesktop' failed: %s\n", msg)
-		err = fmt.Errorf(msg)
+
+	// Waits master configuretion ended
+	masterStatus = <-masterChannel
+	if masterStatus != nil {
+		err = masterStatus
 		goto cleanNodes
 	}
 
 	// Cluster created and configured successfully, saving again to Metadata
-	instance.Common.State = ClusterState.Created
-	err = instance.updateMetadata()
+	err = instance.updateMetadata(func() error {
+		instance.Core.State = ClusterState.Created
+		return nil
+	})
 	if err != nil {
 		goto cleanNodes
 	}
@@ -359,14 +362,16 @@ func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
 
 cleanNodes:
 	if !req.KeepOnFailure {
-		for _, id := range instance.Common.PrivateNodeIDs {
-			brokerclient.New().Host.Delete(id, 0)
+		for _, id := range instance.Core.PrivateNodeIDs {
+			brokerclient.New().Host.Delete(id, brokerclient.DefaultTimeout)
 		}
-		brokerclient.New().Host.Delete(instance.manager.MasterID, brokerclient.DefaultTimeout)
+		for _, id := range instance.manager.MasterIDs {
+			brokerclient.New().Host.Delete(id, brokerclient.DefaultTimeout)
+		}
 	}
 cleanNetwork:
 	if !req.KeepOnFailure {
-		brokerclient.New().Network.Delete(instance.Common.NetworkID, brokerclient.DefaultTimeout)
+		brokerclient.New().Network.Delete(instance.Core.NetworkID, brokerclient.DefaultTimeout)
 		instance.metadata.Delete()
 	}
 	return nil, err
@@ -374,41 +379,62 @@ cleanNetwork:
 
 // createMaster creates an host acting as a master in the cluster
 func (c *Cluster) createMaster(req *pb.HostDefinition) error {
-	log.Println("[Master] starting creation...")
+	log.Println("[Master #1] starting creation...")
 
 	// Create the host
 	var err error
-	req.Name = c.Common.Name + "-master-1"
+	req.Name = c.Core.Name + "-master-1"
 	req.Public = false
-	req.Network = c.Common.NetworkID
+	req.Network = c.Core.NetworkID
 	host, err := brokerclient.New().Host.Create(*req, 0)
 	if err != nil {
-		log.Printf("[Master] creation failed: %s\n", err.Error())
+		log.Printf("[Master #1] creation failed: %s\n", err.Error())
 		return err
 	}
 
 	// Registers the new master in the cluster struct
-	c.metadata.Acquire()
-	err = c.Reload()
+	err = c.updateMetadata(func() error {
+		c.manager.MasterIDs = append(c.manager.MasterIDs, host.ID)
+		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PRIVATE_IP)
+		return nil
+	})
 	if err != nil {
-		c.metadata.Release()
-		return err
-	}
-	c.manager.MasterID = host.ID
-	c.manager.MasterIP = host.PRIVATE_IP
-
-	// Update cluster definition in Object Storage
-	err = c.metadata.Write()
-	c.metadata.Release()
-	if err != nil {
-		c.manager.MasterID = ""
-		c.manager.MasterIP = ""
+		c.manager.MasterIDs = c.manager.MasterIDs[:len(c.manager.MasterIDs)-1]
+		c.manager.MasterIPs = c.manager.MasterIPs[:len(c.manager.MasterIPs)-1]
 		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultTimeout)
-		log.Printf("[Master] creation failed: %s", err.Error())
+		log.Printf("[Master #1] creation failed: %s", err.Error())
 		return err
 	}
 
-	log.Println("[Master] creation successful")
+	// Installs BOH requirements...
+	installCommonRequirements, err := c.getInstallCommonRequirements()
+	if err != nil {
+		return err
+	}
+	data := map[string]interface{}{
+		"InstallCommonRequirements": *installCommonRequirements,
+		"CladmPassword":             c.Core.AdminPassword,
+	}
+	box, err := getBOHTemplateBox()
+	if err != nil {
+		return err
+	}
+	retcode, _, _, err := flavortools.ExecuteScript(box, funcMap, "boh_install_master.sh", data, host.ID)
+	if err != nil {
+		log.Printf("[Masters: #%d (%s)] failed to remotely run installation script: %s\n", 1, host.Name, err.Error())
+		return err
+	}
+	if retcode != 0 {
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[Masters: #%d (%s)] installation failed:\nretcode=%d (%s)", 1, host.Name, errcode, errcode.String())
+			return fmt.Errorf("scripted Master installation failed with error code %d (%s)", errcode, errcode.String())
+		}
+		log.Printf("[Masters: #%d (%s)] installation failed:\nretcode=%d", 1, host.Name, retcode)
+		return fmt.Errorf("scripted Master installation failed with error code %d", retcode)
+	}
+
+	log.Println("[Master #1] creation successful")
 	return nil
 }
 
@@ -456,7 +482,11 @@ func (c *Cluster) createNodes(count int, public bool, def *pb.HostDefinition) er
 
 // asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
-func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.HostDefinition, result chan string, done chan error) {
+func (c *Cluster) asyncCreateNode(
+	index int, nodeType NodeType.Enum, req *pb.HostDefinition,
+	result chan string, done chan error,
+) {
+
 	var publicIP bool
 	var nodeTypeStr string
 	if nodeType == NodeType.PublicNode {
@@ -466,65 +496,142 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 		nodeTypeStr = "private"
 		publicIP = false
 	}
-	log.Printf("[Nodes: %s #%d] starting creation...\n", nodeTypeStr, index)
+	log.Printf("[%s node #%d] starting creation...\n", nodeTypeStr, index)
 
 	// Create the host
 	var err error
 	req.Name, err = c.buildHostname("node", nodeType)
 	if err != nil {
-		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
+		log.Printf("[%s node #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
 		done <- err
 		return
 	}
 	req.Public = publicIP
-	req.Network = c.Common.NetworkID
+	req.Network = c.Core.NetworkID
 	host, err := brokerclient.New().Host.Create(*req, 0)
 	if err != nil {
-		log.Printf("[Nodes: %s #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
+		log.Printf("[%s node #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
 		done <- err
 		return
 	}
 
 	// Registers the new Agent in the cluster struct
-	c.metadata.Acquire()
-	err = c.Reload()
-	if err != nil {
-		c.metadata.Release()
-		result <- ""
-		done <- err
-	}
-	if nodeType == NodeType.PublicNode {
-		c.Common.PublicNodeIDs = append(c.Common.PublicNodeIDs, host.ID)
-		c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PRIVATE_IP)
-	} else {
-		c.Common.PrivateNodeIDs = append(c.Common.PrivateNodeIDs, host.ID)
-		c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PRIVATE_IP)
-	}
-
-	// Update cluster definition in Object Storage
-	err = c.metadata.Write()
-	c.metadata.Release()
+	err = c.updateMetadata(func() error {
+		if nodeType == NodeType.PublicNode {
+			c.Core.PublicNodeIDs = append(c.Core.PublicNodeIDs, host.ID)
+			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PRIVATE_IP)
+		} else {
+			c.Core.PrivateNodeIDs = append(c.Core.PrivateNodeIDs, host.ID)
+			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PRIVATE_IP)
+		}
+		return nil
+	})
 	if err != nil {
 		// Removes the ID we just added to the cluster struct
 		if nodeType == NodeType.PublicNode {
-			c.Common.PublicNodeIDs = c.Common.PublicNodeIDs[:len(c.Common.PublicNodeIDs)-1]
+			c.Core.PublicNodeIDs = c.Core.PublicNodeIDs[:len(c.Core.PublicNodeIDs)-1]
 			c.manager.PublicNodeIPs = c.manager.PublicNodeIPs[:len(c.manager.PublicNodeIPs)-1]
 		} else {
-			c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
+			c.Core.PrivateNodeIDs = c.Core.PrivateNodeIDs[:len(c.Core.PrivateNodeIDs)-1]
 			c.manager.PrivateNodeIPs = c.manager.PrivateNodeIPs[:len(c.manager.PrivateNodeIPs)-1]
 		}
 		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultTimeout)
-		log.Printf("[Nodes: %s #%d] creation failed: %s", nodeTypeStr, index, err.Error())
+		log.Printf("[%s node #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
 		done <- fmt.Errorf("failed to update Cluster configuration: %s", err.Error())
 		return
 	}
 
-	log.Printf("[Nodes: %s #%d] creation successful\n", nodeTypeStr, index)
+	// Installs BOH requirements
+	installCommonRequirements, err := c.getInstallCommonRequirements()
+	if err != nil {
+		done <- err
+		return
+	}
+	data := map[string]interface{}{
+		"InstallCommonRequirements": *installCommonRequirements,
+		"CladmPassword":             c.Core.AdminPassword,
+	}
+	box, err := getBOHTemplateBox()
+	if err != nil {
+		done <- err
+		return
+	}
+	retcode, _, _, err := flavortools.ExecuteScript(box, funcMap, "boh_install_node.sh", data, host.ID)
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to remotely run installation script: %s\n", nodeTypeStr, index, host.Name, err.Error())
+		result <- ""
+		done <- err
+		return
+	}
+	if retcode != 0 {
+		result <- ""
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[%s node #%d (%s)] installation failed: retcode: %d (%s)", nodeTypeStr, index, host.Name, errcode, errcode.String())
+			done <- fmt.Errorf("scripted Node configuration failed with error code %d (%s)", errcode, errcode.String())
+		} else {
+			log.Printf("[%s node #%d (%s)] installation failed: retcode=%d", nodeTypeStr, index, host.Name, retcode)
+			done <- fmt.Errorf("scripted Agent configuration failed with error code %d", retcode)
+		}
+		return
+	}
+
+	log.Printf("[%s node #%d] creation successful\n", nodeTypeStr, index)
 	result <- host.ID
 	done <- nil
+}
+
+// getBOHTemplateBox
+func getBOHTemplateBox() (*rice.Box, error) {
+	var b *rice.Box
+	var err error
+	if bohTemplateBox == nil {
+		// Note: path MUST be literal for rice to work
+		b, err = rice.FindBox("../boh/scripts")
+		if err != nil {
+			return nil, err
+		}
+		bohTemplateBox = b
+	}
+	return bohTemplateBox, nil
+}
+
+// getInstallCommonRequirements returns the string corresponding to the script dcos_install_requirements.sh
+// which installs common components (docker in particular)
+func (c *Cluster) getInstallCommonRequirements() (*string, error) {
+	if installCommonRequirementsContent == nil {
+		// find the rice.Box
+		b, err := getBOHTemplateBox()
+		if err != nil {
+			return nil, err
+		}
+
+		// get file contents as string
+		tmplString, err := b.String("boh_install_requirements.sh")
+		if err != nil {
+			return nil, fmt.Errorf("error loading script template: %s", err.Error())
+		}
+
+		// parse then execute the template
+		tmplPrepared, err := txttmpl.New("install_requirements").Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+		}
+		dataBuffer := bytes.NewBufferString("")
+		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
+			"CIDR":          c.Core.CIDR,
+			"CladmPassword": c.Core.AdminPassword,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
+		}
+		result := dataBuffer.String()
+		installCommonRequirementsContent = &result
+	}
+	return installCommonRequirementsContent, nil
 }
 
 // buildHostname builds a unique hostname in the cluster
@@ -538,66 +645,122 @@ func (c *Cluster) buildHostname(core string, nodeType NodeType.Enum) (string, er
 	case NodeType.PublicNode:
 		coreName = "pub" + core
 	case NodeType.PrivateNode:
-		coreName = "priv" + core
+		coreName = core
 	default:
 		return "", fmt.Errorf("Invalid Node Type '%v'", nodeType)
 	}
 
-	c.metadata.Acquire()
-	err := c.Reload()
-	if err != nil {
-		c.metadata.Release()
-		return "", err
-	}
-	switch nodeType {
-	case NodeType.PublicNode:
-		c.manager.PublicLastIndex++
-		index = c.manager.PublicLastIndex
-	case NodeType.PrivateNode:
-		c.manager.PrivateLastIndex++
-		index = c.manager.PrivateLastIndex
-	}
-
-	// Update cluster definition in Object Storage
-	err = c.metadata.Write()
-	c.metadata.Release()
+	err := c.updateMetadata(func() error {
+		switch nodeType {
+		case NodeType.PublicNode:
+			c.manager.PublicLastIndex++
+			index = c.manager.PublicLastIndex
+		case NodeType.PrivateNode:
+			c.manager.PrivateLastIndex++
+			index = c.manager.PrivateLastIndex
+		}
+		return nil
+	})
 	if err != nil {
 		return "", err
 	}
-	return c.Common.Name + "-" + coreName + "-" + strconv.Itoa(index), nil
+	return c.Core.Name + "-" + coreName + "-" + strconv.Itoa(index), nil
 }
 
-// asyncConfigureMaster configure DCOS on master
-func (c *Cluster) asyncConfigureMaster(done chan error) {
-	log.Println("[Master] starting configuration...")
-
-	target := install.NewClusterTarget(c)
-
-	// Installing component RemoteDesktop on master host
-	component, err := install.NewComponent("remotedesktop")
+// asyncInstallReverseProxy installs the component reverseproxy on network gateway
+func (c *Cluster) asyncInstallReverseProxy(host *providerapi.Host, done chan error) {
+	err := provideruse.WaitSSHServerReady(c.provider, host.ID, 5)
 	if err != nil {
-		log.Printf("[Master] failed to remotely install component 'RemoteDesktop': %s\n", err.Error())
 		done <- err
 		return
 	}
-	ok, results, err := component.Add(target, map[string]interface{}{})
+	target := install.NewHostTarget(pbutils.ToPBHost(host))
+	component, err := install.NewComponent("reverseproxy")
 	if err != nil {
 		done <- err
+		return
+	}
+	ok, results, err := component.Add(target, installapi.Variables{})
+	if err != nil {
+		done <- fmt.Errorf("failed to execute installation of component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		return
+	}
+	if !ok {
+		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, results.PrivateNodes[host.Name].Error())
+		return
+	}
+	done <- nil
+}
+
+// asyncConfigureMasters configure masters
+func (c *Cluster) asyncConfigureMasters(done chan error) {
+	var (
+		dones  []chan error
+		errors []string
+	)
+	for i, id := range c.manager.MasterIDs {
+		d := make(chan error)
+		dones = append(dones, d)
+		go c.asyncConfigureMaster(i, id, d)
+	}
+	for _, d := range dones {
+		err := <-d
+		if err != nil {
+			errors = append(errors, err.Error())
+		}
+	}
+	if len(errors) > 0 {
+		msg := strings.Join(errors, "\n")
+		done <- fmt.Errorf("failed to configure masters: %s", msg)
+		return
+	}
+
+	log.Println("Masters configured successfully")
+	done <- nil
+}
+
+// asyncConfigureMaster configure one master
+func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
+	log.Printf("[master #%d] starting configuration...\n", index)
+
+	// Installs remotedesktop component on host
+	component, err := install.NewComponent("remotedesktop")
+	if err != nil {
+		log.Printf("[master #%d] failed to find component 'remotedesktop': %s\n", index, err.Error())
+		done <- fmt.Errorf("[master #%d] %s", index, err.Error())
+		return
+	}
+	broker := brokerclient.New().Host
+	host, err := broker.Inspect(id, brokerclient.DefaultTimeout)
+	if err != nil {
+		done <- fmt.Errorf("[master #%d] %s", index, err.Error())
+		return
+	}
+	target := install.NewHostTarget(host)
+	ok, results, err := component.Add(target, installapi.Variables{
+		"Hostname": host.Name,
+		"HostIP":   host.PRIVATE_IP,
+		"Username": "cladm",
+		"Password": c.Core.AdminPassword,
+	})
+	if err != nil {
+		done <- fmt.Errorf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), err.Error())
 		return
 	}
 	if !ok {
 		msg := results.Errors()
-		log.Printf("[Master] installation script of component 'RemoteDesktop' failed: %s\n", msg)
+		log.Printf("[master #%d (%s)] installation script of component '%s' failed: %s\n", index, host.Name, component.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
 		return
 	}
-	log.Println("[Master] configuration successful")
+
+	log.Printf("[master #%d (%s)] configuration successful\n", index, host.Name)
 	done <- nil
 }
 
 // GetName returns the name of the cluster
 func (c *Cluster) GetName() string {
-	return c.Common.Name
+	return c.Core.Name
 }
 
 // GetMasters returns a list of master servers
@@ -613,8 +776,10 @@ func (c *Cluster) Start() error {
 		return err
 	}
 	if state == ClusterState.Stopped {
-		c.Common.State = ClusterState.Nominal
-		return c.updateMetadata()
+		return c.updateMetadata(func() error {
+			c.Core.State = ClusterState.Nominal
+			return nil
+		})
 	}
 	if state != ClusterState.Nominal && state != ClusterState.Degraded {
 		return fmt.Errorf("failed to start cluster because of it's current state: %s", state.String())
@@ -640,16 +805,18 @@ func (c *Cluster) GetState() (ClusterState.Enum, error) {
 	if now.After(c.lastStateCollection.Add(c.manager.StateCollectInterval)) {
 		return c.ForceGetState()
 	}
-	return c.Common.State, nil
+	return c.Core.State, nil
 }
 
 // ForceGetState returns the current state of the cluster
 // Does nothing currently...
 func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
-	c.Common.State = ClusterState.Nominal
-	c.lastStateCollection = time.Now()
-	c.updateMetadata()
-	return c.Common.State, nil
+	c.updateMetadata(func() error {
+		c.Core.State = ClusterState.Nominal
+		c.lastStateCollection = time.Now()
+		return nil
+	})
+	return c.Core.State, nil
 }
 
 // AddNode adds one node
@@ -710,33 +877,34 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 	var hostID string
 
 	if public {
-		hostID = c.Common.PublicNodeIDs[len(c.Common.PublicNodeIDs)-1]
+		hostID = c.Core.PublicNodeIDs[len(c.Core.PublicNodeIDs)-1]
 	} else {
-		hostID = c.Common.PrivateNodeIDs[len(c.Common.PrivateNodeIDs)-1]
+		hostID = c.Core.PrivateNodeIDs[len(c.Core.PrivateNodeIDs)-1]
 	}
 	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
 	if err != nil {
 		return nil
 	}
 
-	if public {
-		c.Common.PublicNodeIDs = c.Common.PublicNodeIDs[:len(c.Common.PublicNodeIDs)-1]
-	} else {
-		c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
-	}
-	c.updateMetadata()
-	return nil
+	return c.updateMetadata(func() error {
+		if public {
+			c.Core.PublicNodeIDs = c.Core.PublicNodeIDs[:len(c.Core.PublicNodeIDs)-1]
+		} else {
+			c.Core.PrivateNodeIDs = c.Core.PrivateNodeIDs[:len(c.Core.PrivateNodeIDs)-1]
+		}
+		return nil
+	})
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
 func (c *Cluster) DeleteSpecificNode(hostID string) error {
 	var foundInPrivate bool
-	foundInPublic, idx := contains(c.Common.PublicNodeIDs, hostID)
+	foundInPublic, idx := contains(c.Core.PublicNodeIDs, hostID)
 	if !foundInPublic {
-		foundInPrivate, idx = contains(c.Common.PrivateNodeIDs, hostID)
+		foundInPrivate, idx = contains(c.Core.PrivateNodeIDs, hostID)
 	}
 	if !foundInPublic && !foundInPrivate {
-		return fmt.Errorf("host '%s' isn't a registered Node of the Cluster '%s'", hostID, c.Common.Name)
+		return fmt.Errorf("host '%s' isn't a registered Node of the Cluster '%s'", hostID, c.Core.Name)
 	}
 
 	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
@@ -744,32 +912,34 @@ func (c *Cluster) DeleteSpecificNode(hostID string) error {
 		return err
 	}
 
-	if foundInPublic {
-		c.Common.PublicNodeIDs = append(c.Common.PublicNodeIDs[:idx], c.Common.PublicNodeIDs[idx+1:]...)
-	} else {
-		c.Common.PrivateNodeIDs = append(c.Common.PrivateNodeIDs[:idx], c.Common.PrivateNodeIDs[idx+1:]...)
-	}
-	return nil
+	return c.updateMetadata(func() error {
+		if foundInPublic {
+			c.Core.PublicNodeIDs = append(c.Core.PublicNodeIDs[:idx], c.Core.PublicNodeIDs[idx+1:]...)
+		} else {
+			c.Core.PrivateNodeIDs = append(c.Core.PrivateNodeIDs[:idx], c.Core.PrivateNodeIDs[idx+1:]...)
+		}
+		return nil
+	})
 }
 
 // ListMasterIDs lists the master nodes in the cluster
 // No masters in BOH...
 func (c *Cluster) ListMasterIDs() []string {
-	return []string{c.manager.MasterID}
+	return c.manager.MasterIDs
 }
 
 // ListMasterIPs lists the master nodes in the cluster
 // No masters in BOH...
 func (c *Cluster) ListMasterIPs() []string {
-	return []string{c.manager.MasterIP}
+	return c.manager.MasterIPs
 }
 
 // ListNodeIDs lists the IDs of the nodes in the cluster
 func (c *Cluster) ListNodeIDs(public bool) []string {
 	if public {
-		return c.Common.PublicNodeIDs
+		return c.Core.PublicNodeIDs
 	}
-	return c.Common.PrivateNodeIDs
+	return c.Core.PrivateNodeIDs
 }
 
 // ListNodeIPs lists the IPs of the nodes in the cluster
@@ -782,12 +952,12 @@ func (c *Cluster) ListNodeIPs(public bool) []string {
 
 // GetNode returns a node based on its ID
 func (c *Cluster) GetNode(hostID string) (*pb.Host, error) {
-	found, _ := contains(c.Common.PublicNodeIDs, hostID)
+	found, _ := contains(c.Core.PublicNodeIDs, hostID)
 	if !found {
-		found, _ = contains(c.Common.PrivateNodeIDs, hostID)
+		found, _ = contains(c.Core.PrivateNodeIDs, hostID)
 	}
 	if !found {
-		return nil, fmt.Errorf("failed to find node '%s' in cluster '%s'", hostID, c.Common.Name)
+		return nil, fmt.Errorf("failed to find node '%s' in cluster '%s'", hostID, c.Core.Name)
 	}
 	return brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultTimeout)
 }
@@ -807,16 +977,16 @@ func contains(list []string, hostID string) (bool, int) {
 
 // SearchNode tells if an host ID corresponds to a node of the cluster
 func (c *Cluster) SearchNode(hostID string, public bool) bool {
-	found, _ := contains(c.Common.PublicNodeIDs, hostID)
+	found, _ := contains(c.Core.PublicNodeIDs, hostID)
 	if !found {
-		found, _ = contains(c.Common.PrivateNodeIDs, hostID)
+		found, _ = contains(c.Core.PrivateNodeIDs, hostID)
 	}
 	return found
 }
 
 // GetConfig returns the public properties of the cluster
-func (c *Cluster) GetConfig() clusterapi.Cluster {
-	return *c.Common
+func (c *Cluster) GetConfig() clusterapi.ClusterCore {
+	return *c.Core
 }
 
 // FindAvailableMaster returns the ID of the first master available for execution
@@ -828,11 +998,7 @@ func (c *Cluster) FindAvailableMaster() (string, error) {
 func (c *Cluster) FindAvailableNode(public bool) (string, error) {
 	var hostID string
 	for _, hostID = range c.ListNodeIDs(public) {
-		ssh, err := c.provider.GetSSHConfig(hostID)
-		if err != nil {
-			return "", fmt.Errorf("failed to read SSH config: %s", err.Error())
-		}
-		err = ssh.WaitServerReady(shortTimeoutSSH)
+		err := provideruse.WaitSSHServerReady(c.provider, hostID, 5)
 		if err != nil {
 			if _, ok := err.(retry.TimeoutError); ok {
 				continue
@@ -848,16 +1014,30 @@ func (c *Cluster) FindAvailableNode(public bool) (string, error) {
 }
 
 // updateMetadata writes cluster config in Object Storage
-func (c *Cluster) updateMetadata() error {
+func (c *Cluster) updateMetadata(updatefn func() error) error {
 	if c.metadata == nil {
 		m, err := metadata.NewCluster()
 		if err != nil {
 			return err
 		}
-		m.Carry(c.Common)
+		m.Carry(c.Core)
 		c.metadata = m
+
+		c.metadata.Acquire()
+	} else {
+		c.metadata.Acquire()
+		c.Reload()
 	}
-	return c.metadata.Write()
+	if updatefn != nil {
+		err := updatefn()
+		if err != nil {
+			c.metadata.Release()
+			return err
+		}
+	}
+	err := c.metadata.Write()
+	c.metadata.Release()
+	return err
 }
 
 // Delete destroys everything related to the infrastructure built for the cluster
@@ -867,8 +1047,10 @@ func (c *Cluster) Delete() error {
 	}
 
 	// Updates metadata
-	c.Common.State = ClusterState.Removed
-	err := c.metadata.Write()
+	err := c.updateMetadata(func() error {
+		c.Core.State = ClusterState.Removed
+		return nil
+	})
 	if err != nil {
 		return err
 	}
@@ -876,29 +1058,22 @@ func (c *Cluster) Delete() error {
 	broker := brokerclient.New()
 
 	// Deletes the public nodes
-	for _, n := range c.Common.PublicNodeIDs {
-		err := broker.Host.Delete(n, brokerclient.DefaultTimeout)
-		if err != nil {
-			return err
-		}
+	for _, n := range c.Core.PublicNodeIDs {
+		broker.Host.Delete(n, brokerclient.DefaultTimeout)
 	}
 
 	// Deletes the private nodes
-	for _, n := range c.Common.PrivateNodeIDs {
-		err := broker.Host.Delete(n, brokerclient.DefaultTimeout)
-		if err != nil {
-			return err
-		}
+	for _, n := range c.Core.PrivateNodeIDs {
+		broker.Host.Delete(n, brokerclient.DefaultTimeout)
 	}
 
-	// Delete the Master
-	err = broker.Host.Delete(c.manager.MasterID, brokerclient.DefaultTimeout)
-	if err != nil {
-		return err
+	// Delete the Masters
+	for _, n := range c.manager.MasterIDs {
+		broker.Host.Delete(n, brokerclient.DefaultTimeout)
 	}
 
 	// Deletes the network and gateway
-	err = broker.Network.Delete(c.Common.NetworkID, brokerclient.DefaultTimeout)
+	err = broker.Network.Delete(c.Core.NetworkID, brokerclient.DefaultTimeout)
 	if err != nil {
 		return err
 	}
@@ -909,7 +1084,7 @@ func (c *Cluster) Delete() error {
 		return nil
 	}
 	c.metadata = nil
-	c.Common = nil
+	c.Core = nil
 	c.manager = nil
 	return nil
 }
