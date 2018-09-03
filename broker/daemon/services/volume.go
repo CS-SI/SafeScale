@@ -58,8 +58,12 @@ func (srv *VolumeService) List(all bool) ([]api.Volume, error) {
 func (srv *VolumeService) Delete(ref string) error {
 	vol, err := srv.Get(ref)
 	if err != nil {
+		return err
+	}
+	if vol == nil {
 		return fmt.Errorf("Volume '%s' does not exist", ref)
 	}
+
 	return srv.provider.DeleteVolume(vol.ID)
 }
 
@@ -95,24 +99,11 @@ func (srv *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachmen
 
 // Create a volume
 func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error) {
-	// Check if a volume already exist with the same name
-	volume, err := srv.Get(name)
-	if err != nil {
-		return nil, err
-	}
-	if volume != nil {
-		return nil, fmt.Errorf("Volume '%s' already exists", name)
-	}
-
-	volume, err = srv.provider.CreateVolume(api.VolumeRequest{
+	return srv.provider.CreateVolume(api.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
 	})
-	if err != nil {
-		return nil, err
-	}
-	return volume, nil
 }
 
 // Attach a volume to an host

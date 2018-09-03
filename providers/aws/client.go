@@ -29,13 +29,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
-
-	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
-
-	"github.com/CS-SI/SafeScale/providers/api/HostState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/utils/metadata"
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -1341,6 +1339,15 @@ func (c *Client) removeVolumeName(id string) error {
 //- size is the size of the volume in GB
 //- volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (c *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
+	// Check if a volume already exist with the same name
+	volume, err := metadata.LoadVolume(providers.FromClient(client), request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if volume != nil {
+		return nil, fmt.Errorf("Volume '%s' already exists", request.Name)
+	}
+
 	v, err := c.EC2.CreateVolume(&ec2.CreateVolumeInput{
 		Size:       aws.Int64(int64(request.Size)),
 		VolumeType: aws.String(toVolumeType(request.Speed)),

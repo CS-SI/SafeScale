@@ -19,10 +19,12 @@ package flexibleengine
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/providers/aws/s3"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	v2_vol "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
@@ -119,6 +121,15 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 // - imageID is the ID of the image to initialize the volume with
 func (client *Client) ExCreateVolume(request api.VolumeRequest, imageID string) (*api.Volume, error) {
+	// Check if a volume already exist with the same name
+	volume, err := metadata.LoadVolume(providers.FromClient(client), request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if volume != nil {
+		return nil, fmt.Errorf("Volume '%s' already exists", request.Name)
+	}
+
 	opts := v2_vol.CreateOpts{
 		Name:       request.Name,
 		Size:       request.Size,
