@@ -16,9 +16,7 @@
 #
 # Installs and configures
 
-{{.CommonTools}}
-
-wait_for_userdata
+{{.reserved_BashLibrary}}
 
 echo "Install NFS client"
 case $LINUX_KIND in

@@ -25,24 +25,24 @@ import (
 
 //go:generate rice embed-go
 
-// commonToolsContent contains the content of the script common_tools, that will be injected inside scripts through parameter {{.CommonTools}}
-var commonToolsContent string
+// bashLibrayContent contains the content of the script bash_library.sh, that will be injected inside scripts through parameter {{.reserved_BashLibrary}}
+var bashLibraryContent string
 
-// RealizeCommonTools generates the content of {{.CommonTools}}
-func RealizeCommonTools() (string, error) {
-	if commonToolsContent == "" {
+// GetBashLibrary generates the content of {{.reserved_BashLibrary}}
+func GetBashLibrary() (string, error) {
+	if bashLibraryContent == "" {
 		box, err := rice.FindBox("../system/scripts")
 		if err != nil {
 			return "", err
 		}
 
 		// get file contents as string
-		tmplContent, err := box.String("common_tools.sh")
+		tmplContent, err := box.String("bash_library.sh")
 		if err != nil {
 			return "", err
 		}
 		// Prepare the template for execution
-		tmplPrepared, err := template.New("common_tools").Parse(tmplContent)
+		tmplPrepared, err := template.New("bash_lbrary").Parse(tmplContent)
 		if err != nil {
 			return "", err
 		}
@@ -52,7 +52,7 @@ func RealizeCommonTools() (string, error) {
 			// TODO Use more explicit error
 			return "", err
 		}
-		commonToolsContent = buffer.String()
+		bashLibraryContent = buffer.String()
 	}
-	return commonToolsContent, nil
+	return bashLibraryContent, nil
 }

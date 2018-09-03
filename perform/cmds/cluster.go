@@ -71,7 +71,6 @@ var ClusterCreateCommand = &cli.Command{
 		fmt.Println(cmdStr)
 
 		cmdStr = fmt.Sprintf("deploy cluster %s pkg -K DCOS kubernetes", clusterName)
-		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
 
 		os.Exit(int(ExitCode.NotImplemented))

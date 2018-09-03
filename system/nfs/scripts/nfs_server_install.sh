@@ -18,9 +18,7 @@
 #
 # Installs and configures a NFS Server service
 
-{{.CommonTools}}
-
-wait_for_userdata
+{{.reserved_BashLibrary}}
 
 echo "Install NFS server"
 

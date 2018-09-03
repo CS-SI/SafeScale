@@ -48,11 +48,11 @@ func getTemplateBox() (*rice.Box, error) {
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
 func executeScript(sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, error) {
-	commonTools, err := system.RealizeCommonTools()
+	bashLibrary, err := system.GetBashLibrary()
 	if err != nil {
 		return 255, "", "", err
 	}
-	data["CommonTools"] = commonTools
+	data["reserved_BashLibrary"] = bashLibrary
 
 	tmplBox, err := getTemplateBox()
 
