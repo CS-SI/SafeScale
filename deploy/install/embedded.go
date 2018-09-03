@@ -82,10 +82,10 @@ func loadSpecFile(name string, params map[string]interface{}) (*viper.Viper, err
 	if v.GetString("component.name") == "" {
 		return nil, fmt.Errorf("syntax error in component specification file '%s': name' can't be empty", name)
 	}
-	if !v.IsSet("component.installing") {
+	if !v.IsSet("component.install") {
 		return nil, fmt.Errorf("syntax error in component specification file '%s': missing 'installing'", name)
 	}
-	if len(v.GetStringMap("component.installing")) <= 0 {
+	if len(v.GetStringMap("component.install")) <= 0 {
 		return nil, fmt.Errorf("syntax error in component specification file '%s': 'installing' defines no method", name)
 	}
 	return v, nil
