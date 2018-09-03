@@ -295,11 +295,11 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	}
 
 	// Check name availability
-	host, err := client.GetHost(request.Name)
+	m, err := metadata.LoadHost(providers.FromClient(client), request.Name)
 	if err != nil {
 		return nil, err
 	}
-	if host != nil {
+	if m != nil {
 		return nil, fmt.Errorf("A host already exist with name '%s'", request.Name)
 	}
 
@@ -399,7 +399,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	}
 
 	// Wait that host is started
-	host, err = client.WaitHostReady(server.ID, time.Minute*5)
+	host, err := client.WaitHostReady(server.ID, time.Minute*5)
 	if err != nil {
 		client.DeleteHost(server.ID)
 		return nil, fmt.Errorf("timeout waiting host '%s' ready: %s", request.Name, openstack.ProviderErrorToString(err))
@@ -563,13 +563,22 @@ func (client *Client) listMonitoredHosts() ([]api.Host, error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (client *Client) DeleteHost(id string) error {
+func (client *Client) DeleteHost(ref string) error {
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	if err != nil {
+		return err
+	}
+	if m == nil {
+		return fmt.Errorf("Failed to find host '%s' in metadata", ref)
+	}
+
+	host := m.Get()
+	id := host.ID
 	// Retrieve the list of attached volumes before deleting the host
 	volumeAttachments, err := client.ListVolumeAttachments(id)
 	if err != nil {
 		return err
 	}
-	host, err := client.GetHost(id)
 	if err != nil {
 		return err
 	}

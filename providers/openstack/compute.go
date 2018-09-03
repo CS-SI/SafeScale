@@ -393,12 +393,12 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 
 // createHost ...
 func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.Host, error) {
-	// Check name is not already used
-	host, err := client.GetHost(request.Name)
+	// We 1st check if name is not aleready used
+	m, err := metadata.LoadHost(providers.FromClient(client), request.Name)
 	if err != nil {
 		return nil, err
 	}
-	if host != nil {
+	if m != nil {
 		return nil, fmt.Errorf("A host already exist with name '%s'", request.Name)
 	}
 
@@ -407,6 +407,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	// If the host is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
 		gwServer, err := client.readGateway(request.NetworkIDs[0])
+
 		if err != nil {
 			return nil, fmt.Errorf("no private host can be created on a network without gateway")
 		}
@@ -475,7 +476,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	service := providers.Service{
 		ClientAPI: client,
 	}
-	host, err = service.WaitHostState(server.ID, HostState.STARTED, 120*time.Second)
+	host, err := service.WaitHostState(server.ID, HostState.STARTED, 120*time.Second)
 	if err != nil {
 		servers.Delete(client.Compute, server.ID)
 		return nil, fmt.Errorf("Timeout creating Host: %s", ProviderErrorToString(err))
@@ -630,11 +631,17 @@ func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, err
 }
 
 // DeleteHost deletes the host identified by id
-func (client *Client) DeleteHost(id string) error {
-	host, err := client.GetHost(id)
+func (client *Client) DeleteHost(ref string) error {
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
 	if err != nil {
 		return err
 	}
+	if m == nil {
+		return fmt.Errorf("Failed to find host '%s' in metadata", ref)
+	}
+
+	host := m.Get()
+	id := host.ID
 	if client.Cfg.UseFloatingIP {
 		fip, err := client.getFloatingIP(id)
 		if err == nil {

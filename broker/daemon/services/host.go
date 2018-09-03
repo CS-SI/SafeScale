@@ -90,11 +90,7 @@ func (srv *HostService) Get(ref string) (*api.Host, error) {
 
 // Delete deletes host referenced by ref
 func (srv *HostService) Delete(ref string) error {
-	host, err := srv.Get(ref)
-	if err != nil {
-		return fmt.Errorf("host '%s' does not exist", ref)
-	}
-	return srv.provider.DeleteHost(host.ID)
+	return srv.provider.DeleteHost(ref)
 }
 
 // SSH returns ssh parameters to access the host referenced by ref

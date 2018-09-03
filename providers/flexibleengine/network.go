@@ -321,14 +321,15 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 }
 
 // DeleteNetwork consists to delete subnet in FlexibleEngine VPC
-func (client *Client) DeleteNetwork(id string) error {
-	m, err := metadata.LoadNetwork(providers.FromClient(client), id)
+func (client *Client) DeleteNetwork(networkRef string) error {
+	m, err := metadata.LoadNetwork(providers.FromClient(client), networkRef)
 	if err != nil {
 		return err
 	}
 	if m == nil {
-		return fmt.Errorf("failed to find network '%s' metadata", id)
+		return fmt.Errorf("Failed to find network '%s' in metadata", networkRef)
 	}
+	networkID := m.Get().ID
 	hosts, err := m.ListHosts()
 	if err != nil {
 		return err
@@ -346,12 +347,12 @@ func (client *Client) DeleteNetwork(id string) error {
 			if len(allhosts) > 1 {
 				lenS = "s"
 			}
-			return fmt.Errorf("network '%s' still has %d host%s attached (%s)", id, len(allhosts), lenS, strings.Join(allhosts, ","))
+			return fmt.Errorf("Network '%s' still has %d host%s attached (%s)", networkRef, len(allhosts), lenS, strings.Join(allhosts, ","))
 		}
 	}
 
-	client.DeleteGateway(id)
-	err = client.deleteSubnet(id)
+	client.DeleteGateway(networkID)
+	err = client.deleteSubnet(networkID)
 	if err != nil {
 		return err
 	}
