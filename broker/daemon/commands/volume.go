@@ -25,7 +25,7 @@ import (
 	services "github.com/CS-SI/SafeScale/broker/daemon/services"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 

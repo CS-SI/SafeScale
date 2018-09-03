@@ -24,7 +24,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	services "github.com/CS-SI/SafeScale/broker/daemon/services"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 

@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/providers/aws/s3"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
