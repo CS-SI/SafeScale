@@ -129,8 +129,26 @@ detect_facts() {
         FACTS["threads per core"]=$(LANG=C lscpu | grep "Thread(s) per core" | cut -d: -f2 | sed 's/"//g')
         FACTS["threads"]=$(( ${FACTS["cores"]} * ${FACTS["threads per core"]} ))
         FACTS["2 3rd of threads"]=$(( ${FACTS["threads"]} * 2 / 3 ))
-        FACTS["nVidia GPU"]=$(lspci | grep nvidia 2>/dev/null)
+
+        which lspci &>/dev/null || {
+            case $LINUX_KIND in
+                debian|ubuntu)
+                    wait_for_apt && apt install -y pciutils
+                    ;;
+                centos|redhat)
+                    yum install -y pciutils
+                    ;;
+                dnf)
+                    dnf install -y pciutils
+                    ;;
+            esac
+        }
+        which lspci &>/dev/null && {
+            FACTS["nVidia GPU"]=$(lspci | grep nvidia 2>/dev/null)
+        }
         return
     }
 }
+
+wait_for_userdata
 detect_facts
