@@ -471,7 +471,7 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 func (ssh *SSHConfig) WaitServerReady(timeout uint8) error {
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			cmd, _ := ssh.Command("whoami")
+			cmd, _ := ssh.Command("sudo test -f /var/tmp/user_data.done")
 			retcode, _, stderr, err := cmd.Run()
 			if err != nil {
 				return err
@@ -491,7 +491,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout uint8) error {
 		log.Printf("SSH server on host '%s' not ready after %d mn", ssh.Host, timeout)
 		return fmt.Errorf("failed to get response from SSH on server '%s': %s", ssh.Host, err.Error())
 	}
-	log.Printf("SSH server on Host '%s' ready.\n", ssh.Host)
+	log.Printf("SSH server on host '%s' ready.\n", ssh.Host)
 	return nil
 }
 
