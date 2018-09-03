@@ -2,11 +2,12 @@ package install
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/client"
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/install/api"
@@ -20,16 +21,16 @@ exec 2<&-
 exec 1<>/var/tmp/{{.reserved_Name}}.component.{{.reserved_Action}}.log
 exec 2>&1
 
-{{ .reserved_CommonTools }}
+{{ .reserved_BashLibrary }}
 
 {{ .reserved_Content }}
 `
 )
 
-// scriptInstaller is an installer using script to add and remove a component
-type scriptInstaller struct{}
+// bashInstaller is an installer using script to add and remove a component
+type bashInstaller struct{}
 
-func (i *scriptInstaller) GetName() string {
+func (i *bashInstaller) GetName() string {
 	return "script"
 }
 
@@ -51,11 +52,11 @@ func determineContext(t api.Target) (hT *HostTarget, cT *ClusterTarget, nT *Node
 }
 
 // Check checks if the component is installed, using the check script in Specs
-func (i *scriptInstaller) Check(c api.Component, t api.Target) (bool, api.CheckResults, error) {
+func (i *bashInstaller) Check(c api.Component, t api.Target, v api.Variables) (bool, api.CheckResults, error) {
 	specs := c.Specs()
-	if !specs.IsSet("component.installing.script.check") {
+	if !specs.IsSet("component.install.bash.check") {
 		msg := `syntax error in component '%s' specification file (%s):
-				no key 'component.installing.script.check' found`
+				no key 'component.install.bash.check' found`
 		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
@@ -63,53 +64,66 @@ func (i *scriptInstaller) Check(c api.Component, t api.Target) (bool, api.CheckR
 
 	// Host target
 	if hostTarget != nil {
-		if specs.IsSet("component.targeting.host") {
-			targeting := strings.ToLower(specs.GetString("component.targeting.host"))
-			if targeting != "yes" && targeting != "true" {
+		if specs.IsSet("component.target.host") {
+			target := strings.ToLower(specs.GetString("component.target.host"))
+			if target != "yes" && target != "true" {
 				return false, api.CheckResults{}, fmt.Errorf("can't check, component doesn't target a host")
 			}
 		}
-		return i.checkOnHost(c, hostTarget.host)
+		return i.checkOnHost(c, hostTarget.host, v)
 	}
 	// Cluster target
 	if clusterTarget != nil {
-		return i.checkOnCluster(c, clusterTarget.cluster)
+		return i.checkOnCluster(c, clusterTarget.cluster, v)
 	}
 	// Node target (== Host Target without verifying if the component is targetting a host)
 	if nodeTarget != nil {
-		return i.checkOnHost(c, nodeTarget.host)
+		return i.checkOnHost(c, nodeTarget.host, v)
 	}
 
 	return false, api.CheckResults{}, fmt.Errorf("type of target is unknown")
 }
 
-func (i *scriptInstaller) checkOnHost(
-	c api.Component, host *pb.Host,
-) (bool, api.CheckResults, error) {
+func (i *bashInstaller) checkOnHost(c api.Component, host *pb.Host, v api.Variables) (bool, api.CheckResults, error) {
 	specs := c.Specs()
-	checkScript := specs.GetString("component.installing.script.check")
+	// Normalize script to check
+	checkScript := specs.GetString("component.install.bash.check")
 	if strings.TrimSpace(checkScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
-				key 'component.installing.script.check' is empty`
+				key 'component.install.bash.check' is empty`
 		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
-	cmdStr, err := realizeScript(map[string]interface{}{
+	cmdStr, err := normalizeScript(api.Variables{
 		"reserved_Name":    c.BaseFilename(),
 		"reserved_Content": checkScript,
 		"reserved_Action":  "check",
 	})
 	if err != nil {
-		return false, api.CheckResults{}, err
+		return false, api.CheckResults{}, fmt.Errorf("failed to prepare check script: %s", err.Error())
 	}
+
+	// Replaces variables in normalized script
+	cmdStr, err = replaceVariablesInString(cmdStr, v)
+	if err != nil {
+		return false, api.CheckResults{}, fmt.Errorf("failed to finalize check script: %s", err.Error())
+	}
+
+	// Uploads then executes normalized script
 	filename := fmt.Sprintf("/var/tmp/%s_check.sh", c.BaseFilename())
-	err = uploadStringToTargetFile(cmdStr, host, filename)
+	err = UploadStringToRemoteFile(cmdStr, host, filename)
 	if err != nil {
-		return false, api.CheckResults{}, err
+		return false, api.CheckResults{}, fmt.Errorf("failed to upload check script to host '%s': %s", host.Name, err.Error())
 	}
-	cmd := fmt.Sprintf("sudo bash %s ; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
-	retcode, _, _, err := client.New().Ssh.Run(host.ID, cmd, 0)
+	var cmd string
+	// if debug {
+	if false {
+		cmd = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
+	} else {
+		cmd = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
+	}
+	retcode, _, _, err := brokerclient.New().Ssh.Run(host.ID, cmd, brokerclient.DefaultTimeout)
 	if err != nil {
-		return false, api.CheckResults{}, err
+		return false, api.CheckResults{}, fmt.Errorf("failed to execute remotely check script: %s", err.Error())
 	}
 	ok := retcode == 0
 	return ok, api.CheckResults{
@@ -119,7 +133,10 @@ func (i *scriptInstaller) checkOnHost(
 	}, nil
 }
 
-func (i *scriptInstaller) checkOnCluster(c api.Component, cluster clusterapi.ClusterAPI) (bool, api.CheckResults, error) {
+func (i *bashInstaller) checkOnCluster(
+	c api.Component, cluster clusterapi.Cluster, v api.Variables,
+) (bool, api.CheckResults, error) {
+
 	specs := c.Specs()
 	masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
 	if err != nil {
@@ -140,19 +157,19 @@ func (i *scriptInstaller) checkOnCluster(c api.Component, cluster clusterapi.Clu
 		mastersChannel = make(chan map[string]api.CheckState)
 		list := cluster.ListMasterIDs()
 		checked += len(list)
-		go asyncCheckHosts(list, c, mastersChannel)
+		go asyncCheckHosts(list, c, v, mastersChannel)
 	}
 	if privnodeT != "0" {
 		privnodesChannel = make(chan map[string]api.CheckState)
 		list := cluster.ListNodeIDs(false)
 		checked += len(list)
-		go asyncCheckHosts(list, c, privnodesChannel)
+		go asyncCheckHosts(list, c, v, privnodesChannel)
 	}
 	if pubnodeT != "0" {
 		pubnodesChannel = make(chan map[string]api.CheckState)
 		list := cluster.ListNodeIDs(true)
 		checked += len(list)
-		go asyncCheckHosts(list, c, pubnodesChannel)
+		go asyncCheckHosts(list, c, v, pubnodesChannel)
 	}
 
 	ok := true
@@ -196,37 +213,37 @@ func (i *scriptInstaller) checkOnCluster(c api.Component, cluster clusterapi.Clu
 
 // Add installs the component using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
-func (i *scriptInstaller) Add(c api.Component, t api.Target, v map[string]interface{}) (bool, api.AddResults, error) {
+func (i *bashInstaller) Add(c api.Component, t api.Target, v api.Variables) (bool, api.AddResults, error) {
 	specs := c.Specs()
 	// If component is installed, do nothing but responds with success
-	ok, _, err := i.Check(c, t)
+	ok, _, err := i.Check(c, t, v)
 	if err != nil {
-		return false, api.AddResults{}, err
+		return false, api.AddResults{}, fmt.Errorf("component '%s' check failed: %s", c.DisplayName(), err.Error())
 	}
 	if ok {
-		fmt.Printf("Component '%s' is already installed.", c.DisplayName())
+		log.Printf("Component '%s' is already installed\n", c.DisplayName())
 		return true, api.AddResults{}, nil
 	}
 
-	// Installs first dependencies if there is any
-	err = installRequirements(specs, t, v)
+	// First, installs requirements if there are any
+	err = installRequirements(c, t, v)
 	if err != nil {
-		return false, api.AddResults{}, err
+		return false, api.AddResults{}, fmt.Errorf("failed to install requirements: %s", err.Error())
 	}
 
 	// Determining if install script is defined in specification file
-	if !specs.IsSet("component.installing.script.install") {
+	if !specs.IsSet("component.install.bash.add") {
 		msg := `syntax error in component '%s' specification file (%s):
-				no key 'component.installing.script.install' found`
+				no key 'component.install.bash.add' found`
 		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
 	hostTarget, clusterTarget, nodeTarget := determineContext(t)
 
 	if hostTarget != nil {
-		if specs.IsSet("component.targeting.host") {
-			targeting := strings.ToLower(specs.GetString("component.targeting.host"))
-			if targeting != "yes" && targeting != "true" {
+		if specs.IsSet("component.target.host") {
+			target := strings.ToLower(specs.GetString("component.target.host"))
+			if target != "yes" && target != "true" {
 				return false, api.AddResults{}, fmt.Errorf("can't install, component doesn't target a host")
 			}
 		}
@@ -243,60 +260,80 @@ func (i *scriptInstaller) Add(c api.Component, t api.Target, v map[string]interf
 }
 
 // addOnHost installs a component on an host
-func (i *scriptInstaller) addOnHost(
-	c api.Component, host *pb.Host, v map[string]interface{},
+func (i *bashInstaller) addOnHost(
+	c api.Component,
+	host *pb.Host,
+	v api.Variables,
 ) (bool, api.AddResults, error) {
 
 	specs := c.Specs()
-	addScript := specs.GetString("component.installing.script.install")
+	// Build template script
+	addScript := specs.GetString("component.install.bash.add")
 	if strings.TrimSpace(addScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
-				key 'component.installing.script.install' is empty`
+				key 'component.install.bash.add' is empty`
 		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
-	v["reserved_Name"] = c.BaseFilename()
-	v["reserved_Content"] = addScript
-	v["reserved_Action"] = "install"
-	cmdStr, err := realizeScript(v)
+	cmdStr, err := normalizeScript(api.Variables{
+		"reserved_Name":    c.BaseFilename(),
+		"reserved_Content": addScript,
+		"reserved_Action":  "add",
+	})
 	if err != nil {
-		return false, api.AddResults{}, err
+		return false, api.AddResults{}, fmt.Errorf("failed to normalize script: %s", err.Error())
 	}
-	filename := fmt.Sprintf("/var/tmp/%s_install.sh", c.BaseFilename())
-	err = uploadStringToTargetFile(cmdStr, host, filename)
+	// Replaces variables in install script
+	cmdStr, err = replaceVariablesInString(cmdStr, v)
 	if err != nil {
-		return false, api.AddResults{}, err
+		return false, api.AddResults{}, fmt.Errorf("failed to finalize check script: %s", err.Error())
 	}
+
+	// Uploads final script
+	filename := fmt.Sprintf("/var/tmp/%s_add.sh", c.BaseFilename())
+	err = UploadStringToRemoteFile(cmdStr, host, filename)
+	if err != nil {
+		return false, api.AddResults{}, fmt.Errorf("failed to upload add script on remote host: %s", err.Error())
+	}
+
+	// Runs final script on target
 	var cmd string
 	// if debug {
-	if true {
-		cmd = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
+	if false {
+		cmd = fmt.Sprintf("sudo bash %s", filename)
 	} else {
 		cmd = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
 	}
-	duration := specs.GetInt("component.installing.script.estimated_execution_time")
-	if duration == 0 {
-		duration = 5
+	wallTime := specs.GetInt("component.install.bash.wall_time")
+	if wallTime == 0 {
+		wallTime = 5
 	}
-	retcode, _, stderr, err := client.New().Ssh.Run(host.ID, cmd, time.Duration(duration)*time.Minute)
+	retcode, _, stderr, err := brokerclient.New().Ssh.Run(host.ID, cmd, time.Duration(wallTime)*time.Minute)
 	if err != nil {
-		return false, api.AddResults{}, err
+		return false, api.AddResults{}, fmt.Errorf("failed to execute remotely install script: %s", err.Error())
 	}
-	var status error
 	ok := retcode == 0
+	err = nil
 	if !ok {
-		status = fmt.Errorf("install script for component '%s' failed, retcode=%d:\n%s", c.DisplayName(), retcode, stderr)
+		err = fmt.Errorf("install script for component '%s' failed, retcode=%d:\n%s", c.DisplayName(), retcode, stderr)
+	} else {
+		if ok && specs.IsSet("component.proxy.rules") {
+			err = proxyComponent(c, host)
+			ok = err == nil
+			if !ok {
+				err = fmt.Errorf("failed to install component '%s': %s", c.DisplayName(), err.Error())
+			}
+		}
 	}
 	return ok, api.AddResults{
 		PrivateNodes: map[string]error{
-			host.Name: status,
+			host.Name: err,
 		},
-	}, nil
-
+	}, err
 }
 
 // addOnCluster installs a component on a cluster
-func (i *scriptInstaller) addOnCluster(
-	c api.Component, cluster clusterapi.ClusterAPI, v map[string]interface{},
+func (i *bashInstaller) addOnCluster(
+	c api.Component, cluster clusterapi.Cluster, v api.Variables,
 ) (bool, api.AddResults, error) {
 
 	specs := c.Specs()
@@ -404,83 +441,102 @@ func (i *scriptInstaller) addOnCluster(
 }
 
 // Remove uninstalls the component
-func (i *scriptInstaller) Remove(c api.Component, t api.Target) (bool, api.RemoveResults, error) {
+func (i *bashInstaller) Remove(c api.Component, t api.Target, v api.Variables) (bool, api.RemoveResults, error) {
 
 	specs := c.Specs()
-	if !specs.IsSet("component.installing.script.uninstall") {
+	if !specs.IsSet("component.install.bash.remove") {
 		msg := `syntax error in component '%s' specification file (%s):
-				no key 'component.installing.script.uninstall' found`
+				no key 'component.install.bash.remove' found`
 		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
 	hostTarget, clusterTarget, nodeTarget := determineContext(t)
 
 	if hostTarget != nil {
-		if specs.IsSet("component.targeting.host") {
-			targeting := strings.ToLower(specs.GetString("component.targeting.host"))
-			if targeting != "yes" && targeting != "true" {
+		if specs.IsSet("component.target.host") {
+			target := strings.ToLower(specs.GetString("component.target.host"))
+			if target != "yes" && target != "true" {
 				return false, api.RemoveResults{}, fmt.Errorf("can't install, component doesn't target a host")
 			}
 		}
-		return i.removeFromHost(c, hostTarget.host)
+		return i.removeFromHost(c, hostTarget.host, v)
 	}
 	if clusterTarget != nil {
-		return i.removeFromCluster(c, clusterTarget.cluster)
+		return i.removeFromCluster(c, clusterTarget.cluster, v)
 	}
 	if nodeTarget != nil {
-		return i.removeFromHost(c, hostTarget.host)
+		return i.removeFromHost(c, hostTarget.host, v)
 	}
 	return false, api.RemoveResults{}, fmt.Errorf("type of target is unknown")
 }
 
 // removeFromHost uninstalls a component from a host
-func (i *scriptInstaller) removeFromHost(c api.Component, host *pb.Host) (bool, api.RemoveResults, error) {
+func (i *bashInstaller) removeFromHost(c api.Component, host *pb.Host, v api.Variables) (bool, api.RemoveResults, error) {
 	specs := c.Specs()
-	removeScript := specs.GetString("component.installing.script.uninstall")
+	// Normalize script to uninstall
+	removeScript := specs.GetString("component.install.bash.remove")
 	if strings.TrimSpace(removeScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
-		        key 'component.installing.script.uninstall' is empty`
+		        key 'component.install.bash.remove' is empty`
 		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
-	cmdStr, err := realizeScript(map[string]interface{}{
+	cmdStr, err := normalizeScript(api.Variables{
 		"reserved_Name":    c.BaseFilename(),
 		"reserved_Content": removeScript,
-		"reserved_Action":  "uninstall",
+		"reserved_Action":  "remove",
 	})
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}
-	filename := fmt.Sprintf("/var/tmp/%s_uninstall.sh", c.BaseFilename())
-	err = uploadStringToTargetFile(cmdStr, host, filename)
+
+	// Replaces variables in install script
+	cmdStr, err = replaceVariablesInString(cmdStr, v)
 	if err != nil {
-		return false, api.RemoveResults{}, err
+		return false, api.RemoveResults{}, fmt.Errorf("failed to finalize check script: %s", err.Error())
 	}
 
-	cmd := fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
-	duration := specs.GetInt("component.installing.script.estimated_execution_time")
-	if duration == 0 {
-		duration = 5
-	}
-	retcode, _, _, err := client.New().Ssh.Run(host.ID, cmd, time.Duration(duration)*time.Minute)
+	// Uploads then executes normalized script
+	filename := fmt.Sprintf("/var/tmp/%s_remove.sh", c.BaseFilename())
+	err = UploadStringToRemoteFile(cmdStr, host, filename)
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}
-	var status error
+	var cmd string
+	// if debug {
+	if false {
+		cmd = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
+	} else {
+		cmd = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
+	}
+	wallTime := specs.GetInt("component.install.bash.wall_time")
+	if wallTime == 0 {
+		wallTime = 5
+	}
+	retcode, _, _, err := brokerclient.New().Ssh.Run(host.ID, cmd, time.Duration(wallTime)*time.Minute)
+	if err != nil {
+		return false, api.RemoveResults{}, err
+	}
+	err = nil
 	ok := retcode == 0
 	if !ok {
-		status = fmt.Errorf("uninstall script for component '%s' failed, retcode=%d", c.DisplayName(), retcode)
+		err = fmt.Errorf("remove script for component '%s' failed, retcode=%d", c.DisplayName(), retcode)
 	}
 	return ok, api.RemoveResults{
 		AddResults: api.AddResults{
 			PrivateNodes: map[string]error{
-				host.Name: status,
+				host.Name: err,
 			},
 		},
-	}, nil
+	}, err
 }
 
 // removeFromCluster uninstalled a component from a cluster
-func (i *scriptInstaller) removeFromCluster(c api.Component, cluster clusterapi.ClusterAPI) (bool, api.RemoveResults, error) {
+func (i *bashInstaller) removeFromCluster(
+	c api.Component,
+	cluster clusterapi.Cluster,
+	v api.Variables,
+) (bool, api.RemoveResults, error) {
+
 	specs := c.Specs()
 	masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
 	if err != nil {
@@ -509,7 +565,7 @@ func (i *scriptInstaller) removeFromCluster(c api.Component, cluster clusterapi.
 			list = cluster.ListMasterIDs()
 		}
 		mastersChannel = make(chan map[string]error)
-		go asyncRemoveFromHosts(list, c, mastersChannel)
+		go asyncRemoveFromHosts(list, c, v, mastersChannel)
 		checked += len(list)
 	}
 	if privnodeT != "0" {
@@ -523,7 +579,7 @@ func (i *scriptInstaller) removeFromCluster(c api.Component, cluster clusterapi.
 			list = cluster.ListNodeIDs(false)
 		}
 		privnodesChannel = make(chan map[string]error)
-		go asyncRemoveFromHosts(list, c, privnodesChannel)
+		go asyncRemoveFromHosts(list, c, v, privnodesChannel)
 		checked += len(list)
 	}
 	if pubnodeT != "0" {
@@ -537,7 +593,7 @@ func (i *scriptInstaller) removeFromCluster(c api.Component, cluster clusterapi.
 			list = cluster.ListNodeIDs(true)
 		}
 		pubnodesChannel = make(chan map[string]error)
-		go asyncRemoveFromHosts(list, c, pubnodesChannel)
+		go asyncRemoveFromHosts(list, c, v, pubnodesChannel)
 		checked += len(list)
 	}
 
@@ -583,7 +639,7 @@ func (i *scriptInstaller) removeFromCluster(c api.Component, cluster clusterapi.
 	}, nil
 }
 
-// NewScriptInstaller creates a new instance of Installer using script
-func NewScriptInstaller() api.Installer {
-	return &scriptInstaller{}
+// NewBashInstaller creates a new instance of Installer using script
+func NewBashInstaller() api.Installer {
+	return &bashInstaller{}
 }
