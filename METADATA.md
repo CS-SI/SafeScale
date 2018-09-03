@@ -8,6 +8,11 @@ The container/bucket name is ``0.safescale``. Everything is stored in there.
 
 Each object in this container/bucket is stored as a gob representation of Go structs.
 
+Note: by defining the environment variable SAFESCALE_METADATA_SUFFIX, it's possible to contextualize
+the bucket name to ``0.safescale.$SAFESCALE_METADATA_SUFFIX``.
+For example, with SAFESCALE_METADATA_SUFFIX=dev, the bucket name will be ``0.safescale.dev``.
+The variable needs to be defined before starting brokerd, and for every SafeScale cli (broker, deploy, perform, ...).
+
 ### SafeScale Hosts
 
 The host informations are stored in folder ``0.safescale/host``.
