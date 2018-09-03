@@ -17,16 +17,16 @@
 ---
 component:
     name: Docker
-    targeting:
+    target:
         host: yes
         cluster:
             master: all
             node:
                 private: all
                 public: all
-    installing:
-        script:
-            estimated_execution_time: 15
+    install:
+        bash:
+            wall_time: 15
             check: |
                 case $LINUX_KIND in
                     debian|ubuntu)
@@ -45,45 +45,58 @@ component:
                 esac
                 exit $?
 
-            install: |
+            add: |
                 case $LINUX_KIND in
                     debian|ubuntu)
                         export DEBIAN_FRONTEND=noninteractive
-                        wait_for_apt && apt update
-                        wait_for_apt && apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common
+                        wait_for_apt && apt-get update
+                        wait_for_apt && apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common || exit $?
                         curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -
                         add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable"
-                        wait_for_apt && apt update
-                        wait_for_apt && apt-get install -qqy docker-ce
+                        wait_for_apt && apt-get update
+                        wait_for_apt && apt-get install -qqy docker-ce jq || exit $?
+                        systemctl enable docker-ce
+                        systemctl start docker-ce
                         ;;
                     centos|rhel)
                         yum install -y yum-utils device-mapper-persistent-data lvm2
                         yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-                        yum install -y docker-ce
+                        yum install -y docker-ce jq
+                        systemctl enable docker
+                        systemctl start docker
                         ;;
                     fedora)
-                        dnf -y install dnf-plugins-core
+                        dnf install -y dnf-plugins-core || exit $?
                         dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-                        dnf install -y docker-ce
+                        dnf install -y docker-ce jq || exit $?
+                        systemctl enable docker-ce
+                        systemctl start docker-ce
                         ;;
                     *)
                         echo "Unsupported operating system '$LINUX_KIND'"
                         exit 1
                         ;;
                 esac
-                gpasswd -a "${USER}" docker
+
+                compose_version=$(curl -Ssl https://api.github.com/repos/docker/compose/releases/latest | jq .name -r)
+                curl -Ssl -L https://github.com/docker/compose/releases/download/$compose_version/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose || exit $?
+                chmod +x /usr/local/bin/docker-compose
+                echo "pathappend /usr/local/bin" >>~/.bashrc
                 exit 0
 
-            uninstall: |
+            remove: |
                 case $LINUX_KIND in
                     debian|ubuntu)
                         wait_for_apt && apt-get remove -y docker-ce
+                        rm -f /usr/local/bin/docker-compose
                         ;;
                     centos|rhel)
                         yum remove -y docker-ce
+                        rm -f /usr/local/bin/docker-compose
                         ;;
                     fedora)
                         dnf erase -y docker-ce
+                        rm -f /usr/local/bin/docker-compose
                         ;;
                     *)
                         echo "Unsupported operating system '$LINUX_KIND'"
@@ -91,7 +104,7 @@ component:
                         ;;
                 esac
 
-    servicing:
+    service:
         start: |
             systemctl start docker-ce
 
