@@ -70,7 +70,7 @@ var ClusterCreateCommand = &cli.Command{
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
 
-		cmdStr = fmt.Sprintf("deploy cluster %s pkg -K DCOS kubernetes", clusterName)
+		cmdStr = fmt.Sprintf("deploy cluster %s component spark add", clusterName)
 		fmt.Println(cmdStr)
 
 		os.Exit(int(ExitCode.NotImplemented))
@@ -92,11 +92,11 @@ var ClusterDeleteCommand = &cli.Command{
 	Process: func(c *cli.Command) {
 		populateClusterName(c)
 
-		force := c.Flag("f force", false)
+		yes := c.Flag("y assume-yes", false)
 
-		cmdStr := fmt.Sprintf("deploy cluster %s delete", clusterName)
-		if force {
-			cmdStr += " -f"
+		cmdStr := fmt.Sprintf("deploy cluster %s rm", clusterName)
+		if yes {
+			cmdStr += " -y"
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
@@ -160,13 +160,9 @@ var ClusterExpandCommand = &cli.Command{
 
 		count := c.IntOption("n count", "<count>", 1)
 		public := c.Flag("p public", false)
-		cpu := c.IntOption("cpu", "<cpu>", 4)
-		ram := c.FloatOption("ram", "<ram>", 7.0)
-		disk := c.IntOption("disk", "<disk>", 100)
 		//gpu := c.Flag("g gpu", false)
 
-		cmdStr := fmt.Sprintf("deploy cluster %s expand -n %d --cpu %d --ram %f --disk %d",
-			clusterName, count, cpu, ram, disk)
+		cmdStr := fmt.Sprintf("deploy cluster %s expand -n %d", clusterName, count)
 		if public {
 			cmdStr += " -p"
 		}
