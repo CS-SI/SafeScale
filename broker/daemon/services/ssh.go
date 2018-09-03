@@ -58,8 +58,14 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 	var retCode int
 	var err error
 
+	host, err := svc.hostService.Get(hostName)
+	if err != nil {
+		return 0, "", "", fmt.Errorf("no host found with name or id '%s'", hostName)
+	}
+
 	// retrieve ssh config to perform some commands
-	ssh, err := svc.provider.GetSSHConfig(hostName)
+	ssh, err := svc.provider.GetSSHConfig(host.ID)
+
 	if err != nil {
 		return 0, "", "", err
 	}
