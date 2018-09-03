@@ -47,17 +47,14 @@ var (
 	completeUsage string = `
 	Usage: perform version
 		   perform help <command>
-		   perform [-vd][--rebrand <prefix>] create <clustername> -N <cidr> [-C <complexity>][-k]
-		   perform [-vd][--rebrand <prefix>] (delete|destroy|remove|rm) <clustername> [-y]
-		   perform [-vd][--rebrand <prefix>] (start|stop|state|inspect) <clustername>
-		   perform [-vd][--rebrand <prefix>] shrink <clustername> [-n <count>]
-		   perform [-vd][--rebrand <prefix>] expand <clustername> [-n <count>][--cpu <cpu>][--ram <ram>][--disk <disk>]
-		   perform [-vd][--rebrand <prefix>] (package|pkg) <pkgname> (add|install)
-		   perform [-vd][--rebrand <prefix>] (package|pkg) <pkgname> check
-		   perform [-vd][--rebrand <prefix>] (package|pkg) <pkgname> (delete|destroy|remove|rm|uninstall)
-		   perform [-vd][--rebrand <prefix>] (service|svc) <svcname> (add|install)
-		   perform [-vd][--rebrand <prefix>] (service|svc) <svcname> (check|start|state|stop)
-		   perform [-vd][--rebrand <prefix>] (service|svc) <svcname> (delete|destroy|remove|rm|uninstall)
+		   perform [-vd][--rebrand <prefix>] <clustername> create [-N <cidr>][-C <complexity>][-k][--cpu <cpu>][--ram <ram>][--disk <disk>]
+		   perform [-vd][--rebrand <prefix>] <clustername> (delete|destroy|remove|rm) [-y]
+		   perform [-vd][--rebrand <prefix>] <clustername> (start|stop|state|inspect)
+		   perform [-vd][--rebrand <prefix>] <clustername> shrink [-n <count>]
+		   perform [-vd][--rebrand <prefix>] <clustername> expand [-n <count>]
+		   perform [-vd][--rebrand <prefix>] <clustername> (component|package|pkg) <pkgname> (check|add|install|remove|delete|destroy|rm)
+		   perform [-vd][--rebrand <prefix>] <clustername> (service|svc) <svcname> (check|add|install|remove|delete|destroy|rm|uninstall)
+		   perform [-vd][--rebrand <prefix>] <clustername> (service|svc) <svcname> (start|state|stop|pause|resume)
 		   perform [-vd][--rebrand <prefix>] (dcos|marathon|kubectl) [-- <arg>...]
 
 	Options:
@@ -105,7 +102,7 @@ Usage: {{.ProgName}} [options] <command>
   delete,destroy,remove,rm  Deletes a cluster
   start                     Start a cluster
   stop                      Stops a cluster
-  State                     State of the cluster
+  state                     State of the cluster
   expand                    Expands the cluster by adding nodes
   shrink                    Shrinks the cluster by removing nodes
   dcos                      Executes dcos command
