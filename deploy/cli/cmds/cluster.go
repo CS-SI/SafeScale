@@ -52,6 +52,7 @@ var (
 // ClusterCommand handles 'deploy cluster'
 var ClusterCommand = &cli.Command{
 	Keyword: "cluster",
+	Aliases: []string{"datacenter", "dc"},
 
 	Commands: []*cli.Command{
 		clusterListCommand,
