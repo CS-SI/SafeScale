@@ -34,8 +34,5 @@ openstack:	api userdata
 ovh:	api userdata openstack
 	@(cd $@ && $(MAKE))
 
-userdata:
-	@(cd $@ && $(MAKE))
-
 clean:
 	@(for d in $(DIRECTORIES); do (cd $$d; $(MAKE) $@); done)
