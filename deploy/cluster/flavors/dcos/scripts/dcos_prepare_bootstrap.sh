@@ -25,9 +25,7 @@ exec 2<&-
 exec 1<>/var/tmp/prepare_bootstrap.log
 exec 2>&1
 
-{{ .CommonTools }}
-
-wait_for_userdata
+{{ .reserved_BashLibrary }}
 
 # Download if needed the file dcos_generate_config.sh and executes it
 download_dcos_config_generator() {
@@ -79,30 +77,41 @@ download_kubectl_bin() {
 }
 export -f download_kubectl_bin
 
+download_nginx_image() {
+    echo "---------------------"
+    echo "download_nginx_image:"
+    echo "---------------------"
+    while true; do
+        systemctl status docker &>/dev/null
+        [ $? -eq 0 ] && break
+        systemctl restart docker &>/dev/null
+    done
+    docker pull nginx:latest
+}
+export -f download_nginx_image
+
 mkdir -p /usr/local/dcos/genconf/serve/docker && \
 cd /usr/local/dcos && \
 yum makecache fast && \
-yum install -y time
+yum install -y time wget
 [ $? -ne 0 ] && exit {{ errcode "ToolsInstall" }}
 
 # Lauch downloads in parallel
 bg_start DDCG 15m bash -c download_dcos_config_generator
 bg_start DDB 10m bash -c download_dcos_bin
 bg_start DKB 10m bash -c download_kubectl_bin
+bg_start DNI 10m bash -c download_nginx_image
 
 # Install requirements for DCOS environment
 {{ .InstallCommonRequirements }}
-
-# Pulling nginx in parallel to save some time
-bg_start DPN 10m docker pull nginx
 
 # Awaits download of DCOS configuration generator
 echo "Waiting for download_dcos_config_generator..."
 bg_wait DDCG {{ errcode "DcosConfigGeneratorDownload" }}
 
 # Awaits pull of docker nginx image
-echo "Waiting for docker pull nginx..."
-bg_wait DPN {{ errcode "DockerNginxDownload" }}
+echo "Waiting for docker nginx image..."
+bg_wait DNI {{ errcode "DockerNginxDownload" }}
 
 # Awaits the download of DCOS binary
 echo "Waiting for download_dcos_binary..."

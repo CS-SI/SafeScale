@@ -26,11 +26,11 @@ exec 2<&-
 exec 1<>/var/tmp/configure_bootstrap.log
 exec 2>&1
 
-{{ .CommonTools }}
+{{ .reserved_BashLibrary }}
 
 # Stats build of needed docker images in backgroud
-bg_start GUACAMOLE 30m bash /var/tmp/docker_image_create_guacamole.sh
-bg_start PROXY 30m bash /var/tmp/docker_image_create_proxy.sh
+#bg_start GUACAMOLE 30m bash /var/tmp/docker_image_create_guacamole.sh
+#bg_start PROXY 30m bash /var/tmp/docker_image_create_proxy.sh
 
 cd /usr/local/dcos
 
@@ -93,15 +93,15 @@ docker run -d --restart always -p {{ .BootstrapPort }}:80 -v $PWD/genconf/serve:
 }
 
 # Awaits the proxy docker image is built
-echo "Waiting for proxy docker image..."
-bg_wait PROXY {{ errcode "DockerProxyBuild" }}
-docker run -d --restart always -p 443:443 --hostname proxy --name proxy proxy:latest >/dev/null || exit {{ errcode "DockerProxyStart" }}
+#echo "Waiting for proxy docker image..."
+#bg_wait PROXY {{ errcode "DockerProxyBuild" }}
+#docker run -d --restart always -p 443:443 --hostname proxy --name proxy proxy:latest >/dev/null || exit {{ errcode "DockerProxyStart" }}
 # ... and instructs host firewall to allow access on port 443
-iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
-save_iptables_rules
+#iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+#save_iptables_rules
 
 # Awaits the build of Guacamole Docker Image...
-bg_wait GUACAMOLE {{ errcode "DockerGuacamoleBuild" }}
+#bg_wait GUACAMOLE {{ errcode "DockerGuacamoleBuild" }}
 
 echo
 echo "Bootstrap successfully configured."

@@ -14,7 +14,6 @@
 
 #### Installs and configure common tools for any kind of nodes ####
 
-
 install_common_requirements() {
     echo "Installing common requirements..."
 
@@ -38,58 +37,9 @@ install_common_requirements() {
     # Create group nogroup
     groupadd nogroup &>/dev/null
 
-    # Disables installation of docker-python from yum and adds some requirements
-    yum remove -y python-docker-py &>/dev/null
-    yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils jq && \
-    yum versionlock exclude python-docker-py
-    [ $? -ne 0 ] && exit {{ errcode "ToolsInstall" }}
-
-    # Installs PIP
-    yum install -y epel-release && \
-    yum makecache fast && \
-    yum install -y python-pip
-    [ $? -ne 0 ] && exit {{ errcode "PipInstall" }}
-
-    # Installs docker-python with pip
-    pip install -q docker-py==1.10.6
-    [ $? -ne 0 ] && exit {{ errcode "DockerPyInstall" }}
-
-    # Enable overlay module
-    echo overlay >/etc/modules-load.d/10-overlay.conf
-
-    # Loads overlay module
-    modprobe overlay
-
-    # Creates docker systemd directory
-    mkdir -p /etc/systemd/system/docker.service.d && chmod 0755 /etc/systemd/system/docker.service.d
-
-    # Configure docker to use overlay driver
-    echo >/etc/systemd/system/docker.service.d/override.conf <<-'EOF'
-[Service]
-ExecStart=
-ExecStart=/usr/bin/dockerd --storage-driver=overlay --log-driver=none
-EOF
-
-    # Installs docker
-    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && \
-    yum install -y docker-ce-17.06.2.ce
-    [ $? -ne 0 ] && exit {{ errcode "DockerInstall" }}
-
-    # Enable docker at boot
-    systemctl enable docker.service
-    systemctl start docker
-
-    # Enables admin user to use docker CLI
-    usermod -aG docker gpac
-
-    # Installs docker-compose
-    curl -sS -q -L https://github.com/docker/compose/releases/download/1.21.2/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
-    [ $? -ne 0 ] && exit {{ errcode "DockerComposeDownload"  }}
-    chmod a+rx /usr/local/bin/docker-compose
-    [ -f /bin/docker-compose ] && mv -f /bin/docker-compose /bin/docker-compose.notused
-
     # Creates user cladm
     useradd -s /bin/bash -m -d /home/cladm cladm
+    groupadd -r -f docker &>/dev/null
     usermod -aG docker cladm
     echo "cladm:{{ .CladmPassword }}" | chpasswd
     mkdir -p /home/cladm/.ssh && chmod 0700 /home/cladm/.ssh
@@ -121,6 +71,25 @@ pathprepend $HOME/.local/bin
 pathappend /opt/mesosphere/bin
 EOF
     chown -R cladm:cladm /home/cladm
+
+    # Disables installation of docker-python from yum and adds some requirements
+    yum remove -y python-docker-py &>/dev/null
+    yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils jq && \
+    yum versionlock exclude python-docker-py || exit $?
+
+    # Installs PIP
+    yum install -y epel-release && \
+    yum makecache fast && \
+    yum install -y python-pip || yum install -y python2-pip || exit $?
+
+    # Installs docker-python with pip
+    pip install -q docker-py==1.10.6 || exit $?
+
+    # Enable overlay module
+    echo overlay >/etc/modules-load.d/10-overlay.conf
+
+    # Loads overlay module
+    modprobe overlay
 
     echo "Common requirements successfully installed."
 }

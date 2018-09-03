@@ -68,9 +68,6 @@ var (
 	// templateBox is the rice box to use in this package
 	templateBoxes = map[string]*rice.Box{}
 
-	// commonToolsContent contains the script containing commons tools
-	commonToolsContent *string
-
 	//funcMap defines the custome functions to be used in templates
 	funcMap = template.FuncMap{
 		// The name "inc" is what the function will be called in the template text.
@@ -143,7 +140,7 @@ func (c *Cluster) SetAdditionalInfo(ctx AdditionalInfo.Enum, info interface{}) {
 }
 
 // Load loads the internals of an existing cluster from metadata
-func Load(data *metadata.Cluster) (clusterapi.ClusterAPI, error) {
+func Load(data *metadata.Cluster) (clusterapi.Cluster, error) {
 	svc, err := provideruse.GetProviderService()
 	if err != nil {
 		return nil, err
@@ -183,7 +180,7 @@ func (c *Cluster) Reload() error {
 }
 
 // Create creates the necessary infrastructure of cluster
-func Create(req clusterapi.Request) (clusterapi.ClusterAPI, error) {
+func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	var (
 		nodesDef         pb.HostDefinition
 		instance         Cluster
@@ -552,7 +549,7 @@ func (c *Cluster) buildHostname(core string, nodeType NodeType.Enum) (string, er
 	if err != nil {
 		return "", err
 	}
-	return c.Common.Name + "-" + coreName + "-" + strconv.Itoa(index), nil
+	return c.Core.Name + "-" + coreName + "-" + strconv.Itoa(index), nil
 }
 
 // asyncConfigureMaster configure DCOS on master
@@ -814,23 +811,32 @@ func (c *Cluster) GetConfig() clusterapi.Cluster {
 
 // FindAvailableMaster returns the ID of the first master available for execution
 func (c *Cluster) FindAvailableMaster() (string, error) {
-	return "", fmt.Errorf("cluster of flavor 'BOH' doesn't have any master")
+	var masterID string
+	for _, masterID = range c.manager.MasterIDs {
+		err := provideruse.WaitSSHServerReady(c.provider, masterID, 2)
+		if err != nil {
+			if _, ok := err.(retry.TimeoutError); ok {
+				continue
+			}
+			return "", err
+		}
+		break
+	}
+	if masterID == "" {
+		return "", fmt.Errorf("failed to find available master")
+	}
+	return masterID, nil
 }
 
 // FindAvailableNode returns the ID of a node available
 func (c *Cluster) FindAvailableNode(public bool) (string, error) {
 	var hostID string
 	for _, hostID = range c.ListNodeIDs(public) {
-		ssh, err := c.provider.GetSSHConfig(hostID)
-		if err != nil {
-			return "", fmt.Errorf("failed to read SSH config: %s", err.Error())
-		}
-		err = ssh.WaitServerReady(shortTimeoutSSH)
+		err := provideruse.WaitSSHServerReady(c.provider, hostID, 2)
 		if err != nil {
 			if _, ok := err.(retry.TimeoutError); ok {
 				continue
 			}
-			return "", err
 		}
 		break
 	}

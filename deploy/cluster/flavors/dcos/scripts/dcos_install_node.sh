@@ -24,7 +24,7 @@ exec 2<&-
 exec 1<>/var/tmp/install_node.log
 exec 2>&1
 
-{{ .CommonTools }}
+{{ .reserved_BashLibrary }}
 
 wait_for_userdata
 

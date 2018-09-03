@@ -28,6 +28,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/utils/template"
 
+	"github.com/CS-SI/SafeScale/system"
+
 	rice "github.com/GeertJohan/go.rice"
 )
 
@@ -38,74 +40,33 @@ const (
 var (
 	// systemTemplateBox ...
 	systemTemplateBox *rice.Box
-	// commonToolsContent contains the script containing Cores tools
-	commonToolsContent *string
+	// bashLibraryContent contains the script containing bash library
+	bashLibraryContent *string
 )
-
-// GetCommonTools returns the string corresponding to the script common_tools.sh
-// which defines variables and functions useable everywhere
-func GetCommonTools(funcMap map[string]interface{}) (*string, error) {
-	if commonToolsContent == nil {
-		// find the rice.Box
-		b, err := getSystemTemplateBox()
-		if err != nil {
-			return nil, err
-		}
-
-		// get file contents as string
-		tmplString, err := b.String("common_tools.sh")
-		if err != nil {
-			return nil, fmt.Errorf("error loading script template: %s", err.Error())
-		}
-
-		// parse then execute the template
-		tmplPrepared, err := txttmpl.New("common_tools").Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
-		}
-		dataBuffer := bytes.NewBufferString("")
-		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{})
-		if err != nil {
-			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
-		}
-		result := dataBuffer.String()
-		commonToolsContent = &result
-	}
-	return commonToolsContent, nil
-}
-
-// getSystemTemplateBox ...
-func getSystemTemplateBox() (*rice.Box, error) {
-	var b *rice.Box
-	var err error
-	if systemTemplateBox == nil {
-		// Note: path MUST be literal for rice to work
-		b, err = rice.FindBox("../../../../system/scripts")
-		if err != nil {
-			return nil, err
-		}
-		systemTemplateBox = b
-	}
-	return systemTemplateBox, nil
-}
 
 // ExecuteScript executes the script template with the parameters on tarGetHost
 func ExecuteScript(
 	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	hostID string,
 ) (int, string, string, error) {
-	// Configures CommonTools template var
-	CommonTools, err := GetCommonTools(funcMap)
+	// Configures reserved_BashLibrary template var
+	bashLibrary, err := system.GetBashLibrary()
 	if err != nil {
 		return 0, "", "", err
 	}
-	data["CommonTools"] = *CommonTools
+	data["reserved_BashLibrary"] = bashLibrary
 
 	path, err := UploadTemplateToFile(box, funcMap, tmplName, data, hostID, tmplName)
 	if err != nil {
 		return 0, "", "", err
 	}
-	cmd := fmt.Sprintf("sudo bash %s; rc=$?; rm %s; exit $rc", path, path)
+	var cmd string
+	//if debug
+	if true {
+		cmd = fmt.Sprintf("sudo bash %s", path)
+	} else {
+		cmd = fmt.Sprintf("sudo bash %s; rc=$?; rm %s; exit $rc", path, path)
+	}
 	return brokerclient.New().Ssh.Run(hostID, cmd, time.Duration(20)*time.Minute)
 }
 
@@ -121,7 +82,7 @@ func UploadTemplateToFile(
 	broker := brokerclient.New()
 	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultTimeout)
 	if err != err {
-		return "", err
+		return "", fmt.Errorf("failed to get host information: %s", err)
 	}
 
 	tmplString, err := box.String(tmplName)

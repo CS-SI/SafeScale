@@ -421,20 +421,20 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 	}
 	retcode, _, _, err := flavortools.ExecuteScript(box, funcMap, "boh_install_master.sh", data, host.ID)
 	if err != nil {
-		log.Printf("[Masters: #%d (%s)] failed to remotely run installation script: %s\n", 1, host.Name, err.Error())
+		log.Printf("[master #%d (%s)] failed to remotely run installation script: %s\n", 1, host.Name, err.Error())
 		return err
 	}
 	if retcode != 0 {
 		if retcode < int(ErrorCode.NextErrorCode) {
 			errcode := ErrorCode.Enum(retcode)
-			log.Printf("[Masters: #%d (%s)] installation failed:\nretcode=%d (%s)", 1, host.Name, errcode, errcode.String())
+			log.Printf("[master #%d (%s)] installation failed:\nretcode=%d (%s)", 1, host.Name, errcode, errcode.String())
 			return fmt.Errorf("scripted Master installation failed with error code %d (%s)", errcode, errcode.String())
 		}
-		log.Printf("[Masters: #%d (%s)] installation failed:\nretcode=%d", 1, host.Name, retcode)
+		log.Printf("[master #%d (%s)] installation failed:\nretcode=%d", 1, host.Name, retcode)
 		return fmt.Errorf("scripted Master installation failed with error code %d", retcode)
 	}
 
-	log.Println("[Master #1] creation successful")
+	log.Printf("[master #%d (%s)] creation successful", 1, host.Name)
 	return nil
 }
 

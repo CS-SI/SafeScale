@@ -34,6 +34,8 @@ const (
 	Swarm
 	// BOH for a "Bunch Of Hosts", without cluster management
 	BOH
+	// OHPC for a OpenHPC cluster
+	OHPC
 )
 
 var (
@@ -42,6 +44,7 @@ var (
 		"kubernetes": Kubernetes,
 		"swarm":      Swarm,
 		"boh":        BOH,
+		"ohpc":       OHPC,
 	}
 
 	enumMap = map[Enum]string{
@@ -49,6 +52,7 @@ var (
 		Kubernetes: "Kubernetes",
 		Swarm:      "Swarm",
 		BOH:        "BOH",
+		OHPC:       "OHPC",
 	}
 )
 

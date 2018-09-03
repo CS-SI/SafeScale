@@ -23,9 +23,7 @@ exec 2<&-
 exec 1<>/var/tmp/install_master.log
 exec 2>&1
 
-{{ .CommonTools }}
-
-wait_for_userdata
+{{ .reserved_BashLibrary }}
 
 # Installs and configures everything needed on any node
 {{ .InstallCommonRequirements }}

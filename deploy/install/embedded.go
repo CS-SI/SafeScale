@@ -20,11 +20,8 @@ import (
 	"bytes"
 	"fmt"
 
-	txttmpl "text/template"
-
 	"github.com/CS-SI/SafeScale/deploy/install/api"
 	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
-	"github.com/CS-SI/SafeScale/utils/template"
 
 	"github.com/spf13/viper"
 
@@ -41,7 +38,7 @@ var (
 )
 
 // loadSpecFile returns the content of the spec file of the component named 'name'
-func loadSpecFile(name string, params map[string]interface{}) (*viper.Viper, error) {
+func loadSpecFile(name string) (*viper.Viper, error) {
 	if templateBox == nil {
 		var err error
 		templateBox, err = rice.FindBox("../install/components")
@@ -54,20 +51,20 @@ func loadSpecFile(name string, params map[string]interface{}) (*viper.Viper, err
 	if err != nil {
 		panic(fmt.Sprintf("failed to read embedded component speficication file '%s': %s", name, err.Error()))
 	}
-	tmplPrepared, err := txttmpl.New(name).Funcs(template.FuncMap).Parse(tmplString)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse embedded component specification file '%s': %s", name, err.Error())
-	}
+	// tmplPrepared, err := txttmpl.New(name).Funcs(template.FuncMap).Parse(tmplString)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to parse embedded component specification file '%s': %s", name, err.Error())
+	// }
 
-	dataBuffer := bytes.NewBufferString("")
-	err = tmplPrepared.Execute(dataBuffer, params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to realize embedded component specification file '%s': %s", name, err.Error())
-	}
+	// dataBuffer := bytes.NewBufferString("")
+	// err = tmplPrepared.Execute(dataBuffer, params)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to realize embedded component specification file '%s': %s", name, err.Error())
+	// }
 
 	v := viper.New()
 	v.SetConfigType("yaml")
-	err = v.ReadConfig(bytes.NewBuffer(dataBuffer.Bytes()))
+	err = v.ReadConfig(bytes.NewBuffer([]byte(tmplString)))
 	if err != nil {
 		return nil, fmt.Errorf("syntax error in component specification file '%s': %s", name, err.Error())
 	}
@@ -83,17 +80,17 @@ func loadSpecFile(name string, params map[string]interface{}) (*viper.Viper, err
 		return nil, fmt.Errorf("syntax error in component specification file '%s': name' can't be empty", name)
 	}
 	if !v.IsSet("component.install") {
-		return nil, fmt.Errorf("syntax error in component specification file '%s': missing 'installing'", name)
+		return nil, fmt.Errorf("syntax error in component specification file '%s': missing 'install'", name)
 	}
 	if len(v.GetStringMap("component.install")) <= 0 {
-		return nil, fmt.Errorf("syntax error in component specification file '%s': 'installing' defines no method", name)
+		return nil, fmt.Errorf("syntax error in component specification file '%s': 'install' defines no method", name)
 	}
 	return v, nil
 }
 
 // dockerComponent ...
 func dockerComponent() *component {
-	specs, err := loadSpecFile("docker", emptyParams)
+	specs, err := loadSpecFile("docker")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -106,7 +103,7 @@ func dockerComponent() *component {
 
 // nVidiaDockerComponent ...
 func nVidiaDockerComponent() *component {
-	specs, err := loadSpecFile("nvidiadocker", emptyParams)
+	specs, err := loadSpecFile("nvidiadocker")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -119,7 +116,7 @@ func nVidiaDockerComponent() *component {
 
 // kubernetesComponent ...
 func kubernetesComponent() *component {
-	specs, err := loadSpecFile("kubernetes", emptyParams)
+	specs, err := loadSpecFile("kubernetes")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -132,7 +129,7 @@ func kubernetesComponent() *component {
 
 // nexusComponent ...
 func nexusComponent() *component {
-	specs, err := loadSpecFile("nexus", emptyParams)
+	specs, err := loadSpecFile("nexus")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -145,7 +142,7 @@ func nexusComponent() *component {
 
 // elasticSearchComponent ...
 func elasticSearchComponent() *component {
-	specs, err := loadSpecFile("elasticsearch", emptyParams)
+	specs, err := loadSpecFile("elasticsearch")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -158,7 +155,7 @@ func elasticSearchComponent() *component {
 
 // helmComponent ...
 func helmComponent() *component {
-	specs, err := loadSpecFile("helm", emptyParams)
+	specs, err := loadSpecFile("helm")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -170,8 +167,21 @@ func helmComponent() *component {
 }
 
 // reverseProxyComponent ...
+//func reverseProxyComponent() *component {
+//	specs, err := loadSpecFile("reverseproxy")
+//	if err != nil {
+//		panic(err.Error())
+//	}
+//	return &component{
+//		displayName: specs.GetString("component.name"),
+//		fileName:    "reverseproxy",
+//		specs:       specs,
+//	}
+//}
+
+// reverseProxyComponent ...
 func reverseProxyComponent() *component {
-	specs, err := loadSpecFile("reverseproxy", emptyParams)
+	specs, err := loadSpecFile("reverseproxy")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -184,7 +194,7 @@ func reverseProxyComponent() *component {
 
 // xfceComponent ...
 func xfceComponent() *component {
-	specs, err := loadSpecFile("xfce", emptyParams)
+	specs, err := loadSpecFile("xfce")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -197,7 +207,7 @@ func xfceComponent() *component {
 
 // tigervncComponent ...
 func tigervncComponent() *component {
-	specs, err := loadSpecFile("tigervnc", emptyParams)
+	specs, err := loadSpecFile("tigervnc")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -210,7 +220,7 @@ func tigervncComponent() *component {
 
 // remoteDesktopComponent ...
 func remoteDesktopComponent() *component {
-	specs, err := loadSpecFile("remotedesktop", emptyParams)
+	specs, err := loadSpecFile("remotedesktop")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -223,7 +233,7 @@ func remoteDesktopComponent() *component {
 
 // mpichOsPkgComponent ...
 func mpichOsPkgComponent() *component {
-	specs, err := loadSpecFile("mpich-ospkg", emptyParams)
+	specs, err := loadSpecFile("mpich-ospkg")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -236,7 +246,7 @@ func mpichOsPkgComponent() *component {
 
 // mpichBuildComponent ...
 func mpichBuildComponent() *component {
-	specs, err := loadSpecFile("mpich-build", emptyParams)
+	specs, err := loadSpecFile("mpich-build")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -278,7 +288,7 @@ func init() {
 		xfceComponent(),
 		tigervncComponent(),
 		remoteDesktopComponent(),
-		//reverseProxyComponent(),
+		reverseProxyComponent(),
 		//		kubernetesComponent(),
 		//		elasticSearchComponent(),
 		//		helmComponent(),
@@ -287,11 +297,11 @@ func init() {
 	for _, item := range allEmbedded {
 		allEmbeddedMap[item.BaseFilename()] = item
 		allEmbeddedMap[item.DisplayName()] = item
-		installers := item.Specs().GetStringMap("component.installing")
+		installers := item.Specs().GetStringMap("component.install")
 		for k := range installers {
 			method, err := Method.Parse(k)
 			if err != nil {
-				panic(fmt.Sprintf("syntax error in component '%s' specification file (%s)! installing method '%s' unknown!",
+				panic(fmt.Sprintf("syntax error in component '%s' specification file (%s)! install method '%s' unknown!",
 					item.DisplayName(), item.DisplayFilename(), k))
 			}
 			if _, found := availableEmbeddedMap[method]; !found {

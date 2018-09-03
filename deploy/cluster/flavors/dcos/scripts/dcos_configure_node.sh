@@ -24,7 +24,7 @@ exec 2<&-
 exec 1<>/var/tmp/configure_node.log
 exec 2>&1
 
-{{ .CommonTools }}
+{{ .reserved_BashLibrary }}
 
 # # Get rclone package
 # download_rclone_package() {

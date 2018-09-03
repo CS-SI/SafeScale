@@ -2,9 +2,11 @@ package install
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
+	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
@@ -26,7 +28,7 @@ func (g *genericPackager) GetName() string {
 }
 
 // Check checks if the component is installed
-func (g *genericPackager) Check(c api.Component, t api.Target) (bool, api.CheckResults, error) {
+func (g *genericPackager) Check(c api.Component, t api.Target, v api.Variables) (bool, api.CheckResults, error) {
 	var (
 		onCluster     bool
 		clusterTarget *ClusterTarget
@@ -40,16 +42,16 @@ func (g *genericPackager) Check(c api.Component, t api.Target) (bool, api.CheckR
 		}
 	}
 
-	// First check if component is targeting host. Even in cluster context, host has to be targeteable
+	// First check if component is target host. Even in cluster context, host has to be targeteable
 	specs := c.Specs()
-	if specs.IsSet("component.targeting.host") {
-		targeting := strings.ToLower(specs.GetString("component.targeting.host"))
-		if targeting != "yes" && targeting != "true" {
+	if specs.IsSet("component.target.host") {
+		target := strings.ToLower(specs.GetString("component.target.host"))
+		if target != "yes" && target != "true" {
 			return false, api.CheckResults{}, fmt.Errorf("can't install, component doesn't target a host")
 		}
 	}
 
-	rootKey := "component.installing." + g.name
+	rootKey := "component.install." + g.name
 
 	if onCluster {
 		masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
@@ -57,9 +59,9 @@ func (g *genericPackager) Check(c api.Component, t api.Target) (bool, api.CheckR
 			return false, api.CheckResults{}, err
 		}
 
-		if !specs.IsSet(rootKey + ".uninstall") {
+		if !specs.IsSet(rootKey + ".check") {
 			msg := `syntax error in component '%s' specification file (%s):
-					no key '%s.uninstall' found`
+					no key '%s.check' found`
 			return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
 		}
 
@@ -76,15 +78,15 @@ func (g *genericPackager) Check(c api.Component, t api.Target) (bool, api.CheckR
 		// Startig async jobs...
 		if masterT != "0" {
 			mastersChannel = make(chan map[string]api.CheckState)
-			go asyncCheckHosts(cluster.ListMasterIDs(), c, mastersChannel)
+			go asyncCheckHosts(cluster.ListMasterIDs(), c, v, mastersChannel)
 		}
 		if privnodeT != "0" {
 			privNodesChannel = make(chan map[string]api.CheckState)
-			go asyncCheckHosts(cluster.ListNodeIDs(false), c, privNodesChannel)
+			go asyncCheckHosts(cluster.ListNodeIDs(false), c, v, privNodesChannel)
 		}
 		if pubnodeT != "0" {
 			pubNodesChannel = make(chan map[string]api.CheckState)
-			go asyncCheckHosts(cluster.ListNodeIDs(true), c, pubNodesChannel)
+			go asyncCheckHosts(cluster.ListNodeIDs(true), c, v, pubNodesChannel)
 		}
 
 		ok = true
@@ -149,10 +151,11 @@ func (g *genericPackager) Check(c api.Component, t api.Target) (bool, api.CheckR
 }
 
 // Add installs the component using apt
-func (g *genericPackager) Add(c api.Component, t api.Target, v map[string]interface{}) (bool, api.AddResults, error) {
+func (g *genericPackager) Add(c api.Component, t api.Target, v api.Variables) (bool, api.AddResults, error) {
 	var (
 		onCluster     bool
 		clusterTarget *ClusterTarget
+		err           error
 	)
 
 	hostTarget, ok := t.(*HostTarget)
@@ -163,123 +166,57 @@ func (g *genericPackager) Add(c api.Component, t api.Target, v map[string]interf
 		}
 	}
 
-	// First check if component is targeting host. Even in cluster context, host has to be targateable
+	// If component is installed, do nothing but responds with success
+	ok, _, err = g.Check(c, t, v)
+	if err != nil {
+		return false, api.AddResults{}, fmt.Errorf("component '%s' check failed: %s", c.DisplayName(), err.Error())
+	}
+	if ok {
+		log.Printf("Component '%s' is already installed\n", c.DisplayName())
+		return true, api.AddResults{}, nil
+	}
+
+	// First, installs requirements if there are any
+	err = installRequirements(c, t, v)
+	if err != nil {
+		return false, api.AddResults{}, fmt.Errorf("failed to install requirements: %s", err.Error())
+	}
+
 	specs := c.Specs()
-	if specs.IsSet("component.targeting.host") {
-		targeting := strings.ToLower(specs.GetString("component.targeting.host"))
-		if targeting != "yes" && targeting != "true" {
-			return false, api.AddResults{}, fmt.Errorf("can't install, component doesn't target a host")
-		}
+	rootKey := "component.install." + g.name
+
+	// Determining if install script is defined in specification file
+	if !specs.IsSet(rootKey + ".install") {
+		msg := `syntax error in component '%s' specification file (%s):
+				no key '%s.add' found`
+		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
 	}
 
-	rootKey := "component.installing." + g.name
+	hostTarget, clusterTarget, nodeTarget := determineContext(t)
 
-	if onCluster {
-		// Cluster mode
-		masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
-		if err != nil {
-			return false, api.AddResults{}, err
-		}
-
-		if !specs.IsSet(rootKey + ".uninstall") {
-			msg := `syntax error in component '%s' specification file (%s):
-					no key '%s.uninstall' found`
-			return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
-		}
-
-		var (
-			list             []string
-			mastersChannel   chan map[string]error
-			pubNodesChannel  chan map[string]error
-			privNodesChannel chan map[string]error
-			cluster          = clusterTarget.cluster
-			mastersStatus    = map[string]error{}
-			pubNodesStatus   = map[string]error{}
-			privNodesStatus  = map[string]error{}
-		)
-
-		if masterT != "0" {
-			if masterT != "0" {
-				if masterT == "1" {
-					hostID, err := cluster.FindAvailableMaster()
-					if err != nil {
-						return false, api.AddResults{}, err
-					}
-					list = append(list, hostID)
-				} else {
-					list = cluster.ListMasterIDs()
-				}
-			}
-			mastersChannel = make(chan map[string]error)
-			go asyncAddOnHosts(list, c, v, mastersChannel)
-		}
-		if privnodeT != "0" {
-			if privnodeT == "1" {
-				hostID, err := cluster.FindAvailableNode(false)
-				if err != nil {
-					return false, api.AddResults{}, err
-				}
-				list = []string{hostID}
-			} else {
-				list = cluster.ListNodeIDs(false)
-			}
-			privNodesChannel = make(chan map[string]error)
-			go asyncAddOnHosts(list, c, v, privNodesChannel)
-		}
-		if pubnodeT != "0" {
-			if pubnodeT == "1" {
-				hostID, err := cluster.FindAvailableNode(true)
-				if err != nil {
-					return false, api.AddResults{}, err
-				}
-				list = []string{hostID}
-			} else {
-				list = cluster.ListNodeIDs(true)
-			}
-			pubNodesChannel = make(chan map[string]error)
-			go asyncAddOnHosts(list, c, v, pubNodesChannel)
-		}
-
-		ok = true
-
-		// Waiting go routines...
-		if masterT != "0" {
-			mastersStatus = <-mastersChannel
-			for _, k := range mastersStatus {
-				if k != nil {
-					ok = false
-					break
-				}
+	if hostTarget != nil {
+		if specs.IsSet("component.target.host") {
+			target := strings.ToLower(specs.GetString("component.target.host"))
+			if target != "yes" && target != "true" {
+				return false, api.AddResults{}, fmt.Errorf("can't install, component doesn't target a host")
 			}
 		}
-		if privnodeT != "0" {
-			privNodesStatus = <-privNodesChannel
-			for _, k := range privNodesStatus {
-				if k != nil {
-					ok = false
-					break
-				}
-			}
-		}
-		if pubnodeT != "0" {
-			pubNodesStatus = <-pubNodesChannel
-			for _, k := range pubNodesStatus {
-				if k != nil {
-					ok = false
-					break
-				}
-			}
-		}
-
-		// Return the result
-		return ok, api.AddResults{
-			Masters:      mastersStatus,
-			PrivateNodes: privNodesStatus,
-			PublicNodes:  pubNodesStatus,
-		}, nil
+		return g.addOnHost(c, hostTarget.host, v)
+	}
+	if clusterTarget != nil {
+		return g.addOnCluster(c, clusterTarget.cluster, v)
+	}
+	if nodeTarget != nil {
+		return g.addOnHost(c, nodeTarget.host, v)
 	}
 
-	// Host target
+	return false, api.AddResults{}, fmt.Errorf("type of target is unknown")
+}
+
+func (g *genericPackager) addOnHost(c api.Component, host *pb.Host, v map[string]interface{}) (bool, api.AddResults, error) {
+	specs := c.Specs()
+	rootKey := "component.install." + g.name
+
 	if !specs.IsSet(rootKey + ".package") {
 		msg := `syntax error in component '%s' specification file (%s):
 		        no key '%s.package' found`
@@ -292,28 +229,143 @@ func (g *genericPackager) Add(c api.Component, t api.Target, v map[string]interf
 		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
 	}
 	cmdStr := fmt.Sprintf(g.addCmd, packageName)
-	duration := specs.GetInt(rootKey + ".estimated_execution_time")
-	if duration == 0 {
-		duration = 5
+	wallTime := specs.GetInt(rootKey + ".wall_time")
+	if wallTime == 0 {
+		wallTime = 5
 	}
-	retcode, _, stderr, err := client.New().Ssh.Run(hostTarget.host.ID, cmdStr, time.Duration(duration)*time.Minute)
+	retcode, _, stderr, err := client.New().Ssh.Run(host.ID, cmdStr, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.AddResults{}, err
 	}
-	var status error
-	ok = retcode == 0
+	ok := retcode == 0
+	err = nil
 	if !ok {
-		status = fmt.Errorf("install command failed for component '%s': %s", c.DisplayName(), stderr)
+		err = fmt.Errorf("install script for component '%s' failed, retcode=%d:\n%s", c.DisplayName(), retcode, stderr)
+	} else {
+		if ok && specs.IsSet("component.proxy.rules") {
+			err = proxyComponent(c, host)
+			ok = err == nil
+			if !ok {
+				err = fmt.Errorf("failed to install component '%s': %s", c.DisplayName(), err.Error())
+			}
+		}
 	}
 	return ok, api.AddResults{
 		PrivateNodes: map[string]error{
-			hostTarget.host.Name: status,
+			host.Name: err,
 		},
+	}, err
+}
+
+func (g *genericPackager) addOnCluster(c api.Component, cluster clusterapi.Cluster, v map[string]interface{}) (bool, api.AddResults, error) {
+	specs := c.Specs()
+	rootKey := "component.install." + g.name
+
+	// Cluster mode
+	masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
+	if err != nil {
+		return false, api.AddResults{}, err
+	}
+
+	if !specs.IsSet(rootKey + ".add") {
+		msg := `syntax error in component '%s' specification file (%s):
+					no key '%s.add' found`
+		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
+	}
+
+	var (
+		list             []string
+		mastersChannel   chan map[string]error
+		pubNodesChannel  chan map[string]error
+		privNodesChannel chan map[string]error
+		mastersStatus    = map[string]error{}
+		pubNodesStatus   = map[string]error{}
+		privNodesStatus  = map[string]error{}
+	)
+
+	if masterT != "0" {
+		if masterT != "0" {
+			if masterT == "1" {
+				hostID, err := cluster.FindAvailableMaster()
+				if err != nil {
+					return false, api.AddResults{}, err
+				}
+				list = append(list, hostID)
+			} else {
+				list = cluster.ListMasterIDs()
+			}
+		}
+		mastersChannel = make(chan map[string]error)
+		go asyncAddOnHosts(list, c, v, mastersChannel)
+	}
+	if privnodeT != "0" {
+		if privnodeT == "1" {
+			hostID, err := cluster.FindAvailableNode(false)
+			if err != nil {
+				return false, api.AddResults{}, err
+			}
+			list = []string{hostID}
+		} else {
+			list = cluster.ListNodeIDs(false)
+		}
+		privNodesChannel = make(chan map[string]error)
+		go asyncAddOnHosts(list, c, v, privNodesChannel)
+	}
+	if pubnodeT != "0" {
+		if pubnodeT == "1" {
+			hostID, err := cluster.FindAvailableNode(true)
+			if err != nil {
+				return false, api.AddResults{}, err
+			}
+			list = []string{hostID}
+		} else {
+			list = cluster.ListNodeIDs(true)
+		}
+		pubNodesChannel = make(chan map[string]error)
+		go asyncAddOnHosts(list, c, v, pubNodesChannel)
+	}
+
+	ok := true
+
+	// Waiting go routines...
+	if masterT != "0" {
+		mastersStatus = <-mastersChannel
+		for _, k := range mastersStatus {
+			if k != nil {
+				ok = false
+				break
+			}
+		}
+	}
+	if privnodeT != "0" {
+		privNodesStatus = <-privNodesChannel
+		for _, k := range privNodesStatus {
+			if k != nil {
+				ok = false
+				break
+			}
+		}
+	}
+	if pubnodeT != "0" {
+		pubNodesStatus = <-pubNodesChannel
+		for _, k := range pubNodesStatus {
+			if k != nil {
+				ok = false
+				break
+			}
+		}
+	}
+
+	// Return the result
+	return ok, api.AddResults{
+		Masters:      mastersStatus,
+		PrivateNodes: privNodesStatus,
+		PublicNodes:  pubNodesStatus,
 	}, nil
 }
 
 // Remove uninstalls the component using the RemoveScript script
-func (g *genericPackager) Remove(c api.Component, t api.Target) (bool, api.RemoveResults, error) {
+func (g *genericPackager) Remove(c api.Component, t api.Target, v api.Variables) (bool, api.RemoveResults, error) {
 	var (
 		onCluster     bool
 		hostTarget    *HostTarget
@@ -329,16 +381,16 @@ func (g *genericPackager) Remove(c api.Component, t api.Target) (bool, api.Remov
 		}
 	}
 
-	// First check if component is targeting host. Even in cluster context, host has to be targateable
+	// First check if component is target host. Even in cluster context, host has to be targateable
 	specs := c.Specs()
-	if specs.IsSet("component.targeting.host") {
-		targeting := strings.ToLower(specs.GetString("component.targeting.host"))
-		if targeting != "yes" && targeting != "true" {
+	if specs.IsSet("component.target.host") {
+		target := strings.ToLower(specs.GetString("component.target.host"))
+		if target != "yes" && target != "true" {
 			return false, api.RemoveResults{}, fmt.Errorf("can't install, component doesn't target a host")
 		}
 	}
 
-	rootKey := "component.installing." + g.name
+	rootKey := "component.install." + g.name
 
 	if onCluster {
 		masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
@@ -346,9 +398,9 @@ func (g *genericPackager) Remove(c api.Component, t api.Target) (bool, api.Remov
 			return false, api.RemoveResults{}, err
 		}
 
-		if !specs.IsSet(rootKey + ".uninstall") {
+		if !specs.IsSet(rootKey + ".remove") {
 			msg := `syntax error in component '%s' specification file (%s):
-					no key '%s.uninstall' found`
+					no key '%s.remove' found`
 			return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
 		}
 
@@ -376,7 +428,7 @@ func (g *genericPackager) Remove(c api.Component, t api.Target) (bool, api.Remov
 				}
 			}
 			mastersChannel = make(chan map[string]error)
-			go asyncRemoveFromHosts(list, c, mastersChannel)
+			go asyncRemoveFromHosts(list, c, v, mastersChannel)
 		}
 		if privnodeT != "0" {
 			if privnodeT == "1" {
@@ -389,7 +441,7 @@ func (g *genericPackager) Remove(c api.Component, t api.Target) (bool, api.Remov
 				list = cluster.ListNodeIDs(false)
 			}
 			privNodesChannel = make(chan map[string]error)
-			go asyncRemoveFromHosts(list, c, privNodesChannel)
+			go asyncRemoveFromHosts(list, c, v, privNodesChannel)
 		}
 		if pubnodeT != "0" {
 			if pubnodeT == "1" {
@@ -402,7 +454,7 @@ func (g *genericPackager) Remove(c api.Component, t api.Target) (bool, api.Remov
 				list = cluster.ListNodeIDs(true)
 			}
 			pubNodesChannel = make(chan map[string]error)
-			go asyncRemoveFromHosts(list, c, pubNodesChannel)
+			go asyncRemoveFromHosts(list, c, v, pubNodesChannel)
 		}
 
 		ok = true
@@ -459,30 +511,30 @@ func (g *genericPackager) Remove(c api.Component, t api.Target) (bool, api.Remov
 		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
 	}
 	cmdStr := fmt.Sprintf(g.removeCmd, packageName)
-	duration := specs.GetInt(rootKey + ".estimated_execution_time")
-	if duration == 0 {
-		duration = 5
+	wallTime := specs.GetInt(rootKey + ".wall_time")
+	if wallTime == 0 {
+		wallTime = 5
 	}
-	retcode, _, _, err := client.New().Ssh.Run(hostTarget.host.ID, cmdStr, time.Duration(duration)*time.Minute)
+	retcode, _, _, err := client.New().Ssh.Run(hostTarget.host.ID, cmdStr, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}
-	var status error
+	err = nil
 	ok = retcode == 0
 	if !ok {
-		status = fmt.Errorf("uninstall command failed for component '%s'", c.DisplayName())
+		err = fmt.Errorf("uninstall command failed for component '%s'", c.DisplayName())
 	}
 	return ok, api.RemoveResults{
 		AddResults: api.AddResults{
 			PrivateNodes: map[string]error{
-				hostTarget.host.Name: status,
+				hostTarget.host.Name: err,
 			},
 		},
-	}, nil
+	}, err
 }
 
 // findConcernedMaster determines from all masters which one has the component installed
-func findConcernedMaster(cluster clusterapi.ClusterAPI, c api.Component) (string, error) {
+func findConcernedMaster(cluster clusterapi.Cluster, c api.Component) (string, error) {
 	// metadata not yet implemented for components, so assuming the concerned master is
 	// the available one
 	return cluster.FindAvailableMaster()
@@ -491,7 +543,7 @@ func findConcernedMaster(cluster clusterapi.ClusterAPI, c api.Component) (string
 }
 
 // findConcernedNode determines from all nodes which one has the component installed
-func findConcernedNode(cluster clusterapi.ClusterAPI, c api.Component, public bool) (string, error) {
+func findConcernedNode(cluster clusterapi.Cluster, c api.Component, public bool) (string, error) {
 	// metadata not yet implemented for components, so assuming the concerned node is
 	// the first one
 	list := cluster.ListNodeIDs(public)
