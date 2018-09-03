@@ -83,7 +83,7 @@ func Unsuccessful() Arbiter {
 }
 
 // Unsuccessful255 returns Retry when the try produced an error with code 255,
-// all other code are considered as sucessful and returns Done.
+// all other codes are considered as successful and returns Done.
 func Unsuccessful255() Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {

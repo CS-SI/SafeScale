@@ -51,16 +51,6 @@ func loadSpecFile(name string) (*viper.Viper, error) {
 	if err != nil {
 		panic(fmt.Sprintf("failed to read embedded component speficication file '%s': %s", name, err.Error()))
 	}
-	// tmplPrepared, err := txttmpl.New(name).Funcs(template.FuncMap).Parse(tmplString)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to parse embedded component specification file '%s': %s", name, err.Error())
-	// }
-
-	// dataBuffer := bytes.NewBufferString("")
-	// err = tmplPrepared.Execute(dataBuffer, params)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to realize embedded component specification file '%s': %s", name, err.Error())
-	// }
 
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -167,19 +157,6 @@ func helmComponent() *component {
 }
 
 // reverseProxyComponent ...
-//func reverseProxyComponent() *component {
-//	specs, err := loadSpecFile("reverseproxy")
-//	if err != nil {
-//		panic(err.Error())
-//	}
-//	return &component{
-//		displayName: specs.GetString("component.name"),
-//		fileName:    "reverseproxy",
-//		specs:       specs,
-//	}
-//}
-
-// reverseProxyComponent ...
 func reverseProxyComponent() *component {
 	specs, err := loadSpecFile("reverseproxy")
 	if err != nil {
@@ -188,32 +165,6 @@ func reverseProxyComponent() *component {
 	return &component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "reverseproxy",
-		specs:       specs,
-	}
-}
-
-// xfceComponent ...
-func xfceComponent() *component {
-	specs, err := loadSpecFile("xfce")
-	if err != nil {
-		panic(err.Error())
-	}
-	return &component{
-		displayName: specs.GetString("component.name"),
-		fileName:    "xfce",
-		specs:       specs,
-	}
-}
-
-// tigervncComponent ...
-func tigervncComponent() *component {
-	specs, err := loadSpecFile("tigervnc")
-	if err != nil {
-		panic(err.Error())
-	}
-	return &component{
-		displayName: specs.GetString("component.name"),
-		fileName:    "tigervnc",
 		specs:       specs,
 	}
 }
@@ -285,8 +236,6 @@ func init() {
 		nVidiaDockerComponent(),
 		mpichOsPkgComponent(),
 		mpichBuildComponent(),
-		xfceComponent(),
-		tigervncComponent(),
 		remoteDesktopComponent(),
 		reverseProxyComponent(),
 		//		kubernetesComponent(),
