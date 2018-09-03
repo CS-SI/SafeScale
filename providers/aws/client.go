@@ -208,7 +208,7 @@ func createFilters() []*ec2.Filter {
 }
 
 //ListImages lists available OS images
-func (c *Client) ListImages() ([]api.Image, error) {
+func (c *Client) ListImages(all bool) ([]api.Image, error) {
 
 	images, err := c.EC2.DescribeImages(&ec2.DescribeImagesInput{
 		//Owners: []*string{aws.String("aws-marketplace"), aws.String("self")},
@@ -457,7 +457,7 @@ func parseMemory(str string) float64 {
 
 //ListTemplates lists available host templates
 //Host templates are sorted using Dominant Resource Fairness Algorithm
-func (c *Client) ListTemplates() ([]api.HostTemplate, error) {
+func (c *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 	input := pricing.GetProductsInput{
 		Filters: []*pricing.Filter{
 			{

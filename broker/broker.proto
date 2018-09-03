@@ -36,8 +36,12 @@ message ImageList{
     repeated  Image Images= 1;
 }
 
+message ImageListRequest{
+    bool all = 1;
+}
+
 service ImageService{
-    rpc List(Reference) returns (ImageList){}
+    rpc List(ImageListRequest) returns (ImageList){}
 }
 
 // broker network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
@@ -145,6 +149,28 @@ service HostService{
     rpc List(HostListRequest) returns (HostList){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
     rpc SSH(Reference) returns (SshConfig){}
+}
+
+message HostTemplate{
+    string ID = 1;
+    string Name = 2;
+    int32 Cores = 3;
+    int32 Ram = 4;
+    int32 Disk = 5;
+    int32 GPUs = 6;
+    string GPUType = 7;
+}
+
+message TemplateList{
+    repeated HostTemplate Templates = 1;
+}
+
+message TemplateListRequest{
+    bool All = 1;
+}
+
+service TemplateService{
+    rpc List(TemplateListRequest) returns (TemplateList){}
 }
 
 // broker volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)

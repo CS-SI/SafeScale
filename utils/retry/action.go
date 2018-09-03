@@ -134,6 +134,32 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 	}.loop()
 }
 
+// WhileUnsuccessful255WithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil
+// and this error has 255 as exit status code), waiting 'delay' after each try, expiting after 'timeout'
+func WhileUnsuccessful255WithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) error {
+	if notify == nil {
+		panic("retry.WhileUnsuccessfulWithNotify(): notify == nil!")
+	}
+
+	if delay <= 0 {
+		delay = time.Second
+	}
+	var arbiter Arbiter
+	if timeout <= 0 {
+		arbiter = Unsuccessful255()
+	} else {
+		arbiter = PrevailDone(Unsuccessful255(), Timeout(timeout))
+	}
+	return action{
+		Arbiter: arbiter,
+		Officer: Constant(delay),
+		Run:     run,
+		First:   nil,
+		Last:    nil,
+		Notify:  notify,
+	}.loop()
+}
+
 // WhileUnsuccessfulDelay1SecondWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 1 second after each try, expiring after a duration of 'timeout'.
 // 'notify' is called after each try for feedback.
@@ -146,6 +172,13 @@ func WhileUnsuccessfulDelay1SecondWithNotify(run func() error, timeout time.Dura
 // 'notify' is called after each try for feedback.
 func WhileUnsuccessfulDelay5SecondsWithNotify(run func() error, timeout time.Duration, notify Notify) error {
 	return WhileUnsuccessfulWithNotify(run, time.Second*5, timeout, notify)
+}
+
+// WhileUnsuccessful255Delay5SecondsWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil
+// and this error has 255 as exit status code), waiting 5 seconds after each try, expiring after a duration of 'timeout'.
+// 'notify' is called after each try for feedback.
+func WhileUnsuccessful255Delay5SecondsWithNotify(run func() error, timeout time.Duration, notify Notify) error {
+	return WhileUnsuccessful255WithNotify(run, time.Second*5, timeout, notify)
 }
 
 // WhileSuccessful retries while 'run' is successful (ie 'run' returns an error == nil),

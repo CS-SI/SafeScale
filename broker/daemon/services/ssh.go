@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"

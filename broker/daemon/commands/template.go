@@ -26,33 +26,33 @@ import (
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 )
 
-// broker image list --all=false
+// broker template list --all=false
 
-//ImageServiceServer image service server grpc
-type ImageServiceServer struct{}
+//TempalteServiceServer host service server grpc
+type TempalteServiceServer struct{}
 
-// List available images
-func (s *ImageServiceServer) List(ctx context.Context, in *pb.ImageListRequest) (*pb.ImageList, error) {
-	log.Printf("List images called")
+// List available templates
+func (s *TempalteServiceServer) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
+	log.Printf("Template List called")
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
-	service := services.NewImageService(currentTenant.Client)
+	service := services.NewTemplateService(currentTenant.Client)
 
-	images, err := service.List(in.GetAll())
+	templates, err := service.List(in.GetAll())
 	if err != nil {
 		return nil, err
 	}
 
-	var pbImages []*pb.Image
+	var pbTempaltes []*pb.HostTemplate
 
-	// Map api.Image to pb.Image
-	for _, image := range images {
-		pbImages = append(pbImages, conv.ToPBImage(&image))
+	// Map api.Host to pb.Host
+	for _, template := range templates {
+		pbTempaltes = append(pbTempaltes, conv.ToPBHostTemplate(&template))
 	}
-	rv := &pb.ImageList{Images: pbImages}
-	log.Printf("End List images")
+	rv := &pb.TemplateList{Templates: pbTempaltes}
+	log.Printf("End ListTemplates")
 	return rv, nil
 }

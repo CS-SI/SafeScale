@@ -57,7 +57,7 @@ func TestGetService(t *testing.T) {
 	require.Nil(t, err)
 	_, err = providers.GetService("TestOpenTelekom")
 	require.Nil(t, err)
-	imgs, err := ovh.ListImages()
+	imgs, err := ovh.ListImages(false)
 	require.Nil(t, err)
 	require.True(t, len(imgs) > 3)
 	//_, err = providers.GetService("TestCloudwatt")

@@ -86,6 +86,12 @@ func main() {
 	app.Commands = append(app.Commands, cmd.NasCmd)
 	sort.Sort(cli.CommandsByName(cmd.NasCmd.Subcommands))
 
+	app.Commands = append(app.Commands, cmd.ImageCmd)
+	sort.Sort(cli.CommandsByName(cmd.ImageCmd.Subcommands))
+
+	app.Commands = append(app.Commands, cmd.TemplateCmd)
+	sort.Sort(cli.CommandsByName(cmd.TemplateCmd.Subcommands))
+
 	sort.Sort(cli.CommandsByName(app.Commands))
 	err := app.Run(os.Args)
 	if err != nil {

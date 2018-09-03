@@ -145,3 +145,24 @@ func ToPBHost(in *api.Host) *pb.Host {
 		State:      pb.HostState(in.State),
 	}
 }
+
+// ToPBHostTemplate convert an template from api to protocolbuffer format
+func ToPBHostTemplate(in *api.HostTemplate) *pb.HostTemplate {
+	return &pb.HostTemplate{
+		ID:      in.ID,
+		Name:    in.Name,
+		Cores:   int32(in.Cores),
+		Ram:     int32(in.RAMSize),
+		Disk:    int32(in.DiskSize),
+		GPUs:    int32(in.GPUNumber),
+		GPUType: in.GPUType,
+	}
+}
+
+//ToPBImage convert an image from api to protocolbuffer format
+func ToPBImage(in *api.Image) *pb.Image {
+	return &pb.Image{
+		ID:   in.ID,
+		Name: in.Name,
+	}
+}

@@ -299,7 +299,7 @@ func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, c
 //SelectTemplatesBySize select templates satisfying sizing requirements
 //returned list is ordered by size fitting
 func (srv *Service) SelectTemplatesBySize(sizing api.SizingRequirements) ([]api.HostTemplate, error) {
-	tpls, err := srv.ListTemplates()
+	tpls, err := srv.ListTemplates(false)
 	var selectedTpls []api.HostTemplate
 	if err != nil {
 		return nil, err
@@ -316,7 +316,7 @@ func (srv *Service) SelectTemplatesBySize(sizing api.SizingRequirements) ([]api.
 //FilterImages search an images corresponding to OS Name
 func (srv *Service) FilterImages(filter string) ([]api.Image, error) {
 
-	imgs, err := srv.ListImages()
+	imgs, err := srv.ListImages(false)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +342,7 @@ func (srv *Service) FilterImages(filter string) ([]api.Image, error) {
 //SearchImage search an image corresponding to OS Name
 func (srv *Service) SearchImage(osname string) (*api.Image, error) {
 
-	imgs, err := srv.ListImages()
+	imgs, err := srv.ListImages(false)
 	if err != nil {
 		return nil, err
 	}

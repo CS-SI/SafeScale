@@ -48,7 +48,7 @@ import (
 )
 
 // ListImages lists available OS images
-func (client *Client) ListImages() ([]api.Image, error) {
+func (client *Client) ListImages(all bool) ([]api.Image, error) {
 	opts := images.ListOpts{}
 
 	// Retrieve a pager (i.e. a paginated collection)
@@ -114,7 +114,7 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (client *Client) ListTemplates() ([]api.HostTemplate, error) {
+func (client *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 	opts := flavors.ListOpts{}
 
 	// Retrieve a pager (i.e. a paginated collection)

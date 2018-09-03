@@ -22,6 +22,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/urfave/cli"
 )
@@ -54,7 +55,11 @@ var volumeList = cli.Command{
 			return fmt.Errorf("Could not get volume list: %v", err)
 		}
 
-		out, _ := json.Marshal(resp.GetVolumes())
+		var volumes []*volumeDisplayable
+		for _, vol := range resp.GetVolumes() {
+			volumes = append(volumes, toDisplaybleVolume(vol))
+		}
+		out, _ := json.Marshal(volumes)
 		fmt.Println(string(out))
 		return nil
 	},
@@ -75,7 +80,7 @@ var volumeInspect = cli.Command{
 			return fmt.Errorf("Could not get volume '%s': %v", c.Args().First(), err)
 		}
 
-		out, _ := json.Marshal(volumeInfo)
+		out, _ := json.Marshal(toDisplaybleVolumeInfo(volumeInfo))
 		fmt.Println(string(out))
 
 		return nil
@@ -115,8 +120,7 @@ var volumeCreate = cli.Command{
 		cli.StringFlag{
 			Name:  "speed",
 			Value: "HDD",
-			// Improvement: get allowed values from brokerd.pb.go
-			Usage: "Allowed values: SSD, HDD, COLD",
+			Usage: fmt.Sprintf("Allowed values: %s", getAllowedSpeeds()),
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -126,16 +130,22 @@ var volumeCreate = cli.Command{
 			return fmt.Errorf("Volume name required")
 		}
 		speed := c.String("speed")
+
+		volSpeed, ok := pb.VolumeSpeed_value[speed]
+		if !ok {
+			return fmt.Errorf("Invalid speed '%s'", speed)
+		}
 		def := pb.VolumeDefinition{
 			Name:  c.Args().First(),
 			Size:  int32(c.Int("size")),
-			Speed: pb.VolumeSpeed(pb.VolumeSpeed_value[speed]),
+			Speed: pb.VolumeSpeed(volSpeed),
 		}
+
 		volume, err := client.New().Volume.Create(def, 0)
 		if err != nil {
 			return fmt.Errorf("Could not create volume '%s': %v", c.Args().First(), err)
 		}
-		out, _ := json.Marshal(volume)
+		out, _ := json.Marshal(toDisplaybleVolume(volume))
 		fmt.Println(string(out))
 
 		return nil
@@ -198,4 +208,58 @@ var volumeDetach = cli.Command{
 
 		return nil
 	},
+}
+
+type volumeInfoDisplayable struct {
+	ID        string
+	Name      string
+	Speed     string
+	Size      int32
+	Host      string
+	MountPath string
+	Format    string
+	Device    string
+}
+
+type volumeDisplayable struct {
+	ID    string
+	Name  string
+	Speed string
+	Size  int32
+}
+
+func toDisplaybleVolumeInfo(volumeInfo *pb.VolumeInfo) *volumeInfoDisplayable {
+	return &volumeInfoDisplayable{
+		volumeInfo.GetID(),
+		volumeInfo.GetName(),
+		pb.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
+		volumeInfo.GetSize(),
+		utils.GetReference(volumeInfo.GetHost()),
+		volumeInfo.GetMountPath(),
+		volumeInfo.GetFormat(),
+		volumeInfo.GetDevice(),
+	}
+}
+
+func toDisplaybleVolume(volumeInfo *pb.Volume) *volumeDisplayable {
+	return &volumeDisplayable{
+		volumeInfo.GetID(),
+		volumeInfo.GetName(),
+		pb.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
+		volumeInfo.GetSize(),
+	}
+}
+
+func getAllowedSpeeds() string {
+	speeds := ""
+	i := 0
+	for k := range pb.VolumeSpeed_value {
+		if i > 0 {
+			speeds += ", "
+		}
+		speeds += k
+		i++
+
+	}
+	return speeds
 }

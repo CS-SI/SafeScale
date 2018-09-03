@@ -25,6 +25,8 @@ type Session struct {
 	Ssh       *ssh
 	Tenant    *tenant
 	Volume    *volume
+	Template  *template
+	Image     *image
 
 	// For future use...
 	brokerdAddress string
@@ -48,5 +50,7 @@ func New() Client {
 	s.Ssh = &ssh{session: s}
 	s.Tenant = &tenant{session: s}
 	s.Volume = &volume{session: s}
+	s.Template = &template{session: s}
+	s.Image = &image{session: s}
 	return s
 }

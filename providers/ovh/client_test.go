@@ -40,7 +40,7 @@ func getClient() *tests.ClientTester {
 }
 
 func Test_GetTemplate(t *testing.T) {
-	tpls, err := getClient().Service.ListTemplates()
+	tpls, err := getClient().Service.ListTemplates(false)
 	assert.NoError(t, err)
 	find := false
 	for _, tpl := range tpls {
@@ -60,7 +60,7 @@ func Test_ListImages(t *testing.T) {
 
 func Test_ListHostTemplates(t *testing.T) {
 	getClient().ListHostTemplates(t)
-	tpls, err := getClient().Service.ListTemplates()
+	tpls, err := getClient().Service.ListTemplates(false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
 	for _, f := range tpls {

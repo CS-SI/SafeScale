@@ -66,9 +66,8 @@ var tenantGet = cli.Command{
 }
 
 var tenantSet = cli.Command{
-	Name:      "set",
-	Usage:     "Set tenant to work with",
-	ArgsUsage: "<tenant_name>",
+	Name:  "set",
+	Usage: "Set tenant to work with",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <tenant_name>")

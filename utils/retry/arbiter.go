@@ -19,6 +19,7 @@ package retry
 import (
 	"time"
 
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 )
 
@@ -76,6 +77,20 @@ func Unsuccessful() Arbiter {
 	return func(t Try) (Verdict.Enum, error) {
 		if t.Err != nil {
 			return Verdict.Retry, nil
+		}
+		return Verdict.Done, nil
+	}
+}
+
+// Unsuccessful255 returns Retry when the try produced an error with code 255,
+// all other code are considered as sucessful and returns Done.
+func Unsuccessful255() Arbiter {
+	return func(t Try) (Verdict.Enum, error) {
+		if t.Err != nil {
+			_, retCode, _ := utils.ExtractRetCode(t.Err)
+			if retCode == 255 {
+				return Verdict.Retry, nil
+			}
 		}
 		return Verdict.Done, nil
 	}
