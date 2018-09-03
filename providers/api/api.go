@@ -23,11 +23,11 @@ import (
 
 	// "github.com/CS-SI/SafeScale/system"
 
-	"github.com/CS-SI/SafeScale/providers/api/HostAdditionalInfo"
-	"github.com/CS-SI/SafeScale/providers/api/HostState"
-	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/HostAdditionalInfo"
+	"github.com/CS-SI/SafeScale/providers/api/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/system"
 )
 

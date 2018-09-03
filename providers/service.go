@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/HostState"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
 	uuid "github.com/satori/go.uuid"
 )
 

@@ -24,8 +24,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects"
 

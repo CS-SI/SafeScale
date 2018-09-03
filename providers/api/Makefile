@@ -1,21 +1,14 @@
 GO?=go
 
-.PHONY:	generate clean
+.PHONY:	enums clean filters
 
-all:	generate 
+all:	enums 
 
 vet:
 	@$(GO) vet
-	@$(GO) vet ./HostAdditionalInfo
-	@$(GO) vet ./IPVersion
-	@$(GO) vet ./HostState
-	@$(GO) vet ./VolumeSpeed
-	@$(GO) vet ./VolumeState
 
-DIRECTORIES := $(sort $(dir $(wildcard */)))
-
-generate:
-	@(for d in $(DIRECTORIES); do (cd $$d; $(GO) generate); done)
+enums:
+	@(cd $@; $(MAKE) generate)
 
 clean:
-	@(for d in $(DIRECTORIES); do (cd $$d; $(RM) *_string.go); done)
+	@(for d in $(DIRECTORIES); do (cd $$d; $(MAKE) clean); done)

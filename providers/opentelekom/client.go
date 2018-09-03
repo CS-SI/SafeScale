@@ -19,7 +19,7 @@ package opentelekom
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
 
 	"github.com/CS-SI/SafeScale/providers/flexibleengine"
 )
