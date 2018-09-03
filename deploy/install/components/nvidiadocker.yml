@@ -16,27 +16,26 @@
 
 ---
 component:
-    name: nVidia-Docker
-    targeting:
+    name: nVidia-Docker2
+    requirements:
+        - docker
+    target:
         host: yes
         cluster:
             master: no
             node:
-                private: no
-                public: no
-    installing:
-        script:
-            estimated_execution_time: 15
+                private: all
+                public: all
+    install:
+        bash:
+            wall_time: 15
             check: |
                 case $LINUX_KIND in
                     debian|ubuntu)
-                        dpkg -l | grep docker-ce &>/dev/null
+                        dpkg -l | grep docker-nvidia2 &>/dev/null
                         ;;
                     centos|rhel)
-                        rpm -qa | grep docker-ce &>/dev/null
-                        ;;
-                    fedora)
-                        dnf list installed | grep docker-ce &>/dev/null
+                        rpm -qa | grep docker-nvidia2 &>/dev/null
                         ;;
                     *)
                         echo "Unsupported operating system '$LINUX_KIND'"
@@ -45,60 +44,57 @@ component:
                 esac
                 exit $?
 
-            install: |
+            add: |
+                lspci | grep -i nvidia &>/dev/null || {
+                    echo "No nVidia GPU detected. Aborting."
+                    exit 10
+                }
+                NVIDIA_URL=http://developer.download.nvidia.com/compute/cuda/repos
                 case $LINUX_KIND in
                     debian|ubuntu)
-                        export DEBIAN_FRONTEND=noninteractive
+                        version=${VERSION_ID/./}
+                        wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu$version/x86_64/cuda-repo-ubuntu${version}_9.2.148-1_amd64.deb || \
+                        wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu1710/x86_64/cuda-repo-ubuntu1710_9.2.148-1_amd64.deb || exit $?
+                        dpkg -i cuda-repo.deb || exit $?
+                        rm -f cuda-repo.deb
+                        wait_for_apt && apt install -y gcc linux-headers
+                        curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
+                        distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+                        curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
+                        tee /etc/apt/sources.list.d/nvidia-docker.list
                         wait_for_apt && apt update
-                        wait_for_apt && apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common
-                        curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -
-                        add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable"
-                        wait_for_apt && apt update
-                        wait_for_apt && apt-get install -qqy docker-ce
+                        wait_for_apt && apt install -y cuda nvidia-docker2 || exit $?
+                        pkill -SIGHUP dockerd
                         ;;
                     centos|rhel)
-                        yum install -y yum-utils device-mapper-persistent-data lvm2
-                        yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-                        yum install -y docker-ce
-                        ;;
-                    fedora)
-                        dnf -y install dnf-plugins-core
-                        dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-                        dnf install -y docker-ce
+                        yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+                        yum install -y gcc yum kernel-devel kernel-headers
+                        distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+                        curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.repo | \
+                        tee /etc/yum.repos.d/nvidia-docker.repo || exit $?
+                        yum cleanexpire-cache
+                        yum install -y cuda nvidia-docker2 || exit $?
+                        pkill -SIGHUP dockerd
                         ;;
                     *)
                         echo "Unsupported operating system '$LINUX_KIND'"
                         exit 1
                         ;;
                 esac
-                gpasswd -a "${USER}" docker
                 exit 0
 
-            uninstall: |
+            remove: |
                 case $LINUX_KIND in
                     debian|ubuntu)
-                        wait_for_apt && apt-get remove -y docker-ce
+                        wait_for_apt && apt remove -y nvidia-docker2
                         ;;
                     centos|rhel)
-                        yum remove -y docker-ce
-                        ;;
-                    fedora)
-                        dnf erase -y docker-ce
+                        yum remove -y nvidia-docker2
                         ;;
                     *)
                         echo "Unsupported operating system '$LINUX_KIND'"
                         exit 1
                         ;;
                 esac
-
-    servicing:
-        start: |
-            systemctl start docker-ce
-
-        stop: |
-            systemctl stop docker-ce
-
-        state: |
-            systemctl status docker-ce
 
 ...

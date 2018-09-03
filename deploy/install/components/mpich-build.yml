@@ -18,20 +18,20 @@
 ---
 component:
     name: mpich-build
-    targeting:
+    target:
         host: yes
         cluster:
             master: all
             node:
                 private: all
                 public: all
-    installing:
-        script:
-            estimated_execution_time: 15
+    install:
+        bash:
+            wall_time: 15
             check: |
                 which /usr/local/bin/mpiexec &>/dev/null
 
-            install: |
+            add: |
                 case $LINUX_KIND in
                     redhat|centos)
                         yum makecache fast
@@ -57,6 +57,6 @@ component:
                 rm -rf mpich-3.2.1*
                 exit 0
 
-            uninstall: |
+            remove: |
                 rm -rf /usr/local/bin/mpiexec
                 exit 0

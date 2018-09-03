@@ -15,14 +15,14 @@
 ---
 component:
     name: Kubernetes
-    targeting:
+    target:
         host: no
         cluster:
             master: any
             node:
                 private: no
                 public: no
-    installing:
+    install:
         dcos:
             options:
                 dev: |
@@ -53,13 +53,11 @@ component:
             check: |
                 {{.dcos}} kubernetes plan show deploy --json | jq .status | grep COMPLETE
 
-            install: |
-                {{.dcos}} package install --yes kubernetes --cli
-
-            post-install: |
+            add: |
+                {{.dcos}} package install --yes kubernetes {{.options}} --cli
                 {{.dcos}} kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
                 {{.dcos}} kubectl config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443`
 
-            uninstall: |
+            remove: |
                 {{.dcos}} package remove --yes kubernetes
 ...

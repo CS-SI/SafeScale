@@ -88,6 +88,8 @@ component:
                             retries: 10
                 EOF
                 docker-compose -f /opt/safescale/run/reverseproxy.compose.yml -p reverseproxy up -d
+                iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+                save_iptables_rules
 
             remove: |
                 docker-compose -f /opt/safescale/reverseproxy.compose.yml rm -f

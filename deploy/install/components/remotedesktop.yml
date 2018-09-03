@@ -17,17 +17,17 @@ component:
     name: RemoteDesktop
     requirements:
         - docker
-    targeting:
-        host: no
+    target:
+        host: yes
         cluster:
-            master: all
+            master: no
             node:
                 private: no
                 public: no
-    installing:
-        script:
-            estimated_execution_time: 15
-            install: |
+    install:
+        bash:
+            wall_time: 15
+            add: |
                 ###########################################################
                 # Install xfce + tigervnc                                 #
                 ###########################################################
@@ -46,14 +46,48 @@ component:
                 cat >~cladm/.vnc/config <<-'EOF'
                 screen=0 1600x900x24
                 geometry=1600x900
-                desktop={{ .ClusterName }}-master-{{ .MasterIndex }}
+                desktop={{ .Hostname }}
                 passwordfile=
                 extension=GLX
                 noreset
                 SecurityTypes=None
                 ZlibLevel=0
+                Localhost=no
                 EOF
                 chown -R cladm:cladm ~cladm/.vnc
+
+                cat >/etc/systemd/system/vncserver@:0.service <<'EOF'
+                [Unit]
+                Description=Remote desktop service (VNC)
+                After=syslog.target network.target
+
+                [Service]
+                Type=simple
+                User={{.Username}}
+                PIDFile=/home/%u/.vnc/%H%i.pid
+                ExecStartPre=/bin/bash -c '/usr/bin/vncserver -kill %i &>/dev/null || :'
+                ExecStart=/usr/bin/vncserver %i -fg -SecurityTypes None -geometry 1600x900  -localhost no --I-KNOW-THIS-IS-INSECURE
+                ExecStop=/usr/bin/vncserver -kill %i
+
+                [Install]
+                WantedBy=multi-user.target
+                EOF
+
+                cat >/etc/systemd/system/vncconfig@:0.service <<'EOF'
+                [Unit]
+                Description=Remote desktop config helper service
+                After=syslog.target network.target vncserver@:0.service
+
+                [Service]
+                Type=simple
+                Environment=DISPLAY=%i
+                User={{.Username}}
+                ExecStart=/usr/bin/vncconfig -nowin
+
+                [Install]
+                WantedBy=multi-user.target
+                EOF
+                systemctl daemon-reload
 
                 case $LINUX_KIND in
                     centos|redhat)
@@ -62,11 +96,10 @@ component:
                         yum groupinstall -y -t "X Window system" && \
                         yum groupinstall -y -t Xfce && \
                         yum install -y -t xorg-x11-fonts-Type1 firefox tigervnc-server && \
-                        cp -s /lib/systemd/system/vncserver\@.service /etc/systemd/system/vncserver\@:0.service && \
-                        sed -i -e "s/<USER>/{{ .Username }}/g" /etc/systemd/system/vncserver\@:0.service && \
-                        systemctl daemon-reload && \
-                        systemctl enable vncserver\@:0.service && \
-                        systemctl restart vncserver\@:0.service
+                        systemctl enable vncserver@:0.service && \
+                        systemctl enable vncconfig@:0.service && \
+                        systemctl restart vncserver@:0.service && \
+                        systemctl restart vncconfig@:0.service
 
                         ;;
                     debian|ubuntu)
@@ -79,11 +112,10 @@ component:
                         else
                             wait_for_apt && apt install -y tigervnc-standalone-server || exit $?
                         fi
-                        cp -s /lib/systemd/system/vncserver\@.service /etc/systemd/system/vncserver\@:0.service && \
-                        sed -i -e "s/<USER>/{{ .Username }}/g" /etc/systemd/system/vncserver\@:0.service && \
-                        systemctl daemon-reload && \
-                        systemctl enable vncserver\@:0.service && \
-                        systemctl restart vncserver\@:0.service
+                        systemctl enable vncserver@:0.service && \
+                        systemctl enable vncconfig@:0.service && \
+                        systemctl restart vncserver@:0.service && \
+                        systemctl restart vncconfig@:0.service
                         ;;
                     *)
                         echo "unsupported OS type '$LINUX_KIND'"
@@ -175,12 +207,35 @@ component:
                 </tomcat-users>
                 EOF
 
+                cat >user-mapping.xml <<'EOF'
+                <user-mapping>
+                    <authorize
+                        username="{{ .Username }}"
+                        password="{{ .Password }}">
+
+                        <!-- First authorized connection -->
+                        <connection name="{{ .Hostname }}">
+                            <protocol>vnc</protocol>
+                            <param name="hostname">{{ .HostIP }}</param>
+                            <param name="port">5900</param>
+                            <param name="enable-sftp">true</param>
+                            <param name="sftp-username">{{ .Username }}</param>
+                            <param name="sftp-password">{{ .Password }}</param>
+                            <param name="sftp-directory">/home/{{ .Username }}/Desktop</param>
+                            <param name="sftp-root-directory">/home/{{ .Username }}</param>
+                            <param name="sftp-server-alive-interval">60</param>
+                            <param name="color-depth">16</param>
+                        </connection>
+                    </authorize>
+                </user-mapping>
+                EOF
+
                 cat >Dockerfile <<-'EOF'
                 FROM debian:sid-slim AS Builder
                 LABEL maintainer "CS SI"
 
                 ARG GUACAMOLE_VERSION=0.9.14
-                ARG GUACAMOLE_URL=http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUACAMOLE_VERSION}
+                ARG GUACAMOLE_URL=http://apache.mirrors.ovh.net/ftp.apache.org/dist/guacamole/${GUACAMOLE_VERSION}
 
                 ENV DEBIAN_FRONTEND noninteractive
 
@@ -202,7 +257,7 @@ component:
                         libwebp-dev \
                         wget
 
-                # Guacamole
+                # Guacamole server (guacd)
                 WORKDIR /usr/local/src
                 ADD ${GUACAMOLE_URL}/source/guacamole-server-${GUACAMOLE_VERSION}.tar.gz ./guacamole-server-${GUACAMOLE_VERSION}.tar.gz
                 RUN tar -zxvf guacamole-server-${GUACAMOLE_VERSION}.tar.gz -C . >/dev/null
@@ -254,6 +309,7 @@ component:
                 WORKDIR /root
                 RUN mkdir .guacamole
                 ADD logback.xml .guacamole/
+                ADD user-mapping.xml .guacamole/
                 ENV GUACAMOLE_HOME /root/.guacamole
 
                 RUN mkdir /opt/safescale
@@ -275,24 +331,33 @@ component:
                 ENTRYPOINT ["/opt/safescale/startup.sh"]
                 EOF
 
-                docker build -t remotedesktop:latest . && \
-                cd .. && rm -rf remotedesktop.image
+                # build image
+                docker build -t remotedesktop:latest . || exit $?
+                cd .. && rm -rf remotedesktop.image && docker image prune -f
+
+                # Guacd need sshd to authorize password authentication...
+                cat >>/etc/ssh/sshd_config <<-'EOF'
+                # Allow Password Authentication from cladm user for guacd to work
+                Match User cladm Address 172.17.0.0/16
+                    PasswordAuthentication yes
+                EOF
+                systemctl reload sshd
 
                 ###########################################################
                 # Starts remotedesktop container                          #
                 ###########################################################
-                docker run --rm -d --hostname remotedesktop --name remotedesktop remotedesktop:latest
+                docker run --rm -d --hostname remotedesktop --name remotedesktop -p "8080:8080" -p "8009:8009" remotedesktop:latest
 
-            uninstall: |
+            remove: |
                 docker rm -f remotedesktop
                 docker image rm remotedesktop:latest
 
             check: |
                 docker image ls | grep remotedesktop &>/dev/null
 
-    servicing:
+    service:
         start: |
-            docker run --rm -d --hostname remotedesktop --name remotedesktop remotedesktop:latest
+            docker run --rm -d --hostname remotedesktop --name remotedesktop  -p "8080:8080" -p "8009:8009" remotedesktop:latest
 
         pause: |
             docker stop remotedesktop
@@ -304,4 +369,23 @@ component:
             docker rm -f remotedesktop
 
         status: |
-            docker ps | grep remotedesktop
+            docker ps | grep remotedesktop &>/dev/null
+
+    proxy:
+        rules:
+            - name: guacamole
+              type: service
+              content: |
+                {
+                    "name": "remotedesktop_{{.Hostname}}",
+                    "url": "http://{{.HostIP}}:8080/guacamole/"
+                }
+
+            - name: remotedesktop
+              type: route
+              content: |
+                {
+                    "paths": ["/remotedesktop/{{.Hostname}}"],
+                    "service": { "id": "{{.guacamole}}" }
+                }
+...
