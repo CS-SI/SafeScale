@@ -123,9 +123,5 @@ func (svc *NetworkService) Get(ref string) (*api.Network, error) {
 
 //Delete deletes network referenced by ref
 func (svc *NetworkService) Delete(ref string) error {
-	n, err := svc.Get(ref)
-	if err != nil {
-		return fmt.Errorf("Network %s does not exist", ref)
-	}
-	return svc.provider.DeleteNetwork(n.ID)
+	return svc.provider.DeleteNetwork(ref)
 }

@@ -64,7 +64,7 @@ type Subnet struct {
 //CreateNetwork creates a network named name
 func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
 	// We 1st check if name is not aleready used
-	_net, err := client.GetNetwork(req.Name)
+	_net, err := metadata.LoadNetwork(providers.FromClient(client), req.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -252,14 +252,15 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (client *Client) DeleteNetwork(networkID string) error {
-	m, err := metadata.LoadNetwork(providers.FromClient(client), networkID)
+func (client *Client) DeleteNetwork(networkRef string) error {
+	m, err := metadata.LoadNetwork(providers.FromClient(client), networkRef)
 	if err != nil {
 		return err
 	}
 	if m == nil {
-		return fmt.Errorf("failed to find network '%s' metadata", networkID)
+		return fmt.Errorf("Failed to find network '%s' in metadata", networkRef)
 	}
+	networkID := m.Get().ID
 	hosts, err := m.ListHosts()
 	if err != nil {
 		return err
@@ -277,7 +278,7 @@ func (client *Client) DeleteNetwork(networkID string) error {
 			if len(allhosts) > 1 {
 				lenS = "s"
 			}
-			return fmt.Errorf("network '%s' has %d host%s attached (%s)", networkID, len(allhosts), lenS, strings.Join(allhosts, ","))
+			return fmt.Errorf("network '%s' has %d host%s attached (%s)", networkRef, len(allhosts), lenS, strings.Join(allhosts, ","))
 		}
 	}
 
