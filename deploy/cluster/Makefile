@@ -1,17 +1,14 @@
 GO?=go
 
-.PHONY: api components flavors tests clean mrproper
+.PHONY: api flavors tests clean mrproper
 
-all: api components flavors tests
+all: api flavors tests
 
 vet:
 	@$(GO) vet
 
 api:
 	@(cd api && $(MAKE))
-
-components:
-	@(cd components && $(MAKE))
 
 flavors:
 	@(cd flavors && $(MAKE))
