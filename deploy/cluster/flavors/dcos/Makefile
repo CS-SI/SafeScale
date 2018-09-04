@@ -1,17 +1,12 @@
 GO?=go
 
-.PHONY: generate enums clean mrproper
+.PHONY: generate clean mrproper
 
-all: generate enums
+all: generate
 
 vet:
 	@$(GO) vet
 	@$(GO) vet ./ErrorCode
-
-enums: ErrorCode/enum_string.go
-
-ErrorCode/enum_string.go: ErrorCode/enum.go
-	@(cd ErrorCode && $(GO) generate)
 
 generate: dcos.go scripts/*.sh
 	@$(GO) generate
