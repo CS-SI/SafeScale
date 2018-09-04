@@ -23,7 +23,7 @@ cd /var/tmp/guacamole.image
 cat >startup.sh <<-'EOF'
 #!/bin/bash
 
-# start up supervisord, all daemons should launched by supervisord.
+# start up supervisord, all daemons should be launched by supervisord.
 exec /usr/bin/supervisord -c /opt/safescale/supervisord.conf
 EOF
 

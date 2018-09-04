@@ -23,7 +23,9 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 
-	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/deploy/install"
+
+	pb "github.com/CS-SI/SafeScale/broker"
 )
 
 //go:generate rice embed-go
@@ -43,7 +45,7 @@ var (
 	}
 )
 
-//getTemplateBox
+// getTemplateBox
 func getTemplateBox() (*rice.Box, error) {
 	if templateBox == nil {
 		b, err := rice.FindBox("../../cluster/components/scripts")
@@ -55,9 +57,9 @@ func getTemplateBox() (*rice.Box, error) {
 	return templateBox, nil
 }
 
-//UploadBuildScript creates the string corresponding to script
+// UploadBuildScript creates the string corresponding to script
 // used to prepare Docker image to be used by a cluster
-func UploadBuildScript(ssh *system.SSHConfig, component string, data map[string]interface{}) (string, error) {
+func UploadBuildScript(host *pb.Host, component string, data map[string]interface{}) (string, error) {
 	// find the rice.Box
 	b, err := getTemplateBox()
 	if err != nil {
@@ -81,7 +83,7 @@ func UploadBuildScript(ssh *system.SSHConfig, component string, data map[string]
 	if err != nil {
 		return "", fmt.Errorf("error realizing component '%s' template: %s", scriptName, err.Error())
 	}
-	err = ssh.UploadString(remotePath, dataBuffer.String())
+	err = install.UploadStringToRemoteFile(dataBuffer.String(), host, remotePath)
 	if err != nil {
 		return "", err
 	}
