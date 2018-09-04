@@ -79,7 +79,7 @@ var (
 			return i + 1
 		},
 		"errcode": func(msg string) int {
-			if code, ok := ErrorCode.ErrorCodes[msg]; ok {
+			if code, ok := ErrorCode.StringMap[msg]; ok {
 				return int(code)
 			}
 			return 1023

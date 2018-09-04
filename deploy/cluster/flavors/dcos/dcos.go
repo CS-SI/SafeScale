@@ -38,10 +38,10 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/NodeType"
-	"github.com/CS-SI/SafeScale/deploy/cluster/components"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos/ErrorCode"
 	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
+
 	"github.com/CS-SI/SafeScale/deploy/install"
 	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 
@@ -86,7 +86,7 @@ var (
 	// funcMap defines the custom functions to be used in templates
 	funcMap = txttmpl.FuncMap{
 		"errcode": func(msg string) int {
-			if code, ok := ErrorCode.ErrorCodes[msg]; ok {
+			if code, ok := ErrorCode.StringMap[msg]; ok {
 				return int(code)
 			}
 			return 1023
@@ -1553,24 +1553,6 @@ func (c *Cluster) installElastic() (int, error) {
 		return retcode, fmt.Errorf("execution of elasticsearch pâckage installation failed: %s", stderr)
 	}
 	return 0, nil
-}
-
-// uploadDockerImageBuildScripts creates the string corresponding to script
-// used to prepare Docker images on Bootstrap server
-func (c *Cluster) uploadDockerImageBuildScripts(host *pb.Host) error {
-	_, err := components.UploadBuildScript(host, "guacamole", map[string]interface{}{})
-	if err != nil {
-		return err
-	}
-	_, err = components.UploadBuildScript(host, "proxy", map[string]interface{}{
-		"ClusterName": c.Core.Name,
-		"DNSDomain":   "",
-		"MasterIPs":   c.manager.MasterIPs,
-	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // DeleteLastNode deletes the last Agent node added

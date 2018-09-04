@@ -20,7 +20,6 @@ clean:
 	@(cd api && $(MAKE) $@)
 	@(cd flavors && $(MAKE) $@)
 	@(cd tests && $(MAKE) $@)
-	@(cd components && $(MAKE) $@)
 
 mrproper: clean
 	@(cd tests && rm -f debug)
