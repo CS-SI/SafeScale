@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/CS-SI/SafeScale/broker/client"
@@ -74,6 +75,14 @@ var sshRun = cli.Command{
 	},
 }
 
+func normalizeFileName(fileName string) string {
+	absPath, _ := filepath.Abs(fileName)
+	if _, err := os.Stat(absPath); err != nil {
+		return fileName
+	}
+	return absPath
+}
+
 var sshCopy = cli.Command{
 	Name:      "copy",
 	Usage:     "Copy a local file/directory to an host or copy from host to local",
@@ -94,7 +103,7 @@ var sshCopy = cli.Command{
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
-		err := client.New().Ssh.Copy(c.Args().Get(0), c.Args().Get(1), timeout)
+		err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), timeout)
 		if err != nil {
 			return fmt.Errorf("Could not copy %s to %s: %v", c.Args().Get(0), c.Args().Get(1), err)
 		}
