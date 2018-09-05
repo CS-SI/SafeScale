@@ -175,19 +175,28 @@ func (client *Client) listAllVolumes() ([]api.Volume, error) {
 // listMonitoredVolumess lists available Volumes created by SafeScale (ie registered in object storage)
 func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
 	var vols []api.Volume
-	err := metadata.NewVolume(providers.FromClient(client)).Browse(func(vol *api.Volume) error {
+	m := metadata.NewVolume(providers.FromClient(client))
+	err := m.Browse(func(vol *api.Volume) error {
 		vols = append(vols, *vol)
 		return nil
 	})
-	if err != nil {
-		return vols, err
+	if len(vols) == 0 && err != nil {
+		return nil, fmt.Errorf("Error listing volumes : %s", ProviderErrorToString(err))
 	}
 	return vols, nil
 }
 
 //DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(id string) error {
-	err := volumes.Delete(client.Volume, id).ExtractErr()
+	volume, err := metadata.LoadVolume(providers.FromClient(client), id)
+	if err != nil {
+		return err
+	}
+	if volume == nil {
+		return providers.ResourceNotFoundError("Volume", id)
+	}
+
+	err = volumes.Delete(client.Volume, id).ExtractErr()
 	if err != nil {
 		return fmt.Errorf("Error deleting volume: %s", ProviderErrorToString(err))
 	}
