@@ -569,7 +569,7 @@ func (client *Client) DeleteHost(ref string) error {
 		return err
 	}
 	if m == nil {
-		return fmt.Errorf("Failed to find host '%s' in metadata", ref)
+		return providers.ResourceNotFoundError("Host", ref)
 	}
 
 	host := m.Get()

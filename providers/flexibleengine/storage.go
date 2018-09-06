@@ -57,7 +57,23 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 
 // DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(id string) error {
-	return client.osclt.DeleteVolume(id)
+	volume, err := metadata.LoadVolume(providers.FromClient(client), id)
+	if err != nil {
+		return err
+	}
+	if volume == nil {
+		return providers.ResourceNotFoundError("Volume", id)
+	}
+
+	err = v2_vol.Delete(client.osclt.Volume, id).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("Error deleting volume: %s", openstack.ProviderErrorToString(err))
+	}
+	err = metadata.RemoveVolume(providers.FromClient(client), id)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume: %s", openstack.ProviderErrorToString(err))
+	}
+	return nil
 }
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
