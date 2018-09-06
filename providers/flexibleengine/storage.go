@@ -88,14 +88,7 @@ func (client *Client) getVolumeType(speed VolumeSpeed.Enum) string {
 			return t
 		}
 	}
-	switch speed {
-	case VolumeSpeed.SSD:
-		return client.getVolumeType(VolumeSpeed.SSD)
-	case VolumeSpeed.HDD:
-		return client.getVolumeType(VolumeSpeed.HDD)
-	default:
-		return ""
-	}
+	return ""
 }
 
 func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
@@ -112,7 +105,15 @@ func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 // - imageID is the ID of the image to initialize the volume with
 func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
-	return client.ExCreateVolume(request, "")
+	vol, err := client.ExCreateVolume(request, "")
+
+	err = metadata.SaveVolume(providers.FromClient(client), vol)
+	if err != nil {
+		client.DeleteVolume(vol.ID)
+		return nil, fmt.Errorf("failed to create Volume: %s", openstack.ProviderErrorToString(err))
+	}
+
+	return vol, err
 }
 
 // ExCreateVolume creates a block volume
@@ -127,7 +128,7 @@ func (client *Client) ExCreateVolume(request api.VolumeRequest, imageID string) 
 		return nil, err
 	}
 	if volume != nil {
-		return nil, fmt.Errorf("Volume '%s' already exists", request.Name)
+		return nil, providers.ResourceAlreadyExistsError("Volume", request.Name)
 	}
 
 	opts := v2_vol.CreateOpts{
@@ -157,7 +158,27 @@ func (client *Client) GetVolume(id string) (*api.Volume, error) {
 
 // ListVolumes list available volumes
 func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
-	return client.osclt.ListVolumes(all)
+	// return client.osclt.ListVolumes(all)
+	if all {
+		return client.osclt.ListVolumes(all)
+	}
+	return client.listMonitoredVolumes()
+}
+
+// listMonitoredVolumes lists available volumes created by SafeScale (ie registered in object storage)
+// This code seems to be the same than openstack provider, but it HAS TO BE DUPLICATED
+// because client.ListObjects() is different (Swift for openstack, S3 for flexibleengine).
+func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
+	var vols []api.Volume
+	m := metadata.NewVolume(providers.FromClient(client))
+	err := m.Browse(func(vol *api.Volume) error {
+		vols = append(vols, *vol)
+		return nil
+	})
+	if len(vols) == 0 && err != nil {
+		return nil, fmt.Errorf("Error listing volumes : %s", openstack.ProviderErrorToString(err))
+	}
+	return vols, nil
 }
 
 // CreateContainer creates an object container
