@@ -32,7 +32,7 @@ import (
 
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 )
- 
+
 // CreateVolumeAttachment attaches a volume to an host
 //- 'name' of the volume attachment
 //- 'volume' to attach
@@ -46,6 +46,14 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 	if mtdVol == nil {
 		return nil, providers.ResourceNotFoundError("Volume", request.VolumeID)
 	}
+	_volumeAttachment, err := mtdVol.GetAttachment()
+	if err != nil {
+		return nil, err
+	}
+	if _volumeAttachment != nil {
+		return nil, fmt.Errorf("Volume '%s' already has an attachment on '%s", _volumeAttachment.VolumeID, _volumeAttachment.ServerID)
+	}
+
 	mdtHost, err := metadata.LoadHost(providers.FromClient(client), request.ServerID)
 	if err != nil {
 		return nil, err

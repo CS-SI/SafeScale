@@ -169,14 +169,14 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 func (srv *VolumeService) Detach(volumename string, hostName string) error {
 	vol, err := srv.Get(volumename)
 	if err != nil {
-		return fmt.Errorf("No volume found with name or id '%s'", volumename)
+		return providers.ResourceNotFoundError("Volume", volumename)
 	}
 
 	// Get Host ID
 	hostService := NewHostService(srv.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("no host found with name or id '%s'", hostName)
+		return providers.ResourceNotFoundError("Host", hostName)
 	}
 
 	volatt, err := srv.provider.GetVolumeAttachment(host.ID, vol.ID)
@@ -195,6 +195,7 @@ func (srv *VolumeService) Detach(volumename string, hostName string) error {
 	}
 	err = server.UnmountBlockDevice(volatt.Device)
 	if err != nil {
+		fmt.Printf("%s", err.Error())
 		return err
 	}
 
