@@ -50,7 +50,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 	if err != nil {
 		return nil, err
 	}
-	if _volumeAttachment != nil {
+	if _volumeAttachment != nil && _volumeAttachment.ID != "" {
 		return nil, fmt.Errorf("Volume '%s' already has an attachment on '%s", _volumeAttachment.VolumeID, _volumeAttachment.ServerID)
 	}
 
@@ -99,7 +99,27 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttach
 
 // DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
-	return client.osclt.DeleteVolumeAttachment(serverID, id)
+	va, err := client.GetVolumeAttachment(serverID, id)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, openstack.ProviderErrorToString(err))
+	}
+
+	err = volumeattach.Delete(client.osclt.Compute, serverID, id).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, openstack.ProviderErrorToString(err))
+	}
+
+	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), id)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, openstack.ProviderErrorToString(err))
+	}
+
+	err = mtdVol.Detach(va)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, openstack.ProviderErrorToString(err))
+	}
+
+	return nil
 }
 
 // DeleteVolume deletes the volume identified by id
