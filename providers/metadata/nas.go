@@ -154,7 +154,8 @@ func (m *Nas) Browse(callback func(*api.Nas) error) error {
 
 // AddClient adds a client to the Nas definition in Object Storage
 func (m *Nas) AddClient(nas *api.Nas) error {
-	return m.item.WriteInto(m.id, nas.ID)
+	return NewNas(m.item.GetService()).Carry(nas).item.WriteInto(m.id, nas.ID)
+	// return m.item.WriteInto(m.id, nas.ID)
 }
 
 //RemoveClient removes a client to the Nas definition in Object Storage

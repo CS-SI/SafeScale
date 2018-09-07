@@ -65,11 +65,11 @@ func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 
 	// Check if a nas already exist with the same name
 	nas, err := srv.findNas(name)
-	if nas != nil {
-		return nil, fmt.Errorf("NAS '%s' already exists", name)
-	}
-	if _, ok := err.(providers.ResourceNotFound); !ok {
+	if err != nil {
 		return nil, err
+	}
+	if nas != nil {
+		return nil, providers.ResourceAlreadyExistsError("NAS", name)
 	}
 
 	// Sanitize path
@@ -187,6 +187,10 @@ func (srv *NasService) Mount(name, hostName, path string) (*api.Nas, error) {
 	if err != nil {
 		return nil, err
 	}
+	if nas == nil {
+		return nil, providers.ResourceNotFoundError("NAS", name)
+
+	}
 
 	host, err := srv.hostService.Get(hostName)
 	if err != nil {
@@ -235,6 +239,9 @@ func (srv *NasService) UMount(name, hostName string) (*api.Nas, error) {
 	nas, err := srv.findNas(name)
 	if err != nil {
 		return nil, err
+	}
+	if nas == nil {
+		return nil, providers.ResourceNotFoundError("NAS", name)
 	}
 
 	client, err := srv.findClient(name, hostName)
@@ -299,26 +306,24 @@ func (srv *NasService) removeNASDefinition(nas api.Nas) error {
 	return metadata.RemoveNas(srv.provider, &nas)
 }
 
-func (srv *NasService) readNasDefinition(nasName string) (*api.Nas, error) {
-	return srv.findNas(nasName)
-}
-
 func (srv *NasService) findNas(name string) (*api.Nas, error) {
-	mn := metadata.NewNas(srv.provider)
-	found, err := mn.ReadByName(name)
+	mtdNas, err := metadata.LoadNas(srv.provider, name)
 	if err != nil {
 		return nil, err
 	}
-	if !found {
-		return nil, providers.ResourceNotFoundError("Nas", name)
+	if mtdNas == nil {
+		return nil, nil
 	}
-	return mn.Get(), nil
+	return mtdNas.Get(), nil
 }
 
 func (srv *NasService) findClient(nasName, hostName string) (*api.Nas, error) {
 	mtdnas, err := metadata.LoadNas(srv.provider, nasName)
 	if err != nil {
 		return nil, err
+	}
+	if mtdnas == nil {
+		return nil, providers.ResourceNotFoundError("Nas", nasName)
 	}
 
 	client, err := mtdnas.FindClient(hostName)

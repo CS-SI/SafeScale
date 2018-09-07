@@ -69,7 +69,7 @@ func ResourceAlreadyExistsError(resource string, name string) ResourceAlreadyExi
 }
 
 func (e ResourceAlreadyExists) Error() string {
-	return fmt.Sprintf("%s %s alredy exists", e.ResourceType, e.Name)
+	return fmt.Sprintf("%s '%s' alredy exists", e.ResourceType, e.Name)
 }
 
 // Service Client High level service
