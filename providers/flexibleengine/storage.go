@@ -28,16 +28,55 @@ import (
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	v2_vol "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 )
-
+ 
 // CreateVolumeAttachment attaches a volume to an host
 //- 'name' of the volume attachment
 //- 'volume' to attach
 //- 'host' on which the volume is attached
 func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
-	return client.osclt.CreateVolumeAttachment(request)
+	// Ensure volume and host are known
+	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), request.VolumeID)
+	if err != nil {
+		return nil, err
+	}
+	if mtdVol == nil {
+		return nil, providers.ResourceNotFoundError("Volume", request.VolumeID)
+	}
+	mdtHost, err := metadata.LoadHost(providers.FromClient(client), request.ServerID)
+	if err != nil {
+		return nil, err
+	}
+	if mdtHost == nil {
+		return nil, providers.ResourceNotFoundError("Host", request.ServerID)
+	}
+
+	// return client.osclt.CreateVolumeAttachment(request)
+	va, err := volumeattach.Create(client.osclt.Compute, request.ServerID, volumeattach.CreateOpts{
+		VolumeID: request.VolumeID,
+	}).Extract()
+	if err != nil {
+		fmt.Printf("%s", err.Error())
+		return nil, fmt.Errorf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, openstack.ProviderErrorToString(err))
+	}
+
+	volumeAttachment := &api.VolumeAttachment{
+		ID:       va.ID,
+		ServerID: va.ServerID,
+		VolumeID: va.VolumeID,
+		Device:   va.Device,
+	}
+
+	err = mtdVol.Attach(volumeAttachment)
+	if err != nil {
+		// TODO ? Detach volume ?
+		return volumeAttachment, err
+	}
+
+	return volumeAttachment, nil
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
@@ -104,7 +143,14 @@ func (client *Client) getVolumeType(speed VolumeSpeed.Enum) string {
 			return t
 		}
 	}
-	return ""
+	switch speed {
+	case VolumeSpeed.SSD:
+		return client.getVolumeType(VolumeSpeed.HDD)
+	case VolumeSpeed.HDD:
+		return client.getVolumeType(VolumeSpeed.COLD)
+	default:
+		return ""
+	}
 }
 
 func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {

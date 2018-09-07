@@ -341,7 +341,6 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 		UseLayer3Networking: false,
 		VolumeSpeeds: map[string]VolumeSpeed.Enum{
 			"SATA": VolumeSpeed.COLD,
-			"SAS":  VolumeSpeed.HDD,
 			"SSD":  VolumeSpeed.SSD,
 		},
 	})
