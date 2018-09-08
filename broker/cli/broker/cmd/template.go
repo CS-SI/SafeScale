@@ -26,7 +26,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// HostCmd command
+// TemplateCmd command
 var TemplateCmd = cli.Command{
 	Name:  "template",
 	Usage: "template COMMAND",
