@@ -223,7 +223,7 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 	err = nil
 	ok = retcode == 0
 	if !ok {
-		err = fmt.Errorf("install script for component '%s' failed, retcode=%d", c.DisplayName(), retcode)
+		err = fmt.Errorf("install script for component '%s' failed on cluster '%s', retcode=%d", c.DisplayName(), t.Name(), retcode)
 	}
 	return ok, api.AddResults{
 		Masters: map[string]error{
@@ -318,7 +318,7 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (
 	}
 	ok = retcode == 0
 	if !ok {
-		err = fmt.Errorf("uninstall script for component '%s' failed, retcode=%d", c.DisplayName(), retcode)
+		err = fmt.Errorf("uninstall script for component '%s' failed on cluster '%s', retcode=%d", c.DisplayName(), t.Name(), retcode)
 	}
 	return ok, api.RemoveResults{
 		AddResults: api.AddResults{

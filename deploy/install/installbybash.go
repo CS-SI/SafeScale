@@ -290,7 +290,7 @@ func (i *bashInstaller) addOnHost(
 	// Runs final script on target
 	var cmd string
 	// if debug {
-	if false {
+	if true {
 		cmd = fmt.Sprintf("sudo bash %s", filename)
 	} else {
 		cmd = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
@@ -301,18 +301,18 @@ func (i *bashInstaller) addOnHost(
 	}
 	retcode, _, stderr, err := brokerclient.New().Ssh.Run(host.ID, cmd, 30*time.Second, time.Duration(wallTime)*time.Minute)
 	if err != nil {
-		return false, api.AddResults{}, fmt.Errorf("failed to execute remotely install script: %s", err.Error())
+		return false, api.AddResults{}, fmt.Errorf("failed to execute install script on host '%s': %s", host.Name, err.Error())
 	}
 	ok := retcode == 0
 	err = nil
 	if !ok {
-		err = fmt.Errorf("install script for component '%s' failed, retcode=%d:\n%s", c.DisplayName(), retcode, stderr)
+		err = fmt.Errorf("install script for component '%s' failed on host '%s', retcode=%d:\n%s", c.DisplayName(), host.Name, retcode, stderr)
 	} else {
 		if ok && specs.IsSet("component.proxy.rules") {
 			err = proxyComponent(c, host)
 			ok = err == nil
 			if !ok {
-				err = fmt.Errorf("failed to install component '%s': %s", c.DisplayName(), err.Error())
+				err = fmt.Errorf("failed to install component '%s' on host '%s': %s", c.DisplayName(), host.Name, err.Error())
 			}
 		}
 	}

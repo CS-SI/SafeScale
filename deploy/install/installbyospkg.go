@@ -240,7 +240,7 @@ func (g *genericPackager) addOnHost(c api.Component, host *pb.Host, v map[string
 	ok := retcode == 0
 	err = nil
 	if !ok {
-		err = fmt.Errorf("install script for component '%s' failed, retcode=%d:\n%s", c.DisplayName(), retcode, stderr)
+		err = fmt.Errorf("install script for component '%s' failed on host '%s', retcode=%d:\n%s", c.DisplayName(), host.Name, retcode, stderr)
 	} else {
 		if ok && specs.IsSet("component.proxy.rules") {
 			err = proxyComponent(c, host)
