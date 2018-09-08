@@ -178,7 +178,7 @@ func (m *Nas) Listclients() ([]*api.Nas, error) {
 	return list, err
 }
 
-//FindClient returns the client hosted by the Host whose name is given
+// FindClient returns the client hosted by the Host whose name is given
 func (m *Nas) FindClient(hostName string) (*api.Nas, error) {
 	var client *api.Nas
 	err := m.item.BrowseInto(m.id, func(buf *bytes.Buffer) error {

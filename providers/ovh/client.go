@@ -90,11 +90,12 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
 		IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
 		//UserID:           opts.OpenstackID,
-		Username:   opts.OpenstackID,
-		Password:   opts.OpenstackPassword,
-		TenantID:   opts.ApplicationKey,
-		TenantName: opts.ProjectName,
-		Region:     opts.Region,
+		Username:    opts.OpenstackID,
+		Password:    opts.OpenstackPassword,
+		TenantID:    opts.ApplicationKey,
+		TenantName:  opts.ProjectName,
+		Region:      opts.Region,
+		AllowReauth: true,
 	},
 		openstack.CfgOptions{
 			ProviderNetwork:           ProviderNetwork,

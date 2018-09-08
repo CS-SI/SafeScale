@@ -38,7 +38,10 @@ type Session struct {
 type Client *Session
 
 // DefaultTimeout tells to use the timeout by default depending on context
-const DefaultTimeout = 0
+const (
+	DefaultConnectionTimeout = 0
+	DefaultExecutionTimeout  = 0
+)
 
 // New returns an instance of broker Client
 func New() Client {

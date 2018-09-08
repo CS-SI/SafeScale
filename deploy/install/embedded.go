@@ -238,7 +238,7 @@ func init() {
 		mpichBuildComponent(),
 		remoteDesktopComponent(),
 		reverseProxyComponent(),
-		//		kubernetesComponent(),
+		kubernetesComponent(),
 		//		elasticSearchComponent(),
 		//		helmComponent(),
 	}

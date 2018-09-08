@@ -18,7 +18,9 @@ package services
 
 import (
 	"fmt"
+	"log"
 	"strings"
+	"time"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -55,9 +57,10 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	if _host != nil || (err != nil && !strings.Contains(err.Error(), "failed to find host")) {
 		return nil, fmt.Errorf("host '%s' already exists", name)
 	}
-
+	log.Println("creating compute resource...")
 	n, err := svc.network.Get(net)
 	if err != nil {
+		fmt.Println("failed to get network resource data.")
 		return nil, err
 	}
 	tpls, err := svc.provider.SelectTemplatesBySize(api.SizingRequirements{
@@ -67,6 +70,7 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	})
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
+		log.Println("failed to find image to use on compute resource.")
 		return nil, err
 	}
 	hostRequest := api.HostRequest{
@@ -79,9 +83,10 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	}
 	host, err := svc.provider.CreateHost(hostRequest)
 	if err != nil {
+		log.Println("compute resource creation failed.")
 		return nil, err
 	}
-
+	log.Println("compute resource created.")
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
@@ -90,7 +95,7 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		svc.provider.DeleteHost(host.ID)
 		return nil, err
 	}
-	err = ssh.WaitServerReady(5)
+	err = ssh.WaitServerReady(5 * time.Minute)
 	if err != nil {
 		svc.provider.DeleteHost(host.ID)
 		return nil, err

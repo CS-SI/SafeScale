@@ -15,7 +15,7 @@ type dcosPackageInstaller struct {
 
 // Add ...
 func (i *dcosPackageInstaller) Add(t installapi.Target) error {
-	c, ok := t.(clusterapi.ClusterAPI)
+	c, ok := t.(clusterapi.Cluster)
 	if !ok {
 		panic("cluster.install.dcosPackageInstaller.Add() applied on non-cluster target!")
 	}
@@ -28,7 +28,7 @@ func (i *dcosPackageInstaller) Add(t installapi.Target) error {
 
 // Remove ...
 func (i *dcosPackageInstaller) Remove(t installapi.Target) error {
-	c, ok := t.(clusterapi.ClusterAPI)
+	c, ok := t.(clusterapi.Cluster)
 	if !ok {
 		panic("cluster.install.dcosPackageInstaller.Remove() applied on non-cluster target!")
 	}
@@ -54,7 +54,7 @@ type helmInstaller struct {
 }
 
 func (i *helmInstaller) Add(t installapi.Target) error {
-	c, ok := t.(clusterapi.ClusterAPI)
+	c, ok := t.(clusterapi.Cluster)
 	if !ok {
 		panic("cluster.install.helmInstaller.Add() applied on non-cluster target!")
 	}
@@ -62,7 +62,7 @@ func (i *helmInstaller) Add(t installapi.Target) error {
 }
 
 func (i *helmInstaller) Remove(t installapi.Target) error {
-	c, ok := t.(clusterapi.ClusterAPI)
+	c, ok := t.(clusterapi.Cluster)
 	if !ok {
 		panic("cluster.install.helmInstaller.Remove() applied on non-cluster target!")
 	}
@@ -86,7 +86,7 @@ type scriptInstaller struct {
 
 // Add ...
 func (i *scriptInstaller) Add(t installapi.Target) error {
-	c, ok := t.(clusterapi.ClusterAPI)
+	c, ok := t.(clusterapi.Cluster)
 	if !ok {
 		panic("cluster.install.scriptInstaller.Add() applied on non-cluster target!")
 	}
@@ -96,7 +96,7 @@ func (i *scriptInstaller) Add(t installapi.Target) error {
 
 // Remove ...
 func (i *scriptInstaller) Remove(t installapi.Target) error {
-	c, ok := t.(clusterapi.ClusterAPI)
+	c, ok := t.(clusterapi.Cluster)
 	if !ok {
 		panic("cluster.install.scriptInstaller.Remove() applied on non-cluster target!")
 	}
@@ -126,7 +126,7 @@ func (i *dcosInstaller) GetName() {
 func (i *dcosInstaller) Add(t api.Target) error {
 	if i.AddCommand != "" {
 		cmdStr := "sudo -u cladm -i " + i.AddCommand
-		return brokerclient.New().Ssh.Run(h.ID, cmdStr, brokerclient.DefaultTimeout)
+		return brokerclient.New().Ssh.Run(h.ID, cmdStr, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	}
 	return fmt.Errorf("no command to add component found")
 }
@@ -135,7 +135,7 @@ func (i *dcosInstaller) Add(t api.Target) error {
 func (i *dcosInstaller) Remove(t api.Target) error {
 	if i.RemoveCommand != "" {
 		cmdStr := "sudo -u cladm -i " + i.AddCommand
-		return brokerclient.New().Ssh.Run(h.ID, cmdStr, brokerclient.DefaultTimeout)
+		return brokerclient.New().Ssh.Run(h.ID, cmdStr, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	}
 	return fmt.Errorf("no command to remove component found")
 }

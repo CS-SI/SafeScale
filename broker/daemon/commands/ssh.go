@@ -25,8 +25,6 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	services "github.com/CS-SI/SafeScale/broker/daemon/services"
-
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // broker ssh connect host2
@@ -45,25 +43,25 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 	}
 
 	service := services.NewSSHService(currentTenant.Client)
-	retCode, msgStd, msgErr, err := service.Run(in.GetHost().GetName(), in.GetCommand())
+	retcode, stdout, stderr, err := service.Run(in.GetHost().GetName(), in.GetCommand())
 
 	//log.Println("End ssh run")
 	return &pb.SshResponse{
-		Status:    int32(retCode),
-		OutputStd: msgStd,
-		OutputErr: msgErr,
+		Status:    int32(retcode),
+		OutputStd: stdout,
+		OutputErr: stderr,
 	}, err
 }
 
 // Copy copy file from/to an host
-func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*google_protobuf.Empty, error) {
+func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshResponse, error) {
 	//log.Printf("Ssh copy called")
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("No tenant set")
 	}
 
 	service := services.NewSSHService(currentTenant.Client)
-	retcode, _, stderr, err := service.Copy(in.GetSource(), in.GetDestination())
+	retcode, stdout, stderr, err := service.Copy(in.GetSource(), in.GetDestination())
 	if err != nil {
 		return nil, err
 	}
@@ -74,5 +72,9 @@ func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*go
 		return nil, err
 	}
 	//log.Println("End ssh copy")
-	return &google_protobuf.Empty{}, nil
+	return &pb.SshResponse{
+		Status:    int32(retcode),
+		OutputStd: stdout,
+		OutputErr: stderr,
+	}, err
 }

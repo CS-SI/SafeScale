@@ -26,25 +26,25 @@ type Enum int
 
 const (
 
-	//Dev is the simplest mode of cluster
-	Dev Enum = 1
-	//Normal allows the cluster to be resistant to 1 master failure
+	// Minimal is the simplest mode of cluster
+	Minimal Enum = 1
+	// Normal allows the cluster to be resistant to 1 master failure
 	Normal Enum = 3
-	//Volume allows the cluster to be resistant to 2 master failures and is sized for high volume of agents
+	// Volume allows the cluster to be resistant to 2 master failures and is sized for high volume of agents
 	Volume Enum = 5
 )
 
 var (
 	stringMap = map[string]Enum{
-		"dev":    Dev,
-		"normal": Normal,
-		"volume": Volume,
+		"minimal": Minimal,
+		"normal":  Normal,
+		"volume":  Volume,
 	}
 
 	enumMap = map[Enum]string{
-		Dev:    "Dev",
-		Normal: "Normal",
-		Volume: "Volume",
+		Minimal: "Minimal",
+		Normal:  "Normal",
+		Volume:  "Volume",
 	}
 )
 

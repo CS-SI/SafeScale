@@ -26,12 +26,14 @@ import (
 // Target is an interface that target must satisfy to be able to install something
 // on it
 type Target interface {
-	// GetMethods returns a list of installation methods useable on the target
-	GetMethods() []Method.Enum
-	// GetSSHConfig returns a system.SSHConfig to access target
-	//GetSSHConfig() (system.SSHConfig, error)
-	// List returns a list of installed component
-	List() []string
+	// Name returns the name of the target
+	Name() string
+	// Type returns the name of the target
+	Type() string
+	// Methods returns a list of installation methods useable on the target
+	Methods() []Method.Enum
+	// Installed returns a list of installed components
+	Installed() []string
 }
 
 // CheckState ...
@@ -50,6 +52,7 @@ type CheckResults struct {
 	PublicNodes  map[string]CheckState
 }
 
+// Errors joins all errors in CheckResults then returns the corresponding string
 func (r CheckResults) Errors() string {
 	errors := []string{}
 	for _, i := range r.Masters {

@@ -167,7 +167,7 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 		Path: strings.Trim(f.absolutePath(path), "/"),
 	})
 	if err != nil {
-		//TODO: AWS adhered code, to be changed !!!
+		//TODO: AWS adherance, to be changed !!!
 		// If bucket not found, return nil; no item will be processed, meaning empty path
 		if awsError, ok := err.(awserr.RequestFailure); ok {
 			if awsError.StatusCode() == 404 {

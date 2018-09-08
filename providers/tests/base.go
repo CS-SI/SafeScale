@@ -239,8 +239,8 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	ssh, err := tester.Service.GetSSHConfig(host.ID)
 	assert.Nil(t, err)
 
-	//Waits sshd deamon is up
-	ssh.WaitServerReady(time.Minute)
+	// Waits sshd deamon is up
+	ssh.WaitServerReady(1 * time.Minute)
 	cmd, err := ssh.Command("whoami")
 	assert.Nil(t, err)
 	out, err := cmd.Output()
@@ -298,7 +298,7 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 	// time.Sleep(30 * time.Second)
 
 	ssh, err := tester.Service.GetSSHConfig(host.ID)
-	err = ssh.WaitServerReady(time.Minute)
+	err = ssh.WaitServerReady(1 * time.Minute)
 	assert.NoError(t, err)
 	cmd, err := ssh.Command("whoami")
 	assert.Nil(t, err)

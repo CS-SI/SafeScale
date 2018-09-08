@@ -270,7 +270,7 @@ func (srv *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 			}
 		case <-time.After(timeout):
 			next <- false
-			return nil, &api.TimeoutError{Message: "Wait host state timeout"}
+			return nil, &api.ErrTimeout{Message: "Wait host state timeout"}
 		}
 	}
 }

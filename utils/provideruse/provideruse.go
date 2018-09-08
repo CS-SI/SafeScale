@@ -18,6 +18,7 @@ package provideruse
 
 import (
 	"fmt"
+	"time"
 
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
@@ -26,7 +27,7 @@ import (
 
 // GetProviderService returns the service provider corresponding to the current Tenant
 func GetProviderService() (*providers.Service, error) {
-	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultTimeout)
+	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -38,8 +39,7 @@ func GetProviderService() (*providers.Service, error) {
 }
 
 // WaitSSHServerReady waits for SSH server to be ready. After timeout, fails
-// The 'timeout' parameter is in minutes
-func WaitSSHServerReady(svc *providers.Service, hostID string, timeout uint8) error {
+func WaitSSHServerReady(svc *providers.Service, hostID string, timeout time.Duration) error {
 	var err error
 	if svc == nil {
 		svc, err = GetProviderService()

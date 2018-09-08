@@ -26,19 +26,6 @@ exec 2>&1
 
 {{ .reserved_BashLibrary }}
 
-# # Get rclone package
-# download_rclone_package() {
-#     while true; do
-#         wget -q -c -O /var/tmp/rclone.rpm http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/rclone.rpm
-#         [ $? -eq 0 ] && break
-#         echo "Trying again to download rclone package from Bootstrap server..."
-#     done
-#     exit 0
-# }
-# export -f download_rclone_package
-
-# bg_start DRP 10m bash -c download_rclone_package
-
 if [ "{{ .PublicNode }}" = "yes" ]; then
     MODE=slave_public
 else
@@ -52,10 +39,6 @@ curl -sS -q -L -O http://{{.BootstrapIP}}:{{.BootstrapPort}}/dcos_install.sh || 
 # Launch installation
 bash dcos_install.sh $MODE || exit {{ errcode "DcosInstallExecution" }}
 rm -rf /tmp/dcos
-
-# bg_wait DRP {{ errcode "RcloneDownload" }}
-# rpm -U /var/tmp/rclone.rpm || exit {{ errcode "RcloneInstall" }}
-# rm -f /var/tmp/rclone.rpm
 
 echo
 echo "Node configured successfully."

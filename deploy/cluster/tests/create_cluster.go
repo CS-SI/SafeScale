@@ -29,7 +29,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 )
 
-//Run runs the deployment
+// Run runs the deployment
 func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -43,7 +43,7 @@ func Run() {
 		log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
 		instance, err = cluster.Create(clusterapi.Request{
 			Name:       clusterName,
-			Complexity: Complexity.Dev,
+			Complexity: Complexity.Minimal,
 			//Complexity: Complexity.Normal,
 			//Complexity: Complexity.Volume,
 			CIDR:   "192.168.0.0/28",

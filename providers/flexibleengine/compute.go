@@ -399,7 +399,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		return nil, fmt.Errorf("query to create host '%s' failed: %s (HTTP return code: %d)", request.Name, openstack.ProviderErrorToString(err), httpResp.StatusCode)
 	}
 
-	// Wait that host is ready, not just started
+	// Wait that host is ready, not just that the build is started
 	host, err := client.osclt.WaitHostReady(server.ID, time.Minute*5)
 	if err != nil {
 		client.DeleteHost(server.ID)
@@ -459,12 +459,7 @@ func validatehostName(req api.HostRequest) (bool, error) {
 
 // GetHost returns the host identified by id
 func (client *Client) GetHost(id string) (*api.Host, error) {
-	server, err := servers.Get(client.osclt.Compute, id).Extract()
-	if err != nil {
-		return nil, fmt.Errorf("Error getting Host '%s': %s", id, openstack.ProviderErrorToString(err))
-	}
-	host := client.toHost(server)
-	return host, nil
+	return client.osclt.GetHost(id)
 }
 
 // ListHosts lists available hosts

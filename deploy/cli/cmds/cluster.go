@@ -295,7 +295,10 @@ Usage: {{.ProgName}} [options] cluster <clustername> create {cluster options} {h
 cluster options:
   [-N,--cidr <cidr>]              To specify the CIDR of the associated network created with cluster (default: 192.168.0.0/16)
   [-F,--flavor <flavor>]          To specify the management of cluster; can be DCOS or BOH (Bunch Of Hosts) (default: BOH)
-  [-C,--complexity <complexity>]  To fix the cluster complexity; can be Dev, Normal, Volume (default: Normal)
+  [-C,--complexity <complexity>]  To fix the cluster complexity; can be Minimal, Normal, Volume (default: Normal)
+									Minimal implies: 1 master, 1 node
+									Normal  implies: 3 masters, 3 nodes
+									Volume  implies: 5 masters, 3 nodes
   [-k,--keep-on-failure]          Keep resources on failure`,
 			`
 host options:
@@ -804,8 +807,9 @@ func executeCommand(command string) (int, string, string, error) {
 		fmt.Printf("No masters found for the cluster '%s'", clusterInstance.GetName())
 		os.Exit(int(ExitCode.Run))
 	}
+	brokerssh := brokerclient.New().Ssh
 	for i, m := range masters {
-		retcode, stdout, stderr, err := brokerclient.New().Ssh.Run(m, command, 5*time.Minute)
+		retcode, stdout, stderr, err := brokerssh.Run(m, command, brokerclient.DefaultConnectionTimeout, 5*time.Minute)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {

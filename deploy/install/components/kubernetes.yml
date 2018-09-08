@@ -54,10 +54,19 @@ component:
                 {{.dcos}} kubernetes plan show deploy --json | jq .status | grep COMPLETE
 
             add: |
-                {{.dcos}} package install --yes kubernetes {{.options}} --cli
+                output=$({{.dcos}} package install --yes kubernetes {{.options}} 2>&1)
+                rc=$?
+                [ $rc -ne 0 ] && {
+                    echo $output
+                    echo $output | grep "already installed" &>/dev/null || exit $rc
+                }
+                while [ 0 ]; do
+                    {{.dcos}} kubernetes plan show deploy | grep "scheduler (" | grep COMPLETE &>/dev/null && break
+                done
                 {{.dcos}} kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
-                {{.dcos}} kubectl config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443`
+                {{.kubectl}} config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
 
             remove: |
                 {{.dcos}} package remove --yes kubernetes
+
 ...

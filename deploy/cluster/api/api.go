@@ -123,6 +123,8 @@ type ClusterCore struct {
 	Tenant string
 	// NetworkID is the ID of the network to use
 	NetworkID string
+	// GatewayIP is the IP of the gateway of the network
+	GatewayIP string
 	// PublicNodedIDs is a slice of host IDs of the public cluster nodes
 	PublicNodeIDs []string
 	// PrivateNodedIDs is a slice of host IDs of the private cluster nodes
@@ -146,6 +148,11 @@ func (c *ClusterCore) GetName() string {
 // GetNetworkID returns the ID of the Network used by the cluster
 func (c *ClusterCore) GetNetworkID() string {
 	return c.NetworkID
+}
+
+// GetGatewayIP returns the IP of the gateway of the network used by the cluster
+func (c *ClusterCore) GetGatewayIP() string {
+	return c.GatewayIP
 }
 
 // GetAdditionalInfo returns the additional info requested

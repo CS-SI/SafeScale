@@ -234,38 +234,17 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			ImageID: nodesDef.ImageID,
 		},
 	}
-	network, err := brokerclient.New().Network.Create(def, brokerclient.DefaultTimeout)
+	network, err := brokerclient.New().Network.Create(def, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
 		return nil, err
 	}
 	req.NetworkID = network.ID
 
+	broker := brokerclient.New()
+
 	svc, err := provideruse.GetProviderService()
 	if err != nil {
-		goto cleanNetwork
-	}
-
-	// Saving cluster parameters, with status 'Creating'
-	instance = Cluster{
-		Core: &clusterapi.ClusterCore{
-			Name:          req.Name,
-			CIDR:          req.CIDR,
-			Flavor:        Flavor.BOH,
-			State:         ClusterState.Creating,
-			Complexity:    req.Complexity,
-			Tenant:        req.Tenant,
-			NetworkID:     req.NetworkID,
-			AdminPassword: cladmPassword,
-			NodesDef:      &nodesDef,
-		},
-		manager:  &managerData{},
-		provider: svc,
-	}
-	instance.SetAdditionalInfo(AdditionalInfo.Flavor, instance.manager)
-	err = instance.updateMetadata(nil)
-	if err != nil {
-		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
 		goto cleanNetwork
 	}
 
@@ -284,8 +263,33 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	gw = m.Get()
 	instance.Core.PublicIP = gw.GetAccessIP()
 
+	// Saving cluster parameters, with status 'Creating'
+	instance = Cluster{
+		Core: &clusterapi.ClusterCore{
+			Name:          req.Name,
+			CIDR:          req.CIDR,
+			Flavor:        Flavor.BOH,
+			State:         ClusterState.Creating,
+			Complexity:    req.Complexity,
+			Tenant:        req.Tenant,
+			NetworkID:     req.NetworkID,
+			GatewayIP:     gw.GetPrivateIP(),
+			PublicIP:      gw.GetAccessIP(),
+			AdminPassword: cladmPassword,
+			NodesDef:      &nodesDef,
+		},
+		manager:  &managerData{},
+		provider: svc,
+	}
+	instance.SetAdditionalInfo(AdditionalInfo.Flavor, instance.manager)
+	err = instance.updateMetadata(nil)
+	if err != nil {
+		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
+		goto cleanNetwork
+	}
+
 	switch req.Complexity {
-	case Complexity.Dev:
+	case Complexity.Minimal:
 		privateNodeCount = 1
 	case Complexity.Normal:
 		privateNodeCount = 3
@@ -340,7 +344,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	}
 
 	// Get the state of the cluster until successful
-	err = retry.Action(
+	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			status, err := instance.ForceGetState()
 			if err != nil {
@@ -351,27 +355,29 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			}
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(5*time.Minute)),
-		retry.Constant(5*time.Second),
-		nil, nil, nil,
+		5*time.Minute,
 	)
 	if err != nil {
+		log.Println("failed to wait ready state of the cluster")
 		goto cleanNodes
 	}
 	return &instance, nil
 
 cleanNodes:
 	if !req.KeepOnFailure {
+		for _, id := range instance.Core.PublicNodeIDs {
+			broker.Host.Delete(id, brokerclient.DefaultExecutionTimeout)
+		}
 		for _, id := range instance.Core.PrivateNodeIDs {
-			brokerclient.New().Host.Delete(id, brokerclient.DefaultTimeout)
+			broker.Host.Delete(id, brokerclient.DefaultExecutionTimeout)
 		}
 		for _, id := range instance.manager.MasterIDs {
-			brokerclient.New().Host.Delete(id, brokerclient.DefaultTimeout)
+			broker.Host.Delete(id, brokerclient.DefaultExecutionTimeout)
 		}
 	}
 cleanNetwork:
 	if !req.KeepOnFailure {
-		brokerclient.New().Network.Delete(instance.Core.NetworkID, brokerclient.DefaultTimeout)
+		broker.Network.Delete(instance.Core.NetworkID, brokerclient.DefaultExecutionTimeout)
 		instance.metadata.Delete()
 	}
 	return nil, err
@@ -401,7 +407,7 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 	if err != nil {
 		c.manager.MasterIDs = c.manager.MasterIDs[:len(c.manager.MasterIDs)-1]
 		c.manager.MasterIPs = c.manager.MasterIPs[:len(c.manager.MasterIPs)-1]
-		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultTimeout)
+		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultExecutionTimeout)
 		log.Printf("[Master #1] creation failed: %s", err.Error())
 		return err
 	}
@@ -425,13 +431,39 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 		return err
 	}
 	if retcode != 0 {
+		if retcode == 255 {
+			log.Printf("[master #%d (%s)] remote connection failed", 1, host.Name)
+			return fmt.Errorf("remote connection failed on master '%s'", host.Name)
+		}
 		if retcode < int(ErrorCode.NextErrorCode) {
 			errcode := ErrorCode.Enum(retcode)
 			log.Printf("[master #%d (%s)] installation failed:\nretcode=%d (%s)", 1, host.Name, errcode, errcode.String())
-			return fmt.Errorf("scripted Master installation failed with error code %d (%s)", errcode, errcode.String())
+			return fmt.Errorf("scripted installation failed on master '%s' (retcode=%d=%s)", host.Name, errcode, errcode.String())
 		}
-		log.Printf("[master #%d (%s)] installation failed:\nretcode=%d", 1, host.Name, retcode)
-		return fmt.Errorf("scripted Master installation failed with error code %d", retcode)
+		log.Printf("[master #%d (%s)] installation failed (retcode=%d)", 1, host.Name, retcode)
+		return fmt.Errorf("scripted installation failed on master '%s' (retcode=%d)", host.Name, retcode)
+	}
+
+	// install docker component
+	component, err := install.NewComponent("docker")
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", 1, host.ID, err.Error())
+		return fmt.Errorf("failed to install component 'docker': %s", err.Error())
+	}
+	target := install.NewHostTarget(host)
+	ok, results, err := component.Add(target, installapi.Variables{
+		"Hostname": host.Name,
+		"Username": "cladm",
+		"Password": c.Core.AdminPassword,
+	})
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
+		return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
+		return fmt.Errorf(msg)
 	}
 
 	log.Printf("[master #%d (%s)] creation successful", 1, host.Name)
@@ -537,7 +569,7 @@ func (c *Cluster) asyncCreateNode(
 			c.Core.PrivateNodeIDs = c.Core.PrivateNodeIDs[:len(c.Core.PrivateNodeIDs)-1]
 			c.manager.PrivateNodeIPs = c.manager.PrivateNodeIPs[:len(c.manager.PrivateNodeIPs)-1]
 		}
-		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultTimeout)
+		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultExecutionTimeout)
 		log.Printf("[%s node #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
 		done <- fmt.Errorf("failed to update Cluster configuration: %s", err.Error())
@@ -669,7 +701,7 @@ func (c *Cluster) buildHostname(core string, nodeType NodeType.Enum) (string, er
 
 // asyncInstallReverseProxy installs the component reverseproxy on network gateway
 func (c *Cluster) asyncInstallReverseProxy(host *providerapi.Host, done chan error) {
-	err := provideruse.WaitSSHServerReady(c.provider, host.ID, 5)
+	err := provideruse.WaitSSHServerReady(c.provider, host.ID, 5*time.Minute)
 	if err != nil {
 		done <- err
 		return
@@ -731,17 +763,18 @@ func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
 		return
 	}
 	broker := brokerclient.New().Host
-	host, err := broker.Inspect(id, brokerclient.DefaultTimeout)
+	host, err := broker.Inspect(id, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		done <- fmt.Errorf("[master #%d] %s", index, err.Error())
 		return
 	}
 	target := install.NewHostTarget(host)
 	ok, results, err := component.Add(target, installapi.Variables{
-		"Hostname": host.Name,
-		"HostIP":   host.PRIVATE_IP,
-		"Username": "cladm",
-		"Password": c.Core.AdminPassword,
+		"GatewayIP": c.Core.GatewayIP,
+		"Hostname":  host.Name,
+		"HostIP":    host.PRIVATE_IP,
+		"Username":  "cladm",
+		"Password":  c.Core.AdminPassword,
 	})
 	if err != nil {
 		done <- fmt.Errorf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), err.Error())
@@ -863,7 +896,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 	if len(errors) > 0 {
 		if len(hosts) > 0 {
 			for _, hostID := range hosts {
-				brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
+				brokerclient.New().Host.Delete(hostID, brokerclient.DefaultExecutionTimeout)
 			}
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
@@ -881,7 +914,7 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 	} else {
 		hostID = c.Core.PrivateNodeIDs[len(c.Core.PrivateNodeIDs)-1]
 	}
-	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
+	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil
 	}
@@ -907,7 +940,7 @@ func (c *Cluster) DeleteSpecificNode(hostID string) error {
 		return fmt.Errorf("host '%s' isn't a registered Node of the Cluster '%s'", hostID, c.Core.Name)
 	}
 
-	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
+	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -959,7 +992,7 @@ func (c *Cluster) GetNode(hostID string) (*pb.Host, error) {
 	if !found {
 		return nil, fmt.Errorf("failed to find node '%s' in cluster '%s'", hostID, c.Core.Name)
 	}
-	return brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultTimeout)
+	return brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 }
 
 func contains(list []string, hostID string) (bool, int) {
@@ -998,9 +1031,9 @@ func (c *Cluster) FindAvailableMaster() (string, error) {
 func (c *Cluster) FindAvailableNode(public bool) (string, error) {
 	var hostID string
 	for _, hostID = range c.ListNodeIDs(public) {
-		err := provideruse.WaitSSHServerReady(c.provider, hostID, 5)
+		err := provideruse.WaitSSHServerReady(c.provider, hostID, 5*time.Minute)
 		if err != nil {
-			if _, ok := err.(retry.TimeoutError); ok {
+			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 			return "", err
@@ -1059,21 +1092,21 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the public nodes
 	for _, n := range c.Core.PublicNodeIDs {
-		broker.Host.Delete(n, brokerclient.DefaultTimeout)
+		broker.Host.Delete(n, brokerclient.DefaultExecutionTimeout)
 	}
 
 	// Deletes the private nodes
 	for _, n := range c.Core.PrivateNodeIDs {
-		broker.Host.Delete(n, brokerclient.DefaultTimeout)
+		broker.Host.Delete(n, brokerclient.DefaultExecutionTimeout)
 	}
 
 	// Delete the Masters
 	for _, n := range c.manager.MasterIDs {
-		broker.Host.Delete(n, brokerclient.DefaultTimeout)
+		broker.Host.Delete(n, brokerclient.DefaultExecutionTimeout)
 	}
 
 	// Deletes the network and gateway
-	err = broker.Network.Delete(c.Core.NetworkID, brokerclient.DefaultTimeout)
+	err = broker.Network.Delete(c.Core.NetworkID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}

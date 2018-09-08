@@ -27,6 +27,10 @@ import (
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
+const (
+	minConnectTimeout = 10 * time.Second
+)
+
 // ssh is the part of the broker client that handles SSH stuff
 type ssh struct {
 	// session is not used currently
@@ -52,9 +56,15 @@ type ssh struct {
 // }
 
 // Run ...
-func (s *ssh) Run(hostName, command string, timeout time.Duration) (int, string, string, error) {
-	if timeout < utils.TimeoutCtxHost {
-		timeout = utils.TimeoutCtxHost
+func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+	if executionTimeout < utils.TimeoutCtxHost {
+		executionTimeout = utils.TimeoutCtxHost
+	}
+	if connectionTimeout < minConnectTimeout {
+		connectionTimeout = minConnectTimeout
+	}
+	if connectionTimeout > executionTimeout {
+		connectionTimeout = executionTimeout
 	}
 
 	host := &host{session: s.session}
@@ -64,18 +74,31 @@ func (s *ssh) Run(hostName, command string, timeout time.Duration) (int, string,
 	}
 	ssh := conv.ToAPISshConfig(cfg)
 
-	var stdOut, stdErr string
-	var retCode int
+	var (
+		retcode        int
+		stdout, stderr string
+		err            error
+	)
 
 	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			// Create the command
-			sshCmd, err := ssh.Command(command)
 			if err != nil {
+			sshCmd, err := ssh.Command(command)
 				return err
 			}
 			retCode, stdOut, stdErr, err = sshCmd.Run()
-			return err
+			// If an error occured, stop the loop and propagates this error
+			if err != nil {
+				retcode = -1
+				return nil
+			}
+			// If retcode == 255, ssh connection failed, retry
+			retcode = int(resp.GetStatus())
+			if retcode == 255 {
+				err = fmt.Errorf("failed to connect")
+				return err
+			}
 		},
 		2*time.Minute,
 		retry.NotifyByLog)
@@ -120,9 +143,18 @@ func extractPath(in string) (string, error) {
 }
 
 // Copy ...
-func (s *ssh) Copy(from, to string, timeout time.Duration) error {
-	host := &host{session: s.session}
+func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+	if executionTimeout < utils.TimeoutCtxHost {
+		executionTimeout = utils.TimeoutCtxHost
+	}
+	if connectionTimeout < minConnectTimeout {
+		connectionTimeout = minConnectTimeout
+	}
+	if connectionTimeout > executionTimeout {
+		connectionTimeout = executionTimeout
+	}
 
+	host := &host{session: s.session}
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -171,11 +203,30 @@ func (s *ssh) Copy(from, to string, timeout time.Duration) error {
 	}
 	ssh := conv.ToAPISshConfig(cfg)
 
-	if err != nil {
-		return err
-	}
+	var (
+		retcode        int
+		stdout, stderr string
+		err            error
+	)
+	retry.WhileUnsuccessful(
+		func() error {
 	_, _, _, err = ssh.Copy(remotePath, localPath, upload)
-	return err
+			// If an error occured, stop the loop and propagates this error
+			if err != nil {
+				retcode = -1
+				return nil
+			}
+			// If retcode == 255, ssh connection failed, retry
+			if retcode == 255 {
+				err = fmt.Errorf("failed to connect")
+				return err
+			}
+			return nil
+		},
+		1*time.Second,
+		connectionTimeout,
+	)
+	return retcode, stdout, stderr, err
 }
 
 // Connect ...

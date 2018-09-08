@@ -67,7 +67,7 @@ func ExecuteScript(
 	} else {
 		cmd = fmt.Sprintf("sudo bash %s; rc=$?; rm %s; exit $rc", path, path)
 	}
-	return brokerclient.New().Ssh.Run(hostID, cmd, time.Duration(20)*time.Minute)
+	return brokerclient.New().Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(20)*time.Minute)
 }
 
 // UploadTemplateToFile uploads a template named 'tmplName' coming from rice 'box' in a file to a remote host
@@ -80,7 +80,7 @@ func UploadTemplateToFile(
 		panic("box is nil!")
 	}
 	broker := brokerclient.New()
-	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultTimeout)
+	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 	if err != err {
 		return "", fmt.Errorf("failed to get host information: %s", err)
 	}
@@ -101,7 +101,7 @@ func UploadTemplateToFile(
 	cmd := dataBuffer.String()
 	remotePath := tempFolder + fileName
 
-	err = install.UploadStringToRemoteFile(cmd, host, remotePath)
+	err = install.UploadStringToRemoteFile(cmd, host, remotePath, "", "", "")
 	if err != nil {
 		return "", err
 	}

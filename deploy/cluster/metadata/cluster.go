@@ -29,7 +29,7 @@ import (
 
 const (
 	//Path is the path to use to reach Cluster Definitions/Metadata
-	clusterFolderName = "cluster"
+	clusterFolderName = "clusters"
 )
 
 // Cluster is the cluster definition stored in ObjectStorage

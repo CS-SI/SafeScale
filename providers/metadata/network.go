@@ -30,7 +30,7 @@ import (
 
 const (
 	//NetworkFolderName is the technical name of the container used to store networks info
-	networkFolderName = "network"
+	networksFolderName = "networks"
 	//GatewayObjectName is the name of the object containing the id of the host acting as a default gateway for a network
 	gatewayObjectName = "gw"
 )
@@ -46,7 +46,7 @@ type Network struct {
 // NewNetwork creates an instance of network.Metadata
 func NewNetwork(svc *providers.Service) *Network {
 	return &Network{
-		item: metadata.NewItem(svc, networkFolderName),
+		item: metadata.NewItem(svc, networksFolderName),
 	}
 }
 
@@ -241,7 +241,7 @@ func (m *Network) AttachHost(host *api.Host) error {
 	if m.inside == nil {
 		panic("m.inside is nil!")
 	}
-	return m.inside.Write("host", host.ID, host)
+	return m.inside.Write(hostsFolderName, host.ID, host)
 }
 
 // DetachHost unlinks host ID to network
@@ -249,7 +249,7 @@ func (m *Network) DetachHost(hostID string) error {
 	if m.inside == nil {
 		panic("m.inside is nil!")
 	}
-	return m.inside.Delete("host", hostID)
+	return m.inside.Delete(hostsFolderName, hostID)
 }
 
 // ListHosts returns the list of ID of hosts attached to the network (be careful: including gateway)
@@ -258,7 +258,7 @@ func (m *Network) ListHosts() ([]*api.Host, error) {
 		panic("m.inside is nil!")
 	}
 	var list []*api.Host
-	err := m.inside.Browse("host", func(buf *bytes.Buffer) error {
+	err := m.inside.Browse(hostsFolderName, func(buf *bytes.Buffer) error {
 		var host api.Host
 		err := gob.NewDecoder(buf).Decode(&host)
 		if err != nil {

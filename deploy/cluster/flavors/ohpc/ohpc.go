@@ -226,7 +226,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			ImageID: nodesDef.ImageID,
 		},
 	}
-	network, err := brokerclient.New().Network.Create(def, brokerclient.DefaultTimeout)
+	network, err := brokerclient.New().Network.Create(def, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
 		return nil, err
@@ -256,15 +256,16 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	manager = &managerData{}
 	instance = Cluster{
 		Common: &clusterapi.Cluster{
-			Name:       req.Name,
-			CIDR:       req.CIDR,
-			Flavor:     Flavor.BOH,
-			State:      ClusterState.Creating,
-			Complexity: req.Complexity,
-			Tenant:     req.Tenant,
-			NetworkID:  req.NetworkID,
-			//Keypair:       kp,
+			Name:          req.Name,
+			CIDR:          req.CIDR,
+			Flavor:        Flavor.BOH,
+			State:         ClusterState.Creating,
+			Complexity:    req.Complexity,
+			Tenant:        req.Tenant,
+			Keypair:       kp,
 			AdminPassword: cladmPassword,
+			NetworkID:     req.NetworkID,
+			GatewayIP:     gw.GetPrivateIP(),
 			PublicIP:      gw.GetAccessIP(),
 			NodesDef:      &nodesDef,
 		},
@@ -279,7 +280,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	}
 
 	switch req.Complexity {
-	case Complexity.Dev:
+	case Complexity.Minimal:
 		privateNodeCount = 1
 	case Complexity.Normal:
 		privateNodeCount = 3
@@ -347,11 +348,11 @@ cleanNodes:
 		for _, id := range instance.Common.PrivateNodeIDs {
 			brokerclient.New().Host.Delete(id, 0)
 		}
-		brokerclient.New().Host.Delete(instance.manager.MasterID, brokerclient.DefaultTimeout)
+		brokerclient.New().Host.Delete(instance.manager.MasterID, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	}
 cleanNetwork:
 	if !req.KeepOnFailure {
-		brokerclient.New().Network.Delete(instance.Common.NetworkID, brokerclient.DefaultTimeout)
+		brokerclient.New().Network.Delete(instance.Common.NetworkID, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 		instance.metadata.Delete()
 	}
 	return nil, err
@@ -388,7 +389,7 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 	if err != nil {
 		c.manager.MasterID = ""
 		c.manager.MasterIP = ""
-		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultTimeout)
+		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 		log.Printf("[Master] creation failed: %s", err.Error())
 		return err
 	}
@@ -500,7 +501,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 			c.Common.PrivateNodeIDs = c.Common.PrivateNodeIDs[:len(c.Common.PrivateNodeIDs)-1]
 			c.manager.PrivateNodeIPs = c.manager.PrivateNodeIPs[:len(c.manager.PrivateNodeIPs)-1]
 		}
-		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultTimeout)
+		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 		log.Printf("[Nodes: %s #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
 		done <- fmt.Errorf("failed to update Cluster configuration: %s", err.Error())
@@ -556,7 +557,7 @@ func (c *Cluster) buildHostname(core string, nodeType NodeType.Enum) (string, er
 func (c *Cluster) asyncConfigureMaster(done chan error) {
 	log.Println("[Master] starting configuration...")
 
-	host, err := brokerclient.New().Host.Inspect(c.manager.MasterID, brokerclient.DefaultTimeout)
+	host, err := brokerclient.New().Host.Inspect(c.manager.MasterID, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		done <- err
 		return
@@ -570,7 +571,13 @@ func (c *Cluster) asyncConfigureMaster(done chan error) {
 		done <- err
 		return
 	}
-	ok, results, err := component.Add(target, map[string]interface{}{})
+	ok, results, err := component.Add(target, installapi.Variables{
+		"GatewayIP": c.Core.GatewayIP,
+		"Hostname":  host.Name,
+		"HostIP":    host.PRIVATE_IP,
+		"Username":  "cladm",
+		"Password":  c.Core.AdminPassword,
+	})
 	if err != nil {
 		done <- err
 		return
@@ -686,7 +693,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 	if len(errors) > 0 {
 		if len(hosts) > 0 {
 			for _, hostID := range hosts {
-				brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
+				brokerclient.New().Host.Delete(hostID, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 			}
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
@@ -704,7 +711,7 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 	} else {
 		hostID = c.Common.PrivateNodeIDs[len(c.Common.PrivateNodeIDs)-1]
 	}
-	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
+	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil
 	}
@@ -729,7 +736,7 @@ func (c *Cluster) DeleteSpecificNode(hostID string) error {
 		return fmt.Errorf("host '%s' isn't a registered Node of the Cluster '%s'", hostID, c.Common.Name)
 	}
 
-	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultTimeout)
+	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -779,7 +786,7 @@ func (c *Cluster) GetNode(hostID string) (*pb.Host, error) {
 	if !found {
 		return nil, fmt.Errorf("failed to find node '%s' in cluster '%s'", hostID, c.Common.Name)
 	}
-	return brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultTimeout)
+	return brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 }
 
 func contains(list []string, hostID string) (bool, int) {
@@ -813,9 +820,9 @@ func (c *Cluster) GetConfig() clusterapi.Cluster {
 func (c *Cluster) FindAvailableMaster() (string, error) {
 	var masterID string
 	for _, masterID = range c.manager.MasterIDs {
-		err := provideruse.WaitSSHServerReady(c.provider, masterID, 2)
+		err := provideruse.WaitSSHServerReady(c.provider, masterID, 2*time.Minute)
 		if err != nil {
-			if _, ok := err.(retry.TimeoutError); ok {
+			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 			return "", err
@@ -832,9 +839,9 @@ func (c *Cluster) FindAvailableMaster() (string, error) {
 func (c *Cluster) FindAvailableNode(public bool) (string, error) {
 	var hostID string
 	for _, hostID = range c.ListNodeIDs(public) {
-		err := provideruse.WaitSSHServerReady(c.provider, hostID, 2)
+		err := provideruse.WaitSSHServerReady(c.provider, hostID, 2*time.Minute)
 		if err != nil {
-			if _, ok := err.(retry.TimeoutError); ok {
+			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 		}
@@ -876,7 +883,7 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the public nodes
 	for _, n := range c.Common.PublicNodeIDs {
-		err := broker.Host.Delete(n, brokerclient.DefaultTimeout)
+		err := broker.Host.Delete(n, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			return err
 		}
@@ -884,14 +891,14 @@ func (c *Cluster) Delete() error {
 
 	// Deletes the private nodes
 	for _, n := range c.Common.PrivateNodeIDs {
-		err := broker.Host.Delete(n, brokerclient.DefaultTimeout)
+		err := broker.Host.Delete(n, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			return err
 		}
 	}
 
 	// Deletes the network and gateway
-	err = broker.Network.Delete(c.Common.NetworkID, brokerclient.DefaultTimeout)
+	err = broker.Network.Delete(c.Common.NetworkID, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}

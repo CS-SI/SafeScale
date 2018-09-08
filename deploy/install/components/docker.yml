@@ -79,30 +79,27 @@ component:
                 esac
 
                 compose_version=$(curl -Ssl https://api.github.com/repos/docker/compose/releases/latest | jq .name -r)
-                curl -Ssl -L https://github.com/docker/compose/releases/download/$compose_version/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose || exit $?
-                chmod +x /usr/local/bin/docker-compose
-                echo "pathappend /usr/local/bin" >>~/.bashrc
+                curl -Ssl -L https://github.com/docker/compose/releases/download/$compose_version/docker-compose-$(uname -s)-$(uname -m) -o /usr/bin/docker-compose || exit $?
+                chmod +x /usr/bin/docker-compose
                 exit 0
 
             remove: |
                 case $LINUX_KIND in
                     debian|ubuntu)
                         wait_for_apt && apt-get remove -y docker-ce
-                        rm -f /usr/local/bin/docker-compose
                         ;;
                     centos|rhel)
                         yum remove -y docker-ce
-                        rm -f /usr/local/bin/docker-compose
                         ;;
                     fedora)
                         dnf erase -y docker-ce
-                        rm -f /usr/local/bin/docker-compose
                         ;;
                     *)
                         echo "Unsupported operating system '$LINUX_KIND'"
                         exit 1
                         ;;
                 esac
+                rm -f /usr/local/bin/docker-compose
 
     service:
         start: |

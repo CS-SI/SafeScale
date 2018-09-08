@@ -48,12 +48,12 @@ const (
 	DefaultNasMountPath = "/data"
 )
 
-//TimeoutError defines a Timeout error
-type TimeoutError struct {
+//ErrTimeout defines a Timeout error
+type ErrTimeout struct {
 	Message string
 }
 
-func (e *TimeoutError) Error() string {
+func (e *ErrTimeout) Error() string {
 	return e.Message
 }
 

@@ -8,10 +8,13 @@ import (
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
 	"github.com/CS-SI/SafeScale/deploy/install/api"
+
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
 )
 
 const (
-	dcosCli = "sudo -u cladm -i"
+	dcosCli    = "sudo -u cladm -i dcos"
+	kubectlCli = "sudo -u cladm -i kubectl"
 )
 
 // dcosInstaller is an installer using script to add and remove a component
@@ -55,7 +58,7 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target, v api.Variables) (b
 		return false, api.CheckResults{}, err
 	}
 	broker := brokerclient.New()
-	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultTimeout)
+	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return false, api.CheckResults{}, err
 	}
@@ -80,7 +83,7 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target, v api.Variables) (b
 
 	// Uploads the executes the script
 	filename := fmt.Sprintf("/var/tmp/%s_check.sh", c.BaseFilename())
-	err = UploadStringToRemoteFile(cmdStr, host, filename)
+	err = UploadStringToRemoteFile(cmdStr, host, filename, "", "", "u+rw-x,go-rwx")
 	if err != nil {
 		return false, api.CheckResults{}, err
 	}
@@ -96,7 +99,7 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target, v api.Variables) (b
 		wallTime = 5
 	}
 
-	retcode, _, _, err := broker.Ssh.Run(hostID, cmd, time.Duration(wallTime)*time.Minute)
+	retcode, _, _, err := broker.Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.CheckResults{}, err
 	}
@@ -142,7 +145,7 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 		return false, api.AddResults{}, err
 	}
 	broker := brokerclient.New()
-	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultTimeout)
+	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return false, api.AddResults{}, err
 	}
@@ -160,6 +163,37 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 	v["MasterIPs"] = cluster.ListMasterIPs()
 	//v["DomainName"] = cluster.GetConfig().DomainName
 	v["dcos"] = dcosCli
+	v["kubectl"] = kubectlCli
+	v["options"] = ""
+	if specs.IsSet("component.install.dcos.options") {
+		var (
+			avails  = map[string]interface{}{}
+			ok      bool
+			content interface{}
+		)
+		complexity := strings.ToLower(cluster.GetConfig().Complexity.String())
+		options := specs.GetStringMap("component.install.dcos.options")
+		for k, anon := range options {
+			avails[strings.ToLower(k)] = anon
+		}
+		if content, ok = avails[complexity]; !ok {
+			if complexity == Complexity.Volume.String() {
+				complexity = Complexity.Normal.String()
+			}
+			if complexity == Complexity.Normal.String() {
+				if content, ok = avails[complexity]; !ok {
+					content, ok = avails[Complexity.Minimal.String()]
+				}
+			}
+		}
+		if ok {
+			err := UploadStringToRemoteFile(content.(string), host, "/var/tmp/options.json", "cladm", "", "u+rw-x,go-rwx")
+			if err != nil {
+				return false, api.AddResults{}, err
+			}
+			v["options"] = "--options=/var/tmp/options.json"
+		}
+	}
 	cmdStr, err = replaceVariablesInString(cmdStr, v)
 	if err != nil {
 		return false, api.AddResults{}, fmt.Errorf("failed to finalize install script: %s", err.Error())
@@ -167,22 +201,22 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 
 	// Uploads then executes command
 	filename := fmt.Sprintf("/var/tmp/%s_add.sh", c.BaseFilename())
-	err = UploadStringToRemoteFile(cmdStr, host, filename)
+	err = UploadStringToRemoteFile(cmdStr, host, filename, "", "", "")
 	if err != nil {
 		return false, api.AddResults{}, err
 	}
 	var cmd string
 	//if debug {
-	if false {
+	if true {
 		cmd = fmt.Sprintf("sudo bash %s", filename)
 	} else {
-		cmd = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
+		cmd = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s /var/tmp/options.json; exit $rc", filename, filename)
 	}
 	wallTime := specs.GetInt("component.install.dcos.wall_time")
 	if wallTime == 0 {
 		wallTime = 5
 	}
-	retcode, _, _, err := broker.Ssh.Run(hostID, cmd, time.Duration(wallTime)*time.Minute)
+	retcode, _, _, err := broker.Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.AddResults{}, err
 	}
@@ -235,7 +269,7 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (
 		return false, api.RemoveResults{}, err
 	}
 	broker := brokerclient.New()
-	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultTimeout)
+	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}
@@ -262,7 +296,7 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (
 
 	// Uploads then executes script
 	filename := fmt.Sprintf("/var/tmp/%s_remove.sh", c.BaseFilename())
-	err = UploadStringToRemoteFile(cmdStr, host, filename)
+	err = UploadStringToRemoteFile(cmdStr, host, filename, "", "", "")
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}
@@ -278,7 +312,7 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (
 		wallTime = 5
 	}
 
-	retcode, _, _, err := broker.Ssh.Run(hostID, cmd, time.Duration(wallTime)*time.Minute)
+	retcode, _, _, err := broker.Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}

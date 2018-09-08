@@ -40,13 +40,18 @@ func NewHostTarget(host *pb.Host) api.Target {
 	return &HostTarget{host: host}
 }
 
-// GetName returns the name of the Target
-func (t *HostTarget) GetName() string {
+// Type returns the type of the Target
+func (t *HostTarget) Type() string {
+	return "host"
+}
+
+// Name returns the name of the Target
+func (t *HostTarget) Name() string {
 	return t.host.GetName()
 }
 
-// GetMethods returns a list of packaging managers useable on the target
-func (t *HostTarget) GetMethods() []Method.Enum {
+// Methods returns a list of packaging managers useable on the target
+func (t *HostTarget) Methods() []Method.Enum {
 	methods := []Method.Enum{
 		Method.Bash,
 	}
@@ -55,8 +60,8 @@ func (t *HostTarget) GetMethods() []Method.Enum {
 	return methods
 }
 
-// List returns a list of installed components
-func (t *HostTarget) List() []string {
+// Installed returns a list of installed components
+func (t *HostTarget) Installed() []string {
 	var list []string
 	return list
 }
@@ -76,8 +81,18 @@ func NewClusterTarget(cluster clusterapi.Cluster) api.Target {
 	}
 }
 
-// GetMethods returns a list of packaging managers useable on the target
-func (t *ClusterTarget) GetMethods() []Method.Enum {
+// Type returns the type of the Target
+func (t *ClusterTarget) Type() string {
+	return "cluster"
+}
+
+// Name returns the name of the cluster
+func (t *ClusterTarget) Name() string {
+	return t.cluster.GetName()
+}
+
+// Methods returns a list of packaging managers useable on the target
+func (t *ClusterTarget) Methods() []Method.Enum {
 	methods := []Method.Enum{
 		Method.Bash,
 	}
@@ -87,8 +102,8 @@ func (t *ClusterTarget) GetMethods() []Method.Enum {
 	return methods
 }
 
-// List returns a list of installed component
-func (t *ClusterTarget) List() []string {
+// Installed returns a list of installed component
+func (t *ClusterTarget) Installed() []string {
 	var list []string
 	return list
 }

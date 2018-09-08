@@ -58,11 +58,11 @@ var sshRun = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name required")
 		}
-		timeout := utils.TimeoutCtxHost
+		executionTimeout := utils.TimeoutCtxHost
 		if c.IsSet("timeout") {
-			timeout = time.Duration(c.Float64("timeout")) * time.Minute
+			executionTimeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
-		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), timeout)
+		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), 20*time.Second, executionTimeout)
 		if err != nil {
 			return fmt.Errorf("Could not execute ssh command: %v", err)
 		}
@@ -99,12 +99,15 @@ var sshCopy = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("2 arguments (from and to) are required")
 		}
-		timeout := utils.TimeoutCtxHost
+		executionTimeout := utils.TimeoutCtxHost
 		if c.IsSet("timeout") {
-			timeout = time.Duration(c.Float64("timeout")) * time.Minute
+			executionTimeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
 		err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), timeout)
+		_, stdout, stderr, err := client.New().Ssh.Copy(c.Args().Get(0), c.Args().Get(1), 20*time.Second, executionTimeout)
 		if err != nil {
+			fmt.Println(stdout)
+			fmt.Fprintln(os.Stderr, stderr)
 			return fmt.Errorf("Could not copy %s to %s: %v", c.Args().Get(0), c.Args().Get(1), err)
 		}
 		fmt.Printf("Copy of '%s' to '%s' done\n", c.Args().Get(0), c.Args().Get(1))

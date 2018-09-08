@@ -87,28 +87,28 @@ type AuthOptions struct {
 	FloatingIPPool string
 }
 
-//CfgOptions configuration options
+// CfgOptions configuration options
 type CfgOptions struct {
-	//Name of the provider (external) network
+	// Name of the provider (external) network
 	ProviderNetwork string
 
-	//DNSList list of DNS
+	// DNSList list of DNS
 	DNSList []string
 
-	//UseFloatingIP indicates if floating IP are used (optional)
+	// UseFloatingIP indicates if floating IP are used (optional)
 	UseFloatingIP bool
 
-	//UseLayer3Networking indicates if layer 3 networking features (router) can be used
-	//if UseFloatingIP is true UseLayer3Networking must be true
+	// UseLayer3Networking indicates if layer 3 networking features (router) can be used
+	// if UseFloatingIP is true UseLayer3Networking must be true
 	UseLayer3Networking bool
 
-	//AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
+	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
 	AutoHostNetworkInterfaces bool
 
-	//VolumeSpeeds map volume types with volume speeds
+	// VolumeSpeeds map volume types with volume speeds
 	VolumeSpeeds map[string]VolumeSpeed.Enum
 
-	//S3Protocol protocol used to mount object storage (ex: swiftks or s3)
+	// S3Protocol protocol used to mount object storage (ex: swiftks or s3)
 	S3Protocol string
 }
 
@@ -123,6 +123,10 @@ func ProviderErrorToString(err error) string {
 		return fmt.Sprintf("code: 404, reason: %s", string(e.Body[:]))
 	case *gc.ErrDefault404:
 		return fmt.Sprintf("code: 404, reason: %s", string(e.Body[:]))
+	case gc.ErrDefault500:
+		return fmt.Sprintf("code: 500, reason: %s", string(e.Body[:]))
+	case *gc.ErrDefault500:
+		return fmt.Sprintf("code: 500, reason: %s", string(e.Body[:]))
 	case gc.ErrUnexpectedResponseCode:
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
 	case *gc.ErrUnexpectedResponseCode:
@@ -148,7 +152,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		TokenID:          opts.TokenID,
 	}
 
-	//Openstack client
+	// Openstack client
 	pClient, err := openstack.AuthenticatedClient(gcOpts)
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
@@ -189,7 +193,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if len(cfg.S3Protocol) == 0 {
 		cfg.S3Protocol = "swiftks"
 	}
-	log.Print("Object storage protocol: ", cfg.S3Protocol)
+	//log.Print("Object storage protocol: ", cfg.S3Protocol)
 
 	clt := Client{
 		Opts:              &opts,
@@ -217,7 +221,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 const defaultRouter string = "d46886b1-cb8e-4e98-9b18-b60bf847dd09"
 const defaultSecurityGroup string = "30ad3142-a5ec-44b5-9560-618bde3de1ef"
 
-//Client is the implementation of the openstack driver regarding to the api.ClientAPI
+// Client is the implementation of the openstack driver regarding to the api.ClientAPI
 type Client struct {
 	Opts      *AuthOptions
 	Cfg       *CfgOptions
@@ -231,7 +235,7 @@ type Client struct {
 	ProviderNetworkID string
 }
 
-//getDefaultSecurityGroup returns the default security group
+// getDefaultSecurityGroup returns the default security group
 func (client *Client) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
 	var sgList []secgroups.SecurityGroup
 
@@ -257,7 +261,7 @@ func (client *Client) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error
 	return &sgList[0], nil
 }
 
-//createTCPRules creates TCP rules to configure the default security group
+// createTCPRules creates TCP rules to configure the default security group
 func (client *Client) createTCPRules(groupID string) error {
 	//Open TCP Ports
 	ruleOpts := secgroups.CreateRuleOpts{

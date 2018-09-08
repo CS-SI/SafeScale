@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	// volumeFolderName is the technical name of the container used to store volume info
-	volumeFolderName = "vol"
+	// volumesFolderName is the technical name of the container used to store volume info
+	volumesFolderName = "volumes"
 )
 
 // Volume links Object Storage folder and Volumes
@@ -42,7 +42,7 @@ type Volume struct {
 // NewVolume creates an instance of metadata.Volume
 func NewVolume(svc *providers.Service) *Volume {
 	return &Volume{
-		item: metadata.NewItem(svc, volumeFolderName),
+		item: metadata.NewItem(svc, volumesFolderName),
 		name: nil,
 		id:   nil,
 	}

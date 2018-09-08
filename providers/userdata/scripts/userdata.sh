@@ -365,5 +365,5 @@ case $LINUX_KIND in
         ;;
 esac
 
->/var/tmp/user_data.done
+date +%Y/%m/%d-%H:%M:%S >/var/tmp/user_data.done
 exit 0

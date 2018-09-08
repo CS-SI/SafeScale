@@ -69,7 +69,7 @@ func asyncRemoveFromHosts(list []string, c api.Component, v map[string]interface
 	dones := map[string]chan error{}
 	broker := brokerclient.New()
 	for _, hostID := range list {
-		host, err := broker.Host.Inspect(hostID, brokerclient.DefaultTimeout)
+		host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			states[hostID] = err
 			continue

@@ -26,8 +26,6 @@ exec 2>&1
 
 {{ .reserved_BashLibrary }}
 
-wait_for_userdata
-
 # Installs and configures everything needed on any node
 {{ .InstallCommonRequirements }}
 

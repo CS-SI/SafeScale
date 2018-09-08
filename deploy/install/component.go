@@ -133,7 +133,7 @@ func (c *component) Specs() *viper.Viper {
 
 // Applyable tells if the component is installable on the target
 func (c *component) Applyable(t api.Target) bool {
-	methods := t.GetMethods()
+	methods := t.Methods()
 	for _, k := range methods {
 		installer := c.installerOfMethod(k)
 		if installer != nil {
@@ -145,7 +145,7 @@ func (c *component) Applyable(t api.Target) bool {
 
 // Check if component is installed on target
 func (c *component) Check(t api.Target, v api.Variables) (bool, api.CheckResults, error) {
-	methods := t.GetMethods()
+	methods := t.Methods()
 	var installer api.Installer
 	for _, method := range methods {
 		if c.specs.IsSet(fmt.Sprintf("component.install.%s", method.String())) {
@@ -163,7 +163,7 @@ func (c *component) Check(t api.Target, v api.Variables) (bool, api.CheckResults
 
 // Add installs the component on the target
 func (c *component) Add(t api.Target, v api.Variables) (bool, api.AddResults, error) {
-	methods := t.GetMethods()
+	methods := t.Methods()
 	var installer api.Installer
 	for _, method := range methods {
 		if c.specs.IsSet(fmt.Sprintf("component.install.%s", method.String())) {
@@ -176,12 +176,14 @@ func (c *component) Add(t api.Target, v api.Variables) (bool, api.AddResults, er
 	if installer == nil {
 		return false, api.AddResults{}, fmt.Errorf("failed to find a way to install '%s'", c.DisplayName())
 	}
+
+	fmt.Printf("Installing component '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	return installer.Add(c, t, v)
 }
 
 // Remove uninstalls the component from the target
 func (c *component) Remove(t api.Target, v api.Variables) (bool, api.RemoveResults, error) {
-	methods := t.GetMethods()
+	methods := t.Methods()
 	var installer api.Installer
 	for _, method := range methods {
 		if c.specs.IsSet(fmt.Sprintf("component.install.%s", method.String())) {

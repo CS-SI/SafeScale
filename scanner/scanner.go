@@ -180,7 +180,7 @@ func getCPUInfo(tenant string, service *providers.Service, tpl api.HostTemplate,
 		fmt.Printf("[%s] host %s: error reading SSHConfig: %s\n", tenant, tpl.Name, err.Error())
 		return nil, err
 	}
-	ssh.WaitServerReady(60 * time.Second)
+	ssh.WaitServerReady(1 * time.Minute)
 	c, err := ssh.Command(cmd)
 
 	//cmd, err := ssh.Command(cmd)

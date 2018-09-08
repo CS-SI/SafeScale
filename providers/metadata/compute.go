@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	//NetworkFolderName is the technical name of the container used to store networks info
-	hostFolderName = "host"
+	// hostsFolderName is the technical name of the container used to store networks info
+	hostsFolderName = "hosts"
 )
 
 // Host links Object Storage folder and Network
@@ -41,7 +41,7 @@ type Host struct {
 // NewHost creates an instance of api.Host
 func NewHost(svc *providers.Service) *Host {
 	return &Host{
-		item: metadata.NewItem(svc, hostFolderName),
+		item: metadata.NewItem(svc, hostsFolderName),
 	}
 }
 

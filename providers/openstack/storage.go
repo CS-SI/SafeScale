@@ -127,6 +127,7 @@ func (client *Client) GetVolume(id string) (*api.Volume, error) {
 	return &av, nil
 }
 
+// ListVolumes returns a list of volumes
 func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
 	if all {
 		return client.listAllVolumes()
@@ -174,7 +175,7 @@ func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
 	return vols, nil
 }
 
-//DeleteVolume deletes the volume identified by id
+// DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(id string) error {
 	err := volumes.Delete(client.Volume, id).ExtractErr()
 	if err != nil {

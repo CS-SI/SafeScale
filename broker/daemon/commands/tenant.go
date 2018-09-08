@@ -28,7 +28,7 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
-//Tenant structure to handle name and clientAPI for a tenant
+// Tenant structure to handle name and clientAPI for a tenant
 type Tenant struct {
 	name   string
 	Client api.ClientAPI
@@ -47,10 +47,10 @@ var (
 
 // }
 
-//TenantServiceServer server is used to implement SafeScale.broker.
+// TenantServiceServer server is used to implement SafeScale.broker.
 type TenantServiceServer struct{}
 
-//List registerd tenants
+// List registerd tenants
 func (s *TenantServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
 	log.Println("List tenant called")
 
@@ -70,7 +70,7 @@ func (s *TenantServiceServer) List(ctx context.Context, in *google_protobuf.Empt
 	return &pb.TenantList{Tenants: tl}, nil
 }
 
-//Get returns the name of the current tenant used
+// Get returns the name of the current tenant used
 func (s *TenantServiceServer) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
 	log.Println("Tenant Get called")
 	tenant := GetCurrentTenant()
@@ -103,7 +103,7 @@ func getCurrentTenant() *Tenant {
 	return currentTenant
 }
 
-//Set the the tenant tu use for each command
+// Set the the tenant tu use for each command
 func (s *TenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
 	log.Println("Tenant Set called")
 

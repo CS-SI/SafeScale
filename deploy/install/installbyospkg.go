@@ -138,7 +138,7 @@ func (g *genericPackager) Check(c api.Component, t api.Target, v api.Variables) 
 	}
 
 	cmdStr := fmt.Sprintf(g.checkCmd, packageName)
-	retcode, _, _, err := client.New().Ssh.Run(hostTarget.host.ID, cmdStr, 0)
+	retcode, _, _, err := client.New().Ssh.Run(hostTarget.host.ID, cmdStr, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return false, api.CheckResults{}, err
 	}
@@ -233,7 +233,7 @@ func (g *genericPackager) addOnHost(c api.Component, host *pb.Host, v map[string
 	if wallTime == 0 {
 		wallTime = 5
 	}
-	retcode, _, stderr, err := client.New().Ssh.Run(host.ID, cmdStr, time.Duration(wallTime)*time.Minute)
+	retcode, _, stderr, err := client.New().Ssh.Run(host.ID, cmdStr, client.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.AddResults{}, err
 	}
@@ -515,7 +515,7 @@ func (g *genericPackager) Remove(c api.Component, t api.Target, v api.Variables)
 	if wallTime == 0 {
 		wallTime = 5
 	}
-	retcode, _, _, err := client.New().Ssh.Run(hostTarget.host.ID, cmdStr, time.Duration(wallTime)*time.Minute)
+	retcode, _, _, err := client.New().Ssh.Run(hostTarget.host.ID, cmdStr, client.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}

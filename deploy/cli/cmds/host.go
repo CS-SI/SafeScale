@@ -19,6 +19,7 @@ package cmds
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
@@ -123,8 +124,20 @@ var hostComponentAddCommand = &cli.Command{
 			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
 			os.Exit(int(ExitCode.NotFound))
 		}
+		values := installapi.Variables{}
+		anon := c.Option("--param", "<param>")
+		if anon != nil {
+			params := anon.([]string)
+			for _, k := range params {
+				res := strings.Split(k, "=")
+				if len(res[0]) > 0 {
+					values[res[0]] = strings.Join(res[1:], "=")
+				}
+			}
+		}
+
 		target := install.NewHostTarget(hostInstance)
-		ok, results, err := component.Add(target, install.EmptyValues)
+		ok, results, err := component.Add(target, values)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error installing component '%s' on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))

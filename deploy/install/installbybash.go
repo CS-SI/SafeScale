@@ -34,23 +34,6 @@ func (i *bashInstaller) GetName() string {
 	return "script"
 }
 
-func determineContext(t api.Target) (hT *HostTarget, cT *ClusterTarget, nT *NodeTarget) {
-	hT = nil
-	cT = nil
-	nT = nil
-
-	var ok bool
-
-	hT, ok = t.(*HostTarget)
-	if !ok {
-		cT, ok = t.(*ClusterTarget)
-		if !ok {
-			nT, ok = t.(*NodeTarget)
-		}
-	}
-	return
-}
-
 // Check checks if the component is installed, using the check script in Specs
 func (i *bashInstaller) Check(c api.Component, t api.Target, v api.Variables) (bool, api.CheckResults, error) {
 	specs := c.Specs()
@@ -110,18 +93,18 @@ func (i *bashInstaller) checkOnHost(c api.Component, host *pb.Host, v api.Variab
 
 	// Uploads then executes normalized script
 	filename := fmt.Sprintf("/var/tmp/%s_check.sh", c.BaseFilename())
-	err = UploadStringToRemoteFile(cmdStr, host, filename)
+	err = UploadStringToRemoteFile(cmdStr, host, filename, "", "", "")
 	if err != nil {
 		return false, api.CheckResults{}, fmt.Errorf("failed to upload check script to host '%s': %s", host.Name, err.Error())
 	}
 	var cmd string
 	// if debug {
 	if false {
-		cmd = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
+		cmd = fmt.Sprintf("sudo bash %s", filename)
 	} else {
 		cmd = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s; exit $rc", filename, filename)
 	}
-	retcode, _, _, err := brokerclient.New().Ssh.Run(host.ID, cmd, brokerclient.DefaultTimeout)
+	retcode, _, _, err := brokerclient.New().Ssh.Run(host.ID, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return false, api.CheckResults{}, fmt.Errorf("failed to execute remotely check script: %s", err.Error())
 	}
@@ -225,6 +208,15 @@ func (i *bashInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 		return true, api.AddResults{}, nil
 	}
 
+	// Inits implicit parameters
+	setImplicitParameters(t, v)
+
+	// Checks required parameters have value
+	err = checkParameters(c, v)
+	if err != nil {
+		return false, api.AddResults{}, err
+	}
+
 	// First, installs requirements if there are any
 	err = installRequirements(c, t, v)
 	if err != nil {
@@ -290,7 +282,7 @@ func (i *bashInstaller) addOnHost(
 
 	// Uploads final script
 	filename := fmt.Sprintf("/var/tmp/%s_add.sh", c.BaseFilename())
-	err = UploadStringToRemoteFile(cmdStr, host, filename)
+	err = UploadStringToRemoteFile(cmdStr, host, filename, "", "", "")
 	if err != nil {
 		return false, api.AddResults{}, fmt.Errorf("failed to upload add script on remote host: %s", err.Error())
 	}
@@ -307,7 +299,7 @@ func (i *bashInstaller) addOnHost(
 	if wallTime == 0 {
 		wallTime = 5
 	}
-	retcode, _, stderr, err := brokerclient.New().Ssh.Run(host.ID, cmd, time.Duration(wallTime)*time.Minute)
+	retcode, _, stderr, err := brokerclient.New().Ssh.Run(host.ID, cmd, 30*time.Second, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.AddResults{}, fmt.Errorf("failed to execute remotely install script: %s", err.Error())
 	}
@@ -497,7 +489,7 @@ func (i *bashInstaller) removeFromHost(c api.Component, host *pb.Host, v api.Var
 
 	// Uploads then executes normalized script
 	filename := fmt.Sprintf("/var/tmp/%s_remove.sh", c.BaseFilename())
-	err = UploadStringToRemoteFile(cmdStr, host, filename)
+	err = UploadStringToRemoteFile(cmdStr, host, filename, "", "", "")
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}
@@ -512,7 +504,7 @@ func (i *bashInstaller) removeFromHost(c api.Component, host *pb.Host, v api.Var
 	if wallTime == 0 {
 		wallTime = 5
 	}
-	retcode, _, _, err := brokerclient.New().Ssh.Run(host.ID, cmd, time.Duration(wallTime)*time.Minute)
+	retcode, _, _, err := brokerclient.New().Ssh.Run(host.ID, cmd, 30*time.Second, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.RemoveResults{}, err
 	}

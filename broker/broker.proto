@@ -292,7 +292,7 @@ message SshResponse{
 
 service SshService{
     rpc Run(SshCommand) returns (SshResponse){}
-    rpc Copy(SshCopyCommand) returns (google.protobuf.Empty){}
+    rpc Copy(SshCopyCommand) returns (SshResponse){}
 }
 
 // broker nas create nas1 host1 --path="/shared/data"

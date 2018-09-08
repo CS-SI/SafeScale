@@ -15,14 +15,14 @@ The variable needs to be defined before starting brokerd, and for every SafeScal
 
 ### SafeScale Hosts
 
-The host informations are stored in folder ``0.safescale/host``.
+The host informations are stored in folder ``0.safescale/hosts``.
 
 Inside this folder, the metadata of an host is stored in object named with its ID in subfolder ``byID``,
 and in object named with its name in subfolder ``byName``.
 
 ### SafeScale Networks
 
-The metadata for network informations are stored in ``0.safescale/network``.
+The metadata for network informations are stored in ``0.safescale/networks``.
 
 Inside this folder, the metadata of a network are stored in an object named with its ID in subfolder ``byID``,
 and in an object named with its name in subfolder ``byName``.
@@ -41,16 +41,16 @@ and in an object named with its name in subfolder ``byName``.
 
 ### SafeScale Volumes
 
-The metadata for volume informations are stored in ``0.safescale/volume``.
+The metadata for volume informations are stored in ``0.safescale/volumes`.
 
 Inside this folder, the metadata of a volume are stored in an object named with its ID in subfolder ``byID``,
 and in an object named with its name in subfolder ``byName``.
 
-Besides the folders ``byID`` and ``byName`` will be find a folder named with the uid of the volume containing an object named with the id of the host that is currently mounting the volume, and 2 folders named ``attached`` and ``detached`` that will contain volume objects named by uid attached to an host for the former and not attach to an host for the latter.
+Besides the folders ``byID`` and ``byName`` will be find folders named with the uuid of the volumes, containing an object named with the uuids of the hosts that are currently attached to the volume.
 
 ### SafeScale Clusters
 
-The metadata for Cluster informations are stored in ``0.safescale/cluster``.
+The metadata for Cluster informations are stored in ``0.safescale/clusters``.
 
 Inside this folder, the metadata of a cluster is stored in a folder named as the Cluster Name submitted at its creation.
 
@@ -67,7 +67,7 @@ Inside this subfolder is stored :
 ```shell
 0.safescale (dir)
 |
-+- host (dir)
++- hosts (dir)
 |  |
 |  +- byID (dir)
 |  |  |
@@ -81,7 +81,7 @@ Inside this subfolder is stored :
 |     |
 |     +- ...
 |
-+- network (dir)
++- networks (dir)
 |  |
 |  +- byID (dir)
 |  |  |
@@ -99,7 +99,7 @@ Inside this subfolder is stored :
 |  |  |
 |  |  +- gw (obj)
 |  |  |
-|  |  +- host (dir)
+|  |  +- hosts (dir)
 |  |     |
 |  |     +- 4856512f-fca1-4129-b1d5-3c2a19a7b747 (obj)
 |  |     |
@@ -121,7 +121,7 @@ Inside this subfolder is stored :
 |     |
 |     +- ...
 |
-+- volume (dir)
++- volumes (dir)
 |  |
 |  +- byID (dir)
 |  |  |
@@ -135,37 +135,27 @@ Inside this subfolder is stored :
 |  |  |
 |  |  +- ...
 |  |
-|  +- attached
-|  |  |
-|  |  +- 4d17de45-e019-445f-b746-9ab0805008a7 (obj)
-|  |  |
-|  |  +- ...
-|  |
-|  +- detached
-|  |  |
-|  |  +- 4d17de45-e019-445f-b746-9ab0805008a7 (obj)
-|  |  |
-|  |  +- ...
-|  |
 |  +- 4d17de45-e019-445f-b746-9ab0805008a7 (dir)
 |  |  |
 |  |  +- 4856512f-fca1-4129-b1d5-3c2a19a7b747 (obj)
+|  |  |
+|  |  +- ...
 |  |
 |  +- ...
 |
-+- cluster
++- clusters
    |
    +- mycluster (dir)
    |  |
    |  +- config (obj)
    |  |
-   |  +- master (dir)
+   |  +- masters (dir)
    |  |  |
    |  |  +- 4d17de45-e019-445f-b746-9ab0805008a7 (obj)
    |  |  |
    |  |  +- ...
    |  |
-   |  +- node (dir)
+   |  +- nodes (dir)
    |     |
    |     +- private (dir)
    |     |  |

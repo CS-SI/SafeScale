@@ -169,7 +169,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
 
-	//Identity API
+	// Identity API
 	identity, err := gcos.NewIdentityV3(provider, gc.EndpointOpts{})
 	if err != nil {
 		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
@@ -194,13 +194,13 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, fmt.Errorf("failed to found project ID corresponding to region '%s': %s", opts.Region, openstack.ProviderErrorToString(err))
 	}
 
-	//Compute API
+	// Compute API
 	compute, err := gcos.NewComputeV2(provider, gc.EndpointOpts{})
 	if err != nil {
 		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
 
-	//Network API
+	// Network API
 	network, err := gcos.NewNetworkV2(provider, gc.EndpointOpts{
 		Type:   "network",
 		Region: opts.Region,

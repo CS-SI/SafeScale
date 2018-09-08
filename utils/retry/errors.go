@@ -5,17 +5,17 @@ import (
 	"time"
 )
 
-type baseError struct {
+type errBase struct {
 	msgs []string
 }
 
-func (b baseError) Plus(err string) {
+func (b errBase) Plus(err string) {
 	if err != "" {
 		b.msgs = append(b.msgs, err)
 	}
 }
 
-func (b baseError) Error() string {
+func (b errBase) Error() string {
 	var message string
 	for _, m := range b.msgs {
 		if message != "" {
@@ -26,15 +26,15 @@ func (b baseError) Error() string {
 	return message
 }
 
-// TimeoutError is returned when the time limit has been reached.
-type TimeoutError struct {
-	b     baseError
+// ErrTimeout is returned when the time limit has been reached.
+type ErrTimeout struct {
+	b     errBase
 	limit time.Duration
 }
 
-func (e TimeoutError) Error() string {
+func (e ErrTimeout) Error() string {
 	msgFinal := e.b.Error()
-	msg := fmt.Sprintf("retry timed out after %s", e.limit)
+	msg := fmt.Sprintf("retries timed out after %s", e.limit)
 	if msgFinal != "" {
 		msgFinal = msg + " + " + msgFinal
 	} else {
@@ -43,13 +43,13 @@ func (e TimeoutError) Error() string {
 	return msgFinal
 }
 
-// MaxError is returned when the maximum attempts has been reached.
-type MaxError struct {
-	b     baseError
+// ErrLimit is returned when the maximum attempts has been reached.
+type ErrLimit struct {
+	b     errBase
 	limit uint
 }
 
-func (e MaxError) Error() string {
+func (e ErrLimit) Error() string {
 	msg := fmt.Sprintf("retry limit exceeded after %d tries", e.limit)
 	msgFinal := e.b.Error()
 	if msgFinal != "" {

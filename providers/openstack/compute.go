@@ -22,6 +22,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -36,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
 
+	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
@@ -254,14 +257,14 @@ func (client *Client) toHostSize(flavor map[string]interface{}) api.HostSize {
 
 // toHostState converts host status returned by OpenStack driver into HostState enum
 func toHostState(status string) HostState.Enum {
-	switch status {
-	case "BUILD", "build", "BUILDING", "building":
+	switch strings.ToLower(status) {
+	case "build", "building":
 		return HostState.STARTING
-	case "ACTIVE", "active":
+	case "active":
 		return HostState.STARTED
-	case "RESCUED", "rescued":
+	case "rescued":
 		return HostState.STOPPING
-	case "STOPPED", "stopped", "SHUTOFF", "shutoff":
+	case "stopped", "shutoff":
 		return HostState.STOPPED
 	default:
 		return HostState.ERROR
@@ -392,7 +395,6 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 
 // createHost ...
 func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.Host, error) {
-	// Optional network gateway
 	var gw *api.Host
 	// If the host is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
@@ -520,8 +522,11 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 
 // WaitHostReady waits an host achieve ready state
 func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.Host, error) {
-	var server *servers.Server
-	var err error
+	var (
+		server *servers.Server
+		err    error
+		broken bool
+	)
 
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
@@ -529,8 +534,12 @@ func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.
 			if err != nil {
 				return err
 			}
+			if server.Status == "ERROR" {
+				broken = true
+				return nil
+			}
 			if server.Status != "ACTIVE" {
-				return fmt.Errorf("host in '%s' state", server.Status)
+				return fmt.Errorf("host '%s' is in state '%s'", server.Name, server.Status)
 			}
 			return nil
 		},
@@ -539,14 +548,49 @@ func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.
 	if retryErr != nil {
 		return nil, retryErr
 	}
+	if broken {
+		return nil, fmt.Errorf("host '%s' is in '%s' state", server.Name, server.Status)
+	}
 	return client.toHost(server), nil
 }
 
 // GetHost returns the host identified by id
 func (client *Client) GetHost(id string) (*api.Host, error) {
-	server, err := servers.Get(client.Compute, id).Extract()
+	var (
+		server *servers.Server
+		err    error
+	)
+	retryErr := retry.WhileUnsuccessful(
+		func() error {
+			server, err = servers.Get(client.Compute, id).Extract()
+			if err != nil {
+				switch err.(type) {
+				case gc.ErrDefault404:
+					// If error is "resource not found", we want to return GopherCloud error as-is to be able
+					// to behave differently in this special case. To do so, stop the retry
+					return nil
+				case gc.ErrDefault500:
+					// When the response is "Internal Server Error", retries
+					log.Println("received 'Internal Server Error', retrying servers.Get...")
+					return err
+				}
+				// Any other error stops the retry
+				err = fmt.Errorf("Error getting host '%s': %s", id, ProviderErrorToString(err))
+				return nil
+			}
+			return nil
+		},
+		10*time.Second,
+		1*time.Second,
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case retry.ErrTimeout:
+			return nil, fmt.Errorf("failed to get host '%s' information after 10s: %s", id, err.Error())
+		}
+	}
 	if err != nil {
-		return nil, fmt.Errorf("Error getting host '%s': %s", id, ProviderErrorToString(err))
+		return nil, err
 	}
 	return client.toHost(server), nil
 }
@@ -649,43 +693,64 @@ func (client *Client) DeleteHost(id string) error {
 		}
 	}
 
-	// Try to remove host for 1 minute, with 5 seconds between each try
-	err = retry.WhileUnsuccessfulDelay5Seconds(
+	// Try to remove host for 3 minutes
+	outerRetryErr := retry.WhileUnsuccessful(
 		func() error {
+			resourcePresent := true
 			// 1st, send delete host order
-			err = servers.Delete(client.Compute, id).ExtractErr()
-			// if it fails, try again in 5 seconds
+			err := servers.Delete(client.Compute, id).ExtractErr()
 			if err != nil {
-				return fmt.Errorf("failed to submit host '%s' deletion: %s", host.Name, ProviderErrorToString(err))
+				switch err.(type) {
+				case gc.ErrDefault404:
+					// Resource not found, consider deletion succeeded (if the entry doesn't exist at all,
+					// metadata deletion will return an error)
+					return nil
+				default:
+					return fmt.Errorf("failed to submit host '%s' deletion: %s", host.Name, ProviderErrorToString(err))
+				}
 			}
-			// 2nd, check host status every second until it changes to ERROR or
-			// until check failed. On Error, stops the retry without error; if check
-			// failed, retry the whole thing in 5 seconds
-			retry.WhileUnsuccessfulDelay1Second(
+			// 2nd, check host status every 5 seconds until check failed.
+			// If check succeeds but state is Error, retry the deletion.
+			// If check fails and error isn't 'resource not found', retry
+			innerRetryErr := retry.WhileUnsuccessfulDelay5Seconds(
 				func() error {
 					host, err := servers.Get(client.Compute, id).Extract()
 					if err == nil {
 						if toHostState(host.Status) == HostState.ERROR {
 							return nil
 						}
+						return fmt.Errorf("host '%s' state is '%s'", host.Name, host.Status)
+					}
+					switch err.(type) {
+					case gc.ErrDefault404:
+						resourcePresent = false
+						return nil
 					}
 					return err
 				},
-				5,
+				1*time.Minute,
 			)
-			// At last, if the check of the host failed, host is deleted properly...
-			if _, err := servers.Get(client.Compute, id).Extract(); err == nil {
+			if innerRetryErr != nil {
+				switch innerRetryErr.(type) {
+				case retry.ErrTimeout:
+					// retry deletion...
+					return fmt.Errorf("failed to acknowledge host '%s' deletion! %s", host.Name, err.Error())
+				default:
+					return innerRetryErr
+				}
+			}
+			if !resourcePresent {
 				return nil
 			}
-			// ... otherwise, do it again in 5 seconds
-			return fmt.Errorf("failed to acknowledge host '%s' deletion", host.Name)
+			return fmt.Errorf("host '%s' in state 'ERROR', retrying to delete", host.Name)
 		},
-		1*time.Minute,
+		0,
+		3*time.Minute,
 	)
-	if err != nil {
+	if outerRetryErr != nil {
+		log.Printf("failed to remove host '%s': %s", host.Name, err.Error())
 		return err
 	}
-
 	return metadata.RemoveHost(providers.FromClient(client), host)
 }
 
