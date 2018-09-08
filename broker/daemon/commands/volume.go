@@ -58,7 +58,7 @@ func (s *VolumeServiceServer) List(ctx context.Context, in *pb.VolumeListRequest
 
 	// Map api.Volume to pb.Volume
 	for _, volume := range volumes {
-		pbvolumes = append(pbvolumes, conv.ToPbVolume(&volume))
+		pbvolumes = append(pbvolumes, conv.ToPBVolume(&volume))
 	}
 	rv := &pb.VolumeList{Volumes: pbvolumes}
 	log.Printf("End Volume List")
@@ -80,7 +80,7 @@ func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 	}
 
 	log.Printf("Volume '%s' created: %v", in.GetName(), vol)
-	return conv.ToPbVolume(vol), nil
+	return conv.ToPBVolume(vol), nil
 }
 
 //Attach a volume to an host and create a mount point
@@ -170,5 +170,5 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 	}
 
 	log.Printf("End Inspect volume: '%s'", ref)
-	return conv.ToPbVolumeInfo(volume, volattach), nil
+	return conv.ToPBVolumeInfo(volume, volattach), nil
 }

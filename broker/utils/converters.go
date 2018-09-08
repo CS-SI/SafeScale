@@ -22,11 +22,11 @@ import (
 	"github.com/CS-SI/SafeScale/system"
 )
 
-// ToPBSshconfig converts a system.SSHConfig into a SshConfig
-func ToPBSshconfig(from *system.SSHConfig) *pb.SshConfig {
+// ToPBSshConfig converts a system.SSHConfig into a SshConfig
+func ToPBSshConfig(from *system.SSHConfig) *pb.SshConfig {
 	var gw *pb.SshConfig
 	if from.GatewayConfig != nil {
-		gw = ToPBSshconfig(from.GatewayConfig)
+		gw = ToPBSshConfig(from.GatewayConfig)
 	}
 	return &pb.SshConfig{
 		Gateway:    gw,
@@ -37,11 +37,11 @@ func ToPBSshconfig(from *system.SSHConfig) *pb.SshConfig {
 	}
 }
 
-// ToAPISshConfig converts a SshConfig into a system.SSHConfig
-func ToAPISshConfig(from *pb.SshConfig) *system.SSHConfig {
+// ToSystemSshConfig converts a pb.SshConfig into a system.SSHConfig
+func ToSystemSshConfig(from *pb.SshConfig) *system.SSHConfig {
 	var gw *system.SSHConfig
 	if from.Gateway != nil {
-		gw = ToAPISshConfig(from.Gateway)
+		gw = ToSystemSshConfig(from.Gateway)
 	}
 	return &system.SSHConfig{
 		User:          from.User,
@@ -52,8 +52,8 @@ func ToAPISshConfig(from *pb.SshConfig) *system.SSHConfig {
 	}
 }
 
-//ToPbVolume converts an api.Volume to a *Volume
-func ToPbVolume(in *api.Volume) *pb.Volume {
+// ToPBVolume converts an api.Volume to a *Volume
+func ToPBVolume(in *api.Volume) *pb.Volume {
 	return &pb.Volume{
 		ID:    in.ID,
 		Name:  in.Name,
@@ -62,8 +62,8 @@ func ToPbVolume(in *api.Volume) *pb.Volume {
 	}
 }
 
-//ToPbVolumeAttachment converts an api.Volume to a *Volume
-func ToPbVolumeAttachment(in *api.VolumeAttachment) *pb.VolumeAttachment {
+// ToPBVolumeAttachment converts an api.Volume to a *Volume
+func ToPBVolumeAttachment(in *api.VolumeAttachment) *pb.VolumeAttachment {
 	return &pb.VolumeAttachment{
 		Volume:    &pb.Reference{ID: in.VolumeID},
 		Host:      &pb.Reference{ID: in.ServerID},
@@ -72,8 +72,8 @@ func ToPbVolumeAttachment(in *api.VolumeAttachment) *pb.VolumeAttachment {
 	}
 }
 
-//ToPbVolumeInfo merges and converts an api.Volume and an api.VolumeAttachment to a *VolumeInfo
-func ToPbVolumeInfo(volume *api.Volume, volumeAttch *api.VolumeAttachment) *pb.VolumeInfo {
+// ToPBVolumeInfo merges and converts an api.Volume and an api.VolumeAttachment to a *VolumeInfo
+func ToPBVolumeInfo(volume *api.Volume, volumeAttch *api.VolumeAttachment) *pb.VolumeInfo {
 	if volumeAttch != nil {
 		return &pb.VolumeInfo{
 			ID:        volume.ID,
@@ -94,7 +94,7 @@ func ToPbVolumeInfo(volume *api.Volume, volumeAttch *api.VolumeAttachment) *pb.V
 	}
 }
 
-//ToPBContainerList convert a list of string into a *ContainerLsit
+// ToPBContainerList convert a list of string into a *ContainerLsit
 func ToPBContainerList(in []string) *pb.ContainerList {
 
 	var containers []*pb.Container
@@ -106,25 +106,21 @@ func ToPBContainerList(in []string) *pb.ContainerList {
 	}
 }
 
-//ToPBContainerMountPoint convert a ContainerInfo into a ContainerMountingPoint
+// ToPBContainerMountPoint convert a ContainerInfo into a ContainerMountingPoint
 func ToPBContainerMountPoint(in *api.ContainerInfo) *pb.ContainerMountingPoint {
 	return &pb.ContainerMountingPoint{
 		Container: in.Name,
 		Path:      in.MountPoint,
-		Host: &pb.Reference{
-			Name: in.Host,
-		},
+		Host:      &pb.Reference{Name: in.Host},
 	}
 }
 
 // ToPBNas convert a Nas from api to protocolbuffer format
 func ToPBNas(in *api.Nas) *pb.NasDefinition {
 	return &pb.NasDefinition{
-		ID: in.ID,
-		Nas: &pb.NasName{
-			Name: in.Name},
-		Host: &pb.Reference{
-			Name: in.Host},
+		ID:       in.ID,
+		Nas:      &pb.NasName{Name: in.Name},
+		Host:     &pb.Reference{Name: in.Host},
 		Path:     in.Path,
 		IsServer: in.IsServer,
 	}
@@ -159,7 +155,7 @@ func ToPBHostTemplate(in *api.HostTemplate) *pb.HostTemplate {
 	}
 }
 
-//ToPBImage convert an image from api to protocolbuffer format
+// ToPBImage convert an image from api to protocolbuffer format
 func ToPBImage(in *api.Image) *pb.Image {
 	return &pb.Image{
 		ID:   in.ID,

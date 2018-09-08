@@ -144,5 +144,5 @@ func (s *HostServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshC
 		return nil, err
 	}
 	log.Printf("Got Ssh config for host '%s'", ref)
-	return conv.ToPBSshconfig(sshConfig), nil
+	return conv.ToPBSshConfig(sshConfig), nil
 }
