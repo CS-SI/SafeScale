@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/broker/client"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/providers/api"
 
@@ -37,7 +39,7 @@ var ContainerCmd = cli.Command{
 		containerDelete,
 		containerInspect,
 		containerMount,
-		containerUmount,
+		containerUnmount,
 	},
 }
 
@@ -47,6 +49,9 @@ var containerList = cli.Command{
 	Action: func(c *cli.Context) error {
 		resp, err := client.New().Container.List(0)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("list of containers took too long to respond")
+			}
 			return fmt.Errorf("Could not list containers: %v", err)
 		}
 
@@ -66,8 +71,11 @@ var containerCreate = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
-		err := client.New().Container.Create(c.Args().Get(0), 0)
+		err := client.New().Container.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("creation of container took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("Could not create container '%s': %v", c.Args().Get(0), err)
 		}
 		return nil
@@ -84,8 +92,11 @@ var containerDelete = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
-		err := client.New().Container.Delete(c.Args().Get(0), 0)
+		err := client.New().Container.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("deletion of container took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("Could not delete container '%s': %v", c.Args().Get(0), err)
 		}
 		return nil
@@ -102,8 +113,11 @@ var containerInspect = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
-		resp, err := client.New().Container.Inspect(c.Args().Get(0), 0)
+		resp, err := client.New().Container.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("inspection of container took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("Could not inspect container '%s': %v", c.Args().Get(0), err)
 		}
 
@@ -130,8 +144,11 @@ var containerMount = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container and Host name required")
 		}
-		err := client.New().Container.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), 0)
+		err := client.New().Container.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("mount of container took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("could not mount container '%s': %v", c.Args().Get(0), err)
 		}
 		fmt.Printf("Container '%s' mounted on '%s' on host '%s'\n", c.Args().Get(0), c.String("path"), c.Args().Get(1))
@@ -139,7 +156,7 @@ var containerMount = cli.Command{
 	},
 }
 
-var containerUmount = cli.Command{
+var containerUnmount = cli.Command{
 	Name:      "umount",
 	Usage:     "Unmount a container from the filesytem of an host",
 	ArgsUsage: "<Container_name> <Host_name>",
@@ -149,11 +166,14 @@ var containerUmount = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container and Host name required")
 		}
-		err := client.New().Container.Unmount(c.Args().Get(0), c.Args().Get(1), 0)
+		err := client.New().Container.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("could not umount container '%s': %v", c.Args().Get(0), err)
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("unmount of container took too long to respond (may eventually succeed)")
+			}
+			return fmt.Errorf("could not unmount container '%s': %v", c.Args().Get(0), err)
 		}
-		fmt.Printf("Container '%s' umounted from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
+		fmt.Printf("Container '%s' unmounted from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 		return nil
 	},
 }

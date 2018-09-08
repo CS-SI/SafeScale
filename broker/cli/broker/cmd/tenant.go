@@ -22,6 +22,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/urfave/cli"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // TenantCmd command
@@ -39,8 +41,11 @@ var tenantList = cli.Command{
 	Name:  "list",
 	Usage: "List available tenants",
 	Action: func(c *cli.Context) error {
-		tenants, err := client.New().Tenant.List(0)
+		tenants, err := client.New().Tenant.List(client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("crealist of tenants took too long to respond")
+			}
 			return fmt.Errorf("Could not get tenant list: %v", err)
 		}
 		out, _ := json.Marshal(tenants.GetTenants())
@@ -54,8 +59,11 @@ var tenantGet = cli.Command{
 	Name:  "get",
 	Usage: "Get current tenant",
 	Action: func(c *cli.Context) error {
-		tenant, err := client.New().Tenant.Get(0)
+		tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("get tenant took too long to respond")
+			}
 			return fmt.Errorf("Could not get current tenant: %v", err)
 		}
 		out, _ := json.Marshal(tenant)
@@ -74,8 +82,11 @@ var tenantSet = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Tenant name required")
 		}
-		err := client.New().Tenant.Set(c.Args().First(), 0)
+		err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("set tenant took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("Could not get current tenant: %v", err)
 		}
 		fmt.Printf("Tenant '%s' set\n", c.Args().First())

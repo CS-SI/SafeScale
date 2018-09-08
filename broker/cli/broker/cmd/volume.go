@@ -25,6 +25,8 @@ import (
 	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/urfave/cli"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 //VolumeCmd volume command
@@ -50,8 +52,11 @@ var volumeList = cli.Command{
 			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		resp, err := client.New().Volume.List(c.Bool("all"), 0)
+		resp, err := client.New().Volume.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("list of volumes took too long to respond")
+			}
 			return fmt.Errorf("Could not get volume list: %v", err)
 		}
 
@@ -75,8 +80,11 @@ var volumeInspect = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Volume name or ID required")
 		}
-		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), 0)
+		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("inspection of volume took too long to respond")
+			}
 			return fmt.Errorf("Could not get volume '%s': %v", c.Args().First(), err)
 		}
 
@@ -97,8 +105,11 @@ var volumeDelete = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Volume name or ID required")
 		}
-		err := client.New().Volume.Delete(c.Args().First(), 0)
+		err := client.New().Volume.Delete(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("deletion of volume took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("Could not delete volume '%s': %v", c.Args().First(), err)
 		}
 		fmt.Printf("Volume '%s' deleted\n", c.Args().First())
@@ -141,8 +152,11 @@ var volumeCreate = cli.Command{
 			Speed: pb.VolumeSpeed(volSpeed),
 		}
 
-		volume, err := client.New().Volume.Create(def, 0)
+		volume, err := client.New().Volume.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("creation of volume took too long to respond")
+			}
 			return fmt.Errorf("Could not create volume '%s': %v", c.Args().First(), err)
 		}
 		out, _ := json.Marshal(toDisplaybleVolume(volume))
@@ -180,8 +194,11 @@ var volumeAttach = cli.Command{
 			Host:      &pb.Reference{Name: c.Args().Get(1)},
 			Volume:    &pb.Reference{Name: c.Args().Get(0)},
 		}
-		err := client.New().Volume.Attach(def, 0)
+		err := client.New().Volume.Attach(def, client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("attach of volume took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("could not attach volume '%s' to host '%s': %v", c.Args().Get(0), c.Args().Get(1), err)
 		}
 		fmt.Printf("Volume '%s' attached to host '%s'\n", c.Args().Get(0), c.Args().Get(1))
@@ -200,8 +217,11 @@ var volumeDetach = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("volume and host names required")
 		}
-		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), 0)
+		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("detach of volume took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("could not detach volume '%s' from host '%s': %v", c.Args().Get(0), c.Args().Get(1), err)
 		}
 		fmt.Printf("Volume '%s' detached from host '%s'\n", c.Args().Get(0), c.Args().Get(1))

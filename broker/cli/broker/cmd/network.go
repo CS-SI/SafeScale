@@ -23,6 +23,8 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/urfave/cli"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // NetworkCmd command
@@ -46,8 +48,11 @@ var networkList = cli.Command{
 			Usage: "List all Networks on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		networks, err := client.New().Network.List(c.Bool("all"), 0)
+		networks, err := client.New().Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("list of network '%s' took too long to respond", c.Args().First())
+			}
 			return fmt.Errorf("Could not get network list: %v", err)
 		}
 		out, _ := json.Marshal(networks.GetNetworks())
@@ -67,9 +72,12 @@ var networkDelete = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Network name required")
 		}
-		err := client.New().Network.Delete(c.Args().First(), 0)
+		err := client.New().Network.Delete(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not delete network %s: %v", c.Args().First(), err)
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("deletion of network '%s' took too long to respond (may eventually succeed)", c.Args().First())
+			}
+			return fmt.Errorf("could not delete network %s: %v", c.Args().First(), err)
 		}
 		fmt.Println(fmt.Sprintf("Network '%s' deleted", c.Args().First()))
 
@@ -87,9 +95,12 @@ var networkInspect = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Network name required")
 		}
-		network, err := client.New().Network.Inspect(c.Args().First(), 0)
+		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not inspect network %s: %v", c.Args().First(), err)
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("inspection of network '%s' took too long to respond", c.Args().First())
+			}
+			return fmt.Errorf("could not inspect network %s: %v", c.Args().First(), err)
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))
@@ -138,7 +149,7 @@ var networkCreate = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
 			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Network name reqired")
+			return fmt.Errorf("Network name required")
 		}
 		netdef := pb.NetworkDefinition{
 			CIDR: c.String("cidr"),
@@ -152,9 +163,12 @@ var networkCreate = cli.Command{
 				Name:    c.String("gwname"),
 			},
 		}
-		network, err := client.New().Network.Create(netdef, 0)
+		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not get network list: %v", err)
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("creation of network '%s' took too long to respond (may eventually succeed)", c.Args().First())
+			}
+			return fmt.Errorf("Could not create network: %v", err)
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))

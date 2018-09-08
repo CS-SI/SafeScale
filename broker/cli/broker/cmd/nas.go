@@ -23,6 +23,8 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/urfave/cli"
 )
@@ -35,7 +37,7 @@ var NasCmd = cli.Command{
 		nasCreate,
 		nasDelete,
 		nasMount,
-		nasUmount,
+		nasUnmount,
 		nasList,
 		nasInspect,
 	},
@@ -63,8 +65,11 @@ var nasCreate = cli.Command{
 			Host: &pb.Reference{Name: c.Args().Get(1)},
 			Path: c.String("path"),
 		}
-		err := client.New().Nas.Create(def, 0)
+		err := client.New().Nas.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("creation of nas took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("Could not create nas: %v", err)
 		}
 
@@ -82,9 +87,12 @@ var nasDelete = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas name required")
 		}
-		err := client.New().Nas.Delete(c.Args().Get(0), 0)
+		err := client.New().Nas.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
 		// TODO output result to stdout
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("deletion of nas took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("Could not delete nas: %v", err)
 		}
 
@@ -98,6 +106,9 @@ var nasList = cli.Command{
 	Action: func(c *cli.Context) error {
 		nass, err := client.New().Nas.List(0)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("list of nas took too long to respond")
+			}
 			return fmt.Errorf("Could not get nas list: %v", err)
 		}
 		out, _ := json.Marshal(nass.GetNasList())
@@ -124,17 +135,20 @@ var nasMount = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas and Host name required")
 		}
-		err := client.New().Nas.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), 0)
+		err := client.New().Nas.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("mount of nas took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("Could not mount nfs directory: %v", err)
 		}
 		return nil
 	},
 }
 
-var nasUmount = cli.Command{
+var nasUnmount = cli.Command{
 	Name:      "umount",
-	Usage:     "UMount an exported nfs directory on an host",
+	Usage:     "Unmount an exported nfs directory on an host",
 	ArgsUsage: "<Nas_name> <Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
@@ -142,8 +156,11 @@ var nasUmount = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas and Host name required")
 		}
-		err := client.New().Nas.Unmount(c.Args().Get(0), c.Args().Get(1), 0)
+		err := client.New().Nas.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("unmount of nas took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("Could not umount nfs directory: %v", err)
 		}
 
@@ -161,8 +178,11 @@ var nasInspect = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas name required")
 		}
-		nass, err := client.New().Nas.Inspect(c.Args().Get(0), 0)
+		nass, err := client.New().Nas.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("inspection of nas took too long to respond")
+			}
 			return fmt.Errorf("Could not inspect nas: %v", err)
 		}
 		out, _ := json.Marshal(nass.GetNasList())

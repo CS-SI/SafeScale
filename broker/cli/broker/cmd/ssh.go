@@ -25,9 +25,11 @@ import (
 	"github.com/CS-SI/SafeScale/broker/client"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/urfave/cli"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-//SSHCmd ssh command
+// SSHCmd ssh command
 var SSHCmd = cli.Command{
 	Name:  "ssh",
 	Usage: "ssh COMMAND",
@@ -64,6 +66,9 @@ var sshRun = cli.Command{
 		}
 		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), 20*time.Second, executionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("ssh run took too long to respond (may eventually succeed)")
+			}
 			return fmt.Errorf("Could not execute ssh command: %v", err)
 		}
 
@@ -103,15 +108,11 @@ var sshCopy = cli.Command{
 		if c.IsSet("timeout") {
 			executionTimeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
-<<<<<<< Updated upstream
-		err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), timeout)
-		_, stdout, stderr, err := client.New().Ssh.Copy(c.Args().Get(0), c.Args().Get(1), 20*time.Second, executionTimeout)
-||||||| ancestor
-		err := client.New().Ssh.Copy(c.Args().Get(0), c.Args().Get(1), timeout)
-=======
-		_, stdout, stderr, err := client.New().Ssh.Copy(c.Args().Get(0), c.Args().Get(1), 20*time.Second, executionTimeout)
->>>>>>> Stashed changes
+		_, stdout, stderr, err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), 20*time.Second, executionTimeout)
 		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("ssh copy took too long to respond (may eventually succeed)")
+			}
 			fmt.Println(stdout)
 			fmt.Fprintln(os.Stderr, stderr)
 			return fmt.Errorf("Could not copy %s to %s: %v", c.Args().Get(0), c.Args().Get(1), err)
@@ -131,6 +132,12 @@ var sshConnect = cli.Command{
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name required")
 		}
-		return client.New().Ssh.Connect(c.Args().Get(0), 0)
+		err := client.New().Ssh.Connect(c.Args().Get(0), client.DefaultExecutionTimeout)
+		if err != nil {
+			if status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("ssh connect took too long to respond")
+			}
+		}
+		return err
 	},
 }
