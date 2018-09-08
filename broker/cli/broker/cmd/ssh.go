@@ -103,8 +103,14 @@ var sshCopy = cli.Command{
 		if c.IsSet("timeout") {
 			executionTimeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
+<<<<<<< Updated upstream
 		err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), timeout)
 		_, stdout, stderr, err := client.New().Ssh.Copy(c.Args().Get(0), c.Args().Get(1), 20*time.Second, executionTimeout)
+||||||| ancestor
+		err := client.New().Ssh.Copy(c.Args().Get(0), c.Args().Get(1), timeout)
+=======
+		_, stdout, stderr, err := client.New().Ssh.Copy(c.Args().Get(0), c.Args().Get(1), 20*time.Second, executionTimeout)
+>>>>>>> Stashed changes
 		if err != nil {
 			fmt.Println(stdout)
 			fmt.Fprintln(os.Stderr, stderr)
