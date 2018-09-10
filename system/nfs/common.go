@@ -22,8 +22,10 @@ import (
 	"os/exec"
 	"syscall"
 	"text/template"
+	"time"
 
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/GeertJohan/go.rice"
 )
 
@@ -73,26 +75,40 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		return 255, "", "", fmt.Errorf("failed to execute template: %s", err.Error())
 	}
 	tmplResult := buffer.String()
-	sshCmd, err := sshconfig.SudoCommand(tmplResult)
-	if err != nil {
-		return 255, "", "", err
-	}
 
-	cmdResult, err := sshCmd.Output()
 	retcode := 0
-	stdout := string(cmdResult)
+	stdout := ""
 	stderr := ""
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-				retcode = status.ExitStatus()
+	err = retry.Action(
+		func() error {
+			stdout = ""
+			stderr = ""
+			retcode = 0
+
+			sshCmd, err := sshconfig.SudoCommand(tmplResult)
+			if err != nil {
+				return err
 			}
-			stderr = string(ee.Stderr)
-		} else {
-			return 255, "", "", fmt.Errorf("failed to execute script '%s': %s", name, err.Error())
-		}
-	}
-	return retcode, stdout, stderr, nil
+			cmdResult, err := sshCmd.Output()
+			stdout = string(cmdResult)
+			stderr = ""
+			retcode = 0
+			if err != nil {
+				if ee, ok := err.(*exec.ExitError); ok {
+					if status, ok := ee.Sys().(syscall.WaitStatus); ok {
+						retcode = status.ExitStatus()
+					}
+					stderr = string(ee.Stderr)
+				}
+			}
+			return err
+		},
+		retry.PrevailDone(retry.Unsuccessful255(), retry.Timeout(1*time.Minute)),
+		retry.Constant(5*time.Second),
+		nil, nil, nil,
+	)
+
+	return retcode, stdout, stderr, err
 }
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {

@@ -87,6 +87,15 @@ func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
+	// Check if a volume already exist with the same name
+	volume, err := metadata.LoadVolume(providers.FromClient(client), request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if volume != nil {
+		return nil, fmt.Errorf("Volume '%s' already exists", request.Name)
+	}
+
 	vol, err := volumes.Create(client.Volume, volumes.CreateOpts{
 		Name:       request.Name,
 		Size:       request.Size,
@@ -127,7 +136,8 @@ func (client *Client) GetVolume(id string) (*api.Volume, error) {
 	return &av, nil
 }
 
-// ListVolumes returns a list of volumes
+//ListVolumes return the list of all volume known on the current tenant (all=ture)
+//or 'only' thode monitored by safescale (all=false) ie those monitored by metadata
 func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
 	if all {
 		return client.listAllVolumes()
@@ -165,19 +175,28 @@ func (client *Client) listAllVolumes() ([]api.Volume, error) {
 // listMonitoredVolumess lists available Volumes created by SafeScale (ie registered in object storage)
 func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
 	var vols []api.Volume
-	err := metadata.NewVolume(providers.FromClient(client)).Browse(func(vol *api.Volume) error {
+	m := metadata.NewVolume(providers.FromClient(client))
+	err := m.Browse(func(vol *api.Volume) error {
 		vols = append(vols, *vol)
 		return nil
 	})
-	if err != nil {
-		return vols, err
+	if len(vols) == 0 && err != nil {
+		return nil, fmt.Errorf("Error listing volumes : %s", ProviderErrorToString(err))
 	}
 	return vols, nil
 }
 
 // DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(id string) error {
-	err := volumes.Delete(client.Volume, id).ExtractErr()
+	volume, err := metadata.LoadVolume(providers.FromClient(client), id)
+	if err != nil {
+		return err
+	}
+	if volume == nil {
+		return providers.ResourceNotFoundError("Volume", id)
+	}
+
+	err = volumes.Delete(client.Volume, id).ExtractErr()
 	if err != nil {
 		return fmt.Errorf("Error deleting volume: %s", ProviderErrorToString(err))
 	}

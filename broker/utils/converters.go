@@ -162,3 +162,13 @@ func ToPBImage(in *api.Image) *pb.Image {
 		Name: in.Name,
 	}
 }
+
+//ToPBNetwork convert a network from api to protocolbuffer format
+func ToPBNetwork(in *api.Network) *pb.Network {
+	return &pb.Network{
+		ID:        in.ID,
+		Name:      in.Name,
+		CIDR:      in.CIDR,
+		GatewayID: in.GatewayID,
+	}
+}

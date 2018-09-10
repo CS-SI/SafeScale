@@ -34,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
+	gc "github.com/gophercloud/gophercloud"
 
 	uuid "github.com/satori/go.uuid"
 
@@ -290,7 +291,16 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		return nil, fmt.Errorf("name '%s' is invalid for a FlexibleEngine Host: %s", request.Name, openstack.ProviderErrorToString(err))
 	}
 
-	// Eventual network gateway
+	// Check name availability
+	m, err := metadata.LoadHost(providers.FromClient(client), request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return nil, providers.ResourceAlreadyExistsError("Host", request.Name)
+	}
+
+	//Eventual network gateway
 	var gw *api.Host
 	// If the host is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
@@ -326,7 +336,6 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 
 	// Prepare key pair
 	kp := request.KeyPair
-	var err error
 	// If no key pair is supplied create one
 	if kp == nil {
 		id, _ := uuid.NewV4()
@@ -457,21 +466,54 @@ func validatehostName(req api.HostRequest) (bool, error) {
 	return true, nil
 }
 
-// GetHost returns the host identified by id
-func (client *Client) GetHost(id string) (*api.Host, error) {
-	return client.osclt.GetHost(id)
+// GetHost returns the host identified by ref (id or name)
+func (client *Client) GetHost(ref string) (*api.Host, error) {
+	// We first try looking for host from metadata
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return m.Get(), nil
+	}
+
+	// If not found, we look for any host from provider
+	// 1st try with id
+	server, err := servers.Get(client.osclt.Compute, ref).Extract()
+	if err != nil {
+		if _, ok := err.(gc.ErrDefault404); !ok {
+			return nil, fmt.Errorf("Error getting Host '%s': %s", ref, openstack.ProviderErrorToString(err))
+		}
+	}
+	if server != nil && server.ID != "" {
+		return client.toHost(server), nil
+	}
+
+	// Last chance, we look at all network
+	hosts, err := client.listAllHosts()
+	if err != nil {
+		return nil, err
+	}
+	for _, host := range hosts {
+		if host.ID == ref || host.Name == ref {
+			return &host, err
+		}
+	}
+
+	// At this point, no network has been found with given reference
+	return nil, nil
 }
 
 // ListHosts lists available hosts
 func (client *Client) ListHosts(all bool) ([]api.Host, error) {
 	if all {
-		return client.listallhosts()
+		return client.listAllHosts()
 	}
 	return client.listMonitoredHosts()
 }
 
 // listallhosts lists available hosts
-func (client *Client) listallhosts() ([]api.Host, error) {
+func (client *Client) listAllHosts() ([]api.Host, error) {
 	pager := servers.List(client.osclt.Compute, servers.ListOpts{})
 	var hosts []api.Host
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -507,7 +549,17 @@ func (client *Client) listMonitoredHosts() ([]api.Host, error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (client *Client) DeleteHost(id string) error {
+func (client *Client) DeleteHost(ref string) error {
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	if err != nil {
+		return err
+	}
+	if m == nil {
+		return providers.ResourceNotFoundError("Host", ref)
+	}
+
+	host := m.Get()
+	id := host.ID
 	// Retrieve the list of attached volumes before deleting the host
 	volumeAttachments, err := client.ListVolumeAttachments(id)
 	if err != nil {
@@ -823,7 +875,6 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 	}
 
 	imageFilter := filters.NewFilter(isWindowsImage).Not().And(filters.NewFilter(isBMSImage).Not())
-
 	return filters.FilterImages(images, imageFilter), nil
 
 }

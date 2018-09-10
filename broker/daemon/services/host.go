@@ -18,13 +18,12 @@ package services
 
 import (
 	"fmt"
-	"log"
 	"strings"
+	"log"
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system"
 )
 
@@ -53,10 +52,6 @@ type HostService struct {
 
 // Create creates a host
 func (svc *HostService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.Host, error) {
-	_host, err := svc.Get(name)
-	if _host != nil || (err != nil && !strings.Contains(err.Error(), "failed to find host")) {
-		return nil, fmt.Errorf("host '%s' already exists", name)
-	}
 	log.Println("creating compute resource...")
 	n, err := svc.network.Get(net)
 	if err != nil {
@@ -110,30 +105,12 @@ func (svc *HostService) List(all bool) ([]api.Host, error) {
 
 // Get returns the host identified by ref, ref can be the name or the id
 func (svc *HostService) Get(ref string) (*api.Host, error) {
-	m := metadata.NewHost(svc.provider)
-	found, err := m.ReadByName(ref)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		found, err = m.ReadByID(ref)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if !found {
-		return nil, fmt.Errorf("failed to find host '%s'", ref)
-	}
-	return m.Get(), nil
+	return svc.provider.GetHost(ref)
 }
 
 // Delete deletes host referenced by ref
 func (svc *HostService) Delete(ref string) error {
-	host, err := svc.Get(ref)
-	if err != nil {
-		return fmt.Errorf("host '%s' does not exist", ref)
-	}
-	return svc.provider.DeleteHost(host.ID)
+	return svc.provider.DeleteHost(ref)
 }
 
 // SSH returns ssh parameters to access the host referenced by ref

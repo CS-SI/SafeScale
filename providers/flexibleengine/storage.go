@@ -19,13 +19,16 @@ package flexibleengine
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/providers/aws/s3"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	v2_vol "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 )
@@ -35,7 +38,53 @@ import (
 //- 'volume' to attach
 //- 'host' on which the volume is attached
 func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
-	return client.osclt.CreateVolumeAttachment(request)
+	// Ensure volume and host are known
+	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), request.VolumeID)
+	if err != nil {
+		return nil, err
+	}
+	if mtdVol == nil {
+		return nil, providers.ResourceNotFoundError("Volume", request.VolumeID)
+	}
+	_volumeAttachment, err := mtdVol.GetAttachment()
+	if err != nil {
+		return nil, err
+	}
+	if _volumeAttachment != nil && _volumeAttachment.ID != "" {
+		return nil, fmt.Errorf("Volume '%s' already has an attachment on '%s", _volumeAttachment.VolumeID, _volumeAttachment.ServerID)
+	}
+
+	mdtHost, err := metadata.LoadHost(providers.FromClient(client), request.ServerID)
+	if err != nil {
+		return nil, err
+	}
+	if mdtHost == nil {
+		return nil, providers.ResourceNotFoundError("Host", request.ServerID)
+	}
+
+	// return client.osclt.CreateVolumeAttachment(request)
+	va, err := volumeattach.Create(client.osclt.Compute, request.ServerID, volumeattach.CreateOpts{
+		VolumeID: request.VolumeID,
+	}).Extract()
+	if err != nil {
+		fmt.Printf("%s", err.Error())
+		return nil, fmt.Errorf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, openstack.ProviderErrorToString(err))
+	}
+
+	volumeAttachment := &api.VolumeAttachment{
+		ID:       va.ID,
+		ServerID: va.ServerID,
+		VolumeID: va.VolumeID,
+		Device:   va.Device,
+	}
+
+	err = mtdVol.Attach(volumeAttachment)
+	if err != nil {
+		// TODO ? Detach volume ?
+		return volumeAttachment, err
+	}
+
+	return volumeAttachment, nil
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
@@ -50,12 +99,48 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttach
 
 // DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
-	return client.osclt.DeleteVolumeAttachment(serverID, id)
+	va, err := client.GetVolumeAttachment(serverID, id)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, openstack.ProviderErrorToString(err))
+	}
+
+	err = volumeattach.Delete(client.osclt.Compute, serverID, id).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, openstack.ProviderErrorToString(err))
+	}
+
+	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), id)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, openstack.ProviderErrorToString(err))
+	}
+
+	err = mtdVol.Detach(va)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume attachment %s: %s", id, openstack.ProviderErrorToString(err))
+	}
+
+	return nil
 }
 
 // DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(id string) error {
-	return client.osclt.DeleteVolume(id)
+	volume, err := metadata.LoadVolume(providers.FromClient(client), id)
+	if err != nil {
+		return err
+	}
+	if volume == nil {
+		return providers.ResourceNotFoundError("Volume", id)
+	}
+
+	err = v2_vol.Delete(client.osclt.Volume, id).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("Error deleting volume: %s", openstack.ProviderErrorToString(err))
+	}
+	err = metadata.RemoveVolume(providers.FromClient(client), id)
+	if err != nil {
+		return fmt.Errorf("Error deleting volume: %s", openstack.ProviderErrorToString(err))
+	}
+	return nil
 }
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
@@ -88,9 +173,9 @@ func (client *Client) getVolumeType(speed VolumeSpeed.Enum) string {
 	}
 	switch speed {
 	case VolumeSpeed.SSD:
-		return client.getVolumeType(VolumeSpeed.SSD)
-	case VolumeSpeed.HDD:
 		return client.getVolumeType(VolumeSpeed.HDD)
+	case VolumeSpeed.HDD:
+		return client.getVolumeType(VolumeSpeed.COLD)
 	default:
 		return ""
 	}
@@ -110,7 +195,15 @@ func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 // - imageID is the ID of the image to initialize the volume with
 func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
-	return client.ExCreateVolume(request, "")
+	vol, err := client.ExCreateVolume(request, "")
+
+	err = metadata.SaveVolume(providers.FromClient(client), vol)
+	if err != nil {
+		client.DeleteVolume(vol.ID)
+		return nil, fmt.Errorf("failed to create Volume: %s", openstack.ProviderErrorToString(err))
+	}
+
+	return vol, err
 }
 
 // ExCreateVolume creates a block volume
@@ -119,6 +212,15 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 // - imageID is the ID of the image to initialize the volume with
 func (client *Client) ExCreateVolume(request api.VolumeRequest, imageID string) (*api.Volume, error) {
+	// Check if a volume already exist with the same name
+	volume, err := metadata.LoadVolume(providers.FromClient(client), request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if volume != nil {
+		return nil, providers.ResourceAlreadyExistsError("Volume", request.Name)
+	}
+
 	opts := v2_vol.CreateOpts{
 		Name:       request.Name,
 		Size:       request.Size,
@@ -146,7 +248,27 @@ func (client *Client) GetVolume(id string) (*api.Volume, error) {
 
 // ListVolumes list available volumes
 func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
-	return client.osclt.ListVolumes(all)
+	// return client.osclt.ListVolumes(all)
+	if all {
+		return client.osclt.ListVolumes(all)
+	}
+	return client.listMonitoredVolumes()
+}
+
+// listMonitoredVolumes lists available volumes created by SafeScale (ie registered in object storage)
+// This code seems to be the same than openstack provider, but it HAS TO BE DUPLICATED
+// because client.ListObjects() is different (Swift for openstack, S3 for flexibleengine).
+func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
+	var vols []api.Volume
+	m := metadata.NewVolume(providers.FromClient(client))
+	err := m.Browse(func(vol *api.Volume) error {
+		vols = append(vols, *vol)
+		return nil
+	})
+	if len(vols) == 0 && err != nil {
+		return nil, fmt.Errorf("Error listing volumes : %s", openstack.ProviderErrorToString(err))
+	}
+	return vols, nil
 }
 
 // CreateContainer creates an object container

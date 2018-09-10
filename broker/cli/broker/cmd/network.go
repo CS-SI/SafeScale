@@ -77,7 +77,7 @@ var networkDelete = cli.Command{
 			if status.Code(err) == codes.DeadlineExceeded {
 				return fmt.Errorf("deletion of network '%s' took too long to respond (may eventually succeed)", c.Args().First())
 			}
-			return fmt.Errorf("could not delete network %s: %v", c.Args().First(), err)
+			return fmt.Errorf("Could not delete network '%s': %v", c.Args().First(), err)
 		}
 		fmt.Println(fmt.Sprintf("Network '%s' deleted", c.Args().First()))
 
@@ -168,7 +168,7 @@ var networkCreate = cli.Command{
 			if status.Code(err) == codes.DeadlineExceeded {
 				return fmt.Errorf("creation of network '%s' took too long to respond (may eventually succeed)", c.Args().First())
 			}
-			return fmt.Errorf("Could not create network: %v", err)
+			return fmt.Errorf("Could not create network '%s': %v", c.Args().First(), err)
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))

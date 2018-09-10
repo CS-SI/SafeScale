@@ -189,7 +189,6 @@ func (c *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 	}
 
 	filter := filters.NewFilter(isWindowsTemplate).Not().And(filters.NewFilter(isFlexTemplate).Not())
-
 	return filters.FilterTemplates(allTemplates, filter), nil
 }
 

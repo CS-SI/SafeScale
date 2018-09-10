@@ -37,7 +37,7 @@ make
 # Install
 # ----------------------
 echo "Install"
-export GOBIN=${GOBIN=/go/bin}
+export GOBIN=${GOBIN=$GOPATH/bin}
 make install
 
 # ----------------------
