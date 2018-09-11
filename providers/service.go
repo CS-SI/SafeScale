@@ -421,7 +421,7 @@ func (srv *Service) GetHostByName(name string) (*api.Host, error) {
 	}
 	host, ok := hosts[name]
 	if !ok {
-		return nil, ResourceNotFoundError("Host", name)
+		return nil, ResourceNotFoundError("host", name)
 	}
 	return &host, nil
 }

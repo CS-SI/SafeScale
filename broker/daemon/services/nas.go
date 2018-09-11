@@ -123,7 +123,7 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 	}
 
 	if len(nass) == 0 {
-		return nil, providers.ResourceNotFoundError("Nas", name)
+		return nil, providers.ResourceNotFoundError("NAS", name)
 	}
 	if len(nass) > 1 {
 		var hosts []string
@@ -194,12 +194,12 @@ func (srv *NasService) Mount(name, hostName, path string) (*api.Nas, error) {
 
 	host, err := srv.hostService.Get(hostName)
 	if err != nil {
-		return nil, providers.ResourceNotFoundError("Host", hostName)
+		return nil, providers.ResourceNotFoundError("host", hostName)
 	}
 
 	nfsServer, err := srv.hostService.Get(nas.Host)
 	if err != nil {
-		return nil, providers.ResourceNotFoundError("Host", nas.Host)
+		return nil, providers.ResourceNotFoundError("host", nas.Host)
 	}
 
 	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
@@ -251,12 +251,12 @@ func (srv *NasService) UMount(name, hostName string) (*api.Nas, error) {
 
 	host, err := srv.hostService.Get(hostName)
 	if err != nil {
-		return nil, providers.ResourceNotFoundError("Host", hostName)
+		return nil, providers.ResourceNotFoundError("host", hostName)
 	}
 
 	nfsServer, err := srv.hostService.Get(nas.Host)
 	if err != nil {
-		return nil, providers.ResourceNotFoundError("Host", nas.Host)
+		return nil, providers.ResourceNotFoundError("host", nas.Host)
 	}
 
 	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
@@ -285,7 +285,7 @@ func (srv *NasService) Inspect(name string) ([]*api.Nas, error) {
 		return nil, err
 	}
 	if mtdNas == nil {
-		return nil, providers.ResourceNotFoundError("Nas", name)
+		return nil, providers.ResourceNotFoundError("NAS", name)
 	}
 
 	nass, err := mtdNas.Listclients()
@@ -323,7 +323,7 @@ func (srv *NasService) findClient(nasName, hostName string) (*api.Nas, error) {
 		return nil, err
 	}
 	if mtdnas == nil {
-		return nil, providers.ResourceNotFoundError("Nas", nasName)
+		return nil, providers.ResourceNotFoundError("NAS", nasName)
 	}
 
 	client, err := mtdnas.FindClient(hostName)

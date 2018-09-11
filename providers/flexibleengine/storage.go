@@ -44,7 +44,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		return nil, err
 	}
 	if mtdVol == nil {
-		return nil, providers.ResourceNotFoundError("Volume", request.VolumeID)
+		return nil, providers.ResourceNotFoundError("volume", request.VolumeID)
 	}
 	_volumeAttachment, err := mtdVol.GetAttachment()
 	if err != nil {
@@ -59,7 +59,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		return nil, err
 	}
 	if mdtHost == nil {
-		return nil, providers.ResourceNotFoundError("Host", request.ServerID)
+		return nil, providers.ResourceNotFoundError("host", request.ServerID)
 	}
 
 	// return client.osclt.CreateVolumeAttachment(request)
@@ -129,7 +129,7 @@ func (client *Client) DeleteVolume(id string) error {
 		return err
 	}
 	if volume == nil {
-		return providers.ResourceNotFoundError("Volume", id)
+		return providers.ResourceNotFoundError("volume", id)
 	}
 
 	err = v2_vol.Delete(client.osclt.Volume, id).ExtractErr()

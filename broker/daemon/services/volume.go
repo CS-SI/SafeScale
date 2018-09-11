@@ -169,14 +169,14 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 func (srv *VolumeService) Detach(volumename string, hostName string) error {
 	vol, err := srv.Get(volumename)
 	if err != nil {
-		return providers.ResourceNotFoundError("Volume", volumename)
+		return providers.ResourceNotFoundError("volume", volumename)
 	}
 
 	// Get Host ID
 	hostService := NewHostService(srv.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return providers.ResourceNotFoundError("Host", hostName)
+		return providers.ResourceNotFoundError("host", hostName)
 	}
 
 	volatt, err := srv.provider.GetVolumeAttachment(host.ID, vol.ID)

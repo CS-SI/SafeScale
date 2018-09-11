@@ -327,7 +327,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		return err
 	}
 	if m == nil {
-		return fmt.Errorf("Failed to find network '%s' in metadata", networkRef)
+		return providers.ResourceNotFoundError("network", networkRef)
 	}
 	networkID := m.Get().ID
 	hosts, err := m.ListHosts()
@@ -356,7 +356,12 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 	if err != nil {
 		return err
 	}
-	return m.Delete()
+
+	err = m.Delete()
+	if err != nil {
+		return fmt.Errorf("Error deleting network: %s", openstack.ProviderErrorToString(err))
+	}
+	return nil
 }
 
 type subnetRequest struct {

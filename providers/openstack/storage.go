@@ -193,7 +193,7 @@ func (client *Client) DeleteVolume(id string) error {
 		return err
 	}
 	if volume == nil {
-		return providers.ResourceNotFoundError("Volume", id)
+		return providers.ResourceNotFoundError("volume", id)
 	}
 
 	err = volumes.Delete(client.Volume, id).ExtractErr()

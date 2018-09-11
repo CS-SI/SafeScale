@@ -555,7 +555,7 @@ func (client *Client) DeleteHost(ref string) error {
 		return err
 	}
 	if m == nil {
-		return providers.ResourceNotFoundError("Host", ref)
+		return providers.ResourceNotFoundError("host", ref)
 	}
 
 	host := m.Get()
