@@ -124,6 +124,7 @@ message Host{
     HostState State = 8;
     string PrivateKey = 9;
     string GatewayID = 10;
+    string OsKind = 11; 
 }
 
 message HostList{
