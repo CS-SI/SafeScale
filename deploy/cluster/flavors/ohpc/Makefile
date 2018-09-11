@@ -8,5 +8,6 @@ vet:
 
 clean:
 	@($(RM) -f rice-box.go)
+	@($(RM) ErrorCode/*_string.go)
 
 mrproper: clean
