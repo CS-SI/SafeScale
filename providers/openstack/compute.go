@@ -566,11 +566,22 @@ func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.
 }
 
 // GetHost returns the host identified by id
-func (client *Client) GetHost(id string) (*api.Host, error) {
+func (client *Client) GetHost(ref string) (*api.Host, error) {
 	var (
 		server *servers.Server
 		err    error
+		id     string
 	)
+
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	if err != nil {
+		return nil, err
+	}
+	if m == nil {
+		return nil, providers.ResourceNotFoundError("host", ref)
+	}
+	id = m.Get().ID
+
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			server, err = servers.Get(client.Compute, id).Extract()
@@ -598,6 +609,12 @@ func (client *Client) GetHost(id string) (*api.Host, error) {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
 			return nil, fmt.Errorf("failed to get host '%s' information after 10s: %s", id, err.Error())
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return client.toHost(server), nil
 }
 
 //ListHosts lists available hosts

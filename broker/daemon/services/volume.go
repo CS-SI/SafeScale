@@ -111,14 +111,20 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 	// Get volume ID
 	volume, err := srv.Get(volumename)
 	if err != nil {
-		return fmt.Errorf("no volume found with name or id '%s'", volumename)
+		return err
+	}
+	if volume == nil {
+		return providers.ResourceNotFoundError("volume", volumename)
 	}
 
 	// Get Host ID
 	hostService := NewHostService(srv.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("no host found with name or id '%s'", hostName)
+		return err
+	}
+	if host == nil {
+		return providers.ResourceNotFoundError("host", hostName)
 	}
 
 	volatt, err := srv.provider.CreateVolumeAttachment(api.VolumeAttachmentRequest{
