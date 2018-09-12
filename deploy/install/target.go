@@ -28,7 +28,8 @@ import (
 
 // HostTarget defines a target of type Host, satisfying TargetAPI
 type HostTarget struct {
-	host *pb.Host
+	host    *pb.Host
+	methods map[uint8]Method.Enum
 }
 
 // NewHostTarget ...
@@ -36,8 +37,37 @@ func NewHostTarget(host *pb.Host) api.Target {
 	if host == nil {
 		panic("host is nil!")
 	}
+	return createHostTarget(host)
+}
 
-	return &HostTarget{host: host}
+// createHostTarget ...
+func createHostTarget(host *pb.Host) *HostTarget {
+	var (
+		index   uint8
+		methods = map[uint8]Method.Enum{}
+	)
+	//TODO: LinuxKind field doesn't exist, it should contain the $LINUX_KIND value
+	//switch host.LinuxKind {
+	//case "centos":
+	//	fallthrough
+	//case "redhat":
+	//	index++
+	//	methods[index] = Method.Yum
+	//case "debian":
+	//	fallthrough
+	//case "ubuntu":
+	index++
+	methods[index] = Method.Apt
+	//case "fedora":
+	//	index++
+	//	methods[index] = Method.Dnf
+	//}
+	index++
+	methods[index] = Method.Bash
+	return &HostTarget{
+		host:    host,
+		methods: methods,
+	}
 }
 
 // Type returns the type of the Target
@@ -51,13 +81,8 @@ func (t *HostTarget) Name() string {
 }
 
 // Methods returns a list of packaging managers useable on the target
-func (t *HostTarget) Methods() []Method.Enum {
-	methods := []Method.Enum{
-		Method.Bash,
-	}
-	// TODO: défines the managers available for a host to be able to get it there
-	methods = append(methods, Method.Apt) // hardcoded, bad !
-	return methods
+func (t *HostTarget) Methods() map[uint8]Method.Enum {
+	return t.methods
 }
 
 // Installed returns a list of installed components
@@ -69,6 +94,7 @@ func (t *HostTarget) Installed() []string {
 // ClusterTarget defines a target of type Host, satisfying TargetAPI
 type ClusterTarget struct {
 	cluster clusterapi.Cluster
+	methods map[uint8]Method.Enum
 }
 
 // NewClusterTarget ...
@@ -76,8 +102,19 @@ func NewClusterTarget(cluster clusterapi.Cluster) api.Target {
 	if cluster == nil {
 		panic("cluster is nil!")
 	}
+	var (
+		index   uint8
+		methods = map[uint8]Method.Enum{}
+	)
+	if cluster.GetConfig().Flavor == Flavor.DCOS {
+		index++
+		methods[index] = Method.DCOS
+	}
+	index++
+	methods[index] = Method.Bash
 	return &ClusterTarget{
 		cluster: cluster,
+		methods: methods,
 	}
 }
 
@@ -92,14 +129,8 @@ func (t *ClusterTarget) Name() string {
 }
 
 // Methods returns a list of packaging managers useable on the target
-func (t *ClusterTarget) Methods() []Method.Enum {
-	methods := []Method.Enum{
-		Method.Bash,
-	}
-	if t.cluster.GetConfig().Flavor == Flavor.DCOS {
-		methods = append(methods, Method.DCOS)
-	}
-	return methods
+func (t *ClusterTarget) Methods() map[uint8]Method.Enum {
+	return t.methods
 }
 
 // Installed returns a list of installed component
@@ -119,6 +150,6 @@ func NewNodeTarget(host *pb.Host) api.Target {
 		panic("host is nil!")
 	}
 	return &NodeTarget{
-		HostTarget: &HostTarget{host: host},
+		HostTarget: createHostTarget(host),
 	}
 }

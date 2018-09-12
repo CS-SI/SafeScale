@@ -85,6 +85,11 @@ func (i *bashInstaller) checkOnHost(c api.Component, host *pb.Host, v api.Variab
 		return false, api.CheckResults{}, fmt.Errorf("failed to prepare check script: %s", err.Error())
 	}
 
+	// Sets some implicit variables for clusters
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "gpac"
+	}
+
 	// Replaces variables in normalized script
 	cmdStr, err = replaceVariablesInString(cmdStr, v)
 	if err != nil {
@@ -120,6 +125,13 @@ func (i *bashInstaller) checkOnCluster(
 	c api.Component, cluster clusterapi.Cluster, v api.Variables,
 ) (bool, api.CheckResults, error) {
 
+	if !validateClusterFlavor(c, cluster) {
+		config := cluster.GetConfig()
+		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", config.Flavor.String(), config.Name)
+		log.Println(msg)
+		return false, api.CheckResults{}, fmt.Errorf(msg)
+	}
+
 	specs := c.Specs()
 	masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
 	if err != nil {
@@ -135,6 +147,13 @@ func (i *bashInstaller) checkOnCluster(
 		pubnodesStatus   = map[string]api.CheckState{}
 		checked          int
 	)
+
+	// Sets some implicit variables for clusters
+	v["MasterIDs"] = cluster.ListMasterIDs()
+	v["MasterIPs"] = cluster.ListMasterIPs()
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "cladm"
+	}
 
 	if masterT != "0" {
 		mastersChannel = make(chan map[string]api.CheckState)
@@ -274,6 +293,12 @@ func (i *bashInstaller) addOnHost(
 	if err != nil {
 		return false, api.AddResults{}, fmt.Errorf("failed to normalize script: %s", err.Error())
 	}
+
+	// Sets some implicit variables for hosts
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "gpac"
+	}
+
 	// Replaces variables in install script
 	cmdStr, err = replaceVariablesInString(cmdStr, v)
 	if err != nil {
@@ -299,21 +324,18 @@ func (i *bashInstaller) addOnHost(
 	if wallTime == 0 {
 		wallTime = 5
 	}
-	retcode, _, stderr, err := brokerclient.New().Ssh.Run(host.ID, cmd, 30*time.Second, time.Duration(wallTime)*time.Minute)
+	retcode, _, _, err := brokerclient.New().Ssh.Run(host.ID, cmd, 30*time.Second, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.AddResults{}, fmt.Errorf("failed to execute install script on host '%s': %s", host.Name, err.Error())
 	}
 	ok := retcode == 0
 	err = nil
 	if !ok {
-		err = fmt.Errorf("install script for component '%s' failed on host '%s', retcode=%d:\n%s", c.DisplayName(), host.Name, retcode, stderr)
+		err = fmt.Errorf("install script failed (retcode=%d)", retcode)
 	} else {
 		if ok && specs.IsSet("component.proxy.rules") {
 			err = proxyComponent(c, host)
 			ok = err == nil
-			if !ok {
-				err = fmt.Errorf("failed to install component '%s' on host '%s': %s", c.DisplayName(), host.Name, err.Error())
-			}
 		}
 	}
 	return ok, api.AddResults{
@@ -328,10 +350,24 @@ func (i *bashInstaller) addOnCluster(
 	c api.Component, cluster clusterapi.Cluster, v api.Variables,
 ) (bool, api.AddResults, error) {
 
+	if !validateClusterFlavor(c, cluster) {
+		config := cluster.GetConfig()
+		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", config.Flavor.String(), config.Name)
+		log.Println(msg)
+		return false, api.AddResults{}, fmt.Errorf(msg)
+	}
+
 	specs := c.Specs()
 	masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
 	if err != nil {
 		return false, api.AddResults{}, err
+	}
+
+	// Sets some implicit variables for clusters
+	v["MasterIDs"] = cluster.ListMasterIDs()
+	v["MasterIPs"] = cluster.ListMasterIPs()
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "cladm"
 	}
 
 	var (
@@ -529,10 +565,24 @@ func (i *bashInstaller) removeFromCluster(
 	v api.Variables,
 ) (bool, api.RemoveResults, error) {
 
+	if !validateClusterFlavor(c, cluster) {
+		config := cluster.GetConfig()
+		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", config.Flavor.String(), config.Name)
+		log.Println(msg)
+		return false, api.RemoveResults{}, fmt.Errorf(msg)
+	}
+
 	specs := c.Specs()
 	masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
 	if err != nil {
 		return false, api.RemoveResults{}, err
+	}
+
+	// Sets some implicit variables for clusters
+	v["MasterIDs"] = cluster.ListMasterIDs()
+	v["MasterIPs"] = cluster.ListMasterIPs()
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "cladm"
 	}
 
 	var (

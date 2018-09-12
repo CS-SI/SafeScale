@@ -43,9 +43,9 @@ func Run() {
 		log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
 		instance, err = cluster.Create(clusterapi.Request{
 			Name:       clusterName,
-			Complexity: Complexity.Minimal,
+			Complexity: Complexity.Small,
 			//Complexity: Complexity.Normal,
-			//Complexity: Complexity.Volume,
+			//Complexity: Complexity.Large,
 			CIDR:   "192.168.0.0/28",
 			Flavor: Flavor.DCOS,
 		})

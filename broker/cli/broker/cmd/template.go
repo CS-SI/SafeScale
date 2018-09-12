@@ -22,8 +22,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/urfave/cli"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // TemplateCmd command
@@ -46,10 +44,7 @@ var templateList = cli.Command{
 	Action: func(c *cli.Context) error {
 		templates, err := client.New().Template.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			if status.Code(err) == codes.DeadlineExceeded {
-				return fmt.Errorf("list of templates took too long to respond")
-			}
-			return fmt.Errorf("Could not get tempalte list: %v", err)
+			return fmt.Errorf("Could not get tempalte list: %v", client.DecorateError(err, "list of templates", false))
 		}
 		out, _ := json.Marshal(templates.GetTemplates())
 		fmt.Println(string(out))

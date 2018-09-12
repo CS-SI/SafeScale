@@ -54,6 +54,14 @@ func (g *genericPackager) Check(c api.Component, t api.Target, v api.Variables) 
 	rootKey := "component.install." + g.name
 
 	if onCluster {
+		cluster := clusterTarget.cluster
+		if !validateClusterFlavor(c, cluster) {
+			config := cluster.GetConfig()
+			msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", config.Flavor.String(), config.Name)
+			log.Println(msg)
+			return false, api.CheckResults{}, fmt.Errorf(msg)
+		}
+
 		masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
 		if err != nil {
 			return false, api.CheckResults{}, err
@@ -65,11 +73,17 @@ func (g *genericPackager) Check(c api.Component, t api.Target, v api.Variables) 
 			return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
 		}
 
+		// Sets some implicit variables for clusters
+		v["MasterIDs"] = cluster.ListMasterIDs()
+		v["MasterIPs"] = cluster.ListMasterIPs()
+		if _, ok := v["Username"]; !ok {
+			v["Username"] = "cladm"
+		}
+
 		var (
 			mastersChannel   chan map[string]api.CheckState
 			pubNodesChannel  chan map[string]api.CheckState
 			privNodesChannel chan map[string]api.CheckState
-			cluster          = clusterTarget.cluster
 			mastersStatus    = map[string]api.CheckState{}
 			pubNodesStatus   = map[string]api.CheckState{}
 			privNodesStatus  = map[string]api.CheckState{}
@@ -135,6 +149,11 @@ func (g *genericPackager) Check(c api.Component, t api.Target, v api.Variables) 
 		msg := `syntax error in component '%s' specification file (%s):
 				key '%s.package' is empty`
 		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
+	}
+
+	// Sets some implicit variables for clusters
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "gpac"
 	}
 
 	cmdStr := fmt.Sprintf(g.checkCmd, packageName)
@@ -228,19 +247,25 @@ func (g *genericPackager) addOnHost(c api.Component, host *pb.Host, v map[string
 		        key '%s.package' is empty`
 		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
 	}
+
+	// Sets some implicit variables for clusters
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "gpac"
+	}
+
 	cmdStr := fmt.Sprintf(g.addCmd, packageName)
 	wallTime := specs.GetInt(rootKey + ".wall_time")
 	if wallTime == 0 {
 		wallTime = 5
 	}
-	retcode, _, stderr, err := client.New().Ssh.Run(host.ID, cmdStr, client.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
+	retcode, _, _, err := client.New().Ssh.Run(host.ID, cmdStr, client.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
 	if err != nil {
 		return false, api.AddResults{}, err
 	}
 	ok := retcode == 0
 	err = nil
 	if !ok {
-		err = fmt.Errorf("install script for component '%s' failed on host '%s', retcode=%d:\n%s", c.DisplayName(), host.Name, retcode, stderr)
+		err = fmt.Errorf("install script failed (retcode=%d)", retcode)
 	} else {
 		if ok && specs.IsSet("component.proxy.rules") {
 			err = proxyComponent(c, host)
@@ -258,6 +283,13 @@ func (g *genericPackager) addOnHost(c api.Component, host *pb.Host, v map[string
 }
 
 func (g *genericPackager) addOnCluster(c api.Component, cluster clusterapi.Cluster, v map[string]interface{}) (bool, api.AddResults, error) {
+	if !validateClusterFlavor(c, cluster) {
+		config := cluster.GetConfig()
+		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", config.Flavor.String(), config.Name)
+		log.Println(msg)
+		return false, api.AddResults{}, fmt.Errorf(msg)
+	}
+
 	specs := c.Specs()
 	rootKey := "component.install." + g.name
 
@@ -271,6 +303,13 @@ func (g *genericPackager) addOnCluster(c api.Component, cluster clusterapi.Clust
 		msg := `syntax error in component '%s' specification file (%s):
 					no key '%s.add' found`
 		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
+	}
+
+	// Sets some implicit variables for clusters
+	v["MasterIDs"] = cluster.ListMasterIDs()
+	v["MasterIPs"] = cluster.ListMasterIPs()
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "cladm"
 	}
 
 	var (
@@ -393,6 +432,14 @@ func (g *genericPackager) Remove(c api.Component, t api.Target, v api.Variables)
 	rootKey := "component.install." + g.name
 
 	if onCluster {
+		cluster := clusterTarget.cluster
+		if !validateClusterFlavor(c, cluster) {
+			config := cluster.GetConfig()
+			msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", config.Flavor.String(), config.Name)
+			log.Println(msg)
+			return false, api.RemoveResults{}, fmt.Errorf(msg)
+		}
+
 		masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
 		if err != nil {
 			return false, api.RemoveResults{}, err
@@ -404,13 +451,19 @@ func (g *genericPackager) Remove(c api.Component, t api.Target, v api.Variables)
 			return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
 		}
 
+		// Sets some implicit variables for clusters
+		v["MasterIDs"] = cluster.ListMasterIDs()
+		v["MasterIPs"] = cluster.ListMasterIPs()
+		if _, ok := v["Username"]; !ok {
+			v["Username"] = "cladm"
+		}
+
 		var (
 			list             []string
 			mastersChannel   chan map[string]error
 			pubNodesChannel  chan map[string]error
 			privNodesChannel chan map[string]error
 		)
-		cluster := clusterTarget.cluster
 		mastersStatus := map[string]error{}
 		pubNodesStatus := map[string]error{}
 		privNodesStatus := map[string]error{}
@@ -510,6 +563,12 @@ func (g *genericPackager) Remove(c api.Component, t api.Target, v api.Variables)
 				key '%s.package' is empty`
 		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
 	}
+
+	// Sets some implicit variables for clusters
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "gpac"
+	}
+
 	cmdStr := fmt.Sprintf(g.removeCmd, packageName)
 	wallTime := specs.GetInt(rootKey + ".wall_time")
 	if wallTime == 0 {

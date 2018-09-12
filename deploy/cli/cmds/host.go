@@ -136,14 +136,21 @@ var hostComponentAddCommand = &cli.Command{
 			}
 		}
 
+		// Wait for SSH service on remote host first
+		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
+			os.Exit(int(ExitCode.RPC))
+		}
+
 		target := install.NewHostTarget(hostInstance)
 		ok, results, err := component.Add(target, values)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error installing component '%s' on '%s': %s\n", componentName, hostName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error installing component '%s' on host '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if ok {
-			fmt.Printf("Component '%s' installed successfully on '%s'\n", componentName, hostName)
+			fmt.Printf("Component '%s' installed successfully on host '%s'\n", componentName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
 
@@ -170,6 +177,14 @@ var hostComponentCheckCommand = &cli.Command{
 			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
 			os.Exit(int(ExitCode.NotFound))
 		}
+
+		// Wait for SSH service on remote host first
+		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
+			os.Exit(int(ExitCode.RPC))
+		}
+
 		target := install.NewHostTarget(hostInstance)
 		found, results, err := component.Check(target, installapi.Variables{})
 		if err != nil {
@@ -206,6 +221,14 @@ var hostComponentDeleteCommand = &cli.Command{
 			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
 			os.Exit(int(ExitCode.NotFound))
 		}
+
+		// Wait for SSH service on remote host first
+		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
+			os.Exit(int(ExitCode.RPC))
+		}
+
 		target := install.NewHostTarget(hostInstance)
 		ok, results, err := component.Remove(target, installapi.Variables{})
 		if err != nil {

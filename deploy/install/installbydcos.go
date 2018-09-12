@@ -2,6 +2,7 @@ package install
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -26,14 +27,21 @@ func (i *dcosInstaller) GetName() string {
 
 // Check checks if the component is installed
 func (i *dcosInstaller) Check(c api.Component, t api.Target, v api.Variables) (bool, api.CheckResults, error) {
-	specializedTarget, ok := t.(*ClusterTarget)
+	clusterTarget, ok := t.(*ClusterTarget)
 	if !ok {
 		return false, api.CheckResults{}, fmt.Errorf("target isn't a cluster")
 	}
+	cluster := clusterTarget.cluster
 
-	specs := c.Specs()
+	if !validateClusterFlavor(c, cluster) {
+		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", cluster.GetConfig().Flavor.String(), t.Name())
+		log.Println(msg)
+		return false, api.CheckResults{}, fmt.Errorf(msg)
+	}
+
 	// Note: In special case of DCOS, installation is done on any master available. values returned
 	// by validateClusterTargets() are ignored
+	specs := c.Specs()
 	_, _, _, err := validateClusterTargets(specs)
 	if err != nil {
 		return false, api.CheckResults{}, err
@@ -50,8 +58,6 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target, v api.Variables) (b
 				key 'component.install.dcos.check' is empty`
 		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
-
-	cluster := specializedTarget.cluster
 
 	hostID, err := cluster.FindAvailableMaster()
 	if err != nil {
@@ -76,6 +82,9 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target, v api.Variables) (b
 	v["MasterIPs"] = cluster.ListMasterIPs()
 	//v["DomainName"] = cluster.GetConfig().DomainName
 	v["dcos"] = dcosCli
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "cladm"
+	}
 	cmdStr, err = replaceVariablesInString(cmdStr, v)
 	if err != nil {
 		return false, api.CheckResults{}, fmt.Errorf("failed to finalize check script: %s", err.Error())
@@ -120,6 +129,14 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 	if !ok {
 		return false, api.AddResults{}, fmt.Errorf("target isn't a cluster")
 	}
+	cluster := clusterTarget.cluster
+
+	if !validateClusterFlavor(c, cluster) {
+		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", cluster.GetConfig().Flavor.String(), t.Name())
+		log.Println(msg)
+		return false, api.AddResults{}, fmt.Errorf(msg)
+	}
+
 	specs := c.Specs()
 	_, _, _, err := validateClusterTargets(specs)
 	if err != nil {
@@ -137,8 +154,6 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 				key 'component.install.dcos.add' is empty`
 		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
-
-	cluster := clusterTarget.cluster
 
 	hostID, err := cluster.FindAvailableMaster()
 	if err != nil {
@@ -165,6 +180,9 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 	v["dcos"] = dcosCli
 	v["kubectl"] = kubectlCli
 	v["options"] = ""
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "cladm"
+	}
 	if specs.IsSet("component.install.dcos.options") {
 		var (
 			avails  = map[string]interface{}{}
@@ -177,12 +195,12 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 			avails[strings.ToLower(k)] = anon
 		}
 		if content, ok = avails[complexity]; !ok {
-			if complexity == Complexity.Volume.String() {
+			if complexity == Complexity.Large.String() {
 				complexity = Complexity.Normal.String()
 			}
 			if complexity == Complexity.Normal.String() {
 				if content, ok = avails[complexity]; !ok {
-					content, ok = avails[Complexity.Minimal.String()]
+					content, ok = avails[Complexity.Small.String()]
 				}
 			}
 		}
@@ -223,7 +241,7 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 	err = nil
 	ok = retcode == 0
 	if !ok {
-		err = fmt.Errorf("install script for component '%s' failed on cluster '%s', retcode=%d", c.DisplayName(), t.Name(), retcode)
+		err = fmt.Errorf("install script failed (retcode=%d)", retcode)
 	}
 	return ok, api.AddResults{
 		Masters: map[string]error{
@@ -239,10 +257,18 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 // - if err == nil and ok == false, removal was submitted successfully but failed, results contain reasons
 //   of failures on what parts
 func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (bool, api.RemoveResults, error) {
-	specializedTarget, ok := t.(*ClusterTarget)
+	clusterTarget, ok := t.(*ClusterTarget)
 	if !ok {
 		return false, api.RemoveResults{}, fmt.Errorf("target isn't a cluster")
 	}
+	cluster := clusterTarget.cluster
+
+	if !validateClusterFlavor(c, cluster) {
+		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", cluster.GetConfig().Flavor.String(), t.Name())
+		log.Println(msg)
+		return false, api.RemoveResults{}, fmt.Errorf(msg)
+	}
+
 	specs := c.Specs()
 	_, _, _, err := validateClusterTargets(specs)
 	if err != nil {
@@ -263,7 +289,6 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (
 		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
-	cluster := specializedTarget.cluster
 	hostID, err := cluster.FindAvailableMaster()
 	if err != nil {
 		return false, api.RemoveResults{}, err
@@ -289,6 +314,9 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (
 	v["MasterIPs"] = cluster.ListMasterIPs()
 	//v["DomainName"] = cluster.GetConfig().DomainName
 	v["dcos"] = dcosCli
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "cladm"
+	}
 	cmdStr, err = replaceVariablesInString(cmdStr, v)
 	if err != nil {
 		return false, api.RemoveResults{}, fmt.Errorf("failed to finalize install script: %s", err.Error())
@@ -318,7 +346,7 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (
 	}
 	ok = retcode == 0
 	if !ok {
-		err = fmt.Errorf("uninstall script for component '%s' failed on cluster '%s', retcode=%d", c.DisplayName(), t.Name(), retcode)
+		err = fmt.Errorf("uninstall script failed (retcode=%d)", retcode)
 	}
 	return ok, api.RemoveResults{
 		AddResults: api.AddResults{

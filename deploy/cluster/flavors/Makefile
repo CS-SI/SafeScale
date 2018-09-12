@@ -1,8 +1,8 @@
 GO?=go
 
-.PHONY: dcos boh tests clean mrproper
+.PHONY: dcos boh ohpc tests clean mrproper
 
-all: dcos boh
+all: dcos boh ohpc
 
 vet:
 
@@ -12,12 +12,16 @@ dcos:
 boh:
 	@(cd boh && $(MAKE))
 
-tests: dcos boh
+ohpc:
+	@(cd ohpc && $(MAKE))
+
+tests: dcos boh ohpc
 	@(cd tests && $(MAKE))
 
 clean:
 	@(cd dcos && $(MAKE) $@)
 	@(cd boh && $(MAKE) $@)
+	@(cd ohpc && $(MAKE) $@)
 	#@(cd tests && $(MAKE) $@)
 
 mrproper: clean

@@ -289,11 +289,11 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	}
 
 	switch req.Complexity {
-	case Complexity.Minimal:
+	case Complexity.Small:
 		privateNodeCount = 1
 	case Complexity.Normal:
 		privateNodeCount = 3
-	case Complexity.Volume:
+	case Complexity.Large:
 		privateNodeCount = 7
 	}
 
@@ -611,6 +611,31 @@ func (c *Cluster) asyncCreateNode(
 		return
 	}
 
+	// install docker component
+	component, err := install.NewComponent("docker")
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", 1, host.ID, err.Error())
+		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
+		return
+	}
+	target := install.NewHostTarget(host)
+	ok, results, err := component.Add(target, installapi.Variables{
+		"Hostname": host.Name,
+		"Username": "cladm",
+		"Password": c.Core.AdminPassword,
+	})
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
+		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		return
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
+		done <- fmt.Errorf(msg)
+		return
+	}
+
 	log.Printf("[%s node #%d] creation successful\n", nodeTypeStr, index)
 	result <- host.ID
 	done <- nil
@@ -863,8 +888,18 @@ func (c *Cluster) AddNode(public bool, req *pb.HostDefinition) (string, error) {
 
 // AddNodes adds <count> nodes
 func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]string, error) {
-	var nodeType NodeType.Enum
+	request := c.GetConfig().NodesDef
+	if req.CPUNumber > 0 {
+		request.CPUNumber = req.CPUNumber
+	}
+	if req.RAM > 0.0 {
+		request.RAM = req.RAM
+	}
+	if req.Disk > 0 {
+		request.Disk = req.Disk
+	}
 
+	var nodeType NodeType.Enum
 	if public {
 		nodeType = NodeType.PublicNode
 	} else {
@@ -880,7 +915,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 		results = append(results, r)
 		d := make(chan error)
 		dones = append(dones, d)
-		go c.asyncCreateNode(i+1, nodeType, req, r, d)
+		go c.asyncCreateNode(i+1, nodeType, request, r, d)
 	}
 	for i := range dones {
 		hostID := <-results[i]
@@ -1024,7 +1059,21 @@ func (c *Cluster) GetConfig() clusterapi.ClusterCore {
 
 // FindAvailableMaster returns the ID of the first master available for execution
 func (c *Cluster) FindAvailableMaster() (string, error) {
-	return "", fmt.Errorf("cluster of flavor 'BOH' doesn't have any master")
+	var masterID string
+	for _, masterID = range c.manager.MasterIDs {
+		err := provideruse.WaitSSHServerReady(c.provider, masterID, 2*time.Minute)
+		if err != nil {
+			if _, ok := err.(retry.ErrTimeout); ok {
+				continue
+			}
+			return "", err
+		}
+		break
+	}
+	if masterID == "" {
+		return "", fmt.Errorf("failed to find available master")
+	}
+	return masterID, nil
 }
 
 // FindAvailableNode returns the ID of a node available

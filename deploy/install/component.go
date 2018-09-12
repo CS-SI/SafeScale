@@ -18,6 +18,8 @@ package install
 
 import (
 	"fmt"
+	"log"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/deploy/install/api"
 	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
@@ -148,7 +150,7 @@ func (c *component) Check(t api.Target, v api.Variables) (bool, api.CheckResults
 	methods := t.Methods()
 	var installer api.Installer
 	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.install.%s", method.String())) {
+		if c.specs.IsSet(fmt.Sprintf("component.install.%s", strings.ToLower(method.String()))) {
 			installer = c.installerOfMethod(method)
 			if installer != nil {
 				break
@@ -158,15 +160,20 @@ func (c *component) Check(t api.Target, v api.Variables) (bool, api.CheckResults
 	if installer == nil {
 		return false, api.CheckResults{}, fmt.Errorf("failed to find a way to check '%s'", c.DisplayName())
 	}
+	log.Printf("Checking if component '%s' is installed on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	return installer.Check(c, t, v)
 }
 
 // Add installs the component on the target
 func (c *component) Add(t api.Target, v api.Variables) (bool, api.AddResults, error) {
 	methods := t.Methods()
-	var installer api.Installer
-	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.install.%s", method.String())) {
+	var (
+		installer api.Installer
+		i         uint8
+	)
+	for i = 1; i <= uint8(len(methods)); i++ {
+		method := methods[i]
+		if c.specs.IsSet(fmt.Sprintf("component.install.%s", strings.ToLower(method.String()))) {
 			installer = c.installerOfMethod(method)
 			if installer != nil {
 				break
@@ -177,7 +184,7 @@ func (c *component) Add(t api.Target, v api.Variables) (bool, api.AddResults, er
 		return false, api.AddResults{}, fmt.Errorf("failed to find a way to install '%s'", c.DisplayName())
 	}
 
-	fmt.Printf("Installing component '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+	log.Printf("Installing component '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	return installer.Add(c, t, v)
 }
 
@@ -186,7 +193,7 @@ func (c *component) Remove(t api.Target, v api.Variables) (bool, api.RemoveResul
 	methods := t.Methods()
 	var installer api.Installer
 	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.install.%s", method.String())) {
+		if c.specs.IsSet(fmt.Sprintf("component.install.%s", strings.ToLower(method.String()))) {
 			installer = c.installerOfMethod(method)
 			if installer != nil {
 				break
@@ -196,6 +203,7 @@ func (c *component) Remove(t api.Target, v api.Variables) (bool, api.RemoveResul
 	if installer == nil {
 		return false, api.RemoveResults{}, fmt.Errorf("failed to find a way to uninstall '%s'", c.DisplayName())
 	}
+	log.Printf("Removing component '%s' from %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	return installer.Remove(c, t, v)
 }
 

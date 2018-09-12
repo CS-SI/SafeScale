@@ -22,8 +22,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/urfave/cli"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // ImageCmd command
@@ -46,10 +44,7 @@ var imageList = cli.Command{
 	Action: func(c *cli.Context) error {
 		images, err := client.New().Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			if status.Code(err) == codes.DeadlineExceeded {
-				return fmt.Errorf("list of images took too long to respond")
-			}
-			return fmt.Errorf("Could not get image list: %v", err)
+			return fmt.Errorf("Could not get image list: %v", client.DecorateError(err, "list of images", false))
 		}
 		out, _ := json.Marshal(images.GetImages())
 		fmt.Println(string(out))

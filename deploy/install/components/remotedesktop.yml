@@ -109,6 +109,7 @@ component:
                 [Service]
                 Type=simple
                 User={{.Username}}
+                ExecStartPre=sleep 5
                 ExecStart=/usr/bin/vncconfig -display %i -nowin
 
                 [Install]
@@ -120,7 +121,7 @@ component:
                 # tar --exclude .config/g* -Jcvf remotedesktop_conf.tar.xz .config
                 # base64 remotedesktop_conf.tar.xz >remotedesktop_conf.tar.xz.encoded
                 # Then copy between EOFs the content of the .encoded file
-                cat >/var/tmp/remotedesktop_conf.tar.xz.encoded <<'EOF'
+                cat >/var/tmp/xfce_front.encoded <<'EOF'
                 /Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4O//FW9dABcYyecMYYgb8tkd/QwXnBEBYq7o9K5cz3Dw
                 IsSonUkO6IaHvO+YS5nNHN2/lJlax4FCiWhkmwiAJRTWbQy6nFQuCNTNR5RdGaujqV44zxFE5CBR
                 FiN6bl2NP2uZ5T48K9Q83bcLDuMSi1aQGYaj9hyFQp0aO1Emt7tMgDStsEebG1Wm2YSx0d8STDbe
@@ -220,9 +221,8 @@ component:
                 6DxAL5QxcUg11XgF202lp4xtaGE6Ztp54kOJl0q2WnF0147fJuLhKZ6xH4C3AAAAnOC4P8r+AxMA
                 AYsrgOADAIsbpW6xxGf7AgAAAAAEWVo=
                 EOF
-
-                base64 -d /var/tmp/remotedesktop_conf.tar.xz.encoded | tar -Jxvf -C ~{{.Username}} - && \
-                rm -f /var/tmp/remotedesktop_conf.tar.xz.encoded && \
+                cat /var/tmp/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
+                rm -f /var/tmp/xfce_conf.encoded
                 chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit $?
 
                 systemctl daemon-reload && \
@@ -235,15 +235,8 @@ component:
                 # Prepares remotedesktop docker image, based on guacamole #
                 ###########################################################
 
-                mkdir /var/tmp/remotedesktop.image
+                mkdir -p /var/tmp/remotedesktop.image
                 cd /var/tmp/remotedesktop.image
-
-                cat >startup.sh <<-'EOF'
-                #!/bin/bash
-
-                # start up supervisord, all daemons should launched by supervisord.
-                exec /usr/bin/supervisord -c /opt/safescale/supervisord.conf
-                EOF
 
                 cat >supervisord.conf <<-'EOF'
                 [supervisord]
@@ -337,6 +330,11 @@ component:
                         </connection>
                     </authorize>
                 </user-mapping>
+                EOF
+
+                cat >startup.sh <<-'EOF'
+                #!/bin/bash
+                exec /usr/bin/supervisord -c /opt/safescale/supervisord.conf
                 EOF
 
                 cat >Dockerfile <<-'EOF'
@@ -441,9 +439,10 @@ component:
                 ENTRYPOINT ["/opt/safescale/startup.sh"]
                 EOF
 
+                ls -la
                 # build image
                 docker build -t remotedesktop:latest . || exit $?
-                cd .. && rm -rf remotedesktop.image && docker image prune -f
+                #cd /var/tmp && rm -rf remotedesktop.image && docker image prune -f
 
                 # Guacd need sshd to authorize password authentication...
                 cat >>/etc/ssh/sshd_config <<-'EOF'

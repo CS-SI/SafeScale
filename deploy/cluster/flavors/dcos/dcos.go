@@ -55,6 +55,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 )
 
 //go:generate rice embed-go
@@ -267,6 +268,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		mastersStatus                 error
 		nodesChannel                  chan error
 		nodesStatus                   error
+		component                     installapi.Component
+		target                        installapi.Target
+		results                       installapi.AddResults
 	)
 	broker := brokerclient.New()
 
@@ -289,6 +293,25 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		goto cleanNetwork
 	}
 	gw = m.Get()
+
+	err = brokerclient.New().Ssh.WaitReady(gw.ID, brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		err = brokerclient.DecorateError(err, "wait for remote ssh service to be ready", false)
+		goto cleanNetwork
+	}
+	component, err = install.NewComponent("proxycache-server")
+	if err != nil {
+		goto cleanNetwork
+	}
+	target = install.NewHostTarget(pbutils.ToPBHost(gw))
+	ok, results, err = component.Add(target, installapi.Variables{})
+	if err != nil {
+		goto cleanNetwork
+	}
+	if !ok {
+		err = fmt.Errorf(results.Errors())
+		goto cleanNetwork
+	}
 
 	// Create a KeyPair for the user cladm
 	kpName = "cluster_" + req.Name + "_cladm_key"
@@ -339,13 +362,13 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	}
 
 	switch req.Complexity {
-	case Complexity.Minimal:
+	case Complexity.Small:
 		masterCount = 1
 		privateNodeCount = 1
 	case Complexity.Normal:
 		masterCount = 3
 		privateNodeCount = 3
-	case Complexity.Volume:
+	case Complexity.Large:
 		masterCount = 5
 		privateNodeCount = 3
 	}
@@ -479,6 +502,7 @@ func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.HostDefinitio
 
 	var dones []chan error
 	var results []chan string
+	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
 	for i := 1; i <= count; i++ {
 		d := make(chan error)
 		dones = append(dones, d)
@@ -493,6 +517,7 @@ func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.HostDefinitio
 				Disk:      100,
 				ImageID:   centos,
 			},
+			timeout,
 			r,
 			d)
 	}
@@ -558,11 +583,11 @@ func (c *Cluster) asyncConfigurePrivateNodes(done chan error) {
 // Intended to be used as goroutine
 func (c *Cluster) asyncCreateMasters(count int, done chan error) {
 	var dones []chan error
-
+	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
 	for i := 1; i <= count; i++ {
 		d := make(chan error)
 		dones = append(dones, d)
-		go c.asyncCreateMaster(i, d)
+		go c.asyncCreateMaster(i, timeout, d)
 	}
 	var state error
 	var errors []string
@@ -620,12 +645,12 @@ func (c *Cluster) createAndConfigureNode(public bool, req *pb.HostDefinition) (s
 		nodeType = NodeType.PrivateNode
 	}
 	if c.Core.State != ClusterState.Created && c.Core.State != ClusterState.Nominal {
-		return "", fmt.Errorf("The DCOS flavor of Cluster needs to be at least in state 'Created' to allow node addition.")
+		return "", fmt.Errorf("cluster flavor DCOS needs to be at least in state 'Created' to allow node addition.")
 	}
 
 	done := make(chan error)
 	result := make(chan string)
-	go c.asyncCreateNode(1, nodeType, req, result, done)
+	go c.asyncCreateNode(1, nodeType, req, timeoutCtxHost, result, done)
 	hostID := <-result
 	err := <-done
 	if err != nil {
@@ -647,7 +672,7 @@ func (c *Cluster) createAndConfigureNode(public bool, req *pb.HostDefinition) (s
 }
 
 // asyncCreateMaster adds a master node
-func (c *Cluster) asyncCreateMaster(index int, done chan error) {
+func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan error) {
 	log.Printf("[master #%d] starting creation...\n", index)
 
 	name, err := c.buildHostname("master", NodeType.Master)
@@ -666,9 +691,10 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 		Network:   c.Core.NetworkID,
 		Public:    false,
 	}
-	host, err := brokerclient.New().Host.Create(hostDef, 10*time.Minute)
+	host, err := brokerclient.New().Host.Create(hostDef, timeout)
 	if err != nil {
-		log.Printf("[master #%d] creation failed: host resource creation failed: %s\n", index, err.Error())
+		err = brokerclient.DecorateError(err, "creation of host", false)
+		log.Printf("[master #%d] host resource creation failed: %s\n", index, err.Error())
 		done <- fmt.Errorf("failed to create Master server %d: %s", index, err.Error())
 		return
 	}
@@ -689,6 +715,53 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 		done <- fmt.Errorf("failed to update Cluster metadata: %s", err.Error())
 		return
 	}
+
+	// install proxycache-client component
+	component, err := install.NewComponent("proxycache-client")
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to prepare component 'proxycache-client': %s", 1, host.ID, err.Error())
+		done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
+	}
+	target := install.NewHostTarget(host)
+	values := installapi.Variables{
+		"Password": c.Core.AdminPassword,
+	}
+	ok, results, err := component.Add(target, values)
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
+		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		return
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
+		done <- fmt.Errorf(msg)
+		return
+	}
+
+	/* 	// install docker component
+	   	log.Printf("[master #%d (%s)] installing component 'docker'", index, host.Name)
+	   	component, err = install.NewComponent("docker")
+	   	if err != nil {
+	   		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", index, host.ID, err.Error())
+	   		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
+	   		return
+	   	}
+	   	target = install.NewHostTarget(host)
+	   	ok, results, err = component.Add(target, values)
+	   	if err != nil {
+	   		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", index, host.Name, component.DisplayName(), err.Error())
+	   		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+	   		return
+	   	}
+	   	if !ok {
+	   		msg := results.Errors()
+	   		log.Printf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), msg)
+	   		done <- fmt.Errorf(msg)
+	   		return
+	   	}
+	   	log.Printf("[master #%d (%s)] component 'docker' installed successfully\n", index, host.Name)
+	*/
 
 	// Installs DCOS requirements...
 	log.Printf("[master #%d (%s)] installing DCOS requirements", index, host.Name)
@@ -723,32 +796,6 @@ func (c *Cluster) asyncCreateMaster(index int, done chan error) {
 		return
 	}
 	log.Printf("[master #%d (%s)] DCOS requirements successfully installed", index, host.Name)
-
-	// install docker component
-	log.Printf("[master #%d (%s)] installing component 'docker'", index, host.Name)
-	component, err := install.NewComponent("docker")
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", index, host.ID, err.Error())
-		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
-		return
-	}
-	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, installapi.Variables{
-		"Username": "cladm",
-		"Password": c.Core.AdminPassword,
-	})
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", index, host.Name, component.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
-		return
-	}
-	if !ok {
-		msg := results.Errors()
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), msg)
-		done <- fmt.Errorf(msg)
-		return
-	}
-	log.Printf("[master #%d (%s)] component 'docker' installed successfully\n", index, host.Name)
 	log.Printf("[master #%d (%s)] creation successful\n", index, host.Name)
 	done <- nil
 }
@@ -814,7 +861,7 @@ func (c *Cluster) asyncConfigureMaster(index int, host *pb.Host, done chan error
 
 // asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
-func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.HostDefinition, result chan string, done chan error) {
+func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.HostDefinition, timeout time.Duration, result chan string, done chan error) {
 	var publicIP bool
 	var nodeTypeStr string
 	if nodeType == NodeType.PublicNode {
@@ -842,6 +889,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 	req.ImageID = centos
 	host, err := brokerclient.New().Host.Create(*req, 10*time.Minute)
 	if err != nil {
+		err = brokerclient.DecorateError(err, "creation of host", true)
 		log.Printf("[%s node #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
 		result <- ""
 		done <- err
@@ -870,12 +918,56 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 			c.manager.PrivateNodeIPs = c.manager.PrivateNodeIPs[:len(c.manager.PrivateNodeIPs)-1]
 		}
 		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultExecutionTimeout)
-		log.Printf("[Nodes: %s #%d] creation failed: %s", nodeTypeStr, index, err.Error())
+
+		log.Printf("[%s node #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
 		done <- fmt.Errorf("failed to update Cluster configuration: %s", err.Error())
 		return
 	}
 	log.Printf("[%s node #%d (%s)] host created successfully.\n", nodeTypeStr, index, host.Name)
+
+	// install proxycache-client component
+	component, err := install.NewComponent("proxycache-client")
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to prepare component 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
+		done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
+		return
+	}
+	target := install.NewHostTarget(host)
+	ok, results, err := component.Add(target, installapi.Variables{})
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
+		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		return
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
+		done <- fmt.Errorf(msg)
+		return
+	}
+
+	// install docker component
+	log.Printf("[%s node #%d (%s)] installing component 'docker'...\n", nodeTypeStr, index, host.Name)
+	component, err = install.NewComponent("docker")
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to prepare component 'docker': %s", nodeTypeStr, index, host.Name, err.Error())
+		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
+		return
+	}
+	ok, results, err = component.Add(target, installapi.Variables{})
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
+		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		return
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
+		done <- fmt.Errorf("failed to intall component '%s' on host '%s': %s", component.DisplayName(), host.Name, msg)
+		return
+	}
+	log.Printf("[%s node #%d (%s)] component 'docker' installed successfully.\n", nodeTypeStr, index, host.Name)
 
 	// Installs DCOS requirements
 	log.Printf("[%s node #%d (%s)] installing DCOS requirements...\n", nodeTypeStr, index, host.Name)
@@ -914,29 +1006,6 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 		return
 	}
 	log.Printf("[%s node #%d (%s)] DCOS requirements installed successfully.\n", nodeTypeStr, index, host.Name)
-
-	// install docker component
-	log.Printf("[%s node #%d (%s)] installing component 'docker'...\n", nodeTypeStr, index, host.Name)
-	component, err := install.NewComponent("docker")
-	if err != nil {
-		log.Printf("[%s node #%d (%s)] failed to prepare component 'docker': %s", nodeTypeStr, index, host.Name, err.Error())
-		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
-		return
-	}
-	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, installapi.Variables{})
-	if err != nil {
-		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
-		return
-	}
-	if !ok {
-		msg := results.Errors()
-		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
-		done <- fmt.Errorf("failed to intall component '%s' on host '%s': %s", component.DisplayName(), host.Name, msg)
-		return
-	}
-	log.Printf("[%s node #%d (%s)] component 'docker' installed successfully.\n", nodeTypeStr, index, host.Name)
 
 	log.Printf("[%s node #%d (%s)] creation successful.\n", nodeTypeStr, index, host.Name)
 	result <- host.ID
@@ -1315,6 +1384,17 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 		return nil, fmt.Errorf("The DCOS flavor of Cluster needs to be at least in state 'Created' to allow node addition.")
 	}
 
+	request := c.GetConfig().NodesDef
+	if req.CPUNumber > 0 {
+		request.CPUNumber = req.CPUNumber
+	}
+	if req.RAM > 0.0 {
+		request.RAM = req.RAM
+	}
+	if req.Disk > 0 {
+		request.Disk = req.Disk
+	}
+
 	var hosts []string
 	var errors []string
 	var dones []chan error
@@ -1325,7 +1405,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 		d := make(chan error)
 		dones = append(dones, d)
 		go func(result chan string, done chan error) {
-			hostID, err := c.createAndConfigureNode(public, req)
+			hostID, err := c.createAndConfigureNode(public, request)
 			if err != nil {
 				result <- ""
 				done <- err

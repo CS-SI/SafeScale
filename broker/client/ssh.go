@@ -18,6 +18,7 @@ package client
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -26,10 +27,7 @@ import (
 	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/retry"
-)
-
-const (
-	minConnectTimeout = 10 * time.Second
+	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 )
 
 // ssh is the part of the broker client that handles SSH stuff
@@ -61,8 +59,8 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 	if executionTimeout < utils.TimeoutCtxHost {
 		executionTimeout = utils.TimeoutCtxHost
 	}
-	if connectionTimeout < minConnectTimeout {
-		connectionTimeout = minConnectTimeout
+	if connectionTimeout < DefaultConnectionTimeout {
+		connectionTimeout = DefaultConnectionTimeout
 	}
 	if connectionTimeout > executionTimeout {
 		connectionTimeout = executionTimeout + 1*time.Minute
@@ -104,7 +102,11 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 			return nil
 		},
 		connectionTimeout,
-		retry.NotifyByLog,
+		func(t retry.Try, v Verdict.Enum) {
+			if v == Verdict.Retry {
+				log.Printf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
+			}
+		},
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -156,8 +158,8 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	if executionTimeout < utils.TimeoutCtxHost {
 		executionTimeout = utils.TimeoutCtxHost
 	}
-	if connectionTimeout < minConnectTimeout {
-		connectionTimeout = minConnectTimeout
+	if connectionTimeout < DefaultConnectionTimeout {
+		connectionTimeout = DefaultConnectionTimeout
 	}
 	if connectionTimeout > executionTimeout {
 		connectionTimeout = executionTimeout
@@ -269,7 +271,12 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 			return sshCfg.Enter()
 		},
 		2*time.Minute,
-		retry.NotifyByLog)
+		func(t retry.Try, v Verdict.Enum) {
+			if v == Verdict.Retry {
+				log.Printf("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
+			}
+		},
+	)
 }
 
 // WaitReady waits the SSH service of remote host is ready, for 'timeout' duration

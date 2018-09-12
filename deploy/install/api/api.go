@@ -17,6 +17,7 @@
 package api
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
@@ -30,8 +31,9 @@ type Target interface {
 	Name() string
 	// Type returns the name of the target
 	Type() string
-	// Methods returns a list of installation methods useable on the target
-	Methods() []Method.Enum
+	// Methods returns a list of installation methods useable on the target, ordered from
+	// upper to lower priority (1 = highest priority)
+	Methods() map[uint8]Method.Enum
 	// Installed returns a list of installed components
 	Installed() []string
 }
@@ -55,19 +57,19 @@ type CheckResults struct {
 // Errors joins all errors in CheckResults then returns the corresponding string
 func (r CheckResults) Errors() string {
 	errors := []string{}
-	for _, i := range r.Masters {
+	for k, i := range r.Masters {
 		if !i.Success {
-			errors = append(errors, i.Error)
+			errors = append(errors, i.Error+fmt.Sprintf(" on '%s'", k))
 		}
 	}
-	for _, i := range r.PrivateNodes {
+	for k, i := range r.PrivateNodes {
 		if !i.Success {
-			errors = append(errors, i.Error)
+			errors = append(errors, i.Error+fmt.Sprintf(" on '%s'", k))
 		}
 	}
-	for _, i := range r.PublicNodes {
+	for k, i := range r.PublicNodes {
 		if !i.Success {
-			errors = append(errors, i.Error)
+			errors = append(errors, i.Error+fmt.Sprintf(" on '%s'", k))
 		}
 	}
 	return strings.Join(errors, "\n")

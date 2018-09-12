@@ -16,6 +16,8 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
+	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/install/api"
 
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -118,6 +120,26 @@ func validateClusterTargets(specs *viper.Viper) (string, string, string, error) 
 		return "", "", "", fmt.Errorf("invalid 'component.target.cluster': no target designated")
 	}
 	return master, privnode, pubnode, nil
+}
+
+// validateClusterFlavor checks if the flavor of the cluster is listed in component specification
+// 'component.target.cluster.flavors'.
+// If no flavors is listed, all flavors are authorized (if 'component.target.cluster' != no)
+func validateClusterFlavor(c api.Component, cluster clusterapi.Cluster) bool {
+	specs := c.Specs()
+	config := cluster.GetConfig()
+	clusterFlavor := config.Flavor
+	ok := true
+	if specs.IsSet("component.target.cluster.flavors") {
+		flavors := specs.GetStringSlice("component.target.cluster.flavors")
+		for _, k := range flavors {
+			f := strings.ToLower(k)
+			if clusterFlavor == Flavor.FromString(f) {
+				break
+			}
+		}
+	}
+	return ok
 }
 
 // UploadStringToRemoteFile creates a file 'filename' on remote 'host' with the content 'content'

@@ -23,8 +23,6 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/urfave/cli"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // NetworkCmd command
@@ -50,10 +48,7 @@ var networkList = cli.Command{
 	Action: func(c *cli.Context) error {
 		networks, err := client.New().Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			if status.Code(err) == codes.DeadlineExceeded {
-				return fmt.Errorf("list of network '%s' took too long to respond", c.Args().First())
-			}
-			return fmt.Errorf("Could not get network list: %v", err)
+			return fmt.Errorf("Could not get network list: %v", client.DecorateError(err, "list of networks", false))
 		}
 		out, _ := json.Marshal(networks.GetNetworks())
 		fmt.Println(string(out))
@@ -74,10 +69,7 @@ var networkDelete = cli.Command{
 		}
 		err := client.New().Network.Delete(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			if status.Code(err) == codes.DeadlineExceeded {
-				return fmt.Errorf("deletion of network '%s' took too long to respond (may eventually succeed)", c.Args().First())
-			}
-			return fmt.Errorf("Could not delete network '%s': %v", c.Args().First(), err)
+			return fmt.Errorf("could not delete network %s: %v", c.Args().First(), client.DecorateError(err, "deletion of network", true))
 		}
 		fmt.Println(fmt.Sprintf("Network '%s' deleted", c.Args().First()))
 
@@ -97,10 +89,7 @@ var networkInspect = cli.Command{
 		}
 		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			if status.Code(err) == codes.DeadlineExceeded {
-				return fmt.Errorf("inspection of network '%s' took too long to respond", c.Args().First())
-			}
-			return fmt.Errorf("could not inspect network %s: %v", c.Args().First(), err)
+			return fmt.Errorf("could not inspect network %s: %v", c.Args().First(), client.DecorateError(err, "inspection of network", false))
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))
@@ -165,10 +154,7 @@ var networkCreate = cli.Command{
 		}
 		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
 		if err != nil {
-			if status.Code(err) == codes.DeadlineExceeded {
-				return fmt.Errorf("creation of network '%s' took too long to respond (may eventually succeed)", c.Args().First())
-			}
-			return fmt.Errorf("Could not create network '%s': %v", c.Args().First(), err)
+			return fmt.Errorf("Could not create network: %v", client.DecorateError(err, "creation of network", true))
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))

@@ -16,6 +16,14 @@
 
 package client
 
+import (
+	"fmt"
+	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
 // Session units the different resources proposed by brokerd as broker client
 type Session struct {
 	Container *container
@@ -39,8 +47,8 @@ type Client *Session
 
 // DefaultTimeout tells to use the timeout by default depending on context
 const (
-	DefaultConnectionTimeout = 0
-	DefaultExecutionTimeout  = 0
+	DefaultConnectionTimeout = 10 * time.Second
+	DefaultExecutionTimeout  = 5 * time.Minute
 )
 
 // New returns an instance of broker Client
@@ -56,4 +64,17 @@ func New() Client {
 	s.Template = &template{session: s}
 	s.Image = &image{session: s}
 	return s
+}
+
+// DecorateError changes the error to something more comprehensible when
+// timeout occured
+func DecorateError(err error, action string, maySucceed bool) error {
+	if status.Code(err) == codes.DeadlineExceeded {
+		msg := "%s took too long (> %v) to respond"
+		if maySucceed {
+			msg += "(may eventually succeed)"
+		}
+		return fmt.Errorf(msg, action, DefaultExecutionTimeout)
+	}
+	return err
 }

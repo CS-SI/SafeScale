@@ -18,8 +18,11 @@ package services
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 
 	"github.com/CS-SI/SafeScale/utils/retry"
 
@@ -76,7 +79,12 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 			return err
 		},
 		2*time.Minute,
-		retry.NotifyByLog)
+		func(t retry.Try, v Verdict.Enum) {
+			if v == Verdict.Retry {
+				log.Printf("Remote SSH service on host '%s' isn't readybroker ssh co, retrying...\n", hostName)
+			}
+		},
+	)
 
 	return retCode, stdOut, stdErr, err
 }

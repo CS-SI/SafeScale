@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos"
+	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 )
 
@@ -56,6 +57,11 @@ func Get(name string) (clusterapi.Cluster, error) {
 		if err != nil {
 			return nil, err
 		}
+	case Flavor.OHPC:
+		instance, err = ohpc.Load(m)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		found = false
 	}
@@ -65,7 +71,7 @@ func Get(name string) (clusterapi.Cluster, error) {
 	return instance, nil
 }
 
-//Create creates a cluster following the parameters of the request
+// Create creates a cluster following the parameters of the request
 func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	// Validates parameters
 	if req.Name == "" {
@@ -97,9 +103,15 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		if err != nil {
 			return nil, err
 		}
-	case Flavor.Swarm:
-		fallthrough
-	case Flavor.Kubernetes:
+	case Flavor.OHPC:
+		req.Tenant = tenant.Name
+		instance, err = ohpc.Create(req)
+		if err != nil {
+			return nil, err
+		}
+	//case Flavor.Swarm:
+	//case Flavor.Kubernetes:
+	default:
 		return nil, fmt.Errorf("cluster Flavor '%s' not yet implemented", req.Flavor.String())
 	}
 

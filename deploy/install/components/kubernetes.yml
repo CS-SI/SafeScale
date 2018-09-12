@@ -60,9 +60,14 @@ component:
                     echo $output
                     echo $output | grep "already installed" &>/dev/null || exit $rc
                 }
-                while [ 0 ]; do
-                    {{.dcos}} kubernetes plan show deploy | grep "scheduler (" | grep COMPLETE &>/dev/null && break
-                done
+                wait_complete() {
+                    while [ 0 ]; do
+                        {{.dcos}} kubernetes plan show deploy | grep "scheduler (" | grep COMPLETE &>/dev/null && break
+                    done
+                }
+                export -f wait_complete
+                bg_start WC wait_complete 10
+                bg_wait WC {{.errorcode "WaitKubernetesCompleted"}}
                 {{.dcos}} kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
                 {{.kubectl}} config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
 

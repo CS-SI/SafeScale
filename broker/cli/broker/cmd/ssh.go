@@ -24,8 +24,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/broker/client"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/urfave/cli"
 )
@@ -67,10 +65,7 @@ var sshRun = cli.Command{
 		}
 		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), client.DefaultConnectionTimeout, timeout)
 		if err != nil {
-			if status.Code(err) == codes.DeadlineExceeded {
-				return fmt.Errorf("ssh run took too long to respond (may eventually succeed)")
-			}
-			return fmt.Errorf("Could not execute ssh command: %v", err)
+			return fmt.Errorf("Could not execute ssh command: %v", client.DecorateError(err, "ssh run", false))
 		}
 
 		fmt.Println(stdout)
@@ -111,10 +106,7 @@ var sshCopy = cli.Command{
 		}
 		_, _, _, err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), client.DefaultConnectionTimeout, timeout)
 		if err != nil {
-			if status.Code(err) == codes.DeadlineExceeded {
-				return fmt.Errorf("ssh copy took too long to respond (may eventually succeed)")
-			}
-			return fmt.Errorf("Could not copy %s to %s: %v", c.Args().Get(0), c.Args().Get(1), err)
+			return fmt.Errorf("Could not copy %s to %s: %v", c.Args().Get(0), c.Args().Get(1), client.DecorateError(err, "ssh copy", true))
 		}
 		fmt.Printf("Copy of '%s' to '%s' done\n", c.Args().Get(0), c.Args().Get(1))
 		return nil
@@ -133,9 +125,7 @@ var sshConnect = cli.Command{
 		}
 		err := client.New().Ssh.Connect(c.Args().Get(0), 0)
 		if err != nil {
-			if status.Code(err) == codes.DeadlineExceeded {
-				return fmt.Errorf("ssh connect took too long to respond")
-			}
+			err = client.DecorateError(err, "ssh connect", false)
 		}
 		return err
 	},

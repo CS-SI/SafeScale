@@ -208,6 +208,71 @@ func mpichBuildComponent() *component {
 	}
 }
 
+// ohpcSlurmMasterComponent ...
+func ohpcSlurmMasterComponent() *component {
+	specs, err := loadSpecFile("ohpc-slurm-master")
+	if err != nil {
+		panic(err.Error())
+	}
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "ohpc-slurm-master",
+		specs:       specs,
+	}
+}
+
+// ohpcSlurmNodeComponent ...
+func ohpcSlurmNodeComponent() *component {
+	specs, err := loadSpecFile("ohpc-slurm-node")
+	if err != nil {
+		panic(err.Error())
+	}
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "ohpc-slurm-node",
+		specs:       specs,
+	}
+}
+
+// proxycacheServerComponent ...
+func proxycacheServerComponent() *component {
+	specs, err := loadSpecFile("proxycache-server")
+	if err != nil {
+		panic(err.Error())
+	}
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "proxycache-server",
+		specs:       specs,
+	}
+}
+
+// proxycacheClientComponent ...
+func proxycacheClientComponent() *component {
+	specs, err := loadSpecFile("proxycache-client")
+	if err != nil {
+		panic(err.Error())
+	}
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "proxycache-client",
+		specs:       specs,
+	}
+}
+
+// apacheIgniteComponent ...
+func apacheIgniteComponent() *component {
+	specs, err := loadSpecFile("apache-ignite")
+	if err != nil {
+		panic(err.Error())
+	}
+	return &component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "apache-ignite",
+		specs:       specs,
+	}
+}
+
 // ListAvailables returns an array of availables components with the useable installers
 // func ListAvailables() []string {
 // 	var output []string
@@ -236,9 +301,14 @@ func init() {
 		nVidiaDockerComponent(),
 		mpichOsPkgComponent(),
 		mpichBuildComponent(),
+		ohpcSlurmMasterComponent(),
+		ohpcSlurmNodeComponent(),
 		remoteDesktopComponent(),
 		reverseProxyComponent(),
 		kubernetesComponent(),
+		proxycacheServerComponent(),
+		proxycacheClientComponent(),
+		apacheIgniteComponent(),
 		//		elasticSearchComponent(),
 		//		helmComponent(),
 	}
