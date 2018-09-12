@@ -395,10 +395,21 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 
 // createHost ...
 func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.Host, error) {
+	// We 1st check if name is not aleready used
+	m, err := metadata.LoadHost(providers.FromClient(client), request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return nil, fmt.Errorf("A host already exist with name '%s'", request.Name)
+	}
+
+	// Optional network gateway
 	var gw *api.Host
 	// If the host is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
 		gwServer, err := client.readGateway(request.NetworkIDs[0])
+
 		if err != nil {
 			return nil, fmt.Errorf("no private host can be created on a network without gateway")
 		}
@@ -441,7 +452,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 
 	// Prepare key pair
 	kp := request.KeyPair
-	var err error
+
 	//If no key pair is supplied create one
 	if kp == nil {
 		id, _ := uuid.NewV4()
@@ -555,11 +566,22 @@ func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.
 }
 
 // GetHost returns the host identified by id
-func (client *Client) GetHost(id string) (*api.Host, error) {
+func (client *Client) GetHost(ref string) (*api.Host, error) {
 	var (
 		server *servers.Server
 		err    error
+		id     string
 	)
+
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	if err != nil {
+		return nil, err
+	}
+	if m == nil {
+		return nil, providers.ResourceNotFoundError("host", ref)
+	}
+	id = m.Get().ID
+
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			server, err = servers.Get(client.Compute, id).Extract()
@@ -670,11 +692,17 @@ func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, err
 }
 
 // DeleteHost deletes the host identified by id
-func (client *Client) DeleteHost(id string) error {
-	host, err := client.GetHost(id)
+func (client *Client) DeleteHost(ref string) error {
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
 	if err != nil {
 		return err
 	}
+	if m == nil {
+		return fmt.Errorf("Failed to find host '%s' in metadata", ref)
+	}
+
+	host := m.Get()
+	id := host.ID
 	if client.Cfg.UseFloatingIP {
 		fip, err := client.getFloatingIP(id)
 		if err == nil {

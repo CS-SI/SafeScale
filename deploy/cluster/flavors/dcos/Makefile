@@ -13,5 +13,6 @@ generate: dcos.go scripts/*.sh
 
 clean:
 	@($(RM) -f rice-box.go)
+	@($(RM) ErrorCode/*_string.go)
 
 mrproper: clean

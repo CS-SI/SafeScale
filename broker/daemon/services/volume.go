@@ -58,8 +58,12 @@ func (srv *VolumeService) List(all bool) ([]api.Volume, error) {
 func (srv *VolumeService) Delete(ref string) error {
 	vol, err := srv.Get(ref)
 	if err != nil {
+		return err
+	}
+	if vol == nil {
 		return fmt.Errorf("Volume '%s' does not exist", ref)
 	}
+
 	return srv.provider.DeleteVolume(vol.ID)
 }
 
@@ -95,24 +99,11 @@ func (srv *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachmen
 
 // Create a volume
 func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error) {
-	// Check if a volume already exist with the same name
-	volume, err := srv.Get(name)
-	if err != nil {
-		return nil, err
-	}
-	if volume != nil {
-		return nil, fmt.Errorf("Volume '%s' already exists", name)
-	}
-
-	volume, err = srv.provider.CreateVolume(api.VolumeRequest{
+	return srv.provider.CreateVolume(api.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
 	})
-	if err != nil {
-		return nil, err
-	}
-	return volume, nil
 }
 
 // Attach a volume to an host
@@ -120,14 +111,20 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 	// Get volume ID
 	volume, err := srv.Get(volumename)
 	if err != nil {
-		return fmt.Errorf("no volume found with name or id '%s'", volumename)
+		return err
+	}
+	if volume == nil {
+		return providers.ResourceNotFoundError("volume", volumename)
 	}
 
 	// Get Host ID
 	hostService := NewHostService(srv.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("no host found with name or id '%s'", hostName)
+		return err
+	}
+	if host == nil {
+		return providers.ResourceNotFoundError("host", hostName)
 	}
 
 	volatt, err := srv.provider.CreateVolumeAttachment(api.VolumeAttachmentRequest{
@@ -178,14 +175,14 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 func (srv *VolumeService) Detach(volumename string, hostName string) error {
 	vol, err := srv.Get(volumename)
 	if err != nil {
-		return fmt.Errorf("No volume found with name or id '%s'", volumename)
+		return providers.ResourceNotFoundError("volume", volumename)
 	}
 
 	// Get Host ID
 	hostService := NewHostService(srv.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("no host found with name or id '%s'", hostName)
+		return providers.ResourceNotFoundError("host", hostName)
 	}
 
 	volatt, err := srv.provider.GetVolumeAttachment(host.ID, vol.ID)
@@ -204,6 +201,7 @@ func (srv *VolumeService) Detach(volumename string, hostName string) error {
 	}
 	err = server.UnmountBlockDevice(volatt.Device)
 	if err != nil {
+		fmt.Printf("%s", err.Error())
 		return err
 	}
 

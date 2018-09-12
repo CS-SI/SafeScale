@@ -368,34 +368,6 @@ func (srv *Service) SearchImage(osname string) (*api.Image, error) {
 	return &imgs[maxi], nil
 }
 
-//GetNetworkByName returns the network named name
-func (srv *Service) GetNetworkByName(name string) (*api.Network, error) {
-	nets, err := srv.ListNetworksByName()
-	if err != nil {
-		return nil, err
-	}
-	n, ok := nets[name]
-	if !ok {
-		return nil, ResourceNotFoundError("Network", name)
-	}
-	return &n, nil
-
-}
-
-//ListNetworksByName returns network list
-func (srv *Service) ListNetworksByName() (map[string]api.Network, error) {
-	nets, err := srv.ListNetworks(false)
-	if err != nil {
-		return nil, err
-	}
-	netMap := make(map[string]api.Network)
-	for _, n := range nets {
-		netMap[n.Name] = n
-	}
-	return netMap, nil
-
-}
-
 //CreateHostWithKeyPair creates an host
 func (srv *Service) CreateHostWithKeyPair(request api.HostRequest) (*api.Host, *api.KeyPair, error) {
 	_, err := srv.GetHostByName(request.Name)
@@ -449,7 +421,7 @@ func (srv *Service) GetHostByName(name string) (*api.Host, error) {
 	}
 	host, ok := hosts[name]
 	if !ok {
-		return nil, ResourceNotFoundError("Host", name)
+		return nil, ResourceNotFoundError("host", name)
 	}
 	return &host, nil
 }

@@ -23,6 +23,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	services "github.com/CS-SI/SafeScale/broker/daemon/services"
+	conv "github.com/CS-SI/SafeScale/broker/utils"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -54,11 +55,7 @@ func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 	}
 
 	log.Println("Network created")
-	return &pb.Network{
-		ID:   network.ID,
-		Name: network.Name,
-		CIDR: network.CIDR,
-	}, nil
+	return conv.ToPBNetwork(network), nil
 }
 
 // List existing networks
@@ -80,11 +77,7 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (
 
 	// Map api.Network to pb.Network
 	for _, network := range networks {
-		pbnetworks = append(pbnetworks, &pb.Network{
-			ID:   network.ID,
-			Name: network.Name,
-			CIDR: network.CIDR,
-		})
+		pbnetworks = append(pbnetworks, conv.ToPBNetwork(&network))
 	}
 	rv := &pb.NetworkList{Networks: pbnetworks}
 	log.Printf("End List Network")
@@ -109,14 +102,12 @@ func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 	if err != nil {
 		return nil, err
 	}
+	if network == nil {
+		return nil, fmt.Errorf("No network '%s' found", ref)
+	}
 
 	log.Printf("End Inspect Network: '%s'", ref)
-	return &pb.Network{
-		ID:        network.ID,
-		Name:      network.Name,
-		CIDR:      network.CIDR,
-		GatewayID: network.GatewayID,
-	}, nil
+	return conv.ToPBNetwork(network), nil
 }
 
 // Delete a network

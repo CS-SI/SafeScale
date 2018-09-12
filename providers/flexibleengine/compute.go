@@ -19,6 +19,7 @@ package flexibleengine
 import (
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -34,6 +35,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils/retry"
+	gc "github.com/gophercloud/gophercloud"
 
 	uuid "github.com/satori/go.uuid"
 
@@ -290,7 +293,16 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		return nil, fmt.Errorf("name '%s' is invalid for a FlexibleEngine Host: %s", request.Name, openstack.ProviderErrorToString(err))
 	}
 
-	// Eventual network gateway
+	// Check name availability
+	m, err := metadata.LoadHost(providers.FromClient(client), request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return nil, providers.ResourceAlreadyExistsError("Host", request.Name)
+	}
+
+	//Eventual network gateway
 	var gw *api.Host
 	// If the host is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
@@ -326,7 +338,6 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 
 	// Prepare key pair
 	kp := request.KeyPair
-	var err error
 	// If no key pair is supplied create one
 	if kp == nil {
 		id, _ := uuid.NewV4()
@@ -400,7 +411,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	}
 
 	// Wait that host is ready, not just that the build is started
-	host, err := client.osclt.WaitHostReady(server.ID, time.Minute*5)
+	host, err := client.WaitHostReady(server.ID, time.Minute*5)
 	if err != nil {
 		client.DeleteHost(server.ID)
 		return nil, fmt.Errorf("timeout waiting host '%s' ready: %s", request.Name, openstack.ProviderErrorToString(err))
@@ -457,21 +468,54 @@ func validatehostName(req api.HostRequest) (bool, error) {
 	return true, nil
 }
 
-// GetHost returns the host identified by id
-func (client *Client) GetHost(id string) (*api.Host, error) {
-	return client.osclt.GetHost(id)
+// GetHost returns the host identified by ref (id or name)
+func (client *Client) GetHost(ref string) (*api.Host, error) {
+	// We first try looking for host from metadata
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return m.Get(), nil
+	}
+
+	// If not found, we look for any host from provider
+	// 1st try with id
+	server, err := servers.Get(client.osclt.Compute, ref).Extract()
+	if err != nil {
+		if _, ok := err.(gc.ErrDefault404); !ok {
+			return nil, fmt.Errorf("Error getting Host '%s': %s", ref, openstack.ProviderErrorToString(err))
+		}
+	}
+	if server != nil && server.ID != "" {
+		return client.toHost(server), nil
+	}
+
+	// Last chance, we look at all network
+	hosts, err := client.listAllHosts()
+	if err != nil {
+		return nil, err
+	}
+	for _, host := range hosts {
+		if host.ID == ref || host.Name == ref {
+			return &host, err
+		}
+	}
+
+	// At this point, no network has been found with given reference
+	return nil, nil
 }
 
 // ListHosts lists available hosts
 func (client *Client) ListHosts(all bool) ([]api.Host, error) {
 	if all {
-		return client.listallhosts()
+		return client.listAllHosts()
 	}
 	return client.listMonitoredHosts()
 }
 
 // listallhosts lists available hosts
-func (client *Client) listallhosts() ([]api.Host, error) {
+func (client *Client) listAllHosts() ([]api.Host, error) {
 	pager := servers.List(client.osclt.Compute, servers.ListOpts{})
 	var hosts []api.Host
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -507,14 +551,31 @@ func (client *Client) listMonitoredHosts() ([]api.Host, error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (client *Client) DeleteHost(id string) error {
+func (client *Client) DeleteHost(ref string) error {
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	if err != nil {
+		return err
+	}
+	if m == nil {
+		return providers.ResourceNotFoundError("host", ref)
+	}
+
+	host := m.Get()
+	id := host.ID
 	// Retrieve the list of attached volumes before deleting the host
 	volumeAttachments, err := client.ListVolumeAttachments(id)
 	if err != nil {
 		return err
 	}
 
-	err = client.osclt.DeleteHost(id)
+	err = client.oscltDeleteHost(id)
+	if err != nil {
+		return err
+	}
+	err = metadata.RemoveHost(providers.FromClient(client), host)
+	if err != nil {
+		return err
+	}
 
 	// In FlexibleEngine, volumes may not be always automatically removed, so take care of them
 	for _, va := range volumeAttachments {
@@ -526,6 +587,87 @@ func (client *Client) DeleteHost(id string) error {
 	}
 
 	return err
+}
+
+func (client *Client) oscltDeleteHost(id string) error {
+	if client.Cfg.UseFloatingIP {
+		fip, err := client.getFloatingIPOfHost(id)
+		if err == nil {
+			if fip != nil {
+				err = floatingips.DisassociateInstance(client.osclt.Compute, id, floatingips.DisassociateOpts{
+					FloatingIP: fip.IP,
+				}).ExtractErr()
+				if err != nil {
+					return fmt.Errorf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
+				}
+				err = floatingips.Delete(client.osclt.Compute, fip.ID).ExtractErr()
+				if err != nil {
+					return fmt.Errorf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
+				}
+			}
+		}
+	}
+
+	var err error
+	// Try to remove host for 3 minutes
+	outerRetryErr := retry.WhileUnsuccessful(
+		func() error {
+			resourcePresent := true
+			// 1st, send delete host order
+			err = servers.Delete(client.osclt.Compute, id).ExtractErr()
+			if err != nil {
+				switch err.(type) {
+				case gc.ErrDefault404:
+					// Resource not found, consider deletion succeeded (if the entry doesn't exist at all,
+					// metadata deletion will return an error)
+					return nil
+				default:
+					return fmt.Errorf("failed to submit host '%s' deletion: %s", id, openstack.ProviderErrorToString(err))
+				}
+			}
+			// 2nd, check host status every 5 seconds until check failed.
+			// If check succeeds but state is Error, retry the deletion.
+			// If check fails and error isn't 'resource not found', retry
+			innerRetryErr := retry.WhileUnsuccessfulDelay5Seconds(
+				func() error {
+					host, err := servers.Get(client.osclt.Compute, id).Extract()
+					if err == nil {
+						if toHostState(host.Status) == HostState.ERROR {
+							return nil
+						}
+						return fmt.Errorf("host '%s' state is '%s'", host.Name, host.Status)
+					}
+					switch err.(type) {
+					case gc.ErrDefault404:
+						resourcePresent = false
+						return nil
+					}
+					return err
+				},
+				1*time.Minute,
+			)
+			if innerRetryErr != nil {
+				switch innerRetryErr.(type) {
+				case retry.ErrTimeout:
+					// retry deletion...
+					return fmt.Errorf("failed to acknowledge host '%s' deletion! %s", id, err.Error())
+				default:
+					return innerRetryErr
+				}
+			}
+			if !resourcePresent {
+				return nil
+			}
+			return fmt.Errorf("host '%s' in state 'ERROR', retrying to delete", id)
+		},
+		0,
+		3*time.Minute,
+	)
+	if outerRetryErr != nil {
+		log.Printf("failed to remove host '%s': %s", id, err.Error())
+		return err
+	}
+	return nil
 }
 
 // GetSSHConfig creates SSHConfig to connect an host by its ID
@@ -823,7 +965,6 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 	}
 
 	imageFilter := filters.NewFilter(isWindowsImage).Not().And(filters.NewFilter(isBMSImage).Not())
-
 	return filters.FilterImages(images, imageFilter), nil
 
 }
@@ -868,4 +1009,38 @@ func (client *Client) StopHost(id string) error {
 // StartHost starts the host identified by id
 func (client *Client) StartHost(id string) error {
 	return client.osclt.StartHost(id)
+}
+
+// WaitHostReady waits an host achieve ready state
+func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.Host, error) {
+	var (
+		server *servers.Server
+		err    error
+		broken bool
+	)
+
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			server, err = servers.Get(client.osclt.Compute, hostID).Extract()
+			if err != nil {
+				return err
+			}
+			if server.Status == "ERROR" {
+				broken = true
+				return nil
+			}
+			if server.Status != "ACTIVE" {
+				return fmt.Errorf("host '%s' is in state '%s'", server.Name, server.Status)
+			}
+			return nil
+		},
+		timeout,
+	)
+	if retryErr != nil {
+		return nil, retryErr
+	}
+	if broken {
+		return nil, fmt.Errorf("host '%s' is in '%s' state", server.Name, server.Status)
+	}
+	return client.toHost(server), nil
 }

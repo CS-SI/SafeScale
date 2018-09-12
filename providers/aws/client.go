@@ -29,13 +29,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/CS-SI/SafeScale/metadata"
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
-
-	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
-
-	"github.com/CS-SI/SafeScale/providers/api/HostState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
+	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -634,6 +632,13 @@ func (c *Client) removeNetwork(netID string) error {
 
 //CreateNetwork creates a network
 func (c *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
+	m, err := metadata.LoadNetwork(providers.FromClient(c), req.Name)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil {
+		return nil, fmt.Errorf("A network already exist with name '%s'", req.Name)
+	}
 	vpcOut, err := c.EC2.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: aws.String(req.CIDR),
 	})
@@ -930,7 +935,7 @@ func (c *Client) saveHost(host api.Host) error {
 func (c *Client) removeHost(hostID string) error {
 	return c.DeleteObject("gpac.aws.wms", hostID)
 }
-func (c *Client) readHost(hostID string) (*api.host, error) {
+func (c *Client) readHost(hostID string) (*api.Host, error) {
 	o, err := c.GetObject("gpac.aws.wms", hostID, nil)
 	if err != nil {
 		return nil, err
@@ -979,7 +984,7 @@ func (c *Client) createSecurityGroup(vpcID string, name string) (string, error) 
 }
 
 //CreateHost creates an host that fulfils the request
-func (c *Client) CreateHost(request api.HostRequest) (*api.host, error) {
+func (c *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 
 	// If no KeyPair is supplied a temporay one is created
 	kp := request.KeyPair
@@ -1139,7 +1144,7 @@ func (c *Client) CreateHost(request api.HostRequest) (*api.host, error) {
 }
 
 //GetHost returns the host identified by id
-func (c *Client) GetHost(id string) (*api.host, error) {
+func (c *Client) GetHost(id string) (*api.Host, error) {
 
 	out, err := c.EC2.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{aws.String(id)},
@@ -1179,7 +1184,7 @@ func (c *Client) GetHost(id string) (*api.host, error) {
 }
 
 // ListHosts lists available hosts
-func (c *Client) ListHosts() ([]api.host, error) {
+func (c *Client) ListHosts() ([]api.Host, error) {
 	panic("Not Implemented")
 }
 
@@ -1341,6 +1346,15 @@ func (c *Client) removeVolumeName(id string) error {
 //- size is the size of the volume in GB
 //- volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (c *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
+	// Check if a volume already exist with the same name
+	_volume, err := metadata.LoadVolume(providers.FromClient(client), request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if _volume != nil {
+		return nil, fmt.Errorf("Volume '%s' already exists", request.Name)
+	}
+
 	v, err := c.EC2.CreateVolume(&ec2.CreateVolumeInput{
 		Size:       aws.Int64(int64(request.Size)),
 		VolumeType: aws.String(toVolumeType(request.Speed)),

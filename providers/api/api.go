@@ -351,8 +351,8 @@ type ClientAPI interface {
 
 	// CreateNetwork creates a network named name
 	CreateNetwork(req NetworkRequest) (*Network, error)
-	// GetNetwork returns the network identified by id
-	GetNetwork(id string) (*Network, error)
+	// GetNetwork returns the network identified by ref (id or name)
+	GetNetwork(ref string) (*Network, error)
 	// ListNetworks lists available networks
 	ListNetworks(all bool) ([]Network, error)
 	// DeleteNetwork deletes the network identified by id
