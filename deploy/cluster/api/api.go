@@ -31,17 +31,17 @@ import (
 
 // Request defines what kind of Cluster is wanted
 type Request struct {
-	//Name is the name of the cluster wanted
+	// Name is the name of the cluster wanted
 	Name string
-	//CIDR defines the network to create
+	// CIDR defines the network to create
 	CIDR string
-	//Mode is the implementation wanted, can be Simple, HighAvailability or HighVolume
+	// Complexity is the implementation wanted, can be Small, Normal or Large
 	Complexity Complexity.Enum
-	//Flavor tells what kind of cluster to create
+	// Flavor tells what kind of cluster to create
 	Flavor Flavor.Enum
-	//NetworkID is the ID of the network to use
+	// NetworkID is the ID of the network to use
 	NetworkID string
-	//Tenant contains the name of the tenant
+	// Tenant contains the name of the tenant
 	Tenant string
 	// KeepOnFailure is set to True to keep resources on cluster creation failure
 	KeepOnFailure bool
@@ -108,36 +108,36 @@ type AdditionalInfoMap map[AdditionalInfo.Enum]interface{}
 // ClusterCore contains the bare minimum information about a cluster
 type ClusterCore struct {
 	// Name is the name of the cluster
-	Name string
+	Name string `json:"name"`
 	// CIDR is the network CIDR wanted for the Network
-	CIDR string
+	CIDR string `json:"cidr"`
 	// Flavor tells what kind of cluster it is
-	Flavor Flavor.Enum
+	Flavor Flavor.Enum `json:"flavor"`
 	// Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
-	Complexity Complexity.Enum
+	Complexity Complexity.Enum `json:"complexity"`
 	// Keypair contains the key-pair used inside the Cluster
-	Keypair *providerapi.KeyPair
+	Keypair *providerapi.KeyPair `json:"keypair,omitempty"`
 	// State of the cluster
-	State ClusterState.Enum
+	State ClusterState.Enum `json:"state,omitempty"`
 	// Tenant is the name of the tenant
-	Tenant string
+	Tenant string `json:"tenant"`
 	// NetworkID is the ID of the network to use
-	NetworkID string
+	NetworkID string `json:"network_id"`
 	// GatewayIP is the IP of the gateway of the network
-	GatewayIP string
+	GatewayIP string `json:"gateway_ip,omitempty"`
 	// PublicNodedIDs is a slice of host IDs of the public cluster nodes
-	PublicNodeIDs []string
+	PublicNodeIDs []string `json:"public_node_ids,omitempty"`
 	// PrivateNodedIDs is a slice of host IDs of the private cluster nodes
-	PrivateNodeIDs []string
+	PrivateNodeIDs []string `json:"private_node_ids,omitempty"`
 	// AdminPassword contains the password of cladm account. This password
 	// is used to connect via Guacamole, but can't be used with SSH
-	AdminPassword string
+	AdminPassword string `json:"admin_password"`
 	// PublicIP is the IP address to reach the cluster (ie the public IP address of the network gateway)
-	PublicIP string
+	PublicIP string `json:"public_ip"`
 	// NodesDef keeps the default node definition
-	NodesDef *pb.HostDefinition
+	NodesDef *pb.HostDefinition `json:"nodes_def"`
 	// Infos contains additional info about the cluster
-	Infos AdditionalInfoMap
+	Infos AdditionalInfoMap `json:"infos,omitempty"`
 }
 
 // GetName returns the name of the cluster

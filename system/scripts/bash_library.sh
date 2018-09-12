@@ -88,7 +88,7 @@ bg_start() {
    eval "$pid=$!"
 }
 
-# bg_wait <what> <error message>
+# bg_wait <what> <error code>
 bg_wait() {
    local pid="${1}_PID"
    local log="${1}.log"

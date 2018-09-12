@@ -295,10 +295,10 @@ Usage: {{.ProgName}} [options] cluster <clustername> create {cluster options} {h
 cluster options:
   [-N,--cidr <cidr>]              To specify the CIDR of the associated network created with cluster (default: 192.168.0.0/16)
   [-F,--flavor <flavor>]          To specify the management of cluster; can be DCOS or BOH (Bunch Of Hosts) (default: BOH)
-  [-C,--complexity <complexity>]  To fix the cluster complexity; can be Minimal, Normal, Volume (default: Normal)
-									Minimal implies: 1 master, 1 node
+  [-C,--complexity <complexity>]  To fix the cluster complexity; can be Small, Normal, Large (default: Normal)
+									Small implies: 1 master, 1 node
 									Normal  implies: 3 masters, 3 nodes
-									Volume  implies: 5 masters, 3 nodes
+									Large  implies: 5 masters, 3 nodes
   [-k,--keep-on-failure]          Keep resources on failure`,
 			`
 host options:
@@ -434,12 +434,12 @@ var clusterExpandCommand = &cli.Command{
 	Keyword: "expand",
 
 	Process: func(c *cli.Command) {
-		count := c.IntOption("-n,--count", "<count>", 1)
+		count := c.IntOption("-n,--count", "<number of nodes>", 1)
 		public := c.Flag("-p,--public", false)
-		los := c.StringOption("--os", "<os>", ubuntu1604)
-		cpu := int32(c.IntOption("--cpu", "<cpu>", 2))
-		ram := float32(c.FloatOption("--ram", "<ram>", 7.0))
-		disk := int32(c.IntOption("--disk", "<disk>", 100))
+		los := c.StringOption("--os", "<operating system", ubuntu1604)
+		cpu := int32(c.IntOption("--cpu", "<number of cpus>", 2))
+		ram := float32(c.FloatOption("--ram", "<ram size>", 7.0))
+		disk := int32(c.IntOption("--disk", "<disk size>", 100))
 		//gpu := c.Flag("--gpu", false)
 		_ = c.Flag("--gpu", false)
 
@@ -880,15 +880,15 @@ var clusterComponentAddCommand = &cli.Command{
 		target := install.NewClusterTarget(clusterInstance)
 		ok, results, err := component.Add(target, install.EmptyValues)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error installing component '%s' on '%s': %s\n", componentName, clusterName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error installing component '%s' on cluster '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if ok {
-			fmt.Printf("Component '%s' installed successfully on '%s'\n", componentName, clusterName)
+			fmt.Printf("Component '%s' installed successfully on cluster '%s'\n", componentName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
 
-		fmt.Printf("Failed to install component '%s' on host '%s'\n", componentName, clusterName)
+		fmt.Printf("Failed to install component '%s' on cluster '%s'\n", componentName, clusterName)
 		fmt.Println(results.Errors())
 		os.Exit(int(ExitCode.Run))
 	},
