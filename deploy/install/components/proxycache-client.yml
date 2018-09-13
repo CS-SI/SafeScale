@@ -34,10 +34,12 @@ component:
                 cat >>/etc/environment <<-'EOF'
                 http_proxy="http://{{.GatewayIP}}:3128/"
                 HTTP_PROXY="http://{{.GatewayIP}}:3128/"
-                https_proxy="https://{{.GatewayIP}}:3128/"
-                HTTPS_PROXY="https://{{.GatewayIP}}:3128/"
-                ftp_proxy="ftp://{{.GatewayIP}}:3128/"
-                FTP_PROXY="ftp://{{.GatewayIP}}:3128/"
+                https_proxy="http://{{.GatewayIP}}:3128/"
+                HTTPS_PROXY="http://{{.GatewayIP}}:3128/"
+                ftp_proxy="http://{{.GatewayIP}}:3128/"
+                FTP_PROXY="http://{{.GatewayIP}}:3128/"
+                no_proxy={{.GatewayIP}},{{.HostIP}},localhost
+                NO_PROXY={{.GatewayIP}},{{.HostIP}},localhost
                 EOF
 
                 case $LINUX_KIND in
