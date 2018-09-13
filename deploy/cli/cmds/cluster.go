@@ -157,20 +157,20 @@ List available clusters.`,
 // formatClusterConfig...
 func formatClusterConfig(value interface{}) map[string]interface{} {
 	core := value.(map[string]interface{})
-	e := Flavor.Enum(int(core["Flavor"].(float64)))
-	core["FlavorLabel"] = e.String()
+	e := Flavor.Enum(int(core["flavor"].(float64)))
+	core["flavor_label"] = e.String()
 
-	c := Complexity.Enum(int(core["Complexity"].(float64)))
-	core["ComplexityLabel"] = c.String()
+	c := Complexity.Enum(int(core["complexity"].(float64)))
+	core["complexity_label"] = c.String()
 
-	s := ClusterState.Enum(int(core["State"].(float64)))
-	core["StateLabel"] = s.String()
+	s := ClusterState.Enum(int(core["state"].(float64)))
+	core["state_label"] = s.String()
 
 	if !Debug {
-		delete(core, "Infos")
-		delete(core, "PrivateNodeIDs")
-		delete(core, "PublicNodeIDs")
-		delete(core, "Keypair")
+		delete(core, "infos")
+		delete(core, "private_node_ids")
+		delete(core, "public_node_ids")
+		delete(core, "keypair")
 	}
 
 	return core
@@ -802,7 +802,7 @@ Usage: {{.ProgName}} [options] cluster list,ls
 }
 
 func executeCommand(command string) (int, string, string, error) {
-	masters := clusterInstance.ListMasterIPs()
+	masters := clusterInstance.ListMasterIDs()
 	if len(masters) <= 0 {
 		fmt.Printf("No masters found for the cluster '%s'", clusterInstance.GetName())
 		os.Exit(int(ExitCode.Run))
