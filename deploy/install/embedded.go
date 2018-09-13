@@ -310,7 +310,7 @@ func init() {
 		proxycacheClientComponent(),
 		apacheIgniteComponent(),
 		//		elasticSearchComponent(),
-		//		helmComponent(),
+		helmComponent(),
 	}
 
 	for _, item := range allEmbedded {

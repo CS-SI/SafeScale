@@ -20,7 +20,7 @@ component:
     target:
         host: no
         cluster:
-            master: any
+            master: all
             node:
                 private: no
                 public: no
@@ -37,7 +37,7 @@ component:
                 chmod a+rx helm && \
                 chown {{.Username}} helm && \
                 mv helm ~{{.Username}}/.local/bin
-                sudo -u {{.Username}} -i helm init
+                #sudo -u {{.Username}} -i helm init
 
             remove: |
                 rm -f ~{{.Username}}/.local/bin/helm
