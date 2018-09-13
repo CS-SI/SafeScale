@@ -17,6 +17,8 @@
 package opentelekom
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
@@ -54,6 +56,9 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	var err error
 	client := &Client{}
 
+	if opts.IdentityEndpoint == "" {
+		opts.IdentityEndpoint = fmt.Sprintf(authURL, opts.Region)
+	}
 	client.feclt, err = flexibleengine.AuthenticatedClient(opts.AuthOptions, cfg.CfgOptions)
 	if err != nil {
 		return nil, err
@@ -63,7 +68,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	return client, err
 }
 
-//Build build a new Client from configuration parameter
+// Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	Username, _ := params["Username"].(string)
 	Password, _ := params["Password"].(string)
@@ -73,6 +78,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	VPCCIDR, _ := params["VPCCIDR"].(string)
 	Region, _ := params["Region"].(string)
 	IdentityEndpoint, _ := params["IdentityEndpoint"].(string)
+
 	S3AccessKeyID, _ := params["S3AccessKeyID"].(string)
 	S3AccessKeyPassword, _ := params["S3AccessKeyPassword"].(string)
 	authOptions := AuthOptions{
