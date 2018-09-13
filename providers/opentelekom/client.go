@@ -39,7 +39,7 @@ type CfgOptions struct {
 }
 
 const (
-	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com"
+	authURL string = "https://iam.%s.otc.t-systems.com"
 )
 
 // Client is the implementation of the flexibleengine driver regarding to the api.ClientAPI
