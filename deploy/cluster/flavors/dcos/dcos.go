@@ -739,29 +739,28 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 		return
 	}
 
-	/* 	// install docker component
-	   	log.Printf("[master #%d (%s)] installing component 'docker'", index, host.Name)
-	   	component, err = install.NewComponent("docker")
-	   	if err != nil {
-	   		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", index, host.ID, err.Error())
-	   		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
-	   		return
-	   	}
-	   	target = install.NewHostTarget(host)
-	   	ok, results, err = component.Add(target, values)
-	   	if err != nil {
-	   		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", index, host.Name, component.DisplayName(), err.Error())
-	   		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
-	   		return
-	   	}
-	   	if !ok {
-	   		msg := results.Errors()
-	   		log.Printf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), msg)
-	   		done <- fmt.Errorf(msg)
-	   		return
-	   	}
-	   	log.Printf("[master #%d (%s)] component 'docker' installed successfully\n", index, host.Name)
-	*/
+	// install docker component
+	log.Printf("[master #%d (%s)] installing component 'docker'", index, host.Name)
+	component, err = install.NewComponent("docker")
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", index, host.ID, err.Error())
+		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
+		return
+	}
+	target = install.NewHostTarget(host)
+	ok, results, err = component.Add(target, values)
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", index, host.Name, component.DisplayName(), err.Error())
+		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		return
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), msg)
+		done <- fmt.Errorf(msg)
+		return
+	}
+	log.Printf("[master #%d (%s)] component 'docker' installed successfully\n", index, host.Name)
 
 	// Installs DCOS requirements...
 	log.Printf("[master #%d (%s)] installing DCOS requirements", index, host.Name)
