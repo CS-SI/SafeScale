@@ -157,7 +157,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
-	to := fmt.Sprintf("%s:%s", host.GetName(), filename)
+	to := fmt.Sprintf("%s:%s", host.Name, filename)
 	broker := brokerclient.New().Ssh
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -167,6 +167,10 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 				return err
 			}
 			if retcode != 0 {
+				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
+				if retcode == 1 {
+					return fmt.Errorf(system.SCPErrorString(1))
+				}
 				err = fmt.Errorf("failed to copy temporary file to '%s' (retcode=%d)", to, retcode)
 				return nil
 			}
