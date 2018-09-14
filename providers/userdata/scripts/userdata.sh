@@ -365,5 +365,5 @@ case $LINUX_KIND in
         ;;
 esac
 
-date +%Y/%m/%d-%H:%M:%S >/var/tmp/user_data.done
+echo "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
 exit 0
