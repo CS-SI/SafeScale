@@ -199,6 +199,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		rpStatus         error
 		nodesStatus      error
 		ok               bool
+		component        installapi.Component
+		target           installapi.Target
+		results          installapi.AddResults
 	)
 
 	// Generate needed password for account cladm
@@ -261,7 +264,20 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		goto cleanNetwork
 	}
 	gw = m.Get()
-	instance.Core.PublicIP = gw.GetAccessIP()
+
+	component, err = install.NewComponent("proxycache-server")
+	if err != nil {
+		goto cleanNetwork
+	}
+	target = install.NewHostTarget(pbutils.ToPBHost(gw))
+	ok, results, err = component.Add(target, installapi.Variables{})
+	if err != nil {
+		goto cleanNetwork
+	}
+	if !ok {
+		err = fmt.Errorf(results.Errors())
+		goto cleanNetwork
+	}
 
 	// Saving cluster parameters, with status 'Creating'
 	instance = Cluster{
@@ -412,6 +428,47 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 		return err
 	}
 
+	// install proxycache-client component
+	component, err := install.NewComponent("proxycache-client")
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to prepare component 'proxycache-client': %s", 1, host.ID, err.Error())
+		return fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
+	}
+	target := install.NewHostTarget(host)
+	values := installapi.Variables{
+		"Password": c.Core.AdminPassword,
+	}
+	ok, results, err := component.Add(target, values)
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
+		return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
+		return fmt.Errorf(msg)
+	}
+
+	// install docker component
+	log.Printf("[master #%d (%s)] installing component 'docker'", 1, host.Name)
+	component, err = install.NewComponent("docker")
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", 1, host.ID, err.Error())
+		return fmt.Errorf("failed to install component 'docker': %s", err.Error())
+	}
+	target = install.NewHostTarget(host)
+	ok, results, err = component.Add(target, values)
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
+		return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
+		return fmt.Errorf(msg)
+	}
+	log.Printf("[master #%d (%s)] component 'docker' installed successfully\n", 1, host.Name)
+
 	// Installs BOH requirements...
 	installCommonRequirements, err := c.getInstallCommonRequirements()
 	if err != nil {
@@ -442,28 +499,6 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 		}
 		log.Printf("[master #%d (%s)] installation failed (retcode=%d)", 1, host.Name, retcode)
 		return fmt.Errorf("scripted installation failed on master '%s' (retcode=%d)", host.Name, retcode)
-	}
-
-	// install docker component
-	component, err := install.NewComponent("docker")
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", 1, host.ID, err.Error())
-		return fmt.Errorf("failed to install component 'docker': %s", err.Error())
-	}
-	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, installapi.Variables{
-		"Hostname": host.Name,
-		"Username": "cladm",
-		"Password": c.Core.AdminPassword,
-	})
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
-		return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
-	}
-	if !ok {
-		msg := results.Errors()
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
-		return fmt.Errorf(msg)
 	}
 
 	log.Printf("[master #%d (%s)] creation successful", 1, host.Name)
@@ -576,6 +611,49 @@ func (c *Cluster) asyncCreateNode(
 		return
 	}
 
+	// install proxycache-client component
+	component, err := install.NewComponent("proxycache-client")
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to prepare component 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
+		done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
+		return
+	}
+	target := install.NewHostTarget(host)
+	ok, results, err := component.Add(target, installapi.Variables{})
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
+		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		return
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
+		done <- fmt.Errorf(msg)
+		return
+	}
+
+	// install docker component
+	log.Printf("[%s node #%d (%s)] installing component 'docker'...\n", nodeTypeStr, index, host.Name)
+	component, err = install.NewComponent("docker")
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to prepare component 'docker': %s", nodeTypeStr, index, host.Name, err.Error())
+		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
+		return
+	}
+	ok, results, err = component.Add(target, installapi.Variables{})
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
+		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		return
+	}
+	if !ok {
+		msg := results.Errors()
+		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
+		done <- fmt.Errorf("failed to intall component '%s' on host '%s': %s", component.DisplayName(), host.Name, msg)
+		return
+	}
+	log.Printf("[%s node #%d (%s)] component 'docker' installed successfully.\n", nodeTypeStr, index, host.Name)
+
 	// Installs BOH requirements
 	installCommonRequirements, err := c.getInstallCommonRequirements()
 	if err != nil {
@@ -608,31 +686,6 @@ func (c *Cluster) asyncCreateNode(
 			log.Printf("[%s node #%d (%s)] installation failed: retcode=%d", nodeTypeStr, index, host.Name, retcode)
 			done <- fmt.Errorf("scripted Agent configuration failed with error code %d", retcode)
 		}
-		return
-	}
-
-	// install docker component
-	component, err := install.NewComponent("docker")
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", 1, host.ID, err.Error())
-		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
-		return
-	}
-	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, installapi.Variables{
-		"Hostname": host.Name,
-		"Username": "cladm",
-		"Password": c.Core.AdminPassword,
-	})
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
-		return
-	}
-	if !ok {
-		msg := results.Errors()
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
-		done <- fmt.Errorf(msg)
 		return
 	}
 
