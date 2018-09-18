@@ -106,8 +106,8 @@ var hostCreate = cli.Command{
 			Usage: "Image name for the host",
 		},
 		cli.BoolFlag{
-			Name:  "private",
-			Usage: "Create with no public IP",
+			Name:  "public",
+			Usage: "Create with public IP",
 		},
 		cli.BoolFlag{
 			Name:   "gpu",
@@ -127,7 +127,7 @@ var hostCreate = cli.Command{
 			Disk:      int32(c.Float64("disk")),
 			ImageID:   c.String("os"),
 			Network:   c.Args().Get(1),
-			Public:    !c.Bool("private"),
+			Public:    c.Bool("public"),
 			RAM:       float32(c.Float64("ram")),
 		}
 		resp, err := client.New().Host.Create(def, client.DefaultExecutionTimeout)
