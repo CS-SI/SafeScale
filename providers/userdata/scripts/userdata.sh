@@ -253,6 +253,11 @@ configure_as_gateway() {
 
     save_iptables_rules
 
+    grep -v AllowTcpForwarding /etc/ssh/sshd_config >/etc/ssh/sshd_config.new
+    echo "AllowTcpForwarding yes" >>/etc/ssh/sshd_config.new
+    mv /etc/ssh/sshd_config.new /etc/ssh/sshd_config
+    systemctl restart ssh
+
     echo done
 }
 
