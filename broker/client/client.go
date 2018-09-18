@@ -72,7 +72,7 @@ func DecorateError(err error, action string, maySucceed bool) error {
 	if status.Code(err) == codes.DeadlineExceeded {
 		msg := "%s took too long (> %v) to respond"
 		if maySucceed {
-			msg += "(may eventually succeed)"
+			msg += " (may eventually succeed)"
 		}
 		return fmt.Errorf(msg, action, DefaultExecutionTimeout)
 	}
