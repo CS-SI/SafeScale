@@ -17,6 +17,7 @@
 package ovh
 
 import (
+	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -34,13 +35,20 @@ func (client *Client) GetImage(id string) (*api.Image, error) {
 	return client.osclt.GetImage(id)
 }
 
-//GetTemplate overload OpenStack GetTemplate method to add GPU configuration
+// GetTemplate overload OpenStack GetTemplate method to add GPU configuration
 func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 	tpl, err := client.osclt.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
 	}
 	return tpl, err
+}
+
+func addGPUCfg(tpl *api.HostTemplate) {
+	if cfg, ok := gpuMap[tpl.Name]; ok {
+		tpl.GPUNumber = cfg.GPUNumber
+		tpl.GPUType = cfg.GPUType
+	}
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
@@ -55,6 +63,13 @@ func (client *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 
 	filter := filters.NewFilter(isWindowsTemplate).Not().And(filters.NewFilter(isFlexTemplate).Not())
 	return filters.FilterTemplates(allTemplates, filter), nil
+}
+
+func isWindowsTemplate(t api.HostTemplate) bool {
+	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
+}
+func isFlexTemplate(t api.HostTemplate) bool {
+	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 
 // CreateKeyPair creates and import a key pair

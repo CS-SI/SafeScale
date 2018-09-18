@@ -87,6 +87,23 @@ var (
 	}
 )
 
+// IsSSHRetryable tells if the retcode of a ssh command may be retried
+func IsSSHRetryable(code int) bool {
+	if code == 2 || code == 4 || code == 5 || code == 66 || code == 67 || code == 70 || code == 74 || code == 75 || code == 76 {
+		return true
+	}
+	return false
+
+}
+
+// IsSCPRetryable tells if the retcode of a scp command may be retried
+func IsSCPRetryable(code int) bool {
+	if code == 4 || code == 5 || code == 66 || code == 67 || code == 70 || code == 74 || code == 75 || code == 76 {
+		return true
+	}
+	return false
+}
+
 // SSHConfig helper to manage ssh session
 type SSHConfig struct {
 	User          string
@@ -179,7 +196,7 @@ func isTunnelReady(port int) bool {
 
 }
 
-// CreateTunnel create SSH from local host to remote host throw gateway
+// createTunnel create SSH from local host to remote host throw gateway
 func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
@@ -456,7 +473,6 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
-	//log.Println(sshCmdString)
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
@@ -536,7 +552,6 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	sshCmdString := copyCommand.String()
 
 	cmd := exec.Command("bash", "-c", sshCmdString)
-	//log.Println("cmd", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
 		tunnels: tunnels,
@@ -566,7 +581,6 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
 	bash, err := exec.LookPath("bash")
-	//log.Println("BASH ", bash)
 	if err != nil {
 		for _, t := range tunnels {
 			t.Close()
@@ -582,7 +596,6 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 	} else {
 		args = []string{"-c", sshCmdString}
 	}
-	//log.Println("ARGS ", args)
 	err = syscall.Exec(bash, args, nil)
 	os.Remove(keyFile.Name())
 	return err
@@ -597,6 +610,7 @@ func (ssh *SSHConfig) Enter() error {
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
+
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, "", false)
 	if err != nil {
 		for _, t := range tunnels {
@@ -620,8 +634,8 @@ func (ssh *SSHConfig) Enter() error {
 	}
 
 	proc := exec.Command(bash, "-c", sshCmdString)
-	proc.Stdout = os.Stdout
 	proc.Stdin = os.Stdin
+	proc.Stdout = os.Stdout
 	proc.Stderr = os.Stderr
 	err = proc.Run()
 	os.Remove(keyFile.Name())
