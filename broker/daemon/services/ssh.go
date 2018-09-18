@@ -81,7 +81,7 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 		2*time.Minute,
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
-				log.Printf("Remote SSH service on host '%s' isn't readybroker ssh co, retrying...\n", hostName)
+				log.Printf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
 			}
 		},
 	)
