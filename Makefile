@@ -62,6 +62,7 @@ DSP := github.com/mjibson/go-dsp/fft
 TESTIFY := github.com/stretchr/testify
 PASSWORD := github.com/sethvargo/go-password/password
 CRYPTO_SSH := golang.org/x/crypto/ssh
+MAPSET := github.com/deckarep/golang-set
 
 #Golang Object Relationnal Mapper needed by pckage security
 GORM := github.com/jinzhu/gorm
@@ -87,6 +88,6 @@ AWS := github.com/aws/aws-sdk-go
 # Providers SDK
 PROVIDERS_SDK := $(GOPHERCLOUD) $(AWS)
 
-DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(PASSWORD) $(CRYPTO_SSH) $(GORM_LIBS) $(GLOB) $(GRPC_LIBS) $(PROVIDERS_SDK) $(MOW)
+DEPS := $(STRINGER) $(RICE) $(URFAVE) $(VIPER) $(PENGUS_CHECK) $(UUID) $(SPEW) $(DSP) $(TESTIFY) $(PASSWORD) $(CRYPTO_SSH) $(GORM_LIBS) $(GLOB) $(GRPC_LIBS) $(PROVIDERS_SDK) $(MOW) $(MAPSET)
 
 deps: ; $(GO) get -u $(DEPS)

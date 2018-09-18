@@ -22,7 +22,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster"
-	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 )
 
 var (

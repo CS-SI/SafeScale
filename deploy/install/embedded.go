@@ -20,8 +20,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/deploy/install/api"
-	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 
 	"github.com/spf13/viper"
 
@@ -32,9 +31,9 @@ var (
 	templateBox *rice.Box
 	emptyParams = map[string]interface{}{}
 
-	availableEmbeddedMap = map[Method.Enum]map[string]api.Component{}
-	allEmbeddedMap       = map[string]api.Component{}
-	allEmbedded          = []api.Component{}
+	availableEmbeddedMap = map[Method.Enum]map[string]*Component{}
+	allEmbeddedMap       = map[string]*Component{}
+	allEmbedded          = []*Component{}
 )
 
 // loadSpecFile returns the content of the spec file of the component named 'name'
@@ -79,12 +78,12 @@ func loadSpecFile(name string) (*viper.Viper, error) {
 }
 
 // dockerComponent ...
-func dockerComponent() *component {
+func dockerComponent() *Component {
 	specs, err := loadSpecFile("docker")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "docker",
 		specs:       specs,
@@ -92,12 +91,12 @@ func dockerComponent() *component {
 }
 
 // nVidiaDockerComponent ...
-func nVidiaDockerComponent() *component {
+func nVidiaDockerComponent() *Component {
 	specs, err := loadSpecFile("nvidiadocker")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "nvidiadocker",
 		specs:       specs,
@@ -105,12 +104,12 @@ func nVidiaDockerComponent() *component {
 }
 
 // kubernetesComponent ...
-func kubernetesComponent() *component {
+func kubernetesComponent() *Component {
 	specs, err := loadSpecFile("kubernetes")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "kubernetes",
 		specs:       specs,
@@ -118,12 +117,12 @@ func kubernetesComponent() *component {
 }
 
 // nexusComponent ...
-func nexusComponent() *component {
+func nexusComponent() *Component {
 	specs, err := loadSpecFile("nexus")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("name"),
 		fileName:    "nexus",
 		specs:       specs,
@@ -131,12 +130,12 @@ func nexusComponent() *component {
 }
 
 // elasticSearchComponent ...
-func elasticSearchComponent() *component {
+func elasticSearchComponent() *Component {
 	specs, err := loadSpecFile("elasticsearch")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "elasticsearch",
 		specs:       specs,
@@ -144,12 +143,12 @@ func elasticSearchComponent() *component {
 }
 
 // helmComponent ...
-func helmComponent() *component {
+func helmComponent() *Component {
 	specs, err := loadSpecFile("helm")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "helm",
 		specs:       specs,
@@ -157,12 +156,12 @@ func helmComponent() *component {
 }
 
 // reverseProxyComponent ...
-func reverseProxyComponent() *component {
+func reverseProxyComponent() *Component {
 	specs, err := loadSpecFile("reverseproxy")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "reverseproxy",
 		specs:       specs,
@@ -170,12 +169,12 @@ func reverseProxyComponent() *component {
 }
 
 // remoteDesktopComponent ...
-func remoteDesktopComponent() *component {
+func remoteDesktopComponent() *Component {
 	specs, err := loadSpecFile("remotedesktop")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "remotedesktop",
 		specs:       specs,
@@ -183,12 +182,12 @@ func remoteDesktopComponent() *component {
 }
 
 // mpichOsPkgComponent ...
-func mpichOsPkgComponent() *component {
+func mpichOsPkgComponent() *Component {
 	specs, err := loadSpecFile("mpich-ospkg")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "mpich-ospkg",
 		specs:       specs,
@@ -196,12 +195,12 @@ func mpichOsPkgComponent() *component {
 }
 
 // mpichBuildComponent ...
-func mpichBuildComponent() *component {
+func mpichBuildComponent() *Component {
 	specs, err := loadSpecFile("mpich-build")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "mpich-build",
 		specs:       specs,
@@ -209,12 +208,12 @@ func mpichBuildComponent() *component {
 }
 
 // ohpcSlurmMasterComponent ...
-func ohpcSlurmMasterComponent() *component {
+func ohpcSlurmMasterComponent() *Component {
 	specs, err := loadSpecFile("ohpc-slurm-master")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "ohpc-slurm-master",
 		specs:       specs,
@@ -222,12 +221,12 @@ func ohpcSlurmMasterComponent() *component {
 }
 
 // ohpcSlurmNodeComponent ...
-func ohpcSlurmNodeComponent() *component {
+func ohpcSlurmNodeComponent() *Component {
 	specs, err := loadSpecFile("ohpc-slurm-node")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "ohpc-slurm-node",
 		specs:       specs,
@@ -235,12 +234,12 @@ func ohpcSlurmNodeComponent() *component {
 }
 
 // proxycacheServerComponent ...
-func proxycacheServerComponent() *component {
+func proxycacheServerComponent() *Component {
 	specs, err := loadSpecFile("proxycache-server")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "proxycache-server",
 		specs:       specs,
@@ -248,12 +247,12 @@ func proxycacheServerComponent() *component {
 }
 
 // proxycacheClientComponent ...
-func proxycacheClientComponent() *component {
+func proxycacheClientComponent() *Component {
 	specs, err := loadSpecFile("proxycache-client")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "proxycache-client",
 		specs:       specs,
@@ -261,12 +260,12 @@ func proxycacheClientComponent() *component {
 }
 
 // apacheIgniteComponent ...
-func apacheIgniteComponent() *component {
+func apacheIgniteComponent() *Component {
 	specs, err := loadSpecFile("apache-ignite")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &component{
+	return &Component{
 		displayName: specs.GetString("component.name"),
 		fileName:    "apache-ignite",
 		specs:       specs,
@@ -296,7 +295,7 @@ func apacheIgniteComponent() *component {
 
 func init() {
 
-	allEmbedded = []api.Component{
+	allEmbedded = []*Component{
 		dockerComponent(),
 		nVidiaDockerComponent(),
 		mpichOsPkgComponent(),
@@ -324,7 +323,7 @@ func init() {
 					item.DisplayName(), item.DisplayFilename(), k))
 			}
 			if _, found := availableEmbeddedMap[method]; !found {
-				availableEmbeddedMap[method] = map[string]api.Component{
+				availableEmbeddedMap[method] = map[string]*Component{
 					item.DisplayName():  item,
 					item.BaseFilename(): item,
 				}

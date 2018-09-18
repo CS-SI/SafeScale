@@ -28,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
 
 	"github.com/CS-SI/SafeScale/deploy/install"
-	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 )
 
 var (
@@ -124,7 +123,7 @@ var hostComponentAddCommand = &cli.Command{
 			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
 			os.Exit(int(ExitCode.NotFound))
 		}
-		values := installapi.Variables{}
+		values := install.Variables{}
 		anon := c.Option("--param", "<param>")
 		if anon != nil {
 			params := anon.([]string)
@@ -186,7 +185,7 @@ var hostComponentCheckCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		found, results, err := component.Check(target, installapi.Variables{})
+		found, results, err := component.Check(target, install.Variables{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
@@ -230,7 +229,7 @@ var hostComponentDeleteCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		ok, results, err := component.Remove(target, installapi.Variables{})
+		ok, results, err := component.Remove(target, install.Variables{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))

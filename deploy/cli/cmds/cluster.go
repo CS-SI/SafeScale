@@ -32,7 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/install"
-	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 
 	"github.com/CS-SI/SafeScale/utils"
 	cli "github.com/CS-SI/SafeScale/utils/cli"
@@ -912,7 +911,7 @@ var clusterComponentCheckCommand = &cli.Command{
 			os.Exit(int(ExitCode.NotFound))
 		}
 		target := install.NewClusterTarget(clusterInstance)
-		found, results, err := component.Check(target, installapi.Variables{})
+		found, results, err := component.Check(target, install.Variables{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
@@ -948,7 +947,7 @@ var clusterComponentDeleteCommand = &cli.Command{
 			os.Exit(int(ExitCode.NotFound))
 		}
 		target := install.NewClusterTarget(clusterInstance)
-		ok, results, err := component.Remove(target, installapi.Variables{})
+		ok, results, err := component.Remove(target, install.Variables{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))

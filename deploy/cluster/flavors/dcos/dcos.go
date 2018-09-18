@@ -43,7 +43,6 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 
 	"github.com/CS-SI/SafeScale/deploy/install"
-	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 
 	"github.com/CS-SI/SafeScale/providers"
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
@@ -268,9 +267,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		mastersStatus                 error
 		nodesChannel                  chan error
 		nodesStatus                   error
-		component                     installapi.Component
-		target                        installapi.Target
-		results                       installapi.AddResults
+		component                     *install.Component
+		target                        install.Target
+		results                       install.AddResults
 	)
 	broker := brokerclient.New()
 
@@ -304,7 +303,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		goto cleanNetwork
 	}
 	target = install.NewHostTarget(pbutils.ToPBHost(gw))
-	ok, results, err = component.Add(target, installapi.Variables{})
+	ok, results, err = component.Add(target, install.Variables{})
 	if err != nil {
 		goto cleanNetwork
 	}
@@ -723,7 +722,7 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 		done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
 	}
 	target := install.NewHostTarget(host)
-	values := installapi.Variables{
+	values := install.Variables{
 		"Password": c.Core.AdminPassword,
 	}
 	ok, results, err := component.Add(target, values)
@@ -838,7 +837,7 @@ func (c *Cluster) asyncConfigureMaster(index int, host *pb.Host, done chan error
 		return
 	}
 	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, installapi.Variables{
+	ok, results, err := component.Add(target, install.Variables{
 		"Username": "cladm",
 		"Password": c.Core.AdminPassword,
 	})
@@ -933,7 +932,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 		return
 	}
 	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, installapi.Variables{})
+	ok, results, err := component.Add(target, install.Variables{})
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -954,7 +953,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
 		return
 	}
-	ok, results, err = component.Add(target, installapi.Variables{})
+	ok, results, err = component.Add(target, install.Variables{})
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -1081,7 +1080,7 @@ func (c *Cluster) asyncPrepareGateway(done chan error) {
 		return
 	}
 	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, installapi.Variables{})
+	ok, results, err := component.Add(target, install.Variables{})
 	if err != nil {
 		msg := fmt.Sprintf("failed to install component '%s' on '%s': %s", component.DisplayName(), host.Name, err.Error())
 		log.Println(msg)

@@ -17,14 +17,27 @@
 package install
 
 import (
-	"github.com/CS-SI/SafeScale/deploy/install/api"
-	"github.com/CS-SI/SafeScale/deploy/install/api/Method"
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )
+
+// Target is an interface that target must satisfy to be able to install something
+// on it
+type Target interface {
+	// Name returns the name of the target
+	Name() string
+	// Type returns the name of the target
+	Type() string
+	// Methods returns a list of installation methods useable on the target, ordered from
+	// upper to lower priority (1 = highest priority)
+	Methods() map[uint8]Method.Enum
+	// Installed returns a list of installed components
+	Installed() []string
+}
 
 // HostTarget defines a target of type Host, satisfying TargetAPI
 type HostTarget struct {
@@ -33,7 +46,7 @@ type HostTarget struct {
 }
 
 // NewHostTarget ...
-func NewHostTarget(host *pb.Host) api.Target {
+func NewHostTarget(host *pb.Host) Target {
 	if host == nil {
 		panic("host is nil!")
 	}
@@ -98,7 +111,7 @@ type ClusterTarget struct {
 }
 
 // NewClusterTarget ...
-func NewClusterTarget(cluster clusterapi.Cluster) api.Target {
+func NewClusterTarget(cluster clusterapi.Cluster) Target {
 	if cluster == nil {
 		panic("cluster is nil!")
 	}
@@ -145,7 +158,7 @@ type NodeTarget struct {
 }
 
 // NewNodeTarget ...
-func NewNodeTarget(host *pb.Host) api.Target {
+func NewNodeTarget(host *pb.Host) Target {
 	if host == nil {
 		panic("host is nil!")
 	}

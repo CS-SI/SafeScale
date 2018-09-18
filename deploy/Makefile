@@ -8,14 +8,11 @@ vet:
 	@$(GO) vet
 	@$(GO) vet ./cmds
 
-cli:	cluster install #service
+cli:	cluster #service
 	@(cd cli && $(MAKE))
 
 cluster:
 	@(cd cluster && $(MAKE))
-
-install:
-	@(cd install && $(MAKE))
 
 service:
 	@(cd service && $(MAKE))
@@ -23,6 +20,5 @@ service:
 clean:
 	@(cd cli && $(MAKE) $(@))
 	@(cd cluster && $(MAKE) $(@))
-	@(cd install && $(MAKE) $(@))
 	#@(cd service && $(MAKE) $(@))
 

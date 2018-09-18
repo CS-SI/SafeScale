@@ -57,6 +57,9 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		fmt.Println("failed to get network resource data.")
 		return nil, err
 	}
+	if n == nil {
+		return nil, fmt.Errorf("failed to find network '%s'", net)
+	}
 	tpls, err := svc.provider.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    cpu,
 		MinRAMSize:  ram,
@@ -81,9 +84,11 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		return nil, err
 	}
 	log.Println("compute resource created.")
+
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
+	log.Println("Waiting start of SSH service on remote host...")
 	ssh, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		svc.provider.DeleteHost(host.ID)
@@ -91,9 +96,9 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	}
 	err = ssh.WaitServerReady(5 * time.Minute)
 	if err != nil {
-		svc.provider.DeleteHost(host.ID)
 		return nil, err
 	}
+	log.Println("SSH service started.")
 	return host, nil
 }
 

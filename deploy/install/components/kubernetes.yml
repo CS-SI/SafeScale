@@ -15,63 +15,86 @@
 ---
 component:
     name: Kubernetes
-    target:
+    context:
         host: no
-        cluster:
-            master: any
-            node:
-                private: no
-                public: no
+        cluster: dcos
     install:
         dcos:
-            options:
-                dev: |
-                    {
-                        "kubernetes": {
-                            "node_count": 1,
-                            "reserved_resources": {
-                                "kube_cpus": 1,
-                                "kube_mem": 1024,
-                                "kube_disk": 512
-                            }
-                        }
-                    }
+            add:
+                pace:
+                    - package
+                    - cli,config
+                steps:
+                    package:
+                        targets:
+                            masters: one
+                        options:
+                            dev: |
+                                {
+                                    "kubernetes": {
+                                        "node_count": 1,
+                                        "reserved_resources": {
+                                            "kube_cpus": 1,
+                                            "kube_mem": 1024,
+                                            "kube_disk": 512
+                                        }
+                                    }
+                                }
 
-                normal: |
-                    {
-                        "kubernetes": {
-                            "high_availability": true,
-                            "node_count": 3,
-                            "reserved_resources": {
-                                "kube_cpus": 1,
-                                "kube_mem": 1024,
-                                "kube_disk": 512
+                            normal: |
+                                {
+                                    "kubernetes": {
+                                        "high_availability": true,
+                                        "node_count": 3,
+                                        "reserved_resources": {
+                                            "kube_cpus": 1,
+                                            "kube_mem": 1024,
+                                            "kube_disk": 512
+                                        }
+                                    }
+                                }
+
+                        run: |
+                            output=$({{.dcos}} package install --yes kubernetes {{.options}} 2>&1)
+                            rc=$?
+                            [ $rc -ne 0 ] && {
+                                echo $output
+                                echo $output | grep "already installed" &>/dev/null || exit $rc
                             }
-                        }
-                    }
+                            exit 0
+
+                    cli:
+                        targets:
+                            masters: all
+                        run: |
+                            {{.dcos}} package install --yes kubernetes --cli
+
+                    config:
+                        targets:
+                            masters: one
+                        run: |
+                            wait_complete() {
+                                while [ 0 ]; do
+                                    {{.dcos}} kubernetes plan show deploy | grep "scheduler (" | grep COMPLETE &>/dev/null && break
+                                done
+                            }
+                            export -f wait_complete
+                            bg_start WC 10 wait_complete
+                            bg_wait WC 512
+                            {{.dcos}} kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
+                            {{.kubectl}} config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
 
             check: |
                 {{.dcos}} kubernetes plan show deploy --json | jq .status | grep COMPLETE
 
-            add: |
-                output=$({{.dcos}} package install --yes kubernetes {{.options}} 2>&1)
-                rc=$?
-                [ $rc -ne 0 ] && {
-                    echo $output
-                    echo $output | grep "already installed" &>/dev/null || exit $rc
-                }
-                wait_complete() {
-                    while [ 0 ]; do
-                        {{.dcos}} kubernetes plan show deploy | grep "scheduler (" | grep COMPLETE &>/dev/null && break
-                    done
-                }
-                export -f wait_complete
-                bg_start WC wait_complete 10
-                bg_wait WC {{.errorcode "WaitKubernetesCompleted"}}
-                {{.dcos}} kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
-                {{.kubectl}} config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
-
             remove: |
-                {{.dcos}} package remove --yes kubernetes
+                pace:
+                    - remove
+                steps:
+                    remove:
+                        target:
+                            masters: one
+                        run: |
+                        {{.dcos}} package remove --yes kubernetes
 
 ...

@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
-	"github.com/CS-SI/SafeScale/deploy/install/api"
-
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 )
 
 const (
@@ -26,17 +26,17 @@ func (i *dcosInstaller) GetName() string {
 }
 
 // Check checks if the component is installed
-func (i *dcosInstaller) Check(c api.Component, t api.Target, v api.Variables) (bool, api.CheckResults, error) {
+func (i *dcosInstaller) Check(c *Component, t Target, v Variables) (bool, CheckResults, error) {
 	clusterTarget, ok := t.(*ClusterTarget)
 	if !ok {
-		return false, api.CheckResults{}, fmt.Errorf("target isn't a cluster")
+		return false, CheckResults{}, fmt.Errorf("target isn't a cluster")
 	}
 	cluster := clusterTarget.cluster
 
-	if !validateClusterFlavor(c, cluster) {
+	if !validateContextForCluster(c, cluster) {
 		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", cluster.GetConfig().Flavor.String(), t.Name())
 		log.Println(msg)
-		return false, api.CheckResults{}, fmt.Errorf(msg)
+		return false, CheckResults{}, fmt.Errorf(msg)
 	}
 
 	// Note: In special case of DCOS, installation is done on any master available. values returned
@@ -44,37 +44,37 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target, v api.Variables) (b
 	specs := c.Specs()
 	_, _, _, err := validateClusterTargets(specs)
 	if err != nil {
-		return false, api.CheckResults{}, err
+		return false, CheckResults{}, err
 	}
 
 	if !specs.IsSet("component.install.dcos.check") {
 		msg := `syntax error in component '%s' specification file (%s):
 				no key 'component.install.dcos.check' found`
-		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
+		return false, CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 	checkScript := specs.GetString("component.install.dcos.check")
 	if strings.TrimSpace(checkScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
 				key 'component.install.dcos.check' is empty`
-		return false, api.CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
+		return false, CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
 	hostID, err := cluster.FindAvailableMaster()
 	if err != nil {
-		return false, api.CheckResults{}, err
+		return false, CheckResults{}, err
 	}
 	broker := brokerclient.New()
 	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
-		return false, api.CheckResults{}, err
+		return false, CheckResults{}, err
 	}
-	cmdStr, err := normalizeScript(api.Variables{
+	cmdStr, err := normalizeScript(Variables{
 		"reserved_Name":    c.BaseFilename(),
 		"reserved_Content": checkScript,
 		"reserved_Action":  "check",
 	})
 	if err != nil {
-		return false, api.CheckResults{}, err
+		return false, CheckResults{}, err
 	}
 
 	// Replaces variables in normalized script
@@ -87,14 +87,14 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target, v api.Variables) (b
 	}
 	cmdStr, err = replaceVariablesInString(cmdStr, v)
 	if err != nil {
-		return false, api.CheckResults{}, fmt.Errorf("failed to finalize check script: %s", err.Error())
+		return false, CheckResults{}, fmt.Errorf("failed to finalize check script: %s", err.Error())
 	}
 
 	// Uploads the executes the script
 	filename := fmt.Sprintf("/var/tmp/%s_check.sh", c.BaseFilename())
 	err = UploadStringToRemoteFile(cmdStr, host, filename, "", "", "u+rw-x,go-rwx")
 	if err != nil {
-		return false, api.CheckResults{}, err
+		return false, CheckResults{}, err
 	}
 	var cmd string
 	//if debug {
@@ -110,68 +110,78 @@ func (i *dcosInstaller) Check(c api.Component, t api.Target, v api.Variables) (b
 
 	retcode, _, _, err := broker.Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
 	if err != nil {
-		return false, api.CheckResults{}, err
+		return false, CheckResults{}, err
 	}
 	ok = retcode == 0
-	return ok, api.CheckResults{
-		Masters: map[string]api.CheckState{
-			host.Name: api.CheckState{
-				Success: true,
-				Present: ok,
-			},
-		},
-	}, nil
+	return ok, CheckResults{host.Name: CheckState{Success: true, Present: ok}}, nil
 }
 
-// Add installs the component using apt
-func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (bool, api.AddResults, error) {
+type task struct {
+	action    string
+	component *Component
+	hosts     []*pb.Host
+	values    map[string]interface{}
+	serial    bool
+	before    func(*task) error
+	run       func(*task, interface{}) error
+	after     func(*task) error
+}
+
+func (t *task) execute() error {
+	defer t.after(t)
+
+	err := t.before(t)
+	if err != nil {
+		return err
+	}
+	if t.serial {
+		// Loops steps in serial order
+		for _, host := range t.hosts {
+			t.values["HostIP"] = host.ID
+			t.values["Hostname"] = host.Name
+
+			err := t.run(t, host)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		// Loops steps in parallels
+		for _, host := range t.hosts {
+			t.values["HostIP"] = host.ID
+			t.values["Hostname"] = host.Name
+
+			err := t.run(t, host)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Add installs the component in a DCOS cluster
+func (i *dcosInstaller) Add(c *Component, t Target, v Variables) (bool, AddResults, error) {
+	worker, err := NewWorker(c, t, Method.DCOS, Action.Add)
+	if err != nil {
+		return false, AddResults{}, err
+	}
 	clusterTarget, ok := t.(*ClusterTarget)
 	if !ok {
-		return false, api.AddResults{}, fmt.Errorf("target isn't a cluster")
+		return false, AddResults{}, fmt.Errorf("target is not a cluster")
 	}
 	cluster := clusterTarget.cluster
-
-	if !validateClusterFlavor(c, cluster) {
-		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", cluster.GetConfig().Flavor.String(), t.Name())
+	if !worker.CanProceed() {
+		msg := fmt.Sprintf("component can't apply to flavor '%s' of cluster '%s'\n", cluster.GetConfig().Flavor.String(), t.Name())
 		log.Println(msg)
-		return false, api.AddResults{}, fmt.Errorf(msg)
+		return false, AddResults{}, fmt.Errorf(msg)
 	}
 
-	specs := c.Specs()
-	_, _, _, err := validateClusterTargets(specs)
-	if err != nil {
-		return false, api.AddResults{}, err
-	}
-
-	if !specs.IsSet("component.install.dcos.add") {
-		msg := `syntax error in component '%s' specification file (%s):
-				no key 'component.install.dcos.add' found`
-		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
-	}
-	addScript := specs.GetString("component.install.dcos.add")
-	if strings.TrimSpace(addScript) == "" {
-		msg := `syntax error in component '%s' specification file (%s):
-				key 'component.install.dcos.add' is empty`
-		return false, api.AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
-	}
-
-	hostID, err := cluster.FindAvailableMaster()
-	if err != nil {
-		return false, api.AddResults{}, err
-	}
-	broker := brokerclient.New()
-	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
-	if err != nil {
-		return false, api.AddResults{}, err
-	}
-	cmdStr, err := normalizeScript(api.Variables{
-		"reserved_Name":    c.BaseFilename(),
-		"reserved_Content": addScript,
-		"reserved_Action":  "add",
-	})
-	if err != nil {
-		return false, api.AddResults{}, err
-	}
+	//specs := c.Specs()
+	// _, _, _, err := validateClusterTargets(specs)
+	// if err != nil {
+	// 	return false, AddResults{}, err
+	// }
 
 	// Replaces variables in normalized script
 	v["MasterIDs"] = cluster.ListMasterIDs()
@@ -183,71 +193,13 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 	if _, ok := v["Username"]; !ok {
 		v["Username"] = "cladm"
 	}
-	if specs.IsSet("component.install.dcos.options") {
-		var (
-			avails  = map[string]interface{}{}
-			ok      bool
-			content interface{}
-		)
-		complexity := strings.ToLower(cluster.GetConfig().Complexity.String())
-		options := specs.GetStringMap("component.install.dcos.options")
-		for k, anon := range options {
-			avails[strings.ToLower(k)] = anon
-		}
-		if content, ok = avails[complexity]; !ok {
-			if complexity == Complexity.Large.String() {
-				complexity = Complexity.Normal.String()
-			}
-			if complexity == Complexity.Normal.String() {
-				if content, ok = avails[complexity]; !ok {
-					content, ok = avails[Complexity.Small.String()]
-				}
-			}
-		}
-		if ok {
-			err := UploadStringToRemoteFile(content.(string), host, "/var/tmp/options.json", "cladm", "", "u+rw-x,go-rwx")
-			if err != nil {
-				return false, api.AddResults{}, err
-			}
-			v["options"] = "--options=/var/tmp/options.json"
-		}
-	}
-	cmdStr, err = replaceVariablesInString(cmdStr, v)
+
+	results, err := worker.Proceed(v)
 	if err != nil {
-		return false, api.AddResults{}, fmt.Errorf("failed to finalize install script: %s", err.Error())
+		return false, results, err
 	}
 
-	// Uploads then executes command
-	filename := fmt.Sprintf("/var/tmp/%s_add.sh", c.BaseFilename())
-	err = UploadStringToRemoteFile(cmdStr, host, filename, "", "", "")
-	if err != nil {
-		return false, api.AddResults{}, err
-	}
-	var cmd string
-	//if debug {
-	if true {
-		cmd = fmt.Sprintf("sudo bash %s", filename)
-	} else {
-		cmd = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s /var/tmp/options.json; exit $rc", filename, filename)
-	}
-	wallTime := specs.GetInt("component.install.dcos.wall_time")
-	if wallTime == 0 {
-		wallTime = 5
-	}
-	retcode, _, _, err := broker.Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
-	if err != nil {
-		return false, api.AddResults{}, err
-	}
-	err = nil
-	ok = retcode == 0
-	if !ok {
-		err = fmt.Errorf("install script failed (retcode=%d)", retcode)
-	}
-	return ok, api.AddResults{
-		Masters: map[string]error{
-			host.Name: err,
-		},
-	}, err
+	return true, results, err
 }
 
 // Remove uninstalls the component using the RemoveScript script
@@ -256,23 +208,23 @@ func (i *dcosInstaller) Add(c api.Component, t api.Target, v api.Variables) (boo
 // - if err == nil and ok ==true, removal wa submitted and succeeded
 // - if err == nil and ok == false, removal was submitted successfully but failed, results contain reasons
 //   of failures on what parts
-func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (bool, api.RemoveResults, error) {
+func (i *dcosInstaller) Remove(c *Component, t Target, v Variables) (bool, RemoveResults, error) {
 	clusterTarget, ok := t.(*ClusterTarget)
 	if !ok {
-		return false, api.RemoveResults{}, fmt.Errorf("target isn't a cluster")
+		return false, RemoveResults{}, fmt.Errorf("target isn't a cluster")
 	}
 	cluster := clusterTarget.cluster
 
-	if !validateClusterFlavor(c, cluster) {
+	if !validateContextForCluster(c, cluster) {
 		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", cluster.GetConfig().Flavor.String(), t.Name())
 		log.Println(msg)
-		return false, api.RemoveResults{}, fmt.Errorf(msg)
+		return false, RemoveResults{}, fmt.Errorf(msg)
 	}
 
 	specs := c.Specs()
 	_, _, _, err := validateClusterTargets(specs)
 	if err != nil {
-		return false, api.RemoveResults{}, err
+		return false, RemoveResults{}, err
 	}
 	// Note: In special case of DCOS, removal is done on any master available. values returned
 	// by clusterTargets() are ignored
@@ -280,33 +232,33 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (
 	if !specs.IsSet("component.install.dcos.remove") {
 		msg := `syntax error in component '%s' specification file (%s):
 				no key 'component.install.dcos.remove' found`
-		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
+		return false, RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 	removeScript := specs.GetString("component.install.dcos.remove")
 	if strings.TrimSpace(removeScript) == "" {
 		msg := `syntax error in component '%s' specification file (%s):
 				key 'component.install.dcos.remove' is empty`
-		return false, api.RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
+		return false, RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
 
 	hostID, err := cluster.FindAvailableMaster()
 	if err != nil {
-		return false, api.RemoveResults{}, err
+		return false, RemoveResults{}, err
 	}
 	broker := brokerclient.New()
 	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
-		return false, api.RemoveResults{}, err
+		return false, RemoveResults{}, err
 	}
 
 	// Normalizes script
-	cmdStr, err := normalizeScript(api.Variables{
+	cmdStr, err := normalizeScript(Variables{
 		"reserved_Name":    c.BaseFilename(),
 		"reserved_Content": removeScript,
 		"reserved_Action":  "remove",
 	})
 	if err != nil {
-		return false, api.RemoveResults{}, err
+		return false, RemoveResults{}, err
 	}
 
 	// Replaces variables in normalized script
@@ -319,14 +271,14 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (
 	}
 	cmdStr, err = replaceVariablesInString(cmdStr, v)
 	if err != nil {
-		return false, api.RemoveResults{}, fmt.Errorf("failed to finalize install script: %s", err.Error())
+		return false, RemoveResults{}, fmt.Errorf("failed to finalize install script: %s", err.Error())
 	}
 
 	// Uploads then executes script
 	filename := fmt.Sprintf("/var/tmp/%s_remove.sh", c.BaseFilename())
 	err = UploadStringToRemoteFile(cmdStr, host, filename, "", "", "")
 	if err != nil {
-		return false, api.RemoveResults{}, err
+		return false, RemoveResults{}, err
 	}
 	var cmd string
 	//if debug {
@@ -342,22 +294,16 @@ func (i *dcosInstaller) Remove(c api.Component, t api.Target, v api.Variables) (
 
 	retcode, _, _, err := broker.Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
 	if err != nil {
-		return false, api.RemoveResults{}, err
+		return false, RemoveResults{}, err
 	}
 	ok = retcode == 0
 	if !ok {
 		err = fmt.Errorf("uninstall script failed (retcode=%d)", retcode)
 	}
-	return ok, api.RemoveResults{
-		AddResults: api.AddResults{
-			Masters: map[string]error{
-				host.Name: err,
-			},
-		},
-	}, err
+	return ok, RemoveResults{map[string]stepErrors{host.Name: stepErrors{"__error__": err}}}, err
 }
 
 // NewDcosInstaller creates a new instance of Installer using DCOS
-func NewDcosInstaller() api.Installer {
+func NewDcosInstaller() Installer {
 	return &dcosInstaller{}
 }
