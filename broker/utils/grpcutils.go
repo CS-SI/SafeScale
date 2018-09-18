@@ -31,7 +31,7 @@ const (
 	// TimeoutCtxDefault default timeout for grpc command invocation
 	TimeoutCtxDefault = 1 * time.Minute
 	// TimeoutCtxHost timeout for grpc command relative to host creation
-	TimeoutCtxHost = 5 * time.Minute
+	TimeoutCtxHost = 8 * time.Minute
 )
 
 // GetConnection returns a connection to GRPC server
