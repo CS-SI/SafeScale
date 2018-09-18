@@ -18,12 +18,17 @@ package services
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system/nfs"
+	"github.com/CS-SI/SafeScale/utils/retry"
+
+	mapset "github.com/deckarep/golang-set"
 )
 
 //VolumeAPI defines API to manipulate hosts
@@ -127,6 +132,14 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return providers.ResourceNotFoundError("host", hostName)
 	}
 
+	// Note: most providers are not able to tell the real device name the volume
+	//       will have on the host, so we have to use a way that can work everywhere
+	// Get list of disks before attachment
+	oldDiskSet, err := srv.listAttachedDevices(host)
+	if err != nil {
+		return fmt.Errorf("failed to get list of connected disks: %s", err)
+	}
+
 	volatt, err := srv.provider.CreateVolumeAttachment(api.VolumeAttachmentRequest{
 		Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
 		ServerID: host.ID,
@@ -136,6 +149,30 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 		// TODO Use more explicit error
 		return err
 	}
+
+	// Waits to acknowledge the volume is really attached to host
+	var newDisk mapset.Set
+	retryErr := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			// Get new of disk after attachment
+			newDiskSet, err := srv.listAttachedDevices(host)
+			if err != nil {
+				return fmt.Errorf("failed to get list of connected disks: %s", err)
+			}
+			// Isolate the new device
+			newDisk = newDiskSet.Difference(oldDiskSet)
+			if newDisk.Cardinality() == 0 {
+				return fmt.Errorf("disk not yet attached, retrying")
+			}
+			return nil
+		},
+		2*time.Minute,
+	)
+	if retryErr != nil {
+		return fmt.Errorf("failed to acknowledge the disk attachment after %s", 2*time.Minute)
+	}
+
+	volatt.Device = "/dev/" + newDisk.ToSlice()[0].(string)
 
 	// Create mount point
 	mountPoint := path
@@ -159,7 +196,7 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return err
 	}
 
-	//Update volume attacheemnt info ith mountpoint
+	// Update volume attachement info with mountpoint
 	volatt.MountPoint = mountPoint
 	volatt.Format = format
 	mtdVol, err := metadata.LoadVolume(srv.provider, volumename)
@@ -171,7 +208,42 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 	return nil
 }
 
-//Detach detach the volume identified by ref, ref can be the name or the id
+func (srv *VolumeService) listAttachedDevices(host *api.Host) (mapset.Set, error) {
+	var (
+		retcode        int
+		stdout, stderr string
+		err            error
+	)
+	sshService := NewSSHService(srv.provider)
+	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
+	retryErr := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			retcode, stdout, stderr, err = sshService.Run(host.ID, cmd)
+			if err != nil {
+				return err
+			}
+			if retcode != 0 {
+				if retcode == 255 {
+					return fmt.Errorf("failed to reach SSH service of host '%s', retrying", host.Name)
+				}
+				return fmt.Errorf(stderr)
+			}
+			return nil
+		},
+		2*time.Minute,
+	)
+	if retryErr != nil {
+		return nil, fmt.Errorf("failed to get list of connected disks after %s: %s", 2*time.Minute, retryErr.Error())
+	}
+	disks := strings.Split(stdout, "\n")
+	set := mapset.NewThreadUnsafeSet()
+	for _, k := range disks {
+		set.Add(k)
+	}
+	return set, nil
+}
+
+// Detach detach the volume identified by ref, ref can be the name or the id
 func (srv *VolumeService) Detach(volumename string, hostName string) error {
 	vol, err := srv.Get(volumename)
 	if err != nil {
