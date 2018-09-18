@@ -80,16 +80,16 @@ type vpcDeleteResult struct {
 	gc.ErrResult
 }
 
-//CreateVPC creates a network, which is managed by VPC in FlexibleEngine
+// CreateVPC creates a network, which is managed by VPC in FlexibleEngine
 func (client *Client) CreateVPC(req VPCRequest) (*VPC, error) {
 	// Only one VPC allowed by client instance
 	if client.vpc != nil {
-		return nil, fmt.Errorf("failed to create VPC '%s', a VPC named '%s' is already in use", req.Name, client.vpc.Name)
+		return nil, fmt.Errorf("failed to create VPC '%s', a VPC with this name already exists", req.Name, client.vpc.Name)
 	}
 
 	b, err := gc.BuildRequestBody(req, "vpc")
 	if err != nil {
-		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
 	resp := vpcCreateResult{}
@@ -102,55 +102,50 @@ func (client *Client) CreateVPC(req VPCRequest) (*VPC, error) {
 	_, err = client.osclt.Provider.Request("POST", url, &opts)
 	vpc, err := resp.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
 	// Searching for the OpenStack Router corresponding to the VPC (router.id == vpc.id)
 	router, err := routers.Get(client.osclt.Network, vpc.ID).Extract()
 	if err != nil {
 		client.DeleteVPC(vpc.ID)
-		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 	vpc.Router = router
 
-	// Searching for the OpenStack Network corresponding to the VPC (network.name == vpc.id)
-	network, err := client.findOpenstackNetworkByName(vpc.ID)
+	// Searching for the Network binded to the VPC
+	network, err := client.findVPCBindedNetwork(vpc.Name)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating VPC %s: %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 	vpc.Network = network
 
 	return vpc, nil
 }
 
-func (client *Client) findOpenstackNetworkByName(name string) (*networks.Network, error) {
-	// Searching for the network corresponding to the VPC (network.name == vpc.id)
-	pager := networks.List(client.osclt.Network, networks.ListOpts{
-		Name: name,
-	})
-	var network networks.Network
+func (client *Client) findVPCBindedNetwork(vpcName string) (*networks.Network, error) {
+	var router *openstack.Router
 	found := false
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		list, err := networks.ExtractNetworks(page)
-		if err != nil {
-			return false, fmt.Errorf("Error finding Openstack Network named '%s': %s", name, openstack.ProviderErrorToString(err))
-		}
-		for _, n := range list {
-			if n.Name == name {
-				found = true
-				network = n
-				return false, nil
-			}
-		}
-		return true, nil
-	})
+	routers, err := client.osclt.ListRouters()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find Openstack Network named '%s': %s", name, openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to list routers: %s", openstack.ProviderErrorToString(err))
 	}
-	if found {
-		return &network, nil
+	for _, r := range routers {
+		if r.Name == vpcName {
+			found = true
+			router = &r
+			break
+		}
 	}
-	return nil, fmt.Errorf("Openstack Network named '%s' not found", name)
+	if !found {
+		return nil, fmt.Errorf("failed to find router associated to VPC '%s'", vpcName)
+	}
+
+	network, err := networks.Get(client.osclt.Network, router.NetworkID).Extract()
+	if err != nil {
+		return nil, fmt.Errorf("failed to find binded network of VPC '%s': %s", vpcName, openstack.ProviderErrorToString(err))
+	}
+	return network, nil
 }
 
 // GetVPC returns the information about a VPC identified by 'id'
@@ -513,7 +508,9 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 		},
 		time.Minute,
 		func(try retry.Try, verdict Verdict.Enum) {
-			log.Printf("FlexibleEngine.Client.createSubnet(%s): try #%d: verdict=%s, err=%v", name, try.Count, verdict.String(), try.Err)
+			if verdict != Verdict.Done {
+				log.Printf("Network '%s' is not in 'ACTIVE' state, retrying...", name)
+			}
 		},
 	)
 	return &subnet.Subnet, retryErr

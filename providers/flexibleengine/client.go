@@ -619,7 +619,7 @@ func (client *Client) initVPC() error {
 func (client *Client) findVPCID() (*string, error) {
 	var router *openstack.Router
 	found := false
-	routers, err := client.osclt.ListRouter()
+	routers, err := client.osclt.ListRouters()
 	if err != nil {
 		return nil, fmt.Errorf("Error listing routers: %s", openstack.ProviderErrorToString(err))
 	}

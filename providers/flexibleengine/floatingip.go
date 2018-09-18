@@ -128,7 +128,7 @@ type deleteResult struct {
 	gophercloud.ErrResult
 }
 
-//ListFloatingIPs lists all the floating IP currently requested for the VPC
+// ListFloatingIPs lists all the floating IP currently requested for the VPC
 func (client *Client) ListFloatingIPs() pagination.Pager {
 	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips"
 	return pagination.NewPager(client.osclt.Network, url, func(r pagination.PageResult) pagination.Page {
@@ -136,7 +136,7 @@ func (client *Client) ListFloatingIPs() pagination.Pager {
 	})
 }
 
-//GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
+// GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
 func (client *Client) GetFloatingIP(id string) (*FloatingIP, error) {
 	r := getResult{}
 	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips/" + id
@@ -153,7 +153,7 @@ func (client *Client) GetFloatingIP(id string) (*FloatingIP, error) {
 	return fip, nil
 }
 
-//FindFloatingIPByIP returns FloatingIP instance associated with 'ipAddress'
+// FindFloatingIPByIP returns FloatingIP instance associated with 'ipAddress'
 func (client *Client) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 	pager := client.ListFloatingIPs()
 	found := false
@@ -181,7 +181,7 @@ func (client *Client) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) 
 	return nil, nil
 }
 
-//CreateFloatingIP creates a floating IP
+// CreateFloatingIP creates a floating IP
 func (client *Client) CreateFloatingIP() (*FloatingIP, error) {
 	ipOpts := ipCreateOpts{
 		Type: "5_bgp",
@@ -212,6 +212,9 @@ func (client *Client) CreateFloatingIP() (*FloatingIP, error) {
 		OkCodes:      []int{200, 201},
 	}
 	_, err = client.osclt.Provider.Request("POST", url, &opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to request Floating IP creation: %s", openstack.ProviderErrorToString(err))
+	}
 	fip, err := r.Extract()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create Floating IP: %s", err)
@@ -219,7 +222,7 @@ func (client *Client) CreateFloatingIP() (*FloatingIP, error) {
 	return fip, nil
 }
 
-//DeleteFloatingIP deletes a floating IP
+// DeleteFloatingIP deletes a floating IP
 func (client *Client) DeleteFloatingIP(id string) error {
 	r := deleteResult{}
 	url := client.osclt.Network.Endpoint + "v1/" + client.Opts.ProjectID + "/publicips/" + id
@@ -254,7 +257,7 @@ func (client *Client) AssociateFloatingIP(host *api.Host, id string) error {
 	return nil
 }
 
-//DissociateFloatingIP from host
+// DissociateFloatingIP from host
 func (client *Client) DissociateFloatingIP(host *api.Host, id string) error {
 	fip, err := client.GetFloatingIP(id)
 	if err != nil {

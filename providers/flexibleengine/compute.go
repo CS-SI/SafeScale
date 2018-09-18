@@ -302,7 +302,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		return nil, providers.ResourceAlreadyExistsError("Host", request.Name)
 	}
 
-	//Eventual network gateway
+	// Network gateway
 	var gw *api.Host
 	// If the host is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
