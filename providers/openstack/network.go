@@ -85,7 +85,7 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		return nil, fmt.Errorf("Error creating network %s: %s", req.Name, ProviderErrorToString(err))
 	}
 
-	sn, err := client.createSubnet(req.Name, network.ID, req.CIDR, req.IPVersion)
+	sn, err := client.CreateSubnet(req.Name, network.ID, req.CIDR, req.IPVersion)
 	if err != nil {
 		client.DeleteNetwork(network.ID)
 		return nil, fmt.Errorf("Error creating network %s: %s", req.Name, ProviderErrorToString(err))
@@ -126,7 +126,7 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 	}
 	if network != nil && network.ID != "" {
 
-		sns, err := client.listSubnets(ref)
+		sns, err := client.ListSubnets(ref)
 		if err != nil {
 			return nil, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
 		}
@@ -188,7 +188,7 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 
 		for _, n := range networkList {
 
-			sns, err := client.listSubnets(n.ID)
+			sns, err := client.ListSubnets(n.ID)
 			if err != nil {
 				return false, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
 			}
@@ -284,12 +284,12 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 
 	client.DeleteGateway(networkID)
 
-	sns, err := client.listSubnets(networkID)
+	sns, err := client.ListSubnets(networkID)
 	if err != nil {
 		return fmt.Errorf("error deleting network: %s", ProviderErrorToString(err))
 	}
 	for _, sn := range sns {
-		err := client.deleteSubnet(sn.ID)
+		err := client.DeleteSubnet(sn.ID)
 		if err != nil {
 			return fmt.Errorf("error deleting network: %s", ProviderErrorToString(err))
 		}
@@ -354,7 +354,8 @@ func (client *Client) DeleteGateway(networkID string) error {
 	return m.Delete()
 }
 
-func toGopherIPversion(v IPVersion.Enum) gc.IPVersion {
+// ToGopherIPversion ...
+func ToGopherIPversion(v IPVersion.Enum) gc.IPVersion {
 	if v == IPVersion.IPv4 {
 		return gc.IPv4
 	} else if v == IPVersion.IPv6 {
@@ -371,7 +372,9 @@ func fromGopherIPversion(v gc.IPVersion) IPVersion.Enum {
 	}
 	return -1
 }
-func fromIntIPversion(v int) IPVersion.Enum {
+
+// FromIntIPversion ...
+func FromIntIPversion(v int) IPVersion.Enum {
 	if v == 4 {
 		return IPVersion.IPv4
 	} else if v == 6 {
@@ -380,11 +383,11 @@ func fromIntIPversion(v int) IPVersion.Enum {
 	return -1
 }
 
-//createSubnet creates a sub network
-//- netID ID of the parent network
-//- name is the name of the sub network
-//- mask is a network mask defined in CIDR notation
-func (client *Client) createSubnet(name string, networkID string, cidr string, ipVersion IPVersion.Enum) (*Subnet, error) {
+// CreateSubnet creates a sub network
+// - netID ID of the parent network
+// - name is the name of the sub network
+// - mask is a network mask defined in CIDR notation
+func (client *Client) CreateSubnet(name string, networkID string, cidr string, ipVersion IPVersion.Enum) (*Subnet, error) {
 	// You must associate a new subnet with an existing network - to do this you
 	// need its UUID. You must also provide a well-formed CIDR value.
 	//addr, _, err := net.ParseCIDR(mask)
@@ -392,7 +395,7 @@ func (client *Client) createSubnet(name string, networkID string, cidr string, i
 	opts := subnets.CreateOpts{
 		NetworkID:  networkID,
 		CIDR:       cidr,
-		IPVersion:  toGopherIPversion(ipVersion),
+		IPVersion:  ToGopherIPversion(ipVersion),
 		Name:       name,
 		EnableDHCP: &dhcp,
 	}
@@ -409,18 +412,18 @@ func (client *Client) createSubnet(name string, networkID string, cidr string, i
 	}
 
 	if client.Cfg.UseLayer3Networking {
-		router, err := client.createRouter(RouterRequest{
+		router, err := client.CreateRouter(RouterRequest{
 			Name:      subnet.ID,
 			NetworkID: client.ProviderNetworkID,
 		})
 		if err != nil {
-			client.deleteSubnet(subnet.ID)
+			client.DeleteSubnet(subnet.ID)
 			return nil, fmt.Errorf("Error creating subnet: %s", ProviderErrorToString(err))
 		}
-		err = client.addSubnetToRouter(router.ID, subnet.ID)
+		err = client.AddSubnetToRouter(router.ID, subnet.ID)
 		if err != nil {
-			client.deleteSubnet(subnet.ID)
-			client.deleteRouter(router.ID)
+			client.DeleteSubnet(subnet.ID)
+			client.DeleteRouter(router.ID)
 			return nil, fmt.Errorf("Error creating subnet: %s", ProviderErrorToString(err))
 		}
 	}
@@ -428,14 +431,14 @@ func (client *Client) createSubnet(name string, networkID string, cidr string, i
 	return &Subnet{
 		ID:        subnet.ID,
 		Name:      subnet.Name,
-		IPVersion: fromIntIPversion(subnet.IPVersion),
+		IPVersion: FromIntIPversion(subnet.IPVersion),
 		Mask:      subnet.CIDR,
 		NetworkID: subnet.NetworkID,
 	}, nil
 }
 
-//getSubnet returns the sub network identified by id
-func (client *Client) getSubnet(id string) (*Subnet, error) {
+// GetSubnet returns the sub network identified by id
+func (client *Client) GetSubnet(id string) (*Subnet, error) {
 	// Execute the operation and get back a subnets.Subnet struct
 	subnet, err := subnets.Get(client.Network, id).Extract()
 	if err != nil {
@@ -444,14 +447,14 @@ func (client *Client) getSubnet(id string) (*Subnet, error) {
 	return &Subnet{
 		ID:        subnet.ID,
 		Name:      subnet.Name,
-		IPVersion: fromIntIPversion(subnet.IPVersion),
+		IPVersion: FromIntIPversion(subnet.IPVersion),
 		Mask:      subnet.CIDR,
 		NetworkID: subnet.NetworkID,
 	}, nil
 }
 
-//listSubnets lists available sub networks of network net
-func (client *Client) listSubnets(netID string) ([]Subnet, error) {
+// ListSubnets lists available sub networks of network net
+func (client *Client) ListSubnets(netID string) ([]Subnet, error) {
 	pager := subnets.List(client.Network, subnets.ListOpts{
 		NetworkID: netID,
 	})
@@ -466,7 +469,7 @@ func (client *Client) listSubnets(netID string) ([]Subnet, error) {
 			subnetList = append(subnetList, Subnet{
 				ID:        subnet.ID,
 				Name:      subnet.Name,
-				IPVersion: fromIntIPversion(subnet.IPVersion),
+				IPVersion: FromIntIPversion(subnet.IPVersion),
 				Mask:      subnet.CIDR,
 				NetworkID: subnet.NetworkID,
 			})
@@ -476,9 +479,9 @@ func (client *Client) listSubnets(netID string) ([]Subnet, error) {
 	return subnetList, nil
 }
 
-//deleteSubnet deletes the sub network identified by id
-func (client *Client) deleteSubnet(id string) error {
-	routerList, _ := client.ListRouter()
+// DeleteSubnet deletes the sub network identified by id
+func (client *Client) DeleteSubnet(id string) error {
+	routerList, _ := client.ListRouters()
 	var router *Router
 	for _, r := range routerList {
 		if r.Name == id {
@@ -487,10 +490,10 @@ func (client *Client) deleteSubnet(id string) error {
 		}
 	}
 	if router != nil {
-		if err := client.removeSubnetFromRouter(router.ID, id); err != nil {
+		if err := client.RemoveSubnetFromRouter(router.ID, id); err != nil {
 			return fmt.Errorf("Error deleting subnets: %s", ProviderErrorToString(err))
 		}
-		if err := client.deleteRouter(router.ID); err != nil {
+		if err := client.DeleteRouter(router.ID); err != nil {
 			return fmt.Errorf("Error deleting subnets: %s", ProviderErrorToString(err))
 		}
 	}
@@ -509,8 +512,8 @@ func (client *Client) deleteSubnet(id string) error {
 	return nil
 }
 
-//createRouter creates a router satisfying req
-func (client *Client) createRouter(req RouterRequest) (*Router, error) {
+// CreateRouter creates a router satisfying req
+func (client *Client) CreateRouter(req RouterRequest) (*Router, error) {
 	//Create a router to connect external Provider network
 	gi := routers.GatewayInfo{
 		NetworkID: req.NetworkID,
@@ -533,8 +536,8 @@ func (client *Client) createRouter(req RouterRequest) (*Router, error) {
 
 }
 
-//getRouter returns the router identified by id
-func (client *Client) getRouter(id string) (*Router, error) {
+// GetRouter returns the router identified by id
+func (client *Client) GetRouter(id string) (*Router, error) {
 
 	r, err := routers.Get(client.Network, id).Extract()
 	if err != nil {
@@ -548,8 +551,8 @@ func (client *Client) getRouter(id string) (*Router, error) {
 
 }
 
-//ListRouter lists available routers
-func (client *Client) ListRouter() ([]Router, error) {
+// ListRouters lists available routers
+func (client *Client) ListRouters() ([]Router, error) {
 
 	var ns []Router
 	err := routers.List(client.Network, routers.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
@@ -573,8 +576,8 @@ func (client *Client) ListRouter() ([]Router, error) {
 	return ns, nil
 }
 
-//deleteRouter deletes the router identified by id
-func (client *Client) deleteRouter(id string) error {
+// DeleteRouter deletes the router identified by id
+func (client *Client) DeleteRouter(id string) error {
 	err := routers.Delete(client.Network, id).ExtractErr()
 	if err != nil {
 		return fmt.Errorf("Error deleting Router: %s", ProviderErrorToString(err))
@@ -582,8 +585,8 @@ func (client *Client) deleteRouter(id string) error {
 	return nil
 }
 
-//addSubnetToRouter attaches subnet to router
-func (client *Client) addSubnetToRouter(routerID string, subnetID string) error {
+// AddSubnetToRouter attaches subnet to router
+func (client *Client) AddSubnetToRouter(routerID string, subnetID string) error {
 	_, err := routers.AddInterface(client.Network, routerID, routers.AddInterfaceOpts{
 		SubnetID: subnetID,
 	}).Extract()
@@ -593,8 +596,8 @@ func (client *Client) addSubnetToRouter(routerID string, subnetID string) error 
 	return nil
 }
 
-//removeSubnetFromRouter detachesa subnet from router interface
-func (client *Client) removeSubnetFromRouter(routerID string, subnetID string) error {
+// RemoveSubnetFromRouter detachesa subnet from router interface
+func (client *Client) RemoveSubnetFromRouter(routerID string, subnetID string) error {
 	_, err := routers.RemoveInterface(client.Network, routerID, routers.RemoveInterfaceOpts{
 		SubnetID: subnetID,
 	}).Extract()

@@ -17,12 +17,9 @@
 package ovh
 
 import (
-	"strings"
-
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
-	filters "github.com/CS-SI/SafeScale/providers/api/filters/templates"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
@@ -87,16 +84,17 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	// 	return nil, err
 	// }
 	//client.ovh = c
-	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
-		IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
-		//UserID:           opts.OpenstackID,
-		Username:    opts.OpenstackID,
-		Password:    opts.OpenstackPassword,
-		TenantID:    opts.ApplicationKey,
-		TenantName:  opts.ProjectName,
-		Region:      opts.Region,
-		AllowReauth: true,
-	},
+	osclt, err := openstack.AuthenticatedClient(
+		openstack.AuthOptions{
+			IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
+			//UserID:           opts.OpenstackID,
+			Username:    opts.OpenstackID,
+			Password:    opts.OpenstackPassword,
+			TenantID:    opts.ApplicationKey,
+			TenantName:  opts.ProjectName,
+			Region:      opts.Region,
+			AllowReauth: true,
+		},
 		openstack.CfgOptions{
 			ProviderNetwork:           ProviderNetwork,
 			UseFloatingIP:             false,
@@ -113,22 +111,21 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	client.Client = os
+	client.osclt = osclt
 
 	return client, nil
 
 }
 
-//Client is the implementation of the ovh driver regarding to the api.ClientAPI
-//This client used ovh api and opensatck ovh api to maximize code reuse
+// Client is the implementation of the ovh driver regarding to the api.ClientAPI
+// This client used ovh api and opensatck ovh api to maximize code reuse
 type Client struct {
-	*openstack.Client
-	opts AuthOptions
-	//ovh  *ovh.Client
+	osclt *openstack.Client
+	opts  AuthOptions
 }
 
 //Build build a new Client from configuration parameter
-func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
+func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	ApplicationKey, _ := params["ApplicationKey"].(string)
 	OpenstackID, _ := params["OpenstackID"].(string)
 	OpenstackPassword, _ := params["OpenstackPassword"].(string)
@@ -143,53 +140,14 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	})
 }
 
-func addGPUCfg(tpl *api.HostTemplate) {
-	if cfg, ok := gpuMap[tpl.Name]; ok {
-		tpl.GPUNumber = cfg.GPUNumber
-		tpl.GPUType = cfg.GPUType
-	}
-}
-
-//GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (c *Client) GetTemplate(id string) (*api.HostTemplate, error) {
-	tpl, err := c.Client.GetTemplate(id)
-	if tpl != nil {
-		addGPUCfg(tpl)
-	}
-	return tpl, err
-}
-
 // GetCfgOpts return configuration parameters
 func (client *Client) GetCfgOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
-
-	cfg.Set("DNSList", client.Cfg.DNSList)
-	cfg.Set("S3Protocol", client.Cfg.S3Protocol)
-	cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
-	cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
-
-	return cfg, nil
+	return client.osclt.GetCfgOpts()
 }
 
-func isWindowsTemplate(t api.HostTemplate) bool {
-	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
-}
-func isFlexTemplate(t api.HostTemplate) bool {
-	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
-}
-
-//ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (c *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
-	allTemplates, err := c.Client.ListTemplates(all)
-	if err != nil {
-		return nil, err
-	}
-	if all {
-		return allTemplates, nil
-	}
-
-	filter := filters.NewFilter(isWindowsTemplate).Not().And(filters.NewFilter(isFlexTemplate).Not())
-	return filters.FilterTemplates(allTemplates, filter), nil
+// GetAuthOpts returns the auth options
+func (client *Client) GetAuthOpts() (api.Config, error) {
+	return client.osclt.GetAuthOpts()
 }
 
 func init() {
