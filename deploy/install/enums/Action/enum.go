@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package Method
+package Action
 
 import (
 	"fmt"
@@ -26,20 +26,12 @@ type Enum uint8
 const (
 	_ Enum = iota
 
-	// Apt is supported by target
-	Apt
-	// Yum is supported by target
-	Yum
-	// Dnf is supported by target
-	Dnf
-	// Bash is supported by target
-	Bash
-	// Ansible is supported by target
-	Ansible
-	// DCOS packager is supported by cluster target
-	DCOS
-	// Helm is supported by cluster target
-	Helm
+	// Check ...
+	Check
+	// Add ...
+	Add
+	// Remove ...
+	Remove
 
 	// NextEnum marks the next value (or the max, depending the use)
 	NextEnum
@@ -47,23 +39,15 @@ const (
 
 var (
 	stringMap = map[string]Enum{
-		"apt":     Apt,
-		"yum":     Yum,
-		"dnf":     Dnf,
-		"bash":    Bash,
-		"ansible": Ansible,
-		"dcos":    DCOS,
-		"helm":    Helm,
+		"check":  Check,
+		"add":    Add,
+		"remove": Remove,
 	}
 
 	enumMap = map[Enum]string{
-		Apt:     "Apt",
-		Yum:     "Yum",
-		Dnf:     "Dnf",
-		Bash:    "Bash",
-		Ansible: "Ansible",
-		DCOS:    "DCOS",
-		Helm:    "Helm",
+		Check:  "Check",
+		Add:    "Add",
+		Remove: "Remove",
 	}
 )
 
@@ -77,7 +61,7 @@ func Parse(v string) (Enum, error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = stringMap[lowered]; !ok {
-		return e, fmt.Errorf("failed to find a Flavor.Enum corresponding to '%s'", v)
+		return e, fmt.Errorf("failed to find a Action.Enum corresponding to '%s'", v)
 	}
 	return e, nil
 
@@ -98,5 +82,5 @@ func (e Enum) String() string {
 	if str, found := enumMap[e]; found {
 		return str
 	}
-	panic(fmt.Sprintf("failed to find a Flavor.Enum string corresponding to value '%d'!", e))
+	panic(fmt.Sprintf("failed to find a Action.Enum string corresponding to value '%d'!", e))
 }

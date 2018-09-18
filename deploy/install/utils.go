@@ -17,8 +17,11 @@ import (
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
-	"github.com/CS-SI/SafeScale/deploy/install/api"
+
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 
 	"github.com/CS-SI/SafeScale/utils/retry"
 
@@ -26,12 +29,513 @@ import (
 )
 
 const (
-	curlPost = "curl -Ssl -k -X POST --url https://localhost:8444/%s -H \"Content-Type:application/json\" -d @- <<'EOF'\n%s\nEOF\n"
+	curlPost           = "curl -Ssl -k -X POST --url https://localhost:8444/%s -H \"Content-Type:application/json\" -d @- <<'EOF'\n%s\nEOF\n"
+	targetMasters      = "masters"
+	targetPublicNodes  = "public_nodes"
+	targetPrivateNodes = "private_nodes"
 )
 
 var (
 	componentScriptTemplate *template.Template
 )
+
+// installerMap keeps a map of available installers sorted by Method
+type installerMap map[Method.Enum]Installer
+
+type stepTargets map[string]string
+
+func (st stepTargets) parse() (string, string, string, error) {
+	var masterT, privnodeT, pubnodeT string
+
+	switch strings.ToLower(st[targetMasters]) {
+	case "":
+		fallthrough
+	case "false":
+		fallthrough
+	case "no":
+		fallthrough
+	case "none":
+		fallthrough
+	case "0":
+		masterT = "0"
+	case "any":
+		fallthrough
+	case "one":
+		fallthrough
+	case "1":
+		masterT = "1"
+	case "all":
+		fallthrough
+	case "*":
+		masterT = "*"
+	default:
+		return "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", masterT, targetMasters)
+	}
+
+	switch strings.ToLower(st[targetPrivateNodes]) {
+	case "false":
+		fallthrough
+	case "no":
+		fallthrough
+	case "none":
+		privnodeT = "0"
+	case "any":
+		fallthrough
+	case "one":
+		fallthrough
+	case "1":
+		privnodeT = "1"
+	case "":
+		fallthrough
+	case "all":
+		fallthrough
+	case "*":
+		privnodeT = "*"
+	default:
+		return "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", privnodeT, targetPrivateNodes)
+	}
+
+	switch strings.ToLower(st[targetPublicNodes]) {
+	case "":
+		fallthrough
+	case "false":
+		fallthrough
+	case "no":
+		fallthrough
+	case "none":
+		fallthrough
+	case "0":
+		pubnodeT = "0"
+	case "any":
+		fallthrough
+	case "one":
+		fallthrough
+	case "1":
+		pubnodeT = "1"
+	case "all":
+		fallthrough
+	case "*":
+		pubnodeT = "*"
+	default:
+		return "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", pubnodeT, targetPublicNodes)
+	}
+
+	if masterT == "0" && privnodeT == "0" && pubnodeT == "0" {
+		return "", "", "", fmt.Errorf("no targets identified")
+	}
+	return masterT, privnodeT, pubnodeT, nil
+}
+
+type worker struct {
+	component *Component
+	target    Target
+	method    Method.Enum
+	action    Action.Enum
+	pace      string
+
+	host    *pb.Host
+	node    bool
+	cluster clusterapi.Cluster
+
+	availableMaster      *pb.Host
+	availablePrivateNode *pb.Host
+	availablePublicNode  *pb.Host
+
+	allMasters      []*pb.Host
+	allPrivateNodes []*pb.Host
+	allPublicNodes  []*pb.Host
+
+	rootKey string
+}
+
+// NewWorker ...
+func NewWorker(c *Component, t Target, m Method.Enum, a Action.Enum) (*worker, error) {
+	w := worker{
+		component: c,
+		target:    t,
+		method:    m,
+		action:    a,
+	}
+	hT, cT, nT := determineContext(t)
+	if cT != nil {
+		w.cluster = cT.cluster
+	}
+	if hT != nil {
+		w.host = hT.host
+	}
+	if nT != nil {
+		w.host = nT.host
+		w.node = true
+	}
+
+	w.rootKey = "component.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
+	specs := w.component.Specs()
+	if !specs.IsSet(w.rootKey) {
+		msg := `syntax error in component '%s' specification file (%s):
+				no key '%s' found`
+		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), w.rootKey)
+	}
+	paceKey := w.rootKey + ".pace"
+	if !specs.IsSet(paceKey) {
+		msg := `syntax error in component '%s' specification file (%s):
+				no key '%s' found`
+		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), paceKey)
+	}
+	w.pace = specs.GetString(paceKey)
+
+	return &w, nil
+}
+
+// CanProceed tells if the combination Component/Target can work
+func (w *worker) CanProceed() bool {
+	if w.cluster != nil {
+		return validateContextForCluster(w.component, w.cluster)
+	}
+	// TODO: check if host satisfy requirements
+	return validateContextForHost(w.component, w.host)
+}
+
+// validateContextForHost ...
+func validateContextForHost(c *Component, host *pb.Host) bool {
+	specs := c.Specs()
+	if specs.IsSet("component.context.host") {
+		value := strings.ToLower(specs.GetString("component.context.host"))
+		return value == "ok" || value == "yes" || value == "true" || value == "1"
+	}
+	return false
+}
+
+// AvailableMaster finds a master available, and keep track of it
+// for all the life of the action (prevent to request too often)
+func (w *worker) AvailableMaster() (*pb.Host, error) {
+	if w.cluster == nil {
+		return nil, fmt.Errorf("can't get masters, target not a cluster")
+	}
+	if w.availableMaster == nil {
+		hostID, err := w.cluster.FindAvailableMaster()
+		if err != nil {
+			return nil, err
+		}
+		w.availableMaster, err = brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return w.availableMaster, nil
+}
+
+// AvailableNode finds a node available and will use this one during all the install session
+func (w *worker) AvailableNode(public bool) (*pb.Host, error) {
+	if w.cluster == nil {
+		return nil, fmt.Errorf("can't get a node, target not a cluster")
+	}
+	found := false
+	if public {
+		found = w.availablePublicNode != nil
+	} else {
+		found = w.availablePrivateNode != nil
+	}
+	if !found {
+		hostID, err := w.cluster.FindAvailableNode(public)
+		if err != nil {
+			return nil, err
+		}
+		host, err := brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		if err != nil {
+			return nil, err
+		}
+		if public {
+			w.availablePublicNode = host
+		} else {
+			w.availablePrivateNode = host
+		}
+	}
+	if public {
+		return w.availablePublicNode, nil
+	}
+	return w.availablePrivateNode, nil
+}
+
+// AllMasters returns a list of all the hosts acting as masters and keep this list
+// during all the install session
+func (w *worker) AllMasters() ([]*pb.Host, error) {
+	if w.cluster == nil {
+		return nil, fmt.Errorf("can't get list of masters, target not a cluster")
+	}
+	if w.allMasters == nil || len(w.allMasters) == 0 {
+		w.allMasters = []*pb.Host{}
+		broker := brokerclient.New().Host
+		for _, i := range w.cluster.ListMasterIDs() {
+			host, err := broker.Inspect(i, brokerclient.DefaultExecutionTimeout)
+			if err != nil {
+				return nil, err
+			}
+			w.allMasters = append(w.allMasters, host)
+		}
+	}
+	return w.allMasters, nil
+}
+
+// AllNodes returns a list of all the hosts acting as public of private nodes and keep this list
+// during all the install session
+func (w *worker) AllNodes(public bool) ([]*pb.Host, error) {
+	if w.cluster == nil {
+		return nil, fmt.Errorf("can't get list of masters, target not a cluster")
+	}
+	found := false
+	if public {
+		found = w.allPublicNodes != nil && len(w.allPublicNodes) > 0
+	} else {
+		found = w.allPrivateNodes != nil && len(w.allPrivateNodes) > 0
+	}
+	if !found {
+		brokerhost := brokerclient.New().Host
+		allHosts := []*pb.Host{}
+		nodes := w.cluster.ListNodeIDs(public)
+		for _, i := range nodes {
+			host, err := brokerhost.Inspect(i, brokerclient.DefaultExecutionTimeout)
+			if err != nil {
+				return nil, err
+			}
+			allHosts = append(allHosts, host)
+		}
+		if public {
+			w.allPublicNodes = allHosts
+		} else {
+			w.allPrivateNodes = allHosts
+		}
+	}
+	if public {
+		return w.allPublicNodes, nil
+	}
+	return w.allPrivateNodes, nil
+
+}
+
+// Proceed executes the action
+func (w *worker) Proceed(v Variables) (map[string]stepErrors, error) {
+	specs := w.component.Specs()
+
+	results := map[string]stepErrors{}
+
+	stepsKey := w.rootKey + ".steps"
+	steps := specs.GetStringSlice(stepsKey)
+
+	for _, k := range steps {
+		log.Printf("executing step '%s'...\n", k)
+
+		stepKey := stepsKey + "." + k
+		var (
+			runContent string
+			stepT      stepTargets
+			ok         bool
+		)
+
+		if !specs.IsSet(stepKey) {
+			msg := `syntax error in component '%s' specification file (%s):
+			no key '%s' found`
+			return nil, fmt.Errorf(msg, w.component.DisplayName(), w.component.DisplayFilename(), stepKey)
+		}
+		stepMap := specs.GetStringMap(stepKey)
+		if stepT, ok = stepMap["targets"].(stepTargets); !ok {
+			msg := `syntax error in component '%s' specification file (%s):
+			no key '%s.targets' found`
+			return nil, fmt.Errorf(msg, w.component.DisplayName(), w.component.DisplayFilename(), stepKey)
+		}
+
+		if runContent, ok = stepMap["run"].(string); !ok {
+			msg := `syntax error in component '%s' specification file (%s):
+			no key '%s.run' found`
+			return nil, fmt.Errorf(msg, w.component.DisplayName(), w.component.DisplayFilename(), stepKey)
+		}
+
+		// If there is an options file (for now specific to DCOS), upload it to the remote
+		optionsFileContent := ""
+		if specs.IsSet(stepKey + ".options") {
+			var (
+				avails  = map[string]interface{}{}
+				ok      bool
+				content interface{}
+			)
+			complexity := strings.ToLower(w.cluster.GetConfig().Complexity.String())
+			options := specs.GetStringMap(stepKey + ".options")
+			for k, anon := range options {
+				avails[strings.ToLower(k)] = anon
+			}
+			if content, ok = avails[complexity]; !ok {
+				if complexity == strings.ToLower(Complexity.Large.String()) {
+					complexity = Complexity.Normal.String()
+				}
+				if complexity == strings.ToLower(Complexity.Normal.String()) {
+					if content, ok = avails[complexity]; !ok {
+						content, ok = avails[Complexity.Small.String()]
+					}
+				}
+			}
+			if ok {
+				optionsFileContent = content.(string)
+				v["options"] = "--options=/var/tmp/options.json"
+			}
+		} else {
+			v["options"] = ""
+		}
+
+		wallTime := 0
+		wallTimeKey := stepKey + ".wall_time"
+		if specs.IsSet(wallTimeKey) {
+			wallTime = specs.GetInt(wallTimeKey)
+		}
+		if wallTime == 0 {
+			wallTime = 5
+		}
+
+		templateCommand, err := normalizeScript(Variables{
+			"reserved_Name":    w.component.BaseFilename(),
+			"reserved_Content": runContent,
+			"reserved_Action":  strings.ToLower(w.action.String()),
+		})
+		if err != nil {
+			return results, err
+		}
+
+		step := step{
+			Worker:             w,
+			Name:               k,
+			Targets:            stepT,
+			Script:             templateCommand,
+			WallTime:           time.Duration(wallTime) * time.Minute,
+			OptionsFileContent: optionsFileContent,
+			YamlKey:            stepKey,
+		}
+		results[k], err = step.Run(v)
+		if err != nil {
+			return results, err
+		}
+	}
+	return results, nil
+}
+
+type step struct {
+	Worker             *worker
+	Name               string
+	Action             Action.Enum
+	Targets            stepTargets
+	Script             string
+	WallTime           time.Duration
+	YamlKey            string
+	OptionsFileContent string
+}
+
+// Run executes the step on all the concerned hosts
+func (is *step) Run(v Variables) (stepErrors, error) {
+	// Determine list of hosts concerned by the step
+	hostsList, err := is.identifyHosts(is.Worker, is.Targets)
+	if err != nil {
+		return nil, err
+	}
+
+	// Empty results
+	results := stepErrors{}
+
+	broker := brokerclient.New()
+	for _, host := range hostsList {
+		// Updates variables in step script
+		command, err := replaceVariablesInString(is.Script, v)
+		if err != nil {
+			return results, fmt.Errorf("failed to finalize installer script: %s", err.Error())
+		}
+
+		// If options file is defined, upload it to the remote host
+		if is.OptionsFileContent != "" {
+			err := UploadStringToRemoteFile(is.OptionsFileContent, host, "/var/tmp/options.json", "cladm", "gpac", "ug+rw-x,o-rwx")
+			if err != nil {
+				return results, err
+			}
+		}
+
+		// Uploads then executes command
+		filename := fmt.Sprintf("/var/tmp/%s_add.sh", is.Worker.component.BaseFilename())
+		err = UploadStringToRemoteFile(command, host, filename, "", "", "")
+		if err != nil {
+			return results, err
+		}
+		//if debug {
+		if true {
+			command = fmt.Sprintf("sudo bash %s", filename)
+		} else {
+			command = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s /var/tmp/options.json; exit $rc", filename, filename)
+		}
+
+		// Executes the script on the remote host
+		retcode, _, _, err := broker.Ssh.Run(host.Name, command, brokerclient.DefaultConnectionTimeout, is.WallTime)
+		if err != nil {
+			return results, err
+		}
+		err = nil
+		ok := retcode == 0
+		if !ok {
+			err = fmt.Errorf("installer step failed (retcode=%d)", retcode)
+		}
+		results[host.Name] = err
+	}
+	return results, nil
+}
+
+// IdentifyHosts identifies hosts concerned by the step
+func (is *step) identifyHosts(w *worker, targets stepTargets) ([]*pb.Host, error) {
+	//specs := is.Worker.component.Specs()
+
+	masterT, privnodeT, pubnodeT, err := targets.parse()
+	if err != nil {
+		return nil, err
+	}
+
+	hostsList := []*pb.Host{}
+	switch masterT {
+	case "1":
+		host, err := is.Worker.AvailableMaster()
+		if err != nil {
+			return nil, err
+		}
+		hostsList = append(hostsList, host)
+	case "*":
+		all, err := is.Worker.AllMasters()
+		if err != nil {
+			return nil, err
+		}
+		hostsList = append(hostsList, all...)
+	}
+	switch privnodeT {
+	case "1":
+		host, err := is.Worker.AvailableNode(false)
+		if err != nil {
+			return nil, err
+		}
+		hostsList = append(hostsList, host)
+	case "*":
+		hosts, err := is.Worker.AllNodes(false)
+		if err != nil {
+			return nil, err
+		}
+		hostsList = append(hostsList, hosts...)
+	}
+	switch pubnodeT {
+	case "1":
+		host, err := is.Worker.AvailableNode(true)
+		if err != nil {
+			return nil, err
+		}
+		hostsList = append(hostsList, host)
+	case "*":
+		hosts, err := is.Worker.AllNodes(true)
+		if err != nil {
+			return nil, err
+		}
+		hostsList = append(hostsList, hosts...)
+	}
+
+	return hostsList, nil
+}
 
 // validateClusterTargets validates targets on the cluster from the component specification
 // Without error, returns 'master target', 'private node target' and 'public node target'
@@ -122,10 +626,10 @@ func validateClusterTargets(specs *viper.Viper) (string, string, string, error) 
 	return master, privnode, pubnode, nil
 }
 
-// validateClusterFlavor checks if the flavor of the cluster is listed in component specification
-// 'component.target.cluster.flavors'.
-// If no flavors is listed, all flavors are authorized (if 'component.target.cluster' != no)
-func validateClusterFlavor(c api.Component, cluster clusterapi.Cluster) bool {
+// validateContextForCluster checks if the flavor of the cluster is listed in component specification
+// 'component.context.cluster'.
+// If no flavors is listed, no flavors are authorized
+func validateContextForCluster(c *Component, cluster clusterapi.Cluster) bool {
 	specs := c.Specs()
 	config := cluster.GetConfig()
 	clusterFlavor := config.Flavor
@@ -169,9 +673,13 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 			if retcode != 0 {
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
-					return fmt.Errorf(system.SCPErrorString(1))
+					// File may exist on target, try to remote it
+					_, _, _, err = broker.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), 15*time.Second, brokerclient.DefaultExecutionTimeout)
+					return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 				}
-				err = fmt.Errorf("failed to copy temporary file to '%s' (retcode=%d)", to, retcode)
+				if system.IsSCPRetryable(retcode) {
+					err = fmt.Errorf("failed to copy temporary file to '%s' (retcode: %d=%s)", to, retcode, system.SCPErrorString(retcode))
+				}
 				return nil
 			}
 			return nil
@@ -183,10 +691,8 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return fmt.Errorf("timeout trying to copy temporary file to '%s': %s", to, err.Error())
+			return fmt.Errorf("timeout trying to copy temporary file to '%s': %s", to, retryErr.Error())
 		}
-	}
-	if err != nil {
 		return err
 	}
 
@@ -209,7 +715,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = broker.Run(host.ID, cmd, 15*time.Second, brokerclient.DefaultExecutionTimeout)
+			retcode, _, _, err = broker.Run(host.Name, cmd, 15*time.Second, brokerclient.DefaultExecutionTimeout)
 			if err != nil {
 				return err
 			}
@@ -261,7 +767,7 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 	return dataBuffer.String(), nil
 }
 
-func replaceVariablesInString(text string, v api.Variables) (string, error) {
+func replaceVariablesInString(text string, v Variables) (string, error) {
 	tmpl, err := template.New("text").Parse(text)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse: %s", err.Error())
@@ -274,7 +780,7 @@ func replaceVariablesInString(text string, v api.Variables) (string, error) {
 	return dataBuffer.String(), nil
 }
 
-func findConcernedHosts(list []string, c api.Component) (string, error) {
+func findConcernedHosts(list []string, c *Component) (string, error) {
 	// No metadata yet for components, first host is designated concerned host
 	if len(list) > 0 {
 		return list[0], nil
@@ -285,7 +791,7 @@ func findConcernedHosts(list []string, c api.Component) (string, error) {
 }
 
 // installRequirements walks through requirements and installs them if needed
-func installRequirements(c api.Component, t api.Target, v map[string]interface{}) error {
+func installRequirements(c *Component, t Target, v Variables) error {
 	specs := c.Specs()
 	if specs.IsSet("component.requirements") {
 		hostInstance, clusterInstance, nodeInstance := determineContext(t)
@@ -311,24 +817,7 @@ func installRequirements(c api.Component, t api.Target, v map[string]interface{}
 				return fmt.Errorf("failed to install required component '%s': %s", requirement, err.Error())
 			}
 			if !ok {
-				var errors []string
-				for _, i := range addResults.Masters {
-					if i != nil {
-						errors = append(errors, i.Error())
-					}
-				}
-				for _, i := range addResults.PrivateNodes {
-					if i != nil {
-						errors = append(errors, i.Error())
-					}
-				}
-				for _, i := range addResults.PublicNodes {
-					if i != nil {
-						errors = append(errors, i.Error())
-					}
-				}
-				msg := strings.Join(errors, "\n")
-				return fmt.Errorf("failed to install required component '%s':\n%s", requirement, msg)
+				return fmt.Errorf("failed to install required component '%s':\n%s", requirement, addResults.Errors())
 			}
 		}
 	}
@@ -336,7 +825,7 @@ func installRequirements(c api.Component, t api.Target, v map[string]interface{}
 }
 
 // determineContext ...
-func determineContext(t api.Target) (hT *HostTarget, cT *ClusterTarget, nT *NodeTarget) {
+func determineContext(t Target) (hT *HostTarget, cT *ClusterTarget, nT *NodeTarget) {
 	hT = nil
 	cT = nil
 	nT = nil
@@ -442,7 +931,7 @@ func (c *MapCache) GetOrDefault(key string, def interface{}) (value interface{})
 var proxyInstalledCache = NewMapCache()
 
 // proxyComponent applies the proxy rules defined in specification file (if there are some)
-func proxyComponent(c api.Component, host *pb.Host) error {
+func proxyComponent(c *Component, host *pb.Host) error {
 	// First check if proxy is there
 	broker := brokerclient.New()
 	gw := gatewayFromHost(host)
@@ -461,7 +950,7 @@ func proxyComponent(c api.Component, host *pb.Host) error {
 	} else {
 		setErr := proxyInstalledCache.SetBy(gw.Name, func() (interface{}, error) {
 			target := NewHostTarget(gw)
-			present, _, err = rp.Check(target, api.Variables{})
+			present, _, err = rp.Check(target, Variables{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 			}
@@ -528,7 +1017,7 @@ func proxyComponent(c api.Component, host *pb.Host) error {
 		finalRule := dataBuffer.String()
 
 		cmd := fmt.Sprintf(curlPost, url, finalRule)
-		retcode, stdout, _, err := broker.Ssh.Run(gw.ID, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+		retcode, stdout, _, err := broker.Ssh.Run(gw.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 		}
@@ -551,7 +1040,7 @@ func proxyComponent(c api.Component, host *pb.Host) error {
 }
 
 // Check if required parameters defined in specification file have been set in 'v'
-func checkParameters(c api.Component, v api.Variables) error {
+func checkParameters(c *Component, v Variables) error {
 	specs := c.Specs()
 	if specs.IsSet("component.parameters") {
 		params := specs.GetStringSlice("component.parameters")
@@ -565,7 +1054,7 @@ func checkParameters(c api.Component, v api.Variables) error {
 }
 
 // setImplicitParameters configures parameters that are implicitely defined, based on context
-func setImplicitParameters(t api.Target, v api.Variables) {
+func setImplicitParameters(t Target, v Variables) {
 	hT, cT, nT := determineContext(t)
 	if cT != nil {
 		cluster := cT.cluster
@@ -591,6 +1080,9 @@ func setImplicitParameters(t api.Target, v api.Variables) {
 	gw := gatewayFromHost(host)
 	if gw != nil {
 		v["GatewayIP"] = gw.PRIVATE_IP
+	}
+	if _, ok := v["Username"]; !ok {
+		v["Username"] = "gpac"
 	}
 }
 

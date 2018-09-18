@@ -2,29 +2,27 @@ package install
 
 import (
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-
-	"github.com/CS-SI/SafeScale/deploy/install/api"
 )
 
 // asyncCheckHosts ...
-func asyncCheckHosts(hostIDs []string, c api.Component, v map[string]interface{}, done chan map[string]api.CheckState) {
-	states := map[string]api.CheckState{}
-	dones := map[string]chan api.CheckState{}
+func asyncCheckHosts(hostIDs []string, c *Component, v map[string]interface{}, done chan map[string]CheckState) {
+	states := map[string]CheckState{}
+	dones := map[string]chan CheckState{}
 	broker := brokerclient.New()
 	for _, hostID := range hostIDs {
 		host, err := broker.Host.Inspect(hostID, 0)
 		if err != nil {
-			states[hostID] = api.CheckState{Success: false, Error: err.Error()}
+			states[hostID] = CheckState{Success: false, Error: err.Error()}
 			continue
 		}
-		d := make(chan api.CheckState)
+		d := make(chan CheckState)
 		dones[host.Name] = d
 		go func() {
 			_, results, err := c.Check(NewNodeTarget(host), v)
 			if err != nil {
-				d <- api.CheckState{Success: false, Error: err.Error()}
+				d <- CheckState{Success: false, Error: err.Error()}
 			} else {
-				d <- results.PrivateNodes[host.Name]
+				d <- results[host.Name]
 			}
 		}()
 	}
@@ -36,24 +34,24 @@ func asyncCheckHosts(hostIDs []string, c api.Component, v map[string]interface{}
 }
 
 // asyncAddOnHosts installs a component on all the hosts in the list
-func asyncAddOnHosts(list []string, c api.Component, v map[string]interface{}, done chan map[string]error) {
-	states := map[string]error{}
-	dones := map[string]chan error{}
+func asyncAddOnHosts(list []string, c *Component, v map[string]interface{}, done chan map[string]stepErrors) {
+	states := map[string]stepErrors{}
+	dones := map[string]chan stepErrors{}
 	broker := brokerclient.New()
 	for _, hostID := range list {
 		host, err := broker.Host.Inspect(hostID, 0)
 		if err != nil {
-			states[hostID] = err
+			states[hostID] = stepErrors{"__error__": err}
 			continue
 		}
-		d := make(chan error)
+		d := make(chan stepErrors)
 		dones[host.GetName()] = d
 		go func() {
-			_, result, err := c.Add(NewNodeTarget(host), v)
+			_, results, err := c.Add(NewNodeTarget(host), v)
 			if err != nil {
-				d <- err
+				d <- stepErrors{host.Name: err}
 			} else {
-				d <- result.PrivateNodes[host.Name]
+				d <- results[host.Name]
 			}
 		}()
 	}
@@ -64,24 +62,24 @@ func asyncAddOnHosts(list []string, c api.Component, v map[string]interface{}, d
 	done <- states
 }
 
-func asyncRemoveFromHosts(list []string, c api.Component, v map[string]interface{}, done chan map[string]error) {
-	states := map[string]error{}
-	dones := map[string]chan error{}
+func asyncRemoveFromHosts(list []string, c *Component, v map[string]interface{}, done chan map[string]stepErrors) {
+	states := map[string]stepErrors{}
+	dones := map[string]chan stepErrors{}
 	broker := brokerclient.New()
 	for _, hostID := range list {
 		host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
-			states[hostID] = err
+			states[hostID] = stepErrors{"__error__": err}
 			continue
 		}
-		d := make(chan error)
+		d := make(chan stepErrors)
 		dones[host.GetName()] = d
 		go func() {
-			_, result, err := c.Remove(NewNodeTarget(host), v)
+			_, results, err := c.Remove(NewNodeTarget(host), v)
 			if err != nil {
-				d <- err
+				d <- stepErrors{"__error__": err}
 			} else {
-				d <- result.PrivateNodes[host.Name]
+				d <- results.AddResults[host.Name]
 			}
 		}()
 	}
