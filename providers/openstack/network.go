@@ -307,14 +307,14 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (client *Client) CreateGateway(req api.GWRequest) error {
+func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	// Ensure network exists
 	net, err := client.GetNetwork(req.NetworkID)
 	if err != nil {
-		return fmt.Errorf("Network %s not found %s", req.NetworkID, ProviderErrorToString(err))
+		return nil, fmt.Errorf("Network %s not found %s", req.NetworkID, ProviderErrorToString(err))
 	}
 	if net == nil {
-		return fmt.Errorf("Network %s not found", req.NetworkID)
+		return nil, fmt.Errorf("Network %s not found", req.NetworkID)
 	}
 	gwname := req.GWName
 	if gwname == "" {
@@ -330,9 +330,10 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	}
 	host, err := client.createHost(hostReq, true)
 	if err != nil {
-		return fmt.Errorf("error creating gateway : %s", ProviderErrorToString(err))
+		return nil, fmt.Errorf("error creating gateway : %s", ProviderErrorToString(err))
 	}
-	return metadata.SaveGateway(providers.FromClient(client), host, req.NetworkID)
+	err = metadata.SaveGateway(providers.FromClient(client), host, req.NetworkID)
+	return host, err
 }
 
 // DeleteGateway delete the public gateway of a private network

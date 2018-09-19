@@ -47,7 +47,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (client *Client) CreateGateway(req api.GWRequest) error {
+func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	return client.osclt.CreateGateway(req)
 }
 

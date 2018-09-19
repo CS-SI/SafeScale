@@ -18,10 +18,13 @@ package services
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 )
 
 //NetworkAPI defines API to manage networks
@@ -79,7 +82,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		panic(err)
 	}
 	if len(tpls) < 1 {
-		panic(fmt.Sprintf("No template found for %v cpu, %v ram, %v disk", cpu, ram, disk))
+		panic(fmt.Sprintf("No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
 	}
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
@@ -102,26 +105,51 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		GWName:     gwname,
 	}
 
-	err = svc.provider.CreateGateway(gwRequest)
+	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
 		panic(err)
 	}
 
+	// A host claimed ready by a Cloud provider is not necessarily ready
+	// to be used until ssh service is up and running. So we wait for it before
+	// claiming host is created
+	log.Println("Waiting start of SSH service on gateway...")
+	ssh, err := svc.provider.GetSSHConfig(gw.ID)
+	if err != nil {
+		svc.provider.DeleteHost(gw.ID)
+		return nil, err
+	}
+	err = ssh.WaitServerReady(utils.TimeoutCtxHost)
+	if err != nil {
+		log.Println("failed to reach SSH service")
+		return nil, err
+	}
+	log.Println("SSH service started.")
+
+	// Gateway is ready to work, update Network metadata
 	rv, err := svc.Get(net)
+	if rv != nil {
+		rv.GatewayID = gw.ID
+	}
+	err = metadata.SaveNetwork(svc.provider, rv)
+	if err != nil {
+		return nil, err
+	}
+
 	return rv, err
 }
 
-//List returns the network list
+// List returns the network list
 func (svc *NetworkService) List(all bool) ([]api.Network, error) {
 	return svc.provider.ListNetworks(all)
 }
 
-//Get returns the network identified by ref, ref can be the name or the id
+// Get returns the network identified by ref, ref can be the name or the id
 func (svc *NetworkService) Get(ref string) (*api.Network, error) {
 	return svc.provider.GetNetwork(ref)
 }
 
-//Delete deletes network referenced by ref
+// Delete deletes network referenced by ref
 func (svc *NetworkService) Delete(ref string) error {
 	return svc.provider.DeleteNetwork(ref)
 }

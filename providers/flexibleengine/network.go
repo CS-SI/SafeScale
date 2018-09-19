@@ -630,10 +630,10 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (client *Client) CreateGateway(req api.GWRequest) error {
+func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	net, err := client.GetNetwork(req.NetworkID)
 	if err != nil {
-		return fmt.Errorf("Network %s not found: %s", req.NetworkID, openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("Network %s not found: %s", req.NetworkID, openstack.ProviderErrorToString(err))
 	}
 	gwname := req.GWName
 	if gwname == "" {
@@ -649,18 +649,10 @@ func (client *Client) CreateGateway(req api.GWRequest) error {
 	}
 	host, err := client.createHost(hostReq, true)
 	if err != nil {
-		return fmt.Errorf("error creating gateway : %s", openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("error creating gateway : %s", openstack.ProviderErrorToString(err))
 	}
-	svc := providers.FromClient(client)
-	m, err := metadata.NewGateway(svc, req.NetworkID)
-	if err == nil {
-		err = m.Carry(host).Write()
-	}
-	if err != nil {
-		client.DeleteHost(host.ID)
-		return fmt.Errorf("error creating gateway : %s", err.Error())
-	}
-	return nil
+	err = metadata.SaveGateway(providers.FromClient(client), host, req.NetworkID)
+	return host, err
 }
 
 // GetGateway returns the name of the gateway of a network

@@ -800,8 +800,8 @@ func (c *Client) DeleteNetwork(id string) error {
 }
 
 //CreateGateway exists only to comply with api.ClientAPI interface
-func (c *Client) CreateGateway(req api.GWRequest) error {
-	return fmt.Errorf("aws.CreateGateway() isn't available by design")
+func (c *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
+	return nil, fmt.Errorf("aws.CreateGateway() isn't available by design")
 }
 
 //DeleteGateway exists only to comply with api.ClientAPI interface
