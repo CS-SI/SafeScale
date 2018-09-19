@@ -26,6 +26,36 @@ detect_facts() {
 }
 detect_facts
 
+wait_for_apt() {
+    wait_lockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
+}
+
+wait_lockfile() {
+    local ROUNDS=600
+    name=$1
+    shift
+    params=$@
+    echo "check $name lock"
+    echo ${params}
+    if fuser ${params} &>/dev/null; then
+        echo "${name} is locked, waiting... "
+        local i
+        for i in $(seq $ROUNDS); do
+            sleep 6
+            fuser ${params} &>/dev/null || break
+        done
+        if [ $i -ge $ROUNDS ]; then
+            echo "Timed out waiting (1 hour!) for ${name} lock!"
+            exit 100
+        else
+            t=$(($i*6))
+            echo "${name} is unlocked (waited $t seconds), continuing."
+        fi
+    else
+        echo "${name} is ready"
+    fi
+}
+
 # Some functions and global variables related to iptables (the idea being to reduce size of generated
 # user_data.sh script transmitted to the host)
 fw_i_accept() {
@@ -171,8 +201,8 @@ reset_iptables() {
         debian|ubuntu)
             systemctl stop ufw &>/dev/null
             systemctl disable ufw &>/dev/null
-            apt purge ufw &>/dev/null
-            apt install -y iptables-persistent &>/dev/null
+            wait_for_apt && apt purge -q ufw &>/dev/null
+            wait_for_apt && apt install -y -q iptables-persistent &>/dev/null
             [ $? -ne 0 ] && (
                 # at least for Ubuntu 16.04 (and older ?)
                 mkdir -p /etc/iptables
@@ -253,7 +283,7 @@ configure_as_gateway() {
 
     save_iptables_rules
 
-    grep -v AllowTcpForwarding /etc/ssh/sshd_config >/etc/ssh/sshd_config.new
+    grep -vi AllowTcpForwarding /etc/ssh/sshd_config >/etc/ssh/sshd_config.new
     echo "AllowTcpForwarding yes" >>/etc/ssh/sshd_config.new
     mv /etc/ssh/sshd_config.new /etc/ssh/sshd_config
     systemctl restart ssh
@@ -340,10 +370,15 @@ EOF
 
 case $LINUX_KIND in
     debian|ubuntu)
+        export DEBIAN_FRONTEND=noninteractive
+        systemctl stop apt-daily.service &>/dev/null
+        systemctl kill --kill-who=all apt-daily.service &>/dev/null
         create_user
         {{- if .ConfIF }}
         systemctl status systemd-networkd &>/dev/null && configure_network_netplan || configure_network_debian
         {{- end }}
+        wait_for_apt && apt update -q
+        wait_for_apt && apt upgrade -y -q
         {{- if .IsGateway }}
         configure_as_gateway
         {{- else if .AddGateway }}
@@ -353,6 +388,7 @@ case $LINUX_KIND in
         ;;
 
     redhat|centos)
+        yum update
         create_user
         {{- if .ConfIF }}
         configure_network_redhat

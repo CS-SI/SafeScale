@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/providers/api/HostState"
-	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/api/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
 
 	"github.com/CS-SI/SafeScale/providers"
 
@@ -30,8 +30,8 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenant cloudwatt
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise tenant opentelekoms
@@ -168,7 +168,7 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool
 	}
 
 	if withGW {
-		err = tester.Service.CreateGateway(gwRequest)
+		_, err = tester.Service.CreateGateway(gwRequest)
 		assert.Nil(t, err)
 	}
 
@@ -210,7 +210,8 @@ func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
 		TemplateID: tpls[0].ID,
 		NetworkID:  networkID,
 	}
-	return tester.Service.CreateGateway(gwRequest)
+	_, err = tester.Service.CreateGateway(gwRequest)
+	return err
 }
 
 //Networks test
@@ -310,13 +311,13 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 	cmd, err = ssh.Command("ping -c1 8.8.8.8")
 	fmt.Println(ssh.PrivateKey)
 	assert.Nil(t, err)
-	err = cmd.Run()
+	_, _, _, err = cmd.Run()
 	assert.Nil(t, err)
 
 	cmd, err = ssh.Command("ping -c1 www.google.fr")
 	fmt.Println(ssh.PrivateKey)
 	assert.Nil(t, err)
-	err = cmd.Run()
+	_, _, _, err = cmd.Run()
 	assert.Nil(t, err)
 
 	_, err = tester.CreateHost(t, "host2", network.ID, false)
