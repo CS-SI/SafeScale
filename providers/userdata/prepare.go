@@ -66,7 +66,7 @@ func Prepare(
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate password: %s", err.Error())
 	}
-	gpacPassword = "SafeScale"
+
 	// Determine Gateway IP
 	ip := ""
 	if gw != nil {

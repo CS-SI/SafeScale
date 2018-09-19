@@ -196,13 +196,29 @@ EOF
     echo done
 }
 
-reset_iptables() {
+reset_fw() {
     case $LINUX_KIND in
         debian|ubuntu)
             systemctl stop ufw &>/dev/null
             systemctl disable ufw &>/dev/null
             wait_for_apt && apt purge -q ufw &>/dev/null
-            wait_for_apt && apt install -y -q iptables-persistent &>/dev/null
+            ;;
+
+        rhel|centos)
+            systemctl disable firewalld &>/dev/null
+            systemctl stop firewalld &>/dev/null
+            systemctl mask firewalld &>/dev/null
+            yum remove -y firewalld &>/dev/null
+            ;;
+    esac
+
+}
+
+enable_iptables() {
+    case $LINUX_KIND in
+        debian|ubuntu)
+            wait_for_apt && apt update
+            wait_for_apt && apt install -y -q iptables-persistent
             [ $? -ne 0 ] && (
                 # at least for Ubuntu 16.04 (and older ?)
                 mkdir -p /etc/iptables
@@ -218,10 +234,6 @@ EOF
             ;;
 
         rhel|centos)
-            systemctl disable firewalld &>/dev/null
-            systemctl stop firewalld &>/dev/null
-            systemctl mask firewalld &>/dev/null
-            yum remove -y firewalld &>/dev/null
             yum install -y iptables-services
             systemctl enable iptables
             systemctl enable ip6tables
@@ -239,7 +251,8 @@ EOF
 configure_as_gateway() {
     echo "Configuring host as gateway..."
 
-    reset_iptables
+    reset_fw
+    enable_iptables
 
     # Change default policy for table filter chain INPUT to be DROP (block everything)
     iptables -P INPUT DROP
@@ -341,7 +354,7 @@ EOF
 configure_gateway() {
     echo "Configuring default router to {{ .GatewayIP }}"
 
-    reset_iptables
+    reset_fw
 
     route del -net default &>/dev/null
 
@@ -365,6 +378,8 @@ EOF
     systemctl enable gateway
     systemctl start gateway
 
+    enable_iptables
+
     echo done
 }
 
@@ -377,8 +392,6 @@ case $LINUX_KIND in
         {{- if .ConfIF }}
         systemctl status systemd-networkd &>/dev/null && configure_network_netplan || configure_network_debian
         {{- end }}
-        wait_for_apt && apt update -q
-        wait_for_apt && apt upgrade -y -q
         {{- if .IsGateway }}
         configure_as_gateway
         {{- else if .AddGateway }}
@@ -388,7 +401,6 @@ case $LINUX_KIND in
         ;;
 
     redhat|centos)
-        yum update
         create_user
         {{- if .ConfIF }}
         configure_network_redhat
@@ -407,4 +419,5 @@ case $LINUX_KIND in
 esac
 
 echo "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
+systemctl reboot
 exit 0
