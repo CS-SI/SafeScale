@@ -503,7 +503,6 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		timeout,
 	)
 	if err != nil {
-		log.Printf("SSH service on host '%s' not ready after %v", ssh.Host, timeout)
 		return fmt.Errorf("failed to get response from SSH on server '%s': %s", ssh.Host, err.Error())
 	}
 	return nil
