@@ -19,6 +19,7 @@ exec 1<&-
 exec 2<&-
 exec 1<>/var/tmp/user_data.log
 exec 2>&1
+set -x
 
 detect_facts() {
    local -g LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
