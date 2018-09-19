@@ -1,8 +1,8 @@
 GO?=go
 
-.PHONY:	generate clean
+.PHONY: generate clean
 
-all:	generate 
+all: generate
 
 vet:
 	@$(GO) vet

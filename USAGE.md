@@ -159,7 +159,7 @@ This command familly deals with objetc storage management: creation, list, mount
 
 command | description
 --- | ---
-`broker container create <Container_name>`|Create a container<br><br>success response: _empty_<br><br>failure response: `Could not create container 'example_container': rpc error: code = Unknown desc = Container example_container alredy exists`
+`broker container create <Container_name>`|Create a container<br><br>success response: _empty_<br><br>failure response: `Could not create container 'example_container': rpc error: code = Unknown desc = Container example_container already exists`
 `broker container list`|List containers<br><br>response: `{"Containers":[{"Name":"0.safescale"},{"Name":"example_container"}]}`
 `broker container inspect <container_name>`|Get info on a container<br><br>success response: `{"Container":"example_container","Host":{"Name":""},"Path":""}`<br><br>failure response: `Could not inspect container 'fake_container': rpc error: code = Unknown desc = Error getting container fake_container: Resource not found`
 `broker container mount [options] <container_name> <Host_name_or_id>`|Mount a container on the filesusteme of an host.<br>Options:<ul><li>`--path value` Mount point of the container (default: "/containers/<container_name>"</li></ul>success response: `Container 'example_container' mounted on '/containers/' on host 'example_host'`<br><br>failure response: `Could not mount container 'fake_container': rpc error: code = Unknown desc = Error getting container fake_container: Resource not found`<br><br>failure response: `Could not mount container 'example_container': rpc error: code = Unknown desc = No host found with name or id 'fake_host'`

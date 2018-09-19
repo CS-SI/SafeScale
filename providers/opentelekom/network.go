@@ -43,7 +43,7 @@ func (client *Client) DeleteNetwork(id string) error {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (client *Client) CreateGateway(req api.GWRequest) error {
+func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	return client.feclt.CreateGateway(req)
 }
 

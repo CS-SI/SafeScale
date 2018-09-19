@@ -358,7 +358,7 @@ type ClientAPI interface {
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
 	// CreateGateway creates a public Gateway for a private network
-	CreateGateway(req GWRequest) error
+	CreateGateway(req GWRequest) (*Host, error)
 	// DeleteGateway delete the public gateway of a private network
 	DeleteGateway(networkID string) error
 

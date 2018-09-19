@@ -60,12 +60,13 @@ var userdataTemplate *template.Template
 func Prepare(
 	client api.ClientAPI, request api.HostRequest, isGateway bool, kp *api.KeyPair, gw *api.Host, cidr string,
 ) ([]byte, error) {
+
 	// Generate password for user gpac
 	gpacPassword, err := utils.GeneratePassword(16)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate password: %s", err.Error())
 	}
-
+	gpacPassword = "SafeScale"
 	// Determine Gateway IP
 	ip := ""
 	if gw != nil {

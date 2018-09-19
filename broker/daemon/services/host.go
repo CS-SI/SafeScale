@@ -19,8 +19,8 @@ package services
 import (
 	"fmt"
 	"log"
-	"time"
 
+	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/system"
@@ -94,7 +94,7 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		svc.provider.DeleteHost(host.ID)
 		return nil, err
 	}
-	err = ssh.WaitServerReady(5 * time.Minute)
+	err = ssh.WaitServerReady(utils.TimeoutCtxHost)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,10 @@ func (svc *HostService) Delete(ref string) error {
 func (svc *HostService) SSH(ref string) (*system.SSHConfig, error) {
 	host, err := svc.Get(ref)
 	if err != nil {
-		return nil, fmt.Errorf("host '%s' does not exist", ref)
+		return nil, fmt.Errorf("failed to query host '%s'", ref)
+	}
+	if host == nil {
+		return nil, fmt.Errorf("host '%s' not found", ref)
 	}
 
 	return svc.provider.GetSSHConfig(host.ID)
