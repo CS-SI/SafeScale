@@ -19,6 +19,7 @@ package nfs
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"syscall"
 	"text/template"
@@ -46,7 +47,7 @@ func getTemplateBox() (*rice.Box, error) {
 	return tmplBox, nil
 }
 
-//executeScript executes a script template with parameters in data map
+// executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
 func executeScript(sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, error) {
@@ -74,18 +75,35 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	if err := tmplPrepared.Execute(&buffer, data); err != nil {
 		return 255, "", "", fmt.Errorf("failed to execute template: %s", err.Error())
 	}
-	tmplResult := buffer.String()
+	content := buffer.String()
+	f, err := system.CreateTempFileFromString(content, 0600)
+	if err != nil {
+		return 255, "", "", fmt.Errorf("failed to create temporary file: %s", err.Error())
+	}
+	filename := "/var/tmp/" + name
+	retcode, stdout, stderr, err := sshconfig.Copy(filename, f.Name(), true)
+	if err != nil {
+		return 255, "", "", err
+	}
+	if retcode != 0 {
+		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", stderr)
+	}
+	os.Remove(f.Name())
 
-	retcode := 0
-	stdout := ""
-	stderr := ""
-	err = retry.Action(
+	var cmd string
+	// if debug
+	if false {
+		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s", filename, filename)
+	} else {
+		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; rm -f %s; exit $rc", filename, filename, filename)
+	}
+	retryErr := retry.Action(
 		func() error {
 			stdout = ""
 			stderr = ""
 			retcode = 0
 
-			sshCmd, err := sshconfig.SudoCommand(tmplResult)
+			sshCmd, err := sshconfig.SudoCommand(cmd)
 			if err != nil {
 				return err
 			}
@@ -107,7 +125,9 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		retry.Constant(5*time.Second),
 		nil, nil, nil,
 	)
-
+	if retryErr != nil {
+		return 255, "", "", retryErr
+	}
 	return retcode, stdout, stderr, err
 }
 

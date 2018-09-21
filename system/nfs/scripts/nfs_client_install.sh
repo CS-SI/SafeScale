@@ -38,5 +38,3 @@ case $LINUX_KIND in
         echo "Unsupported OS flavor '$LINUX_KIND'!"
         exit 1
 esac
-
-exit 0

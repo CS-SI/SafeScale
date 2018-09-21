@@ -56,10 +56,11 @@ else
         FILTERED_ACCESS_RIGHTS=$(echo $ACCESS_RIGHTS | sed -r 's/\)/fsid=$FSID/g')
     fi
 fi
-#VPL: cas non traité : rien entre parenthèse...
+#VPL: case not managed: nothing between braces...
 
-# Create exported dir if necessary"
-mkdir -p {{.Path}}
+# Create exported dir if necessary
+mkdir -p "{{.Path}}"
+chmod a+rwx "{{.Path}}"
 
 # Configures export
 echo "{{.Path}} $FILTERED_ACCESS_RIGHTS" >>/etc/exports

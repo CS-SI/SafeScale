@@ -22,12 +22,12 @@ import (
 	"github.com/CS-SI/SafeScale/system"
 )
 
-//Server server structure
+// Server structure
 type Server struct {
 	SshConfig *system.SSHConfig
 }
 
-//NewServer instanciates a new nfs.Server struct
+// NewServer instanciates a new nfs.Server struct
 func NewServer(sshconfig *system.SSHConfig) (*Server, error) {
 	if sshconfig == nil {
 		return nil, fmt.Errorf("invalid parameter: 'sshconfig' can't be nil")
@@ -39,18 +39,18 @@ func NewServer(sshconfig *system.SSHConfig) (*Server, error) {
 	return &server, nil
 }
 
-//GetHost returns the hostname or IP address of the nfs.Server
+// GetHost returns the hostname or IP address of the nfs.Server
 func (s *Server) GetHost() string {
 	return s.SshConfig.Host
 }
 
-//Install installs and configure NFS server on the remote host
+// Install installs and configure NFS service on the remote host
 func (s *Server) Install() error {
 	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "nfs_server_install.sh", map[string]interface{}{})
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install nfs server")
 }
 
-//MountBlockDevice mounts a block device in the remote system
+// MountBlockDevice mounts a block device in the remote system
 func (s *Server) MountBlockDevice(device, mountPoint, format string) error {
 	data := map[string]interface{}{
 		"Device":     device,
@@ -61,7 +61,7 @@ func (s *Server) MountBlockDevice(device, mountPoint, format string) error {
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
 }
 
-//UnmountBlockDevice unmounts a local block device on the remote system
+// UnmountBlockDevice unmounts a local block device on the remote system
 func (s *Server) UnmountBlockDevice(device string) error {
 	data := map[string]interface{}{
 		"Device": device,
@@ -70,7 +70,7 @@ func (s *Server) UnmountBlockDevice(device string) error {
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount block device")
 }
 
-//AddShare configures a local path to be exported by NFS
+// AddShare configures a local path to be exported by NFS
 func (s *Server) AddShare(path string, acl string) error {
 	data := map[string]interface{}{
 		"Path":         path,
@@ -80,7 +80,7 @@ func (s *Server) AddShare(path string, acl string) error {
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }
 
-//RemoveShare stops export of a local mount point by NFS on the remote server
+// RemoveShare stops export of a local mount point by NFS on the remote server
 func (s *Server) RemoveShare(path string) error {
 	data := map[string]interface{}{
 		"Path": path,

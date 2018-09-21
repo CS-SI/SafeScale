@@ -18,15 +18,8 @@
 # Creates a filesystem on a device and mounts it
 
 # Create filesystem
-mkfs -t {{.FileSystem}} "{{.Device}}"
-
-# Create mountpoint
-mkdir -p "{{.MountPoint}}"
-
-# Configure fstab
-echo "{{.Device}} {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab
-
-# Mounts device
-mount -a
-
-chmod a+rxw "{{.MountPoint}}"
+mkfs -t {{.FileSystem}} "{{.Device}}" && \
+mkdir -p "{{.MountPoint}}" && \
+echo "{{.Device}} {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
+mount -a && \
+chmod a+rwx "{{.MountPoint}}"

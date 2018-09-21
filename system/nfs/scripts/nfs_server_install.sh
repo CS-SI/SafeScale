@@ -49,4 +49,3 @@ case $LINUX_KIND in
         exit 1
         ;;
 esac
-exit 0
