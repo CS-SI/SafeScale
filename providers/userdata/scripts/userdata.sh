@@ -306,6 +306,8 @@ configure_dns_legacy() {
   {{- range .DNSServers }}
 nameserver {{ . }}
   {{- end }}
+{{- else }}
+nameserver 1.1.1.1
 {{- end }}
 EOF
 }
@@ -313,15 +315,17 @@ EOF
 configure_dns_resolvconf() {
     echo "Configuring resolvconf..."
 
-    cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/original
+    cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/base
 {{- if .DNSServers }}
   {{- range .DNSServers }}
 nameserver {{ . }}
   {{- end }}
+{{- else }}
+nameserver 1.1.1.1
 {{- end }}
 EOF
-    rm -f /etc/resolvconf/resolv.conf.d/tail
-    cd /etc/resolvconf/resolv.conf.d && /etc/resolvconf/update.d/libc
+    #rm -f /etc/resolvconf/resolv.conf.d/tail
+    systemctl restart resolvconf
 }
 
 configure_dns_systemd_resolved() {
@@ -332,7 +336,7 @@ configure_dns_systemd_resolved() {
 {{- if .DNSServers }}
 DNS={{ range .DNSServers }}{{ . }} {{ end }}
 {{- else }}
-DNS=
+DNS=1.1.1.1
 {{- end}}
 #FallbackDNS=
 #Domains=
