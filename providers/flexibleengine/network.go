@@ -84,7 +84,7 @@ type vpcDeleteResult struct {
 func (client *Client) CreateVPC(req VPCRequest) (*VPC, error) {
 	// Only one VPC allowed by client instance
 	if client.vpc != nil {
-		return nil, fmt.Errorf("failed to create VPC '%s', a VPC with this name already exists", req.Name, client.vpc.Name)
+		return nil, fmt.Errorf("failed to create VPC '%s', a VPC with this name already exists", req.Name)
 	}
 
 	b, err := gc.BuildRequestBody(req, "vpc")
@@ -455,6 +455,20 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 	}
 	gw := convertNumberToIPv4(n + 1)
 
+	dnsList := client.Cfg.DNSList
+	if len(dnsList) == 0 {
+		dnsList = []string{"1.1.1.1"}
+	}
+	var (
+		primaryDNS   string
+		secondaryDNS string
+	)
+	if len(dnsList) >= 1 {
+		primaryDNS = dnsList[0]
+	}
+	if len(dnsList) >= 2 {
+		secondaryDNS = dnsList[1]
+	}
 	bYes := true
 	req := subnetRequest{
 		Name:         name,
@@ -462,12 +476,9 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 		VPCID:        client.vpc.ID,
 		DHCPEnable:   &bYes,
 		GatewayIP:    gw.String(),
-		PrimaryDNS:   "100.125.0.41",
-		SecondaryDNS: "100.126.0.41",
-		DNSList: []string{
-			"100.125.0.41",
-			"100.126.0.41",
-		},
+		PrimaryDNS:   primaryDNS,
+		SecondaryDNS: secondaryDNS,
+		DNSList:      dnsList,
 	}
 	b, err := gc.BuildRequestBody(req, "subnet")
 	if err != nil {
@@ -578,11 +589,11 @@ func (client *Client) deleteSubnet(id string) error {
 				var v map[string]string
 				jsonErr := json.Unmarshal(r.Body, &v)
 				if jsonErr == nil {
-					log.Printf("flexibleengine.Client.deleteSubnet(%s): try #%d, verdict=%s,  err: '%s'", id, t.Count, verdict.String(), v["message"])
+					log.Printf("network still owns host(s), retrying in 3s...")
 					return
 				}
 			}
-			log.Printf("flexibleengine.Client.deleteSubnet(%s): try #%d, verdict=%s, err: '%v'", id, t.Count, verdict.String(), t.Err)
+			log.Printf("error submitting network deletion, retrying in 3s...")
 		},
 	)
 	if err != nil {

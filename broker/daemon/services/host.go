@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -98,6 +99,11 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	if err != nil {
 		return nil, err
 	}
+	if client.IsTimeout(err) {
+		svc.provider.DeleteHost(host.ID)
+		return nil, err
+	}
+
 	log.Println("SSH service started.")
 	return host, nil
 }

@@ -324,6 +324,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	Region, _ := params["Region"].(string)
 	S3AccessKeyID, _ := params["S3AccessKeyID"].(string)
 	S3AccessKeyPassword, _ := params["S3AccessKeyPassword"].(string)
+
 	return AuthenticatedClient(AuthOptions{
 		Username:            Username,
 		Password:            Password,

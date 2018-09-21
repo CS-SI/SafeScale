@@ -69,7 +69,7 @@ func New() Client {
 // DecorateError changes the error to something more comprehensible when
 // timeout occured
 func DecorateError(err error, action string, maySucceed bool) error {
-	if status.Code(err) == codes.DeadlineExceeded {
+	if IsTimeout(err) {
 		msg := "%s took too long (> %v) to respond"
 		if maySucceed {
 			msg += " (may eventually succeed)"
@@ -77,4 +77,9 @@ func DecorateError(err error, action string, maySucceed bool) error {
 		return fmt.Errorf(msg, action, DefaultExecutionTimeout)
 	}
 	return err
+}
+
+// IsTimeout tells if the err is a timeout kind
+func IsTimeout(err error) bool {
+	return status.Code(err) == codes.DeadlineExceeded
 }

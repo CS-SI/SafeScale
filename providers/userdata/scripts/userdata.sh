@@ -56,8 +56,6 @@ wait_lockfile() {
     fi
 }
 
-# Some functions and global variables related to iptables (the idea being to reduce size of generated
-# user_data.sh script transmitted to the host)
 fw_i_accept() {
     iptables -A INPUT -j ACCEPT $*
 }
@@ -81,20 +79,17 @@ save_iptables_rules() {
    esac
 }
 
-# Creates user gpac
 create_user() {
     echo "Creating user {{ .User }}..."
     useradd {{ .User }} --home-dir /home/{{ .User }} --shell /bin/bash --comment "" --create-home
     echo "gpac:{{ .Password }}" | chpasswd
     echo "{{ .User }} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
-    # Sets ssh config
     mkdir /home/{{ .User }}/.ssh
     echo "{{ .Key }}" >>/home/{{ .User }}/.ssh/authorized_keys
     chmod 0700 /home/{{ .User }}/.ssh
     chmod -R 0600 /home/{{ .User }}/.ssh/*
 
-    # Create flag file to deactivate Welcome message on ssh
     touch /home/{{ .User }}/.hushlogin
 
     cat >>/home/gpac/.bashrc <<-'EOF'
@@ -122,7 +117,7 @@ pathappend() {
 }
 pathprepend $HOME/.local/bin
 EOF
-    # Ensures ownership
+
     chown -R {{ .User }}:{{ .User }} /home/{{ .User }}
     echo done
 }
@@ -134,7 +129,7 @@ configure_network_debian() {
     local cfg=$path/50-cloud-init.cfg
     rm -f $cfg
     mkdir -p $path
-    # Configure all network interfaces in dhcp
+
     for IF in $(ls /sys/class/net); do
         if [ $IF != "lo" ]; then
             echo "auto ${IF}" >>$cfg
@@ -219,9 +214,8 @@ enable_iptables() {
         debian|ubuntu)
             wait_for_apt && apt update
             wait_for_apt && apt install -y -q iptables-persistent
-            [ $? -ne 0 ] && (
-                # at least for Ubuntu 16.04 (and older ?)
-                mkdir -p /etc/iptables
+            [ $? -ne 0 ] && {
+                mkdir -p /etc/iptables /etc/network/if-pre-up.d
                 cd /etc/network/if-pre-up.d
                 cat <<-'EOF' >iptables
 #!/bin/sh
@@ -230,7 +224,7 @@ mkdir -p $DIR
 [ -f $DIR/rules.v4 ] && iptables-restore <$DIR/rules.v4
 EOF
                 chmod a+rx iptables
-            )
+            }
             ;;
 
         rhel|centos)
@@ -243,9 +237,9 @@ EOF
     esac
 
     # We flush the current firewall rules possibly introduced by iptables service
-    iptables-save | awk '/^[*]/ { print $1 }
-                         /^:[A-Z]+ [^-]/ { print $1 " ACCEPT" ; }
-                         /COMMIT/ { print $0; }' | iptables-restore
+    #iptables-save | awk '/^[*]/ { print $1 }
+    #                     /^:[A-Z]+ [^-]/ { print $1 " ACCEPT" ; }
+    #                     /COMMIT/ { print $0; }' | iptables-restore
 }
 
 configure_as_gateway() {
