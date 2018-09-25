@@ -18,9 +18,13 @@ package cmds
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )
@@ -77,4 +81,19 @@ func createNodes(clusterName string, public bool, count int, cpu int32, ram floa
 //     "perform ..." becomes "myperform ..."
 func RebrandCommand(command string) string {
 	return fmt.Sprintf("%s%s", RebrandingPrefix, command)
+}
+
+func runCommand(cmdStr string) int {
+	cmd := exec.Command("bash", "-c", cmdStr)
+	err := cmd.Run()
+	if err != nil {
+		msg, retcode, err := system.ExtractRetCode(err)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to execute command")
+			return int(ExitCode.Run)
+		}
+		fmt.Fprintf(os.Stderr, msg)
+		return retcode
+	}
+	return int(ExitCode.OK)
 }

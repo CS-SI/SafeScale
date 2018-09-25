@@ -41,8 +41,7 @@ var ClusterInspectCommand = &cli.Command{
 	Process: func(c *cli.Command) {
 		populateClusterName(c)
 		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s inspect", clusterName))
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -62,18 +61,27 @@ var ClusterCreateCommand = &cli.Command{
 		ram := c.FloatOption("ram", "<ram>", 7.0)
 		disk := c.IntOption("disk", "<disk>", 100)
 
+		// Create cluster with deploy
 		cmdStr := fmt.Sprintf("deploy cluster %s create -F DCOS -C %s -N %s --cpu %d --ram %f --disk %d",
 			clusterName, complexityStr, cidr, cpu, ram, disk)
 		if keep {
 			cmdStr += " -k"
 		}
 		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
+		retcode := runCommand(cmdStr)
+		if retcode != 0 {
+			os.Exit(retcode)
+		}
 
+		// Installs component Spark
 		cmdStr = fmt.Sprintf("deploy cluster %s component spark add", clusterName)
-		fmt.Println(cmdStr)
+		retcode = runCommand(cmdStr)
+		if retcode != 0 {
+			os.Exit(retcode)
+		}
 
-		os.Exit(int(ExitCode.NotImplemented))
+		// Done
+		os.Exit(retcode)
 	},
 
 	Help: &cli.HelpContent{
@@ -99,8 +107,7 @@ var ClusterDeleteCommand = &cli.Command{
 			cmdStr += " -y"
 		}
 		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -115,8 +122,7 @@ var ClusterStopCommand = &cli.Command{
 		populateClusterName(c)
 
 		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s stop", clusterName))
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 }
 
@@ -129,8 +135,7 @@ var ClusterStartCommand = &cli.Command{
 		populateClusterName(c)
 
 		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s start", clusterName))
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -144,8 +149,7 @@ var ClusterStateCommand = &cli.Command{
 		populateClusterName(c)
 
 		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s state", clusterName))
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -170,8 +174,7 @@ var ClusterExpandCommand = &cli.Command{
 		// 	cmdStr += " --gpu"
 		// }
 		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -192,8 +195,7 @@ var ClusterShrinkCommand = &cli.Command{
 			cmdStr += " -p"
 		}
 		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -212,8 +214,7 @@ var ClusterDcosCommand = &cli.Command{
 			cmdStr += " -- " + strings.Join(args, " ")
 		}
 		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -232,8 +233,7 @@ var ClusterKubectlCommand = &cli.Command{
 			cmdStr += " -- " + strings.Join(args, " ")
 		}
 		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -252,8 +252,7 @@ var ClusterMarathonCommand = &cli.Command{
 			cmdStr += " -- " + strings.Join(args, " ")
 		}
 		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
