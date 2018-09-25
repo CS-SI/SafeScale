@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 )
 
-//Get returns the Cluster instance corresponding to the cluster named 'name'
+// Get returns the Cluster instance corresponding to the cluster named 'name'
 func Get(name string) (clusterapi.Cluster, error) {
 	m, err := metadata.NewCluster()
 	if err != nil {

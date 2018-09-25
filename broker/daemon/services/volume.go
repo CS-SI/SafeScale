@@ -172,7 +172,8 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return fmt.Errorf("failed to acknowledge the disk attachment after %s", 2*time.Minute)
 	}
 
-	volatt.Device = "/dev/" + newDisk.ToSlice()[0].(string)
+	deviceName := newDisk.ToSlice()[0].(string)
+	volatt.Device = "/dev/" + deviceName
 
 	// Create mount point
 	mountPoint := path
