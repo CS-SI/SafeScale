@@ -237,6 +237,8 @@ EOF
     esac
 
     # We flush the current firewall rules possibly introduced by iptables service
+    iptables -F
+    save_iptables_rules
     #iptables-save | awk '/^[*]/ { print $1 }
     #                     /^:[A-Z]+ [^-]/ { print $1 " ACCEPT" ; }
     #                     /COMMIT/ { print $0; }' | iptables-restore
@@ -381,6 +383,20 @@ EOF
     echo done
 }
 
+configure_gateway_redhat() {
+    echo "Configuring default router to {{ .GatewayIP }}"
+
+    reset_fw
+
+    route del -net default &>/dev/null
+    route add default gw {{.GatewayIP}}
+    echo "GATEWAY={{.GatewayIP}}" >/etc/sysconfig/network
+
+    enable_iptables
+
+    echo done
+}
+
 case $LINUX_KIND in
     debian|ubuntu)
         export DEBIAN_FRONTEND=noninteractive
@@ -407,7 +423,7 @@ case $LINUX_KIND in
         configure_as_gateway
         {{- else if .AddGateway }}
         configure_dns_legacy
-        configure_gateway
+        configure_gateway_redhat
         {{- end }}
         ;;
     *)
