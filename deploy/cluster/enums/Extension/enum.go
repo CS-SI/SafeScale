@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package AdditionalInfo
+package Extension
 
 //go:generate stringer -type=Enum
 

@@ -21,10 +21,10 @@ import (
 
 	providerapi "github.com/CS-SI/SafeScale/providers/api"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/AdditionalInfo"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/ClusterState"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )
@@ -91,19 +91,19 @@ type Cluster interface {
 	Delete() error
 	// GetConfig ...
 	GetConfig() ClusterCore
-	// GetAdditionalInfo returns additional info about parameter
-	GetAdditionalInfo(AdditionalInfo.Enum) interface{}
-	// SetAdditionalInfo sets the content of additional info
-	SetAdditionalInfo(AdditionalInfo.Enum, interface{})
+	// GetExtension returns additional info about parameter
+	GetExtension(Extension.Enum) interface{}
+	// SetExtension sets the content of additional info
+	SetExtension(Extension.Enum, interface{})
 }
 
-// AdditionalInfoAPI defines the interface to handle additional info
-type AdditionalInfoAPI interface {
+// ExtensionAPI defines the interface to handle additional info
+type ExtensionAPI interface {
 	Value() interface{}
 }
 
-// AdditionalInfoMap ...
-type AdditionalInfoMap map[AdditionalInfo.Enum]interface{}
+// ExtensionMap ...
+type ExtensionMap map[Extension.Enum]interface{}
 
 // ClusterCore contains the bare minimum information about a cluster
 type ClusterCore struct {
@@ -137,7 +137,7 @@ type ClusterCore struct {
 	// NodesDef keeps the default node definition
 	NodesDef *pb.HostDefinition `json:"nodes_def"`
 	// Infos contains additional info about the cluster
-	Infos AdditionalInfoMap `json:"infos,omitempty"`
+	Infos ExtensionMap `json:"infos,omitempty"`
 }
 
 // GetName returns the name of the cluster
@@ -155,8 +155,8 @@ func (c *ClusterCore) GetGatewayIP() string {
 	return c.GatewayIP
 }
 
-// GetAdditionalInfo returns the additional info requested
-func (c *ClusterCore) GetAdditionalInfo(ctx AdditionalInfo.Enum) interface{} {
+// GetExtension returns the additional info requested
+func (c *ClusterCore) GetExtension(ctx Extension.Enum) interface{} {
 	if c.Infos != nil {
 		if info, ok := c.Infos[ctx]; ok {
 			return info
@@ -165,10 +165,10 @@ func (c *ClusterCore) GetAdditionalInfo(ctx AdditionalInfo.Enum) interface{} {
 	return nil
 }
 
-// SetAdditionalInfo ...
-func (c *ClusterCore) SetAdditionalInfo(ctx AdditionalInfo.Enum, info interface{}) {
+// SetExtension ...
+func (c *ClusterCore) SetExtension(ctx Extension.Enum, info interface{}) {
 	if c.Infos == nil {
-		c.Infos = map[AdditionalInfo.Enum]interface{}{}
+		c.Infos = map[Extension.Enum]interface{}{}
 	}
 	c.Infos[ctx] = info
 }
