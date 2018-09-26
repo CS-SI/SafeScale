@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/providers/api/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
 
 	"github.com/CS-SI/SafeScale/providers"
 
@@ -30,9 +30,9 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
-	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenant cloudwatt
+	_ "github.com/CS-SI/SafeScale/providers/cloudwatt" // Imported to initialise tenant cloudwatt
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise tenant opentelekoms
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenant ovh

@@ -17,7 +17,7 @@ package commands_test
 
 import (
 	"errors"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/providers"
