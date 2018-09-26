@@ -22,16 +22,10 @@ git clone ${GIT_REPO_URL} -b ${BRANCH_NAME} --depth=1
 cd SafeScale
 
 # ----------------------
-# Get dependencies
-# ----------------------
-echo "Get dependencies"
-make deps
-
-# ----------------------
 # Compile
 # ----------------------
 echo "Compile"
-make
+make all
 
 # ----------------------
 # Install
