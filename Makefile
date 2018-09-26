@@ -122,7 +122,7 @@ devdeps:
 
 depclean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning vendor and redownloading deps, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@rm ./Gopkg.toml
+	@rm ./Gopkg.lock
 	@rm -rf ./vendor
 	@(dep ensure)
 
