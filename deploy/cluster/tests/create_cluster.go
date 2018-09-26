@@ -18,13 +18,13 @@ package main
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"log"
 	"runtime"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )

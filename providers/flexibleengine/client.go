@@ -42,8 +42,6 @@ import (
 	awssession "github.com/aws/aws-sdk-go/aws/session"
 )
 
-//go:generate rice embed-go
-
 // AuthOptions fields are the union of those recognized by each identity implementation and
 // provider.
 type AuthOptions struct {

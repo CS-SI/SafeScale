@@ -25,8 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers/flexibleengine"
 )
 
-//go:generate rice embed-go
-
 /*AuthOptions fields are the union of those recognized by each identity implementation and
 provider.
 */
