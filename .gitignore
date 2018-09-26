@@ -21,11 +21,7 @@ providers/aws/*_test.go
 #remove secrets
 *.secrets
 
-#remove tenants configuration
-*.toml
-
 #ignore generated files
-*.pb.go
 *_pb2.py
 rice-box.go
 *_string.go
@@ -48,8 +44,10 @@ deploy/cluster/tests/create_cluster
 
 *.code-workspace
 
-
 *.new
-
+*_results.log
 
 deploy/cli/deploy
+
+vendor
+Gopkg.lock
