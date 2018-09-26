@@ -24,13 +24,14 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/ClusterState"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/install"
 
 	"github.com/CS-SI/SafeScale/utils"
@@ -64,6 +65,7 @@ var ClusterCommand = &cli.Command{
 		clusterKubectlCommand,
 		clusterMarathonCommand,
 		clusterComponentCommand,
+		clusterNodeCommand,
 	},
 
 	Before: func(c *cli.Command) {
@@ -252,12 +254,27 @@ var clusterCreateCommand = &cli.Command{
 			cidr = "192.168.0.0/16"
 		}
 
+		los := c.StringOption("--os", "<operating system>", ubuntu1604)
+		if flavor == Flavor.DCOS {
+			// DCOS forces to use RHEL/CentOS/CoreOS, and we've chosen to use CentOS, so ignore --os option
+			los = ""
+		}
+		cpu := int32(c.IntOption("--cpu", "<number of cpus>", 4))
+		ram := float32(c.FloatOption("--ram", "<ram size>", 15.0))
+		disk := int32(c.IntOption("--disk", "<disk size>", 100))
+		nodesDef := pb.HostDefinition{
+			CPUNumber: cpu,
+			RAM:       ram,
+			Disk:      disk,
+			ImageID:   los,
+		}
 		clusterInstance, err = cluster.Create(clusterapi.Request{
 			Name:          clusterName,
 			Complexity:    complexity,
 			CIDR:          cidr,
 			Flavor:        flavor,
 			KeepOnFailure: keep,
+			NodesDef:      &nodesDef,
 		})
 		if err != nil {
 			if clusterInstance != nil {
@@ -526,87 +543,6 @@ Shrink cluster by removing last added node(s).`,
 	},
 }
 
-// clusterPackageCommand handles 'deploy cluster <clustername> package'
-var clusterPackageCommand = &cli.Command{
-	Keyword: "package",
-	Aliases: []string{"pkg"},
-
-	Commands: []*cli.Command{
-		clusterPackageAddCommand,
-		clusterPackageCheckCommand,
-		clusterPackageDeleteCommand,
-	},
-
-	Before: func(c *cli.Command) {
-		// Preprocessing for 'deploy cluster package'
-		pkgName := c.StringArgument("<pkgname>", "")
-		if pkgName == "" {
-			fmt.Println("Invalid argument <pkgname>")
-			os.Exit(int(ExitCode.InvalidArgument))
-		}
-
-		pkgManagerKind := c.StringOption("-K,--kind", "<kind>", "")
-		if pkgManagerKind == "" {
-			fmt.Println("missing or invalid mandatory option '-K,--kind'")
-			os.Exit(int(ExitCode.InvalidArgument))
-		}
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster <clustername> package|pkg <pkgname> -K <kind> COMMAND`,
-		Options: []string{
-			`
-Commands:
-  check        To check if package is installed and on what nodes
-  add,install  Installs specific package to all nodes of the cluster
-  delete,destroy,remove,rm,uninstall  Uninstall a package from all nodes of the cluster`,
-			`
-Package options:
-  -K,--kind  Filters the nodes on the package manager used by the Linux distribution`,
-		},
-		Description: `
-Manages package on all (filtered on package manager) nodes of the cluster <clustername> .`,
-	},
-}
-
-// clusterPackageAddCommand handles 'deploy cluster <clustername> package <pkgname> add'
-var clusterPackageAddCommand = &cli.Command{
-	Keyword: "add",
-
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterPackageAddCmd not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
-
-	Help: &cli.HelpContent{},
-}
-
-// clusterPackageCheckCommand handles 'deploy cluster <clustername> package <pkgname> check'
-var clusterPackageCheckCommand = &cli.Command{
-	Keyword: "check",
-
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterPackageCheckCmd not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
-
-	Help: &cli.HelpContent{},
-}
-
-// clusterPackageDeleteCmd handles 'deploy cluster <clustername> package <pkgname> delete'
-var clusterPackageDeleteCommand = &cli.Command{
-	Keyword: "delete",
-	Aliases: []string{"destroy", "remove", "rm"},
-
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterPackageDeleteCmd not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
-
-	Help: &cli.HelpContent{},
-}
-
 // clusterServiceCommand handles 'deploy cluster <clustername> service'
 var clusterServiceCommand = &cli.Command{
 	Keyword: "service",
@@ -816,7 +752,12 @@ func executeCommand(command string) (int, string, string, error) {
 			}
 		}
 		if retcode != 0 {
-			fmt.Fprintf(os.Stderr, "master #%d: retcode=%d\n%s\n%s\n", i+1, retcode, stdout, stderr)
+			output := stdout
+			if output != "" {
+				output += "\n"
+			}
+			output += stderr
+			fmt.Fprintf(os.Stderr, "Run on master #%d, retcode=%d\n%s\n", i+1, retcode, output)
 			os.Exit(int(ExitCode.RPC))
 		}
 		fmt.Println(stdout)
