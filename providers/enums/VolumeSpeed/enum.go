@@ -14,18 +14,20 @@
  * limitations under the License.
  */
 
-package AdditionalInfo
+//Package VolumeSpeed defines an enum to represents Volume type
+package VolumeSpeed
 
 //go:generate stringer -type=Enum
 
-// Enum represents the type of additional info for an host
-type Enum uint8
+//Enum represents the state of an host
+type Enum int
 
 const (
-	// Description contains optional additional info describing cluster (purpose, ...)
-	Description Enum = iota
-	// Flavor contains optional additional info used by the cluster manager software
-	Flavor
-	// Components contains optional additional info describing installed components on cluster
-	Components
+
+	//COLD speed volume
+	COLD Enum = iota
+	//HDD speed volume.
+	HDD
+	//SSD speed volume
+	SSD
 )

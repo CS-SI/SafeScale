@@ -26,9 +26,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/openstack"
+
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 

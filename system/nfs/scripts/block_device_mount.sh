@@ -17,9 +17,8 @@
 # block_device_mount.sh
 # Creates a filesystem on a device and mounts it
 
-# Create filesystem
-mkfs -t {{.FileSystem}} "{{.Device}}" && \
+mkfs -F -t {{.FileSystem}} "{{.Device}}" && \
 mkdir -p "{{.MountPoint}}" && \
 echo "{{.Device}} {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
-mount -a && \
+mount "{{.MountPoint}}" && \
 chmod a+rwx "{{.MountPoint}}"

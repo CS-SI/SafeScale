@@ -55,13 +55,14 @@ resolvers:
 ssh_key_path: genconf/ssh_key
 ssh_user: cladm
 ssh_port: 22
-use_proxy: 'true'
-http_proxy: http://{{.GatewayIP}}:3128
-https_proxy: https://{{.GatewayIP}}:3128
-no_proxy:
-- {{.GatewayIP}}
-- {{.HostIP}}
-- localhost
+use_proxy: 'false'
+#use_proxy: 'true'
+#http_proxy: http://{{.GatewayIP}}:3128
+#https_proxy: https://{{.GatewayIP}}:3128
+#no_proxy:
+#- {{.GatewayIP}}
+#- {{.HostIP}}
+#- localhost
 oauth_enabled: 'false'
 EOF
 

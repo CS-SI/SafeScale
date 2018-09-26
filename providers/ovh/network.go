@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"

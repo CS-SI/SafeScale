@@ -39,6 +39,10 @@ func (i *dcosInstaller) Check(c *Component, t Target, v Variables) (bool, CheckR
 		return false, CheckResults{}, fmt.Errorf(msg)
 	}
 
+	if err := validateClusterSizing(c, cluster); err != nil {
+		return false, CheckResults{}, err
+	}
+
 	// Note: In special case of DCOS, installation is done on any master available. values returned
 	// by validateClusterTargets() are ignored
 	specs := c.Specs()
@@ -171,6 +175,10 @@ func (i *dcosInstaller) Add(c *Component, t Target, v Variables) (bool, AddResul
 		return false, AddResults{}, fmt.Errorf("target is not a cluster")
 	}
 	cluster := clusterTarget.cluster
+	if err := validateClusterSizing(c, cluster); err != nil {
+		return false, AddResults{}, err
+	}
+
 	if !worker.CanProceed() {
 		msg := fmt.Sprintf("component can't apply to flavor '%s' of cluster '%s'\n", cluster.GetConfig().Flavor.String(), t.Name())
 		log.Println(msg)

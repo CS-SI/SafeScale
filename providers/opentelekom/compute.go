@@ -18,6 +18,7 @@ package opentelekom
 
 import (
 	"github.com/CS-SI/SafeScale/providers/api"
+
 	"github.com/CS-SI/SafeScale/system"
 )
 

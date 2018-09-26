@@ -60,9 +60,9 @@ var nodeCreateCommand = &cli.Command{
 	Process: func(c *cli.Command) {
 		count := c.IntOption("count n", "<count>", 1)
 		public := c.Flag("public p", false)
-		cpu := c.IntOption("cpu C", "<cpu>", 2)
-		ram := c.FloatOption("ram R", "<ram>", 7.0)
-		disk := c.IntOption("disk D", "<disk>", 100)
+		cpu := c.IntOption("cpu C", "<number of cpu>", 2)
+		ram := c.FloatOption("ram R", "<ram size>", 7.0)
+		disk := c.IntOption("disk D", "<disk size>", 100)
 		//gpu := c.Flag("gpu", false, "With GPU")
 
 		cmdStr := fmt.Sprintf("deploy cluster %s expand -n %d --cpu %d --ram %f --disk %d",
@@ -71,8 +71,7 @@ var nodeCreateCommand = &cli.Command{
 			cmdStr += " -p"
 		}
 		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -91,7 +90,7 @@ var nodeDeleteCommand = &cli.Command{
 		}
 		cmdStr = RebrandCommand(cmdStr)
 		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -110,8 +109,7 @@ var nodeListCommand = &cli.Command{
 			cmdStr += " -p"
 		}
 		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -122,10 +120,8 @@ var nodeInspectCommand = &cli.Command{
 	Keyword: "inspect",
 
 	Process: func(c *cli.Command) {
-		cmdStr := fmt.Sprintf("deploy cluster %s node %s inspect", clusterName, nodeName)
-		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.OK))
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s node %s inspect", clusterName, nodeName))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -137,10 +133,8 @@ var nodeStopCommand = &cli.Command{
 	Aliases: []string{"freeze"},
 
 	Process: func(c *cli.Command) {
-		cmdStr := fmt.Sprintf("deploy cluster %s node %s stop", clusterName, nodeName)
-		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s node %s stop", clusterName, nodeName))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -152,10 +146,8 @@ var nodeStartCommand = &cli.Command{
 	Aliases: []string{"unfreeze"},
 
 	Process: func(c *cli.Command) {
-		cmdStr := fmt.Sprintf("deploy cluster %s node %s start", clusterName, nodeName)
-		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s node %s start", clusterName, nodeName))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},
@@ -166,10 +158,8 @@ var nodeStateCommand = &cli.Command{
 	Keyword: "state",
 
 	Process: func(c *cli.Command) {
-		cmdStr := fmt.Sprintf("deploy cluster %s node %s state", clusterName, nodeName)
-		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(int(ExitCode.NotImplemented))
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s node %s state", clusterName, nodeName))
+		os.Exit(runCommand(cmdStr))
 	},
 
 	Help: &cli.HelpContent{},

@@ -6,13 +6,12 @@ all: generate
 
 vet:
 	@$(GO) vet
-	@$(GO) vet ./ErrorCode
+	@$(GO) vet ./enums/ErrorCode
 
 generate: dcos.go scripts/*.sh
 	@$(GO) generate
 
 clean:
 	@($(RM) -f rice-box.go)
-	@($(RM) ErrorCode/*_string.go)
 
 mrproper: clean

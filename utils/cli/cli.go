@@ -152,7 +152,12 @@ func (c *Command) StringOption(option string, parameter string, def string) stri
 func (c *Command) IntOption(option string, parameter string, def int) int {
 	anon := c.Option(option, parameter)
 	if anon != nil {
-		return anon.(int)
+		strVal := anon.(string)
+		val, err := strconv.Atoi(strVal)
+		if err == nil {
+			return val
+		}
+		fmt.Fprintf(os.Stderr, "Invalid integer value '%s' for option '%s'! Ignored.", strVal, option)
 	}
 	return def
 }

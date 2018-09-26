@@ -23,9 +23,11 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/metadata"
+
 	"github.com/CS-SI/SafeScale/system/nfs"
+
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	mapset "github.com/deckarep/golang-set"
@@ -55,13 +57,13 @@ type VolumeService struct {
 }
 
 //List returns the network list
-func (srv *VolumeService) List(all bool) ([]api.Volume, error) {
-	return srv.provider.ListVolumes(all)
+func (svc *VolumeService) List(all bool) ([]api.Volume, error) {
+	return svc.provider.ListVolumes(all)
 }
 
 //Delete deletes volume referenced by ref
-func (srv *VolumeService) Delete(ref string) error {
-	vol, err := srv.Get(ref)
+func (svc *VolumeService) Delete(ref string) error {
+	vol, err := svc.Get(ref)
 	if err != nil {
 		return err
 	}
@@ -69,12 +71,12 @@ func (srv *VolumeService) Delete(ref string) error {
 		return fmt.Errorf("Volume '%s' does not exist", ref)
 	}
 
-	return srv.provider.DeleteVolume(vol.ID)
+	return svc.provider.DeleteVolume(vol.ID)
 }
 
 //Get returns the volume identified by ref, ref can be the name or the id
-func (srv *VolumeService) Get(ref string) (*api.Volume, error) {
-	m, err := metadata.LoadVolume(srv.provider, ref)
+func (svc *VolumeService) Get(ref string) (*api.Volume, error) {
+	m, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -85,8 +87,8 @@ func (srv *VolumeService) Get(ref string) (*api.Volume, error) {
 }
 
 //Inspect returns the volume identified by ref and its attachment (if any)
-func (srv *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachment, error) {
-	mtdvol, err := metadata.LoadVolume(srv.provider, ref)
+func (svc *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachment, error) {
+	mtdvol, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -103,8 +105,8 @@ func (srv *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachmen
 }
 
 // Create a volume
-func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error) {
-	return srv.provider.CreateVolume(api.VolumeRequest{
+func (svc *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error) {
+	return svc.provider.CreateVolume(api.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
@@ -112,9 +114,9 @@ func (srv *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) 
 }
 
 // Attach a volume to an host
-func (srv *VolumeService) Attach(volumename, hostName, path, format string) error {
+func (svc *VolumeService) Attach(volumename, hostName, path, format string) error {
 	// Get volume ID
-	volume, err := srv.Get(volumename)
+	volume, err := svc.Get(volumename)
 	if err != nil {
 		return err
 	}
@@ -123,7 +125,7 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 	}
 
 	// Get Host ID
-	hostService := NewHostService(srv.provider)
+	hostService := NewHostService(svc.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
 		return err
@@ -135,12 +137,12 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 	// Note: most providers are not able to tell the real device name the volume
 	//       will have on the host, so we have to use a way that can work everywhere
 	// Get list of disks before attachment
-	oldDiskSet, err := srv.listAttachedDevices(host)
+	oldDiskSet, err := svc.listAttachedDevices(host)
 	if err != nil {
 		return fmt.Errorf("failed to get list of connected disks: %s", err)
 	}
 
-	volatt, err := srv.provider.CreateVolumeAttachment(api.VolumeAttachmentRequest{
+	volatt, err := svc.provider.CreateVolumeAttachment(api.VolumeAttachmentRequest{
 		Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
 		ServerID: host.ID,
 		VolumeID: volume.ID,
@@ -155,7 +157,7 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			// Get new of disk after attachment
-			newDiskSet, err := srv.listAttachedDevices(host)
+			newDiskSet, err := svc.listAttachedDevices(host)
 			if err != nil {
 				return fmt.Errorf("failed to get list of connected disks: %s", err)
 			}
@@ -172,7 +174,14 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return fmt.Errorf("failed to acknowledge the disk attachment after %s", 2*time.Minute)
 	}
 
-	volatt.Device = "/dev/" + newDisk.ToSlice()[0].(string)
+	// Updates volume attachment metadata
+	deviceName := newDisk.ToSlice()[0].(string)
+	volatt.Device = "/dev/" + deviceName
+	err = metadata.SaveVolumeAttachment(svc.provider, volatt)
+	if err != nil {
+		svc.Detach(volumename, hostName)
+		return fmt.Errorf("failed to update volume attachment: %s", err.Error())
+	}
 
 	// Create mount point
 	mountPoint := path
@@ -180,7 +189,7 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 		mountPoint = api.DefaultVolumeMountPoint + volume.Name
 	}
 
-	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
+	sshConfig, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return err
 	}
@@ -192,14 +201,14 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 	err = server.MountBlockDevice(volatt.Device, mountPoint, format)
 
 	if err != nil {
-		srv.Detach(volumename, hostName)
+		svc.Detach(volumename, hostName)
 		return err
 	}
 
 	// Update volume attachement info with mountpoint
 	volatt.MountPoint = mountPoint
 	volatt.Format = format
-	mtdVol, err := metadata.LoadVolume(srv.provider, volumename)
+	mtdVol, err := metadata.LoadVolume(svc.provider, volumename)
 	if err != nil {
 		return err
 	}
@@ -208,13 +217,13 @@ func (srv *VolumeService) Attach(volumename, hostName, path, format string) erro
 	return nil
 }
 
-func (srv *VolumeService) listAttachedDevices(host *api.Host) (mapset.Set, error) {
+func (svc *VolumeService) listAttachedDevices(host *api.Host) (mapset.Set, error) {
 	var (
 		retcode        int
 		stdout, stderr string
 		err            error
 	)
-	sshService := NewSSHService(srv.provider)
+	sshService := NewSSHService(svc.provider)
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
@@ -244,25 +253,30 @@ func (srv *VolumeService) listAttachedDevices(host *api.Host) (mapset.Set, error
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (srv *VolumeService) Detach(volumename string, hostName string) error {
-	vol, err := srv.Get(volumename)
+func (svc *VolumeService) Detach(volumename string, hostName string) error {
+	vol, err := svc.Get(volumename)
 	if err != nil {
 		return providers.ResourceNotFoundError("volume", volumename)
 	}
 
 	// Get Host ID
-	hostService := NewHostService(srv.provider)
+	hostService := NewHostService(svc.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
 		return providers.ResourceNotFoundError("host", hostName)
 	}
 
-	volatt, err := srv.provider.GetVolumeAttachment(host.ID, vol.ID)
+	// providerVA, err := svc.provider.GetVolumeAttachment(host.ID, vol.ID)
+	// if err != nil {
+	// 	return fmt.Errorf("error getting volume attachment: %s", err)
+	// }
+	mdVA, err := metadata.LoadVolumeAttachment(svc.provider, host.ID, vol.ID)
 	if err != nil {
 		return fmt.Errorf("error getting volume attachment: %s", err)
 	}
+	volatt := mdVA.Get()
 
-	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
+	sshConfig, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		return err
 	}
@@ -278,5 +292,5 @@ func (srv *VolumeService) Detach(volumename string, hostName string) error {
 	}
 
 	// Finaly delete the attachment
-	return srv.provider.DeleteVolumeAttachment(host.ID, vol.ID)
+	return svc.provider.DeleteVolumeAttachment(host.ID, vol.ID)
 }

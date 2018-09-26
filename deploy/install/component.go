@@ -34,7 +34,7 @@ var (
 // Variables defines the parameters a Installer may need
 type Variables map[string]interface{}
 
-// component contains the information about an installable component
+// Component contains the information about an installable component
 type Component struct {
 	// displayName is the name of the service
 	displayName string

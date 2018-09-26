@@ -206,7 +206,7 @@ var volumeDetach = cli.Command{
 			return fmt.Errorf("could not detach volume '%s' from host '%s': %v",
 				c.Args().Get(0), c.Args().Get(1), client.DecorateError(err, "unattach of volume", true))
 		}
-		fmt.Printf("Volume '%s' unattached from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
+		fmt.Printf("Volume '%s' detached from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 
 		return nil
 	},

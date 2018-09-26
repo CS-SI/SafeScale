@@ -54,6 +54,10 @@ func (g *genericPackager) Check(c *Component, t Target, v Variables) (bool, Chec
 
 	if onCluster {
 		cluster := clusterTarget.cluster
+		if err := validateClusterSizing(c, cluster); err != nil {
+			return false, CheckResults{}, err
+		}
+
 		if !validateContextForCluster(c, cluster) {
 			config := cluster.GetConfig()
 			msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", config.Flavor.String(), config.Name)
@@ -191,6 +195,13 @@ func (g *genericPackager) Add(c *Component, t Target, v Variables) (bool, AddRes
 		return true, AddResults{}, nil
 	}
 
+	hostTarget, clusterTarget, nodeTarget := determineContext(t)
+	if clusterTarget != nil {
+		if err := validateClusterSizing(c, clusterTarget.cluster); err != nil {
+			return false, AddResults{}, err
+		}
+	}
+
 	// First, installs requirements if there are any
 	err = installRequirements(c, t, v)
 	if err != nil {
@@ -206,8 +217,6 @@ func (g *genericPackager) Add(c *Component, t Target, v Variables) (bool, AddRes
 				no key '%s.add' found`
 		return false, AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
 	}
-
-	hostTarget, clusterTarget, nodeTarget := determineContext(t)
 
 	if hostTarget != nil {
 		if specs.IsSet("component.target.host") {

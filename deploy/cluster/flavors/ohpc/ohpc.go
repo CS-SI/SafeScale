@@ -36,12 +36,12 @@ import (
 	"google.golang.org/grpc/status"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/AdditionalInfo"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/ClusterState"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/NodeType"
-	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc/ErrorCode"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc/enums/ErrorCode"
 	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 	"github.com/CS-SI/SafeScale/deploy/install"
@@ -138,14 +138,14 @@ func (c *Cluster) CountNodes(public bool) uint {
 	return c.Core.CountNodes(public)
 }
 
-// GetAdditionalInfo returns additional info of the cluster
-func (c *Cluster) GetAdditionalInfo(ctx AdditionalInfo.Enum) interface{} {
-	return c.Core.GetAdditionalInfo(ctx)
+// GetExtension returns additional info of the cluster
+func (c *Cluster) GetExtension(ctx Extension.Enum) interface{} {
+	return c.Core.GetExtension(ctx)
 }
 
-// SetAdditionalInfo returns additional info of the cluster
-func (c *Cluster) SetAdditionalInfo(ctx AdditionalInfo.Enum, info interface{}) {
-	c.Core.SetAdditionalInfo(ctx, info)
+// SetExtension returns additional info of the cluster
+func (c *Cluster) SetExtension(ctx Extension.Enum, info interface{}) {
+	c.Core.SetExtension(ctx, info)
 }
 
 // Load loads the internals of an existing cluster from metadata
@@ -161,20 +161,20 @@ func Load(data *metadata.Cluster) (clusterapi.Cluster, error) {
 		metadata: data,
 		provider: svc,
 	}
-	instance.resetAdditionalInfos(core)
+	instance.resetExtensions(core)
 	return instance, nil
 }
 
-func (c *Cluster) resetAdditionalInfos(core *clusterapi.ClusterCore) {
+func (c *Cluster) resetExtensions(core *clusterapi.ClusterCore) {
 	if core == nil {
 		return
 	}
-	anon := core.GetAdditionalInfo(AdditionalInfo.Flavor)
+	anon := core.GetExtension(Extension.Flavor)
 	if anon != nil {
 		manager := anon.(managerData)
 		c.manager = &manager
-		// Note: On Load(), need to replace AdditionalInfos that are structs to pointers to struct
-		core.SetAdditionalInfo(AdditionalInfo.Flavor, &manager)
+		// Note: On Load(), need to replace Extensions that are structs to pointers to struct
+		core.SetExtension(Extension.Flavor, &manager)
 	}
 }
 
@@ -184,7 +184,7 @@ func (c *Cluster) Reload() error {
 	if err != nil {
 		return err
 	}
-	c.resetAdditionalInfos(c.metadata.Get())
+	c.resetExtensions(c.metadata.Get())
 	return nil
 }
 
@@ -316,7 +316,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	err = instance.updateMetadata(func() error {
 		instance.Core.GatewayIP = gw.GetPrivateIP()
 		instance.Core.PublicIP = gw.GetAccessIP()
-		instance.SetAdditionalInfo(AdditionalInfo.Flavor, instance.manager)
+		instance.SetExtension(Extension.Flavor, instance.manager)
 		return nil
 	})
 	if err != nil {

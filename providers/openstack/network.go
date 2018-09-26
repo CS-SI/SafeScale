@@ -24,10 +24,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
-	metadata "github.com/CS-SI/SafeScale/providers/metadata"
-	gc "github.com/gophercloud/gophercloud"
+	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 
+	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"

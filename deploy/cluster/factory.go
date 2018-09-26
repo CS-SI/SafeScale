@@ -23,14 +23,14 @@ import (
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 )
 
-//Get returns the Cluster instance corresponding to the cluster named 'name'
+// Get returns the Cluster instance corresponding to the cluster named 'name'
 func Get(name string) (clusterapi.Cluster, error) {
 	m, err := metadata.NewCluster()
 	if err != nil {

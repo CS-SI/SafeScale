@@ -14,16 +14,22 @@
  * limitations under the License.
  */
 
-package HostAdditionalInfo
+package HostState
 
 //go:generate stringer -type=Enum
 
-// Enum represents the type of additional info for an host
-type Enum uint8
+//Enum represents the state of an host
+type Enum int
 
 const (
-	// Description contains optional additional info describing host (purpose, ...)
-	Description Enum = iota
-	// Components contains optional additional info describing installed component
-	Components
+	// STOPPED when host is stopped
+	STOPPED Enum = iota
+	// STARTING when host is starting
+	STARTING
+	// STARTED when host is started
+	STARTED
+	// STOPPING when host is stopping
+	STOPPING
+	// ERROR when host is in error state*/
+	ERROR
 )

@@ -24,15 +24,14 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
-	metadata "github.com/CS-SI/SafeScale/providers/metadata"
-	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects"
-
-	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
+	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers"
+	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects"
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
