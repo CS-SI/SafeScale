@@ -20,12 +20,11 @@ mkdir -p ${GOPATH:-$HOME}/src/github.com/CS-SI
 cd ${GOPATH:-$HOME}/src/github.com/CS-SI
 git clone https://github.com/CS-SI/SafeScale
 
-# Get dependecies
-cd ${GOPATH:-$HOME}/src/github.com/CS-SI/SafeScale
-make deps
+# Show help
+make
 
 # Build SafeScale
-make
+make all
 ```
 
 These commands intitialize your workging directory and produces the folowwing binaries:
