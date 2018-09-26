@@ -7,7 +7,6 @@
     - Download the compiler from [github](https://github.com/google/protobuf/releases/)
     - Follow install instruction
 - make
-- Transitive dependencies. Note: most dependencies are retrived with `make deps` command ([see below](#Build))
 
 
 ## Build
