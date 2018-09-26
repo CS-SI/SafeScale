@@ -33,12 +33,12 @@ import (
 	"github.com/CS-SI/SafeScale/utils/template"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/AdditionalInfo"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/ClusterState"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/NodeType"
-	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos/ErrorCode"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos/enums/ErrorCode"
 	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 
@@ -54,7 +54,6 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 )
 
 //go:generate rice embed-go
@@ -132,7 +131,7 @@ type Cluster struct {
 	// Core cluster data; serialized in ObjectStorage
 	Core *clusterapi.ClusterCore
 
-	// manager is a pointer to AdditionalInfo of type Flavor stored in Core, corresponding to
+	// manager is a pointer to Extension of type Flavor stored in Core, corresponding to
 	// DCOS data wanted in Object Storage
 	manager *managerData
 
@@ -151,14 +150,14 @@ func (c *Cluster) GetNetworkID() string {
 	return c.Core.GetNetworkID()
 }
 
-// GetAdditionalInfo returns additional info corresponding to 'ctx'
-func (c *Cluster) GetAdditionalInfo(ctx AdditionalInfo.Enum) interface{} {
-	return c.Core.GetAdditionalInfo(ctx)
+// GetExtension returns additional info corresponding to 'ctx'
+func (c *Cluster) GetExtension(ctx Extension.Enum) interface{} {
+	return c.Core.GetExtension(ctx)
 }
 
-// SetAdditionalInfo returns additional info corresponding to 'ctx'
-func (c *Cluster) SetAdditionalInfo(ctx AdditionalInfo.Enum, info interface{}) {
-	c.Core.SetAdditionalInfo(ctx, info)
+// SetExtension returns additional info corresponding to 'ctx'
+func (c *Cluster) SetExtension(ctx Extension.Enum, info interface{}) {
+	c.Core.SetExtension(ctx, info)
 }
 
 // CountNodes returns the number of public or private nodes in the cluster
@@ -179,20 +178,20 @@ func Load(data *metadata.Cluster) (clusterapi.Cluster, error) {
 		metadata: data,
 		provider: svc,
 	}
-	instance.resetAdditionalInfos(core)
+	instance.resetExtensions(core)
 	return instance, nil
 }
 
-func (c *Cluster) resetAdditionalInfos(Core *clusterapi.ClusterCore) {
+func (c *Cluster) resetExtensions(Core *clusterapi.ClusterCore) {
 	if Core == nil {
 		return
 	}
-	anon := Core.GetAdditionalInfo(AdditionalInfo.Flavor)
+	anon := Core.GetExtension(Extension.Flavor)
 	if anon != nil {
 		manager := anon.(managerData)
 		c.manager = &manager
-		// Note: On Load(), need to replace AdditionalInfos that are struct to pointers to struct
-		Core.SetAdditionalInfo(AdditionalInfo.Flavor, &manager)
+		// Note: On Load(), need to replace Extensions that are struct to pointers to struct
+		Core.SetExtension(Extension.Flavor, &manager)
 	}
 }
 
@@ -202,7 +201,7 @@ func (c *Cluster) Reload() error {
 	if err != nil {
 		return err
 	}
-	c.resetAdditionalInfos(c.metadata.Get())
+	c.resetExtensions(c.metadata.Get())
 	return nil
 }
 
@@ -225,10 +224,10 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			ImageID:   centos,
 		}
 	}
-	if nodesDef.ImageID != centos {
-		fmt.Printf("cluster Flavor DCOS enforces the use of %s distribution. OS %s ignored.\n", centos, nodesDef.ImageID)
-		nodesDef.ImageID = centos
+	if nodesDef.ImageID != "" && nodesDef.ImageID != centos {
+		fmt.Printf("cluster Flavor DCOS enforces the use of %s distribution. OS '%s' is ignored.\n", centos, nodesDef.ImageID)
 	}
+	nodesDef.ImageID = centos
 
 	// Creates network
 	log.Printf("Creating Network 'net-%s'", req.Name)
@@ -267,9 +266,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		mastersStatus                 error
 		nodesChannel                  chan error
 		nodesStatus                   error
-		component                     *install.Component
-		target                        install.Target
-		results                       install.AddResults
+		// component                     *install.Component
+		// target                        install.Target
+		// results                       install.AddResults
 	)
 	broker := brokerclient.New()
 
@@ -298,19 +297,19 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		err = brokerclient.DecorateError(err, "wait for remote ssh service to be ready", false)
 		goto cleanNetwork
 	}
-	component, err = install.NewComponent("proxycache-server")
-	if err != nil {
-		goto cleanNetwork
-	}
-	target = install.NewHostTarget(pbutils.ToPBHost(gw))
-	ok, results, err = component.Add(target, install.Variables{})
-	if err != nil {
-		goto cleanNetwork
-	}
-	if !ok {
-		err = fmt.Errorf(results.Errors())
-		goto cleanNetwork
-	}
+	// component, err = install.NewComponent("proxycache-server")
+	// if err != nil {
+	// 	goto cleanNetwork
+	// }
+	// target = install.NewHostTarget(pbutils.ToPBHost(gw))
+	// ok, results, err = component.Add(target, install.Variables{})
+	// if err != nil {
+	// 	goto cleanNetwork
+	// }
+	// if !ok {
+	// 	err = fmt.Errorf(results.Errors())
+	// 	goto cleanNetwork
+	// }
 
 	// Create a KeyPair for the user cladm
 	kpName = "cluster_" + req.Name + "_cladm_key"
@@ -341,7 +340,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		provider: svc,
 		manager:  &managerData{},
 	}
-	instance.SetAdditionalInfo(AdditionalInfo.Flavor, instance.manager)
+	instance.SetExtension(Extension.Flavor, instance.manager)
 	err = instance.updateMetadata(nil)
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
@@ -363,13 +362,13 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	switch req.Complexity {
 	case Complexity.Small:
 		masterCount = 1
-		privateNodeCount = 1
+		privateNodeCount = 2
 	case Complexity.Normal:
 		masterCount = 3
-		privateNodeCount = 3
+		privateNodeCount = 4
 	case Complexity.Large:
 		masterCount = 5
-		privateNodeCount = 3
+		privateNodeCount = 6
 	}
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -715,39 +714,40 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 		return
 	}
 
-	// install proxycache-client component
-	component, err := install.NewComponent("proxycache-client")
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to prepare component 'proxycache-client': %s", 1, host.ID, err.Error())
-		done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
-	}
-	target := install.NewHostTarget(host)
 	values := install.Variables{
 		"Password": c.Core.AdminPassword,
 	}
-	ok, results, err := component.Add(target, values)
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
-		return
-	}
-	if !ok {
-		msg := results.Errors()
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
-		done <- fmt.Errorf(msg)
-		return
-	}
+
+	// // install proxycache-client component
+	// component, err := install.NewComponent("proxycache-client")
+	// if err != nil {
+	// 	log.Printf("[master #%d (%s)] failed to prepare component 'proxycache-client': %s", 1, host.ID, err.Error())
+	// 	done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
+	// }
+	// target := install.NewHostTarget(host)
+	// ok, results, err := component.Add(target, values)
+	// if err != nil {
+	// 	log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
+	// 	done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+	// 	return
+	// }
+	// if !ok {
+	// 	msg := results.Errors()
+	// 	log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
+	// 	done <- fmt.Errorf(msg)
+	// 	return
+	// }
 
 	// install docker component
 	log.Printf("[master #%d (%s)] installing component 'docker'", index, host.Name)
-	component, err = install.NewComponent("docker")
+	component, err := install.NewComponent("docker")
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", index, host.ID, err.Error())
 		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
 		return
 	}
-	target = install.NewHostTarget(host)
-	ok, results, err = component.Add(target, values)
+	target := install.NewHostTarget(host)
+	ok, results, err := component.Add(target, values)
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", index, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -924,36 +924,36 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 	}
 	log.Printf("[%s node #%d (%s)] host created successfully.\n", nodeTypeStr, index, host.Name)
 
-	// install proxycache-client component
-	component, err := install.NewComponent("proxycache-client")
-	if err != nil {
-		log.Printf("[%s node #%d (%s)] failed to prepare component 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
-		done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
-		return
-	}
+	// // install proxycache-client component
+	// component, err := install.NewComponent("proxycache-client")
+	// if err != nil {
+	// 	log.Printf("[%s node #%d (%s)] failed to prepare component 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
+	// 	done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
+	// 	return
+	// }
 	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, install.Variables{})
-	if err != nil {
-		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
-		return
-	}
-	if !ok {
-		msg := results.Errors()
-		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
-		done <- fmt.Errorf(msg)
-		return
-	}
+	// ok, results, err := component.Add(target, install.Variables{})
+	// if err != nil {
+	// 	log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
+	// 	done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+	// 	return
+	// }
+	// if !ok {
+	// 	msg := results.Errors()
+	// 	log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
+	// 	done <- fmt.Errorf(msg)
+	// 	return
+	// }
 
 	// install docker component
 	log.Printf("[%s node #%d (%s)] installing component 'docker'...\n", nodeTypeStr, index, host.Name)
-	component, err = install.NewComponent("docker")
+	component, err := install.NewComponent("docker")
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to prepare component 'docker': %s", nodeTypeStr, index, host.Name, err.Error())
 		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
 		return
 	}
-	ok, results, err = component.Add(target, install.Variables{})
+	ok, results, err := component.Add(target, install.Variables{})
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
