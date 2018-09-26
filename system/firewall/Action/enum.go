@@ -22,7 +22,7 @@ package Action
 type Enum int
 
 const (
-	_ int = iota
+	_ Enum = iota
 	Accept
 	Drop
 	Reject

@@ -22,7 +22,7 @@ package Policy
 type Enum int
 
 const (
-	_ int = iota
+	_ Enum = iota
 	Accept
 	Drop
 )
