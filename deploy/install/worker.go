@@ -11,8 +11,8 @@ import (
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Complexity"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
@@ -225,7 +225,12 @@ func (w *worker) Proceed(v Variables) (map[string]stepErrors, error) {
 			anon       interface{}
 			err        error
 		)
-		stepMap := steps[k].(map[string]interface{})
+		stepMap, ok := steps[k].(map[string]interface{})
+		if !ok {
+			msg := `syntax error in component '%s' specification file (%s):
+			no key '%s' found`
+			return nil, fmt.Errorf(msg, w.component.DisplayName(), w.component.DisplayFilename(), stepKey)
+		}
 		// if !specs.IsSet(stepKey) {
 		// 	msg := `syntax error in component '%s' specification file (%s):
 		// 	no key '%s' found`

@@ -20,7 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 )

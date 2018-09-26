@@ -23,7 +23,7 @@ import (
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api/Flavor"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc"

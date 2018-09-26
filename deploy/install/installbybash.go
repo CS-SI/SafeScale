@@ -128,6 +128,10 @@ func (i *bashInstaller) checkOnCluster(
 		return false, CheckResults{}, fmt.Errorf(msg)
 	}
 
+	if err := validateClusterSizing(c, cluster); err != nil {
+		return false, CheckResults{}, err
+	}
+
 	specs := c.Specs()
 	masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
 	if err != nil {
@@ -221,6 +225,13 @@ func (i *bashInstaller) Add(c *Component, t Target, v Variables) (bool, AddResul
 		return true, AddResults{}, nil
 	}
 
+	hostTarget, clusterTarget, nodeTarget := determineContext(t)
+	if clusterTarget != nil {
+		if err := validateClusterSizing(c, clusterTarget.cluster); err != nil {
+			return false, AddResults{}, err
+		}
+	}
+
 	// Inits implicit parameters
 	setImplicitParameters(t, v)
 
@@ -242,8 +253,6 @@ func (i *bashInstaller) Add(c *Component, t Target, v Variables) (bool, AddResul
 				no key 'component.install.bash.add' found`
 		return false, AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
 	}
-
-	hostTarget, clusterTarget, nodeTarget := determineContext(t)
 
 	if hostTarget != nil {
 		if specs.IsSet("component.target.host") {
@@ -468,7 +477,6 @@ func (i *bashInstaller) Remove(c *Component, t Target, v Variables) (bool, Remov
 	}
 
 	hostTarget, clusterTarget, nodeTarget := determineContext(t)
-
 	if hostTarget != nil {
 		if specs.IsSet("component.target.host") {
 			target := strings.ToLower(specs.GetString("component.target.host"))
