@@ -56,6 +56,6 @@ func TestCmds(t *testing.T) {
 	assert.Equal(t, 800.0000, fMin)
 }
 
-func TestMain(t *testing.T) {
+func TestMain(m *testing.M) {
 	Run()
 }

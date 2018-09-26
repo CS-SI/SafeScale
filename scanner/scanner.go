@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
 	"io/ioutil"
 	"math"
 	"os"
@@ -26,8 +27,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/CS-SI/SafeScale/providers/api/IPVersion"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -297,7 +296,9 @@ func scanService(tenant string, service *providers.Service, c chan error) {
 func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	channels := []chan error{}
-	for tenantname := range providers.Tenants() {
+	// TODO Fix check error
+	the_providers, _ := providers.Tenants()
+	for tenantname := range the_providers {
 		service, err := providers.GetService(tenantname)
 		if err != nil {
 			fmt.Printf("Unable to get service for tenant '%s': %s", tenantname, err.Error())
