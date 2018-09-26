@@ -21,7 +21,8 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-	filters "github.com/CS-SI/SafeScale/providers/api/filters/templates"
+	filters "github.com/CS-SI/SafeScale/providers/filters/templates"
+
 	"github.com/CS-SI/SafeScale/system"
 )
 

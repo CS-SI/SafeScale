@@ -22,9 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
-
 	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 
 	"github.com/CS-SI/SafeScale/system"
 

@@ -23,9 +23,11 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/metadata"
+
 	"github.com/CS-SI/SafeScale/system/nfs"
+
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	mapset "github.com/deckarep/golang-set"

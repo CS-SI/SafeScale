@@ -21,13 +21,12 @@ import (
 	"io"
 	"time"
 
-	// "github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/providers/enums/HostExtension"
+	"github.com/CS-SI/SafeScale/providers/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
 
-	"github.com/CS-SI/SafeScale/providers/api/enums/HostAdditionalInfo"
-	"github.com/CS-SI/SafeScale/providers/api/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/system"
 )
 
@@ -88,8 +87,8 @@ type SizingRequirements struct {
 	MinDiskSize int     `json:"min_disk_size,omitempty"`
 }
 
-// HostAdditionalInfoType ...
-type HostAdditionalInfoType map[HostAdditionalInfo.Enum]interface{}
+// HostExtensionType ...
+type HostExtensionType map[HostExtension.Enum]interface{}
 
 // Host represents a virtual machine properties
 type Host struct {
@@ -105,7 +104,7 @@ type Host struct {
 	GatewayID    string         `json:"gateway_id,omitempty"`
 	// This field can contain any kind of supplemental information that will be stored as-is
 	// functions using
-	AdditionalInfo HostAdditionalInfoType `json:"additional_info,omitempty"`
+	Extension HostExtensionType `json:"additional_info,omitempty"`
 }
 
 // GetAccessIP computes access IP of the host

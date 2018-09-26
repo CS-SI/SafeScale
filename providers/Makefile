@@ -1,37 +1,40 @@
 GO?=go
 DIRECTORIES_ = $(sort $(dir $(wildcard */)))
-DIRECTORIES = $(filter-out tests/ metadata/, $(DIRECTORIES_))
+DIRECTORIES = $(filter-out api/ tests/ metadata/ filters/, $(DIRECTORIES_))
 
-.PHONY:	api aws cloudwatt flexibleengine openstack opentelekom ovh userdata clean
+.PHONY:	enums filters cloudwatt flexibleengine openstack opentelekom ovh userdata clean #aws
 
-all:	api aws cloudwatt flexibleengine openstack opentelekom ovh userdata
+all:	enums filters cloudwatt flexibleengine openstack opentelekom ovh userdata #aws
 
 vet:
 	@$(GO) vet
 	@$(GO) vet ./tests
 
-api:
+enums:
+	@(cd $@ && $(MAKE))
+
+filters:
 	@(cd $@ && $(MAKE))
 
 userdata:
 	@(cd $@ && $(MAKE))
 
-aws:	api userdata
+aws:	api enums filters userdata
 	@(cd $@ && $(MAKE))
 
-cloudwatt:	api userdata openstack
+cloudwatt:	api enums filters userdata openstack
 	@(cd $@ && $(MAKE))
 
-flexibleengine:	api userdata openstack
+flexibleengine:	api enums filters userdata openstack
 	@(cd $@ && $(MAKE))
 
-opentelekom:	api userdata flexibleengine
+opentelekom:	api enums filters userdata flexibleengine
 	@(cd $@ && $(MAKE))
 
-openstack:	api userdata
+openstack:	api enums filters userdata
 	@(cd $@ && $(MAKE))
 
-ovh:	api userdata openstack
+ovh:	api enums filters userdata openstack
 	@(cd $@ && $(MAKE))
 
 clean:

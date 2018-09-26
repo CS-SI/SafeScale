@@ -21,9 +21,10 @@ import (
 	"log"
 
 	"github.com/CS-SI/SafeScale/broker/utils"
+
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 )
 

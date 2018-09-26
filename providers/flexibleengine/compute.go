@@ -28,19 +28,20 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/api/enums/IPVersion"
-	filters "github.com/CS-SI/SafeScale/providers/api/filters/images"
+	"github.com/CS-SI/SafeScale/providers/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
+	filters "github.com/CS-SI/SafeScale/providers/filters/images"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
+
 	"github.com/CS-SI/SafeScale/system"
+
 	"github.com/CS-SI/SafeScale/utils/retry"
-	gc "github.com/gophercloud/gophercloud"
 
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/gophercloud/gophercloud"
+	gc "github.com/gophercloud/gophercloud"
 	nics "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
 	exbfv "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
@@ -116,7 +117,7 @@ func (opts bootdiskCreateOptsExt) ToServerCreateMap() (map[string]interface{}, e
 	}
 
 	if len(opts.BlockDevice) == 0 {
-		err := gophercloud.ErrMissingInput{}
+		err := gc.ErrMissingInput{}
 		err.Argument = "bootfromvolume.CreateOptsExt.BlockDevice"
 		return nil, err
 	}
@@ -126,7 +127,7 @@ func (opts bootdiskCreateOptsExt) ToServerCreateMap() (map[string]interface{}, e
 	blkDevices := make([]map[string]interface{}, len(opts.BlockDevice))
 
 	for i, bd := range opts.BlockDevice {
-		b, err := gophercloud.BuildRequestBody(bd, "")
+		b, err := gc.BuildRequestBody(bd, "")
 		if err != nil {
 			return nil, err
 		}
@@ -198,7 +199,7 @@ type serverCreateOpts struct {
 
 	// ServiceClient will allow calls to be made to retrieve an image or
 	// flavor ID by name.
-	ServiceClient *gophercloud.ServiceClient `json:"-"`
+	ServiceClient *gc.ServiceClient `json:"-"`
 }
 
 // ToServerCreateMap assembles a request body based on the contents of a
@@ -206,7 +207,7 @@ type serverCreateOpts struct {
 func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 	sc := opts.ServiceClient
 	opts.ServiceClient = nil
-	b, err := gophercloud.BuildRequestBody(opts, "")
+	b, err := gc.BuildRequestBody(opts, "")
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +400,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	}
 	r := servers.CreateResult{}
 	var httpResp *http.Response
-	httpResp, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
+	httpResp, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers"), b, &r.Body, &gc.RequestOpts{
 		OkCodes: []int{200, 202},
 	})
 	server, err := r.Extract()
