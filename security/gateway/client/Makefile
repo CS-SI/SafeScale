@@ -6,8 +6,7 @@ EXEC:=safe-security
 all: safe-security
 
 vet:
-	@$(GO) vet
-	#@$(GO) vet ./cmd
+	@$(GO) vet ./...
 
 safe-security:	main.go
 	@$(GO) build -o $(EXEC)

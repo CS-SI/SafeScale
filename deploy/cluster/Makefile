@@ -5,7 +5,7 @@ GO?=go
 all: api flavors tests
 
 vet:
-	@$(GO) vet
+	@$(GO) vet ./...
 
 api:
 	@(cd api && $(MAKE))

@@ -6,7 +6,7 @@ EXEC:=brokerd
 all:	brokerd
 
 vet:
-	@$(GO) vet
+	@$(GO) vet ./...
 
 brokerd: main.go ../../daemon/services/*.go ../../daemon/commands/*.go ../../utils/*.go ../../broker.pb.go
 	@$(GO) build -o $(EXEC)

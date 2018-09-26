@@ -5,14 +5,12 @@ GO?=go
 all:	generate 
 
 vet:
-	@$(GO) vet
+	@$(GO) vet ./...
 
 generate:
 	@$(GO) generate
 	
 test:
 	$(GO) test
-	
-clean:
-	@($(RM) rice-box.go)
+
 

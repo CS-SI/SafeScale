@@ -6,8 +6,7 @@ EXEC:=safe-securityd
 all: safe-securityd
 
 vet:
-	@$(GO) vet
-	#@$(GO) vet ./cmd
+	@$(GO) vet ./...
 
 safe-securityd:	proxy.go
 	@$(GO) build -o $(EXEC)

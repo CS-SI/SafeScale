@@ -5,8 +5,7 @@ GO?=go
 all:    generate
 
 vet:
-	@$(GO) vet
-	@$(GO) vet ./Verdict
+	@$(GO) vet ./...
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 

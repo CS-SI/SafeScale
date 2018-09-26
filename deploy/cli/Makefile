@@ -6,8 +6,7 @@ EXEC:=deploy
 all:    $(EXEC)
 
 vet:
-	@$(GO) vet
-	@$(GO) vet ./cmds
+	@$(GO) vet ./...
 
 $(EXEC): main.go cmds/*.go
 	@$(GO) build -o $(EXEC)

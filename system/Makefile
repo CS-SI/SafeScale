@@ -8,7 +8,7 @@ build: *.go scripts/*
 	@$(GO) generate
 
 vet:
-	@$(GO) vet
+	@$(GO) vet ./...
 
 nfs:
 	@(cd nfs && $(MAKE))
@@ -16,4 +16,3 @@ nfs:
 clean:
 	@(cd nfs && $(MAKE) $@)
 	@$(RM) rice-box.go
-

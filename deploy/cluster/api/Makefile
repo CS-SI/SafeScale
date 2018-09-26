@@ -8,8 +8,7 @@ all: generate
 SUBDIRS := $(sort $(dir $(wildcard */)))
 
 vet:
-	@$(GO) vet
-	@(for d in $(SUBDIRS); do (cd $$d; $(GO) vet ); done)
+	@$(GO) vet ./...
 
 generate:
 	@(for d in $(SUBDIRS); do (cd $$d; $(GO) generate); done)

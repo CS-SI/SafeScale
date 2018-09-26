@@ -6,8 +6,7 @@ EXEC:=brokerd
 all:	brokerd 
 
 vet:
-	@$(GO) vet
-	@$(GO) vet ./commands
+	@$(GO) vet ./...
 
 brokerd: services main.go commands/*.go ../utils/*.go ../broker.pb.go 
 	@$(GO) build -o $(EXEC)

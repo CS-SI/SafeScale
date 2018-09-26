@@ -5,7 +5,7 @@ GO?=go
 all: 
 
 vet:
-	@$(GO) vet
+	@$(GO) vet ./...
 
 test:
 	@$(GO) test

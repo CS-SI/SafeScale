@@ -5,6 +5,7 @@ GO?=go
 all: dcos boh ohpc
 
 vet:
+	@$(GO) vet ./...
 
 dcos:
 	@(cd dcos && $(MAKE))

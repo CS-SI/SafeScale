@@ -5,8 +5,7 @@ GO?=go
 all:    cluster install cli #service
 
 vet:
-	@$(GO) vet
-	@$(GO) vet ./cmds
+	@$(GO) vet ./...
 
 cli:	cluster #service
 	@(cd cli && $(MAKE))

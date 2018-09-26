@@ -5,11 +5,7 @@ GO?=go
 all:
 
 vet:
-	@$(GO) vet
+	@$(GO) vet ./...
 
 test:
 	@$(GO) test
-
-clean:
-	@($(RM) rice-box.go)	
-

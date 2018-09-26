@@ -5,9 +5,7 @@ GO?=go
 all:    generate vet
 
 vet:
-	@$(GO) vet
-	@$(GO) vet ./docopt-parser
-	@$(GO) vet ./ExitCode
+	@$(GO) vet ./...
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 

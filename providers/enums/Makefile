@@ -5,7 +5,7 @@ GO?=go
 all:	generate 
 
 vet:
-	@(for d in $(DIRECTORIES); do (cd $$d; $(GO) vet); done)
+	@(go vet ./...)
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 

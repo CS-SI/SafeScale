@@ -6,8 +6,7 @@ EXEC:=broker
 all:	broker
 
 vet:
-	@$(GO) vet
-	@$(GO) vet ./cmd
+	@$(GO) vet ./...
 
 broker:	main.go cmd/*.go ../utils/*.go ../broker.pb.go
 	@$(GO) build -o $(EXEC)

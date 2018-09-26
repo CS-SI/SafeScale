@@ -6,15 +6,14 @@ GO?=go
 all:	cli
 
 vet:
-	@$(GO) vet
-	@$(GO) vet ./utils
+	@$(GO) vet ./...
 
 sdk:	broker.proto
-	@protoc -I. -I$(GOPATH)/src --go_out=plugins=grpc:. broker.proto
+	@[ ! -f ./broker.pb.go ] && protoc -I. -I$(GOPATH)/src --go_out=plugins=grpc:. broker.proto || true
 
 cli:	sdk
 	@(cd cli && $(MAKE))
 
 clean:
 	@(cd cli && $(MAKE) $@)
-	@($(RM) broker_pb2.py broker.pb.go)
+	@($(RM) broker_pb2.py)
