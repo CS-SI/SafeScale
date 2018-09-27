@@ -1,8 +1,11 @@
 GO?=go
 
-.PHONY: clean cluster install service cli vet
+.PHONY: clean generate cluster install service cli vet
 
-all:    cluster install cli #service
+all:    generate cluster install cli #service
+
+generate:
+	@$(GO) generate ./...
 
 vet:
 	@$(GO) vet ./...
