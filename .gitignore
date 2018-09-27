@@ -22,6 +22,7 @@ providers/aws/*_test.go
 *.secrets
 
 #ignore generated files
+*.pb.go
 *_pb2.py
 rice-box.go
 *_string.go
