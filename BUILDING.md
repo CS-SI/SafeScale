@@ -26,7 +26,7 @@ make
 make all
 ```
 
-These commands intitialize your workging directory and produces the folowwing binaries:
+These commands initialize your working directory and produces the following binaries:
 
  - `broker` in `SafeScale/broker/client`: CLI to deal with daemon brokerd. Available commands are described in [usage](#USAGE.md)
  - `brokerd` in `SafeScale/broker/daemon`: daemon in charge of executing requests from broker on providers
