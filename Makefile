@@ -48,9 +48,14 @@ INFO_STRING  = "[INFO]"
 ERROR_STRING = "[ERROR]"
 WARN_STRING  = "[WARNING]"
 
-all: ground getdevdeps ensure generate providers broker system deploy perform utils
+all: begin ground getdevdeps ensure generate providers broker system deploy perform utils
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
+
+begin:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
 
 ground:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing tool prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@command -v git >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) git is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v $(GO) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) go is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v protoc >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) protoc is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
@@ -135,8 +140,12 @@ test: # Run unit tests
 	@$(GO) test -short ${TESTABLE_PKG_LIST} | tee test_results.log
 
 vet:
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running vet checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running vet checks (with restrictions), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(GO) vet ${TESTABLE_PKG_LIST} | tee vet_results.log
+
+truevet:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running vet checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@$(GO) vet ${PKG_LIST} | tee vet_results.log
 
 coverage:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -155,7 +164,8 @@ help:
 	@echo '  install      - Copies all binaries to $(GOBIN)'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)TESTING TARGETS:$(NO_COLOR)\n";
-	@echo '  vet          - Runs all checks'
+	@echo '  vet          - Runs all checks (with restrictions)'
+	@echo '  truevet      - Runs all checks'
 	@echo '  test         - Runs all tests'
 	@echo '  coverage     - Collects coverage info from unit tests'
 	@echo ''
