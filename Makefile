@@ -127,8 +127,9 @@ devdeps:
 
 depclean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning vendor and redownloading deps, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@rm ./Gopkg.lock
+	@if [ -f ./Gopkg.lock ]; then rm ./Gopkg.lock; fi;
 	@rm -rf ./vendor
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading all dependencies from zero, this is gonna take a while..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(dep ensure)
 
 generate: # Run unit tests
