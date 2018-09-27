@@ -2,9 +2,12 @@ GO?=go
 
 .PHONY: vet
 
-all: 
+all: generate
+
+generate:
+	@$(GO) generate
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
 vet:
-	@(go vet ./...)
+	@($(GO) vet ./...)

@@ -7,10 +7,12 @@ ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
 
+VERSION := 0.1.0
+BUILD := `git rev-parse HEAD`
+
 GO?=go
 GOBIN?=$(GOPATH)/bin
 CP?=cp
-
 
 # Binaries generated
 EXECS=broker/cli/broker/broker broker/cli/brokerd/brokerd deploy/cli/deploy perform/perform
@@ -51,6 +53,8 @@ WARN_STRING  = "[WARNING]"
 all: begin ground getdevdeps ensure generate providers broker system deploy perform utils
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
+common: begin ground getdevdeps ensure generate
+
 begin:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
 
@@ -60,7 +64,7 @@ ground:
 	@command -v $(GO) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) go is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v protoc >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) protoc is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 
-getdevdeps:
+getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@which dep rice stringer protoc-gen-go cover > /dev/null; if [ $$? -ne 0 ]; then \
     	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(DEP); \
@@ -70,27 +74,27 @@ ensure:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking versions, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(GOBIN)/dep ensure)
 
-utils:
+utils: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd utils && $(MAKE) all)
 
-providers:
+providers: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building providers, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd providers && $(MAKE) all)
 
-system:
+system: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building system, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd system && $(MAKE) all)
 
-broker: utils system providers
+broker: common utils system providers
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service broker, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd broker && $(MAKE) all)
 
-deploy: utils system providers broker
+deploy: common utils system providers broker
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service deploy, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd deploy && $(MAKE) all)
 
-perform: utils system providers broker
+perform: common utils system providers broker
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd perform && $(MAKE) all)# List of packages
 
@@ -125,7 +129,7 @@ devdeps:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Getting dev dependencies, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(GO) get -u $(DEVDEPSLIST))
 
-depclean:
+depclean: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning vendor and redownloading deps, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@if [ -f ./Gopkg.lock ]; then rm ./Gopkg.lock; fi;
 	@rm -rf ./vendor
@@ -156,7 +160,7 @@ vet: begin
 	@$(GO) vet ${PKG_LIST} 2>&1 | tee vet_results.log
 	@if [ -s ./vet_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) vet FAILED !$(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
-coverage:
+coverage: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Not ready, coming soon ;) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 

@@ -5,12 +5,12 @@ GO?=go
 all:	generate 
 
 vet:
-	@(go vet ./...)
+	@($(GO) vet ./...)
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
 generate:
-	@(for d in $(DIRECTORIES); do (cd $$d; $(GO) generate); done)
+	$(GO) generate ./...
 
 clean:
 	@(for d in $(DIRECTORIES); do (cd $$d; $(RM) *_string.go); done)
