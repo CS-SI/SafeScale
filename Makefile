@@ -8,7 +8,7 @@ MAKEFLAGS += --no-print-directory
 endif
 
 GO?=go
-GOBIN?=~/go/bin
+GOBIN?=$(GOPATH)/bin
 CP?=cp
 
 
