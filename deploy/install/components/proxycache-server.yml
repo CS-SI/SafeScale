@@ -17,18 +17,15 @@
 ---
 component:
     name: ProxyCache Server
-    target:
+    suitableFor:
         host: yes
-        cluster:
-            master: no
-            node:
-                private: no
-                public: no
+        cluster: no
     requirements:
-        - docker
+        components:
+            - docker
     install:
         bash:
-            wall_time: 10
+            wallTime: 10
             check: |
                 docker image ls | grep proxycache &>/dev/null
 
@@ -55,6 +52,8 @@ component:
                 acl localnet src 192.168.0.0/16 # RFC1918 possible internal network
                 acl localnet src fc00::/7       # RFC 4193 local private network range
                 acl localnet src fe80::/10      # RFC 4291 link-local (directly plugged) machines
+                acl k8snet src 10.96.0.0/12
+                acl k8snet src 10.100.0.0/16
 
                 acl SSL_ports port 443
                 acl Safe_ports port 80
@@ -115,6 +114,7 @@ component:
                 maximum_object_size_in_memory 10240 KB
 
                 cache allow localnet
+                cache deny k8snet
                 EOF
 
                 cat >Dockerfile <<'EOF'

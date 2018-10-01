@@ -15,13 +15,9 @@
 ---
 component:
     name: Cassandra
-    target:
+    suitableFor:
         host: no
-        cluster:
-            master: any
-            node:
-                private: no
-                public: no
+        cluster: dcos
     install:
         dcos:
             check: |

@@ -17,109 +17,111 @@
 ---
 component:
     name: Kong
-    target:
+    suitableFor:
         host: no
-        cluster:
-            master: any
-            node:
-                private: no
-                public: no
+        cluster: dcos
     requirements:
         - marathon-lb
         - cassandra
     install:
-        options:
-            dev: |
-                {
-                    "service": {
-                        "name": "kong",
-                        "instances": 1,
-                        "cpus": 1,
-                        "mem": 512,
-                        "role": "*"
-                    },
-                    "configurations": {
-                        "log-level": "notice",
-                        "database": {
-                            "migrations": true,
-                            "use-cassandra": true
+        dcos:
+            options:
+                small: |
+                    {
+                        "service": {
+                            "name": "kong",
+                            "instances": 1,
+                            "cpus": 1,
+                            "mem": 512,
+                            "role": "*"
                         },
-                        "cassandra": {
-                            "contact-points": "node-0.cassandra.mesos",
-                            "port": 9042,
-                            "keyspace": "kong"
-                        }
-                    },
-                    "networking": {
-                        "proxy": {
-                            "external-access": true,
-                            "vip-port": 8000,
-                            "vip-port-ssl": 8443",
-                            "https-redirect": true,
-                            "service-port": 10201
+                        "configurations": {
+                            "log-level": "notice",
+                            "database": {
+                                "migrations": true,
+                                "use-cassandra": true
+                            },
+                            "cassandra": {
+                                "contact-points": "node-0.cassandra.mesos",
+                                "port": 9042,
+                                "keyspace": "kong"
+                            }
                         },
-                        "admin": {
-                            "external-access": false,
-                            "vip-port": 8001,
-                            "vip-port-ssl": 8444,
-                            "https-redirect": false,
-                            "service-port": 10202
+                        "networking": {
+                            "proxy": {
+                                "external-access": true,
+                                "vip-port": 8000,
+                                "vip-port-ssl": 8443",
+                                "https-redirect": true,
+                                "service-port": 10201
+                            },
+                            "admin": {
+                                "external-access": false,
+                                "vip-port": 8001,
+                                "vip-port-ssl": 8444,
+                                "https-redirect": false,
+                                "service-port": 10202
+                            }
                         }
                     }
-                }
 
-            normal: |
-                {
-                    "service": {
-                        "name": "kong",
-                        "instances": 1,
-                        "cpus": 1,
-                        "mem": 512,
-                        "role": "*"
-                    },
-                    "configurations": {
-                        "log-level": "notice",
-                        "database": {
-                            "migrations": true,
-                            "use-cassandra": true
+                normal: |
+                    {
+                        "service": {
+                            "name": "kong",
+                            "instances": 1,
+                            "cpus": 1,
+                            "mem": 512,
+                            "role": "*"
                         },
-                        "cassandra": {
-                            "contact-points": "node-0.cassandra.mesos, node-1.cassandra.mesos, node-2.caddansra.mesos",
-                            "port": 9042,
-                            "keyspace": "kong"
-                        }
-                    },
-                    "networking": {
-                        "proxy": {
-                            "external-access": true,
-                            "vip-port": 8000,
-                            "vip-port-ssl": 8443",
-                            "https-redirect": true,
-                            "service-port": 10201
+                        "configurations": {
+                            "log-level": "notice",
+                            "database": {
+                                "migrations": true,
+                                "use-cassandra": true
+                            },
+                            "cassandra": {
+                                "contact-points": "node-0.cassandra.mesos, node-1.cassandra.mesos, node-2.caddansra.mesos",
+                                "port": 9042,
+                                "keyspace": "kong"
+                            }
                         },
-                        "admin": {
-                            "external-access": false,
-                            "vip-port": 8001,
-                            "vip-port-ssl": 8444,
-                            "https-redirect": false,
-                            "service-port": 10202
+                        "networking": {
+                            "proxy": {
+                                "external-access": true,
+                                "vip-port": 8000,
+                                "vip-port-ssl": 8443",
+                                "https-redirect": true,
+                                "service-port": 10201
+                            },
+                            "admin": {
+                                "external-access": false,
+                                "vip-port": 8001,
+                                "vip-port-ssl": 8444,
+                                "https-redirect": false,
+                                "service-port": 10202
+                            }
                         }
                     }
-                }
-        bash:
-            estimated_execution_time: 15
+
             check: |
 
-            add: |
-                cd /var/tmp
-                git clone git@github.com:Kong/kong-dist-dcos.git && \
-                cd kong-dist-dcos && \
-                {{.dcos}} package install --yes kong {{.options}} || exit $?
-                exit 0
+            add:
+                pace: pkg
+                steps:
+                    pkg:
+                        wallTime: 15
+                        run: |
+                            cd /var/tmp
+                            git clone git@github.com:Kong/kong-dist-dcos.git && \
+                            cd kong-dist-dcos && \
+                            {{.dcos}} package install --yes kong {{.options}}
 
-            remove: |
-                cd /var/tmp/kong-dist-dcos && \
-                {{.dcos}} package remove --yes kong
+            remove:
+                pace: pkg
+                steps:
+                    pkg:
+                        {{.dcos}} package remove --yes kong
 
     service:
         start: |

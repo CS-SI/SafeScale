@@ -15,9 +15,12 @@
 ---
 component:
     name: Kubernetes
-    context:
+    suitableFor:
         host: no
         cluster: boh,k8s
+    requirements:
+        packages:
+            - docker
     install:
         bash:
             check: |

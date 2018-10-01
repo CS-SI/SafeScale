@@ -17,16 +17,12 @@
 ---
 component:
     name: ProxyCache Client
-    target:
+    suitableFor:
         host: yes
-        cluster:
-            master: yes
-            node:
-                private: yes
-                public: yes
+        cluster: no
     install:
         bash:
-            wall_time: 10
+            wallTime: 10
             check: |
                 docker image ls | grep proxycache &>/dev/null
 
