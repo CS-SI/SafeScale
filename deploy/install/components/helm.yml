@@ -17,29 +17,46 @@ component:
     name: Helm
     requirements:
         - Kubernetes
-    target:
-        host: no
-        cluster:
-            master: all
-            node:
-                private: no
-                public: no
+    suitableFor:
+        hosts: no
+        clusters: dcos
     install:
-        bash:
-            check: |
-                ls ~{{.Username}}/.local/bin/helm &>/dev/null
+        dcos:
+            check:
+                pace: bin
+                bin:
+                    targets:
+                        masters: all
+                    run: |
+                        ls ~{{.Username}}/.local/bin/helm &>/dev/null
 
-            add: |
-                cd /var/tmp
-                wget -O get_helm.sh https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get && \
-                bash ./get_helm.sh || exit $?
-                rm -f get_helm.sh
-                chmod a+rx helm && \
-                chown {{.Username}} helm && \
-                mv helm ~{{.Username}}/.local/bin
-                #sudo -u {{.Username}} -i helm init
+            add:
+                pace: bin,config
+                bin:
+                    targets:
+                        hosts: none
+                        masters: all
+                    run: |
+                        cd /var/tmp
+                        wget -O get_helm.sh https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get && \
+                        bash ./get_helm.sh || exit $?
+                        rm -f get_helm.sh
+                        chmod a+rx helm && \
+                        chown {{.Username}} helm && \
+                        mv helm ~{{.Username}}/.local/bin
+                config:
+                    targets:
+                        hosts: none
+                        masters: one
+                    run: |
+                        sudo -u {{.Username}} -i helm init
 
-            remove: |
-                rm -f ~{{.Username}}/.local/bin/helm
+            remove:
+                pace: bin
+                bin:
+                    targets:
+                        masters: all
+                    run: |
+                        rm -f ~{{.Username}}/.local/bin/helm
 
 ...

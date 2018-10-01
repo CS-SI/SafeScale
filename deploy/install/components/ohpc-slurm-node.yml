@@ -17,18 +17,12 @@
 ---
 component:
     name: OpenHPC Slurm Node
-    target:
+    suitableFor:
         host: yes
-        cluster:
-            flavors:
-                - ohpc
-            master: no
-            node:
-                private: all
-                public: all
+        cluster: ohpc
     install:
         bash:
-            wall_time: 15
+            wallTime: 15
             check: |
                 rpm -qa | grep ohpc-slurm-server &>/dev/null
 
