@@ -18,16 +18,15 @@ package cmds
 
 import (
 	"fmt"
+	"os"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster"
-	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 )
 
 var (
-	svcName        string
-	pkgManagerKind Method.Enum
+	svcName string
 
 	// Verbose tells if user asks more verbosity
 	Verbose bool
@@ -35,7 +34,7 @@ var (
 	Debug bool
 )
 
-func createNodes(clusterName string, public bool, count int, os string, cpu int32, ram float32, disk int32) error {
+func createNodes(clusterName string, public bool, count int, OS string, cpu int32, ram float32, disk int32) error {
 	instance, err := cluster.Get(clusterName)
 	if err != nil {
 		return err
@@ -55,17 +54,35 @@ func createNodes(clusterName string, public bool, count int, os string, cpu int3
 	}
 	fmt.Printf("Adding %d %s node%s to Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
 
+	dones := []chan error{}
 	for i := 0; i < count; i++ {
-		_, err = instance.AddNode(public, &pb.HostDefinition{
-			CPUNumber: cpu,
-			Disk:      disk,
-			RAM:       ram,
-			ImageID:   os,
-		})
+		d := make(chan error)
+		go func(done chan error) {
+			_, err = instance.AddNode(public, pb.HostDefinition{
+				CPUNumber: cpu,
+				Disk:      disk,
+				RAM:       ram,
+				ImageID:   OS,
+			})
+			done <- err
+		}(d)
+		dones = append(dones, d)
+	}
+	msg := ""
+	failed := false
+	for _, k := range dones {
+		err := <-k
 		if err != nil {
-			return err
+			msg += err.Error() + "\n"
+			failed = true
 		}
 	}
+	if failed {
+		fmt.Fprintf(os.Stderr, "Failed to add %d %s node%s to cluster '%s':\n", count, nodeTypeString, countS, clusterName)
+		fmt.Fprintln(os.Stderr, msg)
+		return fmt.Errorf("failed to add nodes to cluster")
+	}
+
 	fmt.Printf("Added %d %s node%s to cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
 	return nil
 }
