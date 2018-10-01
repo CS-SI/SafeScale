@@ -56,6 +56,8 @@ var ClusterCommand = &cli.Command{
 
 	Commands: []*cli.Command{
 		clusterListCommand,
+		clusterComponentCommand,
+		clusterNodeCommand,
 		clusterCreateCommand,
 		clusterInspectCommand,
 		clusterDeleteCommand,
@@ -64,8 +66,6 @@ var ClusterCommand = &cli.Command{
 		clusterDcosCommand,
 		clusterKubectlCommand,
 		clusterMarathonCommand,
-		clusterComponentCommand,
-		clusterNodeCommand,
 	},
 
 	Before: func(c *cli.Command) {
@@ -817,19 +817,32 @@ var clusterComponentAddCommand = &cli.Command{
 			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
 			os.Exit(int(ExitCode.NotFound))
 		}
+
+		values := install.Variables{}
+		anon := c.Option("--param", "<param>")
+		if anon != nil {
+			params := anon.([]string)
+			for _, k := range params {
+				res := strings.Split(k, "=")
+				if len(res[0]) > 0 {
+					values[res[0]] = strings.Join(res[1:], "=")
+				}
+			}
+		}
+
 		target := install.NewClusterTarget(clusterInstance)
-		ok, results, err := component.Add(target, install.EmptyValues)
+		results, err := component.Add(target, values)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error installing component '%s' on cluster '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
-		if ok {
+		if results.Successful() {
 			fmt.Printf("Component '%s' installed successfully on cluster '%s'\n", componentName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
 
 		fmt.Printf("Failed to install component '%s' on cluster '%s'\n", componentName, clusterName)
-		fmt.Println(results.Errors())
+		fmt.Println(results.AllErrorMessages())
 		os.Exit(int(ExitCode.Run))
 	},
 
@@ -851,18 +864,31 @@ var clusterComponentCheckCommand = &cli.Command{
 			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
 			os.Exit(int(ExitCode.NotFound))
 		}
+
+		values := install.Variables{}
+		anon := c.Option("--param", "<param>")
+		if anon != nil {
+			params := anon.([]string)
+			for _, k := range params {
+				res := strings.Split(k, "=")
+				if len(res[0]) > 0 {
+					values[res[0]] = strings.Join(res[1:], "=")
+				}
+			}
+		}
+
 		target := install.NewClusterTarget(clusterInstance)
-		found, results, err := component.Check(target, install.Variables{})
+		results, err := component.Check(target, values)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
-		if found {
+		if results.Successful() {
 			fmt.Printf("Component '%s' is installed on cluster '%s'\n", componentName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
 		fmt.Printf("Component '%s' is not installed on cluster '%s'\n", componentName, clusterName)
-		msg := results.Errors()
+		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)
 		}
@@ -887,18 +913,31 @@ var clusterComponentDeleteCommand = &cli.Command{
 			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
 			os.Exit(int(ExitCode.NotFound))
 		}
+
+		values := install.Variables{}
+		anon := c.Option("--param", "<param>")
+		if anon != nil {
+			params := anon.([]string)
+			for _, k := range params {
+				res := strings.Split(k, "=")
+				if len(res[0]) > 0 {
+					values[res[0]] = strings.Join(res[1:], "=")
+				}
+			}
+		}
+
 		target := install.NewClusterTarget(clusterInstance)
-		ok, results, err := component.Remove(target, install.Variables{})
+		results, err := component.Remove(target, values)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
-		if ok {
+		if results.Successful() {
 			fmt.Printf("Component '%s' uninstalled successfully from cluster '%s'\n", componentName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
 		fmt.Printf("Failed to uninstall component '%s' from cluster '%s':\n", componentName, clusterName)
-		msg := results.Errors()
+		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)
 		}
