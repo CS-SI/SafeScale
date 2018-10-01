@@ -148,7 +148,8 @@ func (c *Component) Applyable(t Target) bool {
 }
 
 // Check if component is installed on target
-func (c *Component) Check(t Target, v Variables) (bool, CheckResults, error) {
+// Check is ok if error is nil and Results.Successful() is true
+func (c *Component) Check(t Target, v Variables) (Results, error) {
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
@@ -160,14 +161,19 @@ func (c *Component) Check(t Target, v Variables) (bool, CheckResults, error) {
 		}
 	}
 	if installer == nil {
-		return false, CheckResults{}, fmt.Errorf("failed to find a way to check '%s'", c.DisplayName())
+		return nil, fmt.Errorf("failed to find a way to check '%s'", c.DisplayName())
 	}
-	log.Printf("Checking if component '%s' is installed on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+
+	//if debug
+	if true {
+		log.Printf("Checking if component '%s' is installed on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+	}
 	return installer.Check(c, t, v)
 }
 
 // Add installs the component on the target
-func (c *Component) Add(t Target, v Variables) (bool, AddResults, error) {
+// Installs succeeds if error == nil and Results.Successful() is true
+func (c *Component) Add(t Target, v Variables) (Results, error) {
 	methods := t.Methods()
 	var (
 		installer Installer
@@ -183,15 +189,18 @@ func (c *Component) Add(t Target, v Variables) (bool, AddResults, error) {
 		}
 	}
 	if installer == nil {
-		return false, AddResults{}, fmt.Errorf("failed to find a way to install '%s'", c.DisplayName())
+		return nil, fmt.Errorf("failed to find a way to install '%s'", c.DisplayName())
 	}
 
-	log.Printf("Installing component '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+	//if debug
+	if false {
+		log.Printf("Installing component '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+	}
 	return installer.Add(c, t, v)
 }
 
 // Remove uninstalls the component from the target
-func (c *Component) Remove(t Target, v Variables) (bool, RemoveResults, error) {
+func (c *Component) Remove(t Target, v Variables) (Results, error) {
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
@@ -203,9 +212,12 @@ func (c *Component) Remove(t Target, v Variables) (bool, RemoveResults, error) {
 		}
 	}
 	if installer == nil {
-		return false, RemoveResults{}, fmt.Errorf("failed to find a way to uninstall '%s'", c.DisplayName())
+		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", c.DisplayName())
 	}
-	log.Printf("Removing component '%s' from %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+	//if debug
+	if false {
+		log.Printf("Removing component '%s' from %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+	}
 	return installer.Remove(c, t, v)
 }
 
