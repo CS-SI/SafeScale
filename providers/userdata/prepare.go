@@ -62,9 +62,23 @@ func Prepare(
 ) ([]byte, error) {
 
 	// Generate password for user gpac
-	gpacPassword, err := utils.GeneratePassword(16)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate password: %s", err.Error())
+	var (
+		gpacPassword              string
+		err                       error
+		anon                      interface{}
+		ok                        bool
+		autoHostNetworkInterfaces bool
+		useLayer3Networking       = true
+		dnsList                   []string
+	)
+	//if debug
+	if true {
+		gpacPassword = "SafeScale"
+	} else {
+		gpacPassword, err = utils.GeneratePassword(16)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate password: %s", err.Error())
+		}
 	}
 
 	// Determine Gateway IP
@@ -77,13 +91,6 @@ func Prepare(
 		}
 	}
 
-	var (
-		anon                      interface{}
-		ok                        bool
-		autoHostNetworkInterfaces bool
-		useLayer3Networking       = true
-		dnsList                   []string
-	)
 	config, err := client.GetCfgOpts()
 	if err != nil {
 		return nil, nil
