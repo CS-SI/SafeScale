@@ -643,7 +643,7 @@ func (c *Cluster) createAndConfigureNode(public bool, req *pb.HostDefinition) (s
 		nodeType = NodeType.PrivateNode
 	}
 	if c.Core.State != ClusterState.Created && c.Core.State != ClusterState.Nominal {
-		return "", fmt.Errorf("cluster flavor DCOS needs to be at least in state 'Created' to allow node addition.")
+		return "", fmt.Errorf("cluster flavor DCOS needs to be at least in state 'Created' to allow node addition")
 	}
 
 	done := make(chan error)
@@ -747,14 +747,14 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 		return
 	}
 	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, values)
+	results, err := component.Add(target, values)
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", index, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
 		return
 	}
-	if !ok {
-		msg := results.Errors()
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
 		return
@@ -837,7 +837,7 @@ func (c *Cluster) asyncConfigureMaster(index int, host *pb.Host, done chan error
 		return
 	}
 	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, install.Variables{
+	results, err := component.Add(target, install.Variables{
 		"Username": "cladm",
 		"Password": c.Core.AdminPassword,
 	})
@@ -846,8 +846,8 @@ func (c *Cluster) asyncConfigureMaster(index int, host *pb.Host, done chan error
 		done <- err
 		return
 	}
-	if !ok {
-		msg := results.Errors()
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
 		log.Printf("[master #%d (%s)] installation script of component '%s' failed: %s\n", index, host.Name, component.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
 	}
@@ -953,14 +953,14 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
 		return
 	}
-	ok, results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{})
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
 		return
 	}
-	if !ok {
-		msg := results.Errors()
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
 		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
 		done <- fmt.Errorf("failed to intall component '%s' on host '%s': %s", component.DisplayName(), host.Name, msg)
 		return
@@ -1080,15 +1080,15 @@ func (c *Cluster) asyncPrepareGateway(done chan error) {
 		return
 	}
 	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{})
 	if err != nil {
 		msg := fmt.Sprintf("failed to install component '%s' on '%s': %s", component.DisplayName(), host.Name, err.Error())
 		log.Println(msg)
 		done <- fmt.Errorf(msg)
 		return
 	}
-	if !ok {
-		msg := fmt.Sprintf("failed to install component '%s' on '%s': %s", component.DisplayName(), host.Name, results.Errors())
+	if !results.Successful() {
+		msg := fmt.Sprintf("failed to install component '%s' on '%s': %s", component.DisplayName(), host.Name, results.AllErrorMessages())
 		log.Println(msg)
 		done <- fmt.Errorf(msg)
 		return
@@ -1368,7 +1368,7 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 }
 
 // AddNode adds one node
-func (c *Cluster) AddNode(public bool, req *pb.HostDefinition) (string, error) {
+func (c *Cluster) AddNode(public bool, req pb.HostDefinition) (string, error) {
 	hosts, err := c.AddNodes(1, public, req)
 	if err != nil {
 		return "", err
@@ -1377,9 +1377,9 @@ func (c *Cluster) AddNode(public bool, req *pb.HostDefinition) (string, error) {
 }
 
 // AddNodes adds <count> nodes
-func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]string, error) {
+func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]string, error) {
 	if c.Core.State != ClusterState.Created && c.Core.State != ClusterState.Nominal {
-		return nil, fmt.Errorf("The DCOS flavor of Cluster needs to be at least in state 'Created' to allow node addition.")
+		return nil, fmt.Errorf("the DCOS flavor of Cluster needs to be at least in state 'Created' to allow node addition")
 	}
 
 	request := c.GetConfig().NodesDef
