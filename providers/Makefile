@@ -1,8 +1,8 @@
 GO?=go
 
-.PHONY:	generate api aws cloudwatt flexibleengine openstack opentelekom ovh userdata
+.PHONY:	generate enums api aws cloudwatt flexibleengine openstack opentelekom ovh userdata
 
-all:	generate api aws cloudwatt flexibleengine openstack opentelekom ovh userdata
+all:	generate enums api aws cloudwatt flexibleengine openstack opentelekom ovh userdata
 
 generate:
 	@$(GO) generate ./...
@@ -11,6 +11,9 @@ vet:
 	@$(GO) vet ./...
 
 api:
+	@(cd $@ && $(MAKE))
+
+enums:
 	@(cd $@ && $(MAKE))
 
 userdata:
