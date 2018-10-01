@@ -84,7 +84,7 @@ bg_start DKB 10m bash -c download_kubectl_binary
 #########################
 
 echo "Waiting for DCOS Installer download..."
-bg_wait DDI {{ errcode "DcosInstallDownload" }}
+bg_wait DDI || exit {{ errcode "DcosInstallDownload" }}
 
 # Launch DCOS installation
 cd /usr/local/dcos
@@ -92,7 +92,7 @@ bash dcos_install.sh master || exit {{ errcode "DcosInstallExecution" }}
 
 # Sets the url of the dcos master
 echo "Waiting for DCOS cli download..."
-bg_wait DDB {{ errcode "DcosCliDownload" }}
+bg_wait DDB || exit {{ errcode "DcosCliDownload" }}
 cat >>~cladm/.bashrc <<-EOF
 # Makes sure dcos is configured correctly
 dcos cluster setup https://localhost &>/dev/null
@@ -104,7 +104,7 @@ chown -R cladm:cladm ~cladm
 ########################################################
 
 echo "Waiting for kubectl download..."
-bg_wait DKB {{ errcode "KubectlDownload" }}
+bg_wait DKB || exit {{ errcode "KubectlDownload" }}
 
 ### Done
 echo

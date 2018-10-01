@@ -18,8 +18,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"log"
 	"runtime"
 

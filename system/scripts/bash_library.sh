@@ -80,24 +80,61 @@ cidr2broadcast() {
 
 # bg_start <what> <duration> <command>...
 bg_start() {
-   local pid=${1}_PID
-   local log=${1}.log
-   local duration=$2
-   shift 2
-   timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
-   eval "$pid=$!"
+    local pid=${1}_PID
+    local log=${1}.log
+    local duration=$2
+    shift 2
+    timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
+    eval "$pid=$!"
 }
 
-# bg_wait <what> <error code>
+# bg_wait <what>
+# return 0 on success, !=0 on failure
 bg_wait() {
-   local pid="${1}_PID"
-   local log="${1}.log"
-   eval "wait \$$pid"
-   retcode=$?
-   cat /var/tmp/$log
-   [ $retcode -ne 0 ] && exit $2
-   rm -f /var/tmp/$log
+    local pid="${1}_PID"
+    local log="${1}.log"
+    eval "wait \$$pid"
+    retcode=$?
+    cat /var/tmp/$log
+    [ $retcode -ne 0 ] && {
+        [ $retcode -eq 124 ] && echo "timeout"
+        return $retcode
+    }
+    rm -f /var/tmp/$log
+    return 0
 }
+
+# download url timeout delay
+download() {
+    url="$1"
+    encoded=$(echo "$url" | md5sum | cut -d' ' -f1)
+    filename="$2"
+    timeout=$3
+    delay=$4
+    fn=download_$encoded
+    { code=$(</dev/stdin); } <<-EOF
+        $fn() {
+            while true; do
+                wget -q -nc -O "$filename" "$url"
+                rc=\$?
+                # if $filename exists, remove it and restart without delay
+                [ \$rc -eq 1 ] && rm -f $filename && continue
+                # break if wget succeeded or if not found (no benefit to loop on this kind of error)
+                [ \$rc -eq 0 -o \$rc -eq 8 ] && break
+                sleep $delay
+            done
+            return \$rc
+        }
+        export -f $fn
+EOF
+    eval "$code"
+    bg_start DOWN_${encoded}_LOAD $timeout bash -c $fn
+    bg_wait DOWN_${encoded}_LOAD
+    rc=$?
+    unset DOWN_${encoded}_LOAD $fn
+    return $rc
+}
+export -f download
 
 # Waits the completion of the execution of userdata
 wait_for_userdata() {

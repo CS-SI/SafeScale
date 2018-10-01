@@ -95,15 +95,14 @@ docker run -d --restart always -p {{ .BootstrapPort }}:80 -v $PWD/genconf/serve:
 
 # Awaits the proxy docker image is built
 #echo "Waiting for proxy docker image..."
-#bg_wait PROXY {{ errcode "DockerProxyBuild" }}
+#bg_wait PROXY || exit {{ errcode "DockerProxyBuild" }}
 #docker run -d --restart always -p 443:443 --hostname proxy --name proxy proxy:latest >/dev/null || exit {{ errcode "DockerProxyStart" }}
 # ... and instructs host firewall to allow access on port 443
 #iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
 #save_iptables_rules
 
 # Awaits the build of Guacamole Docker Image...
-#bg_wait GUACAMOLE {{ errcode "DockerGuacamoleBuild" }}
-
+#bg_wait GUACAMOLE || exit {{ errcode "DockerGuacamoleBuild" }}
 echo
 echo "Bootstrap successfully configured."
 exit 0
