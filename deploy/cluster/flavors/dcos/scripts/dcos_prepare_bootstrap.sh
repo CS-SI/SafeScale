@@ -107,19 +107,19 @@ bg_start DNI 10m bash -c download_nginx_image
 
 # Awaits download of DCOS configuration generator
 echo "Waiting for download_dcos_config_generator..."
-bg_wait DDCG {{ errcode "DcosConfigGeneratorDownload" }}
+bg_wait DDCG || exit {{ errcode "DcosConfigGeneratorDownload" }}
 
 # Awaits pull of docker nginx image
 echo "Waiting for docker nginx image..."
-bg_wait DNI {{ errcode "DockerNginxDownload" }}
+bg_wait DNI || exit {{ errcode "DockerNginxDownload" }}
 
 # Awaits the download of DCOS binary
 echo "Waiting for download_dcos_binary..."
-bg_wait DDB {{ errcode "DcosCliDownload" }}
+bg_wait DDB || exit {{ errcode "DcosCliDownload" }}
 
 # Awaits the download of kubectl binary
 echo "Waiting for download_kubectl_binary..."
-bg_wait DKB {{ errcode "KubectlDownload" }}
+bg_wait DKB || exit {{ errcode "KubectlDownload" }}
 
 echo
 echo "Bootstrap prepared successfully."
