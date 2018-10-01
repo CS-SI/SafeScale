@@ -17,71 +17,87 @@
 ---
 component:
     name: nVidia-Docker2
-    requirements:
-        - docker
-    target:
+    suitableFor:
         host: yes
-        cluster:
-            master: no
-            node:
-                private: all
-                public: all
+        cluster: all
+    requirements:
+        components:
+            - docker
     install:
         bash:
-            wall_time: 15
-            check: |
-                case $LINUX_KIND in
-                    debian|ubuntu)
-                        dpkg -l | grep docker-nvidia2 &>/dev/null
-                        ;;
-                    centos|rhel)
-                        rpm -qa | grep docker-nvidia2 &>/dev/null
-                        ;;
-                    *)
-                        echo "Unsupported operating system '$LINUX_KIND'"
-                        exit 1
-                        ;;
-                esac
-                exit $?
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            host: yes
+                            cluster:
+                                masters: no
+                                privateNodes: all
+                                publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    dpkg -l | grep docker-nvidia2 &>/dev/null
+                                    ;;
+                                centos|rhel)
+                                    rpm -qa | grep docker-nvidia2 &>/dev/null
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
 
-            add: |
-                lspci | grep -i nvidia &>/dev/null || {
-                    echo "No nVidia GPU detected. Aborting."
-                    exit 10
-                }
-                NVIDIA_URL=http://developer.download.nvidia.com/compute/cuda/repos
-                case $LINUX_KIND in
-                    debian|ubuntu)
-                        version=${VERSION_ID/./}
-                        wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu$version/x86_64/cuda-repo-ubuntu${version}_9.2.148-1_amd64.deb || \
-                        wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu1710/x86_64/cuda-repo-ubuntu1710_9.2.148-1_amd64.deb || exit $?
-                        dpkg -i cuda-repo.deb || exit $?
-                        rm -f cuda-repo.deb
-                        wait_for_apt && apt install -y gcc linux-headers
-                        curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
-                        distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-                        curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
-                        tee /etc/apt/sources.list.d/nvidia-docker.list
-                        wait_for_apt && apt update
-                        wait_for_apt && apt install -y cuda nvidia-docker2 || exit $?
-                        pkill -SIGHUP dockerd
-                        ;;
-                    centos|rhel)
-                        yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
-                        yum install -y gcc yum kernel-devel kernel-headers
-                        distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-                        curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.repo | \
-                        tee /etc/yum.repos.d/nvidia-docker.repo || exit $?
-                        yum cleanexpire-cache
-                        yum install -y cuda nvidia-docker2 || exit $?
-                        pkill -SIGHUP dockerd
-                        ;;
-                    *)
-                        echo "Unsupported operating system '$LINUX_KIND'"
-                        exit 1
-                        ;;
-                esac
-                exit 0
+            add:
+                pace: fromdist
+                wallTime: 15
+                steps:
+                    fromdist:
+                        targets:
+                            hosts: yes
+                            clusters:
+                                masters: no
+                                privateNodes: all
+                                publicNodes: all
+                        run: |
+                            lspci | grep -i nvidia &>/dev/null || {
+                                echo "No nVidia GPU detected. Aborting."
+                                exit 10
+                            }
+                            NVIDIA_URL=http://developer.download.nvidia.com/compute/cuda/repos
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    version=${VERSION_ID/./}
+                                    wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu$version/x86_64/cuda-repo-ubuntu${version}_9.2.148-1_amd64.deb || \
+                                    wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu1710/x86_64/cuda-repo-ubuntu1710_9.2.148-1_amd64.deb || exit $?
+                                    dpkg -i cuda-repo.deb || exit $?
+                                    rm -f cuda-repo.deb
+                                    wait_for_apt && apt install -y gcc linux-headers
+                                    curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
+                                    distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+                                    curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
+                                    tee /etc/apt/sources.list.d/nvidia-docker.list
+                                    wait_for_apt && apt update
+                                    wait_for_apt && apt install -y cuda nvidia-docker2 || exit $?
+                                    pkill -SIGHUP dockerd
+                                    ;;
+                                centos|rhel)
+                                    yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+                                    yum install -y gcc yum kernel-devel kernel-headers
+                                    distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+                                    curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.repo | \
+                                    tee /etc/yum.repos.d/nvidia-docker.repo || exit $?
+                                    yum cleanexpire-cache
+                                    yum install -y cuda nvidia-docker2 || exit $?
+                                    pkill -SIGHUP dockerd
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
+                            exit 0
 
             remove: |
                 case $LINUX_KIND in

@@ -17,89 +17,125 @@
 ---
 component:
     name: Docker
-    target:
+    suitableFor:
         host: yes
-        cluster:
-            master: all
-            node:
-                private: all
-                public: all
+        cluster: boh,dcos,ohpc
     install:
         bash:
-            wall_time: 15
-            check: |
-                case $LINUX_KIND in
-                    debian|ubuntu)
-                        dpkg -l | grep docker-ce &>/dev/null
-                        ;;
-                    centos|rhel)
-                        rpm -qa | grep docker-ce &>/dev/null
-                        ;;
-                    fedora)
-                        dnf list installed | grep docker-ce &>/dev/null
-                        ;;
-                    *)
-                        echo "Unsupported operating system '$LINUX_KIND'"
-                        exit 1
-                        ;;
-                esac
-                exit $?
+            wallTime: 15
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    dpkg -l | grep docker-ce &>/dev/null
+                                    ;;
+                                centos|rhel)
+                                    rpm -qa | grep docker-ce &>/dev/null
+                                    ;;
+                                fedora)
+                                    dnf list installed | grep docker-ce &>/dev/null
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
 
-            add: |
-                case $LINUX_KIND in
-                    debian|ubuntu)
-                        export DEBIAN_FRONTEND=noninteractive
-                        wait_for_apt && apt-get update
-                        wait_for_apt && apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common || exit $?
-                        curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -
-                        add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable"
-                        wait_for_apt && apt-get update
-                        wait_for_apt && apt-get install -qqy docker-ce jq || exit $?
-                        systemctl enable docker-ce
-                        systemctl start docker-ce
-                        ;;
-                    centos|rhel)
-                        yum install -y yum-utils device-mapper-persistent-data lvm2
-                        yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-                        yum install -y docker-ce jq
-                        systemctl enable docker
-                        systemctl start docker
-                        ;;
-                    fedora)
-                        dnf install -y dnf-plugins-core || exit $?
-                        dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-                        dnf install -y docker-ce jq || exit $?
-                        systemctl enable docker-ce
-                        systemctl start docker-ce
-                        ;;
-                    *)
-                        echo "Unsupported operating system '$LINUX_KIND'"
-                        exit 1
-                        ;;
-                esac
+            add:
+                pace: docker-ce,docker-compose
+                steps:
+                    docker-ce:
+                        serial: true
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    export DEBIAN_FRONTEND=noninteractive
+                                    wait_for_apt && apt-get update
+                                    wait_for_apt && apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common || exit $?
+                                    curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -
+                                    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable"
+                                    wait_for_apt && apt-get update
+                                    wait_for_apt && apt-get install -qqy docker-ce jq || exit $?
+                                    systemctl enable docker
+                                    systemctl start docker
+                                    ;;
+                                centos|rhel)
+                                    yum install -y yum-utils device-mapper-persistent-data lvm2
+                                    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+                                    yum install -y docker-ce jq
+                                    systemctl enable docker
+                                    systemctl start docker
+                                    ;;
+                                fedora)
+                                    dnf install -y dnf-plugins-core || exit $?
+                                    dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+                                    dnf install -y docker-ce jq || exit $?
+                                    systemctl enable docker
+                                    systemctl start docker
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 513
+                                    ;;
+                            esac
 
-                compose_version=$(curl -Ssl https://api.github.com/repos/docker/compose/releases/latest | jq .name -r)
-                curl -Ssl -L https://github.com/docker/compose/releases/download/$compose_version/docker-compose-$(uname -s)-$(uname -m) -o /usr/bin/docker-compose || exit $?
-                chmod +x /usr/bin/docker-compose
-                exit 0
+                    docker-compose:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            compose_version=$(curl -Ssl https://api.github.com/repos/docker/compose/releases/latest | jq .name -r)
+                            curl -Ssl -L https://github.com/docker/compose/releases/download/$compose_version/docker-compose-$(uname -s)-$(uname -m) -o /usr/bin/docker-compose || exit 513
+                            chmod +x /usr/bin/docker-compose
 
-            remove: |
-                case $LINUX_KIND in
-                    debian|ubuntu)
-                        wait_for_apt && apt-get remove -y docker-ce
-                        ;;
-                    centos|rhel)
-                        yum remove -y docker-ce
-                        ;;
-                    fedora)
-                        dnf erase -y docker-ce
-                        ;;
-                    *)
-                        echo "Unsupported operating system '$LINUX_KIND'"
-                        exit 1
-                        ;;
-                esac
-                rm -f /usr/local/bin/docker-compose
+            remove:
+                pace: docker-ce,docker-compose
+                steps:
+                    docker-ce:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    wait_for_apt && apt-get remove -y docker-ce
+                                    ;;
+                                centos|rhel)
+                                    yum remove -y docker-ce
+                                    ;;
+                                fedora)
+                                    dnf erase -y docker-ce
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
+                    docker-compose:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            rm -f /usr/local/bin/docker-compose
 
     service:
         start: |
