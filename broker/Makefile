@@ -8,8 +8,8 @@ all:	cli
 vet:
 	@$(GO) vet ./...
 
-sdk:	broker.proto
-	@[ ! -f ./broker.pb.go ] && protoc -I. -I$(GOPATH)/src --go_out=plugins=grpc:. broker.proto || true
+sdk:
+	@protoc -I. -I$(GOPATH)/src --go_out=plugins=grpc:. broker.proto
 
 cli:	sdk
 	@(cd cli && $(MAKE))

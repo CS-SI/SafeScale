@@ -14,6 +14,11 @@ GO?=go
 GOBIN?=$(GOPATH)/bin
 CP?=cp
 
+# Handling multiple gopath: use ~/go by default
+ifeq ($(findstring :,$(GOBIN)),:)
+    GOBIN=~/go/bin
+endif
+
 # Binaries generated
 EXECS=broker/cli/broker/broker broker/cli/brokerd/brokerd deploy/cli/deploy perform/perform
 
@@ -72,7 +77,8 @@ getdevdeps: begin
 
 ensure:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking versions, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(GOBIN)/dep ensure)
+	@if [ ! -d ./vendor ]; then printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading all dependencies from zero, this is gonna take a while..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; else printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating vendor dir..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi;
+	@(dep ensure)
 
 utils: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
