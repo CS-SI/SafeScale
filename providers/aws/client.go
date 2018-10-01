@@ -30,9 +30,9 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/api/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	rice "github.com/GeertJohan/go.rice"
 

@@ -364,7 +364,7 @@ func (srv *Service) SearchImage(osname string) (*api.Image, error) {
 	//fmt.Println(fields, len(fields))
 	//fmt.Println(len(fields))
 	if maxscore < 0.5 || maxi < 0 || len(imgs) == 0 {
-		return nil, fmt.Errorf("Unable to found and image matching %s", osname)
+		return nil, fmt.Errorf("Unable to find an image matching %s", osname)
 	}
 	return &imgs[maxi], nil
 }
