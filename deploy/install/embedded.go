@@ -155,6 +155,19 @@ func helmComponent() *Component {
 	}
 }
 
+// sparkComponent ...
+func sparkComponent() *Component {
+	specs, err := loadSpecFile("spark")
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Component{
+		displayName: specs.GetString("component.name"),
+		fileName:    "spark",
+		specs:       specs,
+	}
+}
+
 // reverseProxyComponent ...
 func reverseProxyComponent() *Component {
 	specs, err := loadSpecFile("reverseproxy")
@@ -310,6 +323,7 @@ func init() {
 		apacheIgniteComponent(),
 		//		elasticSearchComponent(),
 		helmComponent(),
+		sparkComponent(),
 	}
 
 	for _, item := range allEmbedded {

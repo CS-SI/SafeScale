@@ -5,11 +5,56 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
 )
+
+type stepResult struct {
+	success bool
+	err     error
+}
+
+func (sr stepResult) Successful() bool {
+	return sr.success
+}
+
+func (sr stepResult) Error() error {
+	return sr.err
+}
+
+func (sr stepResult) ErrorMessage() string {
+	if sr.err != nil {
+		return sr.err.Error()
+	}
+	return ""
+}
+
+// stepResults contains the errors of the step for each host target
+type stepResults map[string]stepResult
+
+func (s stepResults) ErrorMessages() string {
+	output := ""
+	for _, k := range s {
+		val := k.ErrorMessage()
+		if val != "" {
+			output += val + "\n"
+		}
+	}
+	return output
+}
+
+func (s stepResults) Successful() bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, k := range s {
+		if !k.Successful() {
+			return false
+		}
+	}
+	return true
+}
 
 type stepTargets map[string]string
 
@@ -109,7 +154,7 @@ type step struct {
 // Run executes the step on all the concerned hosts
 func (is *step) Run(v Variables) (stepErrors, error) {
 	// Determine list of hosts concerned by the step
-	hostsList, err := is.identifyHosts(is.Worker, is.Targets)
+	hostsList, err := identifyHosts(is.Worker, is.Targets)
 	if err != nil {
 		return nil, err
 	}
@@ -159,60 +204,4 @@ func (is *step) Run(v Variables) (stepErrors, error) {
 		results[host.Name] = err
 	}
 	return results, nil
-}
-
-// IdentifyHosts identifies hosts concerned by the step
-func (is *step) identifyHosts(w *worker, targets stepTargets) ([]*pb.Host, error) {
-	//specs := is.Worker.component.Specs()
-
-	masterT, privnodeT, pubnodeT, err := targets.parse()
-	if err != nil {
-		return nil, err
-	}
-
-	hostsList := []*pb.Host{}
-	switch masterT {
-	case "1":
-		host, err := is.Worker.AvailableMaster()
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, host)
-	case "*":
-		all, err := is.Worker.AllMasters()
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, all...)
-	}
-	switch privnodeT {
-	case "1":
-		host, err := is.Worker.AvailableNode(false)
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, host)
-	case "*":
-		hosts, err := is.Worker.AllNodes(false)
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, hosts...)
-	}
-	switch pubnodeT {
-	case "1":
-		host, err := is.Worker.AvailableNode(true)
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, host)
-	case "*":
-		hosts, err := is.Worker.AllNodes(true)
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, hosts...)
-	}
-
-	return hostsList, nil
 }

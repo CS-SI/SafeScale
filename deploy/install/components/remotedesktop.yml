@@ -60,13 +60,14 @@ component:
                             hosts: yes
                         wallTime: 15
                         run: |
-                            wget -O tigervnc.tar.gz https://bintray.com/tigervnc/stable/download_file?file_path=tigervnc-1.9.0.x86_64.tar.gz && \
-                            tar --strip-components=1 -zxvf tigervnc.tar.gz -C / || exit $?
+                            url=https://bintray.com/tigervnc/stable/download_file?file_path=tigervnc-1.9.0.x86_64.tar.gz
+                            download $url tigervnc.tgz 10m 5 && \
+                            tar --strip-components=1 -zxvf tigervnc.tgz -C / || exit 513
                             rm -rf tigervnc.tar.gz
 
                             if [ ! -d ~{{.Username}} ]; then
                                 echo "Homedir of user {{.Username}} not found"
-                                exit 100
+                                exit 514
                             fi
 
                             # Configurations
@@ -231,13 +232,13 @@ component:
                             EOF
                             cat /var/tmp/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
                             rm -f /var/tmp/xfce_conf.encoded
-                            chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit $?
+                            chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 515
 
                             systemctl daemon-reload && \
                             systemctl enable vncserver@:0.service && \
                             systemctl enable vncconfig@:0.service && \
                             systemctl restart vncserver@:0.service && \
-                            systemctl restart vncconfig@:0.service || exit $?
+                            systemctl restart vncconfig@:0.service || exit 516
 
                     guacamole:
                         targets:
