@@ -36,6 +36,7 @@ PROTOBUF := github.com/golang/protobuf/protoc-gen-go
 
 # Build tools
 COVER := golang.org/x/tools/cmd/cover
+LINTER := golang.org/x/lint/golint
 DEP := github.com/golang/dep/cmd/dep
 
 DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(COVER)
@@ -71,8 +72,8 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice stringer protoc-gen-go cover > /dev/null; if [ $$? -ne 0 ]; then \
-    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(DEP); \
+	@which dep rice stringer protoc-gen-go golint cover > /dev/null; if [ $$? -ne 0 ]; then \
+    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(DEP); \
     fi
 
 ensure:
@@ -166,6 +167,9 @@ vet: begin
 	@$(GO) vet ${PKG_LIST} 2>&1 | tee vet_results.log
 	@if [ -s ./vet_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) vet FAILED !$(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
+lint: begin
+	@$(GO) list ./... | grep -v /vendor/ | xargs -L1 golint
+
 coverage: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Not ready, coming soon ;) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -183,6 +187,7 @@ help:
 	@echo '  install      - Copies all binaries to $(GOBIN)'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)TESTING TARGETS:$(NO_COLOR)\n";
+	@echo '  lint         - Runs linter'
 	@echo '  vet          - Runs all checks'
 	@echo '  vet-light    - Runs all checks (with restrictions)'
 	@echo '  test         - Runs all tests'
