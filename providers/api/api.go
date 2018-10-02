@@ -324,7 +324,7 @@ func (r Range) String() string {
 	return ""
 }
 
-//go:generate mockgen -destination=../mocks/mock_service.go -package=mocks github.com/CS-SI/SafeScale/providers/api ClientAPI
+//go:generate mockgen -destination=../mocks/mock_clientapi.go -package=mocks github.com/CS-SI/SafeScale/providers/api ClientAPI
 
 // ClientAPI is an API defining an IaaS driver
 type ClientAPI interface {
