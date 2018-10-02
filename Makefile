@@ -126,8 +126,8 @@ deploy/cli/deploy: deploy
 perform/perform: perform
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
-install: $(EXECS)
-	@($(CP) -f $^ $(GOBIN))
+install:
+	@($(CP) -f $(EXECS) $(GOBIN))
 
 docs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
