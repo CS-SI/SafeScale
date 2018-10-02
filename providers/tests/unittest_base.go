@@ -18,10 +18,7 @@ package tests
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"os"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/providers/enums/HostState"
@@ -48,25 +45,9 @@ type ClientTester struct {
 	Service providers.Service
 }
 
-func getTester() (*ClientTester, error) {
-	tenant_name := os.Getenv("TENANT_NAME_TEST")
-	if tenant_name == "" {
-		return nil, errors.New("You must provide a tenant name in the environment variable TENANT_NAME_TEST")
-	}
-
-	the_service, err := providers.GetService(tenant_name)
-	if err != nil {
-		return nil, errors.New("You must provide a VALID tenant name in the environment variable TENANT_NAME_TEST, check your environment variables and your Safescale configuration files")
-	}
-	return &ClientTester{
-		Service: *the_service,
-	}, nil
-}
-
 //ListImages test
-func TestListImages(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) ListImages(t *testing.T) {
+
 	images, err := tester.Service.ListImages(false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, images)
@@ -87,9 +68,7 @@ func TestListImages(t *testing.T) {
 }
 
 //ListHostTemplates test
-func TestListHostTemplates(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) ListHostTemplates(t *testing.T) {
 	tpls, err := tester.Service.ListTemplates(false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
@@ -104,9 +83,7 @@ func TestListHostTemplates(t *testing.T) {
 }
 
 //CreateKeyPair test
-func TestCreateKeyPair(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) CreateKeyPair(t *testing.T) {
 	kp, err := tester.Service.CreateKeyPair("kp")
 	assert.Nil(t, err)
 	defer tester.Service.DeleteKeyPair(kp.ID)
@@ -118,9 +95,7 @@ func TestCreateKeyPair(t *testing.T) {
 }
 
 //GetKeyPair test
-func TestGetKeyPair(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) GetKeyPair(t *testing.T) {
 	kp, err := tester.Service.CreateKeyPair("kp")
 	assert.Nil(t, err)
 	defer tester.Service.DeleteKeyPair("kp")
@@ -135,9 +110,7 @@ func TestGetKeyPair(t *testing.T) {
 }
 
 //ListKeyPairs test
-func TestListKeyPairs(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) ListKeyPairs(t *testing.T) {
 	lst, err := tester.Service.ListKeyPairs()
 	assert.Nil(t, err)
 	nbKP := len(lst)
@@ -167,9 +140,8 @@ func TestListKeyPairs(t *testing.T) {
 }
 
 //CreateNetwork creates a test network
-func CreateNetwork(t *testing.T, name string, withGW bool) (*api.Network, *api.KeyPair) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool) (*api.Network, *api.KeyPair) {
+
 	network, err := tester.Service.CreateNetwork(api.NetworkRequest{
 		Name:      name,
 		IPVersion: IPVersion.IPv4,
@@ -204,9 +176,7 @@ func CreateNetwork(t *testing.T, name string, withGW bool) (*api.Network, *api.K
 }
 
 // CreateHost creates a test host
-func CreateHost(t *testing.T, name string, networkID string, public bool) (*api.Host, error) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) CreateHost(t *testing.T, name string, networkID string, public bool) (*api.Host, error) {
 	tpls, err := tester.Service.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  4,
@@ -226,9 +196,7 @@ func CreateHost(t *testing.T, name string, networkID string, public bool) (*api.
 }
 
 //CreateGW creates a test GW
-func CreateGW(t *testing.T, networkID string) error {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
 	tpls, err := tester.Service.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  4,
@@ -247,9 +215,7 @@ func CreateGW(t *testing.T, networkID string) error {
 }
 
 //Networks test
-func TestNetworks(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) Networks(t *testing.T) {
 	// Get inital number of networks
 	nets, err := tester.Service.ListNetworks(true)
 	assert.Nil(t, err)
@@ -259,7 +225,7 @@ func TestNetworks(t *testing.T) {
 	// nbMonitoredNetworks := len(nets)
 
 	fmt.Println("Creating test_network1")
-	network1, kp1 := CreateNetwork(t, "test_network_1", true)
+	network1, kp1 := tester.CreateNetwork(t, "test_network_1", true)
 	fmt.Println("test_network1 created")
 	defer tester.Service.DeleteKeyPair(kp1.ID)
 	defer tester.Service.DeleteNetwork(network1.ID)
@@ -284,7 +250,7 @@ func TestNetworks(t *testing.T) {
 	assert.Equal(t, api.DefaultUser, content)
 
 	fmt.Println("Creating test_network2")
-	network2, kp2 := CreateNetwork(t, "test_network_2", false)
+	network2, kp2 := tester.CreateNetwork(t, "test_network_2", false)
 	fmt.Println("test_network2 created ")
 
 	defer tester.Service.DeleteKeyPair(kp2.ID)
@@ -315,20 +281,18 @@ func TestNetworks(t *testing.T) {
 }
 
 //Hosts test
-func TestHosts(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) Hosts(t *testing.T) {
 	// Get initial number of hosts
 	hosts, err := tester.Service.ListHosts(false)
 	assert.NoError(t, err)
 	nbHosts := len(hosts)
 
 	// TODO: handle kp delete
-	network, kp := CreateNetwork(t, "test_network", false)
+	network, kp := tester.CreateNetwork(t, "test_network", false)
 	defer tester.Service.DeleteNetwork(network.ID)
 	defer tester.Service.DeleteKeyPair(kp.ID)
 
-	host, err := CreateHost(t, "host1", network.ID, true)
+	host, err := tester.CreateHost(t, "host1", network.ID, true)
 	defer tester.Service.DeleteHost(host.ID)
 
 	assert.NoError(t, err)
@@ -356,11 +320,11 @@ func TestHosts(t *testing.T) {
 	_, _, _, err = cmd.Run()
 	assert.Nil(t, err)
 
-	_, err = CreateHost(t, "host2", network.ID, false)
+	_, err = tester.CreateHost(t, "host2", network.ID, false)
 	assert.Error(t, err)
-	err = CreateGW(t, network.ID)
+	err = tester.CreateGW(t, network.ID)
 	assert.NoError(t, err)
-	host2, err := CreateHost(t, "host2", network.ID, false)
+	host2, err := tester.CreateHost(t, "host2", network.ID, false)
 	defer tester.Service.DeleteHost(host2.ID)
 	assert.NoError(t, err)
 
@@ -416,11 +380,9 @@ func TestHosts(t *testing.T) {
 }
 
 //StartStopHost test
-func TestStartStopHost(t *testing.T) {
+func (tester *ClientTester) StartStopHost(t *testing.T) {
 	// TODO: handle kp delete
-	tester, err := getTester()
-	require.Nil(t, err)
-	net, kp := CreateNetwork(t, "test_network", true)
+	net, kp := tester.CreateNetwork(t, "test_network", true)
 	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
 	host, err := tester.Service.GetHostByName("gw_" + net.Name)
@@ -449,9 +411,7 @@ func TestStartStopHost(t *testing.T) {
 }
 
 //Volume test
-func TestVolume(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) Volume(t *testing.T) {
 	// Get initial number of volumes
 	lst, err := tester.Service.ListVolumes(true)
 	nbVolumes := len(lst)
@@ -496,11 +456,9 @@ func TestVolume(t *testing.T) {
 }
 
 //VolumeAttachment test
-func Test_VolumeAttachment(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
+func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	// TODO: handle kp delete
-	net, kp := CreateNetwork(t, "test_network", true)
+	net, kp := tester.CreateNetwork(t, "test_network", true)
 	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
 	host, err := tester.Service.GetHostByName("gw_" + net.Name)
@@ -570,10 +528,8 @@ func Test_VolumeAttachment(t *testing.T) {
 }
 
 //Containers test
-func TestContainers(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
-	err = tester.Service.CreateContainer("testC")
+func (tester *ClientTester) Containers(t *testing.T) {
+	err := tester.Service.CreateContainer("testC")
 	assert.Nil(t, err)
 	err = tester.Service.CreateContainer("testC2")
 	assert.Nil(t, err)
@@ -589,10 +545,8 @@ func TestContainers(t *testing.T) {
 }
 
 //Objects test
-func TestObjects(t *testing.T) {
-	tester, err := getTester()
-	require.Nil(t, err)
-	err = tester.Service.CreateContainer("testC")
+func (tester *ClientTester) Objects(t *testing.T) {
+	err := tester.Service.CreateContainer("testC")
 	assert.Nil(t, err)
 	err = tester.Service.PutObject("testC", api.Object{
 		Content:  strings.NewReader("123456789"),
