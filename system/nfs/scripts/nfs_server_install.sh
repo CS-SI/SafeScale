@@ -28,7 +28,7 @@ case $LINUX_KIND in
         touch /var/log/lastlog
         chgrp utmp /var/log/lastlog
         chmod 664 /var/log/lastlog
-        wait_for_apt && apt-get update && wait_for_apt && apt-get install -qqy nfs-common nfs-kernel-server
+        sfWaitForApt && apt-get update && sfWaitForApt && apt-get install -qqy nfs-common nfs-kernel-server
         ;;
 
     rhel|centos)

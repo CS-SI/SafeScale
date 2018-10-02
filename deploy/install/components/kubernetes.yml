@@ -111,8 +111,8 @@ component:
                                 done
                             }
                             export -f wait_deploy_complete
-                            bg_start WDC 10 bash -c wait_deploy_complete || exit 513
-                            bg_wait WDC 514
+                            sfAsyncStart WDC 10 bash -c wait_deploy_complete || exit 513
+                            sfAsyncWait WDC 514
                             {{.dcos}} kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
                             {{.kubectl}} config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
 
@@ -145,7 +145,7 @@ component:
                             ps ax | grep kubelet &>/dev/null
 
             add:
-                pace: dir,commontools,cp-tools,cp-pkg,cp1-init,cpx-init,join
+                pace: dir,commontools,cp-tools,cp-pkg,kubelet,cp1-init,cpx-init,join
                 steps:
                     dir:
                         targets:
@@ -155,14 +155,65 @@ component:
 
                     commontools:
                         targets:
-                            masters: all
+                            masters: one
                             privateNodes: all
                             publicNodes: all
                         run: |
                             cd /usr/local/bin
-                            RELEASE="$(curl -sSL https://dl.k8s.io/release/stable.txt)"
-                            curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/amd64/{kubeadm,kubelet,kubectl} || exit 513
-                            chmod +x {kubeadm,kubelet,kubectl}
+
+                            RELEASE=$(sfRetry 5m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
+                            [ $? -ne 0 ] && exit 513
+                            URL="https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/amd64"
+                            sfDownloadInDropzone "$URL/kubeadm" kubeadm 5m 5 || exit 514
+                            sfDownloadInDropzone "$URL/kubelet" kubelet 5m 5 || exit 515
+                            sfDownloadInDropzone "$URL/kubectl" kubectl 5m 5 || exit 516
+
+                    cp-tools:
+                        targets:
+                            masters: one
+                        run: |
+                            VERSION=v1.12.0
+                            URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${VERSION}/crictl-${VERSION}-linux-amd64.tar.gz"
+                            sfDownloadInDropzone "$URL" crictl.tgz 5m 5 || exit 513
+
+                            VERSION=v0.7.1
+                            URL="https://github.com/containernetworking/plugins/releases/download/${VERSION}/cni-plugins-amd64-${VERSION}.tgz"
+                            sfDownloadInDropzone "$URL" cni-plugins.tgz 5m 5 || exit 514
+
+                            for ip in {{ range .MasterIPs}}{{.}} {{ end}}; do
+                                [ "{{.HostIP}}" = "$ip" ] && continue
+                                sfDropzoneSync $ip || exit 515
+                            done
+
+                    cp-pkg:
+                        targets:
+                            masters: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfWaitForApt && sfRetry 2m 5 apt install -y ebtables socat || exit 513
+                                    ;;
+                                redhat|centos)
+                                    yum install -y ebtables socat || exit 513
+                                    ;;
+                                *)
+                                    echo "Unmanaged Linux distribution"
+                                    exit 1
+                                    ;;
+                            esac
+
+                            sfDropzoneUntar crictl.tgz /usr/local/bin && \
+                            sfDropzoneUntar cni-plugins.tgz /usr/local/bin || exit 514
+                            rm -f /var/tmp/{crictl.tgz,cni-plugins.tgz}
+
+                    kubelet:
+                        targets:
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            sfDropzonePop "kube*" /usr/local/bin || exit 513
+                            chmod +rx /usr/local/bin/*
 
                             cat >/etc/systemd/system/kubelet.service <<-'EOF'
                             [Unit]
@@ -193,59 +244,27 @@ component:
                             ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
                             EOF
 
-                            systemctl enable kubelet && systemctl start kubelet || exit 516
-
-                    cp-tools:
-                        targets:
-                            masters: all
-                        run: |
-                            cd /usr/local/bin
-
-                            CRI_VERSION=v1.12.0
-                            url=https://github.com/kubernetes-sigs/cri-tools/releases/download/$CRI_VERSION/crictl-${CRI_VERSION}-linux-amd64.tar.gz &&
-                            download $url crictl.tgz 5m 5 && tar zxvf crictl.tgz -C /usr/local/bin || exit 513
-                            rm -f crictl.tgz
-
-                            CNI_VERSION=v0.7.1
-                            url=https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz
-                            download $url cni-plugins.tgz 5m 5 && tar zxvf cni-plugins.tgz || exit 514
-                            rm -f cni-plugins.tgz
-
-                            chmod +rx *
-
-                    cp-pkg:
-                        targets:
-                            masters: all
-                        run: |
-                            case $LINUX_KIND in
-                                debian|ubuntu)
-                                    wait_for_apt && apt install -y ebtables socat
-                                    ;;
-                                redhat|centos)
-                                    yum install -y ebtables socat
-                                    ;;
-                                *)
-                                    echo "Unmanaged Linux distribution"
-                                    exit 1
-                                    ;;
-                            esac
+                            systemctl daemon-reload
+                            systemctl enable kubelet
 
                     cp1-init:
                         targets:
                             masters: one
                         run: |
                             # Gather the stable release of K8S
-                            RELEASE="$(curl -sSL https://dl.k8s.io/release/stable.txt)"
+                            RELEASE=$(sfRetry 2m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
+                            [ $? -ne 0 ] && exit 513
 
                             cd /opt/safescale/k8s/config
+
                             cat >kubeadm-bootstrap.config.yaml <<-EOF
                             apiVersion: kubeadm.k8s.io/v1alpha2
                             kind: MasterConfiguration
                             kubernetesVersion: $RELEASE
                             apiServerCertSANs:
-                                - "{{.GatewayIP}}"
+                                - "{{.HostIP}}"
                             api:
-                                controlPlaneEndpoint: "{{.GatewayIP}}:6443"
+                                controlPlaneEndpoint: "{{.HostIP}}:6443"
                             etcd:
                                 local:
                                     extraArgs:
@@ -263,14 +282,15 @@ component:
                             networking:
                                 podSubnet: "10.100.0.0/16"
                             EOF
+
                             cat >kubeadm-k8s-cpx.config.template <<-EOF
                             apiVersion: kubeadm.k8s.io/v1alpha2
                             kind: MasterConfiguration
                             kubernetesVersion: $RELEASE
                             apiServerCertSANs:
-                                - "{{.GatewayIP}}"
+                                - "{{.HostIP}}"
                             api:
-                                controlPlaneEndpoint: "{{.GatewayIP}}:6443"
+                                controlPlaneEndpoint: "{{.HostIP}}:6443"
                             etcd:
                                 local:
                                     extraArgs:
@@ -289,13 +309,14 @@ component:
                                 networking:
                                     podSubnet: "10.100.0.0/16"
                             EOF
+
                             cat >etcd-join.sh.template <<-'EOF'
                                 export KUBECONFIG=/etc/kubernetes/admin.conf
                                 kubectl exec -n kube-system etcd-##HOSTNAME## -- etcdctl --ca-file /etc/kubernetes/pki/etcd/ca.crt --cert-file /etc/kubernetes/pki/etcd/peer.crt --key-file /etc/kubernetes/pki/etcd/peer.key --endpoints=https://{{.HostIP}}:2379 member add ##HOSTNAME## https://##HOSTIP##:2380
                             EOF
 
-                            kubeadm config images pull && \
-                            kubeadm init --config kubeadm-bootstrap.config.yaml || exit $?
+                            sfRetry 5m 5 kubeadm config images pull && \
+                            kubeadm init --config kubeadm-bootstrap.config.yaml || exit 514
 
                             cp /etc/kubernetes/pki/ca.crt ../ssl
                             cp /etc/kubernetes/pki/ca.key ../ssl
@@ -305,23 +326,32 @@ component:
                             cp /etc/kubernetes/pki/front-proxy-ca.key ../ssl
                             cp /etc/kubernetes/pki/etcd/ca.crt ../ssl/etcd-ca.crt
                             cp /etc/kubernetes/pki/etcd/ca.key ../ssl/etcd-ca.key
-                            cp /etc/kubernetes/admin.conf .
+                            ( cd .. ; tar zcvf /var/tmp/files.tgz . )
+                            sfDropzonePush /var/tmp/files.tgz || exit 515
+                            rm /var/tmp/files.tgz
 
-                            for host in {{range .MasterIPs}}{{.}} {{end}}; do
-                                [ "$host" = "{{.HostIP}}"] && continue
-                                scp ../ssl/* $host:/opt/safescale/k8s/ssl || exit $?
-                                scp admin.conf $host:/opt/safescale/k8s/config || exit $?
-                                sed -e 's/##HOSTIP##/$host/g' kubeadm-k8s-cpx.config.yaml.template >/tmp/kubeadm-k8s-cpx.config.yaml
-                                scp /tmp/kubeadm-k8s-cpx.config.yaml etcd-join.sh.template $host:/opt/safescale/k8s/config || exit $?
+                            for ip in {{range .MasterIPs}}{{.}} {{end}}; do
+                                [ "$ip" = "{{.HostIP}}" ] && continue
+                                sed -e "s:{{.HostIP}}:${ip}:g" /etc/kubernetes/admin.conf >/var/tmp/admin.conf
+                                sed -e "s:##HOSTIP##:${ip}:g" kubeadm-k8s-cpx.config.yaml.template >/tmp/kubeadm-k8s-cpx.config.yaml
+                                sfDropzonePush /tmp/admin.conf && \
+                                sfDropzonePush /tmp/kubeadm-k8s-cpx.config.yaml && \
+                                sfDropzonePush etcd-join.sh.template && \
+                                sfDropzoneSync $ip || exit 516
+                                rm -f /var/tmp/admin.conf /tmp/kubeadm-k8s-cpx.config.yaml
                             done
-                            rm -f /tmp/kubeadm-k8scpx.config.yaml
+                            sfDropzoneClean
 
                     cpx-init:
                         targets:
                             masters: all
                         run: |
                             cd /opt/safescale/k8s/config
-                            [ -f kubeadm-k8s-cpx.config.yaml ] && {
+                            sfDropzonePop "*" . || :
+                            [ -f files.tgz ] && {
+                                tar zxvf files.tgz -C .. || exit 514
+                                rm files.tgz
+
                                 mkdir -p /etc/kubernetes/pki/etcd
                                 cp ../ssl/ca.crt /etc/kubernetes/pki/
                                 cp ../ssl/ca.key /etc/kubernetes/pki/
@@ -333,6 +363,7 @@ component:
                                 cp ../ssl/etcd-ca.key /etc/kubernetes/pki/etcd/ca.key
                                 cp admin.conf /etc/kubernetes/admin.conf
 
+                                sfRetry 5m 5 kubeadm config images pull && \
                                 kubeadm alpha phase certs all --config kubeadm-k8s-cpx.config.yaml && \
                                 kubeadm alpha phase kubelet config write-to-disk --config kubeadm-k8s-cpx.config.yaml && \
                                 kubeadm alpha phase kubelet write-env-file --config kubeadm-k8s-cpx.config.yaml && \
@@ -348,7 +379,10 @@ component:
                                 kubeadm alpha phase mark-master --config kubeadm-k8s-cpx.config.yaml || exit $?
                                 rm -f etcd-join.sh
                             }
-                            cp -rd ~/.kube ~{{.Username}} && \
+                            sfDropzoneClean
+
+                            mkdir -p ~{{.Username}}/.kube
+                            cp -i /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
                             chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
                             chmod -R go-rwx ~{{.Username}}/.kube
 
@@ -358,10 +392,10 @@ component:
                             publicNodes: all
                         run: |
                             MASTERIP=
-                            for m in {{- range .MasterIPs }}{{.}} {{ end -}}; do
-                                TOKEN=$(ssh $m kubeadm token create)
+                            for m in {{ range .MasterIPs }}{{.}} {{ end -}}; do
+                                TOKEN=$(sfRemoteExec $m kubeadm token create)
                                 [ $? -ne 0 ] && continue
-                                HASH=$(ssh $m openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //')
+                                HASH=$(sfRemoteExec $m openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //')
                                 MASTERIP=$m
                                 break
                             done
@@ -390,41 +424,44 @@ component:
                             privateNodes: all
                             publicNodes: all
                         run: |
+                            kubeadm reset &>/dev/null
                             rm -rf /opt/safescale/k8s
                             rm -rf /usr/local/bin/kube*
 
-    proxy:
-        rules:
-            - name: k8s-upstream
-              type: upstream
-              targets:
-                  masters: all
-              content: |
-                  {
-                      "name": "k8s-CPs",
-                      "target": "{{.HostIP}}:6443",
-                      "weigth": 100,
-                  }
+    # proxy:
+    #     rules:
+    #         - name: upstream
+    #           type: upstream
+    #           targets:
+    #               masters: all
+    #           content: |
+    #               {
+    #                   "name": "k8s-CPs",
+    #                   "target": "{{.HostIP}}:6443",
+    #                   "weigth": 100
+    #               }
 
-            - name: k8s-service
-              type: service
-              targets:
-                  masters: any
-              content: |
-                  {
-                      "name": "k8s-CP-{{.Hostname}}",
-                      "host": "k8s-CPs",
-                      "path": "/"
-                  }
+    #         - name: service
+    #           type: service
+    #           targets:
+    #               masters: one
+    #           content: |
+    #               {
+    #                   "protocol": "https",
+    #                   "name": "k8s-CPs-{{.ClusterName}}",
+    #                   "host": "k8s-CPs",
+    #                   "port": 6443
+    #               }
 
-            - name: k8s-route
-              type: route
-              targets:
-                  masters: any
-              content: |
-                  {
-                      "hosts": ["{{.CIDR}}"],
-                      "service": { "id": "k8s-service" }
-                  }
+    #         - name: route
+    #           type: route
+    #           targets:
+    #               masters: one
+    #           content: |
+    #               {
+    #                   "protocols": ["https"],
+    #                   "paths": ["/"],
+    #                   "service": { "id": "{{.service}}" }
+    #               }
 
 ...

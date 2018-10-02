@@ -63,32 +63,34 @@ component:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    wait_for_apt && apt-get update
-                                    wait_for_apt && apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common || exit $?
-                                    curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -
-                                    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable"
-                                    wait_for_apt && apt-get update
-                                    wait_for_apt && apt-get install -qqy docker-ce jq || exit $?
+                                    sfWaitForApt && apt-get update
+                                    sfWaitForApt && apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common || exit 513
+                                    curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add - || exit 514
+                                    echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
+                                    sfWaitForApt && apt-get update
+                                    sfWaitForApt && apt-get install -qqy docker-ce jq
+                                    [ $? -ne 0 ] && exit 515
+
                                     systemctl enable docker
                                     systemctl start docker
                                     ;;
                                 centos|rhel)
-                                    yum install -y yum-utils device-mapper-persistent-data lvm2
-                                    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-                                    yum install -y docker-ce jq
+                                    yum install -y yum-utils device-mapper-persistent-data lvm2 || exit 513
+                                    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || exit 514
+                                    yum install -y docker-ce jq || exit 515
                                     systemctl enable docker
                                     systemctl start docker
                                     ;;
                                 fedora)
-                                    dnf install -y dnf-plugins-core || exit $?
+                                    dnf install -y dnf-plugins-core || exit 513
                                     dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-                                    dnf install -y docker-ce jq || exit $?
+                                    dnf install -y docker-ce jq || exit 514
                                     systemctl enable docker
                                     systemctl start docker
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 513
+                                    exit 520
                                     ;;
                             esac
 
@@ -99,9 +101,11 @@ component:
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            compose_version=$(curl -Ssl https://api.github.com/repos/docker/compose/releases/latest | jq .name -r)
-                            curl -Ssl -L https://github.com/docker/compose/releases/download/$compose_version/docker-compose-$(uname -s)-$(uname -m) -o /usr/bin/docker-compose || exit 513
-                            chmod +x /usr/bin/docker-compose
+                            VERSION=$(sfRetry 2m 5 "curl -Ssl https://api.github.com/repos/docker/compose/releases/latest | jq .name -r")
+                            [ $? -ne 0 ] && exit 513
+                            URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
+                            sfDownload "$URL" docker-compose 3m 5 || exit 514
+                            chmod +x docker-compose && mv docker-compose /usr/bin
 
             remove:
                 pace: docker-ce,docker-compose
@@ -115,7 +119,7 @@ component:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    wait_for_apt && apt-get remove -y docker-ce
+                                    sfWaitForApt && apt-get remove -y docker-ce
                                     ;;
                                 centos|rhel)
                                     yum remove -y docker-ce
