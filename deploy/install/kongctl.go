@@ -46,7 +46,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 		panic("host is nil!")
 	}
 
-	// Check if reverseproxy component is installed on gateway
+	// Check if reverseproxy component is installed on host
 	rp, err := NewComponent("reverseproxy")
 	if err != nil {
 		return nil, fmt.Errorf("no 'reverseproxy' component found")
@@ -66,6 +66,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 		if setErr != nil {
 			return nil, setErr
 		}
+		present = true
 	}
 	if !present {
 		return nil, fmt.Errorf("'reverseproxy' component isn't installed on gateway")
@@ -79,12 +80,16 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 
 // Apply applies the rule to Kong proxy
 // Currently, support rule types service, route and upstream
-func (k *KongController) Apply(rule map[interface{}]interface{}, values Variables) error {
+func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variables) error {
 	ruleName := rule["name"].(string)
 	ruleType := rule["type"].(string)
 
+	content, err := k.realizeRuleData(strings.Trim(rule["content"].(string), "\n"), *values)
+	if err != nil {
+		return err
+	}
+
 	// Analyzes the rule...
-	content := strings.Trim(rule["content"].(string), "\n")
 	var url string
 	switch ruleType {
 	case "service":
@@ -131,39 +136,41 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values Variable
 		return fmt.Errorf("syntax error in rule '%s': %s isn't a valid type", ruleName, ruleType)
 	}
 
-	err := k.execute(ruleName, url, content, values)
+	err = k.post(ruleName, url, content, values)
 	if err != nil {
 		return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 	}
 	return nil
 }
 
-func (k *KongController) createUpstream(name string, v Variables) error {
-	upstreamData := map[string]string{"name": name}
-	jsoned, _ := json.Marshal(&upstreamData)
-	return k.execute(name, "upstreams/", string(jsoned), v)
-}
-
-func (k *KongController) execute(name, url, data string, values Variables) error {
-	// Now apply the rule to Kong
-	tmpl, err := template.New("rule " + name).Parse(data)
+func (k *KongController) realizeRuleData(content string, v Variables) (string, error) {
+	contentTmpl, err := template.New("proxy_rule").Parse(content)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("error preparing rule: %s", err.Error())
 	}
 	dataBuffer := bytes.NewBufferString("")
-	err = tmpl.Execute(dataBuffer, values)
+	err = contentTmpl.Execute(dataBuffer, v)
 	if err != nil {
-		return err
+		return "", err
 	}
-	finalRule := dataBuffer.String()
+	return dataBuffer.String(), nil
+}
 
-	cmd := fmt.Sprintf(curlPost, url, finalRule)
+func (k *KongController) createUpstream(name string, v *Variables) error {
+	upstreamData := map[string]string{"name": name}
+	jsoned, _ := json.Marshal(&upstreamData)
+	return k.post(name, "upstreams/", string(jsoned), v)
+}
+
+func (k *KongController) post(name, url, data string, v *Variables) error {
+	// Now apply the rule to Kong
+	cmd := fmt.Sprintf(curlPost, url, data)
 	retcode, stdout, _, err := brokerclient.New().Ssh.Run(k.host.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("execution of rule '%s' failed", name)
+		return fmt.Errorf("execution of rule '%s' failed: retcode=%d", name, retcode)
 	}
 	var response map[string]interface{}
 	err = json.Unmarshal([]byte(stdout), &response)
@@ -174,7 +181,7 @@ func (k *KongController) execute(name, url, data string, values Variables) error
 		return fmt.Errorf(msg.(string))
 	}
 	if id, ok := response["id"]; ok {
-		values[name] = id.(string)
+		(*v)[name] = id.(string)
 	}
 
 	return nil
