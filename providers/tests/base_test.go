@@ -50,9 +50,13 @@ type ClientTester struct {
 
 func getTester() (*ClientTester, error) {
 	tenant_name := os.Getenv("TENANT_NAME_TEST")
+	if tenant_name == "" {
+		return nil, errors.New("You must provide a tenant name in the environment variable TENANT_NAME_TEST")
+	}
+
 	the_service, err := providers.GetService(tenant_name)
 	if err != nil {
-		return nil, errors.New("You must provide a tenant name in the environment variable TENANT_NAME_TEST")
+		return nil, errors.New("You must provide a VALID tenant name in the environment variable TENANT_NAME_TEST, check your environment variables and your Safescale configuration files")
 	}
 	return &ClientTester{
 		Service: *the_service,
