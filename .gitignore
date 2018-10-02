@@ -15,6 +15,7 @@ debug
 .glide/
 .idea/workspace.xml
 .vscode
+.idea
 
 #remove client tests
 providers/aws/*_test.go
