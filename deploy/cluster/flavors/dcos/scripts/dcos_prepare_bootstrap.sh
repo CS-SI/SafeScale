@@ -97,29 +97,29 @@ yum install -y time wget
 [ $? -ne 0 ] && exit {{ errcode "ToolsInstall" }}
 
 # Lauch downloads in parallel
-bg_start DDCG 15m bash -c download_dcos_config_generator
-bg_start DDB 10m bash -c download_dcos_bin
-bg_start DKB 10m bash -c download_kubectl_bin
-bg_start DNI 10m bash -c download_nginx_image
+sfAsyncStart DDCG 15m bash -c download_dcos_config_generator
+sfAsyncStart DDB 10m bash -c download_dcos_bin
+sfAsyncStart DKB 10m bash -c download_kubectl_bin
+sfAsyncStart DNI 10m bash -c download_nginx_image
 
 # Install requirements for DCOS environment
 {{ .InstallCommonRequirements }}
 
 # Awaits download of DCOS configuration generator
 echo "Waiting for download_dcos_config_generator..."
-bg_wait DDCG || exit {{ errcode "DcosConfigGeneratorDownload" }}
+sfAsyncWait DDCG || exit {{ errcode "DcosConfigGeneratorDownload" }}
 
 # Awaits pull of docker nginx image
 echo "Waiting for docker nginx image..."
-bg_wait DNI || exit {{ errcode "DockerNginxDownload" }}
+sfAsyncWait DNI || exit {{ errcode "DockerNginxDownload" }}
 
 # Awaits the download of DCOS binary
 echo "Waiting for download_dcos_binary..."
-bg_wait DDB || exit {{ errcode "DcosCliDownload" }}
+sfAsyncWait DDB || exit {{ errcode "DcosCliDownload" }}
 
 # Awaits the download of kubectl binary
 echo "Waiting for download_kubectl_binary..."
-bg_wait DKB || exit {{ errcode "KubectlDownload" }}
+sfAsyncWait DKB || exit {{ errcode "KubectlDownload" }}
 
 echo
 echo "Bootstrap prepared successfully."

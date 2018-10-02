@@ -206,6 +206,8 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		target           install.Target
 		values           = install.Variables{}
 		results          install.Results
+		kpName           string
+		kp               *providerapi.KeyPair
 	)
 
 	// Generate needed password for account cladm
@@ -258,12 +260,22 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		goto cleanNetwork
 	}
 
+	// Create a KeyPair for the user cladm
+	kpName = "cluster_" + req.Name + "_cladm_key"
+	//svc.DeleteKeyPair(kpName)
+	kp, err = svc.CreateKeyPair(kpName)
+	if err != nil {
+		err = fmt.Errorf("failed to create Key Pair: %s", err.Error())
+		goto cleanNetwork
+	}
+
 	// Saving cluster parameters, with status 'Creating'
 	instance = Cluster{
 		Core: &clusterapi.ClusterCore{
 			Name:          req.Name,
 			CIDR:          req.CIDR,
 			Flavor:        Flavor.OHPC,
+			Keypair:       kp,
 			State:         ClusterState.Creating,
 			Complexity:    req.Complexity,
 			Tenant:        req.Tenant,
@@ -792,6 +804,8 @@ func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
 			"CIDR":          c.Core.CIDR,
 			"CladmPassword": c.Core.AdminPassword,
+			"SSHPublicKey":  c.Core.Keypair.PublicKey,
+			"SSHPrivateKey": c.Core.Keypair.PrivateKey,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error realizing script template: %s", err.Error())

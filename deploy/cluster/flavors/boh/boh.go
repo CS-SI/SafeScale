@@ -200,6 +200,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		rpStatus         error
 		nodesStatus      error
 		ok               bool
+		kpName           string
+		kp               *providerapi.KeyPair
+		err              error
 		// component        *install.Component
 		// target           install.Target
 		// results          install.Results
@@ -266,6 +269,15 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	}
 	gw = m.Get()
 
+	// Create a KeyPair for the user cladm
+	kpName = "cluster_" + req.Name + "_cladm_key"
+	//svc.DeleteKeyPair(kpName)
+	kp, err = svc.CreateKeyPair(kpName)
+	if err != nil {
+		err = fmt.Errorf("failed to create Key Pair: %s", err.Error())
+		goto cleanNetwork
+	}
+
 	//target = install.NewHostTarget(pbutils.ToPBHost(gw))
 	// component, err = install.NewComponent("proxycache-server")
 	// if err != nil {
@@ -286,6 +298,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			Name:          req.Name,
 			CIDR:          req.CIDR,
 			Flavor:        Flavor.BOH,
+			Keypair:       kp,
 			State:         ClusterState.Creating,
 			Complexity:    req.Complexity,
 			Tenant:        req.Tenant,
@@ -734,6 +747,8 @@ func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
 			"CIDR":          c.Core.CIDR,
 			"CladmPassword": c.Core.AdminPassword,
+			"SSHPublicKey":  c.Core.Keypair.PublicKey,
+			"SSHPrivateKey": c.Core.Keypair.PrivateKey,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
