@@ -1,11 +1,11 @@
-# Building instruction for SafeScale
+# Building instructions for SafeScale
 
 ## Prerequisites
 
-- [GO 1.10](https://golang.org/dl/)
+- Minimum go version, [GO 1.10](https://golang.org/dl/)
 - Protoc
     - Download the compiler from [github](https://github.com/google/protobuf/releases/)
-    - Follow install instruction
+    - Follow install instructions
 - make
 
 
@@ -17,7 +17,7 @@ mkdir -p ${GOPATH:-$HOME}/src/github.com/CS-SI
 
 # Clone SafeScale
 cd ${GOPATH:-$HOME}/src/github.com/CS-SI
-git clone https://github.com/CS-SI/SafeScale
+git clone https://github.com/CS-SI/SafeScale -b develop
 
 # Show help
 make
@@ -26,7 +26,7 @@ make
 make all
 ```
 
-These commands initialize your working directory and produces the following binaries:
+These commands initialize your working directory and produce the following binaries:
 
  - `broker` in `SafeScale/broker/client`: CLI to deal with daemon brokerd. Available commands are described in [usage](#USAGE.md)
  - `brokerd` in `SafeScale/broker/daemon`: daemon in charge of executing requests from broker on providers
