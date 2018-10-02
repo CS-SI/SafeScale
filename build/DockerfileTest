@@ -44,4 +44,7 @@ ENV SHELL /bin/bash
 ENV GOPATH /go
 COPY build-safescale.sh /opt/build-safescale.sh
 
-ENTRYPOINT ["/opt/build-safescale.sh"]
+WORKDIR /
+RUN /opt/build-safescale.sh
+
+ENTRYPOINT ["/bin/bash"]

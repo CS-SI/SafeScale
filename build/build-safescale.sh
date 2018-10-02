@@ -27,11 +27,7 @@ cd SafeScale
 echo "Compile"
 make all
 
-# ----------------------
-# Install
-# ----------------------
 echo "Install"
-export GOBIN=${GOBIN=$GOPATH/bin}
 make install
 
 # ----------------------
@@ -40,7 +36,8 @@ make install
 EXPDIR=/usr/local/safescale/bin
 echo "Copy produced binaries to export directory '${EXPDIR}'"
 mkdir -p ${EXPDIR}
-cp ${GOBIN}/broker ${EXPDIR}
-cp ${GOBIN}/brokerd ${EXPDIR}
-cp ${GOBIN}/deploy ${EXPDIR}
-cp ${GOBIN}/perform ${EXPDIR}
+
+cp ${GOPATH}/bin/broker ${EXPDIR}
+cp ${GOPATH}/bin/brokerd ${EXPDIR}
+cp ${GOPATH}/bin/deploy ${EXPDIR}
+cp ${GOPATH}/bin/perform ${EXPDIR}
