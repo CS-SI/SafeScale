@@ -20,6 +20,7 @@ component:
             - docker
     suitableFor:
         host: yes
+        cluster: boh,ohpc,dcos
     parameters:
         - Username
         - Password
@@ -27,11 +28,12 @@ component:
         bash:
             add:
                 #pace: desktop+tigervnc+guacamole,start
-                pace: desktop,tigervnc,guacamole,start
+                pace: desktop,tigervnc,deps,guacamole,start
                 steps:
                     desktop:
                         targets:
                             hosts: yes
+                            masters: all
                         wallTime: 15
                         run: |
                             ###########################################################
@@ -46,8 +48,8 @@ component:
                                     yum install -y -t xorg-x11-fonts-Type1 wget firefox || exit $?
                                     ;;
                                 debian|ubuntu)
-                                    wait_for_apt && apt update && \
-                                    wait_for_apt && apt install -y perl xfce4 firefox
+                                    sfWaitForApt && apt update && \
+                                    sfWaitForApt && apt install -y perl xfce4 firefox
 
                                     ;;
                                 *)
@@ -58,11 +60,12 @@ component:
                     tigervnc:
                         targets:
                             hosts: yes
+                            masters: all
                         wallTime: 15
                         run: |
-                            url=https://bintray.com/tigervnc/stable/download_file?file_path=tigervnc-1.9.0.x86_64.tar.gz
-                            download $url tigervnc.tgz 10m 5 && \
-                            tar --strip-components=1 -zxvf tigervnc.tgz -C / || exit 513
+                            URL="https://bintray.com/tigervnc/stable/download_file?file_path=tigervnc-1.9.0.x86_64.tar.gz"
+                            sfDownload "$URL" tigervnc.tgz 3m 5 || exit 513
+                            tar --strip-components=1 -zxvf tigervnc.tgz -C / || exit 514
                             rm -rf tigervnc.tar.gz
 
                             if [ ! -d ~{{.Username}} ]; then
@@ -240,16 +243,25 @@ component:
                             systemctl restart vncserver@:0.service && \
                             systemctl restart vncconfig@:0.service || exit 516
 
+                    deps:
+                        targets:
+                            hosts: yes
+                            masters: all
+                        run: |
+                            mkdir -p /var/tmp/remotedesktop.image
+                            cd /var/tmp/remotedesktop.image
+
+                            VERSION=0.9.14
+                            APACHE="http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${VERSION}"
+                            sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || exit 513
+                            sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || exit 514
+
                     guacamole:
                         targets:
                             hosts: yes
+                            masters: all
                         wallTime: 10
                         run: |
-                            ###########################################################
-                            # Prepares remotedesktop docker image, based on guacamole #
-                            ###########################################################
-
-                            mkdir -p /var/tmp/remotedesktop.image
                             cd /var/tmp/remotedesktop.image
 
                             cat >supervisord.conf <<-'EOF'
@@ -355,9 +367,6 @@ component:
                             FROM debian:sid-slim AS Builder
                             LABEL maintainer "CS SI"
 
-                            ARG GUACAMOLE_VERSION=0.9.14
-                            ARG GUACAMOLE_URL=http://apache.mirrors.ovh.net/ftp.apache.org/dist/guacamole/${GUACAMOLE_VERSION}
-
                             ENV DEBIAN_FRONTEND noninteractive
 
                             # ----------------
@@ -381,21 +390,16 @@ component:
 
                             # Guacamole server (guacd)
                             WORKDIR /usr/local/src
-                            ADD ${GUACAMOLE_URL}/source/guacamole-server-${GUACAMOLE_VERSION}.tar.gz ./guacamole-server-${GUACAMOLE_VERSION}.tar.gz
-                            RUN tar -zxvf guacamole-server-${GUACAMOLE_VERSION}.tar.gz -C . >/dev/null
-
-                            RUN cd guacamole-server-${GUACAMOLE_VERSION} \
-                            && CC=gcc-6 ./configure --prefix=/usr --with-init-dir=/etc/init.d  \
-                            && make -j3 \
-                            && make DESTDIR=/usr/local/dist install
+                            ADD guacamole.tgz /usr/local/src/
+                            RUN cd guacamole-server-* \
+                             && CC=gcc-6 ./configure --prefix=/usr --with-init-dir=/etc/init.d  \
+                             && make -j3 \
+                             && make DESTDIR=/usr/local/dist install
 
                             #------------------------- DIST phase -------------------------
 
                             FROM tomcat:8.5-jre8-slim
                             LABEL maintainer "CS SI"
-
-                            ARG GUACAMOLE_VERSION=0.9.14
-                            ARG GUACAMOLE_URL=http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${GUACAMOLE_VERSION}
 
                             ENV DEBIAN_FRONTEND noninteractive
 
@@ -403,8 +407,8 @@ component:
                             # Needed packages
                             # -----------------
                             RUN apt update -y \
-                            && apt upgrade -y \
-                            && apt install -y \
+                             && apt upgrade -y \
+                             && apt install -y \
                                     libcairo2 \
                                     libjpeg62-turbo \
                                     libossp-uuid16 \
@@ -425,7 +429,7 @@ component:
                             # Tomcat
                             WORKDIR /usr/local/tomcat
                             RUN rm -rf ./webapps/{examples,doc,ROOT}
-                            ADD ${GUACAMOLE_URL}/binary/guacamole-${GUACAMOLE_VERSION}.war ./webapps/guacamole.war
+                            ADD guacamole.war ./webapps/guacamole.war
                             ADD tomcat-users.xml ./conf/
 
                             WORKDIR /root
@@ -462,6 +466,7 @@ component:
                     start:
                         targets:
                             hosts: yes
+                            masters: all
                         run: |
                             # Guacd need sshd to authorize password authentication...
                             cat >>/etc/ssh/sshd_config <<-'EOF'
@@ -474,7 +479,7 @@ component:
                             # Allow only gateway to connect to port 9080
                             iptables -A INPUT -p tcp -s {{.GatewayIP}} --dport 9080 -j ACCEPT
                             iptables -A INPUT -p tcp ! -s {{.GatewayIP}} --dport 9080 -j REJECT
-                            save_iptables_rules
+                            sfSaveIptablesRules
 
                             ###########################################################
                             # Starts remotedesktop container                          #
@@ -520,17 +525,23 @@ component:
         rules:
             - name: guacamole
               type: service
+              targets:
+                  hosts: true
+                  masters: all
               content: |
-                {
-                    "name": "remotedesktop_{{.Hostname}}",
-                    "url": "http://{{.HostIP}}:9080/guacamole/"
-                }
+                  {
+                      "name": "remotedesktop_{{.Hostname}}",
+                      "url": "http://{{.HostIP}}:9080/guacamole/"
+                  }
 
             - name: remotedesktop
               type: route
+              targets:
+                  hosts: true
+                  masters: all
               content: |
-                {
-                    "paths": ["/remotedesktop/{{.Hostname}}"],
-                    "service": { "id": "{{.guacamole}}" }
-                }
+                  {
+                      "paths": ["/remotedesktop/{{.Hostname}}"],
+                      "service": { "id": "{{.guacamole}}" }
+                  }
 ...

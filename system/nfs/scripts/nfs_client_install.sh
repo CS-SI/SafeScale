@@ -26,7 +26,7 @@ case $LINUX_KIND in
         chgrp utmp /var/log/lastlog
         chmod 664 /var/log/lastlog
 
-        wait_for_apt && apt-get -y update && wait_for_apt && apt-get install -qqy nfs-common
+        sfWaitForApt && apt-get -y update && sfWaitForApt && apt-get install -qqy nfs-common
         ;;
 
     rhel|centos)

@@ -73,13 +73,13 @@ component:
                                     wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu1710/x86_64/cuda-repo-ubuntu1710_9.2.148-1_amd64.deb || exit $?
                                     dpkg -i cuda-repo.deb || exit $?
                                     rm -f cuda-repo.deb
-                                    wait_for_apt && apt install -y gcc linux-headers
+                                    sfWaitForApt && apt install -y gcc linux-headers
                                     curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
                                     distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
                                     curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
                                     tee /etc/apt/sources.list.d/nvidia-docker.list
-                                    wait_for_apt && apt update
-                                    wait_for_apt && apt install -y cuda nvidia-docker2 || exit $?
+                                    sfWaitForApt && apt update
+                                    sfWaitForApt && apt install -y cuda nvidia-docker2 || exit $?
                                     pkill -SIGHUP dockerd
                                     ;;
                                 centos|rhel)
@@ -102,7 +102,7 @@ component:
             remove: |
                 case $LINUX_KIND in
                     debian|ubuntu)
-                        wait_for_apt && apt remove -y nvidia-docker2
+                        sfWaitForApt && apt remove -y nvidia-docker2
                         ;;
                     centos|rhel)
                         yum remove -y nvidia-docker2
