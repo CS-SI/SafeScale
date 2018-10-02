@@ -1,6 +1,4 @@
 GO?=go
-DIRECTORIES_ = $(sort $(dir $(wildcard */)))
-DIRECTORIES = $(filter-out tests/ metadata/, $(DIRECTORIES_))
 
 .PHONY:	generate api aws cloudwatt flexibleengine openstack opentelekom ovh userdata
 
