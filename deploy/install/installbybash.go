@@ -24,15 +24,6 @@ func (i *bashInstaller) Check(c *Component, t Target, v Variables) (Results, err
 		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
 	}
 
-	// Inits implicit parameters
-	setImplicitParameters(t, v)
-
-	// Checks required parameters have value
-	err := checkParameters(c, v)
-	if err != nil {
-		return nil, err
-	}
-
 	_, clusterTarget, _ := determineContext(t)
 	if clusterTarget != nil {
 		return i.checkOnCluster(c, t, v)
