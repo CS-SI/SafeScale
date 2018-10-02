@@ -16,6 +16,8 @@
 package ovh_test
 
 import (
+	"errors"
+	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
 
@@ -28,19 +30,24 @@ import (
 
 var tester *tests.ClientTester
 
-func getClient() *tests.ClientTester {
+func getClient() (*tests.ClientTester, error) {
 	if tester == nil {
-		service, _ := providers.GetService("TestOvh")
+		service, err := providers.GetService("TestOvh")
+		if err != nil {
+			return nil, errors.New("You must provide a VALID tenant name in the environment variable TENANT_NAME_TEST, check your environment variables and your Safescale configuration files")
+		}
 		tester = &tests.ClientTester{
 			Service: *service,
 		}
 	}
-	return tester
+	return tester, nil
 
 }
 
 func Test_GetTemplate(t *testing.T) {
-	tpls, err := getClient().Service.ListTemplates(false)
+	cli, err := getClient()
+	require.Nil(t, err)
+	tpls, err := cli.Service.ListTemplates(false)
 	assert.NoError(t, err)
 	find := false
 	for _, tpl := range tpls {
@@ -55,12 +62,16 @@ func Test_GetTemplate(t *testing.T) {
 }
 
 func Test_ListImages(t *testing.T) {
-	getClient().ListImages(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.ListImages(t)
 }
 
 func Test_ListHostTemplates(t *testing.T) {
-	getClient().ListHostTemplates(t)
-	tpls, err := getClient().Service.ListTemplates(false)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.ListHostTemplates(t)
+	tpls, err := cli.Service.ListTemplates(false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
 	for _, f := range tpls {
@@ -70,41 +81,61 @@ func Test_ListHostTemplates(t *testing.T) {
 }
 
 func Test_CreateKeyPair(t *testing.T) {
-	getClient().CreateKeyPair(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.CreateKeyPair(t)
 }
 
 func Test_GetKeyPair(t *testing.T) {
-	getClient().GetKeyPair(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.GetKeyPair(t)
 }
 
 func Test_ListKeyPairs(t *testing.T) {
-	getClient().ListKeyPairs(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.ListKeyPairs(t)
 }
 
 func Test_Networks(t *testing.T) {
-	getClient().Networks(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.Networks(t)
 }
 
 func Test_Hosts(t *testing.T) {
-	getClient().Hosts(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.Hosts(t)
 }
 
 func Test_StartStopHost(t *testing.T) {
-	getClient().StartStopHost(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.StartStopHost(t)
 }
 
 func Test_Volume(t *testing.T) {
-	getClient().Volume(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.Volume(t)
 }
 
 func Test_VolumeAttachment(t *testing.T) {
-	getClient().VolumeAttachment(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.VolumeAttachment(t)
 }
 
 func Test_Containers(t *testing.T) {
-	getClient().Containers(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.Containers(t)
 }
 
 func Test_Objects(t *testing.T) {
-	getClient().Objects(t)
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.Objects(t)
 }
