@@ -35,6 +35,7 @@ PROTOC := github.com/golang/protobuf
 PROTOBUF := github.com/golang/protobuf/protoc-gen-go
 
 # Build tools
+MOCKGEN := github.com/golang/mock/gomock github.com/golang/mock/mockgen
 COVER := golang.org/x/tools/cmd/cover
 LINTER := golang.org/x/lint/golint
 DEP := github.com/golang/dep/cmd/dep
@@ -72,8 +73,8 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice stringer protoc-gen-go golint cover > /dev/null; if [ $$? -ne 0 ]; then \
-    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(DEP); \
+	@which dep rice stringer protoc-gen-go golint mockgen cover > /dev/null; if [ $$? -ne 0 ]; then \
+    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(DEP); \
     fi
 
 ensure:
@@ -168,6 +169,7 @@ vet: begin
 	@if [ -s ./vet_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) vet FAILED !$(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
 lint: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running lint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(GO) list ./... | grep -v /vendor/ | xargs -L1 golint
 
 coverage: begin

@@ -24,7 +24,7 @@
 #   go-tests = true
 #   unused-packages = true
 
-required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", "github.com/GeertJohan/go.rice/rice", "github.com/golang/protobuf/protoc-gen-go"]
+required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", "github.com/GeertJohan/go.rice/rice", "github.com/golang/protobuf/protoc-gen-go", "github.com/golang/mock/gomock", "github.com/golang/mock/mockgen", "golang.org/x/tools/cmd/cover", "golang.org/x/lint/golint"]
 
 [[override]]
   version = "=v1.7.1"
@@ -50,6 +50,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/golang/protobuf"
   version = "=v1.2.0"
 
+# TODO Fork & tag
 [[override]]
   name = "github.com/gophercloud/gophercloud"
   branch = "master"
@@ -62,14 +63,17 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/jinzhu/gorm"
   version = "1.9.1"
 
+# TODO Fork & tag
 [[override]]
   name = "github.com/mjibson/go-dsp"
   branch = "master"
 
+# TODO Fork & tag
 [[override]]
   name = "github.com/pengux/check"
   branch = "master"
 
+# TODO Fork & tag
 [[override]]
   branch = "master"
   name = "github.com/satori/go.uuid"
@@ -90,14 +94,17 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/urfave/cli"
   version = "=v1.20.0"
 
+# TODO Fork & tag
 [[constraint]]
   branch = "master"
   name = "golang.org/x/crypto"
 
+# TODO Fork & tag
 [[constraint]]
   branch = "master"
   name = "golang.org/x/net"
 
+# TODO Fork & tag
 [[constraint]]
   branch = "master"
   name = "golang.org/x/oauth2"
