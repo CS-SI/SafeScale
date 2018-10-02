@@ -168,6 +168,16 @@ func (c *Component) Check(t Target, v Variables) (Results, error) {
 	if true {
 		log.Printf("Checking if component '%s' is installed on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	}
+
+	// Inits implicit parameters
+	setImplicitParameters(t, v)
+
+	// Checks required parameters have value
+	err := checkParameters(c, v)
+	if err != nil {
+		return nil, err
+	}
+
 	return installer.Check(c, t, v)
 }
 
@@ -196,6 +206,16 @@ func (c *Component) Add(t Target, v Variables) (Results, error) {
 	if false {
 		log.Printf("Installing component '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	}
+
+	// Inits implicit parameters
+	setImplicitParameters(t, v)
+
+	// Checks required parameters have value
+	err := checkParameters(c, v)
+	if err != nil {
+		return nil, err
+	}
+
 	return installer.Add(c, t, v)
 }
 
@@ -218,6 +238,16 @@ func (c *Component) Remove(t Target, v Variables) (Results, error) {
 	if false {
 		log.Printf("Removing component '%s' from %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	}
+
+	// Inits implicit parameters
+	setImplicitParameters(t, v)
+
+	// Checks required parameters have value
+	err := checkParameters(c, v)
+	if err != nil {
+		return nil, err
+	}
+
 	return installer.Remove(c, t, v)
 }
 
