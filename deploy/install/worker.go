@@ -250,14 +250,16 @@ func (w *worker) Proceed(v Variables) (Results, error) {
 	}
 	order := strings.Split(pace, ",")
 
-	// Applies reverseproxy rules to make it functional (component may need it operational during the install)
-	err := w.setReverseProxy(v)
-	if err != nil {
-		return nil, err
+	// Applies reverseproxy rules to make it functional (component may need it during the install)
+	if w.action == Action.Add {
+		err := w.setReverseProxy(v)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// Now isolates steps and executes each of them
-	err = nil
+	// Now enumerate steps and execute each of them
+	var err error
 	for _, k := range order {
 		log.Printf("executing step '%s::%s'...\n", w.action.String(), k)
 
@@ -415,7 +417,8 @@ func (w *worker) validateContextForCluster() error {
 	if specs.IsSet(yamlKey) {
 		flavors := strings.Split(specs.GetString(yamlKey), ",")
 		for _, k := range flavors {
-			if clusterFlavor == Flavor.FromString(strings.ToLower(k)) {
+			str, err := Flavor.Parse(strings.ToLower(k))
+			if err == nil && clusterFlavor == str {
 				return nil
 			}
 		}
@@ -477,10 +480,15 @@ func (w *worker) validateClusterSizing() error {
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
 func (w *worker) setReverseProxy(v Variables) error {
+	specs := w.component.Specs()
+	rules, ok := specs.Get("component.proxy.rules").([]interface{})
+	if !ok || len(rules) <= 0 {
+		return nil
+	}
+
 	var (
-		err     error
-		gw      *pb.Host
-		targets stepTargets
+		err error
+		gw  *pb.Host
 	)
 
 	if w.cluster != nil {
@@ -498,13 +506,7 @@ func (w *worker) setReverseProxy(v Variables) error {
 
 	kc, err := NewKongController(gw)
 	if err != nil {
-		return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
-	}
-
-	specs := w.component.Specs()
-	rules, ok := specs.Get("component.proxy.rules").([]interface{})
-	if !ok || len(rules) <= 0 {
-		return nil
+		return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
 	}
 
 	// Sets the values useable in any cases
@@ -512,34 +514,37 @@ func (w *worker) setReverseProxy(v Variables) error {
 
 	// Now submits all the rules to reverse proxy
 	for _, r := range rules {
-		rule := r.(map[interface{}]interface{})
 		targets := stepTargets{}
-		anon, ok = rule["targets"].(map[string]interface{})
+		rule := r.(map[interface{}]interface{})
+		anon, ok := rule["targets"].(map[interface{}]interface{})
 		if !ok {
 			// If no 'targets' key found, applies on host only
 			if w.cluster != nil {
 				continue
 			}
-			targets["host"] = "true"
+			targets[targetHosts] = "true"
 		} else {
 			for i, j := range anon {
 				switch j.(type) {
 				case bool:
 					if j.(bool) {
-						targets[i] = "true"
+						targets[i.(string)] = "true"
 					} else {
-						targets[i] = "false"
+						targets[i.(string)] = "false"
 					}
 				case string:
-					targets[i] = j.(string)
+					targets[i.(string)] = j.(string)
 				}
 			}
 		}
-		hosts := identifyHosts(w, targets)
+		hosts, err := identifyHosts(w, targets)
+		if err != nil {
+			return fmt.Errorf("failed to apply rules: %s", err.Error())
+		}
 		for _, h := range hosts {
-			v["HostIP"] = host.PRIVATE_IP
-			v["Hostname"] = host.Name
-			err := kc.Apply(rule, v)
+			v["HostIP"] = h.PRIVATE_IP
+			v["Hostname"] = h.Name
+			err := kc.Apply(rule, &v)
 			if err != nil {
 				return fmt.Errorf("failed to apply rules: %s", err.Error())
 			}
