@@ -1153,8 +1153,6 @@ func (c *Cluster) asyncConfigureGateway(done chan error) {
 		"ClusterName":               c.Core.Name,
 		"MasterIPs":                 c.manager.MasterIPs,
 		"DNSServerIPs":              dnsServers,
-		"SSHPrivateKey":             c.Core.Keypair.PrivateKey,
-		"SSHPublicKey":              c.Core.Keypair.PublicKey,
 	}
 	box, err := getDCOSTemplateBox()
 	if err != nil {
@@ -1268,6 +1266,8 @@ func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 			"CIDR":          c.Core.CIDR,
 			"Username":      "cladm",
 			"CladmPassword": c.Core.AdminPassword,
+			"SSHPublicKey":  c.Core.Keypair.PublicKey,
+			"SSHPrivateKey": c.Core.Keypair.PrivateKey,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
