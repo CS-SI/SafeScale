@@ -49,6 +49,8 @@ type Request struct {
 	NodesDef *pb.HostDefinition
 }
 
+//go:generate mockgen -destination=../mocks/mock_cluster.go -package=mocks github.com/CS-SI/SafeScale/deploy/cluster/api Cluster
+
 // Cluster is an interface of methods associated to Cluster-like structs
 type Cluster interface {
 	// GetName returns the name of the cluster
@@ -96,6 +98,8 @@ type Cluster interface {
 	// SetExtension sets the content of additional info
 	SetExtension(Extension.Enum, interface{})
 }
+
+//go:generate mockgen -destination=../mocks/mock_extensionapi.go -package=mocks github.com/CS-SI/SafeScale/deploy/cluster/api ExtensionAPI
 
 // ExtensionAPI defines the interface to handle additional info
 type ExtensionAPI interface {

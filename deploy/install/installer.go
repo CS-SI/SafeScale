@@ -16,6 +16,8 @@
 
 package install
 
+//go:generate mockgen -destination=../mocks/mock_installer.go -package=mocks github.com/CS-SI/SafeScale/deploy/install Installer
+
 // Installer defines the API of an Installer
 type Installer interface {
 	// GetName returns the name of the Installer

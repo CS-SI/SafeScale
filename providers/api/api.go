@@ -324,6 +324,8 @@ func (r Range) String() string {
 	return ""
 }
 
+//go:generate mockgen -destination=../mocks/mock_service.go -package=mocks github.com/CS-SI/SafeScale/providers/api ClientAPI
+
 // ClientAPI is an API defining an IaaS driver
 type ClientAPI interface {
 	Build(map[string]interface{}) (ClientAPI, error)
@@ -429,6 +431,8 @@ type ClientAPI interface {
 	// GetCfgOpts returns configuration options as a Config
 	GetCfgOpts() (Config, error)
 }
+
+//go:generate mockgen -destination=../mocks/mock_config.go -package=mocks github.com/CS-SI/SafeScale/providers/api Config
 
 // Config represents key/value configuration.
 type Config interface {

@@ -20,6 +20,9 @@ import (
 	installapi "github.com/CS-SI/SafeScale/deploy/install/api"
 )
 
+// TODO Finish Mock
+// //go:generate mockgen -destination=../mocks/mock_serviceapi.go -package=mocks github.com/CS-SI/SafeScale/deploy/service/api ServiceAPI
+
 // ServiceAPI defines the API of an installable service, which is a component with state
 type ServiceAPI interface {
 	// GetName ...

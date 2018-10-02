@@ -21,6 +21,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 )
 
+//go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services TemplateAPI
+
 //TemplateAPI defines API to manipulate hosts
 type TemplateAPI interface {
 	List(all bool) ([]api.HostTemplate, error)

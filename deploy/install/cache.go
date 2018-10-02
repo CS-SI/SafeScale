@@ -4,6 +4,8 @@ import (
 	"sync"
 )
 
+//go:generate mockgen -destination=../mocks/mock_cache.go -package=mocks github.com/CS-SI/SafeScale/deploy/install Cache
+
 // Cache is an interface for caching elements
 type Cache interface {
 	SetBy(string, func() (interface{}, error)) error

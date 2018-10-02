@@ -24,6 +24,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 )
 
+//go:generate mockgen -destination=../mocks/mock_containerapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services ContainerAPI
+
 //ContainerAPI defines API to manipulate containers
 type ContainerAPI interface {
 	List() ([]string, error)

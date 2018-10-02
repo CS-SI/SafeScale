@@ -30,6 +30,8 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+//go:generate mockgen -destination=../mocks/mock_nasapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services NasAPI
+
 //NasAPI defines API to manipulate NAS
 type NasAPI interface {
 	Create(name, host, path string) (*api.Nas, error)

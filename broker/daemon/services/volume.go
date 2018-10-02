@@ -33,6 +33,8 @@ import (
 	mapset "github.com/deckarep/golang-set"
 )
 
+//go:generate mockgen -destination=../mocks/mock_volumeapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services VolumeAPI
+
 //VolumeAPI defines API to manipulate hosts
 type VolumeAPI interface {
 	Delete(ref string) error

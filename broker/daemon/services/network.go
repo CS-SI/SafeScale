@@ -28,6 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers/metadata"
 )
 
+//go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services NetworkAPI
+
 //NetworkAPI defines API to manage networks
 type NetworkAPI interface {
 	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*api.Network, error)

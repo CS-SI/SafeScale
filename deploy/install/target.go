@@ -25,8 +25,9 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 )
 
-// Target is an interface that target must satisfy to be able to install something
-// on it
+//go:generate mockgen -destination=../mocks/mock_target.go -package=mocks github.com/CS-SI/SafeScale/deploy/install Target
+
+// Target is an interface that target must satisfy to be able to install something on it
 type Target interface {
 	// Name returns the name of the target
 	Name() string

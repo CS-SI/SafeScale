@@ -27,6 +27,8 @@ import (
 	"github.com/CS-SI/SafeScale/system"
 )
 
+//go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services HostAPI
+
 //HostAPI defines API to manipulate hosts
 type HostAPI interface {
 	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.Host, error)

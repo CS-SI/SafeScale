@@ -33,6 +33,8 @@ import (
 
 const protocolSeparator = ":"
 
+//go:generate mockgen -destination=../mocks/mock_sshapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services SSHAPI
+
 // SSHAPI defines ssh management API
 type SSHAPI interface {
 	Connect(name string) error
