@@ -21,9 +21,17 @@ import (
 	"strings"
 	"time"
 
+	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
+)
+
+const (
+	targetHosts        = "hosts"
+	targetMasters      = "masters"
+	targetPublicNodes  = "publicnodes"
+	targetPrivateNodes = "privatenodes"
 )
 
 type stepResult struct {

@@ -28,7 +28,9 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 
+	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	"github.com/CS-SI/SafeScale/system"
@@ -366,30 +368,45 @@ func setImplicitParameters(t Target, v Variables) {
 			v["Username"] = "cladm"
 			v["Password"] = config.AdminPassword
 		}
-		return
-	}
-
-	var host *pb.Host
-	if nT != nil {
-		host = nT.HostTarget.host
-	}
-	if hT != nil {
-		host = hT.host
-	}
-	v["Hostname"] = host.Name
-	v["HostIP"] = host.PRIVATE_IP
-	gw := gatewayFromHost(host)
-	if gw != nil {
-		v["GatewayIP"] = gw.PRIVATE_IP
-	}
-	if _, ok := v["Username"]; !ok {
-		v["Username"] = "gpac"
+		if _, ok := v["CIDR"]; !ok {
+			svc, err := provideruse.GetProviderService()
+			if err == nil {
+				mn, err := metadata.LoadNetwork(svc, config.NetworkID)
+				if err == nil {
+					v["CIDR"] = mn.Get().CIDR
+				}
+			} else {
+				fmt.Fprintf(os.Stderr, "failed to determine network CIDR")
+			}
+		}
+	} else {
+		var host *pb.Host
+		if nT != nil {
+			host = nT.HostTarget.host
+		}
+		if hT != nil {
+			host = hT.host
+		}
+		v["Hostname"] = host.Name
+		v["HostIP"] = host.PRIVATE_IP
+		gw := gatewayFromHost(host)
+		if gw != nil {
+			v["GatewayIP"] = gw.PRIVATE_IP
+		}
+		if _, ok := v["Username"]; !ok {
+			v["Username"] = "gpac"
+		}
 	}
 }
 
 func gatewayFromHost(host *pb.Host) *pb.Host {
 	broker := brokerclient.New()
-	gw, err := broker.Host.Inspect(host.GetGatewayID(), brokerclient.DefaultExecutionTimeout)
+	gwID := host.GetGatewayID()
+	// If host has no gateway, host is gateway
+	if gwID == "" {
+		return host
+	}
+	gw, err := broker.Host.Inspect(gwID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil
 	}
@@ -398,56 +415,65 @@ func gatewayFromHost(host *pb.Host) *pb.Host {
 
 // identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts
 func identifyHosts(w *worker, targets stepTargets) ([]*pb.Host, error) {
-	//specs := is.Worker.component.Specs()
-
-	masterT, privnodeT, pubnodeT, err := targets.parse()
+	hostT, masterT, privnodeT, pubnodeT, err := targets.parse()
 	if err != nil {
 		return nil, err
 	}
 
 	hostsList := []*pb.Host{}
-	switch masterT {
-	case "1":
-		host, err := w.AvailableMaster()
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, host)
-	case "*":
-		all, err := w.AllMasters()
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, all...)
-	}
-	switch privnodeT {
-	case "1":
-		host, err := w.AvailableNode(false)
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, host)
-	case "*":
-		hosts, err := w.AllNodes(false)
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, hosts...)
-	}
-	switch pubnodeT {
-	case "1":
-		host, err := w.AvailableNode(true)
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, host)
-	case "*":
-		hosts, err := w.AllNodes(true)
-		if err != nil {
-			return nil, err
-		}
-		hostsList = append(hostsList, hosts...)
-	}
 
+	if w.cluster == nil {
+		if hostT != "" {
+			hostsList = append(hostsList, w.host)
+		}
+	} else {
+		switch masterT {
+		case "1":
+			host, err := w.AvailableMaster()
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, host)
+		case "*":
+			all, err := w.AllMasters()
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, all...)
+		}
+
+		switch privnodeT {
+		case "1":
+			host, err := w.AvailableNode(false)
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, host)
+		case "*":
+			hosts, err := w.AllNodes(false)
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, hosts...)
+		}
+
+		switch pubnodeT {
+		case "1":
+			host, err := w.AvailableNode(true)
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, host)
+		case "*":
+			hosts, err := w.AllNodes(true)
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, hosts...)
+		}
+	}
+	if len(hostsList) == 0 {
+		return hostsList, fmt.Errorf("failed to identify hosts")
+	}
 	return hostsList, nil
 }
