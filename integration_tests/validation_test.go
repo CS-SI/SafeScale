@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"testing"
 	"time"
 )
 
@@ -145,7 +146,8 @@ func launchClient(tenant string) {
 	launchDockerExec(intera, delay, "broker network  delete  networktest")
 
 }
-func main() {
+
+func Test_Basic(t *testing.T) {
 	start := time.Now()
 	log.Println("https_proxy:", os.Getenv("https_proxy"))
 	log.Println("https_proxy:", os.Getenv("https_proxy"))
