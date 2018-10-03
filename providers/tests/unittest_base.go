@@ -30,12 +30,12 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-	_ "github.com/CS-SI/SafeScale/providers/cloudwatt" // Imported to initialise tenant cloudwatt
+	_ "github.com/CS-SI/SafeScale/providers/cloudwatt" // Imported to initialize tenant cloudwatt
 	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
-	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenant flexibleengine
-	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise tenant opentelekoms
-	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenant ovh
+	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialize tenant flexibleengine
+	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialize tenant opentelekoms
+	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialize tenant ovh
 
 	"github.com/stretchr/testify/assert"
 )
