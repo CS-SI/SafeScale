@@ -8,3 +8,5 @@ DIRECTORIES := $(sort $(dir $(wildcard */)))
 
 vet:
 	@$(GO) vet ./...
+
+clean: ;

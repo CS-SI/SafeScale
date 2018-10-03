@@ -12,4 +12,4 @@ safe-security:	main.go
 	@$(GO) build -o $(EXEC)
 
 clean:
-	@$(RM) $(EXEC)
+	@$(RM) $(EXEC) || true

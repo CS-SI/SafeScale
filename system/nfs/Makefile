@@ -12,4 +12,4 @@ build: *.go scripts/* SecurityFlavor/*.go
 	@$(GO) generate
 
 clean:
-	@$(RM) rice-box.go SecurityFlavor/enum_string.go
+	@$(RM) rice-box.go SecurityFlavor/enum_string.go || true

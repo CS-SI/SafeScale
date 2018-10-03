@@ -12,4 +12,4 @@ brokerd: main.go ../../daemon/services/*.go ../../daemon/commands/*.go ../../uti
 	@$(GO) build -o $(EXEC)
 
 clean:
-	@$(RM) $(EXEC)
+	@$(RM) $(EXEC) || true

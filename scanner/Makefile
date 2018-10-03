@@ -11,5 +11,5 @@ scanner: scanner.go
 .PHONY: clean
 
 clean:
-	@($(RM) scanner)
+	@($(RM) scanner || true)
 

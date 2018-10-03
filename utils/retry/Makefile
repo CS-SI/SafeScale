@@ -7,11 +7,9 @@ all:    generate
 vet:
 	@$(GO) vet ./...
 
-DIRECTORIES := $(sort $(dir $(wildcard */)))
+generate:
+	@$(GO) generate ./...
 
-generate: 
-	@(for d in $(DIRECTORIES); do (cd $$d; $(GO) generate); done)
-        
 clean:
-	@(for d in $(DIRECTORIES); do (cd $$d; $(RM) *_string.go); done)
+	@$(RM) ./Verdict/enum_string.go || true
 

@@ -5,13 +5,9 @@ GO?=go
 
 all: generate
 
-SUBDIRS := $(sort $(dir $(wildcard */)))
-
 vet:
 	@$(GO) vet ./...
 
 generate:
-	@(for d in $(SUBDIRS); do (cd $$d; $(GO) generate); done)
+	@$(GO) generate ./...
 
-clean:
-	@(for d in $(SUBDIRS); do (cd $$d; $(RM) *_string.go); done)
