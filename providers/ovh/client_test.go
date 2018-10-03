@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"os"
 	"strings"
 	"testing"
 
@@ -34,7 +35,10 @@ var tester *tests.ClientTester
 func getClient() (*tests.ClientTester, error) {
 	if tester == nil {
 		tenant_name := "TestOvh"
-		service, err := providers.GetService("TestOvh")
+		if tenant_override := os.Getenv("TEST_OVH"); tenant_override != "" {
+			tenant_name = tenant_override
+		}
+		service, err := providers.GetService(tenant_name)
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name))
 		}
