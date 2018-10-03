@@ -261,7 +261,7 @@ func (w *worker) Proceed(v Variables) (Results, error) {
 	// Now enumerate steps and execute each of them
 	var err error
 	for _, k := range order {
-		log.Printf("executing step '%s::%s'...\n", w.action.String(), k)
+		// log.Printf("executing step '%s::%s'...\n", w.action.String(), k)
 
 		stepKey := stepsKey + "." + k
 		var (
@@ -443,7 +443,7 @@ func (w *worker) validateContextForHost() error {
 		return nil
 	}
 	msg := fmt.Sprintf("component '%s' not suitable for host", w.component.DisplayName())
-	log.Println(msg)
+	// log.Println(msg)
 	return fmt.Errorf(msg)
 }
 

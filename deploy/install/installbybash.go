@@ -76,7 +76,7 @@ func (i *bashInstaller) Add(c *Component, t Target, v Variables) (Results, error
 		return nil, fmt.Errorf("component '%s' check failed: %s", c.DisplayName(), err.Error())
 	}
 	if results.Successful() {
-		log.Printf("Component '%s' is already installed\n", c.DisplayName())
+		//log.Printf("Component '%s' is already installed\n", c.DisplayName())
 		return results, nil
 	}
 
