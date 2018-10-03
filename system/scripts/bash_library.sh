@@ -133,7 +133,7 @@ EOF
     return $rc
 }
 
-# sfDownload url timeout delay
+# sfDownload url filename timeout delay
 sfDownload() {
     url="$1"
     encoded=$(echo "$url" | md5sum | cut -d' ' -f1)

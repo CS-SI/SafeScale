@@ -134,9 +134,10 @@ component:
                 steps:
                     kubectl:
                         targets:
-                            masters: one
+                            masters: all
                         run: |
                             which kubectl &>/dev/null && [ $(kubectl get nodes | wc -l) -gt 1 ]
+
                     nodes:
                         targets:
                             privateNodes: all
@@ -145,56 +146,55 @@ component:
                             ps ax | grep kubelet &>/dev/null
 
             add:
-                pace: dir,commontools,cp-tools,cp-pkg,kubelet,cp1-init,cpx-init,join,weavenet,final
+                pace: cp-dir,common-tools,cp-tools,cp-pkgs,kubelet,cp1-init,cpx-init,join,weavenet,final
                 steps:
-                    dir:
+                    cp-dir:
                         targets:
                             masters: all
                         run: |
-                            mkdir -p /opt/safescale/k8s/ssl /opt/safescale/k8s/config /opt/cni/bin
+                            mkdir -p /opt/safescale/k8s/ssl /opt/safescale/k8s/config
 
-                    commontools:
+                    common-tools:
                         targets:
-                            masters: one
+                            masters: all
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            cd /usr/local/bin
+                            [ ! -f /usr/local/bin/kubeadm ] && {
+                                cd /usr/local/bin
 
-                            RELEASE=$(sfRetry 5m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
-                            [ $? -ne 0 ] && exit 513
-                            URL="https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/amd64"
-                            sfDownloadInDropzone "$URL/kubeadm" kubeadm 5m 5 || exit 514
-                            sfDownloadInDropzone "$URL/kubelet" kubelet 5m 5 || exit 515
-                            sfDownloadInDropzone "$URL/kubectl" kubectl 5m 5 || exit 516
+                                RELEASE=$(sfRetry 5m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
+                                [ $? -ne 0 ] && exit 513
+                                URL="https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/amd64"
+                                sfDownload "$URL/kubeadm" kubeadm 5m 5 || exit 514
+                                sfDownload "$URL/kubelet" kubelet 5m 5 || exit 515
+                                sfDownload "$URL/kubectl" kubectl 5m 5 || exit 516
+                            }
 
                     cp-tools:
                         targets:
-                            masters: one
+                            masters: all
                         run: |
-                            VERSION=v1.12.0
-                            URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${VERSION}/crictl-${VERSION}-linux-amd64.tar.gz"
-                            sfDownloadInDropzone "$URL" crictl.tgz 5m 5 || exit 513
+                            [ ! -f /usr/local/bin/crictl ] && {
+                                cd /var/tmp
+                                VERSION=v1.12.0
+                                URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${VERSION}/crictl-${VERSION}-linux-amd64.tar.gz"
+                                sfDownload "$URL" crictl.tgz 5m 5 || exit 513
+                                tar zxf crictl.tgz -C /usr/local/bin || exit 514
+                                rm -f crictl.tgz
+                            }
 
-                            VERSION=v0.7.1
-                            URL="https://github.com/containernetworking/plugins/releases/download/${VERSION}/cni-plugins-amd64-${VERSION}.tgz"
-                            sfDownloadInDropzone "$URL" cni-plugins.tgz 5m 5 || exit 514
-
-                            for ip in {{ range .MasterIPs}}{{.}} {{ end}}; do
-                                [ "{{.HostIP}}" = "$ip" ] && continue
-                                sfDropzoneSync $ip || exit 515
-                            done
-
-                    cp-pkg:
+                    cp-pkgs:
                         targets:
                             masters: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfWaitForApt && sfRetry 2m 5 apt install -y ebtables socat || exit 513
+                                    sfWaitForApt
+                                    sfRetry 5m 5 apt install -y ebtables socat || exit 513
                                     ;;
                                 redhat|centos)
-                                    yum install -y ebtables socat || exit 513
+                                    sfRetry 5m 5 yum install -y ebtables socat || exit 513
                                     ;;
                                 *)
                                     echo "Unmanaged Linux distribution"
@@ -202,17 +202,23 @@ component:
                                     ;;
                             esac
 
-                            sfDropzoneUntar crictl.tgz /usr/local/bin && \
-                            sfDropzoneUntar cni-plugins.tgz /opt/cni/bin || exit 514
-                            rm -f /var/tmp/{crictl.tgz,cni-plugins.tgz}
-
                     kubelet:
                         targets:
                             masters: all
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            sfDropzonePop "kube*" /usr/local/bin || exit 513
+                            [ ! -f /opt/cni/bin/loopback ] && {
+                                mkdir -p /opt/cni/bin
+                                cd /var/tmp
+                                VERSION=v0.7.1
+                                URL="https://github.com/containernetworking/plugins/releases/download/${VERSION}/cni-plugins-amd64-${VERSION}.tgz"
+                                sfDownload "$URL" cni-plugins.tgz 5m 5 || exit 514
+                                tar zxvf cni-plugins.tgz -C /opt/cni/bin || exit 515
+                                rm -f cni-plugins.tgz
+                                chmod -R a+rx /opt/cni/bin
+                            }
+
                             chmod +rx /usr/local/bin/*
 
                             cat >/etc/systemd/system/kubelet.service <<-'EOF'

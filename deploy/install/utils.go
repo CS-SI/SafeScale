@@ -361,6 +361,7 @@ func setImplicitParameters(t Target, v Variables) {
 		cluster := cT.cluster
 		config := cluster.GetConfig()
 		v["ClusterName"] = cluster.GetName()
+		v["Complexity"] = strings.ToLower(config.Complexity.String())
 		v["GatewayIP"] = config.GatewayIP
 		v["MasterIDs"] = cluster.ListMasterIDs()
 		v["MasterIPs"] = cluster.ListMasterIPs()
