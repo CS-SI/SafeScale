@@ -19,6 +19,7 @@ package tests
 import (
 	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/providers/enums/HostState"
@@ -94,19 +95,31 @@ func (tester *ClientTester) CreateKeyPair(t *testing.T) {
 
 }
 
+func (tester *ClientTester) CreateKeyPairAndLeaveItThere(t *testing.T) {
+	kp, err := tester.Service.CreateKeyPair("kp")
+	assert.Nil(t, err)
+	assert.NotEqual(t, kp.ID, "")
+	assert.NotEqual(t, kp.Name, "")
+	assert.NotEqual(t, kp.PrivateKey, "")
+	assert.NotEqual(t, kp.PublicKey, "")
+}
+
 //GetKeyPair test
 func (tester *ClientTester) GetKeyPair(t *testing.T) {
 	kp, err := tester.Service.CreateKeyPair("kp")
-	assert.Nil(t, err)
-	defer tester.Service.DeleteKeyPair("kp")
-	kp2, err := tester.Service.GetKeyPair(kp.ID)
-	assert.Nil(t, err)
+	require.Nil(t, err)
+
+	kp2, err := tester.Service.GetKeyPair("kp")
+	require.Nil(t, err)
+
 	assert.Equal(t, kp.ID, kp2.ID)
 	assert.Equal(t, kp.Name, kp2.Name)
 	assert.Equal(t, kp.PublicKey, kp2.PublicKey)
 	assert.Equal(t, "", kp2.PrivateKey)
 	_, err = tester.Service.GetKeyPair("notfound")
 	assert.NotNil(t, err)
+
+	defer tester.Service.DeleteKeyPair("kp")
 }
 
 //ListKeyPairs test
@@ -231,7 +244,7 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	defer tester.Service.DeleteNetwork(network1.ID)
 
 	host, err := tester.Service.GetHostByName("gw_" + network1.Name)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	assert.True(t, host.AccessIPv4 != "" || host.AccessIPv6 != "")
 	assert.NotEmpty(t, host.PrivateKey)
 	assert.Empty(t, host.GatewayID)
@@ -386,10 +399,11 @@ func (tester *ClientTester) StartStopHost(t *testing.T) {
 	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
 	host, err := tester.Service.GetHostByName("gw_" + net.Name)
-	assert.NoError(t, err)
+	require.Nil(t, err)
+	require.NotNil(t, host)
 	{
 		err := tester.Service.StopHost(host.ID)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 		start := time.Now()
 		host, err = tester.Service.WaitHostState(host.ID, HostState.STOPPED, 40*time.Second)
 		tt := time.Now()
@@ -399,7 +413,7 @@ func (tester *ClientTester) StartStopHost(t *testing.T) {
 	}
 	{
 		err := tester.Service.StartHost(host.ID)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 		start := time.Now()
 		host, err = tester.Service.WaitHostState(host.ID, HostState.STARTED, 40*time.Second)
 		tt := time.Now()
@@ -459,9 +473,15 @@ func (tester *ClientTester) Volume(t *testing.T) {
 func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	// TODO: handle kp delete
 	net, kp := tester.CreateNetwork(t, "test_network", true)
+
+	// TODO: Seriously ? CreateNetwork CANNOT Fail ?
+
 	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
 	host, err := tester.Service.GetHostByName("gw_" + net.Name)
+	require.Nil(t, err)
+	require.NotNil(t, host)
+
 	defer tester.Service.DeleteHost(host.ID)
 	assert.NoError(t, err)
 

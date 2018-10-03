@@ -50,21 +50,52 @@ func getClient() (*tests.ClientTester, error) {
 
 }
 
-func Test_GetTemplate(t *testing.T) {
+// Test that we have templates, and each template has 1 or more cores
+func Test_GetTemplates(t *testing.T) {
 	cli, err := getClient()
 	require.Nil(t, err)
 	tpls, err := cli.Service.ListTemplates(false)
 	assert.NoError(t, err)
+	assert.True(t, len(tpls) > 0)
+
+	for _, tpl := range tpls {
+		fmt.Println(tpl.Cores)
+		assert.True(t, tpl.Cores > 0)
+	}
+}
+
+func TemplateExists(name string) bool {
+	cli, _ := getClient()
+	tpls, _ := cli.Service.ListTemplates(false)
+
 	find := false
 	for _, tpl := range tpls {
-		if tpl.Name == "g3-120" {
-			assert.Equal(t, 3, tpl.GPUNumber)
-			assert.Equal(t, "NVIDIA 1080 TI", tpl.GPUType)
+		if tpl.Name == name {
+
 			find = true
 		}
 	}
-	assert.True(t, find)
 
+	return find
+}
+
+func Test_GetGpuTemplate(t *testing.T) {
+	cli, err := getClient()
+	require.Nil(t, err)
+	tpls, err := cli.Service.ListTemplates(false)
+	assert.NoError(t, err)
+	find := TemplateExists("g3-120")
+
+	if find {
+		for _, tpl := range tpls {
+			if tpl.Name == "g3-120" {
+				fmt.Println(tpl.Cores)
+				assert.Equal(t, 3, tpl.GPUNumber)
+				assert.Equal(t, "NVIDIA 1080 TI", tpl.GPUType)
+				break
+			}
+		}
+	}
 }
 
 func Test_ListImages(t *testing.T) {
@@ -90,6 +121,12 @@ func Test_CreateKeyPair(t *testing.T) {
 	cli, err := getClient()
 	require.Nil(t, err)
 	cli.CreateKeyPair(t)
+}
+
+func Test_CreateKeyPairAndLeave(t *testing.T) {
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.CreateKeyPairAndLeaveItThere(t)
 }
 
 func Test_GetKeyPair(t *testing.T) {
