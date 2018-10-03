@@ -759,7 +759,7 @@ func (c *Cluster) asyncCreateNode(
 		return
 	}
 
-	log.Printf("[%s node #%d] creation successful\n", nodeTypeStr, index)
+	log.Printf("[%s node #%d (%s)] creation successful\n", nodeTypeStr, index, host.Name)
 	result <- host.ID
 	done <- nil
 }
