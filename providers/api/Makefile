@@ -1,20 +1,16 @@
 GO?=go
 
-.PHONY:	clean enums
+.PHONY:	clean generate
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
-all:	enums 
+all:	generate
 
 vet:
 	@$(GO) vet ./...
-
-enums:
-	@$(GO) generate ./...
 
 generate:
 	@$(GO) generate ./...
 
 clean:
-	@(cd enums && $(MAKE) $@)
 	@(for d in $(DIRECTORIES); do (cd $$d; $(MAKE) clean); done)
