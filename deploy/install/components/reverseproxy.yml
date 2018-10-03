@@ -17,82 +17,98 @@
 ---
 component:
     name: ReverseProxy
-    target:
+    suitableFor:
         host: yes
-        cluster:
-            master: no
-            node:
-                private: no
-                public: no
+        cluster: no
     requirements:
-        - docker
+        components:
+            - docker
     install:
         bash:
-            wall_time: 10
-            check: |
-                curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep "HTTP/1.1 200 OK" &>/dev/null
+            check:
+                pace: curl
+                steps:
+                    curl:
+                        targets:
+                            hosts: yes
+                        run: |
+                            curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep "HTTP/1.1 200 OK" &>/dev/null
 
-            add: |
-                mkdir -p /opt/safescale/data/reverseproxy/postgresql /opt/safescale/run
-                cat >/opt/safescale/run/reverseproxy.compose.yml <<-'EOF'
-                version: '2.1'
-                services:
-                    kong-database:
-                        image: postgres:9
-                        environment:
-                            - POSTGRES_USER=kong
-                            - POSTGRES_DB=kong
-                        volumes:
-                            - /opt/safescale/data/reverseproxy/postgresql:/var/lib/postgresql/data
-                        restart: always
-                        healthcheck:
-                            test: ["CMD", "pg_isready", "-U", "postgres"]
-                            interval: 10s
-                            timeout: 5s
-                            retries: 5
+            add:
+                pace: compose
+                steps:
+                    compose:
+                        wallTime: 10
+                        targets:
+                            hosts: yes
+                        run: |
+                            mkdir -p /opt/safescale/data/reverseproxy/postgresql /opt/safescale/run
+                            cat >/opt/safescale/run/reverseproxy.compose.yml <<-'EOF'
+                            version: '2.1'
+                            services:
+                                kong-database:
+                                    image: postgres:9
+                                    environment:
+                                        - POSTGRES_USER=kong
+                                        - POSTGRES_DB=kong
+                                    volumes:
+                                        - /opt/safescale/data/reverseproxy/postgresql:/var/lib/postgresql/data
+                                    restart: always
+                                    healthcheck:
+                                        test: ["CMD", "pg_isready", "-U", "postgres"]
+                                        interval: 10s
+                                        timeout: 5s
+                                        retries: 5
 
-                    kong-migration:
-                        image: kong:latest
-                        depends_on:
-                            kong-database:
-                                condition: service_healthy
-                        environment:
-                            - KONG_DATABASE=postgres
-                            - KONG_PG_HOST=kong-database
-                        restart: always
-                        command: kong migrations up
+                                kong-migration:
+                                    image: kong:latest
+                                    depends_on:
+                                        kong-database:
+                                            condition: service_healthy
+                                    environment:
+                                        - KONG_DATABASE=postgres
+                                        - KONG_PG_HOST=kong-database
+                                    restart: always
+                                    command: kong migrations up
 
-                    kong-proxy:
-                        image: kong:latest
-                        depends_on:
-                            kong-database:
-                                condition: service_healthy
-                            kong-migration:
-                                condition: service_started
-                        environment:
-                            - KONG_DATABASE=postgres
-                            - KONG_PG_HOST=kong-database
-                            - KONG_PG_DATABASE=kong
-                            - KONG_PROXY_ACCESS_LOG=/dev/stdout
-                            - KONG_ADMIN_ACCESS_LOG=/dev/stdout
-                            - KONG_PROXY_ERROR_LOG=/dev/stderr
-                            - KONG_ADMIN_ERROR_LOG=/dev/stderr
-                            - KONG_ADMIN_LISTEN=0.0.0.0:8444 ssl
-                        ports:
-                            - "443:8443"
-                            - "127.0.0.1:8444:8444"
-                        restart: always
-                        healthcheck:
-                            test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
-                            interval: 5s
-                            retries: 10
-                EOF
-                docker-compose -f /opt/safescale/run/reverseproxy.compose.yml -p reverseproxy up -d
-                iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
-                save_iptables_rules
+                                kong-proxy:
+                                    image: kong:latest
+                                    depends_on:
+                                        kong-database:
+                                            condition: service_healthy
+                                        kong-migration:
+                                            condition: service_started
+                                    environment:
+                                        - KONG_DATABASE=postgres
+                                        - KONG_PG_HOST=kong-database
+                                        - KONG_PG_DATABASE=kong
+                                        - KONG_PROXY_ACCESS_LOG=/dev/stdout
+                                        - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+                                        - KONG_PROXY_ERROR_LOG=/dev/stderr
+                                        - KONG_ADMIN_ERROR_LOG=/dev/stderr
+                                        - KONG_ADMIN_LISTEN=0.0.0.0:8444 ssl
+                                    ports:
+                                        - "443:8443"
+                                        - "127.0.0.1:8444:8444"
+                                    restart: always
+                                    healthcheck:
+                                        test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
+                                        interval: 5s
+                                        retries: 10
+                            EOF
+                            docker-compose -f /opt/safescale/run/reverseproxy.compose.yml -p reverseproxy up -d
+                            iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+                            sfSaveIptablesRules
 
-            remove: |
-                docker-compose -f /opt/safescale/reverseproxy.compose.yml rm -f
+            remove:
+                pace: compose
+                steps:
+                    compose:
+                        targets:
+                            hosts: yes
+                        run: |
+                            docker-compose -f /opt/safescale/run/reverseproxy.compose.yml -p reverseproxy rm --stop -v --force || exit 513
+                            rm -rf /opt/safescale/run/reverseproxy.compose.yml /opt/safescale/data/reverseproxy
 
     service:
         start: |

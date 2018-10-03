@@ -2,12 +2,10 @@ GO?=go
 
 .PHONY: nfs clean
 
-all: build
-
 vet:
 	@$(GO) vet ./...
 
-build: *.go scripts/* SecurityFlavor/*.go
+generate:
 	@(cd SecurityFlavor && $(GO) generate)
 	@$(GO) generate
 

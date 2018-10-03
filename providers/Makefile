@@ -1,6 +1,6 @@
 GO?=go
 
-.PHONY:	generate api aws cloudwatt flexibleengine openstack opentelekom ovh userdata
+.PHONY:	generate
 
 all:	generate
 

@@ -25,7 +25,7 @@ install_common_requirements() {
 
     # Configure Firewall to accept all traffic from/to the private network
     iptables -t filter -A INPUT -s {{ .CIDR }} -j ACCEPT
-    save_iptables_rules
+    sfSaveIptablesRules
 
     # Upgrade to last CentOS revision
     yum upgrade --assumeyes --tolerant && \
@@ -40,9 +40,13 @@ install_common_requirements() {
     groupadd -r -f docker &>/dev/null
     usermod -aG docker cladm
     echo "cladm:{{ .CladmPassword }}" | chpasswd
-    mkdir -p /home/cladm/.ssh && chmod 0700 /home/cladm/.ssh
-    mkdir -p /home/cladm/.local/bin && find /home/cladm/.local -exec chmod 0770 {} \;
-    cat >>/home/cladm/.bashrc <<-'EOF'
+    mkdir -p ~cladm/.ssh && chmod 0700 ~cladm/.ssh
+    echo "{{ .SSHPublicKey }}" >~cladm/.ssh/authorized_keys
+    echo "{{ .SSHPrivateKey }}" >~cladm/.ssh/id_rsa
+    chmod 0400 ~cladm/.ssh/*
+
+    mkdir -p ~cladm/.local/bin && find ~cladm/.local -exec chmod 0770 {} \;
+    cat >>~cladm/.bashrc <<-'EOF'
 pathremove() {
         local IFS=':'
         local NEWPATH
@@ -68,7 +72,7 @@ pathappend() {
 pathprepend $HOME/.local/bin
 pathappend /opt/mesosphere/bin
 EOF
-    chown -R cladm:cladm /home/cladm
+    chown -R cladm:cladm ~cladm
 
     # Enable overlay module
     echo overlay >/etc/modules-load.d/10-overlay.conf

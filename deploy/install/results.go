@@ -17,54 +17,76 @@
 package install
 
 import (
-	"fmt"
 	"strings"
 )
 
-// CheckState ...
-type CheckState struct {
-	Success bool
-	Present bool
-	Error   string
-}
+// Results ...
+type Results map[string]stepResults
 
-// CheckResults contains the result of a component Check
-// In single host mode, the results are stored in PrivateNodes
-// In cluster mode, all results are stored in appropriate fields
-type CheckResults map[string]CheckState
-
-// Errors joins all errors in CheckResults then returns the corresponding string
-func (r CheckResults) Errors() string {
-	errors := []string{}
-	for k, i := range r {
-		if !i.Success {
-			errors = append(errors, i.Error+fmt.Sprintf(" on '%s'", k))
+// Successful ...
+func (r Results) Successful() bool {
+	if len(r) == 0 {
+		return false
+	}
+	for _, step := range r {
+		if !step.Successful() {
+			return false
 		}
 	}
-	return strings.Join(errors, "\n")
+	return true
 }
 
-// stepErrors ...
-type stepErrors map[string]error
+// AllErrorMessages ...
+func (r Results) AllErrorMessages() string {
+	output := ""
+	for _, step := range r {
+		val := strings.TrimSpace(step.ErrorMessages())
+		if val != "" {
+			output += val + "\n"
+		}
+	}
+	return output
+}
 
-// AddResults contains the result of a component addition
-type AddResults map[string]stepErrors
+// ErrorMessagesOfStep ...
+func (r Results) ErrorMessagesOfStep(name string) string {
+	if step, ok := r[name]; ok {
+		return step.ErrorMessages()
+	}
+	return ""
+}
 
-// Errors returned all the errors contained in AddResults as a string
-// one error per line
-func (r AddResults) Errors() string {
-	errors := []string{}
-	for keyStep, stateStep := range r {
-		for keyHost, err := range stateStep {
-			if err != nil {
-				errors = append(errors, err.Error()+fmt.Sprintf(" at step '%s' on '%s'", keyStep, keyHost))
+// ErrorMessagesOfHost ...
+func (r Results) ErrorMessagesOfHost(name string) string {
+	output := ""
+	for _, step := range r {
+		for h, e := range step {
+			if h == name {
+				val := e.Error().Error()
+				if val != "" {
+					output += val + "\n"
+				}
 			}
 		}
 	}
-	return strings.Join(errors, "\n")
+	return output
 }
 
-// RemoveResults contains the result of a component removal
-type RemoveResults struct {
-	AddResults
+// ResultsOfStep ...
+func (r Results) ResultsOfStep(name string) stepResults {
+	if step, ok := r[name]; ok {
+		return step
+	}
+	return stepResults{}
+}
+
+// Transpose reorganizes Results to be indexed by hosts (instead by steps normally)
+func (r Results) Transpose() Results {
+	t := Results{}
+	for step, results := range r {
+		for h, sr := range results {
+			t[h][step] = sr
+		}
+	}
+	return t
 }

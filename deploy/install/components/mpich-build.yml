@@ -18,45 +18,60 @@
 ---
 component:
     name: mpich-build
-    target:
+    suitableFor:
         host: yes
-        cluster:
-            master: all
-            node:
-                private: all
-                public: all
+        cluster: all
     install:
         bash:
-            wall_time: 15
             check: |
                 which /usr/local/bin/mpiexec &>/dev/null
 
             add: |
-                case $LINUX_KIND in
-                    redhat|centos)
-                        yum makecache fast
-                        yum groupinstall -y "Development Tools"
-                        yum install -y wget
-                        ;;
-                    debian|ubuntu)
-                        apt update
-                        apt install -y build-essential wget
-                        ;;
-                    *)
-                        echo "Unsupported operating system '$LINUX_KIND'"
-                        exit 1
-                        ;;
-                esac
-                cd /var/tmp
-                wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz || exit 2
-                tar -zxvf mpich-3.2.1.tar.gz
-                cd mpich-3.2.1
-                ./configure --disable-fortran
-                make -j${FACTS["2 3rd of threads"]} || exit 3
-                make install || exit 4
-                rm -rf mpich-3.2.1*
-                exit 0
+                pace: fromsrc
+                steps:
+                    fromsrc:
+                        wallTime: 15
+                        targets:
+                            host: yes
+                            clusters:
+                                masters: all
+                                privateNodes: all
+                                publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                redhat|centos)
+                                    yum makecache fast
+                                    yum groupinstall -y "Development Tools"
+                                    yum install -y wget
+                                    ;;
+                                debian|ubuntu)
+                                    apt update
+                                    apt install -y build-essential wget
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
+                            cd /var/tmp
+                            wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz || exit 2
+                            tar -zxvf mpich-3.2.1.tar.gz
+                            cd mpich-3.2.1
+                            ./configure --disable-fortran
+                            make -j${FACTS["2 3rd of threads"]} || exit 3
+                            make install || exit 4
+                            rm -rf mpich-3.2.1*
+                            exit 0
 
-            remove: |
-                rm -rf /usr/local/bin/mpiexec
-                exit 0
+            remove:
+                pace: binary
+                steps:
+                    binary:
+                        targets:
+                            hosts: all
+                            clusters:
+                                masters: all
+                                privateNodes: all
+                                publicNodes: all
+                        run: |
+                            rm -rf /usr/local/bin/mpiexec &>/dev/null

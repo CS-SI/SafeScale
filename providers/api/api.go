@@ -87,8 +87,8 @@ type SizingRequirements struct {
 	MinDiskSize int     `json:"min_disk_size,omitempty"`
 }
 
-// HostExtensionType ...
-type HostExtensionType map[HostExtension.Enum]interface{}
+// HostExtensionMap ...
+type HostExtensionMap map[HostExtension.Enum]interface{}
 
 // Host represents a virtual machine properties
 type Host struct {
@@ -103,8 +103,8 @@ type Host struct {
 	PrivateKey   string         `json:"private_key,omitempty"`
 	GatewayID    string         `json:"gateway_id,omitempty"`
 	// This field can contain any kind of supplemental information that will be stored as-is
-	// functions using
-	Extension HostExtensionType `json:"additional_info,omitempty"`
+	// functions using it should know how to exploit this
+	Extension HostExtensionMap `json:"extensions,omitempty"`
 }
 
 // GetAccessIP computes access IP of the host

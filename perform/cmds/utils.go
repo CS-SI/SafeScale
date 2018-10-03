@@ -21,58 +21,20 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
-
-	pb "github.com/CS-SI/SafeScale/broker"
 )
 
 var (
 	clusterName     string
 	clusterInstance clusterapi.Cluster
-	pkgManagerKind  string
 	nodeName        string
 	serviceName     string
 
 	// RebrandingPrefix is used to store the optional prefix to use when calling external SafeScale commands
 	RebrandingPrefix string
 )
-
-func createNodes(clusterName string, public bool, count int, cpu int32, ram float32, disk int32) error {
-	instance, err := cluster.Get(clusterName)
-	if err != nil {
-		return err
-	}
-	if instance == nil {
-		return fmt.Errorf("cluster '%s' not found", clusterName)
-	}
-	var nodeTypeString string
-	if public {
-		nodeTypeString = "public"
-	} else {
-		nodeTypeString = "private"
-	}
-	countS := ""
-	if count > 1 {
-		countS = "s"
-	}
-	fmt.Printf("Adding %d %s node%s to Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
-
-	for i := 0; i < count; i++ {
-		_, err = instance.AddNode(public, &pb.HostDefinition{
-			CPUNumber: cpu,
-			Disk:      disk,
-			RAM:       ram,
-		})
-		if err != nil {
-			return err
-		}
-	}
-	fmt.Printf("Added %d %s node%s to cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
-	return nil
-}
 
 // RebrandCommand allows to prefix a command with cmds.RebrandingPrefix
 // ie: with cmds.RebrandingPrefix == "safe "

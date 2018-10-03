@@ -18,22 +18,19 @@ package install
 
 //go:generate mockgen -destination=../mocks/mock_installer.go -package=mocks github.com/CS-SI/SafeScale/deploy/install Installer
 
+import "github.com/CS-SI/SafeScale/deploy/install/enums/Method"
+
 // Installer defines the API of an Installer
 type Installer interface {
 	// GetName returns the name of the Installer
 	GetName() string
 	// Check checks if the component is installed
-	Check(*Component, Target, Variables) (bool, CheckResults, error)
+	Check(*Component, Target, Variables) (Results, error)
 	// Add executes installation of component
-	Add(*Component, Target, Variables) (bool, AddResults, error)
+	Add(*Component, Target, Variables) (Results, error)
 	// Remove executes deletion of component
-	Remove(*Component, Target, Variables) (bool, RemoveResults, error)
+	Remove(*Component, Target, Variables) (Results, error)
 }
 
-/* type InstallerStep interface {
-	// ListHosts returns a list of host(s) concerned by the installation
-	ListHosts(Component) ([]*pb.Host, error)
-	// Do executes the step
-	Do() error
-}
-*/
+// installerMap keeps a map of available installers sorted by Method
+type installerMap map[Method.Enum]Installer

@@ -3,22 +3,18 @@ package install
 import (
 	"fmt"
 	"log"
-	"strings"
-	"time"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/client"
-
-	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 )
 
 // genericPackager is an object implementing the OS package management
 // It handles package management on single host or entire cluster
 type genericPackager struct {
-	name      string
-	checkCmd  string
-	addCmd    string
-	removeCmd string
+	name          string
+	checkCommand  alterCommandCB
+	addCommand    alterCommandCB
+	removeCommand alterCommandCB
 }
 
 // GetName returns the name of the installer (ex: apt, yum, dnf)
@@ -27,579 +23,120 @@ func (g *genericPackager) GetName() string {
 }
 
 // Check checks if the component is installed
-func (g *genericPackager) Check(c *Component, t Target, v Variables) (bool, CheckResults, error) {
-	var (
-		onCluster     bool
-		clusterTarget *ClusterTarget
-	)
-
-	hostTarget, ok := t.(*HostTarget)
-	if !ok {
-		clusterTarget, onCluster = t.(*ClusterTarget)
-		if !onCluster {
-			return false, CheckResults{}, fmt.Errorf("type of target is unknown")
-		}
-	}
-
-	// First check if component is target host. Even in cluster context, host has to be targeteable
+func (g *genericPackager) Check(c *Component, t Target, v Variables) (Results, error) {
 	specs := c.Specs()
-	if specs.IsSet("component.target.host") {
-		target := strings.ToLower(specs.GetString("component.target.host"))
-		if target != "yes" && target != "true" {
-			return false, CheckResults{}, fmt.Errorf("can't install, component doesn't target a host")
-		}
-	}
-
-	rootKey := "component.install." + g.name
-
-	if onCluster {
-		cluster := clusterTarget.cluster
-		if err := validateClusterSizing(c, cluster); err != nil {
-			return false, CheckResults{}, err
-		}
-
-		if !validateContextForCluster(c, cluster) {
-			config := cluster.GetConfig()
-			msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", config.Flavor.String(), config.Name)
-			log.Println(msg)
-			return false, CheckResults{}, fmt.Errorf(msg)
-		}
-
-		masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
-		if err != nil {
-			return false, CheckResults{}, err
-		}
-
-		if !specs.IsSet(rootKey + ".check") {
-			msg := `syntax error in component '%s' specification file (%s):
-					no key '%s.check' found`
-			return false, CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
-		}
-
-		// Sets some implicit variables for clusters
-		v["MasterIDs"] = cluster.ListMasterIDs()
-		v["MasterIPs"] = cluster.ListMasterIPs()
-		if _, ok := v["Username"]; !ok {
-			v["Username"] = "cladm"
-		}
-
-		var (
-			mastersChannel   chan map[string]CheckState
-			pubNodesChannel  chan map[string]CheckState
-			privNodesChannel chan map[string]CheckState
-			mastersStatus    = map[string]CheckState{}
-			pubNodesStatus   = map[string]CheckState{}
-			privNodesStatus  = map[string]CheckState{}
-		)
-
-		// Startig async jobs...
-		if masterT != "0" {
-			mastersChannel = make(chan map[string]CheckState)
-			go asyncCheckHosts(cluster.ListMasterIDs(), c, v, mastersChannel)
-		}
-		if privnodeT != "0" {
-			privNodesChannel = make(chan map[string]CheckState)
-			go asyncCheckHosts(cluster.ListNodeIDs(false), c, v, privNodesChannel)
-		}
-		if pubnodeT != "0" {
-			pubNodesChannel = make(chan map[string]CheckState)
-			go asyncCheckHosts(cluster.ListNodeIDs(true), c, v, pubNodesChannel)
-		}
-
-		ok = true
-		hostsResults := CheckResults{}
-
-		// Waiting async jobs
-		if masterT != "0" {
-			mastersStatus = <-mastersChannel
-			for h, cs := range mastersStatus {
-				hostsResults[h] = cs
-				if ok && (!cs.Success || !cs.Present) {
-					ok = false
-				}
-			}
-		}
-		if privnodeT != "0" {
-			privNodesStatus = <-privNodesChannel
-			for h, cs := range privNodesStatus {
-				hostsResults[h] = cs
-				if ok && (!cs.Success || !cs.Present) {
-					ok = false
-				}
-			}
-		}
-		if pubnodeT != "0" {
-			pubNodesStatus = <-pubNodesChannel
-			for h, cs := range pubNodesStatus {
-				hostsResults[h] = cs
-				if ok && (!cs.Success || !cs.Present) {
-					ok = false
-				}
-			}
-		}
-
-		// Return the result
-		return ok, hostsResults, nil
-	}
-
-	// Single host mode
-	if !specs.IsSet(rootKey + ".package") {
-		msg := `syntax error in component '%s' specification file (yml):
-				no key '%s.package' found`
-		return false, CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
-	}
-	packageName := specs.GetString(rootKey + ".package")
-	if strings.TrimSpace(packageName) == "" {
+	yamlKey := "component.install." + g.name + ".check"
+	if !specs.IsSet(yamlKey) {
 		msg := `syntax error in component '%s' specification file (%s):
-				key '%s.package' is empty`
-		return false, CheckResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
+				no key '%s' found`
+		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
 	}
 
-	// Sets some implicit variables for clusters
-	if _, ok := v["Username"]; !ok {
-		v["Username"] = "gpac"
-	}
+	// Inits implicit parameters
+	setImplicitParameters(t, v)
 
-	cmdStr := fmt.Sprintf(g.checkCmd, packageName)
-	retcode, _, _, err := client.New().Ssh.Run(hostTarget.host.ID, cmdStr, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	// Checks required parameters have value
+	err := checkParameters(c, v)
 	if err != nil {
-		return false, CheckResults{}, err
+		return nil, err
 	}
-	ok = retcode == 0
-	return ok, CheckResults{hostTarget.host.Name: CheckState{Success: true, Present: ok}}, nil
+
+	worker, err := newWorker(c, t, Method.Bash, Action.Check, g.checkCommand)
+	if err != nil {
+		return nil, err
+	}
+	err = worker.CanProceed()
+	if err != nil {
+		log.Println(err.Error())
+		return nil, err
+	}
+
+	return worker.Proceed(v)
 }
 
 // Add installs the component using apt
-func (g *genericPackager) Add(c *Component, t Target, v Variables) (bool, AddResults, error) {
-	var (
-		onCluster     bool
-		clusterTarget *ClusterTarget
-		err           error
-	)
-
-	hostTarget, ok := t.(*HostTarget)
-	if !ok {
-		clusterTarget, onCluster = t.(*ClusterTarget)
-		if !onCluster {
-			return false, AddResults{}, fmt.Errorf("type of target is unknown")
-		}
-	}
-
-	// If component is installed, do nothing but responds with success
-	ok, _, err = g.Check(c, t, v)
-	if err != nil {
-		return false, AddResults{}, fmt.Errorf("component '%s' check failed: %s", c.DisplayName(), err.Error())
-	}
-	if ok {
-		log.Printf("Component '%s' is already installed\n", c.DisplayName())
-		return true, AddResults{}, nil
-	}
-
-	hostTarget, clusterTarget, nodeTarget := determineContext(t)
-	if clusterTarget != nil {
-		if err := validateClusterSizing(c, clusterTarget.cluster); err != nil {
-			return false, AddResults{}, err
-		}
-	}
-
-	// First, installs requirements if there are any
-	err = installRequirements(c, t, v)
-	if err != nil {
-		return false, AddResults{}, fmt.Errorf("failed to install requirements: %s", err.Error())
-	}
-
-	specs := c.Specs()
-	rootKey := "component.install." + g.name
-
-	// Determining if install script is defined in specification file
-	if !specs.IsSet(rootKey + ".install") {
+func (g *genericPackager) Add(c *Component, t Target, v Variables) (Results, error) {
+	yamlKey := "component.install." + g.name + ".add"
+	if !c.Specs().IsSet(yamlKey) {
 		msg := `syntax error in component '%s' specification file (%s):
-				no key '%s.add' found`
-		return false, AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
+				no key '%s' found`
+		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
 	}
 
-	if hostTarget != nil {
-		if specs.IsSet("component.target.host") {
-			target := strings.ToLower(specs.GetString("component.target.host"))
-			if target != "yes" && target != "true" {
-				return false, AddResults{}, fmt.Errorf("can't install, component doesn't target a host")
-			}
-		}
-		return g.addOnHost(c, hostTarget.host, v)
-	}
-	if clusterTarget != nil {
-		return g.addOnCluster(c, clusterTarget.cluster, v)
-	}
-	if nodeTarget != nil {
-		return g.addOnHost(c, nodeTarget.host, v)
-	}
+	// Inits implicit parameters
+	setImplicitParameters(t, v)
 
-	return false, AddResults{}, fmt.Errorf("type of target is unknown")
-}
-
-func (g *genericPackager) addOnHost(c *Component, host *pb.Host, v map[string]interface{}) (bool, AddResults, error) {
-	specs := c.Specs()
-	rootKey := "component.install." + g.name
-
-	if !specs.IsSet(rootKey + ".package") {
-		msg := `syntax error in component '%s' specification file (%s):
-		        no key '%s.package' found`
-		return false, AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
-	}
-	packageName := specs.GetString(rootKey + ".package")
-	if strings.TrimSpace(packageName) == "" {
-		msg := `syntax error in component '%s' specification file (%s):
-		        key '%s.package' is empty`
-		return false, AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
-	}
-
-	// Sets some implicit variables for clusters
-	if _, ok := v["Username"]; !ok {
-		v["Username"] = "gpac"
-	}
-
-	cmdStr := fmt.Sprintf(g.addCmd, packageName)
-	wallTime := specs.GetInt(rootKey + ".wall_time")
-	if wallTime == 0 {
-		wallTime = 5
-	}
-	retcode, _, _, err := client.New().Ssh.Run(host.ID, cmdStr, client.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
+	// Checks required parameters have value
+	err := checkParameters(c, v)
 	if err != nil {
-		return false, AddResults{}, err
-	}
-	ok := retcode == 0
-	err = nil
-	if !ok {
-		err = fmt.Errorf("install script failed (retcode=%d)", retcode)
-	} else {
-		if ok && specs.IsSet("component.proxy.rules") {
-			err = proxyComponent(c, host)
-			ok = err == nil
-			if !ok {
-				err = fmt.Errorf("failed to install component '%s': %s", c.DisplayName(), err.Error())
-			}
-		}
-	}
-	return ok, AddResults{host.Name: stepErrors{"__error__": err}}, err
-}
-
-func (g *genericPackager) addOnCluster(c *Component, cluster clusterapi.Cluster, v Variables) (bool, AddResults, error) {
-	if !validateContextForCluster(c, cluster) {
-		config := cluster.GetConfig()
-		msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", config.Flavor.String(), config.Name)
-		log.Println(msg)
-		return false, AddResults{}, fmt.Errorf(msg)
+		return nil, err
 	}
 
-	specs := c.Specs()
-	rootKey := "component.install." + g.name
-
-	// Cluster mode
-	masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
+	worker, err := newWorker(c, t, Method.Bash, Action.Add, g.addCommand)
 	if err != nil {
-		return false, AddResults{}, err
+		return nil, err
+	}
+	err = worker.CanProceed()
+	if err != nil {
+		log.Println(err.Error())
+		return nil, err
 	}
 
-	if !specs.IsSet(rootKey + ".add") {
-		msg := `syntax error in component '%s' specification file (%s):
-					no key '%s.add' found`
-		return false, AddResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
-	}
-
-	// Sets some implicit variables for clusters
-	v["MasterIDs"] = cluster.ListMasterIDs()
-	v["MasterIPs"] = cluster.ListMasterIPs()
-	if _, ok := v["Username"]; !ok {
-		v["Username"] = "cladm"
-	}
-
-	var (
-		list             []string
-		mastersChannel   chan map[string]stepErrors
-		pubNodesChannel  chan map[string]stepErrors
-		privNodesChannel chan map[string]stepErrors
-		mastersStatus    = map[string]stepErrors{}
-		pubNodesStatus   = map[string]stepErrors{}
-		privNodesStatus  = map[string]stepErrors{}
-	)
-
-	if masterT != "0" {
-		if masterT != "0" {
-			if masterT == "1" {
-				hostID, err := cluster.FindAvailableMaster()
-				if err != nil {
-					return false, AddResults{}, err
-				}
-				list = append(list, hostID)
-			} else {
-				list = cluster.ListMasterIDs()
-			}
-		}
-		mastersChannel = make(chan map[string]stepErrors)
-		go asyncAddOnHosts(list, c, v, mastersChannel)
-	}
-	if privnodeT != "0" {
-		if privnodeT == "1" {
-			hostID, err := cluster.FindAvailableNode(false)
-			if err != nil {
-				return false, AddResults{}, err
-			}
-			list = []string{hostID}
-		} else {
-			list = cluster.ListNodeIDs(false)
-		}
-		privNodesChannel = make(chan map[string]stepErrors)
-		go asyncAddOnHosts(list, c, v, privNodesChannel)
-	}
-	if pubnodeT != "0" {
-		if pubnodeT == "1" {
-			hostID, err := cluster.FindAvailableNode(true)
-			if err != nil {
-				return false, AddResults{}, err
-			}
-			list = []string{hostID}
-		} else {
-			list = cluster.ListNodeIDs(true)
-		}
-		pubNodesChannel = make(chan map[string]stepErrors)
-		go asyncAddOnHosts(list, c, v, pubNodesChannel)
-	}
-
-	ok := true
-	hostsResults := AddResults{}
-
-	// Waiting go routines...
-	if masterT != "0" {
-		mastersStatus = <-mastersChannel
-		for h, se := range mastersStatus {
-			hostsResults[h] = se
-			if ok && len(se) > 0 {
-				ok = false
-			}
-		}
-	}
-	if privnodeT != "0" {
-		privNodesStatus = <-privNodesChannel
-		for h, se := range privNodesStatus {
-			hostsResults[h] = se
-			if ok && len(se) > 0 {
-				ok = false
-			}
-		}
-	}
-	if pubnodeT != "0" {
-		pubNodesStatus = <-pubNodesChannel
-		for h, se := range pubNodesStatus {
-			hostsResults[h] = se
-			if ok && len(se) > 0 {
-				ok = false
-			}
-		}
-	}
-
-	// Return the result
-	return ok, hostsResults, nil
+	return worker.Proceed(v)
 }
 
 // Remove uninstalls the component using the RemoveScript script
-func (g *genericPackager) Remove(c *Component, t Target, v Variables) (bool, RemoveResults, error) {
-	var (
-		onCluster     bool
-		hostTarget    *HostTarget
-		clusterTarget *ClusterTarget
-		ok            bool
-	)
-
-	hostTarget, ok = t.(*HostTarget)
-	if !ok {
-		clusterTarget, onCluster = t.(*ClusterTarget)
-		if !onCluster {
-			return false, RemoveResults{}, fmt.Errorf("type of target is unknown")
-		}
-	}
-
-	// First check if component is target host. Even in cluster context, host has to be targateable
-	specs := c.Specs()
-	if specs.IsSet("component.target.host") {
-		target := strings.ToLower(specs.GetString("component.target.host"))
-		if target != "yes" && target != "true" {
-			return false, RemoveResults{}, fmt.Errorf("can't install, component doesn't target a host")
-		}
-	}
-
-	rootKey := "component.install." + g.name
-
-	if onCluster {
-		cluster := clusterTarget.cluster
-		if !validateContextForCluster(c, cluster) {
-			config := cluster.GetConfig()
-			msg := fmt.Sprintf("component not permitted on flavor '%s' of cluster '%s'\n", config.Flavor.String(), config.Name)
-			log.Println(msg)
-			return false, RemoveResults{}, fmt.Errorf(msg)
-		}
-
-		masterT, privnodeT, pubnodeT, err := validateClusterTargets(specs)
-		if err != nil {
-			return false, RemoveResults{}, err
-		}
-
-		if !specs.IsSet(rootKey + ".remove") {
-			msg := `syntax error in component '%s' specification file (%s):
-					no key '%s.remove' found`
-			return false, RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
-		}
-
-		// Sets some implicit variables for clusters
-		v["MasterIDs"] = cluster.ListMasterIDs()
-		v["MasterIPs"] = cluster.ListMasterIPs()
-		if _, ok := v["Username"]; !ok {
-			v["Username"] = "cladm"
-		}
-
-		var (
-			list             []string
-			mastersChannel   chan map[string]stepErrors
-			pubNodesChannel  chan map[string]stepErrors
-			privNodesChannel chan map[string]stepErrors
-			mastersStatus    = map[string]stepErrors{}
-			pubNodesStatus   = map[string]stepErrors{}
-			privNodesStatus  = map[string]stepErrors{}
-		)
-
-		if masterT != "0" {
-			if masterT != "0" {
-				if masterT == "1" {
-					hostID, err := findConcernedMaster(cluster, c)
-					if err != nil {
-						return false, RemoveResults{}, err
-					}
-					list = append(list, hostID)
-				} else {
-					list = cluster.ListMasterIDs()
-				}
-			}
-			mastersChannel = make(chan map[string]stepErrors)
-			go asyncRemoveFromHosts(list, c, v, mastersChannel)
-		}
-		if privnodeT != "0" {
-			if privnodeT == "1" {
-				hostID, err := findConcernedNode(cluster, c, false)
-				if err != nil {
-					return false, RemoveResults{}, err
-				}
-				list = []string{hostID}
-			} else {
-				list = cluster.ListNodeIDs(false)
-			}
-			privNodesChannel = make(chan map[string]stepErrors)
-			go asyncRemoveFromHosts(list, c, v, privNodesChannel)
-		}
-		if pubnodeT != "0" {
-			if pubnodeT == "1" {
-				hostID, err := findConcernedNode(cluster, c, true)
-				if err != nil {
-					return false, RemoveResults{}, err
-				}
-				list = []string{hostID}
-			} else {
-				list = cluster.ListNodeIDs(true)
-			}
-			pubNodesChannel = make(chan map[string]stepErrors)
-			go asyncRemoveFromHosts(list, c, v, pubNodesChannel)
-		}
-
-		ok = true
-		hostsResults := RemoveResults{}
-
-		// Waiting go routines...
-		if masterT != "0" {
-			mastersStatus = <-mastersChannel
-			for h, se := range mastersStatus {
-				hostsResults.AddResults[h] = se
-				if ok && len(se) > 0 {
-					ok = false
-				}
-			}
-		}
-		if privnodeT != "0" {
-			privNodesStatus = <-privNodesChannel
-			for h, se := range privNodesStatus {
-				hostsResults.AddResults[h] = se
-				if ok && len(se) > 0 {
-					ok = false
-				}
-			}
-		}
-		if pubnodeT != "0" {
-			pubNodesStatus = <-pubNodesChannel
-			for h, se := range pubNodesStatus {
-				hostsResults.AddResults[h] = se
-				if ok && len(se) > 0 {
-					ok = false
-				}
-			}
-		}
-
-		// Return the result
-		return ok, hostsResults, nil
-	}
-
-	// Single host mode
-	if !specs.IsSet(rootKey + ".package") {
+func (g *genericPackager) Remove(c *Component, t Target, v Variables) (Results, error) {
+	yamlKey := "component.install." + g.name + ".remove"
+	if !c.Specs().IsSet(yamlKey) {
 		msg := `syntax error in component '%s' specification file (%s):
-				no key '%s.package' found`
-		return false, RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
-	}
-	packageName := specs.GetString(rootKey + ".package")
-	if strings.TrimSpace(packageName) == "" {
-		msg := `syntax error in component '%s' specification file (%s):
-				key '%s.package' is empty`
-		return false, RemoveResults{}, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), rootKey)
+				no key '%s' found`
+		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
 	}
 
-	// Sets some implicit variables for clusters
-	if _, ok := v["Username"]; !ok {
-		v["Username"] = "gpac"
-	}
+	// Inits implicit parameters
+	setImplicitParameters(t, v)
 
-	cmdStr := fmt.Sprintf(g.removeCmd, packageName)
-	wallTime := specs.GetInt(rootKey + ".wall_time")
-	if wallTime == 0 {
-		wallTime = 5
-	}
-	retcode, _, _, err := client.New().Ssh.Run(hostTarget.host.ID, cmdStr, client.DefaultConnectionTimeout, time.Duration(wallTime)*time.Minute)
+	// Checks required parameters have value
+	err := checkParameters(c, v)
 	if err != nil {
-		return false, RemoveResults{}, err
+		return nil, err
 	}
-	err = nil
-	ok = retcode == 0
-	if !ok {
-		err = fmt.Errorf("uninstall command failed for component '%s'", c.DisplayName())
+
+	worker, err := newWorker(c, t, Method.Bash, Action.Remove, g.removeCommand)
+	if err != nil {
+		return nil, err
 	}
-	return ok, RemoveResults{AddResults: AddResults{hostTarget.host.Name: stepErrors{"__error__": err}}}, err
+	err = worker.CanProceed()
+	if err != nil {
+		log.Println(err.Error())
+		return nil, err
+	}
+
+	return worker.Proceed(v)
 }
 
-// findConcernedMaster determines from all masters which one has the component installed
-func findConcernedMaster(cluster clusterapi.Cluster, c *Component) (string, error) {
-	// metadata not yet implemented for components, so assuming the concerned master is
-	// the available one
-	return cluster.FindAvailableMaster()
-	//for _, m := range cluster.ListMasterIDs() {
-	//}
-}
+// // findConcernedMaster determines from all masters which one has the component installed
+// func findConcernedMaster(cluster clusterapi.Cluster, c *Component) (string, error) {
+// 	// metadata not yet implemented for components, so assuming the concerned master is
+// 	// the available one
+// 	return cluster.FindAvailableMaster()
+// 	//for _, m := range cluster.ListMasterIDs() {
+// 	//}
+// }
 
-// findConcernedNode determines from all nodes which one has the component installed
-func findConcernedNode(cluster clusterapi.Cluster, c *Component, public bool) (string, error) {
-	// metadata not yet implemented for components, so assuming the concerned node is
-	// the first one
-	list := cluster.ListNodeIDs(public)
-	if len(list) > 0 {
-		return list[0], nil
-	}
-	return "", fmt.Errorf("no node found")
-	//for _, m := range cluster.ListNodeIDs(public) {
-	//}
-}
+// // findConcernedNode determines from all nodes which one has the component installed
+// func findConcernedNode(cluster clusterapi.Cluster, c *Component, public bool) (string, error) {
+// 	// metadata not yet implemented for components, so assuming the concerned node is
+// 	// the first one
+// 	list := cluster.ListNodeIDs(public)
+// 	if len(list) > 0 {
+// 		return list[0], nil
+// 	}
+// 	return "", fmt.Errorf("no node found")
+// 	//for _, m := range cluster.ListNodeIDs(public) {
+// 	//}
+// }
 
 // aptInstaller is an installer using script to add and remove a component
 type aptInstaller struct {
@@ -610,10 +147,16 @@ type aptInstaller struct {
 func NewAptInstaller() Installer {
 	return &aptInstaller{
 		genericPackager: genericPackager{
-			name:      "apt",
-			checkCmd:  "sudo dpkg-query -s '%s' &>/dev/null",
-			addCmd:    "sudo apt-get update -y; sudo apt-get install -y '%s'",
-			removeCmd: "sudo apt-get remove -y '%s'",
+			name: "apt",
+			checkCommand: func(pkg string) string {
+				return fmt.Sprintf("sudo dpkg-query -s '%s' &>/dev/null", pkg)
+			},
+			addCommand: func(pkg string) string {
+				return fmt.Sprintf("sudo apt-get install -y '%s'", pkg)
+			},
+			removeCommand: func(pkg string) string {
+				return fmt.Sprintf("sudo apt-get remove -y '%s'", pkg)
+			},
 		},
 	}
 }
@@ -627,10 +170,16 @@ type yumInstaller struct {
 func NewYumInstaller() Installer {
 	return &yumInstaller{
 		genericPackager: genericPackager{
-			name:      "yum",
-			checkCmd:  "sudo rpm -q %s &>/dev/null",
-			addCmd:    "sudo yum makecache fast; sudo yum install -y %s",
-			removeCmd: "sudo yum remove -y %s",
+			name: "yum",
+			checkCommand: func(pkg string) string {
+				return fmt.Sprintf("sudo rpm -q %s &>/dev/null", pkg)
+			},
+			addCommand: func(pkg string) string {
+				return fmt.Sprintf("sudo yum install -y %s", pkg)
+			},
+			removeCommand: func(pkg string) string {
+				return fmt.Sprintf("sudo yum remove -y %s", pkg)
+			},
 		},
 	}
 }
@@ -644,10 +193,16 @@ type dnfInstaller struct {
 func NewDnfInstaller() Installer {
 	return &dnfInstaller{
 		genericPackager: genericPackager{
-			name:      "dnf",
-			checkCmd:  "sudo dnf list installed %s &>/dev/null",
-			addCmd:    "sudo dnf install -y %s",
-			removeCmd: "sudo dnf uninstall -y %s",
+			name: "dnf",
+			checkCommand: func(pkg string) string {
+				return fmt.Sprintf("sudo dnf list installed %s &>/dev/null", pkg)
+			},
+			addCommand: func(pkg string) string {
+				return fmt.Sprintf("sudo dnf install -y %s", pkg)
+			},
+			removeCommand: func(pkg string) string {
+				return fmt.Sprintf("sudo dnf uninstall -y %s", pkg)
+			},
 		},
 	}
 }

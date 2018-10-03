@@ -205,7 +205,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		component        *install.Component
 		target           install.Target
 		values           = install.Variables{}
-		results          install.AddResults
+		results          install.Results
+		kpName           string
+		kp               *providerapi.KeyPair
 	)
 
 	// Generate needed password for account cladm
@@ -258,12 +260,22 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		goto cleanNetwork
 	}
 
+	// Create a KeyPair for the user cladm
+	kpName = "cluster_" + req.Name + "_cladm_key"
+	//svc.DeleteKeyPair(kpName)
+	kp, err = svc.CreateKeyPair(kpName)
+	if err != nil {
+		err = fmt.Errorf("failed to create Key Pair: %s", err.Error())
+		goto cleanNetwork
+	}
+
 	// Saving cluster parameters, with status 'Creating'
 	instance = Cluster{
 		Core: &clusterapi.ClusterCore{
 			Name:          req.Name,
 			CIDR:          req.CIDR,
 			Flavor:        Flavor.OHPC,
+			Keypair:       kp,
 			State:         ClusterState.Creating,
 			Complexity:    req.Complexity,
 			Tenant:        req.Tenant,
@@ -304,12 +316,12 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		goto cleanNetwork
 	}
 	target = install.NewHostTarget(pbutils.ToPBHost(gw))
-	ok, results, err = component.Add(target, install.Variables{})
+	results, err = component.Add(target, install.Variables{})
 	if err != nil {
 		goto cleanNetwork
 	}
-	if !ok {
-		err = fmt.Errorf(results.Errors())
+	if !results.Successful() {
+		err = fmt.Errorf(results.AllErrorMessages())
 		goto cleanNetwork
 	}
 
@@ -350,7 +362,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	go instance.asyncConfigureMasters(masterChannel)
 
 	// Step 3: starts node creation asynchronously
-	nodesStatus = instance.createNodes(privateNodeCount, false, &nodesDef)
+	nodesStatus = instance.createNodes(privateNodeCount, false, nodesDef)
 	if nodesStatus != nil {
 		err = nodesStatus
 		goto cleanNodes
@@ -392,12 +404,12 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	if len(instance.manager.MasterIPs) > 1 {
 		values["SecondaryMasterIP"] = instance.manager.MasterIPs[1]
 	}
-	ok, results, err = component.Add(target, values)
+	results, err = component.Add(target, values)
 	if err != nil {
 		goto cleanNodes
 	}
-	if !ok {
-		err = fmt.Errorf(results.Errors())
+	if !results.Successful() {
+		err = fmt.Errorf(results.AllErrorMessages())
 		goto cleanNodes
 	}
 
@@ -406,12 +418,12 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	if err != nil {
 		goto cleanNodes
 	}
-	ok, results, err = component.Add(target, values)
+	results, err = component.Add(target, values)
 	if err != nil {
 		goto cleanNodes
 	}
-	if !ok {
-		err = fmt.Errorf(results.Errors())
+	if !results.Successful() {
+		err = fmt.Errorf(results.AllErrorMessages())
 		goto cleanNodes
 	}
 
@@ -492,13 +504,13 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 		return fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
 	}
 	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{})
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
 		return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
 	}
-	if !ok {
-		msg := results.Errors()
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
 		return fmt.Errorf(msg)
 	}
@@ -509,7 +521,7 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", 1, host.ID, err.Error())
 		return fmt.Errorf("failed to install component 'docker': %s", err.Error())
 	}
-	ok, results, err = component.Add(target, install.Variables{
+	results, err = component.Add(target, install.Variables{
 		"Hostname": host.Name,
 		"Username": "cladm",
 		"Password": c.Core.AdminPassword,
@@ -518,8 +530,8 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
 		return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
 	}
-	if !ok {
-		msg := results.Errors()
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
 		return fmt.Errorf(msg)
 	}
@@ -560,7 +572,7 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 	return nil
 }
 
-func (c *Cluster) createNodes(count int, public bool, def *pb.HostDefinition) error {
+func (c *Cluster) createNodes(count int, public bool, def pb.HostDefinition) error {
 	var countS string
 	if count > 1 {
 		countS = "s"
@@ -605,7 +617,7 @@ func (c *Cluster) createNodes(count int, public bool, def *pb.HostDefinition) er
 // asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
 func (c *Cluster) asyncCreateNode(
-	index int, nodeType NodeType.Enum, req *pb.HostDefinition,
+	index int, nodeType NodeType.Enum, req pb.HostDefinition,
 	result chan string, done chan error,
 ) {
 
@@ -631,7 +643,7 @@ func (c *Cluster) asyncCreateNode(
 	}
 	req.Public = publicIP
 	req.Network = c.Core.NetworkID
-	host, err := brokerclient.New().Host.Create(*req, brokerclient.DefaultExecutionTimeout)
+	host, err := brokerclient.New().Host.Create(req, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		err = brokerclient.DecorateError(err, "creation of host", true)
 		log.Printf("[%s node #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
@@ -675,14 +687,14 @@ func (c *Cluster) asyncCreateNode(
 		return
 	}
 	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{})
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
 		return
 	}
-	if !ok {
-		msg := results.Errors()
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
 		return
@@ -695,7 +707,7 @@ func (c *Cluster) asyncCreateNode(
 		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
 		return
 	}
-	ok, results, err = component.Add(target, install.Variables{
+	results, err = component.Add(target, install.Variables{
 		"Hostname": host.Name,
 		"Username": "cladm",
 		"Password": c.Core.AdminPassword,
@@ -705,8 +717,8 @@ func (c *Cluster) asyncCreateNode(
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
 		return
 	}
-	if !ok {
-		msg := results.Errors()
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
 		return
@@ -747,7 +759,7 @@ func (c *Cluster) asyncCreateNode(
 		return
 	}
 
-	log.Printf("[%s node #%d] creation successful\n", nodeTypeStr, index)
+	log.Printf("[%s node #%d (%s)] creation successful\n", nodeTypeStr, index, host.Name)
 	result <- host.ID
 	done <- nil
 }
@@ -792,6 +804,8 @@ func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
 			"CIDR":          c.Core.CIDR,
 			"CladmPassword": c.Core.AdminPassword,
+			"SSHPublicKey":  c.Core.Keypair.PublicKey,
+			"SSHPrivateKey": c.Core.Keypair.PrivateKey,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
@@ -848,13 +862,13 @@ func (c *Cluster) asyncInstallReverseProxy(host *providerapi.Host, done chan err
 		done <- err
 		return
 	}
-	ok, results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{})
 	if err != nil {
 		done <- fmt.Errorf("failed to execute installation of component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
 		return
 	}
-	if !ok {
-		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, results.Errors())
+	if !results.Successful() {
+		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, results.AllErrorMessages())
 		return
 	}
 	done <- nil
@@ -906,7 +920,7 @@ func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
 		return
 	}
 	target := install.NewHostTarget(host)
-	ok, results, err := component.Add(target, install.Variables{
+	results, err := component.Add(target, install.Variables{
 		"GatewayIP": c.Core.GatewayIP,
 		"Hostname":  host.Name,
 		"HostIP":    host.PRIVATE_IP,
@@ -917,8 +931,8 @@ func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
 		done <- fmt.Errorf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), err.Error())
 		return
 	}
-	if !ok {
-		msg := results.Errors()
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
 		log.Printf("[master #%d (%s)] installation script of component '%s' failed: %s\n", index, host.Name, component.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
 		return
@@ -989,7 +1003,7 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 }
 
 // AddNode adds one node
-func (c *Cluster) AddNode(public bool, req *pb.HostDefinition) (string, error) {
+func (c *Cluster) AddNode(public bool, req pb.HostDefinition) (string, error) {
 	hosts, err := c.AddNodes(1, public, req)
 	if err != nil {
 		return "", err
@@ -998,8 +1012,8 @@ func (c *Cluster) AddNode(public bool, req *pb.HostDefinition) (string, error) {
 }
 
 // AddNodes adds <count> nodes
-func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]string, error) {
-	request := c.GetConfig().NodesDef
+func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]string, error) {
+	request := *c.GetConfig().NodesDef
 	if req.CPUNumber > 0 {
 		request.CPUNumber = req.CPUNumber
 	}

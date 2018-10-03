@@ -15,13 +15,9 @@
 ---
 component:
     name: Apache Ignite
-    target:
+    suitableFor:
         host: no
-        cluster:
-            master: all
-            node:
-                private: all
-                public: all
+        cluster: dcos,boh,ohpc
     install:
         bash:
             check: |
