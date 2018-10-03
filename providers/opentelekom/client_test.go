@@ -18,6 +18,7 @@ package opentelekom_test
 
 import (
 	"errors"
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"testing"
 
@@ -50,9 +51,10 @@ func getTester() (*tests.ClientTester, error) {
 
 func getClient() (*opentelekom.Client, error) {
 	if client == nil {
-		service, err := providers.GetService("TestOpenTelekom")
+		tenant_name := "TestOpenTelekom"
+		service, err := providers.GetService(tenant_name)
 		if err != nil {
-			return nil, errors.New("You must provide a VALID tenant name in the environment variable TENANT_NAME_TEST, check your environment variables and your Safescale configuration files")
+			return nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name))
 		}
 		client = service.ClientAPI.(*opentelekom.Client)
 	}
