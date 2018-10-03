@@ -165,7 +165,7 @@ func (c *Component) Check(t Target, v Variables) (Results, error) {
 	}
 
 	//if debug
-	if true {
+	if false {
 		log.Printf("Checking if component '%s' is installed on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	}
 

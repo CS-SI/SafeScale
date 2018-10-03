@@ -757,7 +757,8 @@ func executeCommand(command string) (int, string, string, error) {
 				output += "\n"
 			}
 			output += stderr
-			fmt.Fprintf(os.Stderr, "Run on master #%d, retcode=%d\n%s\n", i+1, retcode, output)
+			// fmt.Fprintf(os.Stderr, "Run on master #%d, retcode=%d\n%s\n", i+1, retcode, output)
+			fmt.Fprintf(os.Stderr, "%s\n", output)
 			os.Exit(int(ExitCode.RPC))
 		}
 		fmt.Println(stdout)
