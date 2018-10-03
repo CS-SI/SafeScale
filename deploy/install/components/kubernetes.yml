@@ -145,13 +145,13 @@ component:
                             ps ax | grep kubelet &>/dev/null
 
             add:
-                pace: dir,commontools,cp-tools,cp-pkg,kubelet,cp1-init,cpx-init,join
+                pace: dir,commontools,cp-tools,cp-pkg,kubelet,cp1-init,cpx-init,join,weavenet,final
                 steps:
                     dir:
                         targets:
                             masters: all
                         run: |
-                            mkdir -p /opt/safescale/k8s/ssl /opt/safescale/k8s/config
+                            mkdir -p /opt/safescale/k8s/ssl /opt/safescale/k8s/config /opt/cni/bin
 
                     commontools:
                         targets:
@@ -203,7 +203,7 @@ component:
                             esac
 
                             sfDropzoneUntar crictl.tgz /usr/local/bin && \
-                            sfDropzoneUntar cni-plugins.tgz /usr/local/bin || exit 514
+                            sfDropzoneUntar cni-plugins.tgz /opt/cni/bin || exit 514
                             rm -f /var/tmp/{crictl.tgz,cni-plugins.tgz}
 
                     kubelet:
@@ -385,6 +385,7 @@ component:
                             cp -i /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
                             chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
                             chmod -R go-rwx ~{{.Username}}/.kube
+                            # Starting from here, use 'sfKubectl' instead of plain 'kubectl'
 
                     join:
                         targets:
@@ -400,7 +401,28 @@ component:
                                 break
                             done
                             [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && exit 513
-                            kubeadm join --token $TOKEN $MASTERIP:2073 --discovery-token-ca-cert-hash sha256:$HASH
+                            kubeadm join --token $TOKEN $MASTERIP:6443 --discovery-token-ca-cert-hash sha256:$HASH
+
+                    weavenet:
+                        targets:
+                            masters: one
+                        run: |
+                            VERSION=$(sfKubectl version | base64 | tr -d '\n')
+                            [ $? -ne 0 ] && exit 513
+                            sfRetry 3m 5 sfKubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$VERSION" || exit 514
+                            #sfRetry 3m 5 sfKubectl apply -f "https://cloud.weave.works/k8s/scope.yaml?k8s-version=$VERSION" || exit 515
+                            #sleep 10
+                            #NAME=$(sfKubectl get -n weave pod --selector=weave-scope-component=app -o jsonpath='{.items..metadata.name}')
+                            #sfKubectl port-forward -n weave "$NAME" 4040
+
+                    final:
+                        targets:
+                            masters: one
+                        run: |
+                            # Allows pods to start on master
+                            [ "{{.Complexity}}" = "small" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master-
+                            # adds Kubernetes Dashboard
+                            sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/src/deploy/recommended/kubernetes-dashboard.yaml || exit 513
 
             remove:
                 pace: node,reset,clean
