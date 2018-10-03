@@ -74,8 +74,8 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice stringer protoc-gen-go golint mockgen cover > /dev/null; if [ $$? -ne 0 ]; then \
-    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(DEP); \
+	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover > /dev/null; if [ $$? -ne 0 ]; then \
+    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(XUNIT) $(DEP); \
     fi
 
 ensure:
