@@ -132,7 +132,7 @@ component:
                             # to update, from a Desktop configured as wanted:
                             # tar --exclude .config/g* -Jcvf remotedesktop_conf.tar.xz .config
                             # base64 remotedesktop_conf.tar.xz >remotedesktop_conf.tar.xz.encoded
-                            # Then copy between EOFs the content of the .encoded file
+                            # Then copy between HEREDOCs the content of the .encoded file
                             cat >/var/tmp/xfce_front.encoded <<'EOF'
                             /Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4O//FW9dABcYyecMYYgb8tkd/QwXnBEBYq7o9K5cz3Dw
                             IsSonUkO6IaHvO+YS5nNHN2/lJlax4FCiWhkmwiAJRTWbQy6nFQuCNTNR5RdGaujqV44zxFE5CBR
