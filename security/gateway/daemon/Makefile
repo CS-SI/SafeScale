@@ -12,4 +12,4 @@ safe-securityd:	proxy.go
 	@$(GO) build -o $(EXEC)
 
 clean:
-	@$(RM) $(EXEC)
+	@$(RM) $(EXEC) || true

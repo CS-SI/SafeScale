@@ -14,5 +14,5 @@ test:
 	@$(GO) test
 
 clean:
-	@($(RM) rice-box.go)	
+	@($(RM) rice-box.go || true)
 

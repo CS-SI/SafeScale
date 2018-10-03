@@ -16,4 +16,5 @@ services:
 
 clean:
 	@(cd services && $(MAKE) $@)
-	@$(RM) $(EXEC)
+	@$(RM) $(EXEC) || true
+	@$(RM) ./mocks/*.go || true

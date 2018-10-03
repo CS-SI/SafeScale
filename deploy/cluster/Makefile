@@ -1,6 +1,8 @@
 GO?=go
 
-.PHONY: api flavors tests clean mrproper
+.PHONY: api flavors tests clean
+
+DIRECTORIES := $(sort $(dir $(wildcard */)))
 
 all: api flavors tests
 
@@ -20,8 +22,7 @@ clean:
 	@(cd api && $(MAKE) $@)
 	@(cd flavors && $(MAKE) $@)
 	@(cd tests && $(MAKE) $@)
+	@(cd enums && $(MAKE) $@)
+	@($(RM) ./mocks/*.go || true)
+	@(for d in $(DIRECTORIES); do (cd $$d; $(RM) *_string.go || true); done)
 
-mrproper: clean
-	@(cd tests && rm -f debug)
-	@($(RM) flavors/dcos/rice-box.go)
-	@($(RM) flavors/boh/rice-box.go)

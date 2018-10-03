@@ -5,7 +5,7 @@ GO?=go
 all: utils retry cli
 
 utils: *.go
-	@go generate
+	@$(GO) generate ./...
 
 cli:
 	@(cd cli && $(MAKE))
@@ -14,4 +14,5 @@ retry:
 	@(cd retry && $(MAKE))
 
 clean:
+	@(cd cli && $(MAKE) $@)
 	@(cd retry && $(MAKE) $@)

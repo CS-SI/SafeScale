@@ -1,6 +1,6 @@
 GO?=go
 
-.PHONY: dcos boh ohpc tests clean mrproper
+.PHONY: dcos boh ohpc tests clean
 
 all: dcos boh ohpc
 
@@ -23,7 +23,4 @@ clean:
 	@(cd dcos && $(MAKE) $@)
 	@(cd boh && $(MAKE) $@)
 	@(cd ohpc && $(MAKE) $@)
-	#@(cd tests && $(MAKE) $@)
 
-mrproper: clean
-	#@(cd tests && rm -f debug)
