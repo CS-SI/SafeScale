@@ -219,8 +219,23 @@ sfDropzoneClean() {
 sfRemoteExec() {
     local remote=$1
     shift
-    ssh -i ~cladm/.ssh/id_rsa cladm@$remote $*
+    ssh -i ~cladm/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no cladm@$remote $*
 }
+
+sfKubectl() {
+    sudo -u cladm -i kubectl $@
+}
+export -f sfKubectl
+
+sfDcos() {
+    sudo -u cladm -i dcos $@
+}
+export -f sfDcos
+
+sfMarathon() {
+    sudo -u cladm -i marathon $@
+}
+export -f sfMarathon
 
 # Waits the completion of the execution of userdata
 sfWaitForUserdata() {
