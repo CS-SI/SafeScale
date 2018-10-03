@@ -25,9 +25,13 @@ install_common_requirements() {
     usermod -aG docker gpac
     usermod -aG docker cladm
     echo "cladm:{{ .CladmPassword }}" | chpasswd
-    mkdir -p /home/cladm/.ssh && chmod 0700 /home/cladm/.ssh
-    mkdir -p /home/cladm/.local/bin && find /home/cladm/.local -exec chmod 0770 {} \;
-    cat >>/home/cladm/.bashrc <<-'EOF'
+    mkdir -p ~cladm/.ssh && chmod 0700 ~cladm/.ssh
+    echo "{{ .SSHPublicKey }}" >~cladm/.ssh/authorized_keys
+    echo "{{ .SSHPrivateKey }}" >~cladm/.ssh/id_rsa
+    chmod 0400 ~cladm/.ssh/*
+
+    mkdir -p ~cladm/.local/bin && find ~cladm/.local -exec chmod 0770 {} \;
+    cat >>~cladm/.bashrc <<-'EOF'
 pathremove() {
         local IFS=':'
         local NEWPATH
@@ -53,7 +57,7 @@ pathappend() {
 pathprepend $HOME/.local/bin
 pathappend /opt/mesosphere/bin
 EOF
-    chown -R cladm:cladm /home/cladm
+    chown -R cladm:cladm ~cladm
 }
 export -f install_common_requirements
 
@@ -63,8 +67,8 @@ case $LINUX_KIND in
         yum install -y curl wget time jq rclone
         ;;
     debian|ubuntu)
-        wait_for_apt && apt update && \
-        wait_for_apt && apt install -y curl wget time jq rclone
+        sfWaitForApt && apt update && \
+        sfWaitForApt && apt install -y curl wget time jq rclone
         ;;
     *)
         echo "unmanaged Linux distribution '$LINUX_KIND'"

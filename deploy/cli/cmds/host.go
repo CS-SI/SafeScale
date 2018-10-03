@@ -143,18 +143,18 @@ var hostComponentAddCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		ok, results, err := component.Add(target, values)
+		results, err := component.Add(target, values)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error installing component '%s' on host '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
-		if ok {
+		if results.Successful() {
 			fmt.Printf("Component '%s' installed successfully on host '%s'\n", componentName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
 
 		fmt.Printf("Failed to install component '%s' on host '%s'\n", componentName, hostName)
-		fmt.Println(results.Errors())
+		fmt.Println(results.AllErrorMessages())
 		os.Exit(int(ExitCode.Run))
 	},
 
@@ -177,6 +177,18 @@ var hostComponentCheckCommand = &cli.Command{
 			os.Exit(int(ExitCode.NotFound))
 		}
 
+		values := install.Variables{}
+		anon := c.Option("--param", "<param>")
+		if anon != nil {
+			params := anon.([]string)
+			for _, k := range params {
+				res := strings.Split(k, "=")
+				if len(res[0]) > 0 {
+					values[res[0]] = strings.Join(res[1:], "=")
+				}
+			}
+		}
+
 		// Wait for SSH service on remote host first
 		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
 		if err != nil {
@@ -185,17 +197,17 @@ var hostComponentCheckCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		found, results, err := component.Check(target, install.Variables{})
+		results, err := component.Check(target, values)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
-		if found {
+		if results.Successful() {
 			fmt.Printf("Component '%s' is installed on '%s'\n", componentName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
 		fmt.Printf("Component '%s' is not installed on '%s'\n", componentName, hostName)
-		msg := results.Errors()
+		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)
 		}
@@ -221,6 +233,18 @@ var hostComponentDeleteCommand = &cli.Command{
 			os.Exit(int(ExitCode.NotFound))
 		}
 
+		values := install.Variables{}
+		anon := c.Option("--param", "<param>")
+		if anon != nil {
+			params := anon.([]string)
+			for _, k := range params {
+				res := strings.Split(k, "=")
+				if len(res[0]) > 0 {
+					values[res[0]] = strings.Join(res[1:], "=")
+				}
+			}
+		}
+
 		// Wait for SSH service on remote host first
 		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
 		if err != nil {
@@ -229,17 +253,17 @@ var hostComponentDeleteCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		ok, results, err := component.Remove(target, install.Variables{})
+		results, err := component.Remove(target, values)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
-		if ok {
+		if results.Successful() {
 			fmt.Printf("Component '%s' uninstalled successfully on '%s'\n", componentName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
 		fmt.Printf("Failed to uninstall component '%s' from host '%s':\n", componentName, hostName)
-		msg := results.Errors()
+		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)
 		}

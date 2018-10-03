@@ -2,9 +2,9 @@ GO?=go
 
 .PHONY: nfs clean
 
-all: build nfs
+all: generate nfs
 
-build: *.go scripts/*
+generate:
 	@$(GO) generate ./...
 
 vet:

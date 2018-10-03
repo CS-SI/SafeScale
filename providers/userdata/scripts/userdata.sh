@@ -20,17 +20,17 @@ exec 2<&-
 exec 1<>/var/tmp/user_data.log
 exec 2>&1
 
-detect_facts() {
+sfDetectFacts() {
    local -g LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
    local -g VERSION_ID=$(cat /etc/os-release | grep "^VERSION_ID=" | cut -d= -f2 | sed 's/"//g')
 }
-detect_facts
+sfDetectFacts
 
-wait_for_apt() {
-    wait_lockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
+sfWaitForApt() {
+    sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
 }
 
-wait_lockfile() {
+sfWaitLockfile() {
     local ROUNDS=600
     name=$1
     shift
@@ -72,7 +72,7 @@ i_PU_IF=
 o_PR_IF=
 o_PU_IF=
 
-save_iptables_rules() {
+sfSaveIptablesRules() {
    case $LINUX_KIND in
        rhel|centos) iptables-save >/etc/sysconfig/iptables ;;
        debian|ubuntu) iptables-save >/etc/iptables/rules.v4 ;;
@@ -196,7 +196,7 @@ reset_fw() {
         debian|ubuntu)
             systemctl stop ufw &>/dev/null
             systemctl disable ufw &>/dev/null
-            wait_for_apt && apt purge -q ufw &>/dev/null
+            sfWaitForApt && apt purge -q ufw &>/dev/null
             ;;
 
         rhel|centos)
@@ -212,8 +212,8 @@ reset_fw() {
 enable_iptables() {
     case $LINUX_KIND in
         debian|ubuntu)
-            wait_for_apt && apt update
-            wait_for_apt && apt install -y -q iptables-persistent
+            sfWaitForApt && apt update
+            sfWaitForApt && apt install -y -q iptables-persistent
             [ $? -ne 0 ] && {
                 mkdir -p /etc/iptables /etc/network/if-pre-up.d
                 cd /etc/network/if-pre-up.d
@@ -238,7 +238,7 @@ EOF
 
     # We flush the current firewall rules possibly introduced by iptables service
     iptables -F
-    save_iptables_rules
+    sfSaveIptablesRules
     #iptables-save | awk '/^[*]/ { print $1 }
     #                     /^:[A-Z]+ [^-]/ { print $1 " ACCEPT" ; }
     #                     /COMMIT/ { print $0; }' | iptables-restore
@@ -290,7 +290,7 @@ configure_as_gateway() {
         fw_f_accept $i_PU_IF $o_PR_IF -m state --state RELATED,ESTABLISHED
     fi
 
-    save_iptables_rules
+    sfSaveIptablesRules
 
     grep -vi AllowTcpForwarding /etc/ssh/sshd_config >/etc/ssh/sshd_config.new
     echo "AllowTcpForwarding yes" >>/etc/ssh/sshd_config.new

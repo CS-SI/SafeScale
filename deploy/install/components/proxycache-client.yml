@@ -17,65 +17,88 @@
 ---
 component:
     name: ProxyCache Client
-    target:
+    suitableFor:
         host: yes
-        cluster:
-            master: yes
-            node:
-                private: yes
-                public: yes
+        cluster: no
     install:
         bash:
-            wall_time: 10
-            check: |
-                docker image ls | grep proxycache &>/dev/null
+            check:
+                pace: image
+                steps:
+                    image:
+                        targets:
+                            hosts: yes
+                        run: |
+                            docker image ls | grep proxycache &>/dev/null
 
-            add: |
-                cat >>/etc/environment <<-'EOF'
-                http_proxy="http://{{.GatewayIP}}:3128/"
-                HTTP_PROXY="http://{{.GatewayIP}}:3128/"
-                https_proxy="http://{{.GatewayIP}}:3128/"
-                HTTPS_PROXY="http://{{.GatewayIP}}:3128/"
-                ftp_proxy="http://{{.GatewayIP}}:3128/"
-                FTP_PROXY="http://{{.GatewayIP}}:3128/"
-                no_proxy={{.GatewayIP}},{{.HostIP}},localhost
-                NO_PROXY={{.GatewayIP}},{{.HostIP}},localhost
-                EOF
+            add:
+                pace: env,docker
+                steps:
+                    env:
+                        targets:
+                            hosts: yes
+                        run: |
+                            cat >>/etc/environment <<-'EOF'
+                            http_proxy="http://{{.GatewayIP}}:3128/"
+                            HTTP_PROXY="http://{{.GatewayIP}}:3128/"
+                            https_proxy="http://{{.GatewayIP}}:3128/"
+                            HTTPS_PROXY="http://{{.GatewayIP}}:3128/"
+                            ftp_proxy="http://{{.GatewayIP}}:3128/"
+                            FTP_PROXY="http://{{.GatewayIP}}:3128/"
+                            no_proxy={{.GatewayIP}},{{.HostIP}},localhost
+                            NO_PROXY={{.GatewayIP}},{{.HostIP}},localhost
+                            EOF
 
-                case $LINUX_KIND in
-                    debian|ubuntu)
-                        echo "Acquire::http::Proxy http://{{.GatewayIP}}:3128/;" >/etc/apt/02proxy
-                        ;;
-                    redhat|centos)
-                        echo "proxy=http://{{.GatewayIP}}:3128/" >>/etc/yum.conf
-                        ;;
-                    *)
-                        echo "Unmanaged OS '$LINUX_KIND'. Aborting."
-                        exit 1
-                esac
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    echo "Acquire::http::Proxy http://{{.GatewayIP}}:3128/;" >/etc/apt/02proxy
+                                    ;;
+                                redhat|centos)
+                                    echo "proxy=http://{{.GatewayIP}}:3128/" >>/etc/yum.conf
+                                    ;;
+                                *)
+                                    echo "Unmanaged OS '$LINUX_KIND'. Aborting."
+                                    exit 1
+                            esac
 
-                # Update proxy for dockerd preventively
-                mkdir -p /etc/systemd/system/docker.service.d
-                cat >/etc/systemd/system/docker.service.d/proxy.conf <<-'EOF'
-                Environment="HTTP_PROXY=http://{{.GatewayIP}}:3128/"
-                EOF
-                systemctl daemon-reload || :
+                    docker:
+                        targets:
+                            hosts: yes
+                        run: |
+                            # Update proxy for dockerd preventively
+                            mkdir -p /etc/systemd/system/docker.service.d
+                            cat >/etc/systemd/system/docker.service.d/proxy.conf <<-'EOF'
+                            Environment="HTTP_PROXY=http://{{.GatewayIP}}:3128/"
+                            EOF
+                            systemctl daemon-reload || :
 
-            remove: |
-                docker-compose -f /opt/safescale/run/proxycache.compose.yml rm -f
-                docker image rm -f proxycache:latest
-                case $LINUX_KIND in
-                    debian|ubuntu)
-                        rm -f /etc/apt/02proxy
-                        ;;
-                    redhat|centos)
-                        cat /etc/yum.conf | grep -v "^proxy=" >/etc/yum.conf.new
-                        mv -f /etc/yum.conf.new /etc/yum.conf
-                        ;;
-                    *)
-                        echo "Unmanaged OS '$LINUX_KIND'. Aborting."
-                        exit 1
-                esac
+            remove:
+                pace:  env,docker
+                steps:
+                    env:
+                        targets:
+                            hosts: yes
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    rm -f /etc/apt/02proxy
+                                    ;;
+                                redhat|centos)
+                                    cat /etc/yum.conf | grep -v "^proxy=" >/etc/yum.conf.new
+                                    mv -f /etc/yum.conf.new /etc/yum.conf
+                                    ;;
+                                *)
+                                    echo "Unmanaged OS '$LINUX_KIND'. Aborting."
+                                    exit 1
+                            esac
+                            grep -vi proxy /etc/environment >/etc/environment.new
+
+                    docker:
+                        targets:
+                            hosts: yes
+                        run: |
+                            mv /etc/environment.new /etc/environment
+                            rm -f /etc/systemd/system/docker.service.d/proxy.conf
 
     service:
         start: |
