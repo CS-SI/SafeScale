@@ -39,6 +39,7 @@ MOCKGEN := github.com/golang/mock/gomock github.com/golang/mock/mockgen
 COVER := golang.org/x/tools/cmd/cover
 LINTER := golang.org/x/lint/golint
 DEP := github.com/golang/dep/cmd/dep
+XUNIT := github.com/tebeka/go2xunit
 
 DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(COVER)
 
