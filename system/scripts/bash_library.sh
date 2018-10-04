@@ -87,6 +87,7 @@ sfAsyncStart() {
     timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
     eval "$pid=$!"
 }
+export -f sfAsyncStart
 
 # sfAsyncWait <what>
 # return 0 on success, !=0 on failure
@@ -103,6 +104,7 @@ sfAsyncWait() {
     rm -f /var/tmp/$log
     return 0
 }
+export -f sfAsyncWait
 
 # sfRetry timeout <delay> command
 # retries command until success, with sleep of <delay> seconds
@@ -132,6 +134,7 @@ EOF
     [ $rc -eq 0 ] && echo $result
     return $rc
 }
+export sfRetry
 
 # sfDownload url filename timeout delay
 sfDownload() {
@@ -185,6 +188,7 @@ sfDropzonePush() {
     cp -f $file ~cladm/.dropzone/
     chown -R cladm:cladm ~cladm/.dropzone
 }
+export -f sfDropzonePush
 
 # Copy content of local dropzone to remote dropzone (parameter can be IP or name)
 sfDropzoneSync() {
@@ -192,6 +196,7 @@ sfDropzoneSync() {
     create_dropzone &>/dev/null
     scp -i ~cladm/.ssh/id_rsa -r ~cladm/.dropzone cladm@${remote}:~/
 }
+export -f sfDropzoneSync
 
 # Moves file (1st parameter) from drop zone to folder (2nd parameter)
 # Dropzone shall be empty after the operation
@@ -202,6 +207,7 @@ sfDropzonePop() {
     mkdir -p "$dest" &>/dev/null
     mv -f ~cladm/.dropzone/$file "$dest"
 }
+export -f sfDropzonePop
 
 sfDropzoneUntar() {
     local file="$1"
@@ -210,10 +216,12 @@ sfDropzoneUntar() {
     create_dropzone &>/dev/null
     tar zxvf ~cladm/.dropzone/"$file" -C "$dest"
 }
+export -f sfDropzoneUntar
 
 sfDropzoneClean() {
     rm -rf ~cladm/.dropzone/* ~cladm/.dropzone/.[^.]*
 }
+export -f sfDropzoneClean
 
 # Executes a remote command with SSH
 sfRemoteExec() {
@@ -221,6 +229,7 @@ sfRemoteExec() {
     shift
     ssh -i ~cladm/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no cladm@$remote $*
 }
+export -f sfRemoteExec
 
 sfKubectl() {
     sudo -u cladm -i kubectl $@
