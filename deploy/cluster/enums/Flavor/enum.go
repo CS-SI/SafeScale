@@ -28,9 +28,9 @@ const (
 	_ Enum = iota
 	// DCOS managed cluster
 	DCOS
-	// Kubernetes flavor for a pure Kubernetes cluster
-	Kubernetes
-	// Swarm flavor for a pure docker swarm cluster
+	// K8S for a pure Kubernetes cluster
+	K8S
+	// Swarm for a pure docker swarm cluster
 	Swarm
 	// BOH for a "Bunch Of Hosts", without cluster management
 	BOH
@@ -40,19 +40,19 @@ const (
 
 var (
 	stringMap = map[string]Enum{
-		"dcos":       DCOS,
-		"kubernetes": Kubernetes,
-		"swarm":      Swarm,
-		"boh":        BOH,
-		"ohpc":       OHPC,
+		"dcos":  DCOS,
+		"k8s":   K8S,
+		"swarm": Swarm,
+		"boh":   BOH,
+		"ohpc":  OHPC,
 	}
 
 	enumMap = map[Enum]string{
-		DCOS:       "DCOS",
-		Kubernetes: "Kubernetes",
-		Swarm:      "Swarm",
-		BOH:        "BOH",
-		OHPC:       "OHPC",
+		DCOS:  "DCOS",
+		K8S:   "K8S",
+		Swarm: "Swarm",
+		BOH:   "BOH",
+		OHPC:  "OHPC",
 	}
 )
 

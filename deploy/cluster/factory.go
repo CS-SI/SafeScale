@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos"
+	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/k8s"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 )
@@ -49,6 +50,11 @@ func Get(name string) (clusterapi.Cluster, error) {
 	switch common.Flavor {
 	case Flavor.DCOS:
 		instance, err = dcos.Load(m)
+		if err != nil {
+			return nil, err
+		}
+	case Flavor.K8S:
+		instance, err = k8s.Load(m)
 		if err != nil {
 			return nil, err
 		}
@@ -109,8 +115,13 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		if err != nil {
 			return nil, err
 		}
+	case Flavor.K8S:
+		req.Tenant = tenant.Name
+		instance, err = k8s.Create(req)
+		if err != nil {
+			return nil, err
+		}
 	//case Flavor.Swarm:
-	//case Flavor.Kubernetes:
 	default:
 		return nil, fmt.Errorf("cluster Flavor '%s' not yet implemented", req.Flavor.String())
 	}
@@ -158,7 +169,7 @@ func List() ([]clusterapi.Cluster, error) {
 			fallthrough
 		case Flavor.Swarm:
 			fallthrough
-		case Flavor.Kubernetes:
+		case Flavor.K8S:
 			return fmt.Errorf("cluster Flavor '%s' not yet implemented", cluster.Flavor.String())
 		}
 
