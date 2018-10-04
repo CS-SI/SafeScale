@@ -19,7 +19,7 @@ component:
         - Kubernetes
     suitableFor:
         hosts: no
-        clusters: dcos
+        clusters: k8s,dcos
     install:
         dcos:
             check:
