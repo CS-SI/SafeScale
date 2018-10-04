@@ -1,13 +1,14 @@
-GOPATH?=$(HOME)/go
-GOINCLUDEPATH?=$(HOME)/go
+GOINCLUDEPATH?=$(GOPATH)
 
 GO?=go
 
-.PHONY:	sdk clean
+.PHONY:	sdk clean vet
 
 # Handling multiple gopath: use $(HOME)/go by default
 ifeq ($(findstring :,$(GOINCLUDEPATH)),:)
     GOINCLUDEPATH=$(HOME)/go
+else
+	GOINCLUDEPATH=$(GOPATH)
 endif
 
 all:	cli
