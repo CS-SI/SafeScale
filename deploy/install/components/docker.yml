@@ -19,7 +19,7 @@ component:
     name: Docker
     suitableFor:
         host: yes
-        cluster: boh,dcos,ohpc
+        cluster: all
     install:
         bash:
             wallTime: 15

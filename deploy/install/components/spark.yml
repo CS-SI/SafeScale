@@ -17,7 +17,7 @@ component:
     name: Spark
     context:
         host: no
-        cluster: dcos
+        cluster: k8s,dcos
     install:
         dcos:
             add:
