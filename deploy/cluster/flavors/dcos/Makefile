@@ -11,5 +11,6 @@ generate: dcos.go scripts/*.sh
 	@$(GO) generate ./...
 
 clean:
+	@(cd enums && $(MAKE) $@)
 	@($(RM) -f rice-box.go || true)
-	@($(RM) ErrorCode/*_string.go || true)
+
