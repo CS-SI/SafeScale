@@ -11,3 +11,5 @@ vet:
 generate:
 	@$(GO) generate ./...
 
+clean: ;
+

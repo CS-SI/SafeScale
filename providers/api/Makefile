@@ -1,6 +1,6 @@
 GO?=go
 
-.PHONY:	clean generate
+.PHONY:	clean generate vet
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
@@ -12,5 +12,4 @@ vet:
 generate:
 	@$(GO) generate ./...
 
-clean:
-	@(for d in $(DIRECTORIES); do (cd $$d; $(MAKE) clean); done)
+clean: ;
