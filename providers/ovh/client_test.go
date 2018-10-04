@@ -147,6 +147,12 @@ func Test_Networks(t *testing.T) {
 	cli.Networks(t)
 }
 
+func Test_NetworkCreation(t *testing.T) {
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.CreateNetworkTest(t)
+}
+
 func Test_Hosts(t *testing.T) {
 	cli, err := getClient()
 	require.Nil(t, err)

@@ -160,18 +160,18 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool
 		IPVersion: IPVersion.IPv4,
 		CIDR:      "192.168.1.0/24",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	tpls, err := tester.Service.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 0,
 	})
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 16.04")
-	assert.Nil(t, err)
+	require.Nil(t, err)
 	keypair, err := tester.Service.CreateKeyPair("kp_" + network.Name)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	gwRequest := api.GWRequest{
 		ImageID:    img.ID,
@@ -182,7 +182,7 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool
 
 	if withGW {
 		_, err = tester.Service.CreateGateway(gwRequest)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 	}
 
 	return network, keypair
@@ -228,6 +228,40 @@ func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
 }
 
 //Networks test
+func (tester *ClientTester) CreateNetworkTest(t *testing.T) {
+	// Get inital number of networks
+	nets, err := tester.Service.ListNetworks(true)
+	require.Nil(t, err)
+	nbAllNetworks := len(nets)
+	require.True(t, nbAllNetworks > 0)
+
+	fmt.Println("Creating unit_test_network1")
+	network1, kp1 := tester.CreateNetwork(t, "unit_test_network_1", true)
+	require.NotNil(t, network1)
+	require.NotNil(t, kp1)
+	fmt.Println(fmt.Sprintf("Created a Network with name %v and id %v", network1.Name, kp1.ID))
+
+	networkFound := false
+
+	nets, err = tester.Service.ListNetworks(true)
+	require.Nil(t, err)
+	for _, net := range nets {
+		if net.Name == "unit_test_network_1" {
+			networkFound = true
+			break
+		}
+	}
+
+	net, err := tester.Service.GetNetwork("unit_test_network_1")
+	require.NotNil(t, net)
+	require.Nil(t, err)
+
+	require.True(t, networkFound)
+	defer tester.Service.DeleteKeyPair(kp1.ID)
+	defer tester.Service.DeleteNetwork(network1.ID)
+}
+
+//Networks test
 func (tester *ClientTester) Networks(t *testing.T) {
 	// Get inital number of networks
 	nets, err := tester.Service.ListNetworks(true)
@@ -237,9 +271,9 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	// assert.Nil(t, err)
 	// nbMonitoredNetworks := len(nets)
 
-	fmt.Println("Creating test_network1")
-	network1, kp1 := tester.CreateNetwork(t, "test_network_1", true)
-	fmt.Println("test_network1 created")
+	fmt.Println("Creating unit_test_network1")
+	network1, kp1 := tester.CreateNetwork(t, "unit_test_network_1", true)
+	fmt.Println("unit_test_network1 created")
 	defer tester.Service.DeleteKeyPair(kp1.ID)
 	defer tester.Service.DeleteNetwork(network1.ID)
 
@@ -262,9 +296,9 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	content := strings.Trim(string(out), "\n")
 	assert.Equal(t, api.DefaultUser, content)
 
-	fmt.Println("Creating test_network2")
-	network2, kp2 := tester.CreateNetwork(t, "test_network_2", false)
-	fmt.Println("test_network2 created ")
+	fmt.Println("Creating unit_test_network2")
+	network2, kp2 := tester.CreateNetwork(t, "unit_test_network_2", false)
+	fmt.Println("unit_test_network2 created ")
 
 	defer tester.Service.DeleteKeyPair(kp2.ID)
 	defer tester.Service.DeleteNetwork(network2.ID)
@@ -301,7 +335,7 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 	nbHosts := len(hosts)
 
 	// TODO: handle kp delete
-	network, kp := tester.CreateNetwork(t, "test_network", false)
+	network, kp := tester.CreateNetwork(t, "unit_test_network", false)
 	defer tester.Service.DeleteNetwork(network.ID)
 	defer tester.Service.DeleteKeyPair(kp.ID)
 
@@ -395,7 +429,7 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 //StartStopHost test
 func (tester *ClientTester) StartStopHost(t *testing.T) {
 	// TODO: handle kp delete
-	net, kp := tester.CreateNetwork(t, "test_network", true)
+	net, kp := tester.CreateNetwork(t, "unit_test_network", true)
 	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
 	host, err := tester.Service.GetHostByName("gw_" + net.Name)
@@ -472,9 +506,7 @@ func (tester *ClientTester) Volume(t *testing.T) {
 //VolumeAttachment test
 func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	// TODO: handle kp delete
-	net, kp := tester.CreateNetwork(t, "test_network", true)
-
-	// TODO: Seriously ? CreateNetwork CANNOT Fail ?
+	net, kp := tester.CreateNetwork(t, "unit_test_network", true)
 
 	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
