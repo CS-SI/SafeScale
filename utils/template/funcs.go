@@ -58,11 +58,14 @@ func empty(param interface{}) bool {
 // MergeFuncs merges the template functions passed as parameter with FuncMap content
 // If overwrite is true, will overwrite any existing entry
 func MergeFuncs(funcs map[string]interface{}, overwrite bool) map[string]interface{} {
-	for k, v := range FuncMap {
-		_, ok := funcs[k]
-		if !ok || overwrite {
-			funcs[k] = v
+	if funcs != nil {
+		for k, v := range FuncMap {
+			_, ok := funcs[k]
+			if !ok || overwrite {
+				funcs[k] = v
+			}
 		}
+		return funcs
 	}
-	return funcs
+	return FuncMap
 }

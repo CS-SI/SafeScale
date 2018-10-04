@@ -17,7 +17,7 @@ component:
     name: Kubernetes
     suitableFor:
         host: no
-        cluster: dcos,boh
+        cluster: all
     requirements:
         components:
             - docker
@@ -39,6 +39,17 @@ component:
                 large:
                     minMasters: 3
                     minPrivateNodes: 3
+            k8s:
+                small:
+                    minMasters: 1
+                    minPrivateNodes: 1
+                normal:
+                    minMasters: 3
+                    minPrivateNodes: 3
+                large:
+                    minMasters: 5
+                    minPrivateNodes: 8
+
     install:
         dcos:
             add:
