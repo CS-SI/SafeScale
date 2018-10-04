@@ -8,12 +8,21 @@ MAKEFLAGS += --no-print-directory
 endif
 
 VERSION := 0.1.0
-BUILD := `git rev-parse HEAD`
+
+BUILD := $(shell git rev-parse HEAD)
+UPSTREAM := $(shell git rev-parse origin/develop)
+LOCAL := $(shell git rev-parse HEAD)
+REMOTE := $(shell git rev-parse $(UPSTREAM))
+BASE := $(shell git merge-base HEAD $(UPSTREAM))
 
 GO?=go
 GOBIN?=$(GOPATH)/bin
 CP?=cp
 BROWSER?=firefox
+
+ifeq (, $(shell which git))
+ $(error "No git in your PATH: $(PATH), you must have git installed and available through your PATH")
+endif
 
 # Handling multiple gopath: use ~/go by default
 ifeq ($(findstring :,$(GOBIN)),:)
@@ -66,6 +75,9 @@ common: begin ground getdevdeps ensure generate
 
 begin:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
+
+with_git:
+	@command -v git >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) git is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 
 ground:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing tool prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -203,10 +215,10 @@ logclean: begin
 	@$(RM) cover.out || true
 	@$(RM) cover.html || true
 
-
-help:
+help: with_git
 	@echo ''
 	@printf "%b" "$(GOLD_COLOR) **************** SAFESCALE BUILD $(BUILD) ****************$(NO_COLOR)\n";
+	@if [ $(LOCAL) = $(REMOTE) ]; then echo " Build Up-to-date"; elif [ $(LOCAL) = $(BASE) ]; then echo " You are behind"; elif [ $(REMOTE) = $(BASE) ]; then echo " You have uncommited changes"; else echo " Diverged"; fi
 	@echo ' If in doubt, try "make all"'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)BUILD TARGETS:$(NO_COLOR)\n";
