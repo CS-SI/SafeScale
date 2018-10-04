@@ -57,3 +57,10 @@ deploy/cli/deploy
 
 vendor
 Gopkg.lock
+
+# coverage info
+cover.out
+cover.html
+
+# unit test xunit format
+xunit_tests.xml
