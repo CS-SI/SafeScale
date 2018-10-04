@@ -217,9 +217,14 @@ logclean: begin
 
 help: with_git
 	@echo ''
-	@printf "%b" "$(GOLD_COLOR) **************** SAFESCALE BUILD $(BUILD) ****************$(NO_COLOR)\n";
-	@if [ $(LOCAL) = $(REMOTE) ]; then echo " Build Up-to-date"; elif [ $(LOCAL) = $(BASE) ]; then echo " You are behind"; elif [ $(REMOTE) = $(BASE) ]; then echo " You have uncommited changes"; else echo " Diverged"; fi
+	@printf "%b" "$(GOLD_COLOR) *************** SAFESCALE BUILD$(GOLD_COLOR) ****************$(NO_COLOR)\n";
 	@echo ' If in doubt, try "make all"'
+	@echo ''
+	@printf "%b" "$(WARN_COLOR)LOCAL BUILD STATUS:$(NO_COLOR)\n";
+	@printf "%b" "$(NO_COLOR)  Build hash $(OK_COLOR)$(BUILD)$(GOLD_COLOR)$(NO_COLOR)\n";
+	@printf "%b" "$(WARN_COLOR)";
+	@if [ $(LOCAL) = $(REMOTE) ]; then echo "  Build Up-to-date"; elif [ $(LOCAL) = $(BASE) ]; then echo "  You are behind origin/develop"; elif [ $(REMOTE) = $(BASE) ]; then echo "  You have local commits NOT PUSHED to origin/develop"; else echo "  Build Diverged"; fi
+	@printf "%b" "$(NO_COLOR)";
 	@echo ''
 	@printf "%b" "$(OK_COLOR)BUILD TARGETS:$(NO_COLOR)\n";
 	@printf "%b" "  $(GOLD_COLOR)all          - Builds all binaries$(NO_COLOR)\n";
