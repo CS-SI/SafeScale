@@ -417,8 +417,9 @@ func (w *worker) validateContextForCluster() error {
 	if specs.IsSet(yamlKey) {
 		flavors := strings.Split(specs.GetString(yamlKey), ",")
 		for _, k := range flavors {
-			str, err := Flavor.Parse(strings.ToLower(k))
-			if err == nil && clusterFlavor == str {
+			k = strings.ToLower(k)
+			str, err := Flavor.Parse(k)
+			if (err == nil && clusterFlavor == str) || (err != nil && k == "all") {
 				return nil
 			}
 		}
