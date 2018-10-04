@@ -68,7 +68,7 @@ INFO_STRING  = "[INFO]"
 ERROR_STRING = "[ERROR]"
 WARN_STRING  = "[WARNING]"
 
-all: begin ground getdevdeps ensure generate providers broker system deploy perform utils
+all: begin ground getdevdeps ensure generate providers broker system deploy perform utils vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps ensure generate
@@ -220,7 +220,7 @@ status: with_git
 	@printf "%b" "$(WARN_COLOR)LOCAL BUILD STATUS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)  Build hash $(OK_COLOR)$(BUILD)$(GOLD_COLOR)$(NO_COLOR)\n";
 	@printf "%b" "$(WARN_COLOR)";
-	@if [ $(LOCAL) = $(REMOTE) ]; then echo "  Build Up-to-date"; elif [ $(LOCAL) = $(BASE) ]; then echo "  You are behind origin/develop"; elif [ $(REMOTE) = $(BASE) ]; then echo "  You have local commits NOT PUSHED to origin/develop"; else echo "  Build Diverged"; fi
+	@if [ $(LOCAL) = $(REMOTE) ]; then echo "  Build Up-to-date"; elif [ $(LOCAL) = $(BASE) ]; then echo "  You are behind origin/develop"; elif [ $(REMOTE) = $(BASE) ]; then echo "  You have local commits NOT PUSHED to origin/develop"; else echo "  Build Diverged, you have to merge"; fi
 	@printf "%b" "$(NO_COLOR)";
 
 help: with_git
@@ -232,7 +232,7 @@ help: with_git
 	@printf "%b" "$(WARN_COLOR)LOCAL BUILD STATUS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)  Build hash $(OK_COLOR)$(BUILD)$(GOLD_COLOR)$(NO_COLOR)\n";
 	@printf "%b" "$(WARN_COLOR)";
-	@if [ $(LOCAL) = $(REMOTE) ]; then echo "  Build Up-to-date"; elif [ $(LOCAL) = $(BASE) ]; then echo "  You are behind origin/develop"; elif [ $(REMOTE) = $(BASE) ]; then echo "  You have local commits NOT PUSHED to origin/develop"; else echo "  Build Diverged"; fi
+	@if [ $(LOCAL) = $(REMOTE) ]; then echo "  Build Up-to-date"; elif [ $(LOCAL) = $(BASE) ]; then echo "  You are behind origin/develop"; elif [ $(REMOTE) = $(BASE) ]; then echo "  You have local commits NOT PUSHED to origin/develop"; else echo "  Build Diverged, you have to merge"; fi
 	@printf "%b" "$(NO_COLOR)";
 	@echo ''
 	@printf "%b" "$(OK_COLOR)BUILD TARGETS:$(NO_COLOR)\n";
