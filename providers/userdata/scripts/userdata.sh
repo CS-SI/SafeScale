@@ -83,6 +83,8 @@ create_user() {
     echo "Creating user {{ .User }}..."
     useradd {{ .User }} --home-dir /home/{{ .User }} --shell /bin/bash --comment "" --create-home
     echo "gpac:{{ .Password }}" | chpasswd
+    groupadd -r docker
+    usermod -aG docker gpac
     echo "{{ .User }} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
     mkdir /home/{{ .User }}/.ssh

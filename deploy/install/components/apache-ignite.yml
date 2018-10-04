@@ -17,7 +17,7 @@ component:
     name: Apache Ignite
     suitableFor:
         host: no
-        cluster: dcos,boh,ohpc
+        cluster: all
     install:
         bash:
             check: |
