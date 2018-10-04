@@ -20,22 +20,12 @@ install_common_requirements() {
     export LANG=C
 
     # Disable SELinux
-    setenforce 0
-    sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
+    setenforce 0 &>/dev/null
+    sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config &>/dev/null
 
     # Configure Firewall to accept all traffic from/to the private network
     iptables -t filter -A INPUT -s {{ .CIDR }} -j ACCEPT
     sfSaveIptablesRules
-
-    # Upgrade to last CentOS revision
-    rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info && \
-    yum install -y python-backports-ssl_match_hostname && \
-    yum upgrade --assumeyes --tolerant && \
-    yum update --assumeyes
-    [ $? -ne 0 ] && exit {{ errcode "SystemUpdate" }}
-
-    # Create group nogroup
-    groupadd nogroup &>/dev/null
 
     # Creates user cladm
     useradd -s /bin/bash -m -d /home/cladm cladm
@@ -72,22 +62,8 @@ pathappend() {
         export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
 }
 pathprepend $HOME/.local/bin
-pathappend /opt/mesosphere/bin
 EOF
     chown -R cladm:cladm ~cladm
-
-    # Disables installation of docker-python from yum and adds some requirements
-    yum remove -y python-docker-py &>/dev/null
-    yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils jq && \
-    yum versionlock exclude python-docker-py || exit $?
-
-    # Installs PIP
-    yum install -y epel-release && \
-    yum makecache fast && \
-    yum install -y python-pip || yum install -y python2-pip || exit $?
-
-    # Installs docker-python with pip
-    pip install -q docker-py==1.10.6 || exit $?
 
     # Enable overlay module
     echo overlay >/etc/modules-load.d/10-overlay.conf
@@ -99,6 +75,22 @@ EOF
 }
 export -f install_common_requirements
 
-yum makecache fast
-yum install -y wget time rclone
+case $(sfGetFact "linux kind") in
+    debian|ubuntu)
+        sfWaitForApt && apt update
+        sfWaitForApt && apt install -y wget time rclone
+        ;;
+    redhat|centos)
+        yum makecache fast
+        yum install -y wget time rclone
+        ;;
+    fedora)
+        dnf install wget time rclone
+        ;;
+    *)
+        echo "Unmanaged linux distribution type '$(sfGetFact "linux kind")'"
+        exit 1
+        ;;
+esac
+
 /usr/bin/time -p bash -c install_common_requirements
