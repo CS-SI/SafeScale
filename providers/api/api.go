@@ -19,6 +19,8 @@ package api
 import (
 	"fmt"
 	"io"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers/enums/HostExtension"
@@ -45,6 +47,9 @@ const (
 
 	// DefaultNasMountPath Default path to be mounted to access a nfs directory
 	DefaultNasMountPath = "/data"
+
+	// MetadataBucketNamePrefix is the prefix of the Object Storage Container/Bucket used to store metadata
+	metadataBucketNamePrefix string = "0.safescale"
 )
 
 //ErrTimeout defines a Timeout error
@@ -508,4 +513,15 @@ func (c ConfigMap) GetInteger(name string) int {
 // Set sets name configuration to value
 func (c ConfigMap) Set(name string, value interface{}) {
 	c[name] = value
+}
+
+// BuildMetadataBucketName builds the name of the bucket/container that will store metadata
+// id must be a unique identifier of the tenant (not the tenant itself, probability of having same
+// name for 2 different customers isn't zero; this can be domain or project name)
+func BuildMetadataBucketName(id string) string {
+	name := metadataBucketNamePrefix + "-" + id
+	if suffix, ok := os.LookupEnv("SAFESCALE_METADATA_SUFFIX"); ok {
+		name += "." + suffix
+	}
+	return strings.ToLower(name)
 }

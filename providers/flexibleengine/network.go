@@ -456,7 +456,7 @@ func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, e
 	}
 	gw := convertNumberToIPv4(n + 1)
 
-	dnsList := client.Cfg.DNSList
+	dnsList := client.osclt.Cfg.DNSList
 	if len(dnsList) == 0 {
 		dnsList = []string{"1.1.1.1"}
 	}
