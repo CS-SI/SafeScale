@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
+
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
@@ -425,6 +427,44 @@ func (srv *Service) GetHostByName(name string) (*api.Host, error) {
 		return nil, ResourceNotFoundError("host", name)
 	}
 	return &host, nil
+}
+
+func (srv *Service) getOrCreateDefaultNetwork() (*api.Network, error) {
+	nets, err := srv.ClientAPI.ListNetworks(false)
+	if err != nil {
+		return nil, err
+	}
+	var defaultNet *api.Network
+	for _, n := range nets {
+		if n.Name == "net-safescale" {
+			defaultNet = &n
+		}
+	}
+	if defaultNet == nil {
+		defaultNet, err = srv.CreateNetwork(api.NetworkRequest{
+			CIDR:      "10.0.0.0/8",
+			Name:      "net-safescale",
+			IPVersion: IPVersion.IPv4,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return defaultNet, nil
+}
+
+// CreateHost creates an host that fulfils the request
+func (srv *Service) CreateHost(request api.HostRequest) (*api.Host, error) {
+	if len(request.NetworkIDs) != 0 {
+		return srv.ClientAPI.CreateHost(request)
+	}
+
+	net, err := srv.getOrCreateDefaultNetwork()
+	if err != nil {
+		return nil, err
+	}
+	request.NetworkIDs = append(request.NetworkIDs, net.ID)
+	return srv.ClientAPI.CreateHost(request)
 }
 
 func runeIndexes(s string, r rune) []int {
