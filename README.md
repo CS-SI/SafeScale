@@ -74,7 +74,7 @@ SafeScale is currently under active development and does not yet offer all the f
 
 ## Contributing
 
-We are strongly interessted by new contributions.
+We are strongly interested by new contributions.
 
 If you wish to contribute you can [fork the project](https://help.github.com/forking/), make your changes, commit to your repository, and then [create a pull request](https://help.github.com/articles/creating-a-pull-request-from-a-fork/). The development team can then review your contribution and commit it upstream as appropriate.
 
