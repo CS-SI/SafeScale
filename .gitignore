@@ -65,3 +65,5 @@ cover.html
 
 # unit test xunit format
 xunit_tests.xml
+SafeScale-*.html
+test_output.html

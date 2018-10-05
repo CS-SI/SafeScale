@@ -51,8 +51,9 @@ LINTER := golang.org/x/lint/golint
 DEP := github.com/golang/dep/cmd/dep
 ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
+REPORTER := github.com/360EntSecGroup-Skylar/goreporter
 
-DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK)
+DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER)
 
 
 # Life is better with colors
@@ -88,8 +89,8 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover errcheck > /dev/null; if [ $$? -ne 0 ]; then \
-    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(XUNIT) $(ERRCHECK) $(DEP); \
+	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover errcheck goreporter > /dev/null; if [ $$? -ne 0 ]; then \
+    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(XUNIT) $(ERRCHECK) $(REPORTER) $(DEP); \
     fi
 
 ensure:
@@ -214,7 +215,9 @@ show-cov: begin coverage
 	@if [ -s ./cover.html ]; then $(BROWSER) ./cover.html || true;fi
 
 report: begin
-	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Not ready, coming soon ;) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Running in background, it takes time... when finished opens report in firefox , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) You should keep in mind that results are pretty useless until we reach a reasonable amount of unit-tested code... ;) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@goreporter -p . -c 1 -e vendor > report_results.log 2>&1
 
 logclean: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning logs... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -227,7 +230,7 @@ logclean: begin
 	@$(RM) cover.html || true
 
 status: with_git
-	@git remote update >/dev/null
+	@git remote update >/dev/null 2>&1
 	@printf "%b" "$(WARN_COLOR)LOCAL BUILD STATUS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)  Build hash $(OK_COLOR)$(BUILD)$(GOLD_COLOR)$(NO_COLOR)\n";
 	@printf "%b" "$(WARN_COLOR)";
@@ -236,7 +239,7 @@ status: with_git
 
 help: with_git
 	@echo ''
-	@git remote update >/dev/null
+	@git remote update >/dev/null 2>&1
 	@printf "%b" "$(GOLD_COLOR) *************** SAFESCALE BUILD$(GOLD_COLOR) ****************$(NO_COLOR)\n";
 	@echo ' If in doubt, try "make all"'
 	@echo ''
