@@ -79,11 +79,6 @@ type AuthOptions struct {
 //AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	client := &Client{}
-	//	c, err := ovh.NewClient(opts.Endpoint, opts.ApplicationName, opts.ApplicationKey, opts.ConsumerKey)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//client.ovh = c
 	osclt, err := openstack.AuthenticatedClient(
 		openstack.AuthOptions{
 			IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
@@ -105,6 +100,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"classic":    VolumeSpeed.COLD,
 				"high-speed": VolumeSpeed.HDD,
 			},
+			MetadataBucketName: api.BuildMetadataBucketName(opts.ProjectName),
 		},
 	)
 
@@ -120,8 +116,9 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 // Client is the implementation of the ovh driver regarding to the api.ClientAPI
 // This client used ovh api and opensatck ovh api to maximize code reuse
 type Client struct {
-	osclt *openstack.Client
-	opts  AuthOptions
+	osclt              *openstack.Client
+	opts               AuthOptions
+	MetadataBucketName string
 }
 
 //Build build a new Client from configuration parameter
@@ -131,6 +128,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	OpenstackPassword, _ := params["OpenstackPassword"].(string)
 	Region, _ := params["Region"].(string)
 	ProjectName, _ := params["ProjectName"].(string)
+
 	return AuthenticatedClient(AuthOptions{
 		ApplicationKey:    ApplicationKey,
 		OpenstackID:       OpenstackID,
