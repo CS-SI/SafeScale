@@ -24,7 +24,7 @@
 #   go-tests = true
 #   unused-packages = true
 
-required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", "github.com/GeertJohan/go.rice/rice", "github.com/golang/protobuf/protoc-gen-go", "github.com/golang/mock/gomock", "github.com/golang/mock/mockgen", "golang.org/x/tools/cmd/cover", "golang.org/x/lint/golint", "github.com/tebeka/go2xunit"]
+required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", "github.com/GeertJohan/go.rice/rice", "github.com/golang/protobuf/protoc-gen-go", "github.com/golang/mock/gomock", "github.com/golang/mock/mockgen", "golang.org/x/tools/cmd/cover", "golang.org/x/lint/golint", "github.com/tebeka/go2xunit", "github.com/360EntSecGroup-Skylar/goreporter"]
 
 [[override]]
   version = "=v1.7.1"
