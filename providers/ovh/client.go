@@ -58,17 +58,17 @@ type AuthOptions struct {
 	// Endpoint string
 	// //Application or Project Name
 	// ApplicationName string
-	//Application Key or project ID
+	// Application Key or project ID
 	ApplicationKey string
 	// //Consumer key
 	// ConsumerKey string
-	//Openstack identifier
+	// Openstack identifier
 	OpenstackID string
-	//OpenStack password
+	// OpenStack password
 	OpenstackPassword string
-	//Name of the data center (GRA3, BHS3 ...)
+	// Name of the data center (GRA3, BHS3 ...)
 	Region string
-	//Project Name
+	// Project Name
 	ProjectName string
 }
 
@@ -100,7 +100,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"classic":    VolumeSpeed.COLD,
 				"high-speed": VolumeSpeed.HDD,
 			},
-			MetadataBucketName: api.BuildMetadataBucketName(opts.ProjectName),
+			MetadataBucketName: api.BuildMetadataBucketName(opts.ApplicationKey),
 		},
 	)
 
