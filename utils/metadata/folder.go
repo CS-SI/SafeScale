@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -29,28 +28,27 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
-const (
-	// containerNamePrefix is the name of the Object Storage Container/Bucket used to store metadata
-	containerNamePrefix string = "0.safescale"
-)
-
-var containerName string
-
-// InitializeContainer creates the Object Storage Container/Bucket that will store the metadata
-func InitializeContainer(client api.ClientAPI) error {
+// InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
+// id contains a unique identifier of the tenant (something coming from the provider, not the tenant name)
+func InitializeBucket(client api.ClientAPI) error {
 	svc := providers.FromClient(client)
-	err := svc.CreateContainer(containerName)
+	cfg, err := client.GetCfgOpts()
 	if err != nil {
-		fmt.Printf("failed to create Object Container %s: %s\n", containerName, err.Error())
+		fmt.Printf("failed to get client options: %s\n", err.Error())
 	}
-	return err
+	anon, found := cfg.Get("MetadataBucket")
+	if !found || anon.(string) == "" {
+		return fmt.Errorf("failed to get value of option 'MetadataBucket'")
+	}
+	return svc.CreateContainer(anon.(string))
 }
 
 // Folder describes a metadata folder
 type Folder struct {
 	//path contains the base path where to read/write record in Object Storage
-	path string
-	svc  *providers.Service
+	path       string
+	svc        *providers.Service
+	bucketName string
 }
 
 // FolderDecoderCallback is the prototype of the function that will decode data read from Metadata
@@ -61,9 +59,18 @@ func NewFolder(svc *providers.Service, path string) *Folder {
 	if svc == nil {
 		panic("svc is nil!")
 	}
+	cfg, err := svc.GetCfgOpts()
+	if err != nil {
+		panic(fmt.Sprintf("config options are not available! %s", err.Error()))
+	}
+	name, found := cfg.Get("MetadataBucket")
+	if !found {
+		panic("config option 'MetadataBucket' is not set!")
+	}
 	return &Folder{
-		path: strings.Trim(path, "/"),
-		svc:  svc,
+		path:       strings.Trim(path, "/"),
+		svc:        svc,
+		bucketName: name.(string),
 	}
 }
 
@@ -94,7 +101,7 @@ func (f *Folder) absolutePath(path ...string) string {
 // Search tells if the object named 'name' is inside the ObjectStorage folder
 func (f *Folder) Search(path string, name string) (bool, error) {
 	absPath := strings.Trim(f.absolutePath(path), "/")
-	list, err := f.svc.ListObjects(containerName, api.ObjectFilter{
+	list, err := f.svc.ListObjects(f.bucketName, api.ObjectFilter{
 		Path: absPath,
 	})
 	if err != nil {
@@ -115,7 +122,7 @@ func (f *Folder) Search(path string, name string) (bool, error) {
 
 // Delete removes metadata passed as parameter
 func (f *Folder) Delete(path string, name string) error {
-	err := f.svc.DeleteObject(containerName, f.absolutePath(path, name))
+	err := f.svc.DeleteObject(f.bucketName, f.absolutePath(path, name))
 	if err != nil {
 		return fmt.Errorf("failed to remove metadata in Object Storage: %s", err.Error())
 	}
@@ -133,7 +140,7 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 		return false, err
 	}
 	if found {
-		o, err := f.svc.GetObject(containerName, f.absolutePath(path, name), nil)
+		o, err := f.svc.GetObject(f.bucketName, f.absolutePath(path, name), nil)
 		if err != nil {
 			return false, err
 		}
@@ -155,7 +162,7 @@ func (f *Folder) Write(path string, name string, content interface{}) error {
 		return err
 	}
 
-	return f.svc.PutObject(containerName, api.Object{
+	return f.svc.PutObject(f.bucketName, api.Object{
 		Name:    f.absolutePath(path, name),
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
@@ -163,7 +170,7 @@ func (f *Folder) Write(path string, name string, content interface{}) error {
 
 // Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
 func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
-	list, err := f.svc.ListObjects(containerName, api.ObjectFilter{
+	list, err := f.svc.ListObjects(f.bucketName, api.ObjectFilter{
 		Path: strings.Trim(f.absolutePath(path), "/"),
 	})
 	if err != nil {
@@ -178,7 +185,7 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 	}
 
 	for _, i := range list {
-		o, err := f.svc.GetObject(containerName, i, nil)
+		o, err := f.svc.GetObject(f.bucketName, i, nil)
 		if err != nil {
 			return err
 		}
@@ -190,11 +197,4 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 		}
 	}
 	return nil
-}
-
-func init() {
-	containerName = containerNamePrefix
-	if suffix, ok := os.LookupEnv("SAFESCALE_METADATA_SUFFIX"); ok {
-		containerName += "." + suffix
-	}
 }

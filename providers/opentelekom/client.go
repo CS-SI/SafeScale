@@ -23,19 +23,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/flexibleengine"
+	"github.com/CS-SI/SafeScale/providers/openstack"
 )
-
-/*AuthOptions fields are the union of those recognized by each identity implementation and
-provider.
-*/
-type AuthOptions struct {
-	flexibleengine.AuthOptions
-}
-
-// CfgOptions configuration options
-type CfgOptions struct {
-	flexibleengine.CfgOptions
-}
 
 const (
 	authURL string = "https://iam.%s.otc.t-systems.com"
@@ -43,25 +32,21 @@ const (
 
 // Client is the implementation of the flexibleengine driver regarding to the api.ClientAPI
 type Client struct {
-	Opts  *flexibleengine.AuthOptions
-	Cfg   *flexibleengine.CfgOptions
 	feclt *flexibleengine.Client
 }
 
 // AuthenticatedClient returns an authenticated client
-func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
+func AuthenticatedClient(opts flexibleengine.AuthOptions, cfg openstack.CfgOptions) (*Client, error) {
 	var err error
 	client := &Client{}
 
 	if opts.IdentityEndpoint == "" {
 		opts.IdentityEndpoint = fmt.Sprintf(authURL, opts.Region)
 	}
-	client.feclt, err = flexibleengine.AuthenticatedClient(opts.AuthOptions, cfg.CfgOptions)
+	client.feclt, err = flexibleengine.AuthenticatedClient(opts, cfg)
 	if err != nil {
 		return nil, err
 	}
-	client.Opts = &opts.AuthOptions
-	client.Cfg = &cfg.CfgOptions
 	return client, err
 }
 
@@ -78,31 +63,27 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 
 	S3AccessKeyID, _ := params["S3AccessKeyID"].(string)
 	S3AccessKeyPassword, _ := params["S3AccessKeyPassword"].(string)
-	authOptions := AuthOptions{
-		AuthOptions: flexibleengine.AuthOptions{
-			Username:            Username,
-			Password:            Password,
-			DomainName:          DomainName,
-			ProjectID:           ProjectID,
-			Region:              Region,
-			AllowReauth:         true,
-			VPCName:             VPCName,
-			VPCCIDR:             VPCCIDR,
-			IdentityEndpoint:    IdentityEndpoint,
-			S3AccessKeyID:       S3AccessKeyID,
-			S3AccessKeyPassword: S3AccessKeyPassword,
-		},
+	authOptions := flexibleengine.AuthOptions{
+		Username:            Username,
+		Password:            Password,
+		DomainName:          DomainName,
+		ProjectID:           ProjectID,
+		Region:              Region,
+		AllowReauth:         true,
+		VPCName:             VPCName,
+		VPCCIDR:             VPCCIDR,
+		IdentityEndpoint:    IdentityEndpoint,
+		S3AccessKeyID:       S3AccessKeyID,
+		S3AccessKeyPassword: S3AccessKeyPassword,
 	}
-	cfgOptions := CfgOptions{
-		CfgOptions: flexibleengine.CfgOptions{
-			DNSList:             []string{"1.1.1.1"},
-			UseFloatingIP:       true,
-			UseLayer3Networking: false,
-			VolumeSpeeds: map[string]VolumeSpeed.Enum{
-				"SATA": VolumeSpeed.COLD,
-				"SAS":  VolumeSpeed.HDD,
-				"SSD":  VolumeSpeed.SSD,
-			},
+	cfgOptions := openstack.CfgOptions{
+		DNSList:             []string{"1.1.1.1"},
+		UseFloatingIP:       true,
+		UseLayer3Networking: false,
+		VolumeSpeeds: map[string]VolumeSpeed.Enum{
+			"SATA": VolumeSpeed.COLD,
+			"SAS":  VolumeSpeed.HDD,
+			"SSD":  VolumeSpeed.SSD,
 		},
 	}
 	return AuthenticatedClient(authOptions, cfgOptions)

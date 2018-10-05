@@ -110,6 +110,9 @@ type CfgOptions struct {
 
 	// S3Protocol protocol used to mount object storage (ex: swiftks or s3)
 	S3Protocol string
+
+	// MetadataBucketName contains the name of the bucket storing metadata
+	MetadataBucketName string
 }
 
 // ProviderErrorToString creates an error string from openstack api error
@@ -137,7 +140,7 @@ func ProviderErrorToString(err error) string {
 	}
 }
 
-//AuthenticatedClient returns an authenticated client
+// AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	gcOpts := gc.AuthOptions{
 		IdentityEndpoint: opts.IdentityEndpoint,
@@ -158,7 +161,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
 
-	//Compute API
+	// Compute API
 	compute, err := openstack.NewComputeV2(pClient, gc.EndpointOpts{
 		Region: opts.Region,
 	})
@@ -167,7 +170,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
 
-	//Network API
+	// Network API
 	network, err := openstack.NewNetworkV2(pClient, gc.EndpointOpts{
 		Region: opts.Region,
 	})
@@ -178,7 +181,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
-	//Storage API
+	// Storage API
 	blocstorage, err := openstack.NewBlockStorageV1(pClient, gc.EndpointOpts{
 		Region: opts.Region,
 	})
@@ -210,8 +213,12 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Creates metadata Object Storage container
-	err = metadata.InitializeContainer(&clt)
+
+	// Creates metadata Object Storage bucket/container
+	if clt.Cfg.MetadataBucketName == "" {
+		clt.Cfg.MetadataBucketName = api.BuildMetadataBucketName(opts.DomainName)
+	}
+	err = metadata.InitializeBucket(&clt)
 	if err != nil {
 		return nil, err
 	}
@@ -421,11 +428,10 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 	cfg.Set("Password", client.Opts.Password)
 	cfg.Set("AuthUrl", client.Opts.IdentityEndpoint)
 	cfg.Set("Region", client.Opts.Region)
-
 	return cfg, nil
 }
 
-//GetCfgOpts return configuration parameters
+// GetCfgOpts return configuration parameters
 func (client *Client) GetCfgOpts() (api.Config, error) {
 	cfg := api.ConfigMap{}
 
@@ -433,6 +439,7 @@ func (client *Client) GetCfgOpts() (api.Config, error) {
 	cfg.Set("S3Protocol", client.Cfg.S3Protocol)
 	cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
+	cfg.Set("MetadataBucket", client.Cfg.MetadataBucketName)
 
 	return cfg, nil
 }

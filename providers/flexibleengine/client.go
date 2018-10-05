@@ -75,26 +75,6 @@ type AuthOptions struct {
 	S3AccessKeyPassword string
 }
 
-// CfgOptions configuration options
-type CfgOptions struct {
-	//DNSList list of DNS
-	DNSList []string
-
-	// VPL: Floating IP are mandatory in FlexibleEngine
-	//UseFloatingIP indicates if floating IP are used (optional)
-	UseFloatingIP bool
-
-	//UseLayer3Networking indicates if layer 3 networking features (router) can be used
-	//if UseFloatingIP is true UseLayer3Networking must be true
-	UseLayer3Networking bool
-
-	//AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
-	AutoHostNetworkInterfaces bool
-
-	//VolumeSpeeds map volume types with volume speeds
-	VolumeSpeeds map[string]VolumeSpeed.Enum
-}
-
 const (
 	defaultUser string = "cloud"
 
@@ -141,7 +121,7 @@ func (o awsAuthOpts) IsExpired() bool {
 //VPL:END
 
 // AuthenticatedClient returns an authenticated client
-func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
+func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, error) {
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if opts.IdentityEndpoint == "" {
@@ -256,6 +236,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 			UseLayer3Networking: cfg.UseLayer3Networking,
 			VolumeSpeeds:        cfg.VolumeSpeeds,
 			S3Protocol:          "s3",
+			MetadataBucketName:  api.BuildMetadataBucketName(opts.DomainName),
 		},
 		Provider: provider,
 		Compute:  compute,
@@ -263,9 +244,9 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Volume:   blockStorage,
 		//Container:   objectStorage,
 	}
+
 	clt := Client{
 		Opts:      &opts,
-		Cfg:       &cfg,
 		osclt:     &openstackClient,
 		Identity:  identity,
 		S3Session: awsSession,
@@ -284,7 +265,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	}
 
 	// Creates metadata Object Storage container
-	err = metadata.InitializeContainer(&clt)
+	err = metadata.InitializeBucket(&clt)
 	if err != nil {
 		return nil, err
 	}
@@ -295,8 +276,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 type Client struct {
 	// Opts contains authentication options
 	Opts *AuthOptions
-	// Cfg contains options
-	Cfg *CfgOptions
 	// Identity contains service client of Identity openstack service
 	Identity *gc.ServiceClient
 	// S3Session is the "AWS Session" for object storage use (compatible S3)
@@ -334,7 +313,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 		VPCCIDR:             VPCCIDR,
 		S3AccessKeyID:       S3AccessKeyID,
 		S3AccessKeyPassword: S3AccessKeyPassword,
-	}, CfgOptions{
+	}, openstack.CfgOptions{
 		DNSList:             []string{"100.125.0.41", "100.126.0.41"},
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
@@ -651,14 +630,7 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 
 // GetCfgOpts return configuration parameters
 func (client *Client) GetCfgOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
-
-	cfg.Set("DNSList", client.Cfg.DNSList)
-	cfg.Set("S3Protocol", "s3")
-	cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
-	cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
-
-	return cfg, nil
+	return client.osclt.GetCfgOpts()
 }
 
 // init registers the flexibleengine provider
