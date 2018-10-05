@@ -55,14 +55,19 @@ type HostService struct {
 // Create creates a host
 func (svc *HostService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.Host, error) {
 	log.Println("creating compute resource...")
-	n, err := svc.network.Get(net)
-	if err != nil {
-		fmt.Println("failed to get network resource data.")
-		return nil, err
+	networks := []string{}
+	if len(net) != 0 {
+		n, err := svc.network.Get(net)
+		if err != nil {
+			fmt.Println("failed to get network resource data.")
+			return nil, err
+		}
+		if n == nil {
+			return nil, fmt.Errorf("failed to find network '%s'", net)
+		}
+		networks = append(networks, n.ID)
 	}
-	if n == nil {
-		return nil, fmt.Errorf("failed to find network '%s'", net)
-	}
+
 	tpls, err := svc.provider.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    cpu,
 		MinRAMSize:  ram,
@@ -79,7 +84,7 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		TemplateID: tpls[0].ID,
 		// IsGateway:  false,
 		PublicIP:   public,
-		NetworkIDs: []string{n.ID},
+		NetworkIDs: networks,
 	}
 	host, err := svc.provider.CreateHost(hostRequest)
 	if err != nil {
