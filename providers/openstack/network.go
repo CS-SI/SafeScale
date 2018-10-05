@@ -232,18 +232,13 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 			return nil
 		}
 		ok, err := mgw.Read()
-		if err != nil {
-			log.Print(err.Error())
-			return fmt.Errorf("failed to read gateway metadata for network '%s': %s", net.ID, err.Error())
-		}
-		if !ok {
-			log.Print("gateway metadata not found")
-			return fmt.Errorf("failed to find gateway metadata for network '%s'", net.ID)
-		}
-		gwhost := mgw.Get()
 
-		// Update GatewayId field
-		net.GatewayID = gwhost.ID
+		if ok && (err == nil) {
+			gwhost := mgw.Get()
+
+			// Update GatewayId field
+			net.GatewayID = gwhost.ID
+		}
 
 		netList = append(netList, *net)
 		return nil

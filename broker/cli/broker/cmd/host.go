@@ -83,8 +83,13 @@ var hostInspect = cli.Command{
 var hostCreate = cli.Command{
 	Name:      "create",
 	Usage:     "create a new host",
-	ArgsUsage: "<Host_name> <Network_name|Network_ID>",
+	ArgsUsage: "<Host_name>",
 	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "net",
+			Value: "",
+			Usage: "network name or network id",
+		},
 		cli.IntFlag{
 			Name:  "cpu",
 			Value: 1,
@@ -116,8 +121,8 @@ var hostCreate = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Host_name> and/or <Network_name>")
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <Host_name>")
 			cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host and network name are required")
 		}
