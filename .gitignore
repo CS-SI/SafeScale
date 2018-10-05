@@ -46,6 +46,7 @@ deploy/deploy
 deploy/cluster/tests/create_cluster
 
 *.code-workspace
+!sample-settings/*.code-workspace
 
 *.toml
 !Gopkg.toml
