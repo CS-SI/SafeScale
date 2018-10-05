@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -51,6 +52,9 @@ func getTester() (*tests.ClientTester, error) {
 func getClient() (*openstack.Client, error) {
 	if client == nil {
 		tenant_name := "TestOpenStack"
+		if tenant_override := os.Getenv("TEST_OPENSTACK"); tenant_override != "" {
+			tenant_name = tenant_override
+		}
 		service, err := providers.GetService(tenant_name)
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name))
