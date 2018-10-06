@@ -591,7 +591,7 @@ func (client *Client) DeleteHost(ref string) error {
 }
 
 func (client *Client) oscltDeleteHost(id string) error {
-	if client.Cfg.UseFloatingIP {
+	if client.osclt.Cfg.UseFloatingIP {
 		fip, err := client.getFloatingIPOfHost(id)
 		if err == nil {
 			if fip != nil {

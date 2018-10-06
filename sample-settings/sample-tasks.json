@@ -1,0 +1,76 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "help",
+            "type": "shell",
+            "command": "make",
+            // use options.cwd property if the Makefile is not in the project root ${workspaceRoot} dir
+            "options": {
+                "cwd": "${workspaceRoot}"
+            },
+            // start the build without prompting for task selection, use "group": "build" otherwise
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new"
+            },
+            // arg passing example: in this case is executed make QUIET=0
+            "args": [""],
+            "problemMatcher": []
+        },
+        {
+            "label": "make all",
+            "type": "shell",
+            "command": "make",
+            // use options.cwd property if the Makefile is not in the project root ${workspaceRoot} dir
+            "options": {
+                "cwd": "${workspaceRoot}"
+            },
+            // start the build without prompting for task selection, use "group": "build" otherwise
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new"
+            },
+            // arg passing example: in this case is executed make QUIET=0
+            "args": ["all"],
+            "problemMatcher": []
+        },
+        {
+            "label": "make err-light",
+            "type": "shell",
+            "command": "make",
+            // use options.cwd property if the Makefile is not in the project root ${workspaceRoot} dir
+            "options": {
+                "cwd": "${workspaceRoot}"
+            },
+            // start the build without prompting for task selection, use "group": "build" otherwise
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "new"
+            },
+            // arg passing example: in this case is executed make QUIET=0
+            "args": ["err-light"],
+            "problemMatcher": []
+        }
+    ]
+}

@@ -106,10 +106,10 @@ func (tester *ClientTester) CreateKeyPairAndLeaveItThere(t *testing.T) {
 
 //GetKeyPair test
 func (tester *ClientTester) GetKeyPair(t *testing.T) {
-	kp, err := tester.Service.CreateKeyPair("kp")
+	kp, err := tester.Service.CreateKeyPair("unit_test_kp")
 	require.Nil(t, err)
 
-	kp2, err := tester.Service.GetKeyPair("kp")
+	kp2, err := tester.Service.GetKeyPair("unit_test_kp")
 	require.Nil(t, err)
 
 	assert.Equal(t, kp.ID, kp2.ID)
@@ -119,7 +119,7 @@ func (tester *ClientTester) GetKeyPair(t *testing.T) {
 	_, err = tester.Service.GetKeyPair("notfound")
 	assert.NotNil(t, err)
 
-	defer tester.Service.DeleteKeyPair("kp")
+	defer tester.Service.DeleteKeyPair("unit_test_kp")
 }
 
 //ListKeyPairs test

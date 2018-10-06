@@ -1,0 +1,6 @@
+{
+    "gulp.autoDetect": "off",
+    "grunt.autoDetect": "off",
+    "jake.autoDetect": "off",
+    "npm.autoDetect": "off"
+}

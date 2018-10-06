@@ -67,25 +67,33 @@ func NewComponent(name string) (*Component, error) {
 	v.AddConfigPath("/etc/safescale/components")
 	v.SetConfigName(name)
 
+	var component *Component
 	err := v.ReadInConfig()
-	if err == nil {
+	if err != nil {
+		switch err.(type) {
+		case viper.ConfigFileNotFoundError:
+			// Failed to find a spec file on filesystem, trying with embedded ones
+			err = nil
+			var ok bool
+			if component, ok = allEmbeddedMap[name]; !ok {
+				err = fmt.Errorf("failed to find a component named '%s'", name)
+			}
+		default:
+			err = fmt.Errorf("failed to read the specification file of component called '%s': %s", name, err.Error())
+		}
+	} else {
 		if !v.IsSet("component.name") {
 			return nil, fmt.Errorf("syntax error in specification file: missing key 'name'")
 		}
 		if v.IsSet("component") {
-			return &Component{
+			component = &Component{
 				fileName:    name + ".yml",
 				displayName: v.GetString("Name"),
 				specs:       v,
-			}, nil
+			}
 		}
 	}
-
-	// Failed to find a spec file on filesystem, trying with embedded ones
-	if component, ok := allEmbeddedMap[name]; ok {
-		return component, nil
-	}
-	return nil, fmt.Errorf("failed to find a component named '%s'", name)
+	return component, err
 }
 
 // installerOfMethod instanciates the right installer corresponding to the method

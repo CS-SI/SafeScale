@@ -166,7 +166,7 @@ func toVolumeState(status string) VolumeState.Enum {
 }
 
 func (client *Client) getVolumeType(speed VolumeSpeed.Enum) string {
-	for t, s := range client.Cfg.VolumeSpeeds {
+	for t, s := range client.osclt.Cfg.VolumeSpeeds {
 		if s == speed {
 			return t
 		}
@@ -182,7 +182,7 @@ func (client *Client) getVolumeType(speed VolumeSpeed.Enum) string {
 }
 
 func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
-	speed, ok := client.Cfg.VolumeSpeeds[vType]
+	speed, ok := client.osclt.Cfg.VolumeSpeeds[vType]
 	if ok {
 		return speed
 	}

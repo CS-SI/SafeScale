@@ -49,9 +49,11 @@ MOCKGEN := github.com/golang/mock/gomock github.com/golang/mock/mockgen
 COVER := golang.org/x/tools/cmd/cover
 LINTER := golang.org/x/lint/golint
 DEP := github.com/golang/dep/cmd/dep
+ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
+REPORTER := github.com/360EntSecGroup-Skylar/goreporter
 
-DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT)
+DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER)
 
 
 # Life is better with colors
@@ -87,8 +89,8 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover > /dev/null; if [ $$? -ne 0 ]; then \
-    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(XUNIT) $(DEP); \
+	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover errcheck goreporter > /dev/null; if [ $$? -ne 0 ]; then \
+    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(XUNIT) $(ERRCHECK) $(REPORTER) $(DEP); \
     fi
 
 ensure:
@@ -184,6 +186,16 @@ vet-light: begin
 	@$(GO) vet ${TESTABLE_PKG_LIST} 2>&1 | tee vet_results.log
 	@if [ -s ./vet_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) vet (with restrictions) FAILED !$(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
 
+err: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck (with restrictions), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@errcheck ${TESTABLE_PKG_LIST} 2>&1 | tee err_results.log
+	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck (with restrictions) FAILED !$(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
+
+err-light: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck (with restrictions), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@errcheck ${TESTABLE_PKG_LIST} 2>&1 | grep -v defer | tee err_results.log
+	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck (with restrictions) FAILED !$(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
+
 vet: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running vet checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(GO) vet ${PKG_LIST} 2>&1 | tee vet_results.log
@@ -203,7 +215,9 @@ show-cov: begin coverage
 	@if [ -s ./cover.html ]; then $(BROWSER) ./cover.html || true;fi
 
 report: begin
-	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Not ready, coming soon ;) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Running in background, it takes time... when finished opens report in firefox , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) You should keep in mind that results are pretty useless until we reach a reasonable amount of unit-tested code... ;) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@goreporter -p . -c 1 -e vendor > report_results.log 2>&1
 
 logclean: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning logs... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -216,7 +230,7 @@ logclean: begin
 	@$(RM) cover.html || true
 
 status: with_git
-	@git remote update >/dev/null
+	@git remote update >/dev/null 2>&1
 	@printf "%b" "$(WARN_COLOR)LOCAL BUILD STATUS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)  Build hash $(OK_COLOR)$(BUILD)$(GOLD_COLOR)$(NO_COLOR)\n";
 	@printf "%b" "$(WARN_COLOR)";
@@ -225,15 +239,9 @@ status: with_git
 
 help: with_git
 	@echo ''
-	@git remote update >/dev/null
+	@git remote update >/dev/null 2>&1
 	@printf "%b" "$(GOLD_COLOR) *************** SAFESCALE BUILD$(GOLD_COLOR) ****************$(NO_COLOR)\n";
 	@echo ' If in doubt, try "make all"'
-	@echo ''
-	@printf "%b" "$(WARN_COLOR)LOCAL BUILD STATUS:$(NO_COLOR)\n";
-	@printf "%b" "$(NO_COLOR)  Build hash $(OK_COLOR)$(BUILD)$(GOLD_COLOR)$(NO_COLOR)\n";
-	@printf "%b" "$(WARN_COLOR)";
-	@if [ $(LOCAL) = $(REMOTE) ]; then echo "  Build Up-to-date"; elif [ $(LOCAL) = $(BASE) ]; then echo "  You are behind origin/develop"; elif [ $(REMOTE) = $(BASE) ]; then echo "  You have local commits NOT PUSHED to origin/develop"; else echo "  Build Diverged, you have to merge"; fi
-	@printf "%b" "$(NO_COLOR)";
 	@echo ''
 	@printf "%b" "$(OK_COLOR)BUILD TARGETS:$(NO_COLOR)\n";
 	@printf "%b" "  $(GOLD_COLOR)all          - Builds all binaries$(NO_COLOR)\n";
@@ -248,6 +256,8 @@ help: with_git
 	@echo '  lint         - Runs linter'
 	@echo '  vet          - Runs all checks'
 	@echo '  vet-light    - Runs all checks (with restrictions)'
+	@echo '  err          - Looks for unhandled errors'
+	@echo '  err-light    - Looks for unhandled errors (with restrictions)'
 	@echo '  test         - Runs all tests'
 	@echo '  test-light   - Runs all tests (with restrictions)'
 	@echo '  coverage     - Collects coverage info from unit tests'
