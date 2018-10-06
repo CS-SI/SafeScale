@@ -54,7 +54,7 @@ type HostService struct {
 
 // Create creates a host
 func (svc *HostService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.Host, error) {
-	log.Println("creating compute resource...")
+	log.Println("creating compute resource ...")
 	networks := []string{}
 	if len(net) != 0 {
 		n, err := svc.network.Get(net)
