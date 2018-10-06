@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"typescript.tsc.autoDetect": "off",
+		"gulp.autoDetect": "off",
+		"grunt.autoDetect": "off",
+		"jake.autoDetect": "off",
+		"npm.autoDetect": "off"
+	}
+}

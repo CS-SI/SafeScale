@@ -277,6 +277,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		}
 	}
 
+	// TODO Unhandled error ?
 	client.DeleteGateway(networkID)
 
 	sns, err := client.ListSubnets(networkID)

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -30,6 +31,9 @@ var tester *tests.ClientTester
 
 func getClient() (*tests.ClientTester, error) {
 	tenant_name := "cloudwatt"
+	if tenant_override := os.Getenv("TEST_CLOUDWATT"); tenant_override != "" {
+		tenant_name = tenant_override
+	}
 	if tester == nil {
 		service, err := providers.GetService(tenant_name)
 		if err != nil {

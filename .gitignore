@@ -46,6 +46,7 @@ deploy/deploy
 deploy/cluster/tests/create_cluster
 
 *.code-workspace
+!sample-settings/*.code-workspace
 
 *.toml
 !Gopkg.toml
@@ -64,3 +65,5 @@ cover.html
 
 # unit test xunit format
 xunit_tests.xml
+SafeScale-*.html
+test_output.html
