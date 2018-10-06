@@ -131,7 +131,7 @@ var hostCreate = cli.Command{
 			CPUNumber: int32(c.Int("cpu")),
 			Disk:      int32(c.Float64("disk")),
 			ImageID:   c.String("os"),
-			Network:   c.Args().Get(1),
+			Network:   c.String("net"),
 			Public:    c.Bool("public"),
 			RAM:       float32(c.Float64("ram")),
 		}
