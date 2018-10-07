@@ -89,6 +89,7 @@ create_user() {
 
     mkdir /home/{{ .User }}/.ssh
     echo "{{ .Key }}" >>/home/{{ .User }}/.ssh/authorized_keys
+    echo "{{ .PKey }}" >/home/{{ .User }}/.ssh/id_rsa
     chmod 0700 /home/{{ .User }}/.ssh
     chmod -R 0600 /home/{{ .User }}/.ssh/*
 

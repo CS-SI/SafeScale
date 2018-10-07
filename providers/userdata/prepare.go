@@ -33,8 +33,10 @@ import (
 type userData struct {
 	// User is the name of the default user (api.DefaultUser)
 	User string
-	// Key is the private key used to create the Host
+	// Key is the public key used to create the Host
 	Key string
+	//PKey is the private key used to create the Host
+	PKey string
 	// ConfIF, if set to true, configure all interfaces to DHCP
 	ConfIF bool
 	// IsGateway, if set to true, activate IP frowarding
@@ -128,6 +130,7 @@ func Prepare(
 	data := userData{
 		User:       api.DefaultUser,
 		Key:        strings.Trim(kp.PublicKey, "\n"),
+		PKey:       strings.Trim(kp.PrivateKey, "\n"),
 		ConfIF:     !autoHostNetworkInterfaces,
 		IsGateway:  isGateway && !useLayer3Networking,
 		AddGateway: !request.PublicIP && !useLayer3Networking,
