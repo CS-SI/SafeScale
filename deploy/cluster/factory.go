@@ -165,11 +165,14 @@ func List() ([]clusterapi.Cluster, error) {
 			if err != nil {
 				return err
 			}
+		case Flavor.K8S:
+			instance, err = k8s.Load(cm)
+			if err != nil {
+				return err
+			}
 		case Flavor.OHPC:
 			fallthrough
 		case Flavor.Swarm:
-			fallthrough
-		case Flavor.K8S:
 			return fmt.Errorf("cluster Flavor '%s' not yet implemented", cluster.Flavor.String())
 		}
 
