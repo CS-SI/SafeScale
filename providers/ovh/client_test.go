@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ovh_test
 
 import (
@@ -187,4 +188,239 @@ func Test_Objects(t *testing.T) {
 	cli, err := getClient()
 	require.Nil(t, err)
 	cli.Objects(t)
+}
+
+// GetImage returns the Image referenced by id
+func Test_GetImage(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// GetTemplate returns the Template referenced by id
+func Test_GetTemplate(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// ListTemplates lists available host templates
+// Host templates are sorted using Dominant Resource Fairness Algorithm
+func Test_ListTemplates(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// DeleteKeyPair deletes the key pair identified by id
+func Test_DeleteKeyPair(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// CreateNetwork creates a network named name
+func Test_CreateNetwork(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// GetNetwork returns the network identified by ref (id or name)
+func Test_GetNetwork(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// ListNetworks lists available networks
+func Test_ListNetworks(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// DeleteNetwork deletes the network identified by id
+func Test_DeleteNetwork(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// CreateGateway creates a public Gateway for a private network
+func Test_CreateGateway(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// DeleteGateway delete the public gateway of a private network
+func Test_DeleteGateway(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// CreateHost creates an host that fulfils the request
+func Test_CreateHost(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// GetHost returns the host identified by id
+func Test_GetHost(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// ListHosts lists available hosts
+func Test_ListHosts(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// DeleteHost deletes the host identified by id
+func Test_DeleteHost(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// StopHost stops the host identified by id
+func Test_StopHost(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// StartHost starts the host identified by id
+func Test_StartHost(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// GetSSHConfig creates SSHConfig from host
+func Test_GetSSHConfig(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// CreateVolume creates a block volume
+// - name is the name of the volume
+// - size is the size of the volume in GB
+// - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
+func Test_CreateVolume(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// GetVolume returns the volume identified by id
+func Test_GetVolume(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// ListVolumes list available volumes
+func Test_ListVolumes(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// DeleteVolume deletes the volume identified by id
+func Test_DeleteVolume(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// CreateVolumeAttachment attaches a volume to an host
+//- name of the volume attachment
+//- volume to attach
+//- host on which the volume is attached
+func Test_CreateVolumeAttachment(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// GetVolumeAttachment returns the volume attachment identified by id
+func Test_GetVolumeAttachment(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// ListVolumeAttachments lists available volume attachment
+func Test_ListVolumeAttachments(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// DeleteVolumeAttachment deletes the volume attachment identifed by id
+func Test_DeleteVolumeAttachment(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// CreateContainer creates an object container
+func Test_CreateContainer(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// DeleteContainer deletes an object container
+func Test_DeleteContainer(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// ListContainers list object containers
+func Test_ListContainers(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// Getcontainer returns info of the container
+func Test_GetContainer(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// PutObject put an object into an object container
+func Test_PutObject(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// UpdateObjectMetadata update an object into  object container
+func Test_UpdateObjectMetadata(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// GetObject get  object content from an object container
+func Test_GetObject(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// GetObjectMetadata get  object metadata from an object container
+func Test_GetObjectMetadata(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// ListObjects list objects of a container
+func Test_ListObjects(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// CopyObject copies an object
+func Test_CopyObject(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// DeleteObject delete an object from a container
+func Test_DeleteObject(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// GetAuthOpts returns authentification options as a Config
+func Test_GetAuthOpts(t *testing.T) {
+	// TODO Implement Test
+
+}
+
+// GetCfgOpts returns configuration options as a Config
+func Test_GetCfgOpts(t *testing.T) {
+	// TODO Implement Test
+
 }
