@@ -9,6 +9,7 @@ endif
 
 VERSION := 0.1.0
 
+FIRSTUPDATE := $(shell git remote update)
 BUILD := $(shell git rev-parse HEAD)
 UPSTREAM := $(shell git rev-parse origin/develop)
 LOCAL := $(shell git rev-parse HEAD)
