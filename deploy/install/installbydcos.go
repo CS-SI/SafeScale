@@ -69,15 +69,6 @@ func (i *dcosInstaller) Add(c *Component, t Target, v Variables) (Results, error
 		return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
 	}
 
-	// Inits implicit parameters
-	setImplicitParameters(t, v)
-
-	// Checks required parameters have value
-	err = checkParameters(c, v)
-	if err != nil {
-		return nil, err
-	}
-
 	// Replaces variables in normalized script
 	//v["DomainName"] = cluster.GetConfig().DomainName
 	v["dcos"] = dcosCli

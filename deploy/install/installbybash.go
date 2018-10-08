@@ -73,20 +73,11 @@ func (i *bashInstaller) Add(c *Component, t Target, v Variables) (Results, error
 	// If component is installed, do nothing but responds with success
 	results, err := i.Check(c, t, v)
 	if err != nil {
-		return nil, fmt.Errorf("component '%s' check failed: %s", c.DisplayName(), err.Error())
+		return nil, fmt.Errorf("component check failed: %s", err.Error())
 	}
 	if results.Successful() {
 		//log.Printf("Component '%s' is already installed\n", c.DisplayName())
 		return results, nil
-	}
-
-	// Inits implicit parameters
-	setImplicitParameters(t, v)
-
-	// Checks required parameters have value
-	err = checkParameters(c, v)
-	if err != nil {
-		return nil, err
 	}
 
 	// Determining if install script is defined in specification file

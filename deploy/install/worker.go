@@ -540,14 +540,14 @@ func (w *worker) setReverseProxy(v Variables) error {
 		}
 		hosts, err := identifyHosts(w, targets)
 		if err != nil {
-			return fmt.Errorf("failed to apply rules: %s", err.Error())
+			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 		}
 		for _, h := range hosts {
 			v["HostIP"] = h.PRIVATE_IP
 			v["Hostname"] = h.Name
 			err := kc.Apply(rule, &v)
 			if err != nil {
-				return fmt.Errorf("failed to apply rules: %s", err.Error())
+				return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 			}
 		}
 	}
