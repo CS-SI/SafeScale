@@ -292,19 +292,21 @@ func installRequirements(c *Component, t Target, v Variables) error {
 	specs := c.Specs()
 	yamlKey := "component.requirements.components"
 	if specs.IsSet(yamlKey) {
-		// hostInstance, clusterInstance, nodeInstance := determineContext(t)
-		// msgHead := fmt.Sprintf("Checking requirements of component '%s'", c.DisplayName())
-		// var msgTail string
-		// if hostInstance != nil {
-		// 	msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
+		// if debug {
+		//	hostInstance, clusterInstance, nodeInstance := determineContext(t)
+		//	msgHead := fmt.Sprintf("Checking requirements of component '%s'", c.DisplayName())
+		//	var msgTail string
+		//	if hostInstance != nil {
+		//		msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
+		//	}
+		//	if nodeInstance != nil {
+		//		msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
+		//	}
+		//	if clusterInstance != nil {
+		//		msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
+		//	}
+		//	log.Printf("%s %s...\n", msgHead, msgTail)
 		// }
-		// if nodeInstance != nil {
-		// 	msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
-		// }
-		// if clusterInstance != nil {
-		// 	msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
-		// }
-		// log.Printf("%s %s...\n", msgHead, msgTail)
 		for _, requirement := range specs.GetStringSlice(yamlKey) {
 			needed, err := NewComponent(requirement)
 			if err != nil {

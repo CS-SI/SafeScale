@@ -88,7 +88,7 @@ func NewComponent(name string) (*Component, error) {
 		if v.IsSet("component") {
 			component = &Component{
 				fileName:    name + ".yml",
-				displayName: v.GetString("Name"),
+				displayName: v.GetString("component.name"),
 				specs:       v,
 			}
 		}
