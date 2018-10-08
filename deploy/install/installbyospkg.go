@@ -63,13 +63,10 @@ func (g *genericPackager) Add(c *Component, t Target, v Variables) (Results, err
 		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
 	}
 
-	// Inits implicit parameters
-	setImplicitParameters(t, v)
-
-	// Checks required parameters have value
-	err := checkParameters(c, v)
+	// Installs requirements if there are any
+	err := installRequirements(c, t, v)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
 	}
 
 	worker, err := newWorker(c, t, Method.Bash, Action.Add, g.addCommand)
