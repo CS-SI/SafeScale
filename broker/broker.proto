@@ -149,6 +149,9 @@ service HostService{
     rpc Inspect(Reference) returns (Host){}
     rpc List(HostListRequest) returns (HostList){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
+    rpc Start(Reference) returns (google.protobuf.Empty){}
+    rpc Stop(Reference) returns (google.protobuf.Empty){}
+    rpc Reboot(Reference) returns (google.protobuf.Empty){}
     rpc SSH(Reference) returns (SshConfig){}
 }
 

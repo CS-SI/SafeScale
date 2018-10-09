@@ -35,6 +35,75 @@ var HostCmd = cli.Command{
 		hostDelete,
 		hostInspect,
 		hostSsh,
+		hostReboot,
+		hostStart,
+		hostStop,
+	},
+}
+
+var hostStart = cli.Command{
+	Name:      "start",
+	Usage:     "start Host",
+	ArgsUsage: "<Host_name|Host_ID>",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <Host_name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("host name or ID required")
+		}
+		resp, err := client.New().Host.Start(c.Args().First(), client.DefaultExecutionTimeout)
+		if err != nil {
+			return fmt.Errorf("Could not start host '%s': %v", c.Args().First(), client.DecorateError(err, "inspection of host", false))
+		}
+
+		out, _ := json.Marshal(resp)
+		fmt.Println(string(out))
+
+		return nil
+	},
+}
+
+var hostStop = cli.Command{
+	Name:      "stop",
+	Usage:     "stop Host",
+	ArgsUsage: "<Host_name|Host_ID>",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <Host_name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("host name or ID required")
+		}
+		resp, err := client.New().Host.Stop(c.Args().First(), client.DefaultExecutionTimeout)
+		if err != nil {
+			return fmt.Errorf("Could not start host '%s': %v", c.Args().First(), client.DecorateError(err, "inspection of host", false))
+		}
+
+		out, _ := json.Marshal(resp)
+		fmt.Println(string(out))
+
+		return nil
+	},
+}
+
+var hostReboot = cli.Command{
+	Name:      "reboot",
+	Usage:     "reboot Host",
+	ArgsUsage: "<Host_name|Host_ID>",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <Host_name>")
+			cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("host name or ID required")
+		}
+		resp, err := client.New().Host.Reboot(c.Args().First(), client.DefaultExecutionTimeout)
+		if err != nil {
+			return fmt.Errorf("Could not reboot host '%s': %v", c.Args().First(), client.DecorateError(err, "inspection of host", false))
+		}
+
+		out, _ := json.Marshal(resp)
+		fmt.Println(string(out))
+
+		return nil
 	},
 }
 

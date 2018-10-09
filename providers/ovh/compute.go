@@ -17,6 +17,7 @@
 package ovh
 
 import (
+	"log"
 	"strings"
 	"time"
 
@@ -121,6 +122,11 @@ func (client *Client) DeleteHost(ref string) error {
 // StopHost stops the host identified by id
 func (client *Client) StopHost(id string) error {
 	return client.osclt.StopHost(id)
+}
+
+func (client *Client) RebootHost(id string) error {
+	log.Println("Received reboot petition OVH")
+	return client.osclt.RebootHost(id)
 }
 
 // StartHost starts the host identified by id

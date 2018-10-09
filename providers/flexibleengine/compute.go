@@ -1012,6 +1012,10 @@ func (client *Client) StartHost(id string) error {
 	return client.osclt.StartHost(id)
 }
 
+func (client *Client) RebootHost(id string) error {
+	return client.osclt.RebootHost(id)
+}
+
 // WaitHostReady waits an host achieve ready state
 func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.Host, error) {
 	var (

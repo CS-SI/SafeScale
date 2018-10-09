@@ -36,6 +36,9 @@ type HostAPI interface {
 	Get(ref string) (*api.Host, error)
 	Delete(ref string) error
 	SSH(ref string) (*system.SSHConfig, error)
+	Reboot(ref string) error
+	Start(ref string) error
+	Stop(ref string) error
 }
 
 // NewHostService creates an host service
@@ -50,6 +53,21 @@ func NewHostService(api api.ClientAPI) HostAPI {
 type HostService struct {
 	provider *providers.Service
 	network  NetworkAPI
+}
+
+func (svc *HostService) Start(ref string) error {
+	log.Println("Starting host ...")
+	return svc.provider.StartHost(ref)
+}
+
+func (svc *HostService) Stop(ref string) error {
+	log.Println("Stopping host ...")
+	return svc.provider.StopHost(ref)
+}
+
+func (svc *HostService) Reboot(ref string) error {
+	log.Println("Rebooting host ...")
+	return svc.provider.RebootHost(ref)
 }
 
 // Create creates a host

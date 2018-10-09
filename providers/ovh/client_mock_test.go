@@ -108,36 +108,23 @@ func TestMock_GetTemplates_Mock(t *testing.T) {
 	}
 }
 
-func TemplateExists_Mock(t *testing.T, name string) bool {
-	cli, amok, _ := getMockableClient(t)
-	tpls, _ := cli.Service.ListTemplates(false)
-
-	// TODO use Mock object
-	_ = amok
-
-	find := false
-	for _, tpl := range tpls {
-		if tpl.Name == name {
-
-			find = true
-		}
-	}
-
-	return find
-}
-
 func TestMock_GetGpuTemplate_Mock(t *testing.T) {
 	cli, amok, err := getMockableClient(t)
 	require.Nil(t, err)
 
-	// TODO use Mock object
-	_ = amok
+	if amok != nil {
+		// TODO Make it return a NVIDIA 1080 TI only for mocks
+		// TODO Create HostTemplateGenerator
+		amok.EXPECT().ListTemplates(false).Return(nil, nil)
+		amok.EXPECT().GetTemplate("g3-120")
+	}
 
 	tpls, err := cli.Service.ListTemplates(false)
 	assert.NoError(t, err)
-	find := TemplateExists_Mock(t, "g3-120")
 
-	if find {
+	_, err = cli.Service.GetTemplate("g3-120")
+
+	if err == nil {
 		for _, tpl := range tpls {
 			if tpl.Name == "g3-120" {
 				fmt.Println(tpl.Cores)
@@ -153,9 +140,12 @@ func TestMock_ListImages_Mock(t *testing.T) {
 	cli, amok, err := getMockableClient(t)
 	require.Nil(t, err)
 
-	// TODO use Mock object
-	_ = amok
+	if amok != nil {
+		// TODO Create ListImagesGenerator
+		amok.EXPECT().ListImages(false).AnyTimes()
+	}
 
+	// TODO Result should NOT be empty
 	cli.ListImages(t)
 }
 
