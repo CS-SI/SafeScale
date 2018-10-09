@@ -22,7 +22,6 @@ component:
         cluster: all
     install:
         bash:
-            wallTime: 15
             check:
                 pace: pkg
                 steps:

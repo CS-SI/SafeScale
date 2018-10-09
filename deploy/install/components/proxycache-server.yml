@@ -31,8 +31,8 @@ component:
                     image:
                         targets:
                             hosts: yes
-                    run: |
-                        docker image ls | grep proxycache &>/dev/null
+                        run: |
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'proxycache:latest' &>/dev/null
 
             add:
                 pace: squid
