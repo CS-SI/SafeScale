@@ -15,7 +15,7 @@
 ---
 component:
     name: Spark
-    context:
+    suitableFor:
         host: no
         cluster: k8s,dcos
     install:
@@ -27,22 +27,27 @@ component:
                         targets:
                             masters: one
                         run: |
-                            {{.dcos}} package install --yes spark
+                            sfDcos package install --yes spark
                     cli:
                         targets:
                             masters: all
                         run: |
-                            {{.dcos}} package install --yes --cli spark
-            check: |
-                {{.dcos}} spark plan show deploy --json | jq .status | grep COMPLETE
-
-            remove: |
-                pace: remove
+                            sfDcos package install --yes --cli spark
+            check:
+                pace: check
                 steps:
-                    pace: package
-                    package:
+                    check:
                         targets:
                             masters: one
                         run: |
-                            {{.dcos}} package remove --yes spark
+                            sfDcos spark plan show deploy --json &>/dev/null
+
+            remove:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDcos package remove --yes spark
 ...
