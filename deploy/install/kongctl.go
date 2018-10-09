@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	curlGet  = "curl -Ssl -k -X GET --url https://localhost:8444/%s -H \"Content-Type:application/json\""
-	curlPost = "curl -Ssl -k -X POST --url https://localhost:8444/%s -H \"Content-Type:application/json\" -d @- <<'EOF'\n%s\nEOF\n"
+	curlGet  = "curl -kSsl -X GET --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"%%{http_code}\""
+	curlPost = "curl -kSsl -X POST --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
 )
 
 var kongProxyCheckedCache = NewMapCache()
@@ -49,7 +49,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 	// Check if reverseproxy component is installed on host
 	rp, err := NewComponent("reverseproxy")
 	if err != nil {
-		return nil, fmt.Errorf("no 'reverseproxy' component found")
+		return nil, fmt.Errorf("failed to find a component called 'reverseproxy'")
 	}
 	present := false
 	if anon, ok := kongProxyCheckedCache.Get(host.Name); ok {
@@ -57,7 +57,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(host.Name, func() (interface{}, error) {
 			target := NewHostTarget(host)
-			results, err := rp.Check(target, Variables{})
+			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to check if component 'reverseproxy' is installed on gateway: %s", err.Error())
 			}
@@ -115,15 +115,17 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 			return fmt.Errorf("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
 		upstreamName := unjsoned["name"].(string)
-		cmd := fmt.Sprintf(curlGet, url+upstreamName)
-		retcode, _, _, err := k.broker.Ssh.Run(k.host.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
-		if err != nil {
+		url += upstreamName
+		response, err := k.get(ruleName, url)
+		if response == nil && err != nil {
 			return err
 		}
-		if retcode != 0 {
-			err := k.createUpstream(upstreamName, values)
-			if err != nil {
-				return err
+		if msg, ok := response["message"]; ok {
+			if strings.ToLower(msg.(string)) == "not found" {
+				err := k.createUpstream(upstreamName, values)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -131,12 +133,13 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		delete(unjsoned, "name")
 		jsoned, _ := json.Marshal(&unjsoned)
 		content = string(jsoned)
+		url += "/targets"
 
 	default:
 		return fmt.Errorf("syntax error in rule '%s': %s isn't a valid type", ruleName, ruleType)
 	}
 
-	err = k.post(ruleName, url, content, values)
+	_, err = k.post(ruleName, url, content, values)
 	if err != nil {
 		return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 	}
@@ -159,30 +162,65 @@ func (k *KongController) realizeRuleData(content string, v Variables) (string, e
 func (k *KongController) createUpstream(name string, v *Variables) error {
 	upstreamData := map[string]string{"name": name}
 	jsoned, _ := json.Marshal(&upstreamData)
-	return k.post(name, "upstreams/", string(jsoned), v)
+	response, err := k.post(name, "upstreams/", string(jsoned), v)
+	if response == nil && err != nil {
+		return err
+	}
+	if msg, ok := response["message"]; ok {
+		return fmt.Errorf("failed to create upstream: %s", msg)
+	}
+	return nil
 }
 
-func (k *KongController) post(name, url, data string, v *Variables) error {
+func (k *KongController) get(name, url string) (map[string]interface{}, error) {
+	// Now apply the rule to Kong
+	cmd := fmt.Sprintf(curlGet, url)
+	retcode, stdout, _, err := brokerclient.New().Ssh.Run(k.host.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return nil, err
+	}
+	if retcode != 0 {
+		return nil, fmt.Errorf("get '%s' failed: retcode=%d", name, retcode)
+	}
+	output := strings.Split(stdout, "\n")
+	var response map[string]interface{}
+	err = json.Unmarshal([]byte(output[0]), &response)
+	if err != nil {
+		return nil, err
+	}
+	if output[1] == "200" || output[1] == "201" {
+		return response, nil
+	}
+	if msg, ok := response["message"]; ok {
+		return response, fmt.Errorf("get failed: HTTP error code=%s: %s", output[1], msg.(string))
+	}
+	return response, fmt.Errorf("get failed with HTTP error code '%s'", output[1])
+}
+
+func (k *KongController) post(name, url, data string, v *Variables) (map[string]interface{}, error) {
 	// Now apply the rule to Kong
 	cmd := fmt.Sprintf(curlPost, url, data)
 	retcode, stdout, _, err := brokerclient.New().Ssh.Run(k.host.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("execution of rule '%s' failed: retcode=%d", name, retcode)
+		return nil, fmt.Errorf("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
+	output := strings.Split(stdout, "\n")
 	var response map[string]interface{}
-	err = json.Unmarshal([]byte(stdout), &response)
+	err = json.Unmarshal([]byte(output[0]), &response)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if output[1] == "200" || output[1] == "201" {
+		if id, ok := response["id"]; ok {
+			(*v)[name] = id.(string)
+		}
+		return response, nil
 	}
 	if msg, ok := response["message"]; ok {
-		return fmt.Errorf(msg.(string))
+		return response, fmt.Errorf("post failed: HTTP Error code %s: %s", output[1], msg.(string))
 	}
-	if id, ok := response["id"]; ok {
-		(*v)[name] = id.(string)
-	}
-
-	return nil
+	return response, fmt.Errorf("post failed: HTTP error code '%s'", output[1])
 }

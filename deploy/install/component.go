@@ -34,6 +34,20 @@ var (
 // Variables defines the parameters a Installer may need
 type Variables map[string]interface{}
 
+// Settings are used to tune the component
+type Settings struct {
+	// SkipCheck doesn't try to check component before add or remove
+	SkipCheck bool
+	// SkipProxy to tell not to try to set reverse proxy
+	SkipProxy bool
+	// Serialize force not to parallel hosts in step
+	Serialize bool
+	// SkipComponentRequirements tells not to install required components
+	SkipComponentRequirements bool
+	// SkipSizingRequirements tells not to check sizing requirements
+	SkipSizingRequirements bool
+}
+
 // Component contains the information about an installable component
 type Component struct {
 	// displayName is the name of the service
@@ -88,7 +102,7 @@ func NewComponent(name string) (*Component, error) {
 		if v.IsSet("component") {
 			component = &Component{
 				fileName:    name + ".yml",
-				displayName: v.GetString("Name"),
+				displayName: v.GetString("component.name"),
 				specs:       v,
 			}
 		}
@@ -157,7 +171,7 @@ func (c *Component) Applyable(t Target) bool {
 
 // Check if component is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (c *Component) Check(t Target, v Variables) (Results, error) {
+func (c *Component) Check(t Target, v Variables, s Settings) (Results, error) {
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
@@ -186,12 +200,12 @@ func (c *Component) Check(t Target, v Variables) (Results, error) {
 		return nil, err
 	}
 
-	return installer.Check(c, t, v)
+	return installer.Check(c, t, v, s)
 }
 
 // Add installs the component on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (c *Component) Add(t Target, v Variables) (Results, error) {
+func (c *Component) Add(t Target, v Variables, s Settings) (Results, error) {
 	methods := t.Methods()
 	var (
 		installer Installer
@@ -224,11 +238,11 @@ func (c *Component) Add(t Target, v Variables) (Results, error) {
 		return nil, err
 	}
 
-	return installer.Add(c, t, v)
+	return installer.Add(c, t, v, s)
 }
 
 // Remove uninstalls the component from the target
-func (c *Component) Remove(t Target, v Variables) (Results, error) {
+func (c *Component) Remove(t Target, v Variables, s Settings) (Results, error) {
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
@@ -256,7 +270,7 @@ func (c *Component) Remove(t Target, v Variables) (Results, error) {
 		return nil, err
 	}
 
-	return installer.Remove(c, t, v)
+	return installer.Remove(c, t, v, s)
 }
 
 // FakeComponent is a component already installed; it's used to tell if a specific component

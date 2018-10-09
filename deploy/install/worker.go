@@ -104,16 +104,20 @@ func newWorker(c *Component, t Target, m Method.Enum, a Action.Enum, f alterComm
 	return &w, nil
 }
 
+// ConcernCluster returns true if the target of the worker is a cluster
+func (w *worker) ConcernCluster() bool {
+	return w.cluster != nil
+}
+
 // CanProceed tells if the combination Component/Target can work
-func (w *worker) CanProceed() error {
+func (w *worker) CanProceed(s Settings) error {
 	if w.cluster != nil {
 		err := w.validateContextForCluster()
-		if err == nil {
+		if err == nil && !s.SkipSizingRequirements {
 			err = w.validateClusterSizing()
 		}
 		return err
 	}
-
 	return w.validateContextForHost()
 }
 
@@ -232,7 +236,7 @@ func (w *worker) AllNodes(public bool) ([]*pb.Host, error) {
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(v Variables) (Results, error) {
+func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 	results := Results{}
 	specs := w.component.Specs()
 
@@ -251,7 +255,7 @@ func (w *worker) Proceed(v Variables) (Results, error) {
 	order := strings.Split(pace, ",")
 
 	// Applies reverseproxy rules to make it functional (component may need it during the install)
-	if w.action == Action.Add {
+	if w.action == Action.Add && !s.SkipProxy {
 		err := w.setReverseProxy(v)
 		if err != nil {
 			return nil, err
@@ -397,7 +401,7 @@ func (w *worker) Proceed(v Variables) (Results, error) {
 			YamlKey:            stepKey,
 			Serial:             serial,
 		}
-		results[k], err = step.Run(v)
+		results[k], err = step.Run(v, s)
 		// If an error occured, don't do the remaining steps, fail immediately
 		if err != nil {
 			break
@@ -540,14 +544,14 @@ func (w *worker) setReverseProxy(v Variables) error {
 		}
 		hosts, err := identifyHosts(w, targets)
 		if err != nil {
-			return fmt.Errorf("failed to apply rules: %s", err.Error())
+			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 		}
 		for _, h := range hosts {
 			v["HostIP"] = h.PRIVATE_IP
 			v["Hostname"] = h.Name
 			err := kc.Apply(rule, &v)
 			if err != nil {
-				return fmt.Errorf("failed to apply rules: %s", err.Error())
+				return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 			}
 		}
 	}
