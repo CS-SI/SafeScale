@@ -135,6 +135,9 @@ var hostComponentAddCommand = &cli.Command{
 			}
 		}
 
+		settings := install.Settings{}
+		settings.SkipProxy = c.Flag("--skip-proxy", false)
+
 		// Wait for SSH service on remote host first
 		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
 		if err != nil {
@@ -143,7 +146,7 @@ var hostComponentAddCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		results, err := component.Add(target, values)
+		results, err := component.Add(target, values, settings)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error installing component '%s' on host '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
@@ -197,7 +200,7 @@ var hostComponentCheckCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		results, err := component.Check(target, values)
+		results, err := component.Check(target, values, install.Settings{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
@@ -253,7 +256,7 @@ var hostComponentDeleteCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		results, err := component.Remove(target, values)
+		results, err := component.Remove(target, values, install.Settings{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
