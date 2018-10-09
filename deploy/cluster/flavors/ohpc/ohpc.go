@@ -316,7 +316,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		goto cleanNetwork
 	}
 	target = install.NewHostTarget(pbutils.ToPBHost(gw))
-	results, err = component.Add(target, install.Variables{})
+	results, err = component.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		goto cleanNetwork
 	}
@@ -404,7 +404,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	if len(instance.manager.MasterIPs) > 1 {
 		values["SecondaryMasterIP"] = instance.manager.MasterIPs[1]
 	}
-	results, err = component.Add(target, values)
+	results, err = component.Add(target, values, install.Settings{})
 	if err != nil {
 		goto cleanNodes
 	}
@@ -418,7 +418,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	if err != nil {
 		goto cleanNodes
 	}
-	results, err = component.Add(target, values)
+	results, err = component.Add(target, values, install.Settings{})
 	if err != nil {
 		goto cleanNodes
 	}
@@ -504,7 +504,7 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 		return fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
 	}
 	target := install.NewHostTarget(host)
-	results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
 		return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -525,7 +525,7 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 		"Hostname": host.Name,
 		"Username": "cladm",
 		"Password": c.Core.AdminPassword,
-	})
+	}, install.Settings{})
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
 		return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -687,7 +687,7 @@ func (c *Cluster) asyncCreateNode(
 		return
 	}
 	target := install.NewHostTarget(host)
-	results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -711,7 +711,7 @@ func (c *Cluster) asyncCreateNode(
 		"Hostname": host.Name,
 		"Username": "cladm",
 		"Password": c.Core.AdminPassword,
-	})
+	}, install.Settings{})
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -862,7 +862,7 @@ func (c *Cluster) asyncInstallReverseProxy(host *providerapi.Host, done chan err
 		done <- err
 		return
 	}
-	results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		done <- fmt.Errorf("failed to execute installation of component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
 		return
@@ -926,7 +926,7 @@ func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
 		"HostIP":    host.PRIVATE_IP,
 		"Username":  "cladm",
 		"Password":  c.Core.AdminPassword,
-	})
+	}, install.Settings{})
 	if err != nil {
 		done <- fmt.Errorf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), err.Error())
 		return

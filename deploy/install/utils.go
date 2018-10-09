@@ -288,7 +288,7 @@ func findConcernedHosts(list []string, c *Component) (string, error) {
 }
 
 // installRequirements walks through requirements and installs them if needed
-func installRequirements(c *Component, t Target, v Variables) error {
+func installRequirements(c *Component, t Target, v Variables, s Settings) error {
 	specs := c.Specs()
 	yamlKey := "component.requirements.components"
 	if specs.IsSet(yamlKey) {
@@ -312,7 +312,7 @@ func installRequirements(c *Component, t Target, v Variables) error {
 			if err != nil {
 				return fmt.Errorf("failed to find required component '%s': %s", requirement, err.Error())
 			}
-			results, err := needed.Add(t, v)
+			results, err := needed.Add(t, v, s)
 			if err != nil {
 				return fmt.Errorf("failed to install required component '%s': %s", requirement, err.Error())
 			}

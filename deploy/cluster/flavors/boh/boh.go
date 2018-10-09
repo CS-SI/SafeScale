@@ -470,7 +470,7 @@ func (c *Cluster) createMaster(req pb.HostDefinition) error {
 		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", 1, host.ID, err.Error())
 		return fmt.Errorf("failed to install component 'docker': %s", err.Error())
 	}
-	results, err := component.Add(target, values)
+	results, err := component.Add(target, values, install.Settings{})
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
 		return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -653,7 +653,7 @@ func (c *Cluster) asyncCreateNode(
 		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
 		return
 	}
-	results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -805,7 +805,7 @@ func (c *Cluster) asyncInstallReverseProxy(host *providerapi.Host, done chan err
 		done <- err
 		return
 	}
-	results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		done <- fmt.Errorf("failed to execute installation of component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
 		return
@@ -867,7 +867,7 @@ func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
 		"HostIP":    host.PRIVATE_IP,
 		"Username":  "cladm",
 		"Password":  c.Core.AdminPassword,
-	})
+	}, install.Settings{})
 	if err != nil {
 		done <- fmt.Errorf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), err.Error())
 		return
