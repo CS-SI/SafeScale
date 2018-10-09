@@ -355,7 +355,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			err = fmt.Errorf("failed to prepare component 'kubernetes': %s", err.Error())
 			goto cleanNodes
 		}
-		results, err := component.Add(target, install.Variables{})
+		results, err := component.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
 			goto cleanNodes
 		}
@@ -613,7 +613,7 @@ func (c *Cluster) createAndConfigureNode(public bool, req *pb.HostDefinition) (s
 		log.Printf("[%s node (%s)] failed to prepare component 'kubernetes': %s", nodeTypeStr, host.Name, err.Error())
 		return "", err
 	}
-	results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		return "", err
 	}
@@ -703,7 +703,7 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 	results, err := component.Add(target, install.Variables{
 		"Username": "cladm",
 		"Password": c.Core.AdminPassword,
-	})
+	}, install.Settings{})
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), err.Error())
 		done <- err
@@ -888,7 +888,7 @@ func (c *Cluster) asyncConfigureGateway(done chan error) {
 		return
 	}
 	target := install.NewHostTarget(host)
-	results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		msg := fmt.Sprintf("[gateway] failed to install component '%s': %s", component.DisplayName(), err.Error())
 		log.Println(msg)
