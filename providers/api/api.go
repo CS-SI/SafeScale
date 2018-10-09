@@ -382,6 +382,9 @@ type ClientAPI interface {
 	StartHost(id string) error
 	// GetSSHConfig creates SSHConfig from host
 	GetSSHConfig(id string) (*system.SSHConfig, error)
+	// TODO Finish this
+	// Reboot host
+	RebootHost(id string) error
 
 	// CreateVolume creates a block volume
 	// - name is the name of the volume

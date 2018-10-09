@@ -97,3 +97,7 @@ func (client *Client) StopHost(id string) error {
 func (client *Client) StartHost(id string) error {
 	return client.feclt.StartHost(id)
 }
+
+func (client *Client) RebootHost(id string) error {
+	return client.feclt.RebootHost(id)
+}

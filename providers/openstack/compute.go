@@ -784,20 +784,67 @@ func (client *Client) DeleteHost(ref string) error {
 }
 
 // StopHost stops the host identified by id
-func (client *Client) StopHost(id string) error {
-	err := startstop.Stop(client.Compute, id).ExtractErr()
+func (client *Client) StopHost(ref string) error {
+	log.Println("Received stop petition")
+	id := ref
+
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	if err != nil {
+		return err
+	}
+	if m != nil {
+		host := m.Get()
+		id = host.ID
+	}
+
+	err = startstop.Stop(client.Compute, id).ExtractErr()
 	if err != nil {
 		return fmt.Errorf("error stopping host : %s", ProviderErrorToString(err))
 	}
 	return nil
 }
 
-// StartHost starts the host identified by id
-func (client *Client) StartHost(id string) error {
-	err := startstop.Start(client.Compute, id).ExtractErr()
+func (client *Client) RebootHost(ref string) error {
+	log.Println("Received reboot petition")
+	id := ref
+
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
 	if err != nil {
-		return fmt.Errorf("error stopping host : %s", ProviderErrorToString(err))
+		return err
 	}
+	if m != nil {
+		host := m.Get()
+		id = host.ID
+	}
+
+	err = servers.Reboot(client.Compute, id, servers.RebootOpts{Type: "HARD"}).ExtractErr()
+	if err != nil {
+		ftErr := fmt.Errorf("error rebooting host [%s]: %s", id, ProviderErrorToString(err))
+		log.Println(ftErr)
+		return ftErr
+	}
+	return nil
+}
+
+// StartHost starts the host identified by id
+func (client *Client) StartHost(ref string) error {
+	log.Println("Received start petition")
+	id := ref
+
+	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	if err != nil {
+		return err
+	}
+	if m != nil {
+		host := m.Get()
+		id = host.ID
+	}
+
+	err = startstop.Start(client.Compute, id).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("error starting host : %s", ProviderErrorToString(err))
+	}
+
 	return nil
 }
 

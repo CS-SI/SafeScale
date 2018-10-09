@@ -55,6 +55,44 @@ func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
 	return service.Inspect(ctx, &pb.Reference{Name: name})
 }
 
+// Reboots host
+func (h *host) Reboot(name string, timeout time.Duration) (interface{}, error) {
+	conn := utils.GetConnection()
+	defer conn.Close()
+	if timeout < utils.TimeoutCtxDefault {
+		timeout = utils.TimeoutCtxDefault
+	}
+	ctx, cancel := utils.GetContext(timeout)
+	defer cancel()
+	service := pb.NewHostServiceClient(conn)
+	return service.Reboot(ctx, &pb.Reference{Name: name})
+}
+
+// Start host
+func (h *host) Start(name string, timeout time.Duration) (interface{}, error) {
+	conn := utils.GetConnection()
+	defer conn.Close()
+	if timeout < utils.TimeoutCtxDefault {
+		timeout = utils.TimeoutCtxDefault
+	}
+	ctx, cancel := utils.GetContext(timeout)
+	defer cancel()
+	service := pb.NewHostServiceClient(conn)
+	return service.Start(ctx, &pb.Reference{Name: name})
+}
+
+func (h *host) Stop(name string, timeout time.Duration) (interface{}, error) {
+	conn := utils.GetConnection()
+	defer conn.Close()
+	if timeout < utils.TimeoutCtxDefault {
+		timeout = utils.TimeoutCtxDefault
+	}
+	ctx, cancel := utils.GetContext(timeout)
+	defer cancel()
+	service := pb.NewHostServiceClient(conn)
+	return service.Stop(ctx, &pb.Reference{Name: name})
+}
+
 // Create ...
 func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, error) {
 	conn := utils.GetConnection()

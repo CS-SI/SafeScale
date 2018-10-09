@@ -36,6 +36,63 @@ import (
 // HostServiceServer host service server grpc
 type HostServiceServer struct{}
 
+func (s *HostServiceServer) Start(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
+	log.Printf("Start host called")
+
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	ref := utils.GetReference(in)
+	hostAPI := services.NewHostService(currentTenant.Client)
+
+	err := hostAPI.Start(ref)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("Host '%s' started", ref)
+	return &google_protobuf.Empty{}, nil
+}
+
+func (s *HostServiceServer) Stop(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
+	log.Printf("Stop host called")
+
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	ref := utils.GetReference(in)
+	hostAPI := services.NewHostService(currentTenant.Client)
+
+	err := hostAPI.Stop(ref)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("Host '%s' rebooted", ref)
+	return &google_protobuf.Empty{}, nil
+}
+
+func (s *HostServiceServer) Reboot(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
+	log.Printf("Reboot host called")
+
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("No tenant set")
+	}
+
+	ref := utils.GetReference(in)
+	hostAPI := services.NewHostService(currentTenant.Client)
+
+	err := hostAPI.Reboot(ref)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("Host '%s' rebooted", ref)
+	return &google_protobuf.Empty{}, nil
+}
+
 // List available hosts
 func (s *HostServiceServer) List(ctx context.Context, in *pb.HostListRequest) (*pb.HostList, error) {
 	log.Printf("List hosts called")
