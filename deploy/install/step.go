@@ -222,7 +222,7 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(v Variables) (stepResults, error) {
+func (is *step) Run(v Variables, s Settings) (stepResults, error) {
 	// Determine list of hosts concerned by the step
 	hostsList, err := identifyHosts(is.Worker, is.Targets)
 	if err != nil {
@@ -232,7 +232,7 @@ func (is *step) Run(v Variables) (stepResults, error) {
 	// Empty results
 	results := stepResults{}
 
-	if is.Serial {
+	if is.Serial || s.Serialize {
 		for _, host := range hostsList {
 			v["HostIP"] = host.PRIVATE_IP
 			v["Hostname"] = host.Name

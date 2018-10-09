@@ -44,6 +44,8 @@ install_common_requirements() {
     echo "{{ .SSHPublicKey }}" >~cladm/.ssh/authorized_keys
     echo "{{ .SSHPrivateKey }}" >~cladm/.ssh/id_rsa
     chmod 0400 ~cladm/.ssh/*
+    echo "cladm ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
+    chmod o-rwx /etc/sudoers.d/10-admins
 
     mkdir -p ~cladm/.local/bin && find ~cladm/.local -exec chmod 0770 {} \;
     cat >>~cladm/.bashrc <<-'EOF'

@@ -747,7 +747,7 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 		return
 	}
 	target := install.NewHostTarget(host)
-	results, err := component.Add(target, values)
+	results, err := component.Add(target, values, install.Settings{})
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", index, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -840,7 +840,7 @@ func (c *Cluster) asyncConfigureMaster(index int, host *pb.Host, done chan error
 	results, err := component.Add(target, install.Variables{
 		"Username": "cladm",
 		"Password": c.Core.AdminPassword,
-	})
+	}, install.Settings{})
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), err.Error())
 		done <- err
@@ -953,7 +953,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
 		return
 	}
-	results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
 		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
@@ -1080,7 +1080,7 @@ func (c *Cluster) asyncPrepareGateway(done chan error) {
 		return
 	}
 	target := install.NewHostTarget(host)
-	results, err := component.Add(target, install.Variables{})
+	results, err := component.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		msg := fmt.Sprintf("failed to install component '%s' on '%s': %s", component.DisplayName(), host.Name, err.Error())
 		log.Println(msg)

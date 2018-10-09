@@ -325,19 +325,33 @@ func dispatch(c *Command) {
 
 	// 3rd step: search for an appropriate subcommand
 	var (
-		ok     bool
-		key    string
-		subcmd *Command
-		anon   interface{}
+		ok, found bool
+		subcmd    *Command
+		anon      interface{}
 	)
-	for key, subcmd = range c.stringMap {
-		if anon, ok = docoptArguments[key]; !ok || anon == nil {
-			continue
+	for _, subcmd = range c.Commands {
+		allKeywords := []string{subcmd.Keyword}
+		allKeywords = append(allKeywords, subcmd.Aliases...)
+		for _, alias := range allKeywords {
+			if anon, ok = docoptArguments[alias]; !ok || anon == nil {
+				continue
+			}
+			if anon.(bool) {
+				found = true
+			}
 		}
-		if anon.(bool) {
+		if found {
 			break
 		}
 	}
+	// for key, subcmd = range c.stringMap {
+	// 	if anon, ok = docoptArguments[key]; !ok || anon == nil {
+	// 		continue
+	// 	}
+	// 	if anon.(bool) {
+	// 		break
+	// 	}
+	// }
 
 	// 4th step: executes current command Process if it's defined
 	if c.Process != nil {

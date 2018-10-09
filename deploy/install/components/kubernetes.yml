@@ -52,6 +52,15 @@ component:
 
     install:
         dcos:
+            check:
+                pace: deploy
+                steps:
+                    deploy:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDcos kubernetes &>/dev/null
+
             add:
                 #pace: package,cli+config
                 pace: package,cli,config
@@ -97,7 +106,7 @@ component:
                                 }
 
                         run: |
-                            output=$({{.dcos}} package install --yes kubernetes {{.options}} 2>&1)
+                            output=$(sfDcos package install --yes kubernetes {{.options}} 2>&1)
                             rc=$?
                             [ $rc -ne 0 ] && {
                                 echo $output
@@ -109,7 +118,7 @@ component:
                         targets:
                             masters: all
                         run: |
-                            {{.dcos}} package install --yes kubernetes --cli
+                            sfDcos package install --yes kubernetes --cli
 
                     config:
                         targets:
@@ -117,27 +126,24 @@ component:
                         run: |
                             wait_deploy_complete() {
                                 while true; do
-                                    {{.dcos}} kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null && break
+                                    sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null && break
                                     sleep 20
                                 done
                             }
                             export -f wait_deploy_complete
                             sfAsyncStart WDC 10 bash -c wait_deploy_complete || exit 513
                             sfAsyncWait WDC 514
-                            {{.dcos}} kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
-                            {{.kubectl}} config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
+                            sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
+                            sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
 
-            check: |
-                {{.dcos}} kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null
-
-            remove: |
-                pace: remove
+            remove:
+                pace: package
                 steps:
-                    remove:
+                    package:
                         targets:
                             masters: one
                         run: |
-                        {{.dcos}} package remove --yes kubernetes
+                            sfDcos package remove --yes kubernetes
 
         bash:
             check:
