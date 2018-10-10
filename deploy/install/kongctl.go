@@ -57,7 +57,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(host.Name, func() (interface{}, error) {
 			target := NewHostTarget(host)
-			results, err := rp.Check(target, Variables{})
+			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to check if component 'reverseproxy' is installed on gateway: %s", err.Error())
 			}

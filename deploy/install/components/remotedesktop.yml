@@ -503,7 +503,7 @@ component:
                         targets:
                             hosts: yes
                         run: |
-                            docker image ls | grep remotedesktop &>/dev/null
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'remotedesktop:latest' &>/dev/null
 
     service:
         start: |
