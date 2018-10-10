@@ -8,7 +8,8 @@ import (
 	"testing"
 )
 
-func Test_Basic(t *testing.T) {
+
+func Test_Flexible_Basic(t *testing.T) {
 	defer tearDown()
 
 	brokerd_launched, err := isBrokerdLaunched()
@@ -49,10 +50,10 @@ func Test_Basic(t *testing.T) {
 
 	fmt.Println("Creating VM easyVM...")
 
-	out, err = getOutput("broker host create easyvm --public --net easy")
+	out, err = getOutput("broker host create easyvm --public --net easy --cpu 4 --ram 50 ")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host create easyvm --public --net easy")
+	out, err = getOutput("broker host create easyvm --public --net easy --cpu 4 --ram 50 ")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A host already exist"))
 
