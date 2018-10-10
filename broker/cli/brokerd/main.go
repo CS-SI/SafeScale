@@ -1,3 +1,4 @@
+//line main.go:1
 /*
  * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
  *
@@ -17,8 +18,13 @@
 package main
 
 import (
+	"fmt"
+	"github.com/dlespiau/covertool/pkg/exit"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/daemon/commands"
@@ -80,8 +86,20 @@ broker nas inspect nas1
 
 */
 
+func cleanup() {
+	fmt.Println("cleanup")
+}
+
 // *** MAIN ***
 func main() {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		cleanup()
+		exit.Exit(1)
+	}()
+
 	log.Println("Checking configuration")
 	_, err := providers.Tenants()
 	if err != nil {
