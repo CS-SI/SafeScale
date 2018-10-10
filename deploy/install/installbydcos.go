@@ -22,60 +22,53 @@ func (i *dcosInstaller) GetName() string {
 }
 
 // Check checks if the component is installed
-func (i *dcosInstaller) Check(c *Component, t Target, v Variables) (Results, error) {
-	worker, err := newWorker(c, t, Method.DCOS, Action.Add, nil)
+func (i *dcosInstaller) Check(c *Component, t Target, v Variables, s Settings) (Results, error) {
+	worker, err := newWorker(c, t, Method.DCOS, Action.Check, nil)
 	if err != nil {
 		return nil, err
 	}
-	err = worker.CanProceed()
+	err = worker.CanProceed(s)
 	if err != nil {
 		log.Println(err.Error())
 		return nil, err
 	}
 
-	// Inits implicit parameters
-	setImplicitParameters(t, v)
-
-	// Checks required parameters have value
-	err = checkParameters(c, v)
-	if err != nil {
-		return nil, err
-	}
-
 	// Replaces variables in normalized script
 	//v["DomainName"] = cluster.GetConfig().DomainName
-	v["dcos"] = dcosCli
-	v["kubectl"] = kubectlCli
+	//	v["dcos"] = dcosCli
+	//	v["kubectl"] = kubectlCli
 	v["options"] = ""
 
-	return worker.Proceed(v)
+	return worker.Proceed(v, s)
 }
 
 // Add installs the component in a DCOS cluster
-func (i *dcosInstaller) Add(c *Component, t Target, v Variables) (Results, error) {
+func (i *dcosInstaller) Add(c *Component, t Target, v Variables, s Settings) (Results, error) {
 	worker, err := newWorker(c, t, Method.DCOS, Action.Add, nil)
 	if err != nil {
 		return nil, err
 	}
-	err = worker.CanProceed()
+	err = worker.CanProceed(s)
 	if err != nil {
 		log.Println(err.Error())
 		return nil, err
 	}
 
 	// Installs requirements if there are any
-	err = installRequirements(c, t, v)
-	if err != nil {
-		return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
+	if !s.SkipComponentRequirements {
+		err = installRequirements(c, t, v, s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
+		}
 	}
 
 	// Replaces variables in normalized script
 	//v["DomainName"] = cluster.GetConfig().DomainName
-	v["dcos"] = dcosCli
-	v["kubectl"] = kubectlCli
+	//v["dcos"] = dcosCli
+	//v["kubectl"] = kubectlCli
 	v["options"] = ""
 
-	return worker.Proceed(v)
+	return worker.Proceed(v, s)
 }
 
 // Remove uninstalls the component using the RemoveScript script
@@ -84,34 +77,25 @@ func (i *dcosInstaller) Add(c *Component, t Target, v Variables) (Results, error
 // - if err == nil and ok ==true, removal wa submitted and succeeded
 // - if err == nil and ok == false, removal was submitted successfully but failed, results contain reasons
 //   of failures on what parts
-func (i *dcosInstaller) Remove(c *Component, t Target, v Variables) (Results, error) {
+func (i *dcosInstaller) Remove(c *Component, t Target, v Variables, s Settings) (Results, error) {
 
 	worker, err := newWorker(c, t, Method.DCOS, Action.Remove, nil)
 	if err != nil {
 		return nil, err
 	}
-	err = worker.CanProceed()
+	err = worker.CanProceed(s)
 	if err != nil {
 		log.Println(err.Error())
 		return nil, err
 	}
 
-	// Inits implicit parameters
-	setImplicitParameters(t, v)
-
-	// Checks required parameters have value
-	err = checkParameters(c, v)
-	if err != nil {
-		return nil, err
-	}
-
 	// Replaces variables in normalized script
 	//v["DomainName"] = cluster.GetConfig().DomainName
-	v["dcos"] = dcosCli
-	v["kubectl"] = kubectlCli
+	//	v["dcos"] = dcosCli
+	//	v["kubectl"] = kubectlCli
 	v["options"] = ""
 
-	return worker.Proceed(v)
+	return worker.Proceed(v, s)
 }
 
 // NewDcosInstaller creates a new instance of Installer using DCOS

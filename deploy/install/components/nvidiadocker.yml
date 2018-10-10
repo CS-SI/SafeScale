@@ -31,10 +31,9 @@ component:
                     pkg:
                         targets:
                             host: yes
-                            cluster:
-                                masters: no
-                                privateNodes: all
-                                publicNodes: all
+                            masters: no
+                            privateNodes: all
+                            publicNodes: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -56,10 +55,9 @@ component:
                     fromdist:
                         targets:
                             hosts: yes
-                            clusters:
-                                masters: no
-                                privateNodes: all
-                                publicNodes: all
+                            masters: no
+                            privateNodes: all
+                            publicNodes: all
                         run: |
                             lspci | grep -i nvidia &>/dev/null || {
                                 echo "No nVidia GPU detected. Aborting."
@@ -99,18 +97,27 @@ component:
                             esac
                             exit 0
 
-            remove: |
-                case $LINUX_KIND in
-                    debian|ubuntu)
-                        sfWaitForApt && apt remove -y nvidia-docker2
-                        ;;
-                    centos|rhel)
-                        yum remove -y nvidia-docker2
-                        ;;
-                    *)
-                        echo "Unsupported operating system '$LINUX_KIND'"
-                        exit 1
-                        ;;
-                esac
+            remove:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            hosts: yes
+                            masters: no
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfWaitForApt && apt remove -y nvidia-docker2
+                                    ;;
+                                centos|rhel)
+                                    yum remove -y nvidia-docker2
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
 
 ...

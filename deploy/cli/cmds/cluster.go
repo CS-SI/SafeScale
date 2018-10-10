@@ -831,8 +831,12 @@ var clusterComponentAddCommand = &cli.Command{
 			}
 		}
 
+		settings := install.Settings{}
+		settings.SkipProxy = c.Flag("--skip-proxy", false)
+		settings.SkipCheck = c.Flag("--force", false)
+
 		target := install.NewClusterTarget(clusterInstance)
-		results, err := component.Add(target, values)
+		results, err := component.Add(target, values, settings)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error installing component '%s' on cluster '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
@@ -878,8 +882,10 @@ var clusterComponentCheckCommand = &cli.Command{
 			}
 		}
 
+		settings := install.Settings{}
+
 		target := install.NewClusterTarget(clusterInstance)
-		results, err := component.Check(target, values)
+		results, err := component.Check(target, values, settings)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
@@ -927,8 +933,14 @@ var clusterComponentDeleteCommand = &cli.Command{
 			}
 		}
 
+		settings := install.Settings{}
+		settings.SkipCheck = c.Flag("--force", false)
+		// TODO: Reverse proxy rules are not purged when component is removed, but by default
+		// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
+		settings.SkipProxy = true
+
 		target := install.NewClusterTarget(clusterInstance)
-		results, err := component.Remove(target, values)
+		results, err := component.Remove(target, values, settings)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
