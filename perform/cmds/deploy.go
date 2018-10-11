@@ -26,13 +26,12 @@ import (
 	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
 )
 
-// PackageCommand ...
-var PackageCommand = &cli.Command{
-	Keyword: "package",
-	Aliases: []string{"pkg"},
+// FeatureCommand ...
+var FeatureCommand = &cli.Command{
+	Keyword: "feature",
 
 	Commands: []*cli.Command{
-		deployPackageCheckCommand,
+		deployFeatureCheckCommand,
 	},
 
 	Before: func(c *cli.Command) {
@@ -51,8 +50,8 @@ var PackageCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// deployPackageCheckCmd
-var deployPackageCheckCommand = &cli.Command{
+// deployFeatureCheckCmd
+var deployFeatureCheckCommand = &cli.Command{
 	Keyword: "check",
 
 	Process: func(c *cli.Command) {
@@ -62,7 +61,7 @@ var deployPackageCheckCommand = &cli.Command{
 			fmt.Println("Invalid empty argument PKGNAME")
 			os.Exit(int(ExitCode.InvalidArgument))
 		}
-		fmt.Println("deployPackageCheckCommand not yet implemented")
+		fmt.Println("deployFeatureCheckCommand not yet implemented")
 		os.Exit(int(ExitCode.NotImplemented))
 	},
 

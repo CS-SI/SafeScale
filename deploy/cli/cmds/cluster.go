@@ -56,7 +56,7 @@ var ClusterCommand = &cli.Command{
 
 	Commands: []*cli.Command{
 		clusterListCommand,
-		clusterComponentCommand,
+		clusterFeatureCommand,
 		clusterNodeCommand,
 		clusterCreateCommand,
 		clusterInspectCommand,
@@ -182,7 +182,7 @@ var clusterInspectCommand = &cli.Command{
 	Keyword: "inspect",
 
 	Process: func(c *cli.Command) {
-		err := outputClusterConfig(clusterInstance.GetConfig())
+		err := outputClusterConfig()
 		if err != nil {
 			fmt.Printf("%v\n", err)
 		}
@@ -198,8 +198,8 @@ Displays information about the cluster 'clustername'.`,
 }
 
 // outputClusterConfig displays cluster configuration after filtering and completing some fields
-func outputClusterConfig(result interface{}) error {
-	toFormat, err := convertStructToMap(result)
+func outputClusterConfig() error {
+	toFormat, err := convertStructToMap(clusterInstance.GetConfig())
 	if err != nil {
 		return err
 	}
@@ -225,6 +225,21 @@ func convertStructToMap(src interface{}) (map[string]interface{}, error) {
 	if err != nil {
 		return map[string]interface{}{}, err
 	}
+
+	// Add information not directly in cluster GetConfig()
+	toFormat["admin_login"] = "cladm"
+	brkclt := brokerclient.New().Host
+	remoteDesktops := []string{}
+	gwPublicIP := clusterInstance.GetConfig().PublicIP
+	for _, id := range clusterInstance.ListMasterIDs() {
+		host, err := brkclt.Inspect(id, brokerclient.DefaultExecutionTimeout)
+		if err != nil {
+			return nil, err
+		}
+		remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s", gwPublicIP, host.Name))
+	}
+	toFormat["remote_desktop"] = remoteDesktops
+
 	return toFormat, nil
 }
 
@@ -771,20 +786,20 @@ func executeCommand(command string) (int, string, string, error) {
 	return 0, "", "", nil
 }
 
-// clusterComponentCommand handles 'deploy cluster <host name or id> component'
-var clusterComponentCommand = &cli.Command{
-	Keyword: "component",
+// clusterFeatureCommand handles 'deploy cluster <host name or id> feature'
+var clusterFeatureCommand = &cli.Command{
+	Keyword: "feature",
 	Aliases: []string{"package", "pkg"},
 
 	Commands: []*cli.Command{
-		clusterComponentCheckCommand,
-		clusterComponentAddCommand,
-		clusterComponentDeleteCommand,
+		clusterFeatureCheckCommand,
+		clusterFeatureAddCommand,
+		clusterFeatureDeleteCommand,
 	},
 
 	Before: func(c *cli.Command) {
-		componentName = c.StringArgument("<pkgname>", "")
-		if componentName == "" {
+		featureName = c.StringArgument("<pkgname>", "")
+		if featureName == "" {
 			fmt.Fprintln(os.Stderr, "Invalid argument <pkgname>")
 			//helpHandler(nil, "")
 			os.Exit(int(ExitCode.InvalidArgument))
@@ -793,29 +808,29 @@ var clusterComponentCommand = &cli.Command{
 
 	Help: &cli.HelpContent{
 		Usage: `
-Usage: {{.ProgName}} [options] cluster <host name or id> component,package,pkg <pkgname> COMMAND`,
+Usage: {{.ProgName}} [options] cluster <host name or id> feature,package,pkg <pkgname> COMMAND`,
 		Commands: `
   add,install                         Installs the package on the host
   check                               Tells if the package is installed
   delete,destroy,remove,rm,uninstall  Uninstall the package of the host`,
 		Description: `
-Manages components (SafeScale packages) on a cluster.`,
+Manages features (SafeScale packages) on a cluster.`,
 	},
 }
 
-// clusterComponentAddCommand handles 'deploy cluster <host name or id> package <pkgname> add'
-var clusterComponentAddCommand = &cli.Command{
+// clusterFeatureAddCommand handles 'deploy cluster <host name or id> package <pkgname> add'
+var clusterFeatureAddCommand = &cli.Command{
 	Keyword: "add",
 	Aliases: []string{"install"},
 
 	Process: func(c *cli.Command) {
-		component, err := install.NewComponent(componentName)
+		feature, err := install.NewFeature(featureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
-		if component == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
+		if feature == nil {
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 
@@ -836,17 +851,17 @@ var clusterComponentAddCommand = &cli.Command{
 		settings.SkipCheck = c.Flag("--force", false)
 
 		target := install.NewClusterTarget(clusterInstance)
-		results, err := component.Add(target, values, settings)
+		results, err := feature.Add(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error installing component '%s' on cluster '%s': %s\n", componentName, clusterName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Component '%s' installed successfully on cluster '%s'\n", componentName, clusterName)
+			fmt.Printf("Feature '%s' installed successfully on cluster '%s'\n", featureName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
 
-		fmt.Printf("Failed to install component '%s' on cluster '%s'\n", componentName, clusterName)
+		fmt.Printf("Failed to install feature '%s' on cluster '%s'\n", featureName, clusterName)
 		fmt.Println(results.AllErrorMessages())
 		os.Exit(int(ExitCode.Run))
 	},
@@ -854,19 +869,19 @@ var clusterComponentAddCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// clusterComponentCheckCommand handles 'deploy host <host name or id> package <pkgname> check'
-var clusterComponentCheckCommand = &cli.Command{
+// clusterFeatureCheckCommand handles 'deploy host <host name or id> package <pkgname> check'
+var clusterFeatureCheckCommand = &cli.Command{
 	Keyword: "check",
 	Aliases: []string{"verify"},
 
 	Process: func(c *cli.Command) {
-		component, err := install.NewComponent(componentName)
+		feature, err := install.NewFeature(featureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
-		if component == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
+		if feature == nil {
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 
@@ -885,16 +900,16 @@ var clusterComponentCheckCommand = &cli.Command{
 		settings := install.Settings{}
 
 		target := install.NewClusterTarget(clusterInstance)
-		results, err := component.Check(target, values, settings)
+		results, err := feature.Check(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, clusterName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Component '%s' is installed on cluster '%s'\n", componentName, clusterName)
+			fmt.Printf("Feature '%s' is installed on cluster '%s'\n", featureName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
-		fmt.Printf("Component '%s' is not installed on cluster '%s'\n", componentName, clusterName)
+		fmt.Printf("Feature '%s' is not installed on cluster '%s'\n", featureName, clusterName)
 		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)
@@ -905,19 +920,19 @@ var clusterComponentCheckCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// clusterComponentDeleteCommand handles 'deploy host <host name or id> package <pkgname> delete'
-var clusterComponentDeleteCommand = &cli.Command{
+// clusterFeatureDeleteCommand handles 'deploy host <host name or id> package <pkgname> delete'
+var clusterFeatureDeleteCommand = &cli.Command{
 	Keyword: "delete",
 	Aliases: []string{"destroy", "remove", "rm", "uninstall"},
 
 	Process: func(c *cli.Command) {
-		component, err := install.NewComponent(componentName)
+		feature, err := install.NewFeature(featureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
-		if component == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
+		if feature == nil {
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 
@@ -935,21 +950,21 @@ var clusterComponentDeleteCommand = &cli.Command{
 
 		settings := install.Settings{}
 		settings.SkipCheck = c.Flag("--force", false)
-		// TODO: Reverse proxy rules are not purged when component is removed, but by default
+		// TODO: Reverse proxy rules are not purged when feature is removed, but by default
 		// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
 		settings.SkipProxy = true
 
 		target := install.NewClusterTarget(clusterInstance)
-		results, err := component.Remove(target, values, settings)
+		results, err := feature.Remove(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, clusterName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Component '%s' uninstalled successfully from cluster '%s'\n", componentName, clusterName)
+			fmt.Printf("Feature '%s' uninstalled successfully from cluster '%s'\n", featureName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
-		fmt.Printf("Failed to uninstall component '%s' from cluster '%s':\n", componentName, clusterName)
+		fmt.Printf("Failed to uninstall feature '%s' from cluster '%s':\n", featureName, clusterName)
 		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)

@@ -278,7 +278,7 @@ func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
 	}
 
 	// Uploads then executes command
-	filename := fmt.Sprintf("/var/tmp/%s.component.%s_%s.sh", is.Worker.component.BaseFilename(), strings.ToLower(is.Action.String()), is.Name)
+	filename := fmt.Sprintf("/var/tmp/%s.feature.%s_%s.sh", is.Worker.feature.BaseFilename(), strings.ToLower(is.Action.String()), is.Name)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
 	if err != nil {
 		return stepResult{success: false, err: err}

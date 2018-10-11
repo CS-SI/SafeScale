@@ -13,30 +13,41 @@
 # limitations under the License.
 
 ---
-component:
-    name: Marathon-LB
+feature:
+    name: Spark
     suitableFor:
         host: no
-        cluster: dcos
+        cluster: k8s,dcos
     install:
         dcos:
-            check: |
-                {{.dcos}} marathon-lb plan show deploy --json | jq .status | grep COMPLETE
-
             add:
-                pace: pkg,cli
+                pace: package,cli
+                steps:
+                    package:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDcos package install --yes spark
+                    cli:
+                        targets:
+                            masters: all
+                        run: |
+                            sfDcos package install --yes --cli spark
+            check:
+                pace: check
+                steps:
+                    check:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDcos spark plan show deploy --json &>/dev/null
+
+            remove:
+                pace: pkg
                 steps:
                     pkg:
                         targets:
                             masters: one
                         run: |
-                            {{.dcos}} package install --yes marathon-lb
-                    cli:
-                        targets:
-                            masters: all
-                        run: |
-                            {{.dcos}} package install --yes marathon-lb --cli
-
-            remove: |
-                {{.dcos}} package remove --yes marathon-lb
+                            sfDcos package remove --yes spark
 ...

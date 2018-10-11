@@ -70,7 +70,7 @@ var (
 	// templateBox is the rice box to use in this package
 	templateBox *rice.Box
 
-	//installCommonRequirementsContent contains the script to install/configure Core components
+	//installCommonRequirementsContent contains the script to install/configure Core features
 	installCommonRequirementsContent *string
 )
 
@@ -242,6 +242,8 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		mastersStatus                 error
 		nodesChannel                  chan error
 		nodesStatus                   error
+		feature                       *install.Feature
+		results                       install.Results
 	)
 	broker := brokerclient.New()
 
@@ -349,32 +351,39 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 	// Installs kubernetes
 	if gatewayStatus == nil && mastersStatus == nil && nodesStatus == nil {
+		log.Println("Installing kubernetes feature...")
 		target := install.NewClusterTarget(&instance)
-		component, err := install.NewComponent("kubernetes")
+		feature, err = install.NewFeature("kubernetes")
 		if err != nil {
-			err = fmt.Errorf("failed to prepare component 'kubernetes': %s", err.Error())
+			err = fmt.Errorf("failed to prepare feature 'kubernetes': %s", err.Error())
 			goto cleanNodes
 		}
-		results, err := component.Add(target, install.Variables{}, install.Settings{})
+		results, err = feature.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
+			log.Printf("failed to install kubernetes feature: %s", err.Error())
 			goto cleanNodes
 		}
 		if !results.Successful() {
 			err = fmt.Errorf(results.AllErrorMessages())
+			log.Printf("failed to install kubernetes feature: %s", err.Error())
 			goto cleanNodes
 		}
+		log.Println("Feature kubernetes installed successfully.")
 	}
 
 	// If any previous step fails, clean everything
 	if gatewayStatus != nil {
+		log.Printf("gatewayStatus: %s", gatewayStatus.Error())
 		err = gatewayStatus
 		goto cleanNodes
 	}
 	if mastersStatus != nil {
+		log.Printf("mastersStatus: %s", mastersStatus.Error())
 		err = mastersStatus
 		goto cleanNodes
 	}
 	if nodesStatus != nil {
+		log.Printf("nodesStatus: %s", nodesStatus.Error())
 		err = nodesStatus
 		goto cleanNodes
 	}
@@ -608,12 +617,12 @@ func (c *Cluster) createAndConfigureNode(public bool, req *pb.HostDefinition) (s
 	}
 
 	target := install.NewClusterTarget(c)
-	component, err := install.NewComponent("kubernetes")
+	feature, err := install.NewFeature("kubernetes")
 	if err != nil {
-		log.Printf("[%s node (%s)] failed to prepare component 'kubernetes': %s", nodeTypeStr, host.Name, err.Error())
+		log.Printf("[%s node (%s)] failed to prepare feature 'kubernetes': %s", nodeTypeStr, host.Name, err.Error())
 		return "", err
 	}
-	results, err := component.Add(target, install.Variables{}, install.Settings{})
+	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		return "", err
 	}
@@ -691,47 +700,47 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 	}
 	log.Printf("[master #%d (%s)] Kubernetes requirements installed successfully.\n", index, host.Name)
 
-	// Installs remotedesktop component on each master
-	log.Printf("[master #%d (%s)] installing component 'remotedesktop'\n", index, host.Name)
-	component, err := install.NewComponent("remotedesktop")
+	// Installs remotedesktop feature on each master
+	log.Printf("[master #%d (%s)] installing feature 'remotedesktop'\n", index, host.Name)
+	feature, err := install.NewFeature("remotedesktop")
 	if err != nil {
-		log.Printf("[master #%d (%s)] failed to instanciate component 'remotedesktop': %s\n", index, host.Name, err.Error())
+		log.Printf("[master #%d (%s)] failed to instanciate feature 'remotedesktop': %s\n", index, host.Name, err.Error())
 		done <- err
 		return
 	}
 	target := install.NewHostTarget(host)
-	results, err := component.Add(target, install.Variables{
+	results, err := feature.Add(target, install.Variables{
 		"Username": "cladm",
 		"Password": c.Core.AdminPassword,
 	}, install.Settings{})
 	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), err.Error())
+		log.Printf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
 		done <- err
 		return
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		log.Printf("[master #%d (%s)] installation script of component '%s' failed: %s\n", index, host.Name, component.DisplayName(), msg)
+		log.Printf("[master #%d (%s)] installation script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
 	}
-	log.Printf("[master #%d (%s)] component '%s' installed successfully\n", index, host.Name, component.DisplayName())
+	log.Printf("[master #%d (%s)] feature '%s' installed successfully\n", index, host.Name, feature.DisplayName())
 
-	// // install proxycache-client component
-	// component, err := install.NewComponent("proxycache-client")
+	// // install proxycache-client feature
+	// feature, err := install.NewFeature("proxycache-client")
 	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to prepare component 'proxycache-client': %s", 1, host.ID, err.Error())
-	// 	done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
+	// 	log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
+	// 	done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
 	// }
 	// target := install.NewHostTarget(host)
-	// ok, results, err := component.Add(target, values)
+	// ok, results, err := feature.Add(target, values)
 	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
-	// 	done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
+	// 	done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 	// 	return
 	// }
 	// if !ok {
 	// 	msg := results.Errors()
-	// 	log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
+	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
 	// 	done <- fmt.Errorf(msg)
 	// 	return
 	// }
@@ -807,23 +816,23 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 	}
 	log.Printf("[%s node #%d (%s)] host created successfully.\n", nodeTypeStr, index, host.Name)
 
-	// // install proxycache-client component
-	// component, err := install.NewComponent("proxycache-client")
+	// // install proxycache-client feature
+	// feature, err := install.NewFeature("proxycache-client")
 	// if err != nil {
-	// 	log.Printf("[%s node #%d (%s)] failed to prepare component 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
-	// 	done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
+	// 	log.Printf("[%s node #%d (%s)] failed to prepare feature 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
+	// 	done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
 	// 	return
 	// }
 	//target := install.NewHostTarget(host)
-	// ok, results, err := component.Add(target, install.Variables{})
+	// ok, results, err := feature.Add(target, install.Variables{})
 	// if err != nil {
-	// 	log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
-	// 	done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+	// 	log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
+	// 	done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 	// 	return
 	// }
 	// if !ok {
 	// 	msg := results.Errors()
-	// 	log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
+	// 	log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
 	// 	done <- fmt.Errorf(msg)
 	// 	return
 	// }
@@ -879,29 +888,29 @@ func (c *Cluster) asyncConfigureGateway(done chan error) {
 	}
 
 	// Installs reverseproxy
-	log.Println("[gateway] starting installation of component 'reverseproxy'...")
-	component, err := install.NewComponent("reverseproxy")
+	log.Println("[gateway] starting installation of feature 'reverseproxy'...")
+	feature, err := install.NewFeature("reverseproxy")
 	if err != nil {
-		msg := fmt.Sprintf("[gateway] failed to instanciate component '%s': %s", component.DisplayName(), err.Error())
+		msg := fmt.Sprintf("[gateway] failed to instanciate feature '%s': %s", feature.DisplayName(), err.Error())
 		log.Println(msg)
 		done <- fmt.Errorf(msg)
 		return
 	}
 	target := install.NewHostTarget(host)
-	results, err := component.Add(target, install.Variables{}, install.Settings{})
+	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
-		msg := fmt.Sprintf("[gateway] failed to install component '%s': %s", component.DisplayName(), err.Error())
+		msg := fmt.Sprintf("[gateway] failed to install feature '%s': %s", feature.DisplayName(), err.Error())
 		log.Println(msg)
 		done <- fmt.Errorf(msg)
 		return
 	}
 	if !results.Successful() {
-		msg := fmt.Sprintf("[gateway] failed to install component '%s': %s", component.DisplayName(), results.AllErrorMessages())
+		msg := fmt.Sprintf("[gateway] failed to install feature '%s': %s", feature.DisplayName(), results.AllErrorMessages())
 		log.Println(msg)
 		done <- fmt.Errorf(msg)
 		return
 	}
-	log.Println("[gateway] Component 'reverseproxy' successfully installed")
+	log.Println("[gateway] Feature 'reverseproxy' successfully installed")
 
 	log.Printf("[gateway] configuration successful")
 	done <- nil
@@ -964,7 +973,7 @@ func getK8STemplateBox() (*rice.Box, error) {
 }
 
 // getCommonRequirements returns the string corresponding to the script k8s_install_requirements.sh
-// which installs common components (docker in particular)
+// which installs common features (docker in particular)
 func (c *Cluster) getCommonRequirements() (*string, error) {
 	if installCommonRequirementsContent == nil {
 		// find the rice.Box

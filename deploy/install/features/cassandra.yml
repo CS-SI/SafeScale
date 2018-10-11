@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-#
 # Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,27 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# install_docker.sh
-#
-# Installs Docker
 
 ---
-component:
-    name: mpich-ospkg
-    target:
-        host: yes
-        cluster:
-            master: all
-            node:
-                private: all
-                public: all
+feature:
+    name: Cassandra
+    suitableFor:
+        host: no
+        cluster: dcos
     install:
-        yum:
-            package: mpich
+        dcos:
+            check: |
+                {{.dcos}} cassandra plan show deploy --json | jq .status | grep COMPLETE
 
-        apt:
-            package: mpich
+            add: |
+                {{.dcos}} package install --yes cassandra --cli
 
-        dnf:
-            package: mpich
+            remove: |
+                {{.dcos}} package remove --yes cassandra
+...

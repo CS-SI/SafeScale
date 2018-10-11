@@ -27,265 +27,267 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 )
 
+//go:generate rice embed-go
+
 var (
 	templateBox *rice.Box
 	emptyParams = map[string]interface{}{}
 
-	availableEmbeddedMap = map[Method.Enum]map[string]*Component{}
-	allEmbeddedMap       = map[string]*Component{}
-	allEmbedded          = []*Component{}
+	availableEmbeddedMap = map[Method.Enum]map[string]*Feature{}
+	allEmbeddedMap       = map[string]*Feature{}
+	allEmbedded          = []*Feature{}
 )
 
-// loadSpecFile returns the content of the spec file of the component named 'name'
+// loadSpecFile returns the content of the spec file of the feature named 'name'
 func loadSpecFile(name string) (*viper.Viper, error) {
 	if templateBox == nil {
 		var err error
-		templateBox, err = rice.FindBox("../install/components")
+		templateBox, err = rice.FindBox("features")
 		if err != nil {
-			return nil, fmt.Errorf("failed to open embedded component specification folder: %s", err.Error())
+			return nil, fmt.Errorf("failed to open embedded feature specification folder: %s", err.Error())
 		}
 	}
 	name += ".yml"
 	tmplString, err := templateBox.String(name)
 	if err != nil {
-		panic(fmt.Sprintf("failed to read embedded component speficication file '%s': %s", name, err.Error()))
+		panic(fmt.Sprintf("failed to read embedded feature speficication file '%s': %s", name, err.Error()))
 	}
 
 	v := viper.New()
 	v.SetConfigType("yaml")
 	err = v.ReadConfig(bytes.NewBuffer([]byte(tmplString)))
 	if err != nil {
-		return nil, fmt.Errorf("syntax error in component specification file '%s': %s", name, err.Error())
+		return nil, fmt.Errorf("syntax error in feature specification file '%s': %s", name, err.Error())
 	}
 
 	// Validating content...
-	if !v.IsSet("component") {
-		return nil, fmt.Errorf("component specification file '%s' must begin with 'component:'", name)
+	if !v.IsSet("feature") {
+		return nil, fmt.Errorf("feature specification file '%s' must begin with 'feature:'", name)
 	}
-	if !v.IsSet("component.name") {
-		return nil, fmt.Errorf("syntax error in component specification file '%s': missing 'name'", name)
+	if !v.IsSet("feature.name") {
+		return nil, fmt.Errorf("syntax error in feature specification file '%s': missing 'name'", name)
 	}
-	if v.GetString("component.name") == "" {
-		return nil, fmt.Errorf("syntax error in component specification file '%s': name' can't be empty", name)
+	if v.GetString("feature.name") == "" {
+		return nil, fmt.Errorf("syntax error in feature specification file '%s': name' can't be empty", name)
 	}
-	if !v.IsSet("component.install") {
-		return nil, fmt.Errorf("syntax error in component specification file '%s': missing 'install'", name)
+	if !v.IsSet("feature.install") {
+		return nil, fmt.Errorf("syntax error in feature specification file '%s': missing 'install'", name)
 	}
-	if len(v.GetStringMap("component.install")) <= 0 {
-		return nil, fmt.Errorf("syntax error in component specification file '%s': 'install' defines no method", name)
+	if len(v.GetStringMap("feature.install")) <= 0 {
+		return nil, fmt.Errorf("syntax error in feature specification file '%s': 'install' defines no method", name)
 	}
 	return v, nil
 }
 
-// dockerComponent ...
-func dockerComponent() *Component {
+// dockerFeature ...
+func dockerFeature() *Feature {
 	specs, err := loadSpecFile("docker")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "docker",
 		specs:       specs,
 	}
 }
 
-// nVidiaDockerComponent ...
-func nVidiaDockerComponent() *Component {
+// nVidiaDockerFeature ...
+func nVidiaDockerFeature() *Feature {
 	specs, err := loadSpecFile("nvidiadocker")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "nvidiadocker",
 		specs:       specs,
 	}
 }
 
-// kubernetesComponent ...
-func kubernetesComponent() *Component {
+// kubernetesFeature ...
+func kubernetesFeature() *Feature {
 	specs, err := loadSpecFile("kubernetes")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "kubernetes",
 		specs:       specs,
 	}
 }
 
-// nexusComponent ...
-func nexusComponent() *Component {
+// nexusFeature ...
+func nexusFeature() *Feature {
 	specs, err := loadSpecFile("nexus")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
+	return &Feature{
 		displayName: specs.GetString("name"),
 		fileName:    "nexus",
 		specs:       specs,
 	}
 }
 
-// elasticSearchComponent ...
-func elasticSearchComponent() *Component {
+// elasticSearchFeature ...
+func elasticSearchFeature() *Feature {
 	specs, err := loadSpecFile("elasticsearch")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "elasticsearch",
 		specs:       specs,
 	}
 }
 
-// helmComponent ...
-func helmComponent() *Component {
+// helmFeature ...
+func helmFeature() *Feature {
 	specs, err := loadSpecFile("helm")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "helm",
 		specs:       specs,
 	}
 }
 
-// sparkComponent ...
-func sparkComponent() *Component {
+// sparkFeature ...
+func sparkFeature() *Feature {
 	specs, err := loadSpecFile("spark")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "spark",
 		specs:       specs,
 	}
 }
 
-// reverseProxyComponent ...
-func reverseProxyComponent() *Component {
+// reverseProxyFeature ...
+func reverseProxyFeature() *Feature {
 	specs, err := loadSpecFile("reverseproxy")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "reverseproxy",
 		specs:       specs,
 	}
 }
 
-// remoteDesktopComponent ...
-func remoteDesktopComponent() *Component {
+// remoteDesktopFeature ...
+func remoteDesktopFeature() *Feature {
 	specs, err := loadSpecFile("remotedesktop")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "remotedesktop",
 		specs:       specs,
 	}
 }
 
-// mpichOsPkgComponent ...
-func mpichOsPkgComponent() *Component {
+// mpichOsPkgFeature ...
+func mpichOsPkgFeature() *Feature {
 	specs, err := loadSpecFile("mpich-ospkg")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "mpich-ospkg",
 		specs:       specs,
 	}
 }
 
-// mpichBuildComponent ...
-func mpichBuildComponent() *Component {
+// mpichBuildFeature ...
+func mpichBuildFeature() *Feature {
 	specs, err := loadSpecFile("mpich-build")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "mpich-build",
 		specs:       specs,
 	}
 }
 
-// ohpcSlurmMasterComponent ...
-func ohpcSlurmMasterComponent() *Component {
+// ohpcSlurmMasterFeature ...
+func ohpcSlurmMasterFeature() *Feature {
 	specs, err := loadSpecFile("ohpc-slurm-master")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "ohpc-slurm-master",
 		specs:       specs,
 	}
 }
 
-// ohpcSlurmNodeComponent ...
-func ohpcSlurmNodeComponent() *Component {
+// ohpcSlurmNodeFeature ...
+func ohpcSlurmNodeFeature() *Feature {
 	specs, err := loadSpecFile("ohpc-slurm-node")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "ohpc-slurm-node",
 		specs:       specs,
 	}
 }
 
-// proxycacheServerComponent ...
-func proxycacheServerComponent() *Component {
+// proxycacheServerFeature ...
+func proxycacheServerFeature() *Feature {
 	specs, err := loadSpecFile("proxycache-server")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "proxycache-server",
 		specs:       specs,
 	}
 }
 
-// proxycacheClientComponent ...
-func proxycacheClientComponent() *Component {
+// proxycacheClientFeature ...
+func proxycacheClientFeature() *Feature {
 	specs, err := loadSpecFile("proxycache-client")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "proxycache-client",
 		specs:       specs,
 	}
 }
 
-// apacheIgniteComponent ...
-func apacheIgniteComponent() *Component {
+// apacheIgniteFeature ...
+func apacheIgniteFeature() *Feature {
 	specs, err := loadSpecFile("apache-ignite")
 	if err != nil {
 		panic(err.Error())
 	}
-	return &Component{
-		displayName: specs.GetString("component.name"),
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
 		fileName:    "apache-ignite",
 		specs:       specs,
 	}
 }
 
-// ListAvailables returns an array of availables components with the useable installers
+// ListAvailables returns an array of availables features with the useable installers
 // func ListAvailables() []string {
 // 	var output []string
 // 	for k, v := range allAvailables {
@@ -306,45 +308,4 @@ func apacheIgniteComponent() *Component {
 // 	return output
 // }
 
-func init() {
-
-	allEmbedded = []*Component{
-		dockerComponent(),
-		nVidiaDockerComponent(),
-		mpichOsPkgComponent(),
-		mpichBuildComponent(),
-		ohpcSlurmMasterComponent(),
-		ohpcSlurmNodeComponent(),
-		remoteDesktopComponent(),
-		reverseProxyComponent(),
-		kubernetesComponent(),
-		proxycacheServerComponent(),
-		proxycacheClientComponent(),
-		apacheIgniteComponent(),
-		//		elasticSearchComponent(),
-		helmComponent(),
-		sparkComponent(),
-	}
-
-	for _, item := range allEmbedded {
-		allEmbeddedMap[item.BaseFilename()] = item
-		allEmbeddedMap[item.DisplayName()] = item
-		installers := item.Specs().GetStringMap("component.install")
-		for k := range installers {
-			method, err := Method.Parse(k)
-			if err != nil {
-				panic(fmt.Sprintf("syntax error in component '%s' specification file (%s)! install method '%s' unknown!",
-					item.DisplayName(), item.DisplayFilename(), k))
-			}
-			if _, found := availableEmbeddedMap[method]; !found {
-				availableEmbeddedMap[method] = map[string]*Component{
-					item.DisplayName():  item,
-					item.BaseFilename(): item,
-				}
-			} else {
-				availableEmbeddedMap[method][item.DisplayName()] = item
-				availableEmbeddedMap[method][item.BaseFilename()] = item
-			}
-		}
-	}
-}
+// Note: init() moved in zinit.go, to be sure the init() of rice-box.go is called first

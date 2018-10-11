@@ -48,10 +48,10 @@ const (
 type alterCommandCB func(string) string
 
 type worker struct {
-	component *Component
-	target    Target
-	method    Method.Enum
-	action    Action.Enum
+	feature *Feature
+	target  Target
+	method  Method.Enum
+	action  Action.Enum
 
 	host    *pb.Host
 	node    bool
@@ -73,9 +73,9 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(c *Component, t Target, m Method.Enum, a Action.Enum, f alterCommandCB) (*worker, error) {
+func newWorker(c *Feature, t Target, m Method.Enum, a Action.Enum, f alterCommandCB) (*worker, error) {
 	w := worker{
-		component: c,
+		feature:   c,
 		target:    t,
 		method:    m,
 		action:    a,
@@ -93,10 +93,10 @@ func newWorker(c *Component, t Target, m Method.Enum, a Action.Enum, f alterComm
 		w.node = true
 	}
 
-	w.rootKey = "component.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
-	specs := w.component.Specs()
+	w.rootKey = "feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
+	specs := w.feature.Specs()
 	if !specs.IsSet(w.rootKey) {
-		msg := `syntax error in component '%s' specification file (%s):
+		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
 		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), w.rootKey)
 	}
@@ -109,7 +109,7 @@ func (w *worker) ConcernCluster() bool {
 	return w.cluster != nil
 }
 
-// CanProceed tells if the combination Component/Target can work
+// CanProceed tells if the combination Feature/Target can work
 func (w *worker) CanProceed(s Settings) error {
 	if w.cluster != nil {
 		err := w.validateContextForCluster()
@@ -238,7 +238,7 @@ func (w *worker) AllNodes(public bool) ([]*pb.Host, error) {
 // Proceed executes the action
 func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 	results := Results{}
-	specs := w.component.Specs()
+	specs := w.feature.Specs()
 
 	// 'pace' tells the order of execution
 	pace := specs.GetString(w.rootKey + "." + yamlPaceKeyword)
@@ -254,7 +254,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 	}
 	order := strings.Split(pace, ",")
 
-	// Applies reverseproxy rules to make it functional (component may need it during the install)
+	// Applies reverseproxy rules to make it functional (feature may need it during the install)
 	if w.action == Action.Add && !s.SkipProxy {
 		err := w.setReverseProxy(v)
 		if err != nil {
@@ -278,8 +278,8 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 		)
 		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 		if !ok {
-			msg := `syntax error in component '%s' specification file (%s): no key '%s' found`
-			return nil, fmt.Errorf(msg, w.component.DisplayName(), w.component.DisplayFilename(), stepKey)
+			msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
+			return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey)
 		}
 
 		anon, ok = stepMap[yamlTargetsKeyword]
@@ -297,8 +297,8 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 				}
 			}
 		} else {
-			msg := `syntax error in component '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fmt.Errorf(msg, w.component.DisplayName(), w.component.DisplayFilename(), stepKey, yamlTargetsKeyword)
+			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
+			return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword)
 		}
 
 		keyword := yamlRunKeyword
@@ -318,8 +318,8 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 				runContent = w.commandCB(runContent)
 			}
 		} else {
-			msg := `syntax error in component '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fmt.Errorf(msg, w.component.DisplayName(), w.component.DisplayFilename(), stepKey, yamlRunKeyword)
+			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
+			return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlRunKeyword)
 		}
 
 		// If there is an options file (for now specific to DCOS), upload it to the remote host
@@ -369,7 +369,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 		}
 
 		templateCommand, err := normalizeScript(Variables{
-			"reserved_Name":    w.component.BaseFilename(),
+			"reserved_Name":    w.feature.BaseFilename(),
 			"reserved_Content": runContent,
 			"reserved_Action":  strings.ToLower(w.action.String()),
 			"reserved_Step":    k,
@@ -410,14 +410,14 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 	return results, err
 }
 
-// validateContextForCluster checks if the flavor of the cluster is listed in component specification
-// 'component.suitableFor.cluster'.
+// validateContextForCluster checks if the flavor of the cluster is listed in feature specification
+// 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommanded)
 func (w *worker) validateContextForCluster() error {
-	specs := w.component.Specs()
+	specs := w.feature.Specs()
 	config := w.cluster.GetConfig()
 	clusterFlavor := config.Flavor
-	yamlKey := "component.suitableFor.cluster"
+	yamlKey := "feature.suitableFor.cluster"
 	if specs.IsSet(yamlKey) {
 		flavors := strings.Split(specs.GetString(yamlKey), ",")
 		for _, k := range flavors {
@@ -428,7 +428,7 @@ func (w *worker) validateContextForCluster() error {
 			}
 		}
 	}
-	msg := fmt.Sprintf("component '%s' not suitable for flavor '%s' of cluster", w.component.DisplayName(), config.Flavor.String())
+	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of cluster", w.feature.DisplayName(), config.Flavor.String())
 	return fmt.Errorf(msg)
 }
 
@@ -437,9 +437,9 @@ func (w *worker) validateContextForHost() error {
 	if w.node {
 		return nil
 	}
-	specs := w.component.Specs()
+	specs := w.feature.Specs()
 	ok := false
-	yamlKey := "component.suitableFor.host"
+	yamlKey := "feature.suitableFor.host"
 	if specs.IsSet(yamlKey) {
 		value := strings.ToLower(specs.GetString(yamlKey))
 		ok = value == "ok" || value == "yes" || value == "true" || value == "1"
@@ -447,14 +447,14 @@ func (w *worker) validateContextForHost() error {
 	if ok {
 		return nil
 	}
-	msg := fmt.Sprintf("component '%s' not suitable for host", w.component.DisplayName())
+	msg := fmt.Sprintf("feature '%s' not suitable for host", w.feature.DisplayName())
 	// log.Println(msg)
 	return fmt.Errorf(msg)
 }
 
 func (w *worker) validateClusterSizing() error {
-	specs := w.component.Specs()
-	yamlKey := "component.requirements.clusterSizing." + strings.ToLower(w.cluster.GetConfig().Flavor.String())
+	specs := w.feature.Specs()
+	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(w.cluster.GetConfig().Flavor.String())
 	if !specs.IsSet(yamlKey) {
 		return nil
 	}
@@ -485,8 +485,8 @@ func (w *worker) validateClusterSizing() error {
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
 func (w *worker) setReverseProxy(v Variables) error {
-	specs := w.component.Specs()
-	rules, ok := specs.Get("component.proxy.rules").([]interface{})
+	specs := w.feature.Specs()
+	rules, ok := specs.Get("feature.proxy.rules").([]interface{})
 	if !ok || len(rules) <= 0 {
 		return nil
 	}

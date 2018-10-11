@@ -15,7 +15,7 @@
 #
 
 ---
-component:
+feature:
     name: Docker
     suitableFor:
         host: yes
@@ -62,12 +62,12 @@ component:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfWaitForApt && apt-get update
-                                    sfWaitForApt && apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common || exit 513
-                                    curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add - || exit 514
+                                    sfRetry 5m 3 "sfWaitForApt && apt-get update"
+                                    sfRetry 5m 3 apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common || exit 513
+                                    sfRetry 5m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || exit 514
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-                                    sfWaitForApt && apt-get update
-                                    sfWaitForApt && apt-get install -qqy docker-ce jq
+                                    sfRetry 5m 3 "sfWaitForApt && apt-get update"
+                                    sfRetry 5m 3 "sfWaitForApt && apt-get install -qqy docker-ce jq"
                                     [ $? -ne 0 ] && exit 515
 
                                     systemctl enable docker
@@ -92,6 +92,7 @@ component:
                                     exit 520
                                     ;;
                             esac
+                            exit 0
 
                     docker-compose:
                         targets:
@@ -100,7 +101,7 @@ component:
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            VERSION=$(sfRetry 2m 5 "curl -Ssl https://api.github.com/repos/docker/compose/releases/latest | jq .name -r")
+                            VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r")
                             [ $? -ne 0 ] && exit 513
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
                             sfDownload "$URL" docker-compose 3m 5 || exit 514

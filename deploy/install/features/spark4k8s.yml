@@ -13,13 +13,13 @@
 # limitations under the License.
 
 ---
-component:
+feature:
     name: Spark in Kubernetes
     context:
         host: no
         cluster: dcos,boh
     requirements:
-        components:
+        features:
             - docker
             - kubernetes
         cluster:

@@ -73,8 +73,8 @@ var ClusterCreateCommand = &cli.Command{
 			os.Exit(retcode)
 		}
 
-		// Installs component Spark
-		cmdStr = fmt.Sprintf("deploy cluster %s component spark add", clusterName)
+		// Installs feature Spark
+		cmdStr = fmt.Sprintf("deploy cluster %s feature spark add", clusterName)
 		retcode = runCommand(cmdStr)
 		if retcode != 0 {
 			os.Exit(retcode)

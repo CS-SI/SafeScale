@@ -15,13 +15,13 @@
 #
 
 ---
-component:
+feature:
     name: ReverseProxy
     suitableFor:
         host: yes
         cluster: no
     requirements:
-        components:
+        features:
             - docker
     install:
         bash:
@@ -112,16 +112,16 @@ component:
 
     service:
         start: |
-            docker-compose -f /opt/safescale/reverseproxy.component.yml up -d
+            docker-compose -f /opt/safescale/reverseproxy.feature.yml up -d
 
         stop: |
-            docker-compose -f /opt/safescale/reverseproxy.component.yml down kong-proxy
+            docker-compose -f /opt/safescale/reverseproxy.feature.yml down kong-proxy
 
         pause: |
-            docker-compose -f /opt/safescale/reverseproxy.component.yml pause
+            docker-compose -f /opt/safescale/reverseproxy.feature.yml pause
 
         unpause: |
-            docker-compose -f /opt/safescale/reverseproxy.component.yml unpause
+            docker-compose -f /opt/safescale/reverseproxy.feature.yml unpause
 
         state: |
             docker ps | grep kong-proxy &>/dev/null

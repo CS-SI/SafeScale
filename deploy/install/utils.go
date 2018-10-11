@@ -37,11 +37,11 @@ import (
 )
 
 const (
-	componentScriptTemplateContent = `
-rm -f /var/tmp/{{.reserved_Name}}.component.{{.reserved_Action}}_{{.reserved_Step}}.log
+	featureScriptTemplateContent = `
+rm -f /var/tmp/{{.reserved_Name}}.feature.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 1<&-
 exec 2<&-
-exec 1<>/var/tmp/{{.reserved_Name}}.component.{{.reserved_Action}}_{{.reserved_Step}}.log
+exec 1<>/var/tmp/{{.reserved_Name}}.feature.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}
@@ -51,17 +51,17 @@ exec 2>&1
 )
 
 var (
-	componentScriptTemplate *template.Template
+	featureScriptTemplate *template.Template
 )
 
-// parseTargets validates targets on the cluster from the component specification
+// parseTargets validates targets on the cluster from the feature specification
 // Without error, returns 'master target', 'private node target' and 'public node target'
 func parseTargets(specs *viper.Viper) (string, string, string, error) {
-	if !specs.IsSet("component.target.cluster") {
-		return "", "", "", fmt.Errorf("component isn't suitable for a cluster")
+	if !specs.IsSet("feature.target.cluster") {
+		return "", "", "", fmt.Errorf("feature isn't suitable for a cluster")
 	}
 
-	master := strings.ToLower(strings.TrimSpace(specs.GetString("component.target.cluster.master")))
+	master := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.master")))
 	switch master {
 	case "":
 		fallthrough
@@ -84,10 +84,10 @@ func parseTargets(specs *viper.Viper) (string, string, string, error) {
 	case "*":
 		master = "*"
 	default:
-		return "", "", "", fmt.Errorf("invalid value '%s' for field 'component.target.cluster.master'", master)
+		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.master'", master)
 	}
 
-	privnode := strings.ToLower(strings.TrimSpace(specs.GetString("component.target.cluster.node.private")))
+	privnode := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.node.private")))
 	switch privnode {
 	case "false":
 		fallthrough
@@ -108,10 +108,10 @@ func parseTargets(specs *viper.Viper) (string, string, string, error) {
 	case "*":
 		privnode = "*"
 	default:
-		return "", "", "", fmt.Errorf("invalid value '%s' for field 'component.target.cluster.node.private'", privnode)
+		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.node.private'", privnode)
 	}
 
-	pubnode := strings.ToLower(strings.TrimSpace(specs.GetString("component.target.cluster.node.public")))
+	pubnode := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.node.public")))
 	switch pubnode {
 	case "":
 		fallthrough
@@ -134,11 +134,11 @@ func parseTargets(specs *viper.Viper) (string, string, string, error) {
 	case "*":
 		pubnode = "*"
 	default:
-		return "", "", "", fmt.Errorf("invalid value '%s' for field 'component.target.cluster.node.public'", pubnode)
+		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.node.public'", pubnode)
 	}
 
 	if master == "0" && privnode == "0" && pubnode == "0" {
-		return "", "", "", fmt.Errorf("invalid 'component.target.cluster': no target designated")
+		return "", "", "", fmt.Errorf("invalid 'feature.target.cluster': no target designated")
 	}
 	return master, privnode, pubnode, nil
 }
@@ -236,14 +236,14 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	return nil
 }
 
-// normalizeScript envelops the script with log redirection to /var/tmp/component.<name>.<action>.log
+// normalizeScript envelops the script with log redirection to /var/tmp/feature.<name>.<action>.log
 // and ensures BashLibrary are there
 func normalizeScript(params map[string]interface{}) (string, error) {
 	var err error
 
-	if componentScriptTemplate == nil {
+	if featureScriptTemplate == nil {
 		// parse then execute the template
-		componentScriptTemplate, err = template.New("normalize_script").Parse(componentScriptTemplateContent)
+		featureScriptTemplate, err = template.New("normalize_script").Parse(featureScriptTemplateContent)
 		if err != nil {
 			return "", fmt.Errorf("error parsing bash template: %s", err.Error())
 		}
@@ -257,7 +257,7 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 	params["reserved_BashLibrary"] = bashLibrary
 
 	dataBuffer := bytes.NewBufferString("")
-	err = componentScriptTemplate.Execute(dataBuffer, params)
+	err = featureScriptTemplate.Execute(dataBuffer, params)
 	if err != nil {
 		return "", err
 	}
@@ -277,8 +277,8 @@ func replaceVariablesInString(text string, v Variables) (string, error) {
 	return dataBuffer.String(), nil
 }
 
-func findConcernedHosts(list []string, c *Component) (string, error) {
-	// No metadata yet for components, first host is designated concerned host
+func findConcernedHosts(list []string, c *Feature) (string, error) {
+	// No metadata yet for features, first host is designated concerned host
 	if len(list) > 0 {
 		return list[0], nil
 	}
@@ -288,13 +288,13 @@ func findConcernedHosts(list []string, c *Component) (string, error) {
 }
 
 // installRequirements walks through requirements and installs them if needed
-func installRequirements(c *Component, t Target, v Variables, s Settings) error {
+func installRequirements(c *Feature, t Target, v Variables, s Settings) error {
 	specs := c.Specs()
-	yamlKey := "component.requirements.components"
+	yamlKey := "feature.requirements.features"
 	if specs.IsSet(yamlKey) {
 		// if debug {
 		//	hostInstance, clusterInstance, nodeInstance := determineContext(t)
-		//	msgHead := fmt.Sprintf("Checking requirements of component '%s'", c.DisplayName())
+		//	msgHead := fmt.Sprintf("Checking requirements of feature '%s'", c.DisplayName())
 		//	var msgTail string
 		//	if hostInstance != nil {
 		//		msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
@@ -308,16 +308,16 @@ func installRequirements(c *Component, t Target, v Variables, s Settings) error 
 		//	log.Printf("%s %s...\n", msgHead, msgTail)
 		// }
 		for _, requirement := range specs.GetStringSlice(yamlKey) {
-			needed, err := NewComponent(requirement)
+			needed, err := NewFeature(requirement)
 			if err != nil {
-				return fmt.Errorf("failed to find required component '%s': %s", requirement, err.Error())
+				return fmt.Errorf("failed to find required feature '%s': %s", requirement, err.Error())
 			}
 			results, err := needed.Add(t, v, s)
 			if err != nil {
-				return fmt.Errorf("failed to install required component '%s': %s", requirement, err.Error())
+				return fmt.Errorf("failed to install required feature '%s': %s", requirement, err.Error())
 			}
 			if !results.Successful() {
-				return fmt.Errorf("failed to install required component '%s':\n%s", requirement, results.AllErrorMessages())
+				return fmt.Errorf("failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
 			}
 		}
 	}
@@ -343,10 +343,10 @@ func determineContext(t Target) (hT *HostTarget, cT *ClusterTarget, nT *NodeTarg
 }
 
 // Check if required parameters defined in specification file have been set in 'v'
-func checkParameters(c *Component, v Variables) error {
+func checkParameters(c *Feature, v Variables) error {
 	specs := c.Specs()
-	if specs.IsSet("component.parameters") {
-		params := specs.GetStringSlice("component.parameters")
+	if specs.IsSet("feature.parameters") {
+		params := specs.GetStringSlice("feature.parameters")
 		for _, k := range params {
 			if _, ok := v[k]; !ok {
 				return fmt.Errorf("missing value for parameter '%s'", k)

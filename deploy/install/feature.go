@@ -27,61 +27,61 @@ import (
 )
 
 var (
-	// EmptyValues corresponds to no values for the component
+	// EmptyValues corresponds to no values for the feature
 	EmptyValues = map[string]interface{}{}
 )
 
 // Variables defines the parameters a Installer may need
 type Variables map[string]interface{}
 
-// Settings are used to tune the component
+// Settings are used to tune the feature
 type Settings struct {
-	// SkipCheck doesn't try to check component before add or remove
+	// SkipCheck doesn't try to check feature before add or remove
 	SkipCheck bool
 	// SkipProxy to tell not to try to set reverse proxy
 	SkipProxy bool
 	// Serialize force not to parallel hosts in step
 	Serialize bool
-	// SkipComponentRequirements tells not to install required components
-	SkipComponentRequirements bool
+	// SkipFeatureRequirements tells not to install required features
+	SkipFeatureRequirements bool
 	// SkipSizingRequirements tells not to check sizing requirements
 	SkipSizingRequirements bool
 }
 
-// Component contains the information about an installable component
-type Component struct {
+// Feature contains the information about an installable feature
+type Feature struct {
 	// displayName is the name of the service
 	displayName string
 	// fileName is the name of the specification file
 	fileName string
-	// embedded tells if the component is embedded in deploy
+	// embedded tells if the feature is embedded in deploy
 	embedded bool
-	// Installers defines the installers available for the component
+	// Installers defines the installers available for the feature
 	installers map[Method.Enum]Installer
-	// Dependencies lists other component(s) (by name) needed by this one
+	// Dependencies lists other feature(s) (by name) needed by this one
 	//dependencies []string
-	// Management contains a string map of data that could be used to manage the component (if it makes sense)
-	// This could be used to explain to Service object how to manage the component, to react as a service
+	// Management contains a string map of data that could be used to manage the feature (if it makes sense)
+	// This could be used to explain to Service object how to manage the feature, to react as a service
 	//Management map[string]interface{}
-	// specs is the Viper instance containing component specification
+	// specs is the Viper instance containing feature specification
 	specs *viper.Viper
 }
 
-// NewComponent searches for a spec file name 'name' and initializes a new Component object
+// NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func NewComponent(name string) (*Component, error) {
+func NewFeature(name string) (*Feature, error) {
 	if name == "" {
 		panic("name is empty!")
 	}
 
 	v := viper.New()
 	v.AddConfigPath(".")
-	v.AddConfigPath("$HOME/.safescale/components")
-	v.AddConfigPath("$HOME/.config/safescale/components")
-	v.AddConfigPath("/etc/safescale/components")
+	v.AddConfigPath("$HOME/.safescale/features")
+	v.AddConfigPath("$HOME/.config/safescale/features")
+	v.AddConfigPath("/etc/safescale/features")
 	v.SetConfigName(name)
 
-	var component *Component
+	var feature *Feature
 	err := v.ReadInConfig()
 	if err != nil {
 		switch err.(type) {
@@ -89,29 +89,29 @@ func NewComponent(name string) (*Component, error) {
 			// Failed to find a spec file on filesystem, trying with embedded ones
 			err = nil
 			var ok bool
-			if component, ok = allEmbeddedMap[name]; !ok {
-				err = fmt.Errorf("failed to find a component named '%s'", name)
+			if feature, ok = allEmbeddedMap[name]; !ok {
+				err = fmt.Errorf("failed to find a feature named '%s'", name)
 			}
 		default:
-			err = fmt.Errorf("failed to read the specification file of component called '%s': %s", name, err.Error())
+			err = fmt.Errorf("failed to read the specification file of feature called '%s': %s", name, err.Error())
 		}
 	} else {
-		if !v.IsSet("component.name") {
+		if !v.IsSet("feature.name") {
 			return nil, fmt.Errorf("syntax error in specification file: missing key 'name'")
 		}
-		if v.IsSet("component") {
-			component = &Component{
+		if v.IsSet("feature") {
+			feature = &Feature{
 				fileName:    name + ".yml",
-				displayName: v.GetString("component.name"),
+				displayName: v.GetString("feature.name"),
 				specs:       v,
 			}
 		}
 	}
-	return component, err
+	return feature, err
 }
 
 // installerOfMethod instanciates the right installer corresponding to the method
-func (c *Component) installerOfMethod(method Method.Enum) Installer {
+func (c *Feature) installerOfMethod(method Method.Enum) Installer {
 	var installer Installer
 	switch method {
 	case Method.Bash:
@@ -132,19 +132,19 @@ func (c *Component) installerOfMethod(method Method.Enum) Installer {
 	return installer
 }
 
-// DisplayName returns the name of the component
-func (c *Component) DisplayName() string {
+// DisplayName returns the name of the feature
+func (c *Feature) DisplayName() string {
 	return c.displayName
 }
 
-// BaseFilename returns the name of the component specification file without '.yml'
-func (c *Component) BaseFilename() string {
+// BaseFilename returns the name of the feature specification file without '.yml'
+func (c *Feature) BaseFilename() string {
 	return c.fileName
 }
 
 // DisplayFilename returns the full file name, with [embedded] added at the end if the
-// component is embedded.
-func (c *Component) DisplayFilename() string {
+// feature is embedded.
+func (c *Feature) DisplayFilename() string {
 	filename := c.fileName + ".yml"
 	if c.embedded {
 		filename += " [embedded]"
@@ -153,12 +153,12 @@ func (c *Component) DisplayFilename() string {
 }
 
 // Specs returns the data from the spec file
-func (c *Component) Specs() *viper.Viper {
+func (c *Feature) Specs() *viper.Viper {
 	return c.specs
 }
 
-// Applyable tells if the component is installable on the target
-func (c *Component) Applyable(t Target) bool {
+// Applyable tells if the feature is installable on the target
+func (c *Feature) Applyable(t Target) bool {
 	methods := t.Methods()
 	for _, k := range methods {
 		installer := c.installerOfMethod(k)
@@ -169,13 +169,13 @@ func (c *Component) Applyable(t Target) bool {
 	return false
 }
 
-// Check if component is installed on target
+// Check if feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (c *Component) Check(t Target, v Variables, s Settings) (Results, error) {
+func (c *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.install.%s", strings.ToLower(method.String()))) {
+		if c.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
 			installer = c.installerOfMethod(method)
 			if installer != nil {
 				break
@@ -188,7 +188,7 @@ func (c *Component) Check(t Target, v Variables, s Settings) (Results, error) {
 
 	//if debug
 	if false {
-		log.Printf("Checking if component '%s' is installed on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+		log.Printf("Checking if feature '%s' is installed on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	}
 
 	// Inits implicit parameters
@@ -203,9 +203,9 @@ func (c *Component) Check(t Target, v Variables, s Settings) (Results, error) {
 	return installer.Check(c, t, v, s)
 }
 
-// Add installs the component on the target
+// Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (c *Component) Add(t Target, v Variables, s Settings) (Results, error) {
+func (c *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	methods := t.Methods()
 	var (
 		installer Installer
@@ -213,7 +213,7 @@ func (c *Component) Add(t Target, v Variables, s Settings) (Results, error) {
 	)
 	for i = 1; i <= uint8(len(methods)); i++ {
 		method := methods[i]
-		if c.specs.IsSet(fmt.Sprintf("component.install.%s", strings.ToLower(method.String()))) {
+		if c.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
 			installer = c.installerOfMethod(method)
 			if installer != nil {
 				break
@@ -226,7 +226,7 @@ func (c *Component) Add(t Target, v Variables, s Settings) (Results, error) {
 
 	//if debug
 	if false {
-		log.Printf("Installing component '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+		log.Printf("Installing feature '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	}
 
 	// Inits implicit parameters
@@ -241,12 +241,12 @@ func (c *Component) Add(t Target, v Variables, s Settings) (Results, error) {
 	return installer.Add(c, t, v, s)
 }
 
-// Remove uninstalls the component from the target
-func (c *Component) Remove(t Target, v Variables, s Settings) (Results, error) {
+// Remove uninstalls the feature from the target
+func (c *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("component.install.%s", strings.ToLower(method.String()))) {
+		if c.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
 			installer = c.installerOfMethod(method)
 			if installer != nil {
 				break
@@ -258,7 +258,7 @@ func (c *Component) Remove(t Target, v Variables, s Settings) (Results, error) {
 	}
 	//if debug
 	if false {
-		log.Printf("Removing component '%s' from %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+		log.Printf("Removing feature '%s' from %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	}
 
 	// Inits implicit parameters
@@ -273,34 +273,34 @@ func (c *Component) Remove(t Target, v Variables, s Settings) (Results, error) {
 	return installer.Remove(c, t, v, s)
 }
 
-// FakeComponent is a component already installed; it's used to tell if a specific component
+// FakeFeature is a feature already installed; it's used to tell if a specific feature
 // is installed, but disallows the ability to be installed or uninstalled.
-// The goal is to be able to mark a component installed even if not installed by the package (because
+// The goal is to be able to mark a feature installed even if not installed by the package (because
 // it's a requirement for a cluster management tool for example)
-type FakeComponent struct {
-	real Component
+type FakeFeature struct {
+	real Feature
 }
 
-// NewFakeComponent returns a fake component
-func NewFakeComponent(name string) *FakeComponent {
-	return &FakeComponent{
-		real: Component{
+// NewFakeFeature returns a fake feature
+func NewFakeFeature(name string) *FakeFeature {
+	return &FakeFeature{
+		real: Feature{
 			displayName: name,
 		},
 	}
 }
 
-// Add errors the component can't be installed
-func (c *FakeComponent) Add(target Target) error {
-	return fmt.Errorf("component can't be installed")
+// Add errors the feature can't be installed
+func (c *FakeFeature) Add(target Target) error {
+	return fmt.Errorf("feature can't be installed")
 }
 
-// Remove errors the component can't be removed
-func (c *FakeComponent) Remove(target Target) error {
-	return fmt.Errorf("component can't be uninstalled")
+// Remove errors the feature can't be removed
+func (c *FakeFeature) Remove(target Target) error {
+	return fmt.Errorf("feature can't be uninstalled")
 }
 
 // Applyable ...
-func (c *FakeComponent) Applyable(target Target) bool {
+func (c *FakeFeature) Applyable(target Target) bool {
 	return c.real.Applyable(target)
 }

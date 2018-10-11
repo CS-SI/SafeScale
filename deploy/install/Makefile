@@ -1,7 +1,9 @@
 GO?=go
 
-.PHONY:  vet
+.PHONY:  vet clean
 
 vet:
 	@$(GO) vet ./...
 
+clean:
+	@$(RM) rice-box.go

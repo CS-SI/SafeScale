@@ -13,13 +13,13 @@
 # limitations under the License.
 
 ---
-component:
+feature:
     name: Kubernetes
     suitableFor:
         host: no
         cluster: all
     requirements:
-        components:
+        features:
             - docker
         clusterSizing:
             dcos:
@@ -186,7 +186,7 @@ component:
                                 sfDownload "$URL/kubeadm" kubeadm 5m 5 || exit 514
                                 sfDownload "$URL/kubelet" kubelet 5m 5 || exit 515
                                 sfDownload "$URL/kubectl" kubectl 5m 5 || exit 516
-                            }
+                            } || :
 
                     cp-tools:
                         targets:
@@ -199,7 +199,7 @@ component:
                                 sfDownload "$URL" crictl.tgz 5m 5 || exit 513
                                 tar zxf crictl.tgz -C /usr/local/bin || exit 514
                                 rm -f crictl.tgz
-                            }
+                            } || :
 
                     cp-pkgs:
                         targets:
@@ -274,6 +274,9 @@ component:
                         targets:
                             masters: one
                         run: |
+                            # Don't try to init a kubernetes cluster already running
+                            sfKubectl get nodes &>/dev/null && exit 0
+
                             # Gather the stable release of K8S
                             RELEASE=$(sfRetry 2m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
                             [ $? -ne 0 ] && exit 513
@@ -340,6 +343,7 @@ component:
 
                             sfRetry 5m 5 kubeadm config images pull && \
                             kubeadm init --config kubeadm-bootstrap.config.yaml || exit 514
+                            touch /etc/kubernetes/.joined
 
                             cp /etc/kubernetes/pki/ca.crt ../ssl
                             cp /etc/kubernetes/pki/ca.key ../ssl
@@ -369,52 +373,57 @@ component:
                         targets:
                             masters: all
                         run: |
-                            cd /opt/safescale/k8s/config
-                            sfDropzonePop "*" . || :
-                            [ -f files.tgz ] && {
-                                tar zxvf files.tgz -C .. || exit 514
-                                rm files.tgz
+                            # Don't try to init a kubernetes cluster already running
+                            [ ! -f /etc/kubernetes/.joined ] && {
+                                cd /opt/safescale/k8s/config
+                                sfDropzonePop "*" . || :
+                                [ -f files.tgz ] && {
+                                    tar zxvf files.tgz -C .. || exit 514
+                                    rm files.tgz
 
-                                mkdir -p /etc/kubernetes/pki/etcd
-                                cp ../ssl/ca.crt /etc/kubernetes/pki/
-                                cp ../ssl/ca.key /etc/kubernetes/pki/
-                                cp ../ssl/sa.pub /etc/kubernetes/pki/
-                                cp ../ssl/sa.key /etc/kubernetes/pki/
-                                cp ../ssl/front-proxy-ca.crt /etc/kubernetes/pki/
-                                cp ../ssl/front-proxy-ca.key /etc/kubernetes/pki/
-                                cp ../ssl/etcd-ca.crt /etc/kubernetes/pki/etcd/ca.crt
-                                cp ../ssl/etcd-ca.key /etc/kubernetes/pki/etcd/ca.key
-                                cp admin.conf /etc/kubernetes/admin.conf
+                                    mkdir -p /etc/kubernetes/pki/etcd
+                                    cp ../ssl/ca.crt /etc/kubernetes/pki/
+                                    cp ../ssl/ca.key /etc/kubernetes/pki/
+                                    cp ../ssl/sa.pub /etc/kubernetes/pki/
+                                    cp ../ssl/sa.key /etc/kubernetes/pki/
+                                    cp ../ssl/front-proxy-ca.crt /etc/kubernetes/pki/
+                                    cp ../ssl/front-proxy-ca.key /etc/kubernetes/pki/
+                                    cp ../ssl/etcd-ca.crt /etc/kubernetes/pki/etcd/ca.crt
+                                    cp ../ssl/etcd-ca.key /etc/kubernetes/pki/etcd/ca.key
+                                    cp admin.conf /etc/kubernetes/admin.conf
 
-                                sfRetry 5m 5 kubeadm config images pull && \
-                                kubeadm alpha phase certs all --config kubeadm-k8s-cpx.config.yaml && \
-                                kubeadm alpha phase kubelet config write-to-disk --config kubeadm-k8s-cpx.config.yaml && \
-                                kubeadm alpha phase kubelet write-env-file --config kubeadm-k8s-cpx.config.yaml && \
-                                kubeadm alpha phase kubeconfig kubelet --config kubeadm-k8s-cpx.config.yaml && \
-                                systemctl start kubelet || exit $?
+                                    sfRetry 5m 5 kubeadm config images pull && \
+                                    kubeadm alpha phase certs all --config kubeadm-k8s-cpx.config.yaml && \
+                                    kubeadm alpha phase kubelet config write-to-disk --config kubeadm-k8s-cpx.config.yaml && \
+                                    kubeadm alpha phase kubelet write-env-file --config kubeadm-k8s-cpx.config.yaml && \
+                                    kubeadm alpha phase kubeconfig kubelet --config kubeadm-k8s-cpx.config.yaml && \
+                                    systemctl start kubelet || exit $?
 
-                                # "realize" the etcd-join template to a working script then executes it and starts k8s master
-                                sed -e 's/##HOSTNAME##/{{.Hostname}}' -e 's/##HOSTIP##/{{.HostIP}}' etcd-join.sh.template >etcd-join.sh
-                                bash ./etcd-join.sh && \
-                                kubeadm alpha phase etcd local --config kubeadm-k8s-cpx.config.yaml && \
-                                kubeadm alpha phase kubeconfig all --config kubeadm-k8s-cpx.config.yaml && \
-                                kubeadm alpha phase controlplane all --config kubeadm-k8s-cpx.config.yaml
-                                kubeadm alpha phase mark-master --config kubeadm-k8s-cpx.config.yaml || exit $?
-                                rm -f etcd-join.sh
+                                    # "realize" the etcd-join template to a working script then executes it and starts k8s master
+                                    sed -e 's/##HOSTNAME##/{{.Hostname}}' -e 's/##HOSTIP##/{{.HostIP}}' etcd-join.sh.template >etcd-join.sh
+                                    bash ./etcd-join.sh && \
+                                    kubeadm alpha phase etcd local --config kubeadm-k8s-cpx.config.yaml && \
+                                    kubeadm alpha phase kubeconfig all --config kubeadm-k8s-cpx.config.yaml && \
+                                    kubeadm alpha phase controlplane all --config kubeadm-k8s-cpx.config.yaml
+                                    kubeadm alpha phase mark-master --config kubeadm-k8s-cpx.config.yaml || exit $?
+                                    rm -f etcd-join.sh
+                                    touch /etc/kubernetes/.joined
+                                }
+                                sfDropzoneClean
                             }
-                            sfDropzoneClean
 
                             mkdir -p ~{{.Username}}/.kube
                             cp -i /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
                             chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
                             chmod -R go-rwx ~{{.Username}}/.kube
-                            # Starting from here, use 'sfKubectl' instead of plain 'kubectl'
 
                     join:
                         targets:
                             privateNodes: all
                             publicNodes: all
                         run: |
+                            [ -f /etc/kubernetes/.joined ] && exit 0
+
                             MASTERIP=
                             for m in {{ range .MasterIPs }}{{.}} {{ end -}}; do
                                 TOKEN=$(sfRemoteExec $m kubeadm token create)
@@ -424,7 +433,7 @@ component:
                                 break
                             done
                             [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && exit 513
-                            kubeadm join --token $TOKEN $MASTERIP:6443 --discovery-token-ca-cert-hash sha256:$HASH
+                            kubeadm join --token $TOKEN $MASTERIP:6443 --discovery-token-ca-cert-hash sha256:$HASH && touch /etc/kubernetes/.joined
 
                     weavenet:
                         targets:
@@ -435,7 +444,7 @@ component:
                             sfRetry 3m 5 sfKubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$VERSION" || exit 514
                             #sfRetry 3m 5 sfKubectl apply -f "https://cloud.weave.works/k8s/scope.yaml?k8s-version=$VERSION" || exit 515
                             #sleep 10
-                            #NAME=$(sfKubectl get -n weave pod --selector=weave-scope-component=app -o jsonpath='{.items..metadata.name}')
+                            #NAME=$(sfKubectl get -n weave pod --selector=weave-scope-feature=app -o jsonpath='{.items..metadata.name}')
                             #sfKubectl port-forward -n weave "$NAME" 4040
 
                     final:

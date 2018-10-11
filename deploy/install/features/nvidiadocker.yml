@@ -15,13 +15,13 @@
 #
 
 ---
-component:
+feature:
     name: nVidia-Docker2
     suitableFor:
         host: yes
         cluster: all
     requirements:
-        components:
+        features:
             - docker
     install:
         bash:

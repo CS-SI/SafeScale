@@ -15,7 +15,7 @@
 #
 
 ---
-component:
+feature:
     name: ProxyCache Client
     suitableFor:
         host: yes
@@ -102,16 +102,16 @@ component:
 
     service:
         start: |
-            docker-compose -f /opt/safescale/run/proxycache.component.yml up -d
+            docker-compose -f /opt/safescale/run/proxycache.feature.yml up -d
 
         stop: |
-            docker-compose -f /opt/safescale/run/proxycache.component.yml down
+            docker-compose -f /opt/safescale/run/proxycache.feature.yml down
 
         pause: |
-            docker-compose -f /opt/safescale/run/proxycache.component.yml pause
+            docker-compose -f /opt/safescale/run/proxycache.feature.yml pause
 
         unpause: |
-            docker-compose -f /opt/safescale/run/proxycache.component.yml unpause
+            docker-compose -f /opt/safescale/run/proxycache.feature.yml unpause
 
         state: |
             docker ps | grep proxycache &>/dev/null

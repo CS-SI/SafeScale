@@ -26,6 +26,6 @@ const (
 	Description Enum = iota
 	// Flavor contains optional additional info used by the cluster manager software
 	Flavor
-	// Components contains optional additional info describing installed components on cluster
-	Components
+	// Features contains optional additional info describing installed features on cluster
+	Features
 )
