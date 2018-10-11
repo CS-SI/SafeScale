@@ -644,3 +644,8 @@ func (tester *ClientTester) Objects(t *testing.T) {
 	err = tester.Service.DeleteContainer("testC")
 	assert.Nil(t, err)
 }
+func (tester *ClientTester) GetImage(t *testing.T) {
+	// TODO Implement this test
+}
+
+// TODO Implement missing methods here (Look at TODO Implement Test)
