@@ -15,7 +15,7 @@
 #
 
 ---
-component:
+feature:
     name: Kong
     suitableFor:
         host: no

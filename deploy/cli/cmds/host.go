@@ -31,9 +31,9 @@ import (
 )
 
 var (
-	hostName      string
-	hostInstance  *pb.Host
-	componentName string
+	hostName     string
+	hostInstance *pb.Host
+	featureName  string
 )
 
 // HostCommand handles 'deploy host'
@@ -41,7 +41,7 @@ var HostCommand = &cli.Command{
 	Keyword: "host",
 
 	Commands: []*cli.Command{
-		hostComponentCommand,
+		hostFeatureCommand,
 		hostServiceCommand,
 	},
 
@@ -67,7 +67,7 @@ Usage: {{.ProgName}} host list|ls
        {{.ProgName}} [options] host <host name or id> COMMAND
 `,
 		Commands: `
-  component  Manages SafeScale components
+  feature  Manages SafeScale features
   service,svc  Manages operating system service`,
 		Description: `
 Deploy package and service on a single host.`,
@@ -76,20 +76,20 @@ Run 'deploy host COMMAND --help' for more information on a command.`,
 	},
 }
 
-// hostComponentCommand handles 'deploy host <host name or id> component'
-var hostComponentCommand = &cli.Command{
-	Keyword: "component",
+// hostFeatureCommand handles 'deploy host <host name or id> feature'
+var hostFeatureCommand = &cli.Command{
+	Keyword: "feature",
 	Aliases: []string{"package", "pkg"},
 
 	Commands: []*cli.Command{
-		hostComponentCheckCommand,
-		hostComponentAddCommand,
-		hostComponentDeleteCommand,
+		hostFeatureCheckCommand,
+		hostFeatureAddCommand,
+		hostFeatureDeleteCommand,
 	},
 
 	Before: func(c *cli.Command) {
-		componentName = c.StringArgument("<pkgname>", "")
-		if componentName == "" {
+		featureName = c.StringArgument("<pkgname>", "")
+		if featureName == "" {
 			fmt.Fprintln(os.Stderr, "Invalid argument <pkgname>")
 			//helpHandler(nil, "")
 			os.Exit(int(ExitCode.InvalidArgument))
@@ -98,29 +98,29 @@ var hostComponentCommand = &cli.Command{
 
 	Help: &cli.HelpContent{
 		Usage: `
-Usage: {{.ProgName}} [options] host <host name or id> component,package,pkg <pkgname> COMMAND`,
+Usage: {{.ProgName}} [options] host <host name or id> feature,package,pkg <pkgname> COMMAND`,
 		Commands: `
   add,install                         Installs the package on the host
   check                               Tells if the package is installed
   delete,destroy,remove,rm,uninstall  Uninstall the package of the host`,
 		Description: `
-Manages components (SafeScale packages) on a single host.`,
+Manages features (SafeScale packages) on a single host.`,
 	},
 }
 
-// hostComponentAddCommand handles 'deploy host <host name or id> package <pkgname> add'
-var hostComponentAddCommand = &cli.Command{
+// hostFeatureAddCommand handles 'deploy host <host name or id> package <pkgname> add'
+var hostFeatureAddCommand = &cli.Command{
 	Keyword: "add",
 	Aliases: []string{"install"},
 
 	Process: func(c *cli.Command) {
-		component, err := install.NewComponent(componentName)
+		feature, err := install.NewFeature(featureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
-		if component == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
+		if feature == nil {
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 		values := install.Variables{}
@@ -146,17 +146,17 @@ var hostComponentAddCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		results, err := component.Add(target, values, settings)
+		results, err := feature.Add(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error installing component '%s' on host '%s': %s\n", componentName, hostName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error installing feature '%s' on host '%s': %s\n", featureName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Component '%s' installed successfully on host '%s'\n", componentName, hostName)
+			fmt.Printf("Feature '%s' installed successfully on host '%s'\n", featureName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
 
-		fmt.Printf("Failed to install component '%s' on host '%s'\n", componentName, hostName)
+		fmt.Printf("Failed to install feature '%s' on host '%s'\n", featureName, hostName)
 		fmt.Println(results.AllErrorMessages())
 		os.Exit(int(ExitCode.Run))
 	},
@@ -164,19 +164,19 @@ var hostComponentAddCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostComponentCheckCommand handles 'deploy host <host name or id> package <pkgname> check'
-var hostComponentCheckCommand = &cli.Command{
+// hostFeatureCheckCommand handles 'deploy host <host name or id> package <pkgname> check'
+var hostFeatureCheckCommand = &cli.Command{
 	Keyword: "check",
 	Aliases: []string{"verify"},
 
 	Process: func(c *cli.Command) {
-		component, err := install.NewComponent(componentName)
+		feature, err := install.NewFeature(featureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
-		if component == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
+		if feature == nil {
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 
@@ -200,16 +200,16 @@ var hostComponentCheckCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		results, err := component.Check(target, values, install.Settings{})
+		results, err := feature.Check(target, values, install.Settings{})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error checking if component '%s' is installed on '%s': %s\n", componentName, hostName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Component '%s' is installed on '%s'\n", componentName, hostName)
+			fmt.Printf("Feature '%s' is installed on '%s'\n", featureName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
-		fmt.Printf("Component '%s' is not installed on '%s'\n", componentName, hostName)
+		fmt.Printf("Feature '%s' is not installed on '%s'\n", featureName, hostName)
 		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)
@@ -220,19 +220,19 @@ var hostComponentCheckCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostComponentDeleteCommand handles 'deploy host <host name or id> package <pkgname> delete'
-var hostComponentDeleteCommand = &cli.Command{
+// hostFeatureDeleteCommand handles 'deploy host <host name or id> package <pkgname> delete'
+var hostFeatureDeleteCommand = &cli.Command{
 	Keyword: "delete",
 	Aliases: []string{"destroy", "remove", "rm", "uninstall"},
 
 	Process: func(c *cli.Command) {
-		component, err := install.NewComponent(componentName)
+		feature, err := install.NewFeature(featureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
-		if component == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a component named '%s'.\n", componentName)
+		if feature == nil {
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 
@@ -256,16 +256,16 @@ var hostComponentDeleteCommand = &cli.Command{
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		results, err := component.Remove(target, values, install.Settings{})
+		results, err := feature.Remove(target, values, install.Settings{})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error uninstalling component '%s' on '%s': %s\n", componentName, hostName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Component '%s' uninstalled successfully on '%s'\n", componentName, hostName)
+			fmt.Printf("Feature '%s' uninstalled successfully on '%s'\n", featureName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
-		fmt.Printf("Failed to uninstall component '%s' from host '%s':\n", componentName, hostName)
+		fmt.Printf("Failed to uninstall feature '%s' from host '%s':\n", featureName, hostName)
 		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)

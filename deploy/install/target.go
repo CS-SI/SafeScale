@@ -36,7 +36,7 @@ type Target interface {
 	// Methods returns a list of installation methods useable on the target, ordered from
 	// upper to lower priority (1 = highest priority)
 	Methods() map[uint8]Method.Enum
-	// Installed returns a list of installed components
+	// Installed returns a list of installed features
 	Installed() []string
 }
 
@@ -99,7 +99,7 @@ func (t *HostTarget) Methods() map[uint8]Method.Enum {
 	return t.methods
 }
 
-// Installed returns a list of installed components
+// Installed returns a list of installed features
 func (t *HostTarget) Installed() []string {
 	var list []string
 	return list
@@ -147,7 +147,7 @@ func (t *ClusterTarget) Methods() map[uint8]Method.Enum {
 	return t.methods
 }
 
-// Installed returns a list of installed component
+// Installed returns a list of installed feature
 func (t *ClusterTarget) Installed() []string {
 	var list []string
 	return list

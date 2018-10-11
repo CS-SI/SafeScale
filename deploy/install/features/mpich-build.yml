@@ -16,7 +16,7 @@
 #
 
 ---
-component:
+feature:
     name: mpich-build
     suitableFor:
         host: yes

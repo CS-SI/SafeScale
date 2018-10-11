@@ -21,6 +21,7 @@ service:
 
 clean:
 	@(cd cli && $(MAKE) $(@))
+	@(cd install && $(MAKE) $(@))
 	@(cd cluster && $(MAKE) $(@))
 	@$(RM) ./mocks/*.go || true
 

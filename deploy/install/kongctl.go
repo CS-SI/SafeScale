@@ -46,10 +46,10 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 		panic("host is nil!")
 	}
 
-	// Check if reverseproxy component is installed on host
-	rp, err := NewComponent("reverseproxy")
+	// Check if reverseproxy feature is installed on host
+	rp, err := NewFeature("reverseproxy")
 	if err != nil {
-		return nil, fmt.Errorf("failed to find a component called 'reverseproxy'")
+		return nil, fmt.Errorf("failed to find a feature called 'reverseproxy'")
 	}
 	present := false
 	if anon, ok := kongProxyCheckedCache.Get(host.Name); ok {
@@ -59,7 +59,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 			target := NewHostTarget(host)
 			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
-				return nil, fmt.Errorf("failed to check if component 'reverseproxy' is installed on gateway: %s", err.Error())
+				return nil, fmt.Errorf("failed to check if feature 'reverseproxy' is installed on gateway: %s", err.Error())
 			}
 			return results.Successful(), nil
 		})
@@ -69,7 +69,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 		present = true
 	}
 	if !present {
-		return nil, fmt.Errorf("'reverseproxy' component isn't installed on gateway")
+		return nil, fmt.Errorf("'reverseproxy' feature isn't installed on gateway")
 	}
 
 	return &KongController{

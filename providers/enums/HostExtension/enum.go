@@ -24,6 +24,6 @@ type Enum uint8
 const (
 	// Description contains optional additional info describing host (purpose, ...)
 	Description Enum = iota
-	// Components contains optional additional info describing installed components
-	Components
+	// Features contains optional additional info describing installed components
+	Features
 )

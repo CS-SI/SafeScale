@@ -13,10 +13,10 @@
 # limitations under the License.
 
 ---
-component:
+feature:
     name: RemoteDesktop
     requirements:
-        components:
+        features:
             - docker
     suitableFor:
         host: yes
@@ -45,11 +45,11 @@ component:
                                     yum makecache fast && \
                                     yum groupinstall -y -t "X Window system" && \
                                     yum groupinstall -y -t Xfce && \
-                                    yum install -y -t xorg-x11-fonts-Type1 wget firefox || exit $?
+                                    yum install -y -t xorg-x11-fonts-Type1 wget firefox jq || exit $?
                                     ;;
                                 debian|ubuntu)
                                     sfWaitForApt && apt update && \
-                                    sfWaitForApt && apt install -y perl xfce4 firefox
+                                    sfWaitForApt && apt install -y perl xfce4 firefox jq
 
                                     ;;
                                 *)

@@ -52,7 +52,7 @@ var (
 		   perform [-vd][--rebrand <prefix>] <clustername> (start|stop|state|inspect)
 		   perform [-vd][--rebrand <prefix>] <clustername> shrink [-n <count>]
 		   perform [-vd][--rebrand <prefix>] <clustername> expand [-n <count>]
-		   perform [-vd][--rebrand <prefix>] <clustername> (component|package|pkg) <pkgname> (check|add|install|remove|delete|destroy|rm)
+		   perform [-vd][--rebrand <prefix>] <clustername> (feature|pkg) <pkgname> (check|add|install|remove|delete|destroy|rm)
 		   perform [-vd][--rebrand <prefix>] <clustername> (service|svc) <svcname> (check|add|install|remove|delete|destroy|rm|uninstall)
 		   perform [-vd][--rebrand <prefix>] <clustername> (service|svc) <svcname> (start|state|stop|pause|resume)
 		   perform [-vd][--rebrand <prefix>] (dcos|marathon|kubectl) [-- <arg>...]
@@ -77,6 +77,8 @@ func main() {
 		Keyword: "perform",
 
 		Commands: []*cli.Command{
+			cmds.FeatureCommand,
+			cmds.ServiceCommand,
 			cmds.ClusterCreateCommand,
 			cmds.ClusterInspectCommand,
 			cmds.ClusterDeleteCommand,
@@ -88,8 +90,6 @@ func main() {
 			cmds.ClusterDcosCommand,
 			cmds.ClusterMarathonCommand,
 			cmds.ClusterKubectlCommand,
-			cmds.PackageCommand,
-			cmds.ServiceCommand,
 		},
 
 		Help: &cli.HelpContent{

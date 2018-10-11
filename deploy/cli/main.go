@@ -51,9 +51,9 @@ Usage: deploy version
        deploy [-vd] (cluster|datacenter|dc) <clustername> (start|stop|state|inspect)
        deploy [-vd] (cluster|datacenter|dc) <clustername> expand [-n <count>][--os <os>][--ram <ram>][--disk <disk>]
        deploy [-vd] (cluster|datacenter|dc) <clustername> shrink [-n <count>]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> component <pkgname> (add|install) [-f][--skip-proxy][--no-master][--no-node][(--param <param>)...]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> component <pkgname> check [(--param <param>)...]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> component <pkgname> (delete|destroy|remove|rm|uninstall) [-f][(--param <param>)...]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> (add|install) [-f][--skip-proxy][--no-master][--no-node][(--param <param>)...]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> check [(--param <param>)...]
+	   deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> (delete|destroy|remove|rm|uninstall) [-f][(--param <param>)...]
 	   deploy [-vd] (cluster|datacenter|dc) <clustername> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
 	   deploy [-vd] (cluster|datacenter|dc) <clustername> (dcos|marathon|kubectl) [-- <arg>...]
 	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> create [-u <storage unit size>][-n <count>]
@@ -64,9 +64,9 @@ Usage: deploy version
 	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> mount <mountpoint>
 	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> (umount|unmount)
 	   deploy [-vd] host help <command>
-	   deploy [-vd] host <host name or id> component <pkgname> (add|install) [(--param <param>)...]
-	   deploy [-vd] host <host name or id> component <pkgname> check
-	   deploy [-vd] host <host name or id> component <pkgname> (delete|destroy|remove|rm|uninstall)
+	   deploy [-vd] host <host name or id> feature <pkgname> (add|install) [(--param <param>)...]
+	   deploy [-vd] host <host name or id> feature <pkgname> check
+	   deploy [-vd] host <host name or id> feature <pkgname> (delete|destroy|remove|rm|uninstall)
 	   deploy [-vd] host <host name or id> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
 
 Options:
@@ -81,15 +81,15 @@ Options:
   -u <storage unit size>,--unit-size <storage unit size>  Defines the size in GB of a storage unit size for the nas
   -v,--verbose                                            Enable verbosity
   -y,--assume-yes                                         Automatically responds y to confirmation
-  -p,--param <param>                                      Used to set parameter of component
+  -p,--param <param>                                      Used to set parameter of feature
   --cpu <cpu>                                             Defines number of CPU of host
   --disk <disk>                                           Defines system disk size
   --os <os>                                               Defines Linux Operating System
   --ram <ram>                                             Defines ram size
   --skip-proxy                                            Disables reverse proxy configuration
-  --no-check                                              Disables component check before add or remove
-  --no-master                                             Disables component installation on master(s)
-  --no-node                                               Disables component installation on node(s)`
+  --no-check                                              Disables feature check before add or remove
+  --no-master                                             Disables feature installation on master(s)
+  --no-node                                               Disables feature installation on node(s)`
 )
 
 func main() {

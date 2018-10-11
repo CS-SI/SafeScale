@@ -22,12 +22,12 @@ func (g *genericPackager) GetName() string {
 	return g.name
 }
 
-// Check checks if the component is installed
-func (g *genericPackager) Check(c *Component, t Target, v Variables, s Settings) (Results, error) {
+// Check checks if the feature is installed
+func (g *genericPackager) Check(c *Feature, t Target, v Variables, s Settings) (Results, error) {
 	specs := c.Specs()
-	yamlKey := "component.install." + g.name + ".check"
+	yamlKey := "feature.install." + g.name + ".check"
 	if !specs.IsSet(yamlKey) {
-		msg := `syntax error in component '%s' specification file (%s):
+		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
 		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
 	}
@@ -44,17 +44,17 @@ func (g *genericPackager) Check(c *Component, t Target, v Variables, s Settings)
 	return worker.Proceed(v, s)
 }
 
-// Add installs the component using apt
-func (g *genericPackager) Add(c *Component, t Target, v Variables, s Settings) (Results, error) {
-	yamlKey := "component.install." + g.name + ".add"
+// Add installs the feature using apt
+func (g *genericPackager) Add(c *Feature, t Target, v Variables, s Settings) (Results, error) {
+	yamlKey := "feature.install." + g.name + ".add"
 	if !c.Specs().IsSet(yamlKey) {
-		msg := `syntax error in component '%s' specification file (%s):
+		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
 		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
 	}
 
 	// Installs requirements if there are any
-	if !s.SkipComponentRequirements {
+	if !s.SkipFeatureRequirements {
 		err := installRequirements(c, t, v, s)
 		if err != nil {
 			return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
@@ -74,11 +74,11 @@ func (g *genericPackager) Add(c *Component, t Target, v Variables, s Settings) (
 	return worker.Proceed(v, s)
 }
 
-// Remove uninstalls the component using the RemoveScript script
-func (g *genericPackager) Remove(c *Component, t Target, v Variables, s Settings) (Results, error) {
-	yamlKey := "component.install." + g.name + ".remove"
+// Remove uninstalls the feature using the RemoveScript script
+func (g *genericPackager) Remove(c *Feature, t Target, v Variables, s Settings) (Results, error) {
+	yamlKey := "feature.install." + g.name + ".remove"
 	if !c.Specs().IsSet(yamlKey) {
-		msg := `syntax error in component '%s' specification file (%s):
+		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
 		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
 	}
@@ -95,7 +95,7 @@ func (g *genericPackager) Remove(c *Component, t Target, v Variables, s Settings
 	return worker.Proceed(v, s)
 }
 
-// aptInstaller is an installer using script to add and remove a component
+// aptInstaller is an installer using script to add and remove a feature
 type aptInstaller struct {
 	genericPackager
 }
@@ -118,7 +118,7 @@ func NewAptInstaller() Installer {
 	}
 }
 
-// yumInstaller is an installer using yum to add and remove a component
+// yumInstaller is an installer using yum to add and remove a feature
 type yumInstaller struct {
 	genericPackager
 }
@@ -141,7 +141,7 @@ func NewYumInstaller() Installer {
 	}
 }
 
-// dnfInstaller is an installer using yum to add and remove a component
+// dnfInstaller is an installer using yum to add and remove a feature
 type dnfInstaller struct {
 	genericPackager
 }

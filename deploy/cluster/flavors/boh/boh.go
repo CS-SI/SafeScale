@@ -60,6 +60,8 @@ import (
 	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 )
 
+//go:generate rice embed-go
+
 const (
 	timeoutCtxHost = 10 * time.Minute
 
@@ -203,7 +205,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		kpName           string
 		kp               *providerapi.KeyPair
 		err              error
-		// component        *install.Component
+		// feature        *install.Feature
 		// target           install.Target
 		// results          install.Results
 	)
@@ -279,11 +281,11 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	}
 
 	//target = install.NewHostTarget(pbutils.ToPBHost(gw))
-	// component, err = install.NewComponent("proxycache-server")
+	// feature, err = install.NewFeature("proxycache-server")
 	// if err != nil {
 	// 	goto cleanNetwork
 	// }
-	// results, err = component.Add(target, install.Variables{})
+	// results, err = feature.Add(target, install.Variables{})
 	// if err != nil {
 	// 	goto cleanNetwork
 	// }
@@ -446,41 +448,41 @@ func (c *Cluster) createMaster(req pb.HostDefinition) error {
 	values := install.Variables{
 		"Password": c.Core.AdminPassword,
 	}
-	// // install proxycache-client component
-	// component, err := install.NewComponent("proxycache-client")
+	// // install proxycache-client feature
+	// feature, err := install.NewFeature("proxycache-client")
 	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to prepare component 'proxycache-client': %s", 1, host.ID, err.Error())
-	// 	return fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
+	// 	log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
+	// 	return fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
 	// }
-	// results, err := component.Add(target, values)
+	// results, err := feature.Add(target, values)
 	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
-	// 	return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
+	// 	return fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 	// }
 	// if !results.Successful() {
 	// 	msg := results.AllErrorMessages()
-	// 	log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
+	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
 	// 	return fmt.Errorf(msg)
 	// }
 
-	// install docker component
-	log.Printf("[master #%d (%s)] installing component 'docker'", 1, host.Name)
-	component, err := install.NewComponent("docker")
+	// install docker feature
+	log.Printf("[master #%d (%s)] installing feature 'docker'", 1, host.Name)
+	feature, err := install.NewFeature("docker")
 	if err != nil {
-		log.Printf("[master #%d (%s)] failed to prepare component 'docker': %s", 1, host.ID, err.Error())
-		return fmt.Errorf("failed to install component 'docker': %s", err.Error())
+		log.Printf("[master #%d (%s)] failed to prepare feature 'docker': %s", 1, host.ID, err.Error())
+		return fmt.Errorf("failed to install feature 'docker': %s", err.Error())
 	}
-	results, err := component.Add(target, values, install.Settings{})
+	results, err := feature.Add(target, values, install.Settings{})
 	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s\n", 1, host.Name, component.DisplayName(), err.Error())
-		return fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
+		return fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		log.Printf("[master #%d (%s)] failed to install component '%s': %s", 1, host.Name, component.DisplayName(), msg)
+		log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
 		return fmt.Errorf(msg)
 	}
-	log.Printf("[master #%d (%s)] component 'docker' installed successfully\n", 1, host.Name)
+	log.Printf("[master #%d (%s)] feature 'docker' installed successfully\n", 1, host.Name)
 
 	// Installs BOH requirements...
 	installCommonRequirements, err := c.getInstallCommonRequirements()
@@ -625,47 +627,47 @@ func (c *Cluster) asyncCreateNode(
 	}
 
 	target := install.NewHostTarget(host)
-	// // install proxycache-client component
-	// component, err := install.NewComponent("proxycache-client")
+	// // install proxycache-client feature
+	// feature, err := install.NewFeature("proxycache-client")
 	// if err != nil {
-	// 	log.Printf("[%s node #%d (%s)] failed to prepare component 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
-	// 	done <- fmt.Errorf("failed to install component 'proxycache-client': %s", err.Error())
+	// 	log.Printf("[%s node #%d (%s)] failed to prepare feature 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
+	// 	done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
 	// 	return
 	// }
-	// results, err := component.Add(target, install.Variables{})
+	// results, err := feature.Add(target, install.Variables{})
 	// if err != nil {
-	// 	log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
-	// 	done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+	// 	log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
+	// 	done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 	// 	return
 	// }
 	// if !results.Successful() {
 	// 	msg := results.AllErrorMessages()
-	// 	log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
+	// 	log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
 	// 	done <- fmt.Errorf(msg)
 	// 	return
 	// }
 
-	// install docker component
-	log.Printf("[%s node #%d (%s)] installing component 'docker'...\n", nodeTypeStr, index, host.Name)
-	component, err := install.NewComponent("docker")
+	// install docker feature
+	log.Printf("[%s node #%d (%s)] installing feature 'docker'...\n", nodeTypeStr, index, host.Name)
+	feature, err := install.NewFeature("docker")
 	if err != nil {
-		log.Printf("[%s node #%d (%s)] failed to prepare component 'docker': %s", nodeTypeStr, index, host.Name, err.Error())
-		done <- fmt.Errorf("failed to install component 'docker': %s", err.Error())
+		log.Printf("[%s node #%d (%s)] failed to prepare feature 'docker': %s", nodeTypeStr, index, host.Name, err.Error())
+		done <- fmt.Errorf("failed to install feature 'docker': %s", err.Error())
 		return
 	}
-	results, err := component.Add(target, install.Variables{}, install.Settings{})
+	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
-		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s\n", nodeTypeStr, index, host.Name, component.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
+		done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 		return
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		log.Printf("[%s node #%d (%s)] failed to install component '%s': %s", nodeTypeStr, index, host.Name, component.DisplayName(), msg)
-		done <- fmt.Errorf("failed to intall component '%s' on host '%s': %s", component.DisplayName(), host.Name, msg)
+		log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
+		done <- fmt.Errorf("failed to intall feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, msg)
 		return
 	}
-	log.Printf("[%s node #%d (%s)] component 'docker' installed successfully.\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] feature 'docker' installed successfully.\n", nodeTypeStr, index, host.Name)
 
 	// Installs BOH requirements
 	installCommonRequirements, err := c.getInstallCommonRequirements()
@@ -723,7 +725,7 @@ func getBOHTemplateBox() (*rice.Box, error) {
 }
 
 // getInstallCommonRequirements returns the string corresponding to the script dcos_install_requirements.sh
-// which installs common components (docker in particular)
+// which installs common features (docker in particular)
 func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 	if installCommonRequirementsContent == nil {
 		// find the rice.Box
@@ -792,7 +794,7 @@ func (c *Cluster) buildHostname(core string, nodeType NodeType.Enum) (string, er
 	return c.Core.Name + "-" + coreName + "-" + strconv.Itoa(index), nil
 }
 
-// asyncInstallReverseProxy installs the component reverseproxy on network gateway
+// asyncInstallReverseProxy installs the feature reverseproxy on network gateway
 func (c *Cluster) asyncInstallReverseProxy(host *providerapi.Host, done chan error) {
 	err := provideruse.WaitSSHServerReady(c.provider, host.ID, 5*time.Minute)
 	if err != nil {
@@ -800,18 +802,18 @@ func (c *Cluster) asyncInstallReverseProxy(host *providerapi.Host, done chan err
 		return
 	}
 	target := install.NewHostTarget(pbutils.ToPBHost(host))
-	component, err := install.NewComponent("reverseproxy")
+	feature, err := install.NewFeature("reverseproxy")
 	if err != nil {
 		done <- err
 		return
 	}
-	results, err := component.Add(target, install.Variables{}, install.Settings{})
+	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
-		done <- fmt.Errorf("failed to execute installation of component '%s' on host '%s': %s", component.DisplayName(), host.Name, err.Error())
+		done <- fmt.Errorf("failed to execute installation of feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 		return
 	}
 	if !results.Successful() {
-		done <- fmt.Errorf("failed to install component '%s' on host '%s': %s", component.DisplayName(), host.Name, results.AllErrorMessages())
+		done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, results.AllErrorMessages())
 		return
 	}
 	done <- nil
@@ -848,10 +850,10 @@ func (c *Cluster) asyncConfigureMasters(done chan error) {
 func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
 	log.Printf("[master #%d] starting configuration...\n", index+1)
 
-	// Installs remotedesktop component on host
-	component, err := install.NewComponent("remotedesktop")
+	// Installs remotedesktop feature on host
+	feature, err := install.NewFeature("remotedesktop")
 	if err != nil {
-		log.Printf("[master #%d] failed to find component 'remotedesktop': %s\n", index, err.Error())
+		log.Printf("[master #%d] failed to find feature 'remotedesktop': %s\n", index, err.Error())
 		done <- fmt.Errorf("[master #%d] %s", index+1, err.Error())
 		return
 	}
@@ -861,7 +863,7 @@ func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
 		return
 	}
 	target := install.NewHostTarget(host)
-	results, err := component.Add(target, install.Variables{
+	results, err := feature.Add(target, install.Variables{
 		"GatewayIP": c.Core.GatewayIP,
 		"Hostname":  host.Name,
 		"HostIP":    host.PRIVATE_IP,
@@ -869,12 +871,12 @@ func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
 		"Password":  c.Core.AdminPassword,
 	}, install.Settings{})
 	if err != nil {
-		done <- fmt.Errorf("[master #%d (%s)] failed to install component '%s': %s", index, host.Name, component.DisplayName(), err.Error())
+		done <- fmt.Errorf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
 		return
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		log.Printf("[master #%d (%s)] installation script of component '%s' failed: %s\n", index, host.Name, component.DisplayName(), msg)
+		log.Printf("[master #%d (%s)] installation script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
 		return
 	}

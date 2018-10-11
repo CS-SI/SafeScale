@@ -24,12 +24,12 @@ import "github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 type Installer interface {
 	// GetName returns the name of the Installer
 	GetName() string
-	// Check checks if the component is installed
-	Check(*Component, Target, Variables, Settings) (Results, error)
-	// Add executes installation of component
-	Add(*Component, Target, Variables, Settings) (Results, error)
-	// Remove executes deletion of component
-	Remove(*Component, Target, Variables, Settings) (Results, error)
+	// Check checks if the feature is installed
+	Check(*Feature, Target, Variables, Settings) (Results, error)
+	// Add executes installation of feature
+	Add(*Feature, Target, Variables, Settings) (Results, error)
+	// Remove executes deletion of feature
+	Remove(*Feature, Target, Variables, Settings) (Results, error)
 }
 
 // installerMap keeps a map of available installers sorted by Method
