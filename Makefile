@@ -17,6 +17,7 @@ REMOTE := $(shell git rev-parse $(UPSTREAM))
 BASE := $(shell git merge-base HEAD $(UPSTREAM))
 
 GO?=go
+GOPATH?=$(HOME)/go
 GOBIN?=$(GOPATH)/bin
 CP?=cp
 BROWSER?=firefox

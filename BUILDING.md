@@ -3,9 +3,12 @@
 ## Prerequisites
 
 - Minimum go version, [GO 1.10](https://golang.org/dl/)
+    - Add $GOPATH/bin to your PATH
+        - ```echo "export PATH=$PATH:${GOPATH:-$HOME/go}/bin" >> $HOME/.profile ```
 - Protoc
     - Download the precompiled version of protobuf for your platform in [github](https://github.com/google/protobuf/releases/)
-    - Uncompress previous file and put the ```protoc``` binary in your ```PATH```
+    - Follow install instructions
+    - ex: ```cd /tmp && PROTOCZIP=$(echo "protoc-3.6.1-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).zip") && wget https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/$PROTOCZIP && unzip -d protoc $PROTOCZIP && cp /tmp/protoc/bin/protoc /usr/local/bin/ && cp -r /tmp/protoc/include /usr/local/include && rm -rf /tmp/protoc && rm /tmp/$PROTOCZIP && unset $PROTOCZIP```
 - make
 
 
@@ -13,11 +16,13 @@
 
 ```bash
 # Prepare directory
-mkdir -p ${GOPATH:-$HOME}/src/github.com/CS-SI
+mkdir -p ${GOPATH:-$HOME/go}/src/github.com/CS-SI
 
 # Clone SafeScale
-cd ${GOPATH:-$HOME}/src/github.com/CS-SI
+cd ${GOPATH:-$HOME/go}/src/github.com/CS-SI
 git clone https://github.com/CS-SI/SafeScale -b develop
+
+cd SafeScale
 
 # Show help
 make
