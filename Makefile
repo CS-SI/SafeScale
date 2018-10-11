@@ -31,7 +31,7 @@ ifeq ($(findstring :,$(GOBIN)),:)
 endif
 
 # Binaries generated
-EXECS=broker/cli/broker/broker broker/cli/brokerd/brokerd deploy/cli/deploy perform/perform
+EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd/brokerd broker/cli/brokerd/brokerd-cover deploy/cli/deploy perform/perform
 
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
@@ -214,6 +214,7 @@ coverage: begin
 
 show-cov: begin
 	@command -v firefox >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) You don't have firefox on PATH.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
+	@if [ -s ./cover.out ]; then $(GO) tool cover -html=cover.out -o cover.html || true;fi
 	@if [ -s ./cover.html ]; then $(BROWSER) ./cover.html || true;fi
 
 report: begin
