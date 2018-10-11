@@ -74,41 +74,41 @@ func Test_Basic(t *testing.T) {
 	out, err = getOutput("broker nas list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating NAS nastest...")
+	fmt.Println("Creating NAS anastest...")
 
-	out, err = getOutput("broker nas  create nastest easyvm")
+	out, err = getOutput("broker nas  create anastest easyvm")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker nas  mount nastest complexvm")
+	out, err = getOutput("broker nas  mount anastest complexvm")
 	require.Nil(t, err)
 
 	out, err = getOutput("broker nas list")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "nastest"))
+	require.True(t, strings.Contains(out, "anastest"))
 
-	out, err = getOutput("broker nas inspect nastest")
+	out, err = getOutput("broker nas inspect anastest")
 	require.Nil(t, err)
 
-	require.True(t, strings.Contains(out, "nastest"))
+	require.True(t, strings.Contains(out, "anastest"))
 	require.True(t, strings.Contains(out, "easyvm"))
 	require.True(t, strings.Contains(out, "complexvm"))
 
-	out, err = getOutput("broker nas  umount nastest complexvm")
+	out, err = getOutput("broker nas  umount anastest complexvm")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker nas inspect nastest")
+	out, err = getOutput("broker nas inspect anastest")
 	require.Nil(t, err)
 
-	require.True(t, strings.Contains(out, "nastest"))
+	require.True(t, strings.Contains(out, "anastest"))
 	require.True(t, strings.Contains(out, "easyvm"))
 	require.False(t, strings.Contains(out, "complexvm"))
 
-	out, err = getOutput("broker nas delete nastest ")
+	out, err = getOutput("broker nas delete anastest ")
 	require.Nil(t, err)
 
 	out, err = getOutput("broker nas list")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "null"))
+	require.False(t, strings.Contains(out, "anastest"))
 
 	out, err = getOutput("broker volume list")
 	require.Nil(t, err)

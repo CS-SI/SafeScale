@@ -193,7 +193,9 @@ func Test_Objects(t *testing.T) {
 // GetImage returns the Image referenced by id
 func Test_GetImage(t *testing.T) {
 	// TODO Implement Test
-
+	cli, err := getClient()
+	require.Nil(t, err)
+	cli.GetImage(t)
 }
 
 // GetTemplate returns the Template referenced by id
