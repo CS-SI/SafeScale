@@ -18,7 +18,7 @@ func TestMain(m *testing.M) {
 
 	// If the test binary name is "calc" we've are being asked to run the
 	// coverage-instrumented calc.
-	if path.Base(os.Args[0]) == "brokercc" {
+	if path.Base(os.Args[0]) == "broker-cover" {
 		main()
 		exit.Exit(0)
 	}
