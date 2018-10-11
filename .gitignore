@@ -35,7 +35,9 @@ scanner/scanner
 
 # ignore binaries from broker
 broker/cli/broker/broker
+broker/cli/broker/broker-cover
 broker/cli/brokerd/brokerd
+broker/cli/brokerd/brokerd-cover
 
 # ignore binaries from perform
 perform/perform
