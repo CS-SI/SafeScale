@@ -17,6 +17,7 @@
 sfWaitForApt() {
     sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
 }
+export -f sfWaitForApt
 
 sfWaitLockfile() {
     local ROUNDS=600
@@ -43,6 +44,7 @@ sfWaitLockfile() {
         echo "${name} is ready"
     fi
 }
+export -f sfWaitLockfile
 
 # Convert netmask to CIDR
 sfNetmask2Cidr() {
@@ -147,11 +149,12 @@ sfDownload() {
     { code=$(</dev/stdin); } <<-EOF
         $fn() {
             while true; do
-                wget -q -nc -O "$filename" "$url"
+                #wget -q -nc -O "$filename" "$url"
+                curl -k -SsL -o "$filename" "$url"
                 rc=\$?
                 # if $filename exists, remove it and restart without delay
                 [ \$rc -eq 1 ] && rm -f $filename && continue
-                # break if wget succeeded or if not found (no benefit to loop on this kind of error)
+                # break if download succeeded or if not found (no benefit to loop on this kind of error)
                 [ \$rc -eq 0 -o \$rc -eq 8 ] && break
                 sleep $delay
             done
