@@ -64,6 +64,7 @@ Gopkg.lock
 # coverage info
 cover.out
 cover.html
+*.cov
 
 # unit test xunit format
 xunit_tests.xml
