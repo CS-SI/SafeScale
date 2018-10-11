@@ -165,11 +165,12 @@ depclean: begin
 
 generate: begin # Run generation
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@cd broker && $(MAKE) sdk
 	@$(GO) generate -run stringer ./... 2>&1 | tee generation_results.log
 	@$(GO) generate -run rice ./... 2>&1 | tee -a generation_results.log
 	@$(GO) generate -run stringer ./... 2>&1 | tee -a generation_results.log
 	@$(GO) generate -run mockgen ./...  2>&1 | tee -a generation_results.log
-	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_STRING)$(WARN_STRING) Warning generating code, if RICE related, then is a false warning !$(NO_COLOR)\n";fi;
+	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warning generating code, if RICE related, then is a false warning !$(NO_COLOR)\n";fi;
 
 test: begin # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
