@@ -24,7 +24,7 @@
 #   go-tests = true
 #   unused-packages = true
 
-required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", "github.com/GeertJohan/go.rice/rice", "github.com/golang/protobuf/protoc-gen-go", "github.com/golang/mock/gomock", "github.com/golang/mock/mockgen", "golang.org/x/tools/cmd/cover", "golang.org/x/lint/golint", "github.com/tebeka/go2xunit", "github.com/kisielk/errcheck", "github.com/360EntSecGroup-Skylar/goreporter"]
+required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", "github.com/GeertJohan/go.rice/rice", "github.com/golang/protobuf/protoc-gen-go", "github.com/golang/mock/gomock", "github.com/golang/mock/mockgen", "golang.org/x/tools/cmd/cover", "golang.org/x/lint/golint", "github.com/tebeka/go2xunit", "github.com/kisielk/errcheck", "github.com/360EntSecGroup-Skylar/goreporter", "github.com/dlespiau/covertool"]
 
 [[override]]
   version = "=v1.7.1"
@@ -112,6 +112,10 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 [[override]]
   name = "google.golang.org/grpc"
   version = "=v1.15.0"
+
+[[constraint]]
+  name = "github.com/dlespiau/covertool"
+  branch = "master"
 
 [prune]
   go-tests = true
