@@ -32,7 +32,7 @@ ifeq ($(findstring :,$(GOBIN)),:)
 endif
 
 # Binaries generated
-EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd/brokerd broker/cli/brokerd/brokerd-cover deploy/cli/deploy perform/perform
+EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd/brokerd broker/cli/brokerd/brokerd-cover deploy/cli/deploy deploy/cli/deploy-cover perform/perform perform/perform-cover
 
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)

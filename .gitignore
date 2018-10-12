@@ -42,11 +42,16 @@ broker/cli/brokerd/brokerd-cover
 
 # ignore binaries from perform
 perform/perform
+perform/perform-cover
 perform/cluster/tests/deploy
+perform/cluster/tests/deploy-cover
 
 # ignore binaries from deploy
 deploy/deploy
+deploy/deploy-cover
 deploy/cluster/tests/create_cluster
+deploy/cli/deploy
+deploy/cli/deploy-cover
 
 *.code-workspace
 !sample-settings/*.code-workspace
@@ -56,8 +61,6 @@ deploy/cluster/tests/create_cluster
 
 *.new
 *_results.log
-
-deploy/cli/deploy
 
 vendor
 Gopkg.lock
