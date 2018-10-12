@@ -48,10 +48,12 @@ const (
 type alterCommandCB func(string) string
 
 type worker struct {
-	feature *Feature
-	target  Target
-	method  Method.Enum
-	action  Action.Enum
+	feature   *Feature
+	target    Target
+	method    Method.Enum
+	action    Action.Enum
+	variables Variables
+	settings  Settings
 
 	host    *pb.Host
 	node    bool
@@ -64,6 +66,10 @@ type worker struct {
 	allMasters      []*pb.Host
 	allPrivateNodes []*pb.Host
 	allPublicNodes  []*pb.Host
+
+	concernedMasters      []*pb.Host
+	concernedPrivateNodes []*pb.Host
+	concernedPublicNodes  []*pb.Host
 
 	rootKey string
 	// function to alter the content of 'run' key of specification file
@@ -128,9 +134,9 @@ func (w *worker) Host() (*pb.Host, error) {
 	return nil, fmt.Errorf("target of worker isn't a host")
 }
 
-// AvailableMaster finds a master available, and keep track of it
+// identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
-func (w *worker) AvailableMaster() (*pb.Host, error) {
+func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 	if w.cluster == nil {
 		return nil, nil
 	}
@@ -147,8 +153,8 @@ func (w *worker) AvailableMaster() (*pb.Host, error) {
 	return w.availableMaster, nil
 }
 
-// AvailableNode finds a node available and will use this one during all the install session
-func (w *worker) AvailableNode(public bool) (*pb.Host, error) {
+// identifyAvailableNode finds a node available and will use this one during all the install session
+func (w *worker) identifyAvailableNode(public bool) (*pb.Host, error) {
 	if w.cluster == nil {
 		return nil, nil
 	}
@@ -179,9 +185,66 @@ func (w *worker) AvailableNode(public bool) (*pb.Host, error) {
 	return w.availablePrivateNode, nil
 }
 
-// AllMasters returns a list of all the hosts acting as masters and keep this list
+// identifyConcernedMasters returns a list of all the hosts acting as masters and keep this list
 // during all the install session
-func (w *worker) AllMasters() ([]*pb.Host, error) {
+func (w *worker) identifyConcernedMasters() ([]*pb.Host, error) {
+	if w.cluster == nil {
+		return []*pb.Host{}, nil
+	}
+	if w.concernedMasters == nil {
+		hosts, err := w.identifyAllMasters()
+		if err != nil {
+			return nil, err
+		}
+		concernedHosts, err := w.extractHostsFailingCheck(hosts)
+		if err != nil {
+			return nil, err
+		}
+		w.concernedMasters = concernedHosts
+	}
+	return w.concernedMasters, nil
+}
+
+// extractHostsFailingCheck identifies from the list passed as parameter which
+// hosts fail feature check.
+// The checks are done in parallel.
+func (w *worker) extractHostsFailingCheck(hosts []*pb.Host) ([]*pb.Host, error) {
+	concernedHosts := []*pb.Host{}
+	dones := map[*pb.Host]chan error{}
+	results := map[*pb.Host]chan Results{}
+	for _, h := range hosts {
+		d := make(chan error)
+		r := make(chan Results)
+		dones[h] = d
+		results[h] = r
+		go func(host *pb.Host, res chan Results, done chan error) {
+			nodeTarget := NewNodeTarget(host)
+			results, err := w.feature.Check(nodeTarget, w.variables, w.settings)
+			if err != nil {
+				res <- nil
+				done <- err
+				return
+			}
+			res <- results
+			done <- nil
+		}(h, r, d)
+	}
+	for h := range dones {
+		r := <-results[h]
+		d := <-dones[h]
+		if d != nil {
+			return nil, d
+		}
+		if !r.Successful() {
+			concernedHosts = append(w.concernedMasters, h)
+		}
+	}
+	return concernedHosts, nil
+}
+
+// identifyAllMasters returns a list of all the hosts acting as masters and keep this list
+// during all the install session
+func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
@@ -199,9 +262,42 @@ func (w *worker) AllMasters() ([]*pb.Host, error) {
 	return w.allMasters, nil
 }
 
-// AllNodes returns a list of all the hosts acting as public of private nodes and keep this list
+// identifyConcernedNodes returns a list of all the hosts acting as public of private nodes and keep this list
 // during all the install session
-func (w *worker) AllNodes(public bool) ([]*pb.Host, error) {
+func (w *worker) identifyConcernedNodes(public bool) ([]*pb.Host, error) {
+	if w.cluster == nil {
+		return []*pb.Host{}, nil
+	}
+	found := false
+	if public {
+		found = w.concernedPublicNodes != nil && len(w.concernedPublicNodes) > 0
+	} else {
+		found = w.concernedPrivateNodes != nil && len(w.concernedPrivateNodes) > 0
+	}
+	if !found {
+		hosts, err := w.identifyAllNodes(public)
+		if err != nil {
+			return nil, err
+		}
+		concernedHosts, err := w.extractHostsFailingCheck(hosts)
+		if err != nil {
+			return nil, err
+		}
+		if public {
+			w.concernedPublicNodes = concernedHosts
+		} else {
+			w.concernedPrivateNodes = concernedHosts
+		}
+	}
+	if public {
+		return w.concernedPublicNodes, nil
+	}
+	return w.concernedPrivateNodes, nil
+}
+
+// identifyAllNodes returns a list of all the hosts acting as public of private nodes and keep this list
+// during all the install session
+func (w *worker) identifyAllNodes(public bool) ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
@@ -214,8 +310,7 @@ func (w *worker) AllNodes(public bool) ([]*pb.Host, error) {
 	if !found {
 		brokerhost := brokerclient.New().Host
 		allHosts := []*pb.Host{}
-		nodes := w.cluster.ListNodeIDs(public)
-		for _, i := range nodes {
+		for _, i := range w.cluster.ListNodeIDs(public) {
 			host, err := brokerhost.Inspect(i, brokerclient.DefaultExecutionTimeout)
 			if err != nil {
 				return nil, err
@@ -232,11 +327,21 @@ func (w *worker) AllNodes(public bool) ([]*pb.Host, error) {
 		return w.allPublicNodes, nil
 	}
 	return w.allPrivateNodes, nil
-
 }
 
 // Proceed executes the action
 func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
+	w.variables = v
+	w.settings = s
+
+	// Installs requirements if there are any
+	if !s.SkipFeatureRequirements && w.action == Action.Add {
+		err := w.installRequirements()
+		if err != nil {
+			return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
+		}
+	}
+
 	results := Results{}
 	specs := w.feature.Specs()
 
@@ -256,7 +361,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 
 	// Applies reverseproxy rules to make it functional (feature may need it during the install)
 	if w.action == Action.Add && !s.SkipProxy {
-		err := w.setReverseProxy(v)
+		err := w.setReverseProxy()
 		if err != nil {
 			return nil, err
 		}
@@ -282,25 +387,40 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 			return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey)
 		}
 
-		anon, ok = stepMap[yamlTargetsKeyword]
-		if ok {
-			for i, j := range anon.(map[string]interface{}) {
-				switch j.(type) {
-				case bool:
-					if j.(bool) {
-						stepT[i] = "true"
-					} else {
-						stepT[i] = "false"
-					}
-				case string:
-					stepT[i] = j.(string)
-				}
-			}
+		// Determine list of hosts concerned by the step
+		var hostsList []*pb.Host
+		if w.target.Type() == "node" {
+			hostsList, err = w.identifyHosts(map[string]string{"hosts": "1"})
 		} else {
-			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword)
+			anon, ok = stepMap[yamlTargetsKeyword]
+			if ok {
+				for i, j := range anon.(map[string]interface{}) {
+					switch j.(type) {
+					case bool:
+						if j.(bool) {
+							stepT[i] = "true"
+						} else {
+							stepT[i] = "false"
+						}
+					case string:
+						stepT[i] = j.(string)
+					}
+				}
+			} else {
+				msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
+				return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword)
+			}
+
+			hostsList, err = w.identifyHosts(stepT)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if len(hostsList) == 0 {
+			continue
 		}
 
+		// Get the content of the action based on method
 		keyword := yamlRunKeyword
 		switch w.method {
 		case Method.Apt:
@@ -401,7 +521,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 			YamlKey:            stepKey,
 			Serial:             serial,
 		}
-		results[k], err = step.Run(v, s)
+		results[k], err = step.Run(hostsList, w.variables, w.settings)
 		// If an error occured, don't do the remaining steps, fail immediately
 		if err != nil {
 			break
@@ -484,7 +604,7 @@ func (w *worker) validateClusterSizing() error {
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
-func (w *worker) setReverseProxy(v Variables) error {
+func (w *worker) setReverseProxy() error {
 	specs := w.feature.Specs()
 	rules, ok := specs.Get("feature.proxy.rules").([]interface{})
 	if !ok || len(rules) <= 0 {
@@ -497,7 +617,7 @@ func (w *worker) setReverseProxy(v Variables) error {
 	)
 
 	if w.cluster != nil {
-		host, err := w.AvailableMaster()
+		host, err := w.identifyAvailableMaster()
 		if err != nil {
 			return fmt.Errorf("failed to set reverse proxy: %s", err.Error())
 		}
@@ -515,7 +635,7 @@ func (w *worker) setReverseProxy(v Variables) error {
 	}
 
 	// Sets the values useable in any cases
-	v["GatewayIP"] = gw.PUBLIC_IP
+	w.variables["GatewayIP"] = gw.PUBLIC_IP
 
 	// Now submits all the rules to reverse proxy
 	for _, r := range rules {
@@ -542,16 +662,137 @@ func (w *worker) setReverseProxy(v Variables) error {
 				}
 			}
 		}
-		hosts, err := identifyHosts(w, targets)
+		hosts, err := w.identifyHosts(targets)
 		if err != nil {
 			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 		}
 		for _, h := range hosts {
-			v["HostIP"] = h.PRIVATE_IP
-			v["Hostname"] = h.Name
-			err := kc.Apply(rule, &v)
+			w.variables["HostIP"] = h.PRIVATE_IP
+			w.variables["Hostname"] = h.Name
+			err := kc.Apply(rule, &(w.variables))
 			if err != nil {
 				return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
+			}
+		}
+	}
+	return nil
+}
+
+// identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts
+func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
+	hostT, masterT, privnodeT, pubnodeT, err := targets.parse()
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		hostsList = []*pb.Host{}
+		all       []*pb.Host
+	)
+
+	if w.cluster == nil {
+		if hostT != "" {
+			hostsList = append(hostsList, w.host)
+		}
+	} else {
+		switch masterT {
+		case "1":
+			host, err := w.identifyAvailableMaster()
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, host)
+		case "*":
+			if w.action == Action.Add {
+				all, err = w.identifyConcernedMasters()
+			} else {
+				all, err = w.identifyAllMasters()
+			}
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, all...)
+		}
+
+		switch privnodeT {
+		case "1":
+			host, err := w.identifyAvailableNode(false)
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, host)
+		case "*":
+			if w.action == Action.Add {
+				all, err = w.identifyConcernedNodes(false)
+			} else {
+				all, err = w.identifyAllNodes(false)
+			}
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, all...)
+		}
+
+		switch pubnodeT {
+		case "1":
+			host, err := w.identifyAvailableNode(true)
+			if err != nil {
+				return nil, err
+			}
+			nodeTarget := NewNodeTarget(host)
+			results, err := w.feature.Check(nodeTarget, w.variables, w.settings)
+			if err != nil {
+				return nil, err
+			}
+			if !results.Successful() {
+				hostsList = append(hostsList, host)
+			}
+		case "*":
+			if w.action == Action.Add {
+				all, err = w.identifyConcernedNodes(true)
+			} else {
+				all, err = w.identifyAllNodes(true)
+			}
+			if err != nil {
+				return nil, err
+			}
+			hostsList = append(hostsList, all...)
+		}
+	}
+	return hostsList, nil
+}
+
+// installRequirements walks through requirements and installs them if needed
+func (w *worker) installRequirements() error {
+	specs := w.feature.Specs()
+	yamlKey := "feature.requirements.features"
+	if specs.IsSet(yamlKey) {
+		// if debug {
+		//	hostInstance, clusterInstance, nodeInstance := determineContext(t)
+		//	msgHead := fmt.Sprintf("Checking requirements of feature '%s'", c.DisplayName())
+		//	var msgTail string
+		//	if hostInstance != nil {
+		//		msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
+		//	}
+		//	if nodeInstance != nil {
+		//		msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
+		//	}
+		//	if clusterInstance != nil {
+		//		msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
+		//	}
+		//	log.Printf("%s %s...\n", msgHead, msgTail)
+		// }
+		for _, requirement := range specs.GetStringSlice(yamlKey) {
+			needed, err := NewFeature(requirement)
+			if err != nil {
+				return fmt.Errorf("failed to find required feature '%s': %s", requirement, err.Error())
+			}
+			results, err := needed.Add(w.target, w.variables, w.settings)
+			if err != nil {
+				return fmt.Errorf("failed to install required feature '%s': %s", requirement, err.Error())
+			}
+			if !results.Successful() {
+				return fmt.Errorf("failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
 			}
 		}
 	}

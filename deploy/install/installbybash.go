@@ -40,32 +40,12 @@ func (i *bashInstaller) Check(c *Feature, t Target, v Variables, s Settings) (Re
 // Add installs the feature using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
 func (i *bashInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Results, error) {
-	specs := c.Specs()
-	if !s.SkipCheck {
-		// If feature is installed, do nothing but responds with success
-		results, err := i.Check(c, t, v, s)
-		if err != nil {
-			return nil, fmt.Errorf("feature check failed: %s", err.Error())
-		}
-		if results.Successful() {
-			//log.Printf("Feature '%s' is already installed\n", c.DisplayName())
-			return results, nil
-		}
-	}
-
 	// Determining if install script is defined in specification file
+	specs := c.Specs()
 	if !specs.IsSet("feature.install.bash.add") {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key 'feature.install.bash.add' found`
 		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
-	}
-
-	// Installs requirements if there are any
-	if !s.SkipFeatureRequirements {
-		err := installRequirements(c, t, v, s)
-		if err != nil {
-			return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
-		}
 	}
 
 	worker, err := newWorker(c, t, Method.Bash, Action.Add, nil)

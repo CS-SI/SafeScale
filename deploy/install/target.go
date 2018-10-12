@@ -167,3 +167,8 @@ func NewNodeTarget(host *pb.Host) Target {
 		HostTarget: createHostTarget(host),
 	}
 }
+
+// Type returns the type of the Target
+func (t *NodeTarget) Type() string {
+	return "node"
+}

@@ -287,43 +287,6 @@ func findConcernedHosts(list []string, c *Feature) (string, error) {
 	//}
 }
 
-// installRequirements walks through requirements and installs them if needed
-func installRequirements(c *Feature, t Target, v Variables, s Settings) error {
-	specs := c.Specs()
-	yamlKey := "feature.requirements.features"
-	if specs.IsSet(yamlKey) {
-		// if debug {
-		//	hostInstance, clusterInstance, nodeInstance := determineContext(t)
-		//	msgHead := fmt.Sprintf("Checking requirements of feature '%s'", c.DisplayName())
-		//	var msgTail string
-		//	if hostInstance != nil {
-		//		msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
-		//	}
-		//	if nodeInstance != nil {
-		//		msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
-		//	}
-		//	if clusterInstance != nil {
-		//		msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
-		//	}
-		//	log.Printf("%s %s...\n", msgHead, msgTail)
-		// }
-		for _, requirement := range specs.GetStringSlice(yamlKey) {
-			needed, err := NewFeature(requirement)
-			if err != nil {
-				return fmt.Errorf("failed to find required feature '%s': %s", requirement, err.Error())
-			}
-			results, err := needed.Add(t, v, s)
-			if err != nil {
-				return fmt.Errorf("failed to install required feature '%s': %s", requirement, err.Error())
-			}
-			if !results.Successful() {
-				return fmt.Errorf("failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
-			}
-		}
-	}
-	return nil
-}
-
 // determineContext ...
 func determineContext(t Target) (hT *HostTarget, cT *ClusterTarget, nT *NodeTarget) {
 	hT = nil
@@ -414,69 +377,4 @@ func gatewayFromHost(host *pb.Host) *pb.Host {
 		return nil
 	}
 	return gw
-}
-
-// identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts
-func identifyHosts(w *worker, targets stepTargets) ([]*pb.Host, error) {
-	hostT, masterT, privnodeT, pubnodeT, err := targets.parse()
-	if err != nil {
-		return nil, err
-	}
-
-	hostsList := []*pb.Host{}
-
-	if w.cluster == nil {
-		if hostT != "" {
-			hostsList = append(hostsList, w.host)
-		}
-	} else {
-		switch masterT {
-		case "1":
-			host, err := w.AvailableMaster()
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, host)
-		case "*":
-			all, err := w.AllMasters()
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, all...)
-		}
-
-		switch privnodeT {
-		case "1":
-			host, err := w.AvailableNode(false)
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, host)
-		case "*":
-			hosts, err := w.AllNodes(false)
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, hosts...)
-		}
-
-		switch pubnodeT {
-		case "1":
-			host, err := w.AvailableNode(true)
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, host)
-		case "*":
-			hosts, err := w.AllNodes(true)
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, hosts...)
-		}
-	}
-	if len(hostsList) == 0 {
-		return hostsList, fmt.Errorf("failed to identify hosts")
-	}
-	return hostsList, nil
 }

@@ -3,6 +3,7 @@ package install
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
@@ -11,28 +12,24 @@ import (
 // genericPackager is an object implementing the OS package management
 // It handles package management on single host or entire cluster
 type genericPackager struct {
-	name          string
+	keyword       string
+	method        Method.Enum
 	checkCommand  alterCommandCB
 	addCommand    alterCommandCB
 	removeCommand alterCommandCB
 }
 
-// GetName returns the name of the installer (ex: apt, yum, dnf)
-func (g *genericPackager) GetName() string {
-	return g.name
-}
-
 // Check checks if the feature is installed
-func (g *genericPackager) Check(c *Feature, t Target, v Variables, s Settings) (Results, error) {
-	specs := c.Specs()
-	yamlKey := "feature.install." + g.name + ".check"
+func (g *genericPackager) Check(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+	specs := f.Specs()
+	yamlKey := "feature.install." + g.keyword + ".check"
 	if !specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
+		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(c, t, Method.Bash, Action.Check, g.checkCommand)
+	worker, err := newWorker(f, t, g.method, Action.Check, g.checkCommand)
 	if err != nil {
 		return nil, err
 	}
@@ -45,25 +42,16 @@ func (g *genericPackager) Check(c *Feature, t Target, v Variables, s Settings) (
 }
 
 // Add installs the feature using apt
-func (g *genericPackager) Add(c *Feature, t Target, v Variables, s Settings) (Results, error) {
-	yamlKey := "feature.install." + g.name + ".add"
-	if !c.Specs().IsSet(yamlKey) {
+func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+	yamlKey := "feature.install." + g.keyword + ".add"
+	if !f.Specs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
+		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
 	}
 
-	// Installs requirements if there are any
-	if !s.SkipFeatureRequirements {
-		err := installRequirements(c, t, v, s)
-		if err != nil {
-			return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
-		}
-	}
-
-	worker, err := newWorker(c, t, Method.Bash, Action.Add, g.addCommand)
+	worker, err := newWorker(f, t, g.method, Action.Add, g.addCommand)
 	if err != nil {
-		return nil, err
 	}
 	err = worker.CanProceed(s)
 	if err != nil {
@@ -75,15 +63,15 @@ func (g *genericPackager) Add(c *Feature, t Target, v Variables, s Settings) (Re
 }
 
 // Remove uninstalls the feature using the RemoveScript script
-func (g *genericPackager) Remove(c *Feature, t Target, v Variables, s Settings) (Results, error) {
-	yamlKey := "feature.install." + g.name + ".remove"
-	if !c.Specs().IsSet(yamlKey) {
+func (g *genericPackager) Remove(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+	yamlKey := "feature.install." + g.keyword + ".remove"
+	if !f.Specs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
+		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(c, t, Method.Bash, Action.Remove, g.removeCommand)
+	worker, err := newWorker(f, t, g.method, Action.Remove, g.removeCommand)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +92,8 @@ type aptInstaller struct {
 func NewAptInstaller() Installer {
 	return &aptInstaller{
 		genericPackager: genericPackager{
-			name: "apt",
+			keyword: strings.ToLower(Method.Apt.String()),
+			method:  Method.Apt,
 			checkCommand: func(pkg string) string {
 				return fmt.Sprintf("sudo dpkg-query -s '%s' &>/dev/null", pkg)
 			},
@@ -127,7 +116,8 @@ type yumInstaller struct {
 func NewYumInstaller() Installer {
 	return &yumInstaller{
 		genericPackager: genericPackager{
-			name: "yum",
+			keyword: strings.ToLower(Method.Yum.String()),
+			method:  Method.Yum,
 			checkCommand: func(pkg string) string {
 				return fmt.Sprintf("sudo rpm -q %s &>/dev/null", pkg)
 			},
@@ -150,7 +140,8 @@ type dnfInstaller struct {
 func NewDnfInstaller() Installer {
 	return &dnfInstaller{
 		genericPackager: genericPackager{
-			name: "dnf",
+			keyword: strings.ToLower(Method.Dnf.String()),
+			method:  Method.Dnf,
 			checkCommand: func(pkg string) string {
 				return fmt.Sprintf("sudo dnf list installed %s &>/dev/null", pkg)
 			},
