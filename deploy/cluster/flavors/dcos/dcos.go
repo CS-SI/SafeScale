@@ -714,6 +714,40 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 		return
 	}
 
+	// Installs DCOS requirements...
+	log.Printf("[master #%d (%s)] installing DCOS requirements", index, host.Name)
+	installCommonRequirements, err := c.getInstallCommonRequirements()
+	if err != nil {
+		done <- fmt.Errorf("failed to retrieve installation script for master: %s", err.Error())
+		return
+	}
+	data := map[string]interface{}{
+		"InstallCommonRequirements": *installCommonRequirements,
+	}
+	box, err := getDCOSTemplateBox()
+	if err != nil {
+		done <- fmt.Errorf("failed to retrieve installation script for master: %s", err.Error())
+		return
+	}
+	retcode, _, _, err := flavortools.ExecuteScript(box, funcMap, "dcos_install_master.sh", data, host.ID)
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to remotely run installation script: %s\n", index, host.Name, err.Error())
+		done <- fmt.Errorf("failed to remotely run installation script on host '%s': %s", host.Name, err.Error())
+		return
+	}
+	if retcode != 0 {
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[master #%d (%s)] installation failed:\nretcode=%d (%s)", index, host.ID, errcode, errcode.String())
+			done <- fmt.Errorf("scripted Master installation failed with error code %d (%s)", errcode, errcode.String())
+		} else {
+			log.Printf("[master #%d (%s)] installation failed:\nretcode=%d", index, host.ID, retcode)
+			done <- fmt.Errorf("scripted Master installation failed with error code %d", retcode)
+		}
+		return
+	}
+	log.Printf("[master #%d (%s)] DCOS requirements successfully installed", index, host.Name)
+
 	values := install.Variables{
 		"Password": c.Core.AdminPassword,
 	}
@@ -761,39 +795,6 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 	}
 	log.Printf("[master #%d (%s)] feature 'docker' installed successfully\n", index, host.Name)
 
-	// Installs DCOS requirements...
-	log.Printf("[master #%d (%s)] installing DCOS requirements", index, host.Name)
-	installCommonRequirements, err := c.getInstallCommonRequirements()
-	if err != nil {
-		done <- fmt.Errorf("failed to retrieve installation script for master: %s", err.Error())
-		return
-	}
-	data := map[string]interface{}{
-		"InstallCommonRequirements": *installCommonRequirements,
-	}
-	box, err := getDCOSTemplateBox()
-	if err != nil {
-		done <- fmt.Errorf("failed to retrieve installation script for master: %s", err.Error())
-		return
-	}
-	retcode, _, _, err := flavortools.ExecuteScript(box, funcMap, "dcos_install_master.sh", data, host.ID)
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to remotely run installation script: %s\n", index, host.Name, err.Error())
-		done <- fmt.Errorf("failed to remotely run installation script on host '%s': %s", host.Name, err.Error())
-		return
-	}
-	if retcode != 0 {
-		if retcode < int(ErrorCode.NextErrorCode) {
-			errcode := ErrorCode.Enum(retcode)
-			log.Printf("[master #%d (%s)] installation failed:\nretcode=%d (%s)", index, host.ID, errcode, errcode.String())
-			done <- fmt.Errorf("scripted Master installation failed with error code %d (%s)", errcode, errcode.String())
-		} else {
-			log.Printf("[master #%d (%s)] installation failed:\nretcode=%d", index, host.ID, retcode)
-			done <- fmt.Errorf("scripted Master installation failed with error code %d", retcode)
-		}
-		return
-	}
-	log.Printf("[master #%d (%s)] DCOS requirements successfully installed", index, host.Name)
 	log.Printf("[master #%d (%s)] creation successful\n", index, host.Name)
 	done <- nil
 }
@@ -927,6 +928,44 @@ func (c *Cluster) asyncCreateNode(
 	}
 	log.Printf("[%s node #%d (%s)] host created successfully.\n", nodeTypeStr, index, host.Name)
 
+	// Installs DCOS requirements
+	log.Printf("[%s node #%d (%s)] installing DCOS requirements...\n", nodeTypeStr, index, host.Name)
+	installCommonRequirements, err := c.getInstallCommonRequirements()
+	if err != nil {
+		done <- err
+		return
+	}
+	data := map[string]interface{}{
+		"InstallCommonRequirements": *installCommonRequirements,
+		"BootstrapIP":               c.manager.BootstrapIP,
+		"BootstrapPort":             bootstrapHTTPPort,
+	}
+	box, err := getDCOSTemplateBox()
+	if err != nil {
+		done <- err
+		return
+	}
+	retcode, _, _, err := flavortools.ExecuteScript(box, funcMap, "dcos_install_node.sh", data, host.ID)
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to remotely run installation script: %s\n", nodeTypeStr, index, host.Name, err.Error())
+		result <- ""
+		done <- err
+		return
+	}
+	if retcode != 0 {
+		result <- ""
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[%s node #%d (%s)] installation failed: retcode: %d (%s)", nodeTypeStr, index, host.Name, errcode, errcode.String())
+			done <- fmt.Errorf("scripted Node configuration failed with error code %d (%s)", errcode, errcode.String())
+		} else {
+			log.Printf("[%s node #%d (%s)] installation failed: retcode=%d", nodeTypeStr, index, host.Name, retcode)
+			done <- fmt.Errorf("scripted Agent configuration failed with error code %d", retcode)
+		}
+		return
+	}
+	log.Printf("[%s node #%d (%s)] DCOS requirements installed successfully.\n", nodeTypeStr, index, host.Name)
+
 	// // install proxycache-client feature
 	// feature, err := install.NewFeature("proxycache-client")
 	// if err != nil {
@@ -969,44 +1008,6 @@ func (c *Cluster) asyncCreateNode(
 		return
 	}
 	log.Printf("[%s node #%d (%s)] feature 'docker' installed successfully.\n", nodeTypeStr, index, host.Name)
-
-	// Installs DCOS requirements
-	log.Printf("[%s node #%d (%s)] installing DCOS requirements...\n", nodeTypeStr, index, host.Name)
-	installCommonRequirements, err := c.getInstallCommonRequirements()
-	if err != nil {
-		done <- err
-		return
-	}
-	data := map[string]interface{}{
-		"InstallCommonRequirements": *installCommonRequirements,
-		"BootstrapIP":               c.manager.BootstrapIP,
-		"BootstrapPort":             bootstrapHTTPPort,
-	}
-	box, err := getDCOSTemplateBox()
-	if err != nil {
-		done <- err
-		return
-	}
-	retcode, _, _, err := flavortools.ExecuteScript(box, funcMap, "dcos_install_node.sh", data, host.ID)
-	if err != nil {
-		log.Printf("[%s node #%d (%s)] failed to remotely run installation script: %s\n", nodeTypeStr, index, host.Name, err.Error())
-		result <- ""
-		done <- err
-		return
-	}
-	if retcode != 0 {
-		result <- ""
-		if retcode < int(ErrorCode.NextErrorCode) {
-			errcode := ErrorCode.Enum(retcode)
-			log.Printf("[%s node #%d (%s)] installation failed: retcode: %d (%s)", nodeTypeStr, index, host.Name, errcode, errcode.String())
-			done <- fmt.Errorf("scripted Node configuration failed with error code %d (%s)", errcode, errcode.String())
-		} else {
-			log.Printf("[%s node #%d (%s)] installation failed: retcode=%d", nodeTypeStr, index, host.Name, retcode)
-			done <- fmt.Errorf("scripted Agent configuration failed with error code %d", retcode)
-		}
-		return
-	}
-	log.Printf("[%s node #%d (%s)] DCOS requirements installed successfully.\n", nodeTypeStr, index, host.Name)
 
 	log.Printf("[%s node #%d (%s)] creation successful.\n", nodeTypeStr, index, host.Name)
 	result <- host.ID
@@ -1073,31 +1074,6 @@ func (c *Cluster) asyncPrepareGateway(done chan error) {
 		return
 	}
 
-	// Installs reverseproxy
-	log.Println("Starting installation of feature 'reverseproxy' on gateway...")
-	feature, err := install.NewFeature("reverseproxy")
-	if err != nil {
-		msg := fmt.Sprintf("failed to prepare feature '%s' for '%s': %s", feature.DisplayName(), host.Name, err.Error())
-		log.Println(msg)
-		done <- fmt.Errorf(msg)
-		return
-	}
-	target := install.NewHostTarget(host)
-	results, err := feature.Add(target, install.Variables{}, install.Settings{})
-	if err != nil {
-		msg := fmt.Sprintf("failed to install feature '%s' on '%s': %s", feature.DisplayName(), host.Name, err.Error())
-		log.Println(msg)
-		done <- fmt.Errorf(msg)
-		return
-	}
-	if !results.Successful() {
-		msg := fmt.Sprintf("failed to install feature '%s' on '%s': %s", feature.DisplayName(), host.Name, results.AllErrorMessages())
-		log.Println(msg)
-		done <- fmt.Errorf(msg)
-		return
-	}
-	log.Println("Feature 'reverseproxy' successfully installed on gateway")
-
 	box, err := getDCOSTemplateBox()
 	if err != nil {
 		done <- err
@@ -1130,6 +1106,31 @@ func (c *Cluster) asyncPrepareGateway(done chan error) {
 		}
 		return
 	}
+
+	// Installs reverseproxy
+	log.Println("Adding feature 'reverseproxy' on gateway...")
+	feature, err := install.NewFeature("reverseproxy")
+	if err != nil {
+		msg := fmt.Sprintf("failed to prepare feature '%s' for '%s': %s", feature.DisplayName(), host.Name, err.Error())
+		log.Println(msg)
+		done <- fmt.Errorf(msg)
+		return
+	}
+	target := install.NewHostTarget(host)
+	results, err := feature.Add(target, install.Variables{}, install.Settings{})
+	if err != nil {
+		msg := fmt.Sprintf("failed to install feature '%s' on '%s': %s", feature.DisplayName(), host.Name, err.Error())
+		log.Println(msg)
+		done <- fmt.Errorf(msg)
+		return
+	}
+	if !results.Successful() {
+		msg := fmt.Sprintf("failed to install feature '%s' on '%s': %s", feature.DisplayName(), host.Name, results.AllErrorMessages())
+		log.Println(msg)
+		done <- fmt.Errorf(msg)
+		return
+	}
+	log.Println("Feature 'reverseproxy' successfully installed on gateway")
 
 	log.Printf("[bootstrap] preparation successful")
 	done <- nil
