@@ -71,3 +71,9 @@ cover.html
 xunit_tests.xml
 SafeScale-*.html
 test_output.html
+
+#ignore wiki files
+docs/img
+docs/*.md
+docs/*.html
+docs/.nojekyll
