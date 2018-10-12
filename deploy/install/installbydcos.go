@@ -1,7 +1,6 @@
 package install
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
@@ -52,14 +51,6 @@ func (i *dcosInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Resu
 	if err != nil {
 		log.Println(err.Error())
 		return nil, err
-	}
-
-	// Installs requirements if there are any
-	if !s.SkipFeatureRequirements {
-		err = installRequirements(c, t, v, s)
-		if err != nil {
-			return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
-		}
 	}
 
 	// Replaces variables in normalized script

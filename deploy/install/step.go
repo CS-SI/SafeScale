@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -222,28 +223,36 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(v Variables, s Settings) (stepResults, error) {
-	// Determine list of hosts concerned by the step
-	hostsList, err := identifyHosts(is.Worker, is.Targets)
-	if err != nil {
-		return nil, err
-	}
+func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, error) {
 
-	// Empty results
 	results := stepResults{}
 
 	if is.Serial || s.Serialize {
-		for _, host := range hostsList {
-			v["HostIP"] = host.PRIVATE_IP
-			v["Hostname"] = host.Name
-			results[host.Name] = is.runOnHost(host, v)
-			if !results[host.Name].Successful() {
-				return results, results[host.Name].err
+		for _, h := range hosts {
+			//if debug
+			if false {
+				log.Printf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			}
+			v["HostIP"] = h.PRIVATE_IP
+			v["Hostname"] = h.Name
+			results[h.Name] = is.runOnHost(h, v)
+			if !results[h.Name].Successful() {
+				if false {
+					log.Printf("%s(%s):step(%s)@%s: fail\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+				}
+				return results, results[h.Name].err
+			}
+			if false {
+				log.Printf("%s(%s):step(%s)@%s: success\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 			}
 		}
 	} else {
 		dones := map[string]chan stepResult{}
-		for _, h := range hostsList {
+		for _, h := range hosts {
+			//if debug
+			if false {
+				log.Printf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			}
 			v["HostIP"] = h.PRIVATE_IP
 			v["Hostname"] = h.Name
 			d := make(chan stepResult)
@@ -255,7 +264,15 @@ func (is *step) Run(v Variables, s Settings) (stepResults, error) {
 		for k, d := range dones {
 			results[k] = <-d
 			if !results[k].Successful() {
+				//if debug
+				if false {
+					log.Printf("%s(%s):step(%s)@%s: fail\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				}
 				return results, results[k].err
+			}
+			//if debug
+			if false {
+				log.Printf("%s(%s):step(%s)@%s: done\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
 			}
 		}
 	}

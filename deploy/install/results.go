@@ -25,12 +25,11 @@ type Results map[string]stepResults
 
 // Successful ...
 func (r Results) Successful() bool {
-	if len(r) == 0 {
-		return false
-	}
-	for _, step := range r {
-		if !step.Successful() {
-			return false
+	if len(r) > 0 {
+		for _, step := range r {
+			if !step.Successful() {
+				return false
+			}
 		}
 	}
 	return true
@@ -85,8 +84,17 @@ func (r Results) Transpose() Results {
 	t := Results{}
 	for step, results := range r {
 		for h, sr := range results {
-			t[h][step] = sr
+			t[h] = stepResults{step: sr}
 		}
 	}
 	return t
+}
+
+// Keys returns the keys of the Results
+func (r Results) Keys() []string {
+	keys := []string{}
+	for k := range r {
+		keys = append(keys, k)
+	}
+	return keys
 }

@@ -22,8 +22,6 @@ import "github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 
 // Installer defines the API of an Installer
 type Installer interface {
-	// GetName returns the name of the Installer
-	GetName() string
 	// Check checks if the feature is installed
 	Check(*Feature, Target, Variables, Settings) (Results, error)
 	// Add executes installation of feature
