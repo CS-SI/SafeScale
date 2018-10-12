@@ -49,7 +49,7 @@ Usage: deploy version
 	   deploy [-vd] (cluster|datacenter|dc) <clustername> create [-N <cidr>][-F <flavor>][-C <complexity][--os <operating system>][--cpu <number of cpu>][--ram <ram size>][--disk <disk size>][-k]
 	   deploy [-vd] (cluster|datacenter|dc) <clustername> (delete|destroy|remove|rm) [-y]
        deploy [-vd] (cluster|datacenter|dc) <clustername> (start|stop|state|inspect)
-       deploy [-vd] (cluster|datacenter|dc) <clustername> expand [-n <count>][--os <os>][--ram <ram>][--disk <disk>]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> expand [-n <count>][--os <os>][--cpu <number of cpu>][--ram <ram size>][--disk <disk size>]
        deploy [-vd] (cluster|datacenter|dc) <clustername> shrink [-n <count>]
 	   deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> (add|install) [-f][--skip-proxy][--no-master][--no-node][(--param <param>)...]
 	   deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> check [(--param <param>)...]
