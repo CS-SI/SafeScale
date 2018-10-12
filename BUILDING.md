@@ -38,3 +38,4 @@ These commands initialize your working directory and produce the following binar
  - `brokerd` in `SafeScale/broker/daemon`: daemon in charge of executing requests from broker on providers
  - `brokerd-cover` in `SafeScale/broker/daemon`: A version of brokerd that generates coverage reports.  Intended only for developers.
  - `perform` in `SafeScale/perform`: CLI to manage cluster. Available commands are described in [usage](#USAGE.md)
+ - `perform-cover` in `SafeScale/perform`: A version of perform that generates coverage reports. Intended only for developers.
