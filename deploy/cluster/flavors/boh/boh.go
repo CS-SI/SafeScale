@@ -308,7 +308,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			GatewayIP:     gw.GetPrivateIP(),
 			PublicIP:      gw.GetAccessIP(),
 			AdminPassword: cladmPassword,
-			NodesDef:      &nodesDef,
+			NodesDef:      nodesDef,
 		},
 		manager:  &managerData{},
 		provider: svc,
@@ -346,7 +346,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	go instance.asyncConfigureMasters(masterChannel)
 
 	// Step 3: starts node creation asynchronously
-	nodesStatus = instance.createNodes(privateNodeCount, false, nodesDef)
+	_, nodesStatus = instance.AddNodes(privateNodeCount, false, nodesDef)
 	if nodesStatus != nil {
 		err = nodesStatus
 		goto cleanNodes
@@ -520,47 +520,47 @@ func (c *Cluster) createMaster(req pb.HostDefinition) error {
 	return nil
 }
 
-func (c *Cluster) createNodes(count int, public bool, def pb.HostDefinition) error {
-	var countS string
-	if count > 1 {
-		countS = "s"
-	}
-	var nodeType NodeType.Enum
-	var nodeTypeStr string
-	if public {
-		nodeType = NodeType.PublicNode
-		nodeTypeStr = "public"
-	} else {
-		nodeType = NodeType.PrivateNode
-		nodeTypeStr = "private"
-	}
-	fmt.Printf("Creating %d %s Node%s...\n", count, nodeTypeStr, countS)
+// func (c *Cluster) createNodes(count int, public bool, def pb.HostDefinition) error {
+// 	var countS string
+// 	if count > 1 {
+// 		countS = "s"
+// 	}
+// 	var nodeType NodeType.Enum
+// 	var nodeTypeStr string
+// 	if public {
+// 		nodeType = NodeType.PublicNode
+// 		nodeTypeStr = "public"
+// 	} else {
+// 		nodeType = NodeType.PrivateNode
+// 		nodeTypeStr = "private"
+// 	}
+// 	fmt.Printf("Creating %d %s Node%s...\n", count, nodeTypeStr, countS)
 
-	var dones []chan error
-	var results []chan string
-	for i := 1; i <= count; i++ {
-		d := make(chan error)
-		dones = append(dones, d)
-		r := make(chan string)
-		results = append(results, r)
-		go c.asyncCreateNode(i, nodeType, def, r, d)
-	}
+// 	var dones []chan error
+// 	var results []chan string
+// 	for i := 1; i <= count; i++ {
+// 		d := make(chan error)
+// 		dones = append(dones, d)
+// 		r := make(chan string)
+// 		results = append(results, r)
+// 		go c.asyncCreateNode(i, nodeType, def, r, d)
+// 	}
 
-	var state error
-	var errors []string
-	for i := range dones {
-		<-results[i]
-		state = <-dones[i]
-		if state != nil {
-			errors = append(errors, state.Error())
-		}
-	}
-	if len(errors) > 0 {
-		return fmt.Errorf(strings.Join(errors, "\n"))
-	}
+// 	var state error
+// 	var errors []string
+// 	for i := range dones {
+// 		<-results[i]
+// 		state = <-dones[i]
+// 		if state != nil {
+// 			errors = append(errors, state.Error())
+// 		}
+// 	}
+// 	if len(errors) > 0 {
+// 		return fmt.Errorf(strings.Join(errors, "\n"))
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
@@ -957,7 +957,7 @@ func (c *Cluster) AddNode(public bool, req pb.HostDefinition) (string, error) {
 
 // AddNodes adds <count> nodes
 func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]string, error) {
-	request := *c.GetConfig().NodesDef
+	request := c.GetConfig().NodesDef
 	if req.CPUNumber > 0 {
 		request.CPUNumber = req.CPUNumber
 	}

@@ -139,7 +139,7 @@ type ClusterCore struct {
 	// PublicIP is the IP address to reach the cluster (ie the public IP address of the network gateway)
 	PublicIP string `json:"public_ip"`
 	// NodesDef keeps the default node definition
-	NodesDef *pb.HostDefinition `json:"nodes_def"`
+	NodesDef pb.HostDefinition `json:"nodes_def"`
 	// Infos contains additional info about the cluster
 	Infos ExtensionMap `json:"infos,omitempty"`
 }

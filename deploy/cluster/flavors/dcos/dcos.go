@@ -70,7 +70,7 @@ const (
 
 	tempFolder = "/var/tmp/"
 
-	centos = "CentOS 7.4"
+	centos = "CentOS 7.3"
 
 	adminCmd = "sudo -u cladm -i"
 )
@@ -335,7 +335,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			PublicIP:      gw.GetAccessIP(),
 			Keypair:       kp,
 			AdminPassword: cladmPassword,
-			NodesDef:      &nodesDef,
+			NodesDef:      nodesDef,
 		},
 		provider: svc,
 		manager:  &managerData{},
@@ -509,7 +509,7 @@ func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.HostDefinitio
 		go c.asyncCreateNode(
 			i,
 			nodeType,
-			&pb.HostDefinition{
+			pb.HostDefinition{
 				CPUNumber: 4,
 				RAM:       16.0,
 				Disk:      100,
@@ -635,7 +635,7 @@ func (c *Cluster) asyncConfigureMasters(done chan error) {
 }
 
 // createAndConfigureNode creates and configure a Node
-func (c *Cluster) createAndConfigureNode(public bool, req *pb.HostDefinition) (string, error) {
+func (c *Cluster) createAndConfigureNode(public bool, req pb.HostDefinition) (string, error) {
 	var nodeType NodeType.Enum
 	if public {
 		nodeType = NodeType.PublicNode
@@ -859,7 +859,10 @@ func (c *Cluster) asyncConfigureMaster(index int, host *pb.Host, done chan error
 
 // asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
-func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.HostDefinition, timeout time.Duration, result chan string, done chan error) {
+func (c *Cluster) asyncCreateNode(
+	index int, nodeType NodeType.Enum, req pb.HostDefinition, timeout time.Duration,
+	result chan string, done chan error,
+) {
 	var publicIP bool
 	var nodeTypeStr string
 	if nodeType == NodeType.PublicNode {
@@ -885,7 +888,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 	req.Public = publicIP
 	req.Network = c.Core.NetworkID
 	req.ImageID = centos
-	host, err := brokerclient.New().Host.Create(*req, 10*time.Minute)
+	host, err := brokerclient.New().Host.Create(req, 10*time.Minute)
 	if err != nil {
 		err = brokerclient.DecorateError(err, "creation of host", true)
 		log.Printf("[%s node #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
