@@ -28,6 +28,7 @@ providers/aws/*_test.go
 rice-box.go
 *_string.go
 mock_*.go
+gomock_reflect*
 
 #ignore results from scanner
 scanner/Test*
