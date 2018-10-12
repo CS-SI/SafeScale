@@ -108,7 +108,7 @@ sfAsyncWait() {
 }
 export -f sfAsyncWait
 
-# sfRetry timeout <delay> command
+# sfRetry <timeout> <delay> command
 # retries command until success, with sleep of <delay> seconds
 sfRetry() {
     local timeout=$1
@@ -136,7 +136,7 @@ EOF
     [ $rc -eq 0 ] && echo $result
     return $rc
 }
-export sfRetry
+export -f sfRetry
 
 # sfDownload url filename timeout delay
 sfDownload() {
