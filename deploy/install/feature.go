@@ -36,8 +36,6 @@ type Variables map[string]interface{}
 
 // Settings are used to tune the feature
 type Settings struct {
-	// SkipCheck doesn't try to check feature before add or remove
-	SkipCheck bool
 	// SkipProxy to tell not to try to set reverse proxy
 	SkipProxy bool
 	// Serialize force not to parallel hosts in step
@@ -191,16 +189,22 @@ func (c *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 		log.Printf("Checking if feature '%s' is installed on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	}
 
+	// 'v' may be updated by parallel tasks, so use copy of it
+	myV := make(Variables)
+	for key, value := range v {
+		myV[key] = value
+	}
+
 	// Inits implicit parameters
-	setImplicitParameters(t, v)
+	setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
-	err := checkParameters(c, v)
+	err := checkParameters(c, myV)
 	if err != nil {
 		return nil, err
 	}
 
-	return installer.Check(c, t, v, s)
+	return installer.Check(c, t, myV, s)
 }
 
 // Add installs the feature on the target
@@ -226,19 +230,25 @@ func (c *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 
 	//if debug
 	if false {
-		log.Printf("Installing feature '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+		log.Printf("Adding feature '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+	}
+
+	// 'v' may be updated by parallel tasks, so use copy of it
+	myV := make(Variables)
+	for key, value := range v {
+		myV[key] = value
 	}
 
 	// Inits implicit parameters
-	setImplicitParameters(t, v)
+	setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
-	err := checkParameters(c, v)
+	err := checkParameters(c, myV)
 	if err != nil {
 		return nil, err
 	}
 
-	return installer.Add(c, t, v, s)
+	return installer.Add(c, t, myV, s)
 }
 
 // Remove uninstalls the feature from the target
@@ -261,46 +271,20 @@ func (c *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 		log.Printf("Removing feature '%s' from %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
 	}
 
+	// 'v' may be updated by parallel tasks, so use copy of it
+	myV := make(Variables)
+	for key, value := range v {
+		myV[key] = value
+	}
+
 	// Inits implicit parameters
-	setImplicitParameters(t, v)
+	setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
-	err := checkParameters(c, v)
+	err := checkParameters(c, myV)
 	if err != nil {
 		return nil, err
 	}
 
-	return installer.Remove(c, t, v, s)
-}
-
-// FakeFeature is a feature already installed; it's used to tell if a specific feature
-// is installed, but disallows the ability to be installed or uninstalled.
-// The goal is to be able to mark a feature installed even if not installed by the package (because
-// it's a requirement for a cluster management tool for example)
-type FakeFeature struct {
-	real Feature
-}
-
-// NewFakeFeature returns a fake feature
-func NewFakeFeature(name string) *FakeFeature {
-	return &FakeFeature{
-		real: Feature{
-			displayName: name,
-		},
-	}
-}
-
-// Add errors the feature can't be installed
-func (c *FakeFeature) Add(target Target) error {
-	return fmt.Errorf("feature can't be installed")
-}
-
-// Remove errors the feature can't be removed
-func (c *FakeFeature) Remove(target Target) error {
-	return fmt.Errorf("feature can't be uninstalled")
-}
-
-// Applyable ...
-func (c *FakeFeature) Applyable(target Target) bool {
-	return c.real.Applyable(target)
+	return installer.Remove(c, t, myV, s)
 }
