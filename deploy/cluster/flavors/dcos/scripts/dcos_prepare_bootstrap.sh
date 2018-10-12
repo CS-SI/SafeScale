@@ -33,12 +33,8 @@ download_dcos_config_generator() {
         echo "-------------------------------"
         echo "download_dcos_config_generator:"
         echo "-------------------------------"
-        >dcos_generate_config.sh
-        while true; do
-            wget -q -c https://downloads.dcos.io/dcos/stable/{{ .DCOSVersion }}/dcos_generate_config.sh
-            [ $? -eq 0 ] && break
-            echo "Retrying to download DCOS configuration generator..."
-        done
+        local URL=https://downloads.dcos.io/dcos/stable/{{ .DCOSVersion }}/dcos_generate_config.sh
+        sfRetry 14m 5 "curl -qkSsL -o dcos_generate_config.sh $URL" || exit $?
     }
     echo "dcos_generate_config.sh successfully downloaded."
     exit 0
@@ -50,11 +46,8 @@ download_dcos_bin() {
         echo "------------------"
         echo "download_dcos_bin:"
         echo "------------------"
-        while true; do
-            wget -q -O /usr/local/dcos/genconf/serve/dcos.bin https://downloads.dcos.io/binaries/cli/linux/x86-64/dcos-1.11/dcos
-            [ $? -eq 0 ] && break
-            echo "Retrying to download DCOS cli..."
-        done
+        local URL=/usr/local/dcos/genconf/serve/dcos.bin https://downloads.dcos.io/binaries/cli/linux/x86-64/dcos-1.11/dcos
+        sfRetry 5m 5 "curl -qkSsL -o /usr/local/dcos/genconf/serve/dcos.bin $URL" || exit $?
     }
     echo "dcos cli successfully downloaded."
     exit 0
@@ -66,11 +59,8 @@ download_kubectl_bin() {
         echo "---------------------"
         echo "download_kubectl_bin:"
         echo "---------------------"
-        while true; do
-            wget -q -O /usr/local/dcos/genconf/serve/kubectl.bin https://storage.googleapis.com/kubernetes-release/release/v1.10.4/bin/linux/amd64/kubectl
-            [ $? -eq 0 ] && break
-            echo "Retrying to download kubectl binary..."
-        done
+        local URL=https://storage.googleapis.com/kubernetes-release/release/v1.10.4/bin/linux/amd64/kubectl
+        sfRetry 2m 5 "curl -qkSsL -o /usr/local/dcos/genconf/serve/kubectl.bin $URL" || exit $?
     }
     echo "kubectl successfully downloaded."
     exit 0
@@ -81,19 +71,15 @@ download_nginx_image() {
     echo "---------------------"
     echo "download_nginx_image:"
     echo "---------------------"
-    while true; do
-        systemctl status docker &>/dev/null
-        [ $? -eq 0 ] && break
-        systemctl restart docker &>/dev/null
-    done
-    docker pull nginx:latest
+    sfRetry 1m 5 "systemctl status docker || systemctl restart docker" && \
+    sfRetry 8m 5 "docker pull nginx:latest" || exit $?
 }
 export -f download_nginx_image
 
 mkdir -p /usr/local/dcos/genconf/serve/docker && \
 cd /usr/local/dcos && \
 yum makecache fast && \
-yum install -y time wget
+yum install -y wget curl time jq unzip
 [ $? -ne 0 ] && exit {{ errcode "ToolsInstall" }}
 
 # Lauch downloads in parallel

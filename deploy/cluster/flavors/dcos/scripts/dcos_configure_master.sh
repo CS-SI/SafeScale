@@ -35,11 +35,8 @@ download_dcos_install() {
     mkdir -p /usr/local/dcos
     cd /usr/local/dcos
     [ ! -f dcos_install.sh ] && {
-        while true; do
-            wget -c http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/dcos_install.sh
-            [ $? -eq 0 ] && break
-            echo "Trying again to download dcos_install.sh from Bootstrap server..."
-        done
+        local URL=http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/dcos_install.sh
+        sfRetry 10m 5 curl -kqSsL -o dcos_install.sh $URL || exit $?
     }
     exit 0
 }
@@ -47,26 +44,24 @@ export -f download_dcos_install
 
 # Get the dcos binary from Bootstrap server
 download_dcos_binary() {
-    while true; do
-        wget -q -c -O ~cladm/.local/bin/dcos http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/dcos.bin
-        [ $? -eq 0 ] && break
-        echo "Trying again to download dcos binary from Bootstrap server..."
-    done
-    chmod ug+rx ~cladm/.local/bin/dcos
-    chown -R cladm:cladm ~cladm
+    [ ! -f ~cladm/.local/bin/dcos ] && {
+        local URL=http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/dcos.bin
+        sfRetry 10m 5 curl -qkSsL -o ~cladm/.local/bin/dcos $URL || exit $?
+        chmod ug+rx ~cladm/.local/bin/dcos
+        chown -R cladm:cladm ~cladm
+    }
     exit 0
 }
 export -f download_dcos_binary
 
 # Get the kubectl binary from Bootstrap server
 download_kubectl_binary() {
-    while true; do
-        wget -q -c -O ~cladm/.local/bin/kubectl http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/kubectl.bin
-        [ $? -eq 0 ] && break
-        echo "Trying again to download dcos binary from Bootstrap server..."
-    done
-    chmod ug+rx ~cladm/.local/bin/kubectl
-    chown -R cladm:cladm ~cladm
+    [ ! -f ~cladm/.local/bin/kubectl ] && {
+        local URL=http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/kubectl.bin
+        sfRetry 10m 5 curl -qkSsL -o ~cladm/.local/bin/kubectl $URL || exit $?
+        chmod ug+rx ~cladm/.local/bin/kubectl
+        chown -R cladm:cladm ~cladm
+    }
     exit 0
 }
 export -f download_kubectl_binary
