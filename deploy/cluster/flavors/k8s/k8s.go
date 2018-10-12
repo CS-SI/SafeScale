@@ -295,7 +295,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			PublicIP:      gw.GetAccessIP(),
 			Keypair:       kp,
 			AdminPassword: cladmPassword,
-			NodesDef:      &nodesDef,
+			NodesDef:      nodesDef,
 		},
 		provider: svc,
 		manager:  &managerData{},
@@ -343,7 +343,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		go instance.asyncCreateMasters(masterCount, mastersChannel)
 
 		nodesChannel = make(chan error)
-		go instance.asyncCreateNodes(privateNodeCount, false, &nodesDef, nodesChannel)
+		go instance.asyncCreateNodes(privateNodeCount, false, nodesDef, nodesChannel)
 
 		mastersStatus = <-mastersChannel
 		nodesStatus = <-nodesChannel
@@ -444,7 +444,7 @@ cleanNetwork:
 	return nil, err
 }
 
-func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.HostDefinition, done chan error) {
+func (c *Cluster) asyncCreateNodes(count int, public bool, def pb.HostDefinition, done chan error) {
 	var countS string
 	if count > 1 {
 		countS = "s"
@@ -585,17 +585,12 @@ func (c *Cluster) asyncCreateMasters(count int, done chan error) {
 // }
 
 // createAndConfigureNode creates and configure a Node
-func (c *Cluster) createAndConfigureNode(public bool, req *pb.HostDefinition) (string, error) {
-	var (
-		nodeType    NodeType.Enum
-		nodeTypeStr string
-	)
-	if public {
+func (c *Cluster) createAndConfigureNode(index int, req pb.HostDefinition) (string, error) {
+	var nodeType NodeType.Enum
+	if req.Public {
 		nodeType = NodeType.PublicNode
-		nodeTypeStr = "public"
 	} else {
 		nodeType = NodeType.PrivateNode
-		nodeTypeStr = "private"
 	}
 	if c.Core.State != ClusterState.Created && c.Core.State != ClusterState.Nominal {
 		return "", fmt.Errorf("cluster flavor K8S needs to be at least in state 'Created' to allow node addition")
@@ -603,7 +598,7 @@ func (c *Cluster) createAndConfigureNode(public bool, req *pb.HostDefinition) (s
 
 	done := make(chan error)
 	result := make(chan string)
-	go c.asyncCreateNode(1, nodeType, req, timeoutCtxHost, result, done)
+	go c.asyncCreateNode(index, nodeType, req, timeoutCtxHost, result, done)
 	hostID := <-result
 	err := <-done
 	if err != nil {
@@ -611,24 +606,6 @@ func (c *Cluster) createAndConfigureNode(public bool, req *pb.HostDefinition) (s
 	}
 	close(done)
 
-	host, err := brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
-	if err != nil {
-		return "", err
-	}
-
-	target := install.NewClusterTarget(c)
-	feature, err := install.NewFeature("kubernetes")
-	if err != nil {
-		log.Printf("[%s node (%s)] failed to prepare feature 'kubernetes': %s", nodeTypeStr, host.Name, err.Error())
-		return "", err
-	}
-	results, err := feature.Add(target, install.Variables{}, install.Settings{})
-	if err != nil {
-		return "", err
-	}
-	if !results.Successful() {
-		return "", fmt.Errorf(results.AllErrorMessages())
-	}
 	return hostID, nil
 }
 
@@ -643,7 +620,7 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 		return
 	}
 
-	hostDef := *c.Core.NodesDef
+	hostDef := c.Core.NodesDef
 	hostDef.Name = name
 	hostDef.Network = c.Core.NetworkID
 	hostDef.Public = false
@@ -751,7 +728,7 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 
 // asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
-func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.HostDefinition, timeout time.Duration, result chan string, done chan error) {
+func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req pb.HostDefinition, timeout time.Duration, result chan string, done chan error) {
 	var publicIP bool
 	var nodeTypeStr string
 	if nodeType == NodeType.PublicNode {
@@ -777,7 +754,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req *pb.Hos
 	req.Name = name
 	req.Public = publicIP
 	req.Network = c.Core.NetworkID
-	host, err := brokerclient.New().Host.Create(*req, brokerclient.DefaultExecutionTimeout)
+	host, err := brokerclient.New().Host.Create(req, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		err = brokerclient.DecorateError(err, "creation of host", true)
 		log.Printf("[%s node #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
@@ -1114,15 +1091,16 @@ func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]str
 		return nil, fmt.Errorf("a K8S cluster needs to be at least in state 'Created' to allow node addition")
 	}
 
-	request := c.GetConfig().NodesDef
+	hostReq := c.GetConfig().NodesDef
+	hostReq.Public = public
 	if req.CPUNumber > 0 {
-		request.CPUNumber = req.CPUNumber
+		hostReq.CPUNumber = req.CPUNumber
 	}
 	if req.RAM > 0.0 {
-		request.RAM = req.RAM
+		hostReq.RAM = req.RAM
 	}
 	if req.Disk > 0 {
-		request.Disk = req.Disk
+		hostReq.Disk = req.Disk
 	}
 
 	var hosts []string
@@ -1134,8 +1112,8 @@ func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]str
 		results = append(results, r)
 		d := make(chan error)
 		dones = append(dones, d)
-		go func(result chan string, done chan error) {
-			hostID, err := c.createAndConfigureNode(public, request)
+		go func(idx int, result chan string, done chan error) {
+			hostID, err := c.createAndConfigureNode(idx, hostReq)
 			if err != nil {
 				result <- ""
 				done <- err
@@ -1143,7 +1121,7 @@ func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]str
 			}
 			result <- hostID
 			done <- nil
-		}(r, d)
+		}(i+1, r, d)
 	}
 	for i := range dones {
 		host := <-results[i]
@@ -1158,13 +1136,37 @@ func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]str
 	}
 	if len(errors) > 0 {
 		if len(hosts) > 0 {
+			dones = []chan error{}
 			broker := brokerclient.New().Host
 			for _, hostID := range hosts {
-				broker.Delete(hostID, brokerclient.DefaultExecutionTimeout)
+				d := make(chan error)
+				dones = append(dones, d)
+				go func(id string, done chan error) {
+					broker.Delete(id, brokerclient.DefaultExecutionTimeout)
+					done <- nil
+				}(hostID, d)
+			}
+			for _, d := range dones {
+				_ = <-d
 			}
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
 	}
+
+	target := install.NewClusterTarget(c)
+	feature, err := install.NewFeature("kubernetes")
+	if err != nil {
+		return nil, err
+	}
+	log.Println("Installing feature 'kubernetes'...")
+	addResults, err := feature.Add(target, install.Variables{}, install.Settings{})
+	if err != nil {
+		return nil, err
+	}
+	if !addResults.Successful() {
+		return nil, fmt.Errorf(addResults.AllErrorMessages())
+	}
+	log.Println("Successfully installed feature 'kubernetes'")
 
 	return hosts, nil
 }
