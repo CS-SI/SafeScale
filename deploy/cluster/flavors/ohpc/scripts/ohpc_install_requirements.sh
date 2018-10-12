@@ -87,5 +87,5 @@ EOF
 export -f install_common_requirements
 
 yum makecache fast
-yum install -y wget time rclone
+yum install -y wget curl time rclone jq unzip
 /usr/bin/time -p bash -c install_common_requirements

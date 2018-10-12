@@ -66,11 +66,11 @@ export -f install_common_requirements
 case $LINUX_KIND in
     centos|redhat)
         yum makecache fast
-        yum install -y curl wget time jq rclone
+        yum install -y curl wget time jq rclone unzip
         ;;
     debian|ubuntu)
         sfWaitForApt && apt update && \
-        sfWaitForApt && apt install -y curl wget time jq rclone
+        sfWaitForApt && apt install -y curl wget time jq rclone unzip
         ;;
     *)
         echo "unmanaged Linux distribution '$LINUX_KIND'"
