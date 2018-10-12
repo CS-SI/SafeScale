@@ -474,7 +474,14 @@ var clusterExpandCommand = &cli.Command{
 		//gpu := c.Flag("--gpu", false)
 		_ = c.Flag("--gpu", false)
 
-		err := createNodes(clusterName, public, count, los, cpu, ram, disk)
+		// err := createNodes(clusterName, public, count, los, cpu, ram, disk)
+		nodeRequest := pb.HostDefinition{
+			CPUNumber: cpu,
+			RAM:       ram,
+			Disk:      disk,
+			ImageID:   los,
+		}
+		_, err := clusterInstance.AddNodes(count, public, nodeRequest)
 		if err != nil {
 			fmt.Printf("%v\n", err)
 			os.Exit(int(ExitCode.RPC))
@@ -848,7 +855,6 @@ var clusterFeatureAddCommand = &cli.Command{
 
 		settings := install.Settings{}
 		settings.SkipProxy = c.Flag("--skip-proxy", false)
-		settings.SkipCheck = c.Flag("--force", false)
 
 		target := install.NewClusterTarget(clusterInstance)
 		results, err := feature.Add(target, values, settings)
@@ -909,11 +915,8 @@ var clusterFeatureCheckCommand = &cli.Command{
 			fmt.Printf("Feature '%s' is installed on cluster '%s'\n", featureName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
+
 		fmt.Printf("Feature '%s' is not installed on cluster '%s'\n", featureName, clusterName)
-		msg := results.AllErrorMessages()
-		if msg != "" {
-			fmt.Println(msg)
-		}
 		os.Exit(int(ExitCode.NotFound))
 	},
 
@@ -949,8 +952,7 @@ var clusterFeatureDeleteCommand = &cli.Command{
 		}
 
 		settings := install.Settings{}
-		settings.SkipCheck = c.Flag("--force", false)
-		// TODO: Reverse proxy rules are not purged when feature is removed, but by default
+		// TODO: Reverse proxy rules are not yet purged when feature is removed, but current code
 		// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
 		settings.SkipProxy = true
 
