@@ -6,9 +6,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+	"time"
 )
 
 func Test_Basic(t *testing.T) {
+	tearDown()
 	defer tearDown()
 
 	brokerd_launched, err := isBrokerdLaunched()
@@ -167,4 +169,68 @@ func Test_Basic(t *testing.T) {
 	out, err = getOutput("broker network delete easy")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
+}
+
+
+func Test_Stop_Start(t *testing.T) {
+	tearDown()
+	defer tearDown()
+
+	brokerd_launched, err := isBrokerdLaunched()
+	if !brokerd_launched {
+		fmt.Println("This requires that you launch brokerd in background and set the tenant")
+		require.True(t, brokerd_launched)
+	}
+	require.Nil(t, err)
+
+	in_path, err := canBeRun("broker")
+	require.Nil(t, err)
+
+	require.True(t, brokerd_launched)
+	require.True(t, in_path)
+
+	out, err := getOutput("broker tenant list")
+	require.Nil(t, err)
+	require.True(t, len(out) > 0)
+
+	out, err = getOutput("broker tenant get")
+	if err != nil {
+		fmt.Println("This requires that you set the right tenant before launching the tests")
+		require.Nil(t, err)
+	}
+	require.True(t, len(out) > 0)
+
+	out, err = getOutput("broker network list")
+	require.Nil(t, err)
+
+	fmt.Println("Creating network easy...")
+
+	out, err = getOutput("broker network create easy")
+	require.Nil(t, err)
+
+	out, err = getOutput("broker network create easy")
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "A network already exist"))
+
+	fmt.Println("Creating VM easyVM...")
+
+	out, err = getOutput("broker host create easyvm --public --net easy")
+	require.Nil(t, err)
+
+	out, err = getOutput("broker host stop easyvm")
+	require.Nil(t, err)
+
+	out, err = getOutput("broker host start easyvm")
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "in vm_state active"))
+
+	time.Sleep(4 * time.Second)
+	out, err = getOutput("broker host start easyvm")
+	require.Nil(t, err)
+
+	time.Sleep(4 * time.Second)
+
+	out, err = getOutput("broker ssh run easyvm -c \"uptime\"")
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "0 users"))
 }
