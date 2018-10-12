@@ -142,6 +142,24 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 	service := services.NewVolumeService(currentTenant.Client)
 	err := service.Delete(ref)
 	if err != nil {
+
+		// TODO CONSIDER DEFINING A "GOOD" FORMAT FOR ERROR MESSAGES, VERBOSE MODES, ETC
+		vin, nerr := s.Inspect(ctx, in)
+		if nerr == nil {
+			if vin.Host != nil {
+				hostName := utils.GetReference(vin.Host)
+
+				hostService := services.NewHostService(currentTenant.Client)
+				hap, ign := hostService.Get(hostName)
+
+				if ign == nil {
+					return nil, fmt.Errorf("Unable to delete volume '%s' because it's mounted on VM '%s'\nDetails: %s", in.Name, hap.Name, err)
+				}
+			}
+		} else {
+			log.Println("Error inspecting volume after delete failure")
+		}
+
 		return nil, err
 	}
 	log.Printf("Volume '%s' deleted", ref)
