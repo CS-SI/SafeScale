@@ -80,7 +80,7 @@ EOF
 
     # Disables installation of docker-python from yum and adds some requirements
     yum remove -y python-docker-py &>/dev/null
-    yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils jq && \
+    yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils jq rclone && \
     yum versionlock exclude python-docker-py || exit $?
 
     # Installs PIP
@@ -102,5 +102,5 @@ EOF
 export -f install_common_requirements
 
 yum makecache fast
-yum install -y wget time rclone
+yum install -y time
 /usr/bin/time -p bash -c install_common_requirements

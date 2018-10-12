@@ -34,7 +34,7 @@ fi
 
 # Get install script from bootstrap server
 mkdir /tmp/dcos && cd /tmp/dcos
-curl -sS -q -L -O http://{{.BootstrapIP}}:{{.BootstrapPort}}/dcos_install.sh || exit {{ errcode "DcosInstallDownload" }}
+curl -qkSsL -O http://{{.BootstrapIP}}:{{.BootstrapPort}}/dcos_install.sh || exit {{ errcode "DcosInstallDownload" }}
 
 # Launch installation
 bash dcos_install.sh $MODE || exit {{ errcode "DcosInstallExecution" }}
