@@ -80,14 +80,14 @@ export -f install_common_requirements
 case $(sfGetFact "linux kind") in
     debian|ubuntu)
         sfWaitForApt && apt update
-        sfWaitForApt && apt install -y wget time rclone
+        sfWaitForApt && apt install -y wget curl time rclone jq unzip
         ;;
     redhat|centos)
         yum makecache fast
-        yum install -y wget time rclone
+        yum install -y wget curl time rclone jq unzip
         ;;
     fedora)
-        dnf install wget time rclone
+        dnf install wget curl time rclone jq unzip
         ;;
     *)
         echo "Unmanaged linux distribution type '$(sfGetFact "linux kind")'"
