@@ -153,17 +153,17 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            which kubectl &>/dev/null && [ $(kubectl get nodes | wc -l) -gt 1 ]
+                            [ $(sfKubectl get nodes | wc -l) -gt 1 ]
 
                     nodes:
                         targets:
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            ps ax | grep kubelet &>/dev/null
+                            pidof kubelet &>/dev/null
 
             add:
-                pace: cp-dir,common-tools,cp-tools,cp-pkgs,kubelet,cp1-init,cpx-init,join,weavenet,final
+                pace: cp-dir,common-tools,cp-tools,sysconf,kubelet,cp1-init,cpx-init,join,weavenet,final
                 steps:
                     cp-dir:
                         targets:
@@ -177,34 +177,34 @@ feature:
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            [ ! -f /usr/local/bin/kubeadm ] && {
-                                cd /usr/local/bin
-
-                                RELEASE=$(sfRetry 5m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
-                                [ $? -ne 0 ] && exit 513
-                                URL="https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/amd64"
-                                sfDownload "$URL/kubeadm" kubeadm 5m 5 || exit 514
-                                sfDownload "$URL/kubelet" kubelet 5m 5 || exit 515
-                                sfDownload "$URL/kubectl" kubectl 5m 5 || exit 516
-                            } || :
+                            [ -f /etc/kubernetes/.joined ] && exit 0
+                            cd /usr/local/bin
+                            RELEASE=$(sfRetry 5m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
+                            [ $? -ne 0 ] && exit 513
+                            URL="https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/amd64"
+                            sfDownload "$URL/kubeadm" kubeadm 5m 5 || exit 514
+                            sfDownload "$URL/kubelet" kubelet 5m 5 || exit 515
+                            sfDownload "$URL/kubectl" kubectl 5m 5 || exit 516
 
                     cp-tools:
                         targets:
                             masters: all
                         run: |
-                            [ ! -f /usr/local/bin/crictl ] && {
-                                cd /var/tmp
-                                VERSION=v1.12.0
-                                URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${VERSION}/crictl-${VERSION}-linux-amd64.tar.gz"
-                                sfDownload "$URL" crictl.tgz 5m 5 || exit 513
-                                tar zxf crictl.tgz -C /usr/local/bin || exit 514
-                                rm -f crictl.tgz
-                            } || :
+                            cd /var/tmp
+                            VERSION=v1.12.0
+                            URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${VERSION}/crictl-${VERSION}-linux-amd64.tar.gz"
+                            sfDownload "$URL" crictl.tgz 5m 5 || exit 513
+                            tar zxf crictl.tgz -C /usr/local/bin || exit 514
+                            rm -f crictl.tgz
 
-                    cp-pkgs:
+                    sysconf:
                         targets:
                             masters: all
+                            privateNodes: all
+                            publicNodes: all
                         run: |
+                            [ -f /etc/kubernetes/.joined ] && exit 0
+
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
@@ -219,22 +219,26 @@ feature:
                                     ;;
                             esac
 
+                            echo "# IPVS modules used by Kubernetes"
+                            for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh; do
+                                echo $i >>/etc/modules
+                            done
+
                     kubelet:
                         targets:
                             masters: all
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            [ ! -f /opt/cni/bin/loopback ] && {
-                                mkdir -p /opt/cni/bin
-                                cd /var/tmp
-                                VERSION=v0.7.1
-                                URL="https://github.com/containernetworking/plugins/releases/download/${VERSION}/cni-plugins-amd64-${VERSION}.tgz"
-                                sfDownload "$URL" cni-plugins.tgz 5m 5 || exit 514
-                                tar zxvf cni-plugins.tgz -C /opt/cni/bin || exit 515
-                                rm -f cni-plugins.tgz
-                                chmod -R a+rx /opt/cni/bin
-                            }
+                            [ -f /etc/kubernetes/.joined ] && exit 0
+                            mkdir -p /opt/cni/bin
+                            cd /var/tmp
+                            VERSION=v0.7.1
+                            URL="https://github.com/containernetworking/plugins/releases/download/${VERSION}/cni-plugins-amd64-${VERSION}.tgz"
+                            sfDownload "$URL" cni-plugins.tgz 5m 5 || exit 514
+                            tar zxvf cni-plugins.tgz -C /opt/cni/bin || exit 515
+                            rm -f cni-plugins.tgz
+                            chmod -R a+rx /opt/cni/bin
 
                             chmod +rx /usr/local/bin/*
 
@@ -274,8 +278,7 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            # Don't try to init a kubernetes cluster already running
-                            sfKubectl get nodes &>/dev/null && exit 0
+                            [ -f /etc/kubernetes/.joined ] && exit 0
 
                             # Gather the stable release of K8S
                             RELEASE=$(sfRetry 2m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
