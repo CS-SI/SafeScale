@@ -45,7 +45,7 @@ feature:
                                     yum makecache fast && \
                                     yum groupinstall -y -t "X Window system" && \
                                     yum groupinstall -y -t Xfce && \
-                                    yum install -y -t xorg-x11-fonts-Type1 wget firefox jq || exit $?
+                                    yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl jq || exit $?
                                     ;;
                                 debian|ubuntu)
                                     sfWaitForApt && apt update && \
