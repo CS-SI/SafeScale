@@ -236,7 +236,7 @@ func convertStructToMap(src interface{}) (map[string]interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s", gwPublicIP, host.Name))
+		remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s/", gwPublicIP, host.Name))
 	}
 	toFormat["remote_desktop"] = remoteDesktops
 
@@ -467,19 +467,22 @@ var clusterExpandCommand = &cli.Command{
 	Process: func(c *cli.Command) {
 		count := c.IntOption("-n,--count", "<number of nodes>", 1)
 		public := c.Flag("-p,--public", false)
-		los := c.StringOption("--os", "<operating system", ubuntu1604)
-		cpu := int32(c.IntOption("--cpu", "<number of cpus>", 2))
-		ram := float32(c.FloatOption("--ram", "<ram size>", 7.0))
-		disk := int32(c.IntOption("--disk", "<disk size>", 100))
+		los := c.StringOption("--os", "<operating system", "")
+		cpu := int32(c.IntOption("--cpu", "<number of cpus>", 0))
+		ram := float32(c.FloatOption("--ram", "<ram size>", 0))
+		disk := int32(c.IntOption("--disk", "<disk size>", 0))
 		//gpu := c.Flag("--gpu", false)
 		_ = c.Flag("--gpu", false)
 
 		// err := createNodes(clusterName, public, count, los, cpu, ram, disk)
-		nodeRequest := pb.HostDefinition{
-			CPUNumber: cpu,
-			RAM:       ram,
-			Disk:      disk,
-			ImageID:   los,
+		var nodeRequest *pb.HostDefinition
+		if los != "" || cpu > 0 || ram > 0.0 || disk > 0 {
+			nodeRequest = &pb.HostDefinition{
+				CPUNumber: cpu,
+				RAM:       ram,
+				Disk:      disk,
+				ImageID:   los,
+			}
 		}
 		_, err := clusterInstance.AddNodes(count, public, nodeRequest)
 		if err != nil {

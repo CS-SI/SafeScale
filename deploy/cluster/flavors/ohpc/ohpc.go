@@ -364,7 +364,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	go instance.asyncConfigureMasters(masterChannel)
 
 	// Step 3: starts node creation asynchronously
-	_, nodesStatus = instance.AddNodes(privateNodeCount, false, nodesDef)
+	_, nodesStatus = instance.AddNodes(privateNodeCount, false, &nodesDef)
 	if nodesStatus != nil {
 		err = nodesStatus
 		goto cleanNodes
@@ -619,7 +619,7 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 // asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
 func (c *Cluster) asyncCreateNode(
-	index int, nodeType NodeType.Enum, req pb.HostDefinition,
+	index int, nodeType NodeType.Enum, req pb.HostDefinition, timeout time.Duration,
 	result chan string, done chan error,
 ) {
 
@@ -645,7 +645,7 @@ func (c *Cluster) asyncCreateNode(
 	}
 	req.Public = publicIP
 	req.Network = c.Core.NetworkID
-	host, err := brokerclient.New().Host.Create(req, brokerclient.DefaultExecutionTimeout)
+	host, err := brokerclient.New().Host.Create(req, timeout)
 	if err != nil {
 		err = brokerclient.DecorateError(err, "creation of host", true)
 		log.Printf("[%s node #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
@@ -678,6 +678,41 @@ func (c *Cluster) asyncCreateNode(
 		log.Printf("[%s node #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
 		done <- fmt.Errorf("failed to update Cluster configuration: %s", err.Error())
+		return
+	}
+
+	// Installs OHPC requirements
+	installCommonRequirements, err := c.getInstallCommonRequirements()
+	if err != nil {
+		done <- err
+		return
+	}
+	data := map[string]interface{}{
+		"InstallCommonRequirements": *installCommonRequirements,
+		"CladmPassword":             c.Core.AdminPassword,
+	}
+	box, err := getOHPCTemplateBox()
+	if err != nil {
+		done <- err
+		return
+	}
+	retcode, _, _, err := flavortools.ExecuteScript(box, funcMap, "ohpc_install_node.sh", data, host.ID)
+	if err != nil {
+		log.Printf("[%s node #%d (%s)] failed to remotely run installation script: %s\n", nodeTypeStr, index, host.Name, err.Error())
+		result <- ""
+		done <- err
+		return
+	}
+	if retcode != 0 {
+		result <- ""
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Printf("[%s node #%d (%s)] installation failed: retcode: %d (%s)", nodeTypeStr, index, host.Name, errcode, errcode.String())
+			done <- fmt.Errorf("scripted Node configuration failed with error code %d (%s)", errcode, errcode.String())
+		} else {
+			log.Printf("[%s node #%d (%s)] installation failed: retcode=%d", nodeTypeStr, index, host.Name, retcode)
+			done <- fmt.Errorf("scripted Agent configuration failed with error code %d", retcode)
+		}
 		return
 	}
 
@@ -723,41 +758,6 @@ func (c *Cluster) asyncCreateNode(
 		msg := results.AllErrorMessages()
 		log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
-		return
-	}
-
-	// Installs OHPC requirements
-	installCommonRequirements, err := c.getInstallCommonRequirements()
-	if err != nil {
-		done <- err
-		return
-	}
-	data := map[string]interface{}{
-		"InstallCommonRequirements": *installCommonRequirements,
-		"CladmPassword":             c.Core.AdminPassword,
-	}
-	box, err := getOHPCTemplateBox()
-	if err != nil {
-		done <- err
-		return
-	}
-	retcode, _, _, err := flavortools.ExecuteScript(box, funcMap, "ohpc_install_node.sh", data, host.ID)
-	if err != nil {
-		log.Printf("[%s node #%d (%s)] failed to remotely run installation script: %s\n", nodeTypeStr, index, host.Name, err.Error())
-		result <- ""
-		done <- err
-		return
-	}
-	if retcode != 0 {
-		result <- ""
-		if retcode < int(ErrorCode.NextErrorCode) {
-			errcode := ErrorCode.Enum(retcode)
-			log.Printf("[%s node #%d (%s)] installation failed: retcode: %d (%s)", nodeTypeStr, index, host.Name, errcode, errcode.String())
-			done <- fmt.Errorf("scripted Node configuration failed with error code %d (%s)", errcode, errcode.String())
-		} else {
-			log.Printf("[%s node #%d (%s)] installation failed: retcode=%d", nodeTypeStr, index, host.Name, retcode)
-			done <- fmt.Errorf("scripted Agent configuration failed with error code %d", retcode)
-		}
 		return
 	}
 
@@ -1005,7 +1005,7 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 }
 
 // AddNode adds one node
-func (c *Cluster) AddNode(public bool, req pb.HostDefinition) (string, error) {
+func (c *Cluster) AddNode(public bool, req *pb.HostDefinition) (string, error) {
 	hosts, err := c.AddNodes(1, public, req)
 	if err != nil {
 		return "", err
@@ -1014,16 +1014,18 @@ func (c *Cluster) AddNode(public bool, req pb.HostDefinition) (string, error) {
 }
 
 // AddNodes adds <count> nodes
-func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]string, error) {
+func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]string, error) {
 	request := c.GetConfig().NodesDef
-	if req.CPUNumber > 0 {
-		request.CPUNumber = req.CPUNumber
-	}
-	if req.RAM > 0.0 {
-		request.RAM = req.RAM
-	}
-	if req.Disk > 0 {
-		request.Disk = req.Disk
+	if req != nil {
+		if req.CPUNumber > 0 {
+			request.CPUNumber = req.CPUNumber
+		}
+		if req.RAM > 0.0 {
+			request.RAM = req.RAM
+		}
+		if req.Disk > 0 {
+			request.Disk = req.Disk
+		}
 	}
 
 	var nodeType NodeType.Enum
@@ -1037,12 +1039,13 @@ func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]str
 	var errors []string
 	var dones []chan error
 	var results []chan string
+	timeout := brokerclient.DefaultExecutionTimeout + time.Duration(count)*time.Minute
 	for i := 0; i < count; i++ {
 		r := make(chan string)
 		results = append(results, r)
 		d := make(chan error)
 		dones = append(dones, d)
-		go c.asyncCreateNode(i+1, nodeType, request, r, d)
+		go c.asyncCreateNode(i+1, nodeType, request, timeout, r, d)
 	}
 	for i := range dones {
 		hostID := <-results[i]
