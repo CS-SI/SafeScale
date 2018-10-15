@@ -83,7 +83,6 @@ var nasDelete = cli.Command{
 			return fmt.Errorf("Nas name required")
 		}
 		err := client.New().Nas.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
-		// TODO output result to stdout
 		if err != nil {
 			return fmt.Errorf("Could not delete nas: %v", client.DecorateError(err, "deletion of nas", true))
 		}

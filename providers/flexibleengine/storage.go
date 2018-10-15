@@ -80,7 +80,12 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 
 	err = mtdVol.Attach(volumeAttachment)
 	if err != nil {
-		// TODO ? Detach volume ?
+		// Detach volume
+		detach_err := volumeattach.Delete(client.osclt.Compute, va.ServerID, va.ID).ExtractErr()
+		if detach_err != nil {
+			return nil, fmt.Errorf("Error deleting volume attachment %s: %s", va.ID, openstack.ProviderErrorToString(err))
+		}
+
 		return volumeAttachment, err
 	}
 
