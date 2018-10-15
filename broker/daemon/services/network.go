@@ -108,6 +108,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		GWName:     gwname,
 	}
 
+	// TODO Panic ???
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
 		panic(err)

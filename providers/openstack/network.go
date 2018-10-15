@@ -329,6 +329,12 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 		return nil, fmt.Errorf("error creating gateway : %s", ProviderErrorToString(err))
 	}
 	err = metadata.SaveGateway(providers.FromClient(client), host, req.NetworkID)
+	// TODO, If metadata creation fails, we delete the host
+	defer func(err error) {
+		if err != nil{
+			client.DeleteHost(host.ID)
+		}
+	}(err)
 	return host, err
 }
 

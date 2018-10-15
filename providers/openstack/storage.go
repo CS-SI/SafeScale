@@ -211,6 +211,7 @@ func (client *Client) DeleteVolume(id string) error {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
+	// Create the attachment
 	va, err := volumeattach.Create(client.Compute, request.ServerID, volumeattach.CreateOpts{
 		VolumeID: request.VolumeID,
 	}).Extract()
@@ -225,14 +226,27 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		Device:   va.Device,
 	}
 
+	// Update the metadata
+
 	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), request.VolumeID)
 	if err != nil {
-		// TODO ? Detach volume ?
+
+		// Detach volume
+		detach_err := volumeattach.Delete(client.Compute, va.ServerID, va.ID).ExtractErr()
+		if detach_err != nil {
+			return nil, fmt.Errorf("Error deleting volume attachment %s: %s", va.ID, ProviderErrorToString(err))
+		}
+
 		return nil, err
 	}
 	err = mtdVol.Attach(vaapi)
 	if err != nil {
-		// TODO ? Detach volume ?
+		// Detach volume
+		detach_err := volumeattach.Delete(client.Compute, va.ServerID, va.ID).ExtractErr()
+		if detach_err != nil {
+			return nil, fmt.Errorf("Error deleting volume attachment %s: %s", va.ID, ProviderErrorToString(err))
+		}
+
 		return vaapi, err
 	}
 

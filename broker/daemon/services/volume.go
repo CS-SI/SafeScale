@@ -150,8 +150,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		VolumeID: volume.ID,
 	})
 	if err != nil {
-		// TODO Use more explicit error
-		return err
+		return fmt.Errorf("failed to create host-volume attachment: %v", err)
 	}
 
 	// Waits to acknowledge the volume is really attached to host
