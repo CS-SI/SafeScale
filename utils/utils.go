@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -28,12 +29,50 @@ import (
 
 // AbsPathify ...
 func AbsPathify(inPath string) string {
-	// TODO Use regular expression to handle ${HOME}
+
+	r, _ := regexp.Compile("(\\$[\\{]{1}[A-Z]+[\\}]{1})|(\\$[A-Z]+)")
+	found := r.FindAllString(inPath, -1)
+
+	// Special variable treatment goes here
+	overrides := map[string]string{}
+	overrides["HOME"] = userHomeDir()
+
+	// found contains strings such as $HOME or ${HOME}, we transform that into HOME, then search HOME in overrides first, then in os.Getenv
+	for _, key := range found {
+		ks := ""
+		if strings.Contains(key, "{") {
+			ks = key[2:len(key)-1]
+		} else {
+			ks = key[1:]
+		}
+
+		if val, ok := overrides[ks]; ok {
+			inPath = strings.Replace(inPath, key, val, -1)
+		} else
+		{
+			inPath = strings.Replace(inPath, key, os.Getenv(ks), -1)
+		}
+	}
+
+	if filepath.IsAbs(inPath) {
+		return filepath.Clean(inPath)
+	}
+
+	p, err := filepath.Abs(inPath)
+	if err == nil {
+		return filepath.Clean(p)
+	}
+
+	return ""
+}
+
+
+// TODO Remove this later
+func OriginalAbsPathify(inPath string) string {
 	if strings.HasPrefix(inPath, "$HOME") {
 		inPath = userHomeDir() + inPath[5:]
 	}
 
-	// TODO Use regular expression to handle var delimited by curly braces
 	if strings.HasPrefix(inPath, "$") {
 		end := strings.Index(inPath, string(os.PathSeparator))
 		inPath = os.Getenv(inPath[1:end]) + inPath[end:]
