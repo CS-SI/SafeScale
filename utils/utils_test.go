@@ -15,7 +15,10 @@
  */
 package utils
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestAbsPathify(t *testing.T) {
 	type args struct {
@@ -34,6 +37,13 @@ func TestAbsPathify(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					fmt.Println("The code did not panic, :)")
+				} else {
+					t.Errorf("Horrible failure")
+				}
+			}()
 			if got := AbsPathify(tt.args.inPath); got != tt.want {
 				t.Errorf("AbsPathify() = %v, want %v", got, tt.want)
 			}
@@ -58,6 +68,13 @@ func TestOriginalAbsPathify(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					fmt.Println("The code did not panic, :)")
+				} else {
+					t.Errorf("Horrible failure")
+				}
+			}()
 			if got := OriginalAbsPathify(tt.args.inPath); got != tt.want {
 				t.Errorf("AbsPathify() = %v, want %v", got, tt.want)
 			}
