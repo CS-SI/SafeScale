@@ -79,8 +79,18 @@ export -f install_common_requirements
 
 case $(sfGetFact "linux kind") in
     debian|ubuntu)
-        sfWaitForApt && apt update
-        sfWaitForApt && apt install -y wget curl time rclone jq unzip
+        sfRetry 3m 5 "sfWaitForApt && apt update"
+        sfRetry 5m 5 "sfWaitForApt && apt install -y wget curl time jq unzip"
+        curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
+        unzip rclone-current-linux-amd64.zip && \
+        cd rclone-*-linux-amd64 && \
+        cp rclone /usr/bin/ && \
+        chown root:root /usr/bin/rclone && \
+        chmod 755 /usr/bin/rclone && \
+        mkdir -p /usr/local/share/man/man1 && \
+        cp rclone.1 /usr/local/share/man/man1/ && \
+        mandb
+
         ;;
     redhat|centos)
         yum makecache fast
