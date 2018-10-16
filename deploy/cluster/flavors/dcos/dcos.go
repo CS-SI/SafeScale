@@ -635,7 +635,7 @@ func (c *Cluster) asyncConfigureMasters(done chan error) {
 }
 
 // createAndConfigureNode creates and configure a Node
-func (c *Cluster) createAndConfigureNode(public bool, req pb.HostDefinition) (string, error) {
+func (c *Cluster) createAndConfigureNode(public bool, req pb.HostDefinition, timeout time.Duration) (string, error) {
 	var nodeType NodeType.Enum
 	if public {
 		nodeType = NodeType.PublicNode
@@ -648,7 +648,7 @@ func (c *Cluster) createAndConfigureNode(public bool, req pb.HostDefinition) (st
 
 	done := make(chan error)
 	result := make(chan string)
-	go c.asyncCreateNode(1, nodeType, req, timeoutCtxHost, result, done)
+	go c.asyncCreateNode(1, nodeType, req, timeout, result, done)
 	hostID := <-result
 	err := <-done
 	if err != nil {
@@ -1372,7 +1372,7 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 }
 
 // AddNode adds one node
-func (c *Cluster) AddNode(public bool, req pb.HostDefinition) (string, error) {
+func (c *Cluster) AddNode(public bool, req *pb.HostDefinition) (string, error) {
 	hosts, err := c.AddNodes(1, public, req)
 	if err != nil {
 		return "", err
@@ -1381,33 +1381,36 @@ func (c *Cluster) AddNode(public bool, req pb.HostDefinition) (string, error) {
 }
 
 // AddNodes adds <count> nodes
-func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]string, error) {
+func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]string, error) {
 	if c.Core.State != ClusterState.Created && c.Core.State != ClusterState.Nominal {
 		return nil, fmt.Errorf("the DCOS flavor of Cluster needs to be at least in state 'Created' to allow node addition")
 	}
 
 	request := c.GetConfig().NodesDef
-	if req.CPUNumber > 0 {
-		request.CPUNumber = req.CPUNumber
-	}
-	if req.RAM > 0.0 {
-		request.RAM = req.RAM
-	}
-	if req.Disk > 0 {
-		request.Disk = req.Disk
+	if req != nil {
+		if req.CPUNumber > 0 {
+			request.CPUNumber = req.CPUNumber
+		}
+		if req.RAM > 0.0 {
+			request.RAM = req.RAM
+		}
+		if req.Disk > 0 {
+			request.Disk = req.Disk
+		}
 	}
 
 	var hosts []string
 	var errors []string
 	var dones []chan error
 	var results []chan string
+	timeout := brokerclient.DefaultExecutionTimeout + time.Duration(count)*time.Minute
 	for i := 0; i < count; i++ {
 		r := make(chan string)
 		results = append(results, r)
 		d := make(chan error)
 		dones = append(dones, d)
 		go func(result chan string, done chan error) {
-			hostID, err := c.createAndConfigureNode(public, request)
+			hostID, err := c.createAndConfigureNode(public, request, timeout)
 			if err != nil {
 				result <- ""
 				done <- err

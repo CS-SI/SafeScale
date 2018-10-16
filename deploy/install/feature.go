@@ -29,6 +29,7 @@ import (
 var (
 	// EmptyValues corresponds to no values for the feature
 	EmptyValues = map[string]interface{}{}
+	checkCache  = NewMapCache()
 )
 
 // Variables defines the parameters a Installer may need
@@ -109,7 +110,7 @@ func NewFeature(name string) (*Feature, error) {
 }
 
 // installerOfMethod instanciates the right installer corresponding to the method
-func (c *Feature) installerOfMethod(method Method.Enum) Installer {
+func (f *Feature) installerOfMethod(method Method.Enum) Installer {
 	var installer Installer
 	switch method {
 	case Method.Bash:
@@ -131,35 +132,35 @@ func (c *Feature) installerOfMethod(method Method.Enum) Installer {
 }
 
 // DisplayName returns the name of the feature
-func (c *Feature) DisplayName() string {
-	return c.displayName
+func (f *Feature) DisplayName() string {
+	return f.displayName
 }
 
 // BaseFilename returns the name of the feature specification file without '.yml'
-func (c *Feature) BaseFilename() string {
-	return c.fileName
+func (f *Feature) BaseFilename() string {
+	return f.fileName
 }
 
 // DisplayFilename returns the full file name, with [embedded] added at the end if the
 // feature is embedded.
-func (c *Feature) DisplayFilename() string {
-	filename := c.fileName + ".yml"
-	if c.embedded {
-		filename += " [embedded]"
+func (f *Feature) DisplayFilename() string {
+	filename := f.fileName
+	if f.embedded {
+		filename += ".yml [embedded]"
 	}
 	return filename
 }
 
 // Specs returns the data from the spec file
-func (c *Feature) Specs() *viper.Viper {
-	return c.specs
+func (f *Feature) Specs() *viper.Viper {
+	return f.specs
 }
 
 // Applyable tells if the feature is installable on the target
-func (c *Feature) Applyable(t Target) bool {
+func (f *Feature) Applyable(t Target) bool {
 	methods := t.Methods()
 	for _, k := range methods {
-		installer := c.installerOfMethod(k)
+		installer := f.installerOfMethod(k)
 		if installer != nil {
 			return true
 		}
@@ -169,24 +170,29 @@ func (c *Feature) Applyable(t Target) bool {
 
 // Check if feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (c *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
+func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
+	cacheKey := f.DisplayName() + "@" + t.Name()
+	if anon, ok := checkCache.Get(cacheKey); ok {
+		return anon.(Results), nil
+	}
+
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
-			installer = c.installerOfMethod(method)
+		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
+			installer = f.installerOfMethod(method)
 			if installer != nil {
 				break
 			}
 		}
 	}
 	if installer == nil {
-		return nil, fmt.Errorf("failed to find a way to check '%s'", c.DisplayName())
+		return nil, fmt.Errorf("failed to find a way to check '%s'", f.DisplayName())
 	}
 
 	//if debug
 	if false {
-		log.Printf("Checking if feature '%s' is installed on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+		log.Printf("Checking if feature '%s' is installed on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
 	}
 
 	// 'v' may be updated by parallel tasks, so use copy of it
@@ -199,17 +205,19 @@ func (c *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 	setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
-	err := checkParameters(c, myV)
+	err := checkParameters(f, myV)
 	if err != nil {
 		return nil, err
 	}
 
-	return installer.Check(c, t, myV, s)
+	results, err := installer.Check(f, t, myV, s)
+	checkCache.ForceSet(cacheKey, results)
+	return results, err
 }
 
 // Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (c *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
+func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	methods := t.Methods()
 	var (
 		installer Installer
@@ -217,20 +225,20 @@ func (c *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	)
 	for i = 1; i <= uint8(len(methods)); i++ {
 		method := methods[i]
-		if c.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
-			installer = c.installerOfMethod(method)
+		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
+			installer = f.installerOfMethod(method)
 			if installer != nil {
 				break
 			}
 		}
 	}
 	if installer == nil {
-		return nil, fmt.Errorf("failed to find a way to install '%s'", c.DisplayName())
+		return nil, fmt.Errorf("failed to find a way to install '%s'", f.DisplayName())
 	}
 
 	//if debug
-	if false {
-		log.Printf("Adding feature '%s' on %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+	if true {
+		log.Printf("Adding feature '%s' on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
 	}
 
 	// 'v' may be updated by parallel tasks, so use copy of it
@@ -243,32 +251,51 @@ func (c *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
-	err := checkParameters(c, myV)
+	err := checkParameters(f, myV)
 	if err != nil {
 		return nil, err
 	}
 
-	return installer.Add(c, t, myV, s)
+	results, err := f.Check(t, v, s)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check feature '%s': %s", f.DisplayName(), err.Error())
+	}
+	if results.Successful() {
+		log.Printf("Feature '%s' is already installed.", f.DisplayName())
+		return results, nil
+	}
+
+	if !s.SkipFeatureRequirements {
+		err := f.installRequirements(t, v, s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
+		}
+	}
+	results, err = installer.Add(f, t, myV, s)
+	if err == nil {
+		checkCache.ForceSet(f.DisplayName()+"@"+t.Name(), results)
+	}
+	return results, err
 }
 
 // Remove uninstalls the feature from the target
-func (c *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
+func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
-		if c.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
-			installer = c.installerOfMethod(method)
+		if f.specs.IsSet(fmt.Sprintf("feature.install.%s", strings.ToLower(method.String()))) {
+			installer = f.installerOfMethod(method)
 			if installer != nil {
 				break
 			}
 		}
 	}
 	if installer == nil {
-		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", c.DisplayName())
+		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", f.DisplayName())
 	}
 	//if debug
 	if false {
-		log.Printf("Removing feature '%s' from %s '%s'...\n", c.DisplayName(), t.Type(), t.Name())
+		log.Printf("Removing feature '%s' from %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
 	}
 
 	// 'v' may be updated by parallel tasks, so use copy of it
@@ -281,10 +308,55 @@ func (c *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 	setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
-	err := checkParameters(c, myV)
+	err := checkParameters(f, myV)
 	if err != nil {
 		return nil, err
 	}
 
-	return installer.Remove(c, t, myV, s)
+	results, err := installer.Remove(f, t, myV, s)
+	checkCache.Reset(f.DisplayName() + "@" + t.Name())
+	return results, err
+}
+
+// installRequirements walks through requirements and installs them if needed
+func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
+	specs := f.Specs()
+	yamlKey := "feature.requirements.features"
+	if specs.IsSet(yamlKey) {
+		// if debug {
+		//	hostInstance, clusterInstance, nodeInstance := determineContext(t)
+		//	msgHead := fmt.Sprintf("Checking requirements of feature '%s'", c.DisplayName())
+		//	var msgTail string
+		//	if hostInstance != nil {
+		//		msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
+		//	}
+		//	if nodeInstance != nil {
+		//		msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
+		//	}
+		//	if clusterInstance != nil {
+		//		msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
+		//	}
+		//	log.Printf("%s %s...\n", msgHead, msgTail)
+		// }
+		for _, requirement := range specs.GetStringSlice(yamlKey) {
+			needed, err := NewFeature(requirement)
+			if err != nil {
+				return fmt.Errorf("failed to find required feature '%s': %s", requirement, err.Error())
+			}
+			results, err := needed.Check(t, v, s)
+			if err != nil {
+				return fmt.Errorf("failed to check required feature '%s' for feature '%s': %s", requirement, f.DisplayName(), err.Error())
+			}
+			if !results.Successful() {
+				results, err := needed.Add(t, v, s)
+				if err != nil {
+					return fmt.Errorf("failed to install required feature '%s': %s", requirement, err.Error())
+				}
+				if !results.Successful() {
+					return fmt.Errorf("failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
+				}
+			}
+		}
+	}
+	return nil
 }

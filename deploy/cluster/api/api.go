@@ -64,9 +64,9 @@ type Cluster interface {
 	// GetNetworkID returns the ID of the network used by the cluster
 	GetNetworkID() string
 	// AddNode adds a node
-	AddNode(bool, pb.HostDefinition) (string, error)
+	AddNode(bool, *pb.HostDefinition) (string, error)
 	// AddNodes adds several nodes
-	AddNodes(int, bool, pb.HostDefinition) ([]string, error)
+	AddNodes(int, bool, *pb.HostDefinition) ([]string, error)
 	// DeleteLastNode deletes a node
 	DeleteLastNode(bool) error
 	// DeleteSpecificNode deletes a node identified by its ID

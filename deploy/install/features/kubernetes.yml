@@ -124,15 +124,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            wait_deploy_complete() {
-                                while true; do
-                                    sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null && break
-                                    sleep 20
-                                done
-                            }
-                            export -f wait_deploy_complete
-                            sfAsyncStart WDC 10 bash -c wait_deploy_complete || exit 513
-                            sfAsyncWait WDC 514
+                            sfRetry 10m 20 "sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null" || exit 193
                             sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
                             sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
 
@@ -153,7 +145,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            [ $(sfKubectl get nodes | wc -l) -gt 1 ]
+                            [ $(sfKubectl get nodes &>/dev/null | wc -l) -gt 1 ]
 
                     nodes:
                         targets:
@@ -163,7 +155,7 @@ feature:
                             pidof kubelet &>/dev/null
 
             add:
-                pace: cp-dir,common-tools,cp-tools,sysconf,kubelet,cp1-init,cpx-init,join,weavenet,final
+                pace: cp-dir,common-tools,sysconf,kubelet,cp1-init,cpx-init,join,weavenet,final
                 steps:
                     cp-dir:
                         targets:
@@ -178,24 +170,29 @@ feature:
                             publicNodes: all
                         run: |
                             [ -f /etc/kubernetes/.joined ] && exit 0
+
                             cd /usr/local/bin
                             RELEASE=$(sfRetry 5m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
-                            [ $? -ne 0 ] && exit 513
+                            [ $? -ne 0 ] && exit 192
                             URL="https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/amd64"
-                            sfDownload "$URL/kubeadm" kubeadm 5m 5 || exit 514
-                            sfDownload "$URL/kubelet" kubelet 5m 5 || exit 515
-                            sfDownload "$URL/kubectl" kubectl 5m 5 || exit 516
+                            sfDownload "$URL/kubeadm" kubeadm 5m 5 || exit 193
+                            sfDownload "$URL/kubelet" kubelet 5m 5 || exit 194
+                            sfDownload "$URL/kubectl" kubectl 5m 5 || exit 195
 
-                    cp-tools:
-                        targets:
-                            masters: all
-                        run: |
                             cd /var/tmp
                             VERSION=v1.12.0
                             URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${VERSION}/crictl-${VERSION}-linux-amd64.tar.gz"
-                            sfDownload "$URL" crictl.tgz 5m 5 || exit 513
-                            tar zxf crictl.tgz -C /usr/local/bin || exit 514
+                            sfDownload "$URL" crictl.tgz 5m 5 || exit 192
+                            tar zxf crictl.tgz -C /usr/local/bin || exit 193
                             rm -f crictl.tgz
+
+                            mkdir -p /opt/cni/bin
+                            VERSION=v0.7.1
+                            URL="https://github.com/containernetworking/plugins/releases/download/${VERSION}/cni-plugins-amd64-${VERSION}.tgz"
+                            sfDownload "$URL" cni-plugins.tgz 5m 5 || exit 192
+                            tar zxf cni-plugins.tgz -C /opt/cni/bin
+                            [ $? -eq 0 ] && rm -f cni-plugins.tgz
+                            chmod -R a+rx /opt/cni/bin
 
                     sysconf:
                         targets:
@@ -208,10 +205,10 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
-                                    sfRetry 5m 5 apt install -y ebtables socat || exit 513
+                                    sfRetry 5m 5 apt install -y ebtables socat || exit 192
                                     ;;
                                 redhat|centos)
-                                    sfRetry 5m 5 yum install -y ebtables socat || exit 513
+                                    sfRetry 5m 5 yum install -y ebtables socat || exit 193
                                     ;;
                                 *)
                                     echo "Unmanaged Linux distribution"
@@ -219,10 +216,14 @@ feature:
                                     ;;
                             esac
 
-                            echo "# IPVS modules used by Kubernetes"
-                            for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh; do
+                            echo "# IPVS modules used by Kubernetes" >>/etc/modules
+                            for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4; do
                                 echo $i >>/etc/modules
+                                modprobe $i
                             done
+
+                            echo "net.ipv4.ip_forward=1" >>/etc/sysctl.d/99-sysctl.conf
+                            sysctl -p
 
                     kubelet:
                         targets:
@@ -231,16 +232,7 @@ feature:
                             publicNodes: all
                         run: |
                             [ -f /etc/kubernetes/.joined ] && exit 0
-                            mkdir -p /opt/cni/bin
-                            cd /var/tmp
-                            VERSION=v0.7.1
-                            URL="https://github.com/containernetworking/plugins/releases/download/${VERSION}/cni-plugins-amd64-${VERSION}.tgz"
-                            sfDownload "$URL" cni-plugins.tgz 5m 5 || exit 514
-                            tar zxvf cni-plugins.tgz -C /opt/cni/bin || exit 515
-                            rm -f cni-plugins.tgz
-                            chmod -R a+rx /opt/cni/bin
-
-                            chmod +rx /usr/local/bin/*
+                            chmod a+rx /usr/local/bin/*
 
                             cat >/etc/systemd/system/kubelet.service <<-'EOF'
                             [Unit]
@@ -273,6 +265,7 @@ feature:
 
                             systemctl daemon-reload
                             systemctl enable kubelet
+                            exit 0
 
                     cp1-init:
                         targets:
@@ -282,7 +275,7 @@ feature:
 
                             # Gather the stable release of K8S
                             RELEASE=$(sfRetry 2m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
-                            [ $? -ne 0 ] && exit 513
+                            [ $? -ne 0 ] && exit 192
 
                             cd /opt/safescale/k8s/config
 
@@ -345,7 +338,7 @@ feature:
                             EOF
 
                             sfRetry 5m 5 kubeadm config images pull && \
-                            kubeadm init --config kubeadm-bootstrap.config.yaml || exit 514
+                            kubeadm init --config kubeadm-bootstrap.config.yaml || exit 193
                             touch /etc/kubernetes/.joined
 
                             cp /etc/kubernetes/pki/ca.crt ../ssl
@@ -357,7 +350,7 @@ feature:
                             cp /etc/kubernetes/pki/etcd/ca.crt ../ssl/etcd-ca.crt
                             cp /etc/kubernetes/pki/etcd/ca.key ../ssl/etcd-ca.key
                             ( cd .. ; tar zcvf /var/tmp/files.tgz . )
-                            sfDropzonePush /var/tmp/files.tgz || exit 515
+                            sfDropzonePush /var/tmp/files.tgz || exit 194
                             rm /var/tmp/files.tgz
 
                             for ip in {{range .MasterIPs}}{{.}} {{end}}; do
@@ -367,7 +360,7 @@ feature:
                                 sfDropzonePush /tmp/admin.conf && \
                                 sfDropzonePush /tmp/kubeadm-k8s-cpx.config.yaml && \
                                 sfDropzonePush etcd-join.sh.template && \
-                                sfDropzoneSync $ip || exit 516
+                                sfDropzoneSync $ip || exit 195
                                 rm -f /var/tmp/admin.conf /tmp/kubeadm-k8s-cpx.config.yaml
                             done
                             sfDropzoneClean
@@ -381,7 +374,7 @@ feature:
                                 cd /opt/safescale/k8s/config
                                 sfDropzonePop "*" . || :
                                 [ -f files.tgz ] && {
-                                    tar zxvf files.tgz -C .. || exit 514
+                                    tar zxvf files.tgz -C .. || exit 192
                                     rm files.tgz
 
                                     mkdir -p /etc/kubernetes/pki/etcd
@@ -400,7 +393,7 @@ feature:
                                     kubeadm alpha phase kubelet config write-to-disk --config kubeadm-k8s-cpx.config.yaml && \
                                     kubeadm alpha phase kubelet write-env-file --config kubeadm-k8s-cpx.config.yaml && \
                                     kubeadm alpha phase kubeconfig kubelet --config kubeadm-k8s-cpx.config.yaml && \
-                                    systemctl start kubelet || exit $?
+                                    systemctl start kubelet || exit 193
 
                                     # "realize" the etcd-join template to a working script then executes it and starts k8s master
                                     sed -e 's/##HOSTNAME##/{{.Hostname}}' -e 's/##HOSTIP##/{{.HostIP}}' etcd-join.sh.template >etcd-join.sh
@@ -408,7 +401,7 @@ feature:
                                     kubeadm alpha phase etcd local --config kubeadm-k8s-cpx.config.yaml && \
                                     kubeadm alpha phase kubeconfig all --config kubeadm-k8s-cpx.config.yaml && \
                                     kubeadm alpha phase controlplane all --config kubeadm-k8s-cpx.config.yaml
-                                    kubeadm alpha phase mark-master --config kubeadm-k8s-cpx.config.yaml || exit $?
+                                    kubeadm alpha phase mark-master --config kubeadm-k8s-cpx.config.yaml || exit 194
                                     rm -f etcd-join.sh
                                     touch /etc/kubernetes/.joined
                                 }
@@ -435,7 +428,7 @@ feature:
                                 MASTERIP=$m
                                 break
                             done
-                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && exit 513
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && exit 192
                             kubeadm join --token $TOKEN $MASTERIP:6443 --discovery-token-ca-cert-hash sha256:$HASH && touch /etc/kubernetes/.joined
 
                     weavenet:
@@ -443,9 +436,9 @@ feature:
                             masters: one
                         run: |
                             VERSION=$(sfKubectl version | base64 | tr -d '\n')
-                            [ $? -ne 0 ] && exit 513
-                            sfRetry 3m 5 sfKubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$VERSION" || exit 514
-                            #sfRetry 3m 5 sfKubectl apply -f "https://cloud.weave.works/k8s/scope.yaml?k8s-version=$VERSION" || exit 515
+                            [ $? -ne 0 ] && exit 192
+                            sfRetry 3m 5 sfKubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$VERSION" || exit 193
+                            #sfRetry 3m 5 sfKubectl apply -f "https://cloud.weave.works/k8s/scope.yaml?k8s-version=$VERSION" || exit 194
                             #sleep 10
                             #NAME=$(sfKubectl get -n weave pod --selector=weave-scope-feature=app -o jsonpath='{.items..metadata.name}')
                             #sfKubectl port-forward -n weave "$NAME" 4040
@@ -457,7 +450,7 @@ feature:
                             # Allows pods to start on master
                             [ "{{.Complexity}}" = "small" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master-
                             # adds Kubernetes Dashboard
-                            sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/src/deploy/recommended/kubernetes-dashboard.yaml || exit 513
+                            sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/src/deploy/recommended/kubernetes-dashboard.yaml || exit 192
 
             remove:
                 pace: node,reset,clean

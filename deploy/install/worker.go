@@ -334,14 +334,6 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 	w.variables = v
 	w.settings = s
 
-	// Installs requirements if there are any
-	if !s.SkipFeatureRequirements && w.action == Action.Add {
-		err := w.installRequirements()
-		if err != nil {
-			return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
-		}
-	}
-
 	results := Results{}
 	specs := w.feature.Specs()
 
@@ -684,7 +676,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	log.Printf("hostT='%s', masterT='%s', privnodeT='%s', pubnodeT='%s'\n", hostT, masterT, privnodeT, pubnodeT)
 	var (
 		hostsList = []*pb.Host{}
 		all       []*pb.Host
@@ -694,107 +686,71 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		if hostT != "" {
 			hostsList = append(hostsList, w.host)
 		}
-	} else {
-		switch masterT {
-		case "1":
-			host, err := w.identifyAvailableMaster()
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, host)
-		case "*":
-			if w.action == Action.Add {
-				all, err = w.identifyConcernedMasters()
-			} else {
-				all, err = w.identifyAllMasters()
-			}
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, all...)
-		}
+		return hostsList, nil
+	}
 
-		switch privnodeT {
-		case "1":
-			host, err := w.identifyAvailableNode(false)
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, host)
-		case "*":
-			if w.action == Action.Add {
-				all, err = w.identifyConcernedNodes(false)
-			} else {
-				all, err = w.identifyAllNodes(false)
-			}
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, all...)
+	switch masterT {
+	case "1":
+		host, err := w.identifyAvailableMaster()
+		if err != nil {
+			return nil, err
 		}
+		hostsList = append(hostsList, host)
+	case "*":
+		if w.action == Action.Add {
+			all, err = w.identifyConcernedMasters()
+		} else {
+			all, err = w.identifyAllMasters()
+		}
+		if err != nil {
+			return nil, err
+		}
+		hostsList = append(hostsList, all...)
+	}
 
-		switch pubnodeT {
-		case "1":
-			host, err := w.identifyAvailableNode(true)
-			if err != nil {
-				return nil, err
-			}
-			nodeTarget := NewNodeTarget(host)
-			results, err := w.feature.Check(nodeTarget, w.variables, w.settings)
-			if err != nil {
-				return nil, err
-			}
-			if !results.Successful() {
-				hostsList = append(hostsList, host)
-			}
-		case "*":
-			if w.action == Action.Add {
-				all, err = w.identifyConcernedNodes(true)
-			} else {
-				all, err = w.identifyAllNodes(true)
-			}
-			if err != nil {
-				return nil, err
-			}
-			hostsList = append(hostsList, all...)
+	switch privnodeT {
+	case "1":
+		host, err := w.identifyAvailableNode(false)
+		if err != nil {
+			return nil, err
 		}
+		hostsList = append(hostsList, host)
+	case "*":
+		if w.action == Action.Add {
+			all, err = w.identifyConcernedNodes(false)
+		} else {
+			all, err = w.identifyAllNodes(false)
+		}
+		if err != nil {
+			return nil, err
+		}
+		hostsList = append(hostsList, all...)
+	}
+
+	switch pubnodeT {
+	case "1":
+		host, err := w.identifyAvailableNode(true)
+		if err != nil {
+			return nil, err
+		}
+		nodeTarget := NewNodeTarget(host)
+		results, err := w.feature.Check(nodeTarget, w.variables, w.settings)
+		if err != nil {
+			return nil, err
+		}
+		if !results.Successful() {
+			hostsList = append(hostsList, host)
+		}
+	case "*":
+		if w.action == Action.Add {
+			all, err = w.identifyConcernedNodes(true)
+		} else {
+			all, err = w.identifyAllNodes(true)
+		}
+		if err != nil {
+			return nil, err
+		}
+		hostsList = append(hostsList, all...)
 	}
 	return hostsList, nil
-}
-
-// installRequirements walks through requirements and installs them if needed
-func (w *worker) installRequirements() error {
-	specs := w.feature.Specs()
-	yamlKey := "feature.requirements.features"
-	if specs.IsSet(yamlKey) {
-		// if debug {
-		//	hostInstance, clusterInstance, nodeInstance := determineContext(t)
-		//	msgHead := fmt.Sprintf("Checking requirements of feature '%s'", c.DisplayName())
-		//	var msgTail string
-		//	if hostInstance != nil {
-		//		msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
-		//	}
-		//	if nodeInstance != nil {
-		//		msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
-		//	}
-		//	if clusterInstance != nil {
-		//		msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
-		//	}
-		//	log.Printf("%s %s...\n", msgHead, msgTail)
-		// }
-		for _, requirement := range specs.GetStringSlice(yamlKey) {
-			needed, err := NewFeature(requirement)
-			if err != nil {
-				return fmt.Errorf("failed to find required feature '%s': %s", requirement, err.Error())
-			}
-			results, err := needed.Add(w.target, w.variables, w.settings)
-			if err != nil {
-				return fmt.Errorf("failed to install required feature '%s': %s", requirement, err.Error())
-			}
-			if !results.Successful() {
-				return fmt.Errorf("failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
-			}
-		}
-	}
-	return nil
 }
