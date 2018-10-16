@@ -20,13 +20,6 @@ exec 2<&-
 exec 1<>/var/tmp/user_data.log
 exec 2>&1
 
-currentscript="$0"
-finish() {
-    systemctl reboot &
-    rm -- "${currentscript}"
-}
-trap finish EXIT
-
 sfDetectFacts() {
    local -g LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
    local -g VERSION_ID=$(cat /etc/os-release | grep "^VERSION_ID=" | cut -d= -f2 | sed 's/"//g')
@@ -443,4 +436,5 @@ case $LINUX_KIND in
 esac
 
 echo "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
+systemctl reboot
 exit 0

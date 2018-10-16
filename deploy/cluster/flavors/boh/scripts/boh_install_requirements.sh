@@ -66,17 +66,7 @@ export -f install_common_requirements
 case $LINUX_KIND in
     centos|redhat)
         yum makecache fast
-        yum install -y curl wget time jq unzip
-        curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
-        unzip rclone-current-linux-amd64.zip && \
-        cd rclone-*-linux-amd64 && \
-        cp rclone /usr/bin/ && \
-        rm -rf rclone-* && \
-        chown root:root /usr/bin/rclone && \
-        chmod 755 /usr/bin/rclone && \
-        mkdir -p /usr/local/share/man/man1 && \
-        cp rclone.1 /usr/local/share/man/man1/ && \
-        mandb
+        yum install -y curl wget time jq rclone unzip
         ;;
     debian|ubuntu)
         sfWaitForApt && apt update && \

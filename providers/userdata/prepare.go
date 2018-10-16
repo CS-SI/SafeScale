@@ -74,7 +74,7 @@ func Prepare(
 		dnsList                   []string
 	)
 	//if debug
-	if false {
+	if true {
 		gpacPassword = "SafeScale"
 	} else {
 		gpacPassword, err = utils.GeneratePassword(16)

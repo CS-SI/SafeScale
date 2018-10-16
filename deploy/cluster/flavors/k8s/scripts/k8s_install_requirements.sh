@@ -85,12 +85,12 @@ case $(sfGetFact "linux kind") in
         unzip rclone-current-linux-amd64.zip && \
         cd rclone-*-linux-amd64 && \
         cp rclone /usr/bin/ && \
-        rm -rf rclone-* && \
         chown root:root /usr/bin/rclone && \
         chmod 755 /usr/bin/rclone && \
         mkdir -p /usr/local/share/man/man1 && \
         cp rclone.1 /usr/local/share/man/man1/ && \
         mandb
+
         ;;
     redhat|centos)
         yum makecache fast

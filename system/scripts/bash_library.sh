@@ -82,12 +82,12 @@ sfCidr2Broadcast() {
 
 # sfAsyncStart <what> <duration> <command>...
 sfAsyncStart() {
-    local pid="${1}_PID"
+    local pid=${1}_PID
     local log=${1}.log
     local duration=$2
     shift 2
     timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
-    eval "export $pid=$!"
+    eval "$pid=$!"
 }
 export -f sfAsyncStart
 
@@ -98,8 +98,7 @@ sfAsyncWait() {
     local log="${1}.log"
     eval "wait \$$pid"
     retcode=$?
-    eval "unset $pid"
-    [ -f "/var/tmp/$log" ] && cat "/var/tmp/$log"
+    cat /var/tmp/$log
     [ $retcode -ne 0 ] && {
         [ $retcode -eq 124 ] && echo "timeout"
         return $retcode
@@ -141,13 +140,12 @@ export -f sfRetry
 
 # sfDownload url filename timeout delay
 sfDownload() {
-    local url="$1"
-    local encoded=$(echo "$url" | md5sum | cut -d' ' -f1)
-    local filename="$2"
-    local timeout=$3
-    local delay=$4
-    local name=DOWN_${encoded}_LOAD
-    local fn=download_$encoded
+    url="$1"
+    encoded=$(echo "$url" | md5sum | cut -d' ' -f1)
+    filename="$2"
+    timeout=$3
+    delay=$4
+    fn=download_$encoded
     { code=$(</dev/stdin); } <<-EOF
         $fn() {
             while true; do
@@ -165,10 +163,10 @@ sfDownload() {
         export -f $fn
 EOF
     eval "$code"
-    sfAsyncStart $name $timeout bash -c $fn
-    sfAsyncWait $name
+    sfAsyncStart DOWN_${encoded}_LOAD $timeout bash -c $fn
+    sfAsyncWait DOWN_${encoded}_LOAD
     rc=$?
-    unset $fn
+    unset DOWN_${encoded}_LOAD $fn
     return $rc
 }
 export -f sfDownload
