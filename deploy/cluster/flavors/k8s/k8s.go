@@ -1077,7 +1077,7 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 }
 
 // AddNode adds one node
-func (c *Cluster) AddNode(public bool, req pb.HostDefinition) (string, error) {
+func (c *Cluster) AddNode(public bool, req *pb.HostDefinition) (string, error) {
 	hosts, err := c.AddNodes(1, public, req)
 	if err != nil {
 		return "", err
@@ -1086,7 +1086,7 @@ func (c *Cluster) AddNode(public bool, req pb.HostDefinition) (string, error) {
 }
 
 // AddNodes adds <count> nodes
-func (c *Cluster) AddNodes(count int, public bool, req pb.HostDefinition) ([]string, error) {
+func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]string, error) {
 	if c.Core.State != ClusterState.Created && c.Core.State != ClusterState.Nominal {
 		return nil, fmt.Errorf("a K8S cluster needs to be at least in state 'Created' to allow node addition")
 	}

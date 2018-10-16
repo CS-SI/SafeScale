@@ -31,9 +31,10 @@ import (
 )
 
 var (
-	hostName     string
-	hostInstance *pb.Host
-	featureName  string
+	hostName        string
+	hostInstance    *pb.Host
+	featureName     string
+	hostServiceName string
 )
 
 // HostCommand handles 'deploy host'
@@ -293,8 +294,8 @@ var hostServiceCommand = &cli.Command{
 	},
 
 	Before: func(c *cli.Command) {
-		svcName = c.StringArgument("<svcname>", "")
-		if svcName == "" {
+		hostServiceName = c.StringArgument("<svcname>", "")
+		if hostServiceName == "" {
 			fmt.Println("Invalid argument <svcname>")
 			os.Exit(int(ExitCode.InvalidArgument))
 		}
