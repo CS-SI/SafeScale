@@ -23,15 +23,13 @@ import (
 
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 
-	"github.com/CS-SI/SafeScale/utils/cache"
-
 	"github.com/spf13/viper"
 )
 
 var (
 	// EmptyValues corresponds to no values for the feature
 	EmptyValues = map[string]interface{}{}
-	checkCache  = cache.NewMapCache()
+	checkCache  = NewMapCache()
 )
 
 // Variables defines the parameters a Installer may need
@@ -239,7 +237,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	//if debug
-	if false {
+	if true {
 		log.Printf("Adding feature '%s' on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
 	}
 
@@ -325,22 +323,21 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 	specs := f.Specs()
 	yamlKey := "feature.requirements.features"
 	if specs.IsSet(yamlKey) {
-		// if debug
-		if false {
-			hostInstance, clusterInstance, nodeInstance := determineContext(t)
-			msgHead := fmt.Sprintf("Checking requirements of feature '%s'", f.DisplayName())
-			var msgTail string
-			if hostInstance != nil {
-				msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
-			}
-			if nodeInstance != nil {
-				msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
-			}
-			if clusterInstance != nil {
-				msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
-			}
-			log.Printf("%s %s...\n", msgHead, msgTail)
-		}
+		// if debug {
+		//	hostInstance, clusterInstance, nodeInstance := determineContext(t)
+		//	msgHead := fmt.Sprintf("Checking requirements of feature '%s'", c.DisplayName())
+		//	var msgTail string
+		//	if hostInstance != nil {
+		//		msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
+		//	}
+		//	if nodeInstance != nil {
+		//		msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
+		//	}
+		//	if clusterInstance != nil {
+		//		msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
+		//	}
+		//	log.Printf("%s %s...\n", msgHead, msgTail)
+		// }
 		for _, requirement := range specs.GetStringSlice(yamlKey) {
 			needed, err := NewFeature(requirement)
 			if err != nil {

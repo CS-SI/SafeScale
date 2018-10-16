@@ -236,7 +236,7 @@ func (w *worker) extractHostsFailingCheck(hosts []*pb.Host) ([]*pb.Host, error) 
 			return nil, d
 		}
 		if !r.Successful() {
-			concernedHosts = append(concernedHosts, h)
+			concernedHosts = append(w.concernedMasters, h)
 		}
 	}
 	return concernedHosts, nil
@@ -676,7 +676,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	// log.Printf("hostT='%s', masterT='%s', privnodeT='%s', pubnodeT='%s'\n", hostT, masterT, privnodeT, pubnodeT)
+	log.Printf("hostT='%s', masterT='%s', privnodeT='%s', pubnodeT='%s'\n", hostT, masterT, privnodeT, pubnodeT)
 	var (
 		hostsList = []*pb.Host{}
 		all       []*pb.Host
@@ -715,7 +715,6 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 			return nil, err
 		}
 		hostsList = append(hostsList, host)
-
 	case "*":
 		if w.action == Action.Add {
 			all, err = w.identifyConcernedNodes(false)

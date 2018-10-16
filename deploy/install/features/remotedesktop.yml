@@ -64,13 +64,13 @@ feature:
                         wallTime: 15
                         run: |
                             URL="https://bintray.com/tigervnc/stable/download_file?file_path=tigervnc-1.9.0.x86_64.tar.gz"
-                            sfDownload "$URL" tigervnc.tgz 5m 5 || exit 192
-                            tar --strip-components=1 -zxvf tigervnc.tgz -C / || exit 193
+                            sfDownload "$URL" tigervnc.tgz 3m 5 || exit 513
+                            tar --strip-components=1 -zxvf tigervnc.tgz -C / || exit 514
                             rm -rf tigervnc.tar.gz
 
                             if [ ! -d ~{{.Username}} ]; then
                                 echo "Homedir of user {{.Username}} not found"
-                                exit 194
+                                exit 514
                             fi
 
                             # Configurations
@@ -235,13 +235,13 @@ feature:
                             EOF
                             cat /var/tmp/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
                             rm -f /var/tmp/xfce_conf.encoded
-                            chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 195
+                            chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 515
 
                             systemctl daemon-reload && \
                             systemctl enable vncserver@:0.service && \
                             systemctl enable vncconfig@:0.service && \
                             systemctl restart vncserver@:0.service && \
-                            systemctl restart vncconfig@:0.service || exit 196
+                            systemctl restart vncconfig@:0.service || exit 516
 
                     deps:
                         targets:
@@ -253,8 +253,8 @@ feature:
 
                             VERSION=0.9.14
                             APACHE="http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${VERSION}"
-                            sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || exit 192
-                            sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || exit 193
+                            sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || exit 513
+                            sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || exit 514
 
                     guacamole:
                         targets:
@@ -460,8 +460,8 @@ feature:
 
                             ls -la
                             # build image
-                            docker build -t remotedesktop:latest . || exit 192
-                            cd /var/tmp && rm -rf remotedesktop.image
+                            docker build -t remotedesktop:latest . || exit $?
+                            cd /var/tmp && rm -rf remotedesktop.image && docker image prune -f
 
                     start:
                         targets:
