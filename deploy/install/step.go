@@ -60,10 +60,10 @@ type stepResults map[string]stepResult
 
 func (s stepResults) ErrorMessages() string {
 	output := ""
-	for _, k := range s {
+	for h, k := range s {
 		val := k.ErrorMessage()
 		if val != "" {
-			output += val + "\n"
+			output += h + ": " + val + "\n"
 		}
 	}
 	return output
@@ -244,10 +244,10 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 				if false {
 					log.Printf("%s(%s):step(%s)@%s: fail\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 				}
-				return results, results[h.Name].err
-			}
-			if false {
-				log.Printf("%s(%s):step(%s)@%s: success\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			} else {
+				if false {
+					log.Printf("%s(%s):step(%s)@%s: success\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+				}
 			}
 		}
 	} else {
@@ -272,11 +272,11 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 				if false {
 					log.Printf("%s(%s):step(%s)@%s: fail\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
 				}
-				return results, results[k].err
-			}
-			//if debug
-			if false {
-				log.Printf("%s(%s):step(%s)@%s: done\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+			} else {
+				//if debug
+				if false {
+					log.Printf("%s(%s):step(%s)@%s: done\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				}
 			}
 		}
 	}
