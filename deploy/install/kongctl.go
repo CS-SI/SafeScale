@@ -25,6 +25,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 const (
@@ -32,7 +33,7 @@ const (
 	curlPost = "curl -kSsl -X POST --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
 )
 
-var kongProxyCheckedCache = NewMapCache()
+var kongProxyCheckedCache = utils.NewMapCache()
 
 // KongController allows to control Kong, installed on a host
 type KongController struct {
