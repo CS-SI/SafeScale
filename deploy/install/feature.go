@@ -23,13 +23,15 @@ import (
 
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 
+	"github.com/CS-SI/SafeScale/utils"
+
 	"github.com/spf13/viper"
 )
 
 var (
 	// EmptyValues corresponds to no values for the feature
 	EmptyValues = map[string]interface{}{}
-	checkCache  = NewMapCache()
+	checkCache  = utils.NewMapCache()
 )
 
 // Variables defines the parameters a Installer may need
