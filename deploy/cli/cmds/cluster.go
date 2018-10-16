@@ -47,6 +47,7 @@ var (
 	clusterName        string
 	clusterServiceName *string
 	clusterInstance    clusterapi.Cluster
+	clusterFeatureName string
 )
 
 // ClusterCommand handles 'deploy cluster'
@@ -808,8 +809,8 @@ var clusterFeatureCommand = &cli.Command{
 	},
 
 	Before: func(c *cli.Command) {
-		featureName = c.StringArgument("<pkgname>", "")
-		if featureName == "" {
+		clusterFeatureName = c.StringArgument("<pkgname>", "")
+		if clusterFeatureName == "" {
 			fmt.Fprintln(os.Stderr, "Invalid argument <pkgname>")
 			//helpHandler(nil, "")
 			os.Exit(int(ExitCode.InvalidArgument))
@@ -834,13 +835,13 @@ var clusterFeatureAddCommand = &cli.Command{
 	Aliases: []string{"install"},
 
 	Process: func(c *cli.Command) {
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(clusterFeatureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", clusterFeatureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 
@@ -862,15 +863,15 @@ var clusterFeatureAddCommand = &cli.Command{
 		target := install.NewClusterTarget(clusterInstance)
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error installing feature '%s' on cluster '%s': %s\n", clusterFeatureName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Feature '%s' installed successfully on cluster '%s'\n", featureName, clusterName)
+			fmt.Printf("Feature '%s' installed successfully on cluster '%s'\n", clusterFeatureName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
 
-		fmt.Printf("Failed to install feature '%s' on cluster '%s'\n", featureName, clusterName)
+		fmt.Printf("Failed to install feature '%s' on cluster '%s'\n", clusterFeatureName, clusterName)
 		fmt.Println(results.AllErrorMessages())
 		os.Exit(int(ExitCode.Run))
 	},
@@ -884,13 +885,13 @@ var clusterFeatureCheckCommand = &cli.Command{
 	Aliases: []string{"verify"},
 
 	Process: func(c *cli.Command) {
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(clusterFeatureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", clusterFeatureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 
@@ -911,15 +912,15 @@ var clusterFeatureCheckCommand = &cli.Command{
 		target := install.NewClusterTarget(clusterInstance)
 		results, err := feature.Check(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error checking if feature '%s' is installed on '%s': %s\n", clusterFeatureName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Feature '%s' is installed on cluster '%s'\n", featureName, clusterName)
+			fmt.Printf("Feature '%s' is installed on cluster '%s'\n", clusterFeatureName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
 
-		fmt.Printf("Feature '%s' is not installed on cluster '%s'\n", featureName, clusterName)
+		fmt.Printf("Feature '%s' is not installed on cluster '%s'\n", clusterFeatureName, clusterName)
 		os.Exit(int(ExitCode.NotFound))
 	},
 
@@ -932,13 +933,13 @@ var clusterFeatureDeleteCommand = &cli.Command{
 	Aliases: []string{"destroy", "remove", "rm", "uninstall"},
 
 	Process: func(c *cli.Command) {
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(clusterFeatureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", clusterFeatureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 
@@ -962,14 +963,14 @@ var clusterFeatureDeleteCommand = &cli.Command{
 		target := install.NewClusterTarget(clusterInstance)
 		results, err := feature.Remove(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error uninstalling feature '%s' on '%s': %s\n", clusterFeatureName, clusterName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Feature '%s' uninstalled successfully from cluster '%s'\n", featureName, clusterName)
+			fmt.Printf("Feature '%s' uninstalled successfully from cluster '%s'\n", clusterFeatureName, clusterName)
 			os.Exit(int(ExitCode.OK))
 		}
-		fmt.Printf("Failed to uninstall feature '%s' from cluster '%s':\n", featureName, clusterName)
+		fmt.Printf("Failed to uninstall feature '%s' from cluster '%s':\n", clusterFeatureName, clusterName)
 		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)

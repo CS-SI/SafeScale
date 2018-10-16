@@ -877,7 +877,7 @@ func (c *Cluster) asyncCreateNode(
 	log.Printf("[%s node #%d] starting creation...\n", nodeTypeStr, index)
 
 	// Create the host
-	log.Printf("[%s node #%d] starting host creation...\n", nodeTypeStr, index)
+	log.Printf("[%s node #%d] starting host resource creation...\n", nodeTypeStr, index)
 	var err error
 	req.Name, err = c.buildHostname("node", nodeType)
 	if err != nil {
@@ -926,7 +926,7 @@ func (c *Cluster) asyncCreateNode(
 		done <- fmt.Errorf("failed to update Cluster configuration: %s", err.Error())
 		return
 	}
-	log.Printf("[%s node #%d (%s)] host created successfully.\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] host resource created successfully.\n", nodeTypeStr, index, host.Name)
 
 	// Installs DCOS requirements
 	log.Printf("[%s node #%d (%s)] installing DCOS requirements...\n", nodeTypeStr, index, host.Name)
