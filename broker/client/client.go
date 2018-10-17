@@ -18,9 +18,10 @@ package client
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -49,7 +50,7 @@ type Client *Session
 
 // DefaultTimeout tells to use the timeout by default depending on context
 const (
-	DefaultConnectionTimeout = 10 * time.Second
+	DefaultConnectionTimeout = 30 * time.Second
 	DefaultExecutionTimeout  = 5 * time.Minute
 )
 
