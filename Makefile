@@ -147,7 +147,7 @@ perform/perform: perform
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
 install:
-	@($(CP) -f $(EXECS) $(GOBIN))
+	@($(CP) -f $(EXECS) $(GOBIN) || true)
 
 docs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
