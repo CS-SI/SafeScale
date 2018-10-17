@@ -19,11 +19,10 @@ package commands
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"log"
-
-	services "github.com/CS-SI/SafeScale/broker/daemon/services"
+	"github.com/CS-SI/SafeScale/broker/daemon/services"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	convert "github.com/CS-SI/SafeScale/broker/utils"

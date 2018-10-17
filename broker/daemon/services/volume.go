@@ -19,7 +19,7 @@ package services
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 
@@ -32,7 +32,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/utils/retry"
 
-	mapset "github.com/deckarep/golang-set"
+	"github.com/deckarep/golang-set"
 )
 
 //go:generate mockgen -destination=../mocks/mock_volumeapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services VolumeAPI

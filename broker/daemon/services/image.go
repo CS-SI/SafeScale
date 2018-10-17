@@ -23,6 +23,7 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services ImageAPI
 
+
 //ImageAPI defines API to manipulate hosts
 type ImageAPI interface {
 	List(all bool) ([]api.Image, error)

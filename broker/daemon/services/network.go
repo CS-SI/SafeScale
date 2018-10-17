@@ -18,10 +18,9 @@ package services
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"log"
-
 	"github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
