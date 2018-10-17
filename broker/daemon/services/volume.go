@@ -70,7 +70,7 @@ func (svc *VolumeService) Delete(ref string) error {
 	vol, err := svc.Get(ref)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 	if vol == nil {
@@ -85,7 +85,7 @@ func (svc *VolumeService) Get(ref string) (*api.Volume, error) {
 	m, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	if m == nil {
@@ -127,7 +127,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	volume, err := svc.Get(volumename)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 	if volume == nil {
@@ -139,7 +139,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	host, err := hostService.Get(hostName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 	if host == nil {
@@ -203,14 +203,14 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	sshConfig, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 
 	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 	err = server.MountBlockDevice(volatt.Device, mountPoint, format)
@@ -218,7 +218,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	if err != nil {
 		svc.Detach(volumename, hostName)
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 
@@ -228,7 +228,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	mtdVol, err := metadata.LoadVolume(svc.provider, volumename)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 	mtdVol.Attach(volatt)
@@ -249,8 +249,8 @@ func (svc *VolumeService) listAttachedDevices(host *api.Host) (mapset.Set, error
 			retcode, stdout, stderr, err = sshService.Run(host.ID, cmd)
 			if err != nil {
 				tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
-		return tbr
+				log.Errorf("%+v", tbr)
+				return tbr
 			}
 			if retcode != 0 {
 				if retcode == 255 {
@@ -300,21 +300,21 @@ func (svc *VolumeService) Detach(volumename string, hostName string) error {
 	sshConfig, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 
 	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 	err = server.UnmountBlockDevice(volatt.Device)
 	if err != nil {
 		fmt.Printf("%s", err.Error())
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 

@@ -51,7 +51,6 @@ func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 		int(in.Gateway.GetCPU()), in.GetGateway().GetRAM(), int(in.GetGateway().GetDisk()), in.GetGateway().GetImageID(), in.GetGateway().GetName())
 
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 

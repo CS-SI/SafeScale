@@ -80,7 +80,7 @@ func (srv *ContainerService) Mount(containerName, hostName, path string) error {
 	_, err := srv.Inspect(containerName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 
@@ -143,7 +143,7 @@ func (srv *ContainerService) UMount(containerName, hostName string) error {
 	_, err := srv.Inspect(containerName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 

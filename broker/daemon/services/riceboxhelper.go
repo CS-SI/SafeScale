@@ -36,21 +36,21 @@ func getBoxContent(script string, data interface{}) (string, error) {
 	if err != nil {
 		// TODO Use more explicit error
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return "", tbr
 	}
 	scriptContent, err := box.String(script)
 	if err != nil {
 		// TODO Use more explicit error
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return "", tbr
 	}
 	tpl, err := template.New("TemplateName").Parse(scriptContent)
 	if err != nil {
 		// TODO Use more explicit error
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return "", tbr
 	}
 
@@ -58,7 +58,7 @@ func getBoxContent(script string, data interface{}) (string, error) {
 	if err = tpl.Execute(&buffer, data); err != nil {
 		// TODO Use more explicit error
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return "", tbr
 	}
 
@@ -73,7 +73,7 @@ func exec(script string, data interface{}, hostid string, provider *providers.Se
 	if err != nil {
 		// TODO Use more explicit error
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 	// retrieve ssh config to perform some commands
@@ -81,7 +81,7 @@ func exec(script string, data interface{}, hostid string, provider *providers.Se
 	if err != nil {
 		// TODO Use more explicit error
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 
@@ -89,7 +89,7 @@ func exec(script string, data interface{}, hostid string, provider *providers.Se
 	if err != nil {
 		// TODO Use more explicit error
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return tbr
 	}
 	_, err = cmd.Output()
