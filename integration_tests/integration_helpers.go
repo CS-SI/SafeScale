@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"log"
 	"os/exec"
 	"strings"
 )
@@ -50,10 +51,12 @@ func getOutput(command string) (string, error) {
 }
 
 func tearDown() {
+	log.Printf("Starting cleanup...")
 	_, _ = getOutput("broker nas delete bnastest")
 	_, _ = getOutput("broker volume delete volumetest")
 	_, _ = getOutput("broker host delete easyvm")
 	_, _ = getOutput("broker host delete complexvm")
 	_, _ = getOutput("broker host delete gw-easy")
 	_, _ = getOutput("broker network delete easy")
+	log.Printf("Finishing cleanup...")
 }
