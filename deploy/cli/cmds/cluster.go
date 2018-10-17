@@ -274,14 +274,18 @@ var clusterCreateCommand = &cli.Command{
 			// DCOS forces to use RHEL/CentOS/CoreOS, and we've chosen to use CentOS, so ignore --os option
 			los = ""
 		}
-		cpu := int32(c.IntOption("--cpu", "<number of cpus>", 4))
-		ram := float32(c.FloatOption("--ram", "<ram size>", 15.0))
-		disk := int32(c.IntOption("--disk", "<disk size>", 100))
-		nodesDef := pb.HostDefinition{
-			CPUNumber: cpu,
-			RAM:       ram,
-			Disk:      disk,
-			ImageID:   los,
+		cpu := int32(c.IntOption("--cpu", "<number of cpus>", 0))
+		ram := float32(c.FloatOption("--ram", "<ram size>", 0.0))
+		disk := int32(c.IntOption("--disk", "<disk size>", 0))
+
+		var nodesDef *pb.HostDefinition
+		if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
+			nodesDef = &pb.HostDefinition{
+				CPUNumber: cpu,
+				RAM:       ram,
+				Disk:      disk,
+				ImageID:   los,
+			}
 		}
 		clusterInstance, err = cluster.Create(clusterapi.Request{
 			Name:          clusterName,
@@ -289,7 +293,7 @@ var clusterCreateCommand = &cli.Command{
 			CIDR:          cidr,
 			Flavor:        flavor,
 			KeepOnFailure: keep,
-			NodesDef:      &nodesDef,
+			NodesDef:      nodesDef,
 		})
 		if err != nil {
 			if clusterInstance != nil {
