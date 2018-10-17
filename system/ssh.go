@@ -508,9 +508,9 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		retcode, stdout, stderr, logErr := logCmd.Run()
 		if logErr == nil {
 			if retcode == 0 {
-				fmt.Println(fmt.Errorf("Log content: %s", stdout))
+				return fmt.Errorf("server '%s' is not ready yet : %s, Log content of file user_data.log: %s", ssh.Host, err.Error(), stdout)
 			} else {
-				fmt.Println(fmt.Errorf("Error reading user_data.log: %s", stderr))
+				return fmt.Errorf("server '%s' is not ready yet : %s, Error reading user_data.log: %s", ssh.Host, err.Error(), stderr)
 			}
 		}
 

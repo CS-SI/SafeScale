@@ -19,13 +19,12 @@ package services
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services NetworkAPI
@@ -116,9 +115,10 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		GWName:     gwname,
 	}
 
+	log.Printf("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwname)
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrapf(err, "Gateway creation with name '%s' failed", gwname)
 		log.Printf("%+v", tbr)
 		return nil, tbr
 	}
@@ -126,22 +126,25 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
-	log.Println("Waiting start of SSH service on gateway...")
+
+
 	ssh, err := svc.provider.GetSSHConfig(gw.ID)
 	if err != nil {
-		svc.provider.DeleteHost(gw.ID)
-		tbr := errors.Wrap(err, "")
+		defer svc.provider.DeleteHost(gw.ID)
+		tbr := errors.Wrapf(err, "Error retrieving SSH config of gateway '%s'", gw.Name)
 		log.Printf("%+v", tbr)
 		return nil, tbr
 	}
+
+	// TODO Test for failure with 15s !!!
 	err = ssh.WaitServerReady(utils.TimeoutCtxHost)
+	// err = ssh.WaitServerReady(time.Second * 15)
 	if err != nil {
-		log.Println("failed to reach SSH service")
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrapf(err, "Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
 		log.Printf("%+v", tbr)
 		return nil, tbr
 	}
-	log.Println("SSH service started.")
+	log.Printf("SSH service of gateway '%s' started.", gw.Name)
 
 	// Gateway is ready to work, update Network metadata
 	rv, err := svc.Get(net)
