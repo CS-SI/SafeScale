@@ -59,7 +59,7 @@ import (
 //go:generate rice embed-go
 
 const (
-	dcosVersion string = "1.11.4"
+	dcosVersion string = "1.11.6"
 
 	timeoutCtxHost = 10 * time.Minute
 
@@ -237,9 +237,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		Name: networkName,
 		CIDR: req.CIDR,
 		Gateway: &pb.GatewayDefinition{
-			CPU:     4,
-			RAM:     32.0,
-			Disk:    120,
+			CPU:     2,
+			RAM:     16.0,
+			Disk:    60,
 			ImageID: centos,
 		},
 	}

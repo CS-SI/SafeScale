@@ -240,14 +240,13 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 			v["HostIP"] = h.PRIVATE_IP
 			v["Hostname"] = h.Name
 			results[h.Name] = is.runOnHost(h, v)
-			if !results[h.Name].Successful() {
-				if false {
-					log.Printf("%s(%s):step(%s)@%s: fail\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
-				}
-				return results, results[h.Name].err
-			}
+			//if debug {
 			if false {
-				log.Printf("%s(%s):step(%s)@%s: success\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+				if !results[h.Name].Successful() {
+					log.Printf("%s(%s):step(%s)@%s: fail\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+				} else {
+					log.Printf("%s(%s):step(%s)@%s: success\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+				}
 			}
 		}
 	} else {
@@ -267,16 +266,13 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 		}
 		for k, d := range dones {
 			results[k] = <-d
-			if !results[k].Successful() {
-				//if debug
-				if false {
-					log.Printf("%s(%s):step(%s)@%s: fail\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
-				}
-				return results, results[k].err
-			}
-			//if debug
+			//if debug {
 			if false {
-				log.Printf("%s(%s):step(%s)@%s: done\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				if !results[k].Successful() {
+					log.Printf("%s(%s):step(%s)@%s: fail\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				} else {
+					log.Printf("%s(%s):step(%s)@%s: done\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				}
 			}
 		}
 	}
