@@ -97,6 +97,17 @@ EOF
     # Loads overlay module
     modprobe overlay
 
+    # Mesos needs a subversion release > 1.8
+    cat >/etc/yum.repos.d/wandisco-svn.repo <<-'EOF'
+[WANdiscoSVN]
+name=WANdisco SVN Repo 1.9
+enabled=1
+baseurl=http://opensource.wandisco.com/centos/7/svn-1.9/RPMS/$basearch/
+gpgcheck=1
+gpgkey=http://opensource.wandisco.com/RPM-GPG-KEY-WANdisco
+EOF
+    yum install -y subversion
+
     echo "Common requirements successfully installed."
 }
 export -f install_common_requirements
