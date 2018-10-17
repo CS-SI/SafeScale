@@ -123,12 +123,12 @@ func launchClient(tenant string) {
 
 	}
 
-	launchDockerExec(intera, delay, "broker nas  create anastest hostest1")
-	launchDockerExec(intera, delay, "broker nas  mount anastest hostest2")
-	launchDockerExec(intera, delay, "broker nas inspect anastest")
+	launchDockerExec(intera, delay, "broker nas  create bnastest hostest1")
+	launchDockerExec(intera, delay, "broker nas  mount bnastest hostest2")
+	launchDockerExec(intera, delay, "broker nas inspect bnastest")
 	launchDockerExec(intera, delay, "broker nas  list ")
-	launchDockerExec(intera, delay, "broker nas  umount anastest hostest2")
-	launchDockerExec(intera, delay, "broker nas delete anastest ")
+	launchDockerExec(intera, delay, "broker nas  umount bnastest hostest2")
+	launchDockerExec(intera, delay, "broker nas delete bnastest ")
 	launchDockerExec(intera, delay, "broker volume  create volumetest")
 	launchDockerExec(intera, delay, "broker volume  attach  volumetest hostest1 ")
 	launchDockerExec(intera, delay, "broker volume  inspect volumetest")
