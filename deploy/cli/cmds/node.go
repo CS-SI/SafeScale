@@ -184,7 +184,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 		yes := c.Flag("-y,--assume-yes", false)
 		force := c.Flag("-f,--force", false)
 
-		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure to delete the node '%s' of the cluster '%s'", nodeName, clusterName)) {
+		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node '%s' of the cluster '%s'", nodeName, clusterName)) {
 			fmt.Println("Aborted.")
 			os.Exit(0)
 		}
