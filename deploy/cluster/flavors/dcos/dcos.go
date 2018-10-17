@@ -213,21 +213,26 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		return nil, fmt.Errorf("failed to generate password for user cladm: %s", err.Error())
 	}
 
-	var nodesDef pb.HostDefinition
+	nodesDef := pb.HostDefinition{
+		CPUNumber: 4,
+		RAM:       15.0,
+		Disk:      100,
+		ImageID:   centos,
+	}
 	if req.NodesDef != nil {
-		nodesDef = *req.NodesDef
-	} else {
-		nodesDef = pb.HostDefinition{
-			CPUNumber: 4,
-			RAM:       15.0,
-			Disk:      100,
-			ImageID:   centos,
+		if req.NodesDef.CPUNumber > nodesDef.CPUNumber {
+			nodesDef.CPUNumber = req.NodesDef.CPUNumber
+		}
+		if req.NodesDef.RAM > nodesDef.RAM {
+			nodesDef.RAM = req.NodesDef.RAM
+		}
+		if req.NodesDef.Disk > nodesDef.Disk {
+			nodesDef.Disk = req.NodesDef.Disk
 		}
 	}
-	if nodesDef.ImageID != "" && nodesDef.ImageID != centos {
-		fmt.Printf("cluster Flavor DCOS enforces the use of %s distribution. OS '%s' is ignored.\n", centos, nodesDef.ImageID)
+	if req.NodesDef.ImageID != "" && req.NodesDef.ImageID != centos {
+		fmt.Printf("cluster Flavor DCOS enforces the use of %s distribution. OS '%s' is ignored.\n", centos, req.NodesDef.ImageID)
 	}
-	nodesDef.ImageID = centos
 
 	// Creates network
 	log.Printf("Creating Network 'net-%s'", req.Name)
@@ -238,7 +243,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		CIDR: req.CIDR,
 		Gateway: &pb.GatewayDefinition{
 			CPU:     2,
-			RAM:     16.0,
+			RAM:     15.0,
 			Disk:    60,
 			ImageID: centos,
 		},
@@ -509,12 +514,7 @@ func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.HostDefinitio
 		go c.asyncCreateNode(
 			i,
 			nodeType,
-			pb.HostDefinition{
-				CPUNumber: 4,
-				RAM:       16.0,
-				Disk:      100,
-				ImageID:   centos,
-			},
+			*def,
 			timeout,
 			r,
 			d)
@@ -829,30 +829,32 @@ func (c *Cluster) asyncConfigureMaster(index int, host *pb.Host, done chan error
 		return
 	}
 
-	// Installs remotedesktop feature on each master
-	log.Printf("[master #%d (%s)] installing feature 'remotedesktop'\n", index, host.Name)
-	feature, err := install.NewFeature("remotedesktop")
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to instanciate feature 'remotedesktop': %s\n", index, host.Name, err.Error())
-		done <- err
-		return
-	}
-	target := install.NewHostTarget(host)
-	results, err := feature.Add(target, install.Variables{
-		"Username": "cladm",
-		"Password": c.Core.AdminPassword,
-	}, install.Settings{})
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
-		done <- err
-		return
-	}
-	if !results.Successful() {
-		msg := results.AllErrorMessages()
-		log.Printf("[master #%d (%s)] installation script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
-		done <- fmt.Errorf(msg)
-	}
-	log.Printf("[master #%d (%s)] feature '%s' installed successfully\n", index, host.Name, feature.DisplayName())
+	// remotedekstop is a feature, can be added after master creation; should be automatically install
+	// in perform, not deploy
+	// // Installs remotedesktop feature on each master
+	// log.Printf("[master #%d (%s)] installing feature 'remotedesktop'\n", index, host.Name)
+	// feature, err := install.NewFeature("remotedesktop")
+	// if err != nil {
+	// 	log.Printf("[master #%d (%s)] failed to instanciate feature 'remotedesktop': %s\n", index, host.Name, err.Error())
+	// 	done <- err
+	// 	return
+	// }
+	// target := install.NewHostTarget(host)
+	// results, err := feature.Add(target, install.Variables{
+	// 	"Username": "cladm",
+	// 	"Password": c.Core.AdminPassword,
+	// }, install.Settings{})
+	// if err != nil {
+	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
+	// 	done <- err
+	// 	return
+	// }
+	// if !results.Successful() {
+	// 	msg := results.AllErrorMessages()
+	// 	log.Printf("[master #%d (%s)] installation script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
+	// 	done <- fmt.Errorf(msg)
+	// }
+	// log.Printf("[master #%d (%s)] feature '%s' installed successfully\n", index, host.Name, feature.DisplayName())
 
 	log.Printf("[master #%d (%s)] configuration successful\n", index, host.Name)
 	done <- nil

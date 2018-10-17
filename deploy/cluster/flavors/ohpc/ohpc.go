@@ -193,23 +193,22 @@ func (c *Cluster) Reload() error {
 // Create creates the necessary infrastructure of cluster
 func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	var (
-		nodesDef         pb.HostDefinition
 		instance         Cluster
 		privateNodeCount int
 		gw               *providerapi.Host
 		m                *providermetadata.Gateway
-		masterChannel    chan error
-		masterStatus     error
-		rpChannel        chan error
-		rpStatus         error
-		nodesStatus      error
-		ok               bool
-		feature          *install.Feature
-		target           install.Target
-		values           = install.Variables{}
-		results          install.Results
-		kpName           string
-		kp               *providerapi.KeyPair
+		// masterChannel    chan error
+		// masterStatus     error
+		rpChannel   chan error
+		rpStatus    error
+		nodesStatus error
+		ok          bool
+		feature     *install.Feature
+		target      install.Target
+		values      = install.Variables{}
+		results     install.Results
+		kpName      string
+		kp          *providerapi.KeyPair
 	)
 
 	// Generate needed password for account cladm
@@ -218,18 +217,25 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		return nil, fmt.Errorf("failed to generate password for user cladm: %s", err.Error())
 	}
 
+	nodesDef := pb.HostDefinition{
+		CPUNumber: 4,
+		RAM:       15.0,
+		Disk:      100,
+		ImageID:   centos,
+	}
 	if req.NodesDef != nil {
-		nodesDef = *req.NodesDef
-	} else {
-		nodesDef = pb.HostDefinition{
-			CPUNumber: 4,
-			RAM:       15.0,
-			Disk:      100,
-			ImageID:   centos,
+		if req.NodesDef.CPUNumber > nodesDef.CPUNumber {
+			nodesDef.CPUNumber = req.NodesDef.CPUNumber
+		}
+		if req.NodesDef.RAM > nodesDef.RAM {
+			nodesDef.RAM = req.NodesDef.RAM
+		}
+		if req.NodesDef.Disk > nodesDef.Disk {
+			nodesDef.Disk = req.NodesDef.Disk
 		}
 	}
-	if nodesDef.ImageID != centos {
-		fmt.Printf("cluster Flavor OHPC enforces the use of %s distribution. OS %s ignored.\n", centos, nodesDef.ImageID)
+	if req.NodesDef.ImageID != "" && req.NodesDef.ImageID != centos {
+		fmt.Printf("cluster Flavor OHPC enforces the use of %s distribution. OS %s ignored.\n", centos, req.NodesDef.ImageID)
 		nodesDef.ImageID = centos
 	}
 
@@ -241,10 +247,10 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		Name: networkName,
 		CIDR: req.CIDR,
 		Gateway: &pb.GatewayDefinition{
-			CPU:     nodesDef.CPUNumber,
-			RAM:     nodesDef.RAM,
-			Disk:    nodesDef.Disk,
-			ImageID: nodesDef.ImageID,
+			CPU:     2,
+			RAM:     15.0,
+			Disk:    60,
+			ImageID: centos,
 		},
 	}
 	broker := brokerclient.New()
@@ -359,9 +365,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		goto cleanNetwork
 	}
 
-	// step 2: configure master asynchronously
-	masterChannel = make(chan error)
-	go instance.asyncConfigureMasters(masterChannel)
+	// // step 2: configure master asynchronously
+	// masterChannel = make(chan error)
+	// go instance.asyncConfigureMasters(masterChannel)
 
 	// Step 3: starts node creation asynchronously
 	_, nodesStatus = instance.AddNodes(privateNodeCount, false, &nodesDef)
@@ -377,12 +383,12 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		goto cleanNodes
 	}
 
-	// Waits master configuretion ended
-	masterStatus = <-masterChannel
-	if masterStatus != nil {
-		err = masterStatus
-		goto cleanNodes
-	}
+	// // Waits master configuretion ended
+	// masterStatus = <-masterChannel
+	// if masterStatus != nil {
+	// 	err = masterStatus
+	// 	goto cleanNodes
+	// }
 
 	// Cluster created and configured successfully, saving again to Metadata
 	err = instance.updateMetadata(func() error {
@@ -876,73 +882,75 @@ func (c *Cluster) asyncInstallReverseProxy(host *providerapi.Host, done chan err
 	done <- nil
 }
 
-// asyncConfigureMasters configure masters
-func (c *Cluster) asyncConfigureMasters(done chan error) {
-	var (
-		dones  []chan error
-		errors []string
-	)
-	for i, id := range c.manager.MasterIDs {
-		d := make(chan error)
-		dones = append(dones, d)
-		go c.asyncConfigureMaster(i+1, id, d)
-	}
-	for _, d := range dones {
-		err := <-d
-		if err != nil {
-			errors = append(errors, err.Error())
-		}
-	}
-	if len(errors) > 0 {
-		msg := strings.Join(errors, "\n")
-		done <- fmt.Errorf("failed to configure masters: %s", msg)
-		return
-	}
+// // asyncConfigureMasters configure masters
+// func (c *Cluster) asyncConfigureMasters(done chan error) {
+// 	var (
+// 		dones  []chan error
+// 		errors []string
+// 	)
+// 	for i, id := range c.manager.MasterIDs {
+// 		d := make(chan error)
+// 		dones = append(dones, d)
+// 		go c.asyncConfigureMaster(i+1, id, d)
+// 	}
+// 	for _, d := range dones {
+// 		err := <-d
+// 		if err != nil {
+// 			errors = append(errors, err.Error())
+// 		}
+// 	}
+// 	if len(errors) > 0 {
+// 		msg := strings.Join(errors, "\n")
+// 		done <- fmt.Errorf("failed to configure masters: %s", msg)
+// 		return
+// 	}
 
-	log.Println("Masters configured successfully")
-	done <- nil
-}
+// 	log.Println("Masters configured successfully")
+// 	done <- nil
+// }
 
-// asyncConfigureMaster configure one master
-func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
-	log.Printf("[master #%d] starting configuration...\n", index)
+// // asyncConfigureMaster configure one master
+// func (c *Cluster) asyncConfigureMaster(index int, id string, done chan error) {
+// 	log.Printf("[master #%d] starting configuration...\n", index)
 
-	// Installs remotedesktop feature on host
-	feature, err := install.NewFeature("remotedesktop")
-	if err != nil {
-		log.Printf("[master #%d] failed to find feature 'remotedesktop': %s\n", index, err.Error())
-		done <- fmt.Errorf("[master #%d] %s", index, err.Error())
-		return
-	}
-	broker := brokerclient.New().Host
-	host, err := broker.Inspect(id, brokerclient.DefaultExecutionTimeout)
-	if err != nil {
-		err = brokerclient.DecorateError(err, "inspection of host", false)
-		done <- fmt.Errorf("[master #%d] %s", index, err.Error())
-		return
-	}
-	target := install.NewHostTarget(host)
-	results, err := feature.Add(target, install.Variables{
-		"GatewayIP": c.Core.GatewayIP,
-		"Hostname":  host.Name,
-		"HostIP":    host.PRIVATE_IP,
-		"Username":  "cladm",
-		"Password":  c.Core.AdminPassword,
-	}, install.Settings{})
-	if err != nil {
-		done <- fmt.Errorf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
-		return
-	}
-	if !results.Successful() {
-		msg := results.AllErrorMessages()
-		log.Printf("[master #%d (%s)] installation script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
-		done <- fmt.Errorf(msg)
-		return
-	}
+// 	// remotedekstop is a feature, can be added after master creation; should be automatically install
+// 	// in perform, not deploy
+// 	// Installs remotedesktop feature on host
+// 	feature, err := install.NewFeature("remotedesktop")
+// 	if err != nil {
+// 		log.Printf("[master #%d] failed to find feature 'remotedesktop': %s\n", index, err.Error())
+// 		done <- fmt.Errorf("[master #%d] %s", index, err.Error())
+// 		return
+// 	}
+// 	broker := brokerclient.New().Host
+// 	host, err := broker.Inspect(id, brokerclient.DefaultExecutionTimeout)
+// 	if err != nil {
+// 		err = brokerclient.DecorateError(err, "inspection of host", false)
+// 		done <- fmt.Errorf("[master #%d] %s", index, err.Error())
+// 		return
+// 	}
+// 	target := install.NewHostTarget(host)
+// 	results, err := feature.Add(target, install.Variables{
+// 		"GatewayIP": c.Core.GatewayIP,
+// 		"Hostname":  host.Name,
+// 		"HostIP":    host.PRIVATE_IP,
+// 		"Username":  "cladm",
+// 		"Password":  c.Core.AdminPassword,
+// 	}, install.Settings{})
+// 	if err != nil {
+// 		done <- fmt.Errorf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
+// 		return
+// 	}
+// 	if !results.Successful() {
+// 		msg := results.AllErrorMessages()
+// 		log.Printf("[master #%d (%s)] installation script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
+// 		done <- fmt.Errorf(msg)
+// 		return
+// 	}
 
-	log.Printf("[master #%d (%s)] configuration successful\n", index, host.Name)
-	done <- nil
-}
+// 	log.Printf("[master #%d (%s)] configuration successful\n", index, host.Name)
+// 	done <- nil
+// }
 
 // GetName returns the name of the cluster
 func (c *Cluster) GetName() string {
