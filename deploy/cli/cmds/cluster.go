@@ -352,7 +352,7 @@ var clusterDeleteCommand = &cli.Command{
 		yes := c.Flag("-y,--assume-yes", false)
 		force := c.Flag("-f,--force", false)
 
-		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure to delete Cluster '%s'", clusterName)) {
+		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete Cluster '%s'", clusterName)) {
 			fmt.Println("Aborted.")
 			os.Exit(0)
 		}
@@ -536,7 +536,7 @@ var clusterShrinkCommand = &cli.Command{
 			os.Exit(int(ExitCode.InvalidOption))
 		}
 
-		msg := fmt.Sprintf("Are you sure to delete %d %s node%s from Cluster %s", count, nodeTypeString, countS, clusterName)
+		msg := fmt.Sprintf("Are you sure you want to delete %d %s node%s from Cluster %s", count, nodeTypeString, countS, clusterName)
 		if !utils.UserConfirmed(msg) {
 			fmt.Println("Aborted.")
 			os.Exit(int(ExitCode.OK))
