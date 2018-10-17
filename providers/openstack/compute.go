@@ -402,7 +402,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		return nil, err
 	}
 	if m != nil {
-		return nil, fmt.Errorf("A host already exist with name '%s'", request.Name)
+		return nil, fmt.Errorf("A host already exists with name '%s'", request.Name)
 	}
 
 	// Optional network gateway

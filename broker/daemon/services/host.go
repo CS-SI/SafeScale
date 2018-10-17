@@ -73,18 +73,18 @@ func (svc *HostService) Reboot(ref string) error {
 
 // Create creates a host
 func (svc *HostService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.Host, error) {
-	log.Printf("creating compute resource '%s' ...", name)
+	log.Printf("Creating compute resource '%s' ...", name)
 	networks := []string{}
 	if len(net) != 0 {
 		n, err := svc.network.Get(net)
 		if err != nil {
-			fmt.Println("failed to get network resource data.")
+			fmt.Println("Failed to get network resource data.")
 			tbr := errors.Wrap(err, "")
 		log.Printf("%+v", tbr)
 		return nil, tbr
 		}
 		if n == nil {
-			return nil, fmt.Errorf("failed to find network '%s'", net)
+			return nil, fmt.Errorf("Failed to find network '%s'", net)
 		}
 		networks = append(networks, n.ID)
 	}
@@ -96,7 +96,7 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	})
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
-		log.Println("failed to find image to use on compute resource.")
+		log.Println("Failed to find image to use on compute resource.")
 		tbr := errors.Wrap(err, "")
 		log.Printf("%+v", tbr)
 		return nil, tbr

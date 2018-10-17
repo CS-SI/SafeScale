@@ -55,7 +55,7 @@ func Test_Flexible_Basic(t *testing.T) {
 
 	out, err = getOutput("broker host create easyvm --public --net easy --cpu 4 --ram 50 ")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "A host already exist"))
+	require.True(t, strings.Contains(out, "A host already exists"))
 
 	out, err = getOutput("broker host inspect easyvm")
 	require.Nil(t, err)
@@ -70,7 +70,7 @@ func Test_Flexible_Basic(t *testing.T) {
 
 	out, err = getOutput("broker host create complexvm --public --net easy")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "A host already exist"))
+	require.True(t, strings.Contains(out, "A host already exists"))
 
 	out, err = getOutput("broker nas list")
 	require.Nil(t, err)
