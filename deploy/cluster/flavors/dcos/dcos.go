@@ -229,9 +229,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		if req.NodesDef.Disk > nodesDef.Disk {
 			nodesDef.Disk = req.NodesDef.Disk
 		}
-	}
-	if req.NodesDef.ImageID != "" && req.NodesDef.ImageID != centos {
-		fmt.Printf("cluster Flavor DCOS enforces the use of %s distribution. OS '%s' is ignored.\n", centos, req.NodesDef.ImageID)
+		if req.NodesDef.ImageID != "" && req.NodesDef.ImageID != centos {
+			fmt.Printf("cluster Flavor DCOS enforces the use of %s distribution. OS '%s' is ignored.\n", centos, req.NodesDef.ImageID)
+		}
 	}
 
 	// Creates network
