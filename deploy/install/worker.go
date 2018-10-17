@@ -676,7 +676,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("hostT='%s', masterT='%s', privnodeT='%s', pubnodeT='%s'\n", hostT, masterT, privnodeT, pubnodeT)
+
 	var (
 		hostsList = []*pb.Host{}
 		all       []*pb.Host
