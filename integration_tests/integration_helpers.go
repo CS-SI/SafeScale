@@ -50,7 +50,7 @@ func getOutput(command string) (string, error) {
 }
 
 func tearDown() {
-	_, _ = getOutput("broker nas delete anastest")
+	_, _ = getOutput("broker nas delete bnastest")
 	_, _ = getOutput("broker volume delete volumetest")
 	_, _ = getOutput("broker host delete easyvm")
 	_, _ = getOutput("broker host delete complexvm")
