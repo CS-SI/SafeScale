@@ -2,6 +2,7 @@ package commands
 
 import (
 	log "github.com/sirupsen/logrus"
+	"io"
 	"os"
 )
 
@@ -11,5 +12,11 @@ func init() {
 
 	// Output to stdout instead of the default stderr
 	// Can be any io.Writer, see below for File example
-	log.SetOutput(os.Stdout)
+
+	file, err := os.OpenFile("brokerd-session.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		panic(err)
+	}
+
+	log.SetOutput(io.MultiWriter(os.Stdout, file))
 }
