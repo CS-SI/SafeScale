@@ -18,6 +18,8 @@ package services
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
+	"log"
 	"strings"
 	"time"
 
@@ -67,7 +69,9 @@ func (svc *VolumeService) List(all bool) ([]api.Volume, error) {
 func (svc *VolumeService) Delete(ref string) error {
 	vol, err := svc.Get(ref)
 	if err != nil {
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 	if vol == nil {
 		return fmt.Errorf("Volume '%s' does not exist", ref)
@@ -80,7 +84,9 @@ func (svc *VolumeService) Delete(ref string) error {
 func (svc *VolumeService) Get(ref string) (*api.Volume, error) {
 	m, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	if m == nil {
 		return nil, nil
@@ -120,7 +126,9 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	// Get volume ID
 	volume, err := svc.Get(volumename)
 	if err != nil {
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 	if volume == nil {
 		return providers.ResourceNotFoundError("volume", volumename)
@@ -130,7 +138,9 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	hostService := NewHostService(svc.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 	if host == nil {
 		return providers.ResourceNotFoundError("host", hostName)
@@ -192,18 +202,24 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 
 	sshConfig, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 
 	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 	err = server.MountBlockDevice(volatt.Device, mountPoint, format)
 
 	if err != nil {
 		svc.Detach(volumename, hostName)
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 
 	// Update volume attachement info with mountpoint
@@ -211,7 +227,9 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	volatt.Format = format
 	mtdVol, err := metadata.LoadVolume(svc.provider, volumename)
 	if err != nil {
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 	mtdVol.Attach(volatt)
 
@@ -230,7 +248,9 @@ func (svc *VolumeService) listAttachedDevices(host *api.Host) (mapset.Set, error
 		func() error {
 			retcode, stdout, stderr, err = sshService.Run(host.ID, cmd)
 			if err != nil {
-				return err
+				tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 			}
 			if retcode != 0 {
 				if retcode == 255 {
@@ -279,17 +299,23 @@ func (svc *VolumeService) Detach(volumename string, hostName string) error {
 
 	sshConfig, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 
 	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 	err = server.UnmountBlockDevice(volatt.Device)
 	if err != nil {
 		fmt.Printf("%s", err.Error())
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 
 	// Finaly delete the attachment

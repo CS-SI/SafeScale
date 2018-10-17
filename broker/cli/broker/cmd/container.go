@@ -47,7 +47,7 @@ var containerList = cli.Command{
 	Action: func(c *cli.Context) error {
 		resp, err := client.New().Container.List(0)
 		if err != nil {
-			return fmt.Errorf("Could not list containers: %v", client.DecorateError(err, "list of containers", false))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "list of containers", false))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -68,7 +68,7 @@ var containerCreate = cli.Command{
 		}
 		err := client.New().Container.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not create container '%s': %v", c.Args().Get(0), client.DecorateError(err, "creation of container", true))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "creation of container", true))
 		}
 		return nil
 	},
@@ -86,7 +86,7 @@ var containerDelete = cli.Command{
 		}
 		err := client.New().Container.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not delete container '%s': %v", c.Args().Get(0), client.DecorateError(err, "deletion of container", true))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "deletion of container", true))
 		}
 		return nil
 	},
@@ -104,7 +104,7 @@ var containerInspect = cli.Command{
 		}
 		resp, err := client.New().Container.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not inspect container '%s': %v", c.Args().Get(0), client.DecorateError(err, "inspection of container", false))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "inspection of container", false))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -132,7 +132,7 @@ var containerMount = cli.Command{
 		}
 		err := client.New().Container.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("could not mount container '%s': %v", c.Args().Get(0), client.DecorateError(err, "mount of container", true))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "mount of container", true))
 		}
 		fmt.Printf("Container '%s' mounted on '%s' on host '%s'\n", c.Args().Get(0), c.String("path"), c.Args().Get(1))
 		return nil
@@ -151,7 +151,7 @@ var containerUnmount = cli.Command{
 		}
 		err := client.New().Container.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("could not unmount container '%s': %v", c.Args().Get(0), client.DecorateError(err, "unmount of container", true))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "unmount of container", true))
 		}
 		fmt.Printf("Container '%s' unmounted from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 		return nil

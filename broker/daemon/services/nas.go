@@ -18,6 +18,8 @@ package services
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
+	"log"
 	"path"
 	"strings"
 
@@ -27,7 +29,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/system/nfs"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 )
 
 //go:generate mockgen -destination=../mocks/mock_nasapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services NasAPI
@@ -70,7 +72,9 @@ func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 	// Check if a nas already exist with the same name
 	nas, err := srv.findNas(name)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	if nas != nil {
 		return nil, providers.ResourceAlreadyExistsError("NAS", name)
@@ -79,31 +83,43 @@ func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 	// Sanitize path
 	exportedPath, err := sanitize(path)
 	if err != nil {
-		return nil, fmt.Errorf("Invalid path to be exposed: '%s' : '%s'", path, err)
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	host, err := srv.hostService.Get(hostName)
 	if err != nil {
-		return nil, fmt.Errorf("no host found with name or id '%s'", hostName)
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	err = server.Install()
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	err = server.AddShare(exportedPath, "")
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	nasid, _ := uuid.NewV4()
@@ -114,7 +130,15 @@ func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 		Path:     exportedPath,
 		IsServer: true,
 	}
+
+	// TODO OPP Check this
 	err = srv.saveNASDefinition(*nas)
+	if err != nil {
+		tbr := errors.Wrap(err, "Error saving NAS definition")
+		log.Printf("%+v", tbr)
+		return nas, tbr
+	}
+
 	return nas, err
 }
 
@@ -123,7 +147,9 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 	// Retrieve info about the nas
 	nass, err := srv.Inspect(name)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	if len(nass) == 0 {
@@ -136,32 +162,47 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 				hosts = append(hosts, nas.Host)
 			}
 		}
-		return nil, fmt.Errorf("cannot delete nas '%s' because it is mounted on hosts : %s", name, strings.Join(hosts, " "))
+		return nil, fmt.Errorf("Cannot delete nas '%s' because it is mounted on hosts : %s", name, strings.Join(hosts, " "))
 	}
 
 	nas := nass[0]
 
 	host, err := srv.hostService.Get(nas.Host)
 	if err != nil {
-		return nil, fmt.Errorf("no host found with name or id '%s'", nas.Host)
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	err = server.RemoveShare(nas.Path)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
+	// TODO OPP Check this
 	err = srv.removeNASDefinition(*nas)
+	if err != nil {
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nas, tbr
+	}
+
 	return nas, err
 }
 
@@ -174,7 +215,9 @@ func (srv *NasService) List() ([]api.Nas, error) {
 		return nil
 	})
 	if err != nil {
-		return nass, err
+		tbr := errors.Wrap(err, "Error browsing nas")
+		log.Printf("%+v", tbr)
+		return nass, tbr
 	}
 	return nass, nil
 }
@@ -189,7 +232,9 @@ func (srv *NasService) Mount(name, hostName, path string) (*api.Nas, error) {
 
 	nas, err := srv.findNas(name)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	if nas == nil {
 		return nil, providers.ResourceNotFoundError("NAS", name)
@@ -208,22 +253,30 @@ func (srv *NasService) Mount(name, hostName, path string) (*api.Nas, error) {
 
 	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	nsfclient, err := nfs.NewNFSClient(sshConfig)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	err = nsfclient.Install()
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	err = nsfclient.Mount(nfsServer.GetAccessIP(), nas.Path, mountPath)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	nasid, _ := uuid.NewV4()
@@ -235,6 +288,12 @@ func (srv *NasService) Mount(name, hostName, path string) (*api.Nas, error) {
 		IsServer: false,
 	}
 	err = metadata.MountNas(srv.provider, client, nas)
+	if err != nil {
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return client, tbr
+	}
+
 	return client, err
 }
 
@@ -242,7 +301,9 @@ func (srv *NasService) Mount(name, hostName, path string) (*api.Nas, error) {
 func (srv *NasService) UMount(name, hostName string) (*api.Nas, error) {
 	nas, err := srv.findNas(name)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	if nas == nil {
 		return nil, providers.ResourceNotFoundError("NAS", name)
@@ -250,7 +311,9 @@ func (srv *NasService) UMount(name, hostName string) (*api.Nas, error) {
 
 	client, err := srv.findClient(name, hostName)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	host, err := srv.hostService.Get(hostName)
@@ -265,20 +328,32 @@ func (srv *NasService) UMount(name, hostName string) (*api.Nas, error) {
 
 	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	nsfclient, err := nfs.NewNFSClient(sshConfig)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	err = nsfclient.Unmount(nfsServer.GetAccessIP(), nas.Path)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	err = metadata.UmountNas(srv.provider, client, nas)
+	if err != nil {
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return client, tbr
+	}
+
 	return client, err
 }
 
@@ -286,15 +361,20 @@ func (srv *NasService) UMount(name, hostName string) (*api.Nas, error) {
 func (srv *NasService) Inspect(name string) ([]*api.Nas, error) {
 	mtdNas, err := metadata.LoadNas(srv.provider, name)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "Error loading NAS metadata")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	if mtdNas == nil {
-		return nil, providers.ResourceNotFoundError("NAS", name)
+		tbr := providers.ResourceNotFoundError("NAS", name)
+		return nil, tbr
 	}
 
 	nass, err := mtdNas.Listclients()
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "Error listing NAS clients")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	nass = append([]*api.Nas{mtdNas.Get()}, nass...)
@@ -313,7 +393,9 @@ func (srv *NasService) removeNASDefinition(nas api.Nas) error {
 func (srv *NasService) findNas(name string) (*api.Nas, error) {
 	mtdNas, err := metadata.LoadNas(srv.provider, name)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	if mtdNas == nil {
 		return nil, nil
@@ -324,12 +406,20 @@ func (srv *NasService) findNas(name string) (*api.Nas, error) {
 func (srv *NasService) findClient(nasName, hostName string) (*api.Nas, error) {
 	mtdnas, err := metadata.LoadNas(srv.provider, nasName)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	if mtdnas == nil {
 		return nil, providers.ResourceNotFoundError("NAS", nasName)
 	}
 
 	client, err := mtdnas.FindClient(hostName)
+	if err != nil {
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return client, tbr
+	}
+
 	return client, err
 }

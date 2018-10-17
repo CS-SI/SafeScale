@@ -36,7 +36,7 @@ func (s *ImageServiceServer) List(ctx context.Context, in *pb.ImageListRequest) 
 	log.Printf("List images called")
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot list images : No tenant set")
 	}
 
 	service := services.NewImageService(currentTenant.Client)

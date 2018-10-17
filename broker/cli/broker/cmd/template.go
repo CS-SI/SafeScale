@@ -44,7 +44,7 @@ var templateList = cli.Command{
 	Action: func(c *cli.Context) error {
 		templates, err := client.New().Template.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not get tempalte list: %v", client.DecorateError(err, "list of templates", false))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of templates", false))
 		}
 		out, _ := json.Marshal(templates.GetTemplates())
 		fmt.Println(string(out))

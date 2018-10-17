@@ -18,6 +18,8 @@ package services
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
+	"log"
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -77,7 +79,9 @@ func (srv *ContainerService) Mount(containerName, hostName, path string) error {
 	// Check container existence
 	_, err := srv.Inspect(containerName)
 	if err != nil {
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 
 	// Get Host ID
@@ -138,7 +142,9 @@ func (srv *ContainerService) UMount(containerName, hostName string) error {
 	// Check container existence
 	_, err := srv.Inspect(containerName)
 	if err != nil {
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 
 	// Get Host ID

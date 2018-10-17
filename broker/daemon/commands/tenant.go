@@ -75,7 +75,7 @@ func (s *TenantServiceServer) Get(ctx context.Context, in *google_protobuf.Empty
 	log.Println("Tenant Get called")
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot get tenant : No tenant set")
 	}
 	return &pb.TenantName{Name: tenant.name}, nil
 }
@@ -105,7 +105,7 @@ func getCurrentTenant() *Tenant {
 
 // Set the the tenant tu use for each command
 func (s *TenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
-	log.Println("Tenant Set called")
+	log.Printf("Tenant Set called '%s'", in.Name)
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		log.Printf("Tenant '%s' is already selected", in.GetName())

@@ -41,10 +41,10 @@ type NetworkServiceServer struct{}
 
 // Create a new network
 func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
-	log.Println("Create Network called")
+	log.Printf("Create Network called '%s'", in.Name)
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot create network : No tenant set")
 	}
 
 	networkAPI := services.NewNetworkService(currentTenant.Client)
@@ -65,7 +65,7 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (
 	log.Printf("List Network called")
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot list networks : No tenant set")
 	}
 
 	networkAPI := services.NewNetworkService(currentTenant.Client)
@@ -88,15 +88,15 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (
 
 // Inspect returns infos on a network
 func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
-	log.Printf("Inspect Network called")
+	log.Printf("Inspect Network called '%s'", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Neither name nor id given as reference")
+		return nil, fmt.Errorf("Cannot inspect network : Neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot inspect network : No tenant set")
 	}
 
 	networkAPI := services.NewNetworkService(currentTenant.Client)
@@ -105,7 +105,7 @@ func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 		return nil, err
 	}
 	if network == nil {
-		return nil, fmt.Errorf("No network '%s' found", ref)
+		return nil, fmt.Errorf("Cannot inspect network : No network '%s' found", ref)
 	}
 
 	log.Printf("End Inspect Network: '%s'", ref)
@@ -118,11 +118,11 @@ func (s *NetworkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*g
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Neither name nor id given as reference")
+		return nil, fmt.Errorf("Cannot delete network : Neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot delete network : No tenant set")
 	}
 
 	networkAPI := services.NewNetworkService(currentTenant.Client)

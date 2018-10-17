@@ -18,6 +18,8 @@ package client
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -75,6 +77,13 @@ func DecorateError(err error, action string, maySucceed bool) error {
 			msg += " (may eventually succeed)"
 		}
 		return fmt.Errorf(msg, action, DefaultExecutionTimeout)
+	} else {
+		msg := err.Error()
+		if strings.Index(msg, "desc = ") != -1 {
+			pos := strings.Index(msg, "desc = ") + 7
+			msg = msg[pos:]
+			return errors.New(msg)
+		}
 	}
 	return err
 }

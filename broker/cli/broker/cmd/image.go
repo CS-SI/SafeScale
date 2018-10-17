@@ -44,7 +44,7 @@ var imageList = cli.Command{
 	Action: func(c *cli.Context) error {
 		images, err := client.New().Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not get image list: %v", client.DecorateError(err, "list of images", false))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of images", false))
 		}
 		out, _ := json.Marshal(images.GetImages())
 		fmt.Println(string(out))
