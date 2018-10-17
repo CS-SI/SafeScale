@@ -32,7 +32,7 @@ case $LINUX_KIND in
         ;;
 
     rhel|centos)
-        yum make-cache fast
+        yum makecache fast
         yum install -y nfs-utils
         systemctl enable rpcbind
         systemctl enable nfs-server

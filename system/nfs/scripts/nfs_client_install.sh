@@ -26,12 +26,13 @@ case $LINUX_KIND in
         chgrp utmp /var/log/lastlog
         chmod 664 /var/log/lastlog
 
-        sfWaitForApt && apt-get -y update && sfWaitForApt && apt-get install -qqy nfs-common
+        sfRetry 3m 5 "sfWaitForApt && apt -y update"
+        sfRetry 5m 5 "sfWaitForApt && apt-get install -qqy nfs-common"
         ;;
 
     rhel|centos)
-        yum make-cache fast
-        yum install -y nfs-server
+        yum makecache fast
+        yum install -y nfs-utils
         ;;
 
     *)
