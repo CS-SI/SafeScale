@@ -19,13 +19,12 @@ package commands
 import (
 	"context"
 	"fmt"
-	"log"
-
 	pb "github.com/CS-SI/SafeScale/broker"
 	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	log "github.com/sirupsen/logrus"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant

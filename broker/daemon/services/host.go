@@ -19,8 +19,7 @@ package services
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"log"
-
+	log "github.com/sirupsen/logrus"
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
@@ -29,6 +28,7 @@ import (
 )
 
 //go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services HostAPI
+
 
 //HostAPI defines API to manipulate hosts
 type HostAPI interface {
@@ -57,23 +57,23 @@ type HostService struct {
 }
 
 func (svc *HostService) Start(ref string) error {
-	log.Println("Starting host ...")
+	log.Printf("Starting host '%s'...", ref)
 	return svc.provider.StartHost(ref)
 }
 
 func (svc *HostService) Stop(ref string) error {
-	log.Println("Stopping host ...")
+	log.Printf("Stopping host '%s'...", ref)
 	return svc.provider.StopHost(ref)
 }
 
 func (svc *HostService) Reboot(ref string) error {
-	log.Println("Rebooting host ...")
+	log.Println("Rebooting host '%s'...", ref)
 	return svc.provider.RebootHost(ref)
 }
 
 // Create creates a host
 func (svc *HostService) Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.Host, error) {
-	log.Println("creating compute resource ...")
+	log.Printf("creating compute resource '%s' ...", name)
 	networks := []string{}
 	if len(net) != 0 {
 		n, err := svc.network.Get(net)

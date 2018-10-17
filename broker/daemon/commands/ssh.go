@@ -19,12 +19,11 @@ package commands
 import (
 	"context"
 	"fmt"
-	"log"
-
 	"github.com/CS-SI/SafeScale/system"
+	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	services "github.com/CS-SI/SafeScale/broker/daemon/services"
+	"github.com/CS-SI/SafeScale/broker/daemon/services"
 )
 
 // broker ssh connect host2

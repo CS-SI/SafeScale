@@ -19,7 +19,7 @@ package services
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"path"
 	"strings"
 

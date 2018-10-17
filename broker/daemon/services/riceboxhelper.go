@@ -20,11 +20,11 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"text/template"
 
 	"github.com/CS-SI/SafeScale/providers"
-	rice "github.com/GeertJohan/go.rice"
+	"github.com/GeertJohan/go.rice"
 )
 
 //go:generate rice embed-go

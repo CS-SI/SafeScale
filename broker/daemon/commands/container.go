@@ -19,11 +19,10 @@ package commands
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"log"
-
-	services "github.com/CS-SI/SafeScale/broker/daemon/services"
+	"github.com/CS-SI/SafeScale/broker/daemon/services"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 
@@ -39,6 +38,7 @@ import (
 
 //ContainerServiceServer is the container service grpc server
 type ContainerServiceServer struct{}
+
 
 //List available containers
 func (s *ContainerServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.ContainerList, error) {

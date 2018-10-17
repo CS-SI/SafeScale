@@ -19,11 +19,10 @@ package commands
 import (
 	"context"
 	"fmt"
-	"log"
-
 	pb "github.com/CS-SI/SafeScale/broker"
-	services "github.com/CS-SI/SafeScale/broker/daemon/services"
+	"github.com/CS-SI/SafeScale/broker/daemon/services"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 // broker image list --all=false

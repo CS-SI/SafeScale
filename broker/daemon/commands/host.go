@@ -19,13 +19,12 @@ package commands
 import (
 	"context"
 	"fmt"
-	"log"
-
 	pb "github.com/CS-SI/SafeScale/broker"
-	services "github.com/CS-SI/SafeScale/broker/daemon/services"
+	"github.com/CS-SI/SafeScale/broker/daemon/services"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
-	utils "github.com/CS-SI/SafeScale/broker/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	log "github.com/sirupsen/logrus"
 )
 
 // broker host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
@@ -35,6 +34,7 @@ import (
 
 // HostServiceServer host service server grpc
 type HostServiceServer struct{}
+
 
 func (s *HostServiceServer) Start(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Start host called '%s'", in.Name)
