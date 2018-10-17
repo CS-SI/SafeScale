@@ -97,7 +97,6 @@ func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachmen
 	err := service.Attach(in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat())
 
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 
@@ -117,7 +116,6 @@ func (s *VolumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachmen
 	err := service.Detach(in.GetVolume().GetName(), in.GetHost().GetName())
 
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 

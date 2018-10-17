@@ -78,10 +78,9 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	if len(net) != 0 {
 		n, err := svc.network.Get(net)
 		if err != nil {
-			fmt.Println("Failed to get network resource data.")
-			tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
-		return nil, tbr
+			tbr := errors.Wrap(err, "Failed to get network resource data.")
+			log.Errorf("%+v", tbr)
+			return nil, tbr
 		}
 		if n == nil {
 			return nil, fmt.Errorf("Failed to find network '%s'", net)
@@ -96,9 +95,8 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	})
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
-		log.Println("Failed to find image to use on compute resource.")
-		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		tbr := errors.Wrap(err, "Failed to find image to use on compute resource.")
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	hostRequest := api.HostRequest{
@@ -111,9 +109,8 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	}
 	host, err := svc.provider.CreateHost(hostRequest)
 	if err != nil {
-		log.Println("Compute resource creation failed.")
-		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		tbr := errors.Wrap(err, "Compute resource creation failed.")
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	log.Printf("Compute resource created: '%s'", host.Name)
@@ -126,23 +123,23 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	if err != nil {
 		svc.provider.DeleteHost(host.ID)
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	err = ssh.WaitServerReady(utils.TimeoutCtxHost)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	if client.IsTimeout(err) {
 		svc.provider.DeleteHost(host.ID)
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
-	log.Println("SSH service started.")
+	log.Printf("SSH service started on host '%s'.", host.Name)
 	return host, nil
 }
 

@@ -131,7 +131,6 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 		int(in.GetCPUNumber()), in.GetRAM(), int(in.GetDisk()), in.GetImageID(), in.GetPublic())
 
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 

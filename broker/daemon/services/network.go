@@ -82,18 +82,18 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	})
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	if len(tpls) < 1 {
 		tbr := errors.New(fmt.Sprintf("No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
@@ -103,7 +103,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	keypair, err := svc.provider.CreateKeyPair(keypairName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
@@ -119,7 +119,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
 		tbr := errors.Wrapf(err, "Gateway creation with name '%s' failed", gwname)
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
@@ -132,7 +132,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	if err != nil {
 		defer svc.provider.DeleteHost(gw.ID)
 		tbr := errors.Wrapf(err, "Error retrieving SSH config of gateway '%s'", gw.Name)
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
@@ -141,7 +141,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	// err = ssh.WaitServerReady(time.Second * 15)
 	if err != nil {
 		tbr := errors.Wrapf(err, "Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	log.Printf("SSH service of gateway '%s' started.", gw.Name)
@@ -154,7 +154,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	err = metadata.SaveNetwork(svc.provider, rv)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
-		log.Printf("%+v", tbr)
+		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
