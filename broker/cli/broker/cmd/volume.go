@@ -52,7 +52,7 @@ var volumeList = cli.Command{
 	Action: func(c *cli.Context) error {
 		resp, err := client.New().Volume.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not get volume list: %v", client.DecorateError(err, "list of volumes", false))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of volumes", false))
 		}
 
 		var volumes []*volumeDisplayable
@@ -77,7 +77,7 @@ var volumeInspect = cli.Command{
 		}
 		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not get volume '%s': %v", c.Args().First(), client.DecorateError(err, "inspection of volume", false))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of volume", false))
 		}
 
 		out, _ := json.Marshal(toDisplaybleVolumeInfo(volumeInfo))
@@ -99,7 +99,7 @@ var volumeDelete = cli.Command{
 		}
 		err := client.New().Volume.Delete(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not delete volume '%s': %v", c.Args().First(), client.DecorateError(err, "deletion of volume", true))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "deletion of volume", true))
 		}
 		fmt.Printf("Volume '%s' deleted\n", c.Args().First())
 
@@ -143,7 +143,7 @@ var volumeCreate = cli.Command{
 
 		volume, err := client.New().Volume.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not create volume '%s': %v", c.Args().First(), client.DecorateError(err, "creation of volume", true))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "creation of volume", true))
 		}
 		out, _ := json.Marshal(toDisplaybleVolume(volume))
 		fmt.Println(string(out))
@@ -182,8 +182,7 @@ var volumeAttach = cli.Command{
 		}
 		err := client.New().Volume.Attach(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("could not attach volume '%s' to host '%s': %v",
-				c.Args().Get(0), c.Args().Get(1), client.DecorateError(err, "attach of volume", true))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "attach of volume", true))
 		}
 		fmt.Printf("Volume '%s' attached to host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 
@@ -203,8 +202,7 @@ var volumeDetach = cli.Command{
 		}
 		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("could not detach volume '%s' from host '%s': %v",
-				c.Args().Get(0), c.Args().Get(1), client.DecorateError(err, "unattach of volume", true))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "unattach of volume", true))
 		}
 		fmt.Printf("Volume '%s' detached from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 

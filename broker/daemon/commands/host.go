@@ -37,10 +37,10 @@ import (
 type HostServiceServer struct{}
 
 func (s *HostServiceServer) Start(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Start host called")
+	log.Printf("Start host called '%s'", in.Name)
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot start host : No tenant set")
 	}
 
 	ref := utils.GetReference(in)
@@ -56,10 +56,10 @@ func (s *HostServiceServer) Start(ctx context.Context, in *pb.Reference) (*googl
 }
 
 func (s *HostServiceServer) Stop(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Stop host called")
+	log.Printf("Stop host called '%s'", in.Name)
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot stop host : No tenant set")
 	}
 
 	ref := utils.GetReference(in)
@@ -75,10 +75,10 @@ func (s *HostServiceServer) Stop(ctx context.Context, in *pb.Reference) (*google
 }
 
 func (s *HostServiceServer) Reboot(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Reboot host called")
+	log.Printf("Reboot host called, '%s'", in.Name)
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot reboot host : No tenant set")
 	}
 
 	ref := utils.GetReference(in)
@@ -98,7 +98,7 @@ func (s *HostServiceServer) List(ctx context.Context, in *pb.HostListRequest) (*
 	log.Printf("List hosts called")
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot list hosts : No tenant set")
 	}
 
 	hostAPI := services.NewHostService(currentTenant.Client)
@@ -121,9 +121,9 @@ func (s *HostServiceServer) List(ctx context.Context, in *pb.HostListRequest) (*
 
 // Create a new host
 func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
-	log.Printf("Create host called")
+	log.Printf("Create host called '%s'", in.Name)
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot create host : No tenant set")
 	}
 
 	hostService := services.NewHostService(currentTenant.Client)
@@ -141,15 +141,15 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 
 // Inspect an host
 func (s *HostServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host, error) {
-	log.Printf("Inspect Host called")
+	log.Printf("Inspect Host called '%s'", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Neither name nor id given as reference")
+		return nil, fmt.Errorf("Cannot inspect host : Neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot inspect host : No tenant set")
 	}
 
 	hostService := services.NewHostService(currentTenant.Client)
@@ -158,7 +158,7 @@ func (s *HostServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.
 		return nil, err
 	}
 	if host == nil {
-		return nil, fmt.Errorf("No host '%s' found", ref)
+		return nil, fmt.Errorf("Cannot inspect host : No host '%s' found", ref)
 	}
 
 	log.Printf("End Inspect Host: '%s'", ref)
@@ -167,15 +167,15 @@ func (s *HostServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.
 
 // Delete an host
 func (s *HostServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Delete Host called")
+	log.Printf("Delete Host called '%s'", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Neither name nor id given as reference")
+		return nil, fmt.Errorf("Cannot delete host : Neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot delete host : No tenant set")
 	}
 	hostService := services.NewHostService(currentTenant.Client)
 	err := hostService.Delete(ref)
@@ -188,15 +188,15 @@ func (s *HostServiceServer) Delete(ctx context.Context, in *pb.Reference) (*goog
 
 // SSH returns ssh parameters to access an host
 func (s *HostServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
-	log.Printf("Ssh Host called")
+	log.Printf("Ssh Host called '%s'", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Neither name nor id given as reference")
+		return nil, fmt.Errorf("Cannot ssh host : Neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot ssh host : No tenant set")
 	}
 	hostService := services.NewHostService(currentTenant.Client)
 	sshConfig, err := hostService.SSH(ref)

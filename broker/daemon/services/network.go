@@ -18,6 +18,7 @@ package services
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"log"
 
 	"github.com/CS-SI/SafeScale/broker/utils"
@@ -82,14 +83,20 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		MinDiskSize: disk,
 	})
 	if err != nil {
-		panic(err)
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	if len(tpls) < 1 {
-		panic(fmt.Sprintf("No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
+		tbr := errors.New(fmt.Sprintf("No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
-		panic(err)
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	keypairName := "kp_" + network.Name
@@ -97,7 +104,9 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	svc.provider.DeleteKeyPair(keypairName)
 	keypair, err := svc.provider.CreateKeyPair(keypairName)
 	if err != nil {
-		panic(err)
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	gwRequest := api.GWRequest{
@@ -108,10 +117,11 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		GWName:     gwname,
 	}
 
-	// TODO Panic ???
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
-		panic(err)
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
@@ -121,12 +131,16 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	ssh, err := svc.provider.GetSSHConfig(gw.ID)
 	if err != nil {
 		svc.provider.DeleteHost(gw.ID)
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	err = ssh.WaitServerReady(utils.TimeoutCtxHost)
 	if err != nil {
 		log.Println("failed to reach SSH service")
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	log.Println("SSH service started.")
 
@@ -137,7 +151,9 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 	err = metadata.SaveNetwork(svc.provider, rv)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	return rv, err

@@ -122,7 +122,7 @@ func main() {
 	pb.RegisterContainerServiceServer(s, &commands.ContainerServiceServer{})
 	pb.RegisterNasServiceServer(s, &commands.NasServiceServer{})
 	pb.RegisterImageServiceServer(s, &commands.ImageServiceServer{})
-	pb.RegisterTemplateServiceServer(s, &commands.TempalteServiceServer{})
+	pb.RegisterTemplateServiceServer(s, &commands.TemplateServiceServer{})
 
 	// log.Println("Initializing service factory")
 	// commands.InitServiceFactory()

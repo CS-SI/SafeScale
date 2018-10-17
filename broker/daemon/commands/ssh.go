@@ -37,9 +37,9 @@ type SSHServiceServer struct{}
 
 // Run executes an ssh command an an host
 func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
-	log.Printf("Ssh run called")
+	log.Printf("Ssh run called '%s', '%s'", in.Host, in.Command)
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot execute ssh command : No tenant set")
 	}
 
 	service := services.NewSSHService(currentTenant.Client)
@@ -55,9 +55,9 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 
 // Copy copy file from/to an host
 func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshResponse, error) {
-	//log.Printf("Ssh copy called")
+	log.Printf("Ssh copy called '%s', '%s'", in.Source, in.Destination)
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot copy ssh : No tenant set")
 	}
 
 	service := services.NewSSHService(currentTenant.Client)
@@ -66,7 +66,7 @@ func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb
 		return nil, err
 	}
 	if retcode != 0 {
-		return nil, fmt.Errorf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
+		return nil, fmt.Errorf("Cannot copy ssh : copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
 	}
 	if err != nil {
 		return nil, err

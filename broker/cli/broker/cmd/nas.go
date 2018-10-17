@@ -65,7 +65,7 @@ var nasCreate = cli.Command{
 		}
 		err := client.New().Nas.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not create nas: %v", client.DecorateError(err, "creation of nas", true))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "creation of nas", true))
 		}
 
 		return nil
@@ -84,7 +84,7 @@ var nasDelete = cli.Command{
 		}
 		err := client.New().Nas.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not delete nas: %v", client.DecorateError(err, "deletion of nas", true))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "deletion of nas", true))
 		}
 
 		return nil
@@ -97,7 +97,7 @@ var nasList = cli.Command{
 	Action: func(c *cli.Context) error {
 		nass, err := client.New().Nas.List(0)
 		if err != nil {
-			return fmt.Errorf("Could not get nas list: %v", client.DecorateError(err, "list of nas", false))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "list of nas", false))
 		}
 		out, _ := json.Marshal(nass.GetNasList())
 		fmt.Println(string(out))
@@ -125,7 +125,7 @@ var nasMount = cli.Command{
 		}
 		err := client.New().Nas.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not mount nfs directory: %v", client.DecorateError(err, "mount of nas", true))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "mount of nas", true))
 		}
 		return nil
 	},
@@ -143,7 +143,7 @@ var nasUnmount = cli.Command{
 		}
 		err := client.New().Nas.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not umount nfs directory: %v", client.DecorateError(err, "unmount of nas", true))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "unmount of nas", true))
 		}
 
 		return nil
@@ -162,7 +162,7 @@ var nasInspect = cli.Command{
 		}
 		nass, err := client.New().Nas.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not inspect nas: %v", client.DecorateError(err, "inspection of nas", false))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "inspection of nas", false))
 		}
 		out, _ := json.Marshal(nass.GetNasList())
 		fmt.Println(string(out))

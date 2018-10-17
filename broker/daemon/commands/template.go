@@ -28,15 +28,15 @@ import (
 
 // broker template list --all=false
 
-//TempalteServiceServer host service server grpc
-type TempalteServiceServer struct{}
+//TemplateServiceServer host service server grpc
+type TemplateServiceServer struct{}
 
 // List available templates
-func (s *TempalteServiceServer) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
+func (s *TemplateServiceServer) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
 	log.Printf("Template List called")
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("No tenant set")
+		return nil, fmt.Errorf("Cannot list templates : No tenant set")
 	}
 
 	service := services.NewTemplateService(currentTenant.Client)
@@ -46,13 +46,13 @@ func (s *TempalteServiceServer) List(ctx context.Context, in *pb.TemplateListReq
 		return nil, err
 	}
 
-	var pbTempaltes []*pb.HostTemplate
+	var pbTemplates []*pb.HostTemplate
 
 	// Map api.Host to pb.Host
 	for _, template := range templates {
-		pbTempaltes = append(pbTempaltes, conv.ToPBHostTemplate(&template))
+		pbTemplates = append(pbTemplates, conv.ToPBHostTemplate(&template))
 	}
-	rv := &pb.TemplateList{Templates: pbTempaltes}
+	rv := &pb.TemplateList{Templates: pbTemplates}
 	log.Printf("End ListTemplates")
 	return rv, nil
 }

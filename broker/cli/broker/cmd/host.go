@@ -53,7 +53,7 @@ var hostStart = cli.Command{
 		}
 		resp, err := client.New().Host.Start(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not start host '%s': %v", c.Args().First(), client.DecorateError(err, "inspection of host", false))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -75,7 +75,7 @@ var hostStop = cli.Command{
 		}
 		resp, err := client.New().Host.Stop(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not start host '%s': %v", c.Args().First(), client.DecorateError(err, "inspection of host", false))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -97,7 +97,7 @@ var hostReboot = cli.Command{
 		}
 		resp, err := client.New().Host.Reboot(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not reboot host '%s': %v", c.Args().First(), client.DecorateError(err, "inspection of host", false))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -118,7 +118,7 @@ var hostList = cli.Command{
 	Action: func(c *cli.Context) error {
 		hosts, err := client.New().Host.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not get host list: %v", client.DecorateError(err, "list of hosts", false))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of hosts", false))
 		}
 		out, _ := json.Marshal(hosts.GetHosts())
 		fmt.Println(string(out))
@@ -139,7 +139,7 @@ var hostInspect = cli.Command{
 		}
 		resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not inspect host '%s': %v", c.Args().First(), client.DecorateError(err, "inspection of host", false))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -206,7 +206,7 @@ var hostCreate = cli.Command{
 		}
 		resp, err := client.New().Host.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not create host '%s': %v", c.Args().First(), client.DecorateError(err, "creation of host", true))
+			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "creation of host", true))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -228,7 +228,7 @@ var hostDelete = cli.Command{
 		}
 		err := client.New().Host.Delete(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Could not delete host '%s': %v", c.Args().First(), client.DecorateError(err, "deletion of host", true))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "deletion of host", true))
 		}
 		fmt.Printf("Host '%s' deleted\n", c.Args().First())
 		return nil
@@ -247,7 +247,7 @@ var hostSsh = cli.Command{
 		}
 		resp, err := client.New().Host.SSHConfig(c.Args().First())
 		if err != nil {
-			return fmt.Errorf("Could not get ssh config for host '%s': %v", c.Args().First(), client.DecorateError(err, "ssh config of host", false))
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "ssh config of host", false))
 		}
 		out, _ := json.Marshal(resp)
 		fmt.Println(string(out))

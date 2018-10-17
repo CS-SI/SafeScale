@@ -50,7 +50,7 @@ func loadSpecFile(name string) (*viper.Viper, error) {
 	name += ".yml"
 	tmplString, err := templateBox.String(name)
 	if err != nil {
-		panic(fmt.Sprintf("failed to read embedded feature speficication file '%s': %s", name, err.Error()))
+		return nil, fmt.Errorf("failed to read embedded feature speficication file '%s': %s", name, err.Error())
 	}
 
 	v := viper.New()

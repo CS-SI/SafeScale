@@ -19,6 +19,8 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"github.com/pkg/errors"
+	"log"
 	"text/template"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -33,23 +35,31 @@ func getBoxContent(script string, data interface{}) (string, error) {
 	box, err := rice.FindBox("broker_scripts")
 	if err != nil {
 		// TODO Use more explicit error
-		return "", err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return "", tbr
 	}
 	scriptContent, err := box.String(script)
 	if err != nil {
 		// TODO Use more explicit error
-		return "", err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return "", tbr
 	}
 	tpl, err := template.New("TemplateName").Parse(scriptContent)
 	if err != nil {
 		// TODO Use more explicit error
-		return "", err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return "", tbr
 	}
 
 	var buffer bytes.Buffer
 	if err = tpl.Execute(&buffer, data); err != nil {
 		// TODO Use more explicit error
-		return "", err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return "", tbr
 	}
 
 	tplcmd := buffer.String()
@@ -62,20 +72,29 @@ func exec(script string, data interface{}, hostid string, provider *providers.Se
 	scriptCmd, err := getBoxContent(script, data)
 	if err != nil {
 		// TODO Use more explicit error
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 	// retrieve ssh config to perform some commands
 	ssh, err := provider.GetSSHConfig(hostid)
 	if err != nil {
 		// TODO Use more explicit error
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 
 	cmd, err := ssh.SudoCommand(scriptCmd)
 	if err != nil {
 		// TODO Use more explicit error
-		return err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return tbr
 	}
 	_, err = cmd.Output()
-	return err
+
+	tbr := errors.Wrap(err, "")
+	log.Printf("%+v", tbr)
+	return tbr
 }

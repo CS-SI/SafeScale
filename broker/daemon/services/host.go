@@ -18,6 +18,7 @@ package services
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"log"
 
 	"github.com/CS-SI/SafeScale/broker/client"
@@ -78,7 +79,9 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		n, err := svc.network.Get(net)
 		if err != nil {
 			fmt.Println("failed to get network resource data.")
-			return nil, err
+			tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 		}
 		if n == nil {
 			return nil, fmt.Errorf("failed to find network '%s'", net)
@@ -94,7 +97,9 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
 		log.Println("failed to find image to use on compute resource.")
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	hostRequest := api.HostRequest{
 		ImageID:    img.ID,
@@ -106,27 +111,35 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	}
 	host, err := svc.provider.CreateHost(hostRequest)
 	if err != nil {
-		log.Println("compute resource creation failed.")
-		return nil, err
+		log.Println("Compute resource creation failed.")
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
-	log.Println("compute resource created.")
+	log.Printf("Compute resource created: '%s'", host.Name)
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
-	log.Println("Waiting start of SSH service on remote host...")
+	log.Printf("Waiting start of SSH service on remote host '%s' ...", host.Name)
 	ssh, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
 		svc.provider.DeleteHost(host.ID)
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	err = ssh.WaitServerReady(utils.TimeoutCtxHost)
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 	if client.IsTimeout(err) {
 		svc.provider.DeleteHost(host.ID)
-		return nil, err
+		tbr := errors.Wrap(err, "")
+		log.Printf("%+v", tbr)
+		return nil, tbr
 	}
 
 	log.Println("SSH service started.")
