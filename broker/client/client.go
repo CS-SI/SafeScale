@@ -82,7 +82,13 @@ func DecorateError(err error, action string, maySucceed bool) error {
 		if strings.Index(msg, "desc = ") != -1 {
 			pos := strings.Index(msg, "desc = ") + 7
 			msg = msg[pos:]
+
+			if strings.Index(msg, " :") == 0 {
+				msg = msg[2:]
+			}
+
 			return errors.New(msg)
+
 		}
 	}
 	return err
