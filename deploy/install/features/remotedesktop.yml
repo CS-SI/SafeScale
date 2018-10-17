@@ -461,7 +461,7 @@ feature:
                             ls -la
                             # build image
                             docker build -t remotedesktop:latest . || exit $?
-                            cd /var/tmp && rm -rf remotedesktop.image && docker image prune -f
+                            cd /var/tmp && rm -rf remotedesktop.image
 
                     start:
                         targets:
