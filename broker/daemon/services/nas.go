@@ -90,7 +90,7 @@ func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 	}
 
 	host, err := srv.hostService.Get(hostName)
-	if err != nil {
+	if err != nil || host == nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
