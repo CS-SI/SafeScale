@@ -19,6 +19,7 @@ package flexibleengine
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/pkg/errors"
 	"log"
 	"net/http"
 	"strings"
@@ -558,7 +559,7 @@ func (client *Client) DeleteHost(ref string) error {
 		return err
 	}
 	if m == nil {
-		return providers.ResourceNotFoundError("host", ref)
+		return errors.Wrap(providers.ResourceNotFoundError("host", ref), "Cannot delete host")
 	}
 
 	host := m.Get()

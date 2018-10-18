@@ -131,7 +131,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return tbr
 	}
 	if volume == nil {
-		return providers.ResourceNotFoundError("volume", volumename)
+		return errors.Wrap(providers.ResourceNotFoundError("volume", volumename), "Cannot attach volume")
 	}
 
 	// Get Host ID
@@ -143,7 +143,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return tbr
 	}
 	if host == nil {
-		return providers.ResourceNotFoundError("host", hostName)
+		return errors.Wrap(providers.ResourceNotFoundError("host", hostName), "Cannot attach volume")
 	}
 
 	// Note: most providers are not able to tell the real device name the volume
@@ -277,14 +277,14 @@ func (svc *VolumeService) listAttachedDevices(host *api.Host) (mapset.Set, error
 func (svc *VolumeService) Detach(volumename string, hostName string) error {
 	vol, err := svc.Get(volumename)
 	if err != nil {
-		return providers.ResourceNotFoundError("volume", volumename)
+		return errors.Wrap(providers.ResourceNotFoundError("volume", volumename), "Cannot detach volume")
 	}
 
 	// Get Host ID
 	hostService := NewHostService(svc.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return providers.ResourceNotFoundError("host", hostName)
+		return errors.Wrap(providers.ResourceNotFoundError("host", hostName), "Cannot detach volume")
 	}
 
 	// providerVA, err := svc.provider.GetVolumeAttachment(host.ID, vol.ID)

@@ -64,6 +64,11 @@ func (s *NasServiceServer) Delete(ctx context.Context, in *pb.NasName) (*pb.NasD
 	}
 
 	nasService := services.NewNasService(currentTenant.Client)
+
+	if _, noNas := nasService.Inspect(in.GetName()); noNas != nil {
+		return nil, fmt.Errorf("Cannot delete NAS : NAS '%s' not found", in.GetName())
+	}
+
 	nas, err := nasService.Delete(in.GetName())
 
 	if err != nil {

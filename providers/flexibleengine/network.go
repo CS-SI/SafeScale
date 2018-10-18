@@ -19,6 +19,7 @@ package flexibleengine
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"log"
 	"net"
 	"strings"
@@ -323,7 +324,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		return err
 	}
 	if m == nil {
-		return providers.ResourceNotFoundError("network", networkRef)
+		return errors.Wrap(providers.ResourceNotFoundError("network", networkRef), "Cannot delete network")
 	}
 	networkID := m.Get().ID
 	hosts, err := m.ListHosts()
