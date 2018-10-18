@@ -18,6 +18,7 @@ package flexibleengine
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -44,7 +45,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		return nil, err
 	}
 	if mtdVol == nil {
-		return nil, providers.ResourceNotFoundError("volume", request.VolumeID)
+		return nil, errors.Wrap(providers.ResourceNotFoundError("volume", request.VolumeID), "Cannot create volume attachment")
 	}
 	_volumeAttachment, err := mtdVol.GetAttachment()
 	if err != nil {
@@ -59,7 +60,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		return nil, err
 	}
 	if mdtHost == nil {
-		return nil, providers.ResourceNotFoundError("host", request.ServerID)
+		return nil, errors.Wrap(providers.ResourceNotFoundError("host", request.ServerID), "Cannot create volume attachment")
 	}
 
 	// return client.osclt.CreateVolumeAttachment(request)
@@ -134,7 +135,7 @@ func (client *Client) DeleteVolume(id string) error {
 		return err
 	}
 	if volume == nil {
-		return providers.ResourceNotFoundError("volume", id)
+		return errors.Wrap(providers.ResourceNotFoundError("volume", id), "Cannot delete volume")
 	}
 
 	err = v2_vol.Delete(client.osclt.Volume, id).ExtractErr()

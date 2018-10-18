@@ -113,12 +113,14 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		KeyPair:    keypair,
 		TemplateID: tpls[0].ID,
 		GWName:     gwname,
-	}
+		}
 
-	log.Printf("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwname)
+	gwGeneratedName := "gw-" + network.Name
+	log.Printf("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwGeneratedName)
+
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
-		tbr := errors.Wrapf(err, "Gateway creation with name '%s' failed", gwname)
+		tbr := errors.Wrapf(err, "Gateway creation with name '%s' failed", gwGeneratedName)
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
