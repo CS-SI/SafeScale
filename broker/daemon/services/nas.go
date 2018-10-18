@@ -327,25 +327,27 @@ func (srv *NasService) UMount(name, hostName string) (*api.Nas, error) {
 		return nil, providers.ResourceNotFoundError("host", nas.Host)
 	}
 
-	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
-	if err != nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return nil, tbr
-	}
+	if host != nil {
+		sshConfig, err := srv.provider.GetSSHConfig(host.ID)
+		if err != nil {
+			tbr := errors.Wrap(err, "")
+			log.Errorf("%+v", tbr)
+			return nil, tbr
+		}
 
-	nsfclient, err := nfs.NewNFSClient(sshConfig)
-	if err != nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return nil, tbr
-	}
+		nsfclient, err := nfs.NewNFSClient(sshConfig)
+		if err != nil {
+			tbr := errors.Wrap(err, "")
+			log.Errorf("%+v", tbr)
+			return nil, tbr
+		}
 
-	err = nsfclient.Unmount(nfsServer.GetAccessIP(), nas.Path)
-	if err != nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return nil, tbr
+		err = nsfclient.Unmount(nfsServer.GetAccessIP(), nas.Path)
+		if err != nil {
+			tbr := errors.Wrap(err, "")
+			log.Errorf("%+v", tbr)
+			return nil, tbr
+		}
 	}
 
 	err = metadata.UmountNas(srv.provider, client, nas)
