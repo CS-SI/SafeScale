@@ -89,7 +89,7 @@ func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 	}
 
 	host, err := srv.hostService.Get(hostName)
-	if err != nil {
+	if err != nil || host == nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
@@ -236,6 +236,7 @@ func (srv *NasService) Mount(name, hostName, path string) (*api.Nas, error) {
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
+
 	if nas == nil {
 		return nil, errors.Wrap(providers.ResourceNotFoundError("NAS", name), "Cannot Mount NAS")
 

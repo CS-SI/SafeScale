@@ -2,7 +2,7 @@
 *.exe
 *.dll
 *.so
-*.dylib
+*.log
 
 # Test binary, build with `go test -c`
 *.test
@@ -16,6 +16,7 @@ debug
 .idea/workspace.xml
 .vscode
 .idea
+
 
 #remove client tests
 providers/aws/*_test.go
