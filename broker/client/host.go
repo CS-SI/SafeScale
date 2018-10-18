@@ -21,7 +21,11 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
+
+	cache "github.com/CS-SI/SafeScale/utils"
 )
+
+var sshCfgCache = cache.NewMapCache()
 
 // host is the broker client part handling hosts
 type host struct {
@@ -122,10 +126,17 @@ func (h *host) Delete(name string, timeout time.Duration) error {
 
 // SSHConfig ...
 func (h *host) SSHConfig(name string) (*pb.SshConfig, error) {
+	if anon, ok := sshCfgCache.Get(name); ok {
+		return anon.(*pb.SshConfig), nil
+	}
 	conn := utils.GetConnection()
 	defer conn.Close()
 	ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
 	defer cancel()
 	service := pb.NewHostServiceClient(conn)
-	return service.SSH(ctx, &pb.Reference{Name: name})
+	sshCfg, err := service.SSH(ctx, &pb.Reference{Name: name})
+	if err == nil {
+		sshCfgCache.Set(name, sshCfg)
+	}
+	return sshCfg, err
 }
