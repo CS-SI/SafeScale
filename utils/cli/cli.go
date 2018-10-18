@@ -147,6 +147,16 @@ func (c *Command) StringOption(option string, parameter string, def string) stri
 	return def
 }
 
+// StringSliceOption extracts the value of a slice of strings option
+// options contains a list of options (format -x or --xxx) separated by commas
+func (c *Command) StringSliceOption(option string, parameter string, def []string) []string {
+	anon := c.Option(option, parameter)
+	if anon != nil {
+		return anon.([]string)
+	}
+	return def
+}
+
 // IntOption returns the integer value of the option 'option',
 // where value is named 'parameter' in the docopt usage
 func (c *Command) IntOption(option string, parameter string, def int) int {
