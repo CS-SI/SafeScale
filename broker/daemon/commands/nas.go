@@ -19,6 +19,7 @@ package commands
 import (
 	"context"
 	"fmt"
+
 	"github.com/CS-SI/SafeScale/broker/daemon/services"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
