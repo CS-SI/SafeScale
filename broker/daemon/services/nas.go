@@ -18,10 +18,11 @@ package services
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"path"
 	"strings"
+
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -236,13 +237,13 @@ func (srv *NasService) Mount(name, hostName, path string) (*api.Nas, error) {
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
+
 	if nas == nil {
 		return nil, providers.ResourceNotFoundError("NAS", name)
-
 	}
 
 	host, err := srv.hostService.Get(hostName)
-	if err != nil {
+	if err != nil || host == nil {
 		return nil, providers.ResourceNotFoundError("host", hostName)
 	}
 
