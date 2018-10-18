@@ -227,18 +227,31 @@ func convertStructToMap(src interface{}) (map[string]interface{}, error) {
 	}
 
 	// Add information not directly in cluster GetConfig()
-	toFormat["admin_login"] = "cladm"
-	brkclt := brokerclient.New().Host
-	remoteDesktops := []string{}
-	gwPublicIP := clusterInstance.GetConfig().PublicIP
-	for _, id := range clusterInstance.ListMasterIDs() {
-		host, err := brkclt.Inspect(id, brokerclient.DefaultExecutionTimeout)
-		if err != nil {
-			return nil, err
+	feature, err := install.NewFeature("remotedesktop")
+	found := false
+	if err == nil {
+		target := install.NewClusterTarget(clusterInstance)
+		var results install.Results
+		results, err := feature.Check(target, install.Variables{}, install.Settings{})
+		found = err == nil && results.Successful()
+		if found {
+			brkclt := brokerclient.New().Host
+			remoteDesktops := []string{}
+			gwPublicIP := clusterInstance.GetConfig().PublicIP
+			for _, id := range clusterInstance.ListMasterIDs() {
+				host, err := brkclt.Inspect(id, brokerclient.DefaultExecutionTimeout)
+				if err != nil {
+					return nil, err
+				}
+				remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s/", gwPublicIP, host.Name))
+			}
+			toFormat["remote_desktop"] = remoteDesktops
 		}
-		remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s/", gwPublicIP, host.Name))
 	}
-	toFormat["remote_desktop"] = remoteDesktops
+	if !found {
+		toFormat["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'deploy cluster %s feature remotedesktop add'.", clusterName)
+	}
+	toFormat["admin_login"] = "cladm"
 
 	return toFormat, nil
 }
@@ -269,6 +282,8 @@ var clusterCreateCommand = &cli.Command{
 			cidr = "192.168.0.0/16"
 		}
 
+		disableFeatures := c.StringSliceArgument("--disable", []string{})
+
 		los := c.StringOption("--os", "<operating system>", ubuntu1604)
 		if flavor == Flavor.DCOS {
 			// DCOS forces to use RHEL/CentOS/CoreOS, and we've chosen to use CentOS, so ignore --os option
@@ -288,12 +303,13 @@ var clusterCreateCommand = &cli.Command{
 			}
 		}
 		clusterInstance, err = cluster.Create(clusterapi.Request{
-			Name:          clusterName,
-			Complexity:    complexity,
-			CIDR:          cidr,
-			Flavor:        flavor,
-			KeepOnFailure: keep,
-			NodesDef:      nodesDef,
+			Name:                    clusterName,
+			Complexity:              complexity,
+			CIDR:                    cidr,
+			Flavor:                  flavor,
+			KeepOnFailure:           keep,
+			NodesDef:                nodesDef,
+			DisabledDefaultFeatures: disableFeatures,
 		})
 		if err != nil {
 			if clusterInstance != nil {
