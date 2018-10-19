@@ -310,21 +310,20 @@ func (svc *VolumeService) Detach(volumename string, hostName string) error {
 
 	sshConfig, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "error getting ssh config")
 		log.Errorf("%+v", tbr)
 		return tbr
 	}
 
 	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "error creating nfs service")
 		log.Errorf("%+v", tbr)
 		return tbr
 	}
 	err = server.UnmountBlockDevice(volatt.Device)
 	if err != nil {
-		fmt.Printf("%s", err.Error())
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "error unmounting block device")
 		log.Errorf("%+v", tbr)
 		return tbr
 	}
