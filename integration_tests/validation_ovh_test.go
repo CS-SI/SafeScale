@@ -40,21 +40,21 @@ func Test_Basic(t *testing.T) {
 	out, err = getOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network eazy...")
+	fmt.Println("Creating network crazy...")
 
-	out, err = getOutput("broker network create eazy")
+	out, err = getOutput("broker network create crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker network create eazy")
+	out, err = getOutput("broker network create crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A network already exist"))
 
 	fmt.Println("Creating VM easyVM...")
 
-	out, err = getOutput("broker host create easyvm --public --net eazy")
+	out, err = getOutput("broker host create easyvm --public --net crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host create easyvm --public --net eazy")
+	out, err = getOutput("broker host create easyvm --public --net crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A host already exists"))
 
@@ -66,10 +66,10 @@ func Test_Basic(t *testing.T) {
 
 	fmt.Println("Creating VM complexvm...")
 
-	out, err = getOutput("broker host create complexvm --public --net eazy")
+	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host create complexvm --public --net eazy")
+	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A host already exists"))
 
@@ -162,11 +162,11 @@ func Test_Basic(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
-	out, err = getOutput("broker host delete gw-eazy")
+	out, err = getOutput("broker host delete gw-crazy")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
-	out, err = getOutput("broker network delete eazy")
+	out, err = getOutput("broker network delete crazy")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 }
@@ -203,18 +203,18 @@ func Test_Stop_Start(t *testing.T) {
 	out, err = getOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network eazy...")
+	fmt.Println("Creating network crazy...")
 
-	out, err = getOutput("broker network create eazy")
+	out, err = getOutput("broker network create crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker network create eazy")
+	out, err = getOutput("broker network create crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A network already exist"))
 
 	fmt.Println("Creating VM easyVM...")
 
-	out, err = getOutput("broker host create easyvm --public --net eazy")
+	out, err = getOutput("broker host create easyvm --public --net crazy")
 	require.Nil(t, err)
 
 	out, err = getOutput("broker host stop easyvm")
@@ -267,21 +267,21 @@ func Test_Delete_Volume_Mounted(t *testing.T) {
 	out, err = getOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network eazy...")
+	fmt.Println("Creating network crazy...")
 
-	out, err = getOutput("broker network create eazy")
+	out, err = getOutput("broker network create crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker network create eazy")
+	out, err = getOutput("broker network create crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A network already exist"))
 
 	fmt.Println("Creating VM easyVM...")
 
-	out, err = getOutput("broker host create easyvm --public --net eazy")
+	out, err = getOutput("broker host create easyvm --public --net crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host create easyvm --public --net eazy")
+	out, err = getOutput("broker host create easyvm --public --net crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A host already exists"))
 
@@ -293,10 +293,10 @@ func Test_Delete_Volume_Mounted(t *testing.T) {
 
 	fmt.Println("Creating VM complexvm...")
 
-	out, err = getOutput("broker host create complexvm --public --net eazy")
+	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host create complexvm --public --net eazy")
+	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A host already exists"))
 
@@ -396,21 +396,21 @@ func Test_Basic_Until_NAS(t *testing.T) {
 	out, err = getOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network eazy...")
+	fmt.Println("Creating network crazy...")
 
-	out, err = getOutput("broker network create eazy")
+	out, err = getOutput("broker network create crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker network create eazy")
+	out, err = getOutput("broker network create crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A network already exist"))
 
 	fmt.Println("Creating VM easyVM...")
 
-	out, err = getOutput("broker host create easyvm --public --net eazy")
+	out, err = getOutput("broker host create easyvm --public --net crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host create easyvm --public --net eazy")
+	out, err = getOutput("broker host create easyvm --public --net crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A host already exists"))
 
@@ -422,10 +422,10 @@ func Test_Basic_Until_NAS(t *testing.T) {
 
 	fmt.Println("Creating VM complexvm...")
 
-	out, err = getOutput("broker host create complexvm --public --net eazy")
+	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host create complexvm --public --net eazy")
+	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A host already exists"))
 

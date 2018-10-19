@@ -56,7 +56,7 @@ func tearDown() {
 	_, _ = getOutput("broker volume delete volumetest")
 	_, _ = getOutput("broker host delete easyvm")
 	_, _ = getOutput("broker host delete complexvm")
-	_, _ = getOutput("broker host delete gw-eazy")
-	_, _ = getOutput("broker network delete eazy")
+	_, _ = getOutput("broker host delete gw-crazy")
+	_, _ = getOutput("broker network delete crazy")
 	log.Printf("Finishing cleanup...")
 }
