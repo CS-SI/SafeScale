@@ -18,6 +18,7 @@ package ovh
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
@@ -91,13 +92,22 @@ func (client *Client) CreateSubnet(name string, networkID string, cidr string, i
 			NetworkID: client.osclt.ProviderNetworkID,
 		})
 		if err != nil {
-			client.DeleteSubnet(subnet.ID)
+			nerr := client.DeleteSubnet(subnet.ID)
+			if nerr != nil {
+				log.Warnf("Error deleting subnet: %v", nerr)
+			}
 			return nil, fmt.Errorf("Error creating subnet: %s", openstack.ProviderErrorToString(err))
 		}
 		err = client.AddSubnetToRouter(router.ID, subnet.ID)
 		if err != nil {
-			client.DeleteSubnet(subnet.ID)
-			client.DeleteRouter(router.ID)
+			nerr := client.DeleteSubnet(subnet.ID)
+			if nerr != nil {
+				log.Warnf("Error deleting subnet: %v", nerr)
+			}
+			nerr = client.DeleteRouter(router.ID)
+			if nerr != nil {
+				log.Warnf("Error deleting router: %v", nerr)
+			}
 			return nil, fmt.Errorf("Error creating subnet: %s", openstack.ProviderErrorToString(err))
 		}
 	}

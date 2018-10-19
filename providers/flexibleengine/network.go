@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
 	"time"
@@ -110,7 +110,10 @@ func (client *Client) CreateVPC(req VPCRequest) (*VPC, error) {
 	// Searching for the OpenStack Router corresponding to the VPC (router.id == vpc.id)
 	router, err := routers.Get(client.osclt.Network, vpc.ID).Extract()
 	if err != nil {
-		client.DeleteVPC(vpc.ID)
+		nerr := client.DeleteVPC(vpc.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting VPC: %v", nerr)
+		}
 		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 	vpc.Router = router
@@ -206,7 +209,10 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	}
 	err = metadata.SaveNetwork(providers.FromClient(client), network)
 	if err != nil {
-		client.DeleteNetwork(subnet.ID)
+		nerr := client.DeleteNetwork(subnet.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting network: %v", nerr)
+		}
 		return nil, err
 	}
 
@@ -348,7 +354,11 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		}
 	}
 
-	client.DeleteGateway(networkID)
+	nerr := client.DeleteGateway(networkID)
+	if nerr != nil {
+		log.Warnf("Error deleting gateway: %v", nerr)
+	}
+
 	err = client.deleteSubnet(networkID)
 	if err != nil {
 		return err
@@ -536,7 +546,7 @@ func (client *Client) listSubnets() (*[]subnets.Subnet, error) {
 		return subnets.SubnetPage{LinkedPageBase: pagination.LinkedPageBase{PageResult: r}}
 	})
 	var subnetList []subnets.Subnet
-	pager.EachPage(func(page pagination.Page) (bool, error) {
+	paginationErr := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := subnets.ExtractSubnets(page)
 		if err != nil {
 			return false, fmt.Errorf("Error listing subnets: %s", openstack.ProviderErrorToString(err))
@@ -547,6 +557,12 @@ func (client *Client) listSubnets() (*[]subnets.Subnet, error) {
 		}
 		return true, nil
 	})
+
+	// TODO previously we ignored the error here, consider returning nil, paginationErr
+	if paginationErr != nil {
+		log.Warnf("We have a pagination error: %v", paginationErr)
+	}
+
 	return &subnetList, nil
 }
 

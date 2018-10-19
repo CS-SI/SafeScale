@@ -21,6 +21,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"strings"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/utils/metadata"
 
@@ -171,7 +172,11 @@ func (m *Network) Delete() error {
 	}
 
 	// First delete network/<id> folder if it exists
-	m.item.Delete(m.id)
+	nerr := m.item.Delete(m.id)
+	if nerr != nil {
+		log.Warnf("Error deleting network: %v", nerr)
+	}
+
 	// then delete the entry in 'ByIDFolderName' folder
 	err := m.item.DeleteFrom(ByIDFolderName, m.id)
 	if err != nil {

@@ -69,7 +69,7 @@ var sshRun = cli.Command{
 		}
 
 		fmt.Println(stdout)
-		fmt.Fprintln(os.Stderr, stderr)
+		_, _ =fmt.Fprintln(os.Stderr, stderr)
 
 		os.Exit(retcode)
 		return nil

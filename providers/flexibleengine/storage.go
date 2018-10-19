@@ -19,6 +19,7 @@ package flexibleengine
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -204,7 +205,10 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 
 	err = metadata.SaveVolume(providers.FromClient(client), vol)
 	if err != nil {
-		client.DeleteVolume(vol.ID)
+		nerr := client.DeleteVolume(vol.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting volume: %v", nerr)
+		}
 		return nil, fmt.Errorf("failed to create Volume: %s", openstack.ProviderErrorToString(err))
 	}
 

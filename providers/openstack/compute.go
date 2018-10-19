@@ -22,7 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 
@@ -387,7 +387,10 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 
 	err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
 	if err != nil {
-		client.DeleteHost(host.ID)
+		nerr := client.DeleteHost(host.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting host: %v", nerr)
+		}
 		return nil, fmt.Errorf("error creating host: %s", ProviderErrorToString(err))
 	}
 

@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
@@ -112,7 +114,10 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 	}
 	err = metadata.SaveVolume(providers.FromClient(client), &v)
 	if err != nil {
-		client.DeleteVolume(v.ID)
+		nerr := client.DeleteVolume(v.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting volume: %v", nerr)
+		}
 		return nil, fmt.Errorf("Error creating volume : %s", ProviderErrorToString(err))
 	}
 

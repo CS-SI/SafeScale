@@ -51,10 +51,10 @@ func runCommand(cmdStr string) int {
 	if err != nil {
 		msg, retcode, err := system.ExtractRetCode(err)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to execute command")
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to execute command")
 			return int(ExitCode.Run)
 		}
-		fmt.Fprintf(os.Stderr, msg)
+		_, _ = fmt.Fprintf(os.Stderr, msg)
 		return retcode
 	}
 	return int(ExitCode.OK)

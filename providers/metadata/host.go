@@ -19,6 +19,7 @@ package metadata
 import (
 	"bytes"
 	"encoding/gob"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -180,7 +181,10 @@ func RemoveHost(svc *providers.Service, host *api.Host) error {
 	mn := NewNetwork(svc)
 	mnb := NewNetwork(svc)
 	err := mn.Browse(func(network *api.Network) error {
-		mnb.Carry(network).DetachHost(host.ID)
+		nerr := mnb.Carry(network).DetachHost(host.ID)
+		if nerr != nil {
+			log.Warnf("Error while browsing network: %v", nerr)
+		}
 		return nil
 	})
 	if err != nil {
