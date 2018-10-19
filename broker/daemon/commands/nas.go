@@ -59,7 +59,7 @@ func (s *NasServiceServer) Create(ctx context.Context, in *pb.NasDefinition) (*p
 
 //Delete call nas service deletion
 func (s *NasServiceServer) Delete(ctx context.Context, in *pb.NasName) (*pb.NasDefinition, error) {
-	log.Printf("Delete NAS called, name %s", in.GetName())
+	log.Printf("Delete NAS called, name '%s'", in.GetName())
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot delete NAS : No tenant set")
 	}
@@ -106,7 +106,7 @@ func (s *NasServiceServer) List(ctx context.Context, in *google_protobuf.Empty) 
 
 //Mount mount exported directory from nas on a local directory of the given host
 func (s *NasServiceServer) Mount(ctx context.Context, in *pb.NasDefinition) (*pb.NasDefinition, error) {
-	log.Printf("Mount NAS called, name %s", in.GetNas().GetName())
+	log.Printf("Mount NAS called, name '%s'", in.GetNas().GetName())
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot mount NAS : No tenant set")
 	}
@@ -123,7 +123,7 @@ func (s *NasServiceServer) Mount(ctx context.Context, in *pb.NasDefinition) (*pb
 
 //UMount umount exported directory from nas on a local directory of the given host
 func (s *NasServiceServer) UMount(ctx context.Context, in *pb.NasDefinition) (*pb.NasDefinition, error) {
-	log.Printf("UMount NAS called, name %s", in.GetNas().GetName())
+	log.Printf("UMount NAS called, name '%s'", in.GetNas().GetName())
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot unmount NAS : No tenant set")
 	}
@@ -140,7 +140,7 @@ func (s *NasServiceServer) UMount(ctx context.Context, in *pb.NasDefinition) (*p
 
 //Inspect shows the detail of a nfs server and all connected clients
 func (s *NasServiceServer) Inspect(ctx context.Context, in *pb.NasName) (*pb.NasList, error) {
-	log.Printf("Inspect NAS called, name %s", in.GetName())
+	log.Printf("Inspect NAS called, name '%s'", in.GetName())
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot inspect NAS : No tenant set")
 	}

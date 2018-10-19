@@ -18,8 +18,7 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 
@@ -261,7 +260,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 	err = networks.Get(client.Network, networkID).Err
 	if err != nil {
 		if strings.Contains(err.Error(), "Resource not found") {
-			return errors.Wrap(err, "Inconsistent data !!")
+			log.Warnf("Inconsistent network data !!")
 		}
 	}
 
@@ -286,19 +285,18 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		}
 	}
 
+	err = client.DeleteGateway(networkID)
+	if err != nil {
+		log.Warnf("Error deleting gateway: %s", ProviderErrorToString(err))
+	}
+
 	if gwID != "" {
 		err = networks.Get(client.Network, gwID).Err
 		if err != nil {
 			if strings.Contains(err.Error(), "Resource not found") {
-				return errors.Wrap(err, "Inconsistent gateway data !!")
+				log.Warnf("Inconsistent gateway data !!")
 			}
 		}
-	}
-
-	// TODO Print unhandled error as a warning
-	err = client.DeleteGateway(networkID)
-	if err != nil {
-		log.Printf("Error deleting gateway: %s", ProviderErrorToString(err))
 	}
 
 	sns, err := client.ListSubnets(networkID)

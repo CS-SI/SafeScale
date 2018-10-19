@@ -159,7 +159,6 @@ func (s *HostServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.
 		return nil, fmt.Errorf("Cannot inspect host : No host '%s' found", ref)
 	}
 
-	log.Printf("End Inspect Host: '%s'", ref)
 	return conv.ToPBHost(host), nil
 }
 
