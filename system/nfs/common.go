@@ -91,7 +91,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	}
 	nerr := os.Remove(f.Name())
 	if nerr != nil {
-		log.Warn("Error deleting file: %v", nerr)
+		log.Warnf("Error deleting file: %v", nerr)
 	}
 
 	var cmd string
