@@ -46,28 +46,28 @@ Usage: deploy version
        deploy [-vd] (cluster|datacenter|dc|host) help <command>
        deploy [-vd] (cluster|datacenter|dc|host) (list|ls)
        deploy [-vd] (cluster|datacenter|dc) help <command>
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> create [-N <cidr>][-F <flavor>][-C <complexity][--os <operating system>][--cpu <number of cpu>][--ram <ram size>][--disk <disk size>][-k]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> (delete|destroy|remove|rm) [-y]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> create [-N <cidr>][-F <flavor>][-C <complexity][--os <operating system>][--cpu <number of cpu>][--ram <ram size>][--disk <disk size>][-k][(--disable-feature <feature>)...]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> (delete|destroy|remove|rm) [-y]
        deploy [-vd] (cluster|datacenter|dc) <clustername> (start|stop|state|inspect)
        deploy [-vd] (cluster|datacenter|dc) <clustername> expand [-n <count>][--os <os>][--cpu <number of cpu>][--ram <ram size>][--disk <disk size>]
        deploy [-vd] (cluster|datacenter|dc) <clustername> shrink [-n <count>]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> (add|install) [-f][--skip-proxy][--no-master][--no-node][(--param <param>)...]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> check [(--param <param>)...]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> (delete|destroy|remove|rm|uninstall) [-f][(--param <param>)...]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> (dcos|marathon|kubectl) [-- <arg>...]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> create [-u <storage unit size>][-n <count>]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> (expand|shrink) [-n <count>]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> (delete|destroy|remove|rm) [-y]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> create [(--acl <acl>)...]
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> (delete|destroy|remove|rm)
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> mount <mountpoint>
-	   deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> (umount|unmount)
-	   deploy [-vd] host help <command>
-	   deploy [-vd] host <host name or id> feature <pkgname> (add|install) [(--param <param>)...]
-	   deploy [-vd] host <host name or id> feature <pkgname> check
-	   deploy [-vd] host <host name or id> feature <pkgname> (delete|destroy|remove|rm|uninstall)
-	   deploy [-vd] host <host name or id> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
+       deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> (add|install) [-f][--skip-proxy][--no-master][--no-node][(--param <param>)...]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> check [(--param <param>)...]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> (delete|destroy|remove|rm|uninstall) [-f][(--param <param>)...]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
+       deploy [-vd] (cluster|datacenter|dc) <clustername> (dcos|marathon|kubectl) [-- <arg>...]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> create [-u <storage unit size>][-n <count>][--host <nas host>]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> (expand|shrink) [-n <count>]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> (delete|destroy|remove|rm) [-y]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> create [(--acl <acl>)...]
+       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> (delete|destroy|remove|rm)
+       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> mount <mountpoint>
+       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> (umount|unmount)
+       deploy [-vd] host help <command>
+       deploy [-vd] host <host name or id> feature <pkgname> (add|install) [(--param <param>)...]
+       deploy [-vd] host <host name or id> feature <pkgname> check
+       deploy [-vd] host <host name or id> feature <pkgname> (delete|destroy|remove|rm|uninstall)
+       deploy [-vd] host <host name or id> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
 
 Options:
   -C <complexity>,--complexity <complexity>               Defines complexity
@@ -82,6 +82,7 @@ Options:
   -v,--verbose                                            Enable verbosity
   -y,--assume-yes                                         Automatically responds y to confirmation
   -p,--param <param>                                      Used to set parameter of feature
+  --host <nas host>                                       By default, nas create creates a new host; with this option, add nas functionality on existing host
   --cpu <cpu>                                             Defines number of CPU of host
   --disk <disk>                                           Defines system disk size
   --os <os>                                               Defines Linux Operating System
@@ -89,7 +90,8 @@ Options:
   --skip-proxy                                            Disables reverse proxy configuration
   --no-check                                              Disables feature check before add or remove
   --no-master                                             Disables feature installation on master(s)
-  --no-node                                               Disables feature installation on node(s)`
+  --no-node                                               Disables feature installation on node(s)
+  --disable-feature <feature>                             Disables a default feature (remotedesktop)`
 )
 
 func main() {
