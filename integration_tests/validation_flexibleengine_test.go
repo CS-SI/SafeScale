@@ -39,21 +39,21 @@ func Test_Flexible_Basic(t *testing.T) {
 	out, err = getOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network eazy...")
+	fmt.Println("Creating network crazy...")
 
-	out, err = getOutput("broker network create eazy")
+	out, err = getOutput("broker network create crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker network create eazy")
+	out, err = getOutput("broker network create crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A network already exist"))
 
 	fmt.Println("Creating VM easyVM...")
 
-	out, err = getOutput("broker host create easyvm --public --net eazy --cpu 4 --ram 50 ")
+	out, err = getOutput("broker host create easyvm --public --net crazy --cpu 4 --ram 50 ")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host create easyvm --public --net eazy --cpu 4 --ram 50 ")
+	out, err = getOutput("broker host create easyvm --public --net crazy --cpu 4 --ram 50 ")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A host already exists"))
 
@@ -65,10 +65,10 @@ func Test_Flexible_Basic(t *testing.T) {
 
 	fmt.Println("Creating VM complexvm...")
 
-	out, err = getOutput("broker host create complexvm --public --net eazy")
+	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host create complexvm --public --net eazy")
+	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "A host already exists"))
 
@@ -161,11 +161,11 @@ func Test_Flexible_Basic(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
-	out, err = getOutput("broker host delete gw-eazy")
+	out, err = getOutput("broker host delete gw-crazy")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
-	out, err = getOutput("broker network delete eazy")
+	out, err = getOutput("broker network delete crazy")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 }
