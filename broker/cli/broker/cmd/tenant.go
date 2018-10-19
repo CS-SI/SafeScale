@@ -71,7 +71,7 @@ var tenantSet = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <tenant_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Tenant name required")
 		}
 		err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)

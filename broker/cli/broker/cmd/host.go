@@ -48,7 +48,7 @@ var hostStart = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
 		resp, err := client.New().Host.Start(c.Args().First(), client.DefaultExecutionTimeout)
@@ -70,7 +70,7 @@ var hostStop = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
 		resp, err := client.New().Host.Stop(c.Args().First(), client.DefaultExecutionTimeout)
@@ -92,7 +92,7 @@ var hostReboot = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
 		resp, err := client.New().Host.Reboot(c.Args().First(), client.DefaultExecutionTimeout)
@@ -134,7 +134,7 @@ var hostInspect = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
 		resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
@@ -192,7 +192,7 @@ var hostCreate = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host and network name are required")
 		}
 		def := pb.HostDefinition{
@@ -223,7 +223,7 @@ var hostDelete = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
 		err := client.New().Host.Delete(c.Args().First(), client.DefaultExecutionTimeout)
@@ -242,7 +242,7 @@ var hostSsh = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
 		resp, err := client.New().Host.SSHConfig(c.Args().First())

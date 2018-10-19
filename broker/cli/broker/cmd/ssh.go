@@ -56,7 +56,7 @@ var sshRun = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name required")
 		}
 		timeout := utils.TimeoutCtxHost
@@ -97,7 +97,7 @@ var sshCopy = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
 			fmt.Println("2 arguments (from and to) are required")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("2 arguments (from and to) are required")
 		}
 		timeout := utils.TimeoutCtxHost
@@ -120,7 +120,7 @@ var sshConnect = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name required")
 		}
 		err := client.New().Ssh.Connect(c.Args().Get(0), 0)

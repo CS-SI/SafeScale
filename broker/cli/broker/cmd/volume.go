@@ -72,7 +72,7 @@ var volumeInspect = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Volume_name|Volume_ID>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Volume name or ID required")
 		}
 		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
@@ -94,7 +94,7 @@ var volumeDelete = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Volume_name|Volume_ID>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Volume name or ID required")
 		}
 		err := client.New().Volume.Delete(c.Args().First(), client.DefaultExecutionTimeout)
@@ -126,7 +126,7 @@ var volumeCreate = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Volume_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Volume name required")
 		}
 		speed := c.String("speed")
@@ -171,7 +171,7 @@ var volumeAttach = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Volume_name> and/or <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Volume and Host name required")
 		}
 		def := pb.VolumeAttachment{
@@ -197,7 +197,7 @@ var volumeDetach = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Volume_name> and/or <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("volume and host names required")
 		}
 		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)

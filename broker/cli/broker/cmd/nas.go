@@ -55,7 +55,7 @@ var nasCreate = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Nas_name> and/or <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas and Host name required")
 		}
 		def := pb.NasDefinition{
@@ -79,7 +79,7 @@ var nasDelete = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Nas_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas name required")
 		}
 		err := client.New().Nas.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
@@ -120,7 +120,7 @@ var nasMount = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Nas_name> and/or <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas and Host name required")
 		}
 		err := client.New().Nas.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
@@ -138,7 +138,7 @@ var nasUnmount = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Nas_name> and/or <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas and Host name required")
 		}
 		err := client.New().Nas.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
@@ -157,7 +157,7 @@ var nasInspect = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Nas_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas name required")
 		}
 		nass, err := client.New().Nas.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
