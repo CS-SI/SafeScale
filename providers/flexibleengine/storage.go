@@ -68,7 +68,6 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		VolumeID: request.VolumeID,
 	}).Extract()
 	if err != nil {
-		fmt.Printf("%s", err.Error())
 		return nil, fmt.Errorf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, openstack.ProviderErrorToString(err))
 	}
 

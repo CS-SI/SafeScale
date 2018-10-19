@@ -41,7 +41,7 @@ type NasServiceServer struct{}
 
 //Create call nas service creation
 func (s *NasServiceServer) Create(ctx context.Context, in *pb.NasDefinition) (*pb.NasDefinition, error) {
-	log.Printf("Create NAS called, name: %s", in.GetNas().GetName())
+	log.Printf("Create NAS called, name: '%s'", in.GetNas().GetName())
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot create NAS : No tenant set")
 	}
