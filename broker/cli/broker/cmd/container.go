@@ -63,7 +63,7 @@ var containerCreate = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Container_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
 		err := client.New().Container.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
@@ -81,7 +81,7 @@ var containerDelete = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Container_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
 		err := client.New().Container.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
@@ -99,7 +99,7 @@ var containerInspect = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Container_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
 		resp, err := client.New().Container.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
@@ -127,7 +127,7 @@ var containerMount = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Container_name> and/or <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container and Host name required")
 		}
 		err := client.New().Container.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
@@ -146,7 +146,7 @@ var containerUnmount = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Container_name> and/or <Host_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container and Host name required")
 		}
 		err := client.New().Container.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)

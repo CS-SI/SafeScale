@@ -64,7 +64,7 @@ var networkDelete = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Network name required")
 		}
 		err := client.New().Network.Delete(c.Args().First(), client.DefaultExecutionTimeout)
@@ -84,7 +84,7 @@ var networkInspect = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Network name required")
 		}
 		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
@@ -137,7 +137,7 @@ var networkCreate = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
-			cli.ShowSubcommandHelp(c)
+			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Network name required")
 		}
 		netdef := pb.NetworkDefinition{
