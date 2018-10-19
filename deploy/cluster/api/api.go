@@ -47,6 +47,8 @@ type Request struct {
 	KeepOnFailure bool
 	// NodesDef count
 	NodesDef *pb.HostDefinition
+	// DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
+	DisabledDefaultFeatures []string
 }
 
 //go:generate mockgen -destination=../mocks/mock_cluster.go -package=mocks github.com/CS-SI/SafeScale/deploy/cluster/api Cluster

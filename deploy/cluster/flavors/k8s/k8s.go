@@ -1102,14 +1102,19 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 
 	hostReq := c.GetConfig().NodesDef
 	hostReq.Public = public
-	if req.CPUNumber > 0 {
-		hostReq.CPUNumber = req.CPUNumber
-	}
-	if req.RAM > 0.0 {
-		hostReq.RAM = req.RAM
-	}
-	if req.Disk > 0 {
-		hostReq.Disk = req.Disk
+	if req != nil {
+		if req.CPUNumber > 0 {
+			hostReq.CPUNumber = req.CPUNumber
+		}
+		if req.RAM > 0.0 {
+			hostReq.RAM = req.RAM
+		}
+		if req.Disk > 0 {
+			hostReq.Disk = req.Disk
+		}
+		if req.ImageID != "" {
+			hostReq.ImageID = req.ImageID
+		}
 	}
 
 	var hosts []string
