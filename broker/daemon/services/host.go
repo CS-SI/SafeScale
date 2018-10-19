@@ -78,7 +78,7 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	if len(net) != 0 {
 		n, err := svc.network.Get(net)
 		if err != nil {
-			tbr := errors.Wrap(err, "Failed to get network resource data.")
+			tbr := errors.Wrapf(err, "Failed to get network resource data: '%s'.", net)
 			log.Errorf("%+v", tbr)
 			return nil, tbr
 		}
@@ -109,7 +109,7 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	}
 	host, err := svc.provider.CreateHost(hostRequest)
 	if err != nil {
-		tbr := errors.Wrap(err, "Compute resource creation failed.")
+		tbr := errors.Wrapf(err, "Compute resource creation failed: '%s'.", hostRequest.Name)
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
@@ -121,7 +121,13 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	log.Printf("Waiting start of SSH service on remote host '%s' ...", host.Name)
 	ssh, err := svc.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		svc.provider.DeleteHost(host.ID)
+		derr := svc.provider.DeleteHost(host.ID)
+		if derr != nil {
+			log.Warnf("Error deleting host after failing to get its ssh config: %v", derr)
+			tbr := errors.Wrap(err, "Error getting ssh configuration")
+			log.Errorf("%+v", tbr)
+			return nil, tbr
+		}
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
@@ -133,8 +139,14 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		return nil, tbr
 	}
 	if client.IsTimeout(err) {
-		svc.provider.DeleteHost(host.ID)
-		tbr := errors.Wrap(err, "")
+		derr := svc.provider.DeleteHost(host.ID)
+		if derr != nil {
+			log.Warnf("Error deleting host after a timeout: %v", derr)
+			tbr := errors.Wrap(err, "Timeout creating a host")
+			log.Errorf("%+v", tbr)
+			return nil, tbr
+		}
+		tbr := errors.Wrap(err, "Timeout creating a host")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}

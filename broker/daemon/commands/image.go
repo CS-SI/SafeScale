@@ -52,6 +52,5 @@ func (s *ImageServiceServer) List(ctx context.Context, in *pb.ImageListRequest) 
 		pbImages = append(pbImages, conv.ToPBImage(&image))
 	}
 	rv := &pb.ImageList{Images: pbImages}
-	log.Printf("End List images")
 	return rv, nil
 }

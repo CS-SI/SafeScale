@@ -52,6 +52,5 @@ func (s *TemplateServiceServer) List(ctx context.Context, in *pb.TemplateListReq
 		pbTemplates = append(pbTemplates, conv.ToPBHostTemplate(&template))
 	}
 	rv := &pb.TemplateList{Templates: pbTemplates}
-	log.Printf("End ListTemplates")
 	return rv, nil
 }

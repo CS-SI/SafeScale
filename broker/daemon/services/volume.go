@@ -190,7 +190,10 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	volatt.Device = "/dev/" + deviceName
 	err = metadata.SaveVolumeAttachment(svc.provider, volatt)
 	if err != nil {
-		svc.Detach(volumename, hostName)
+		derr := svc.Detach(volumename, hostName)
+		if derr != nil {
+			log.Warnf("Failure trying to detach volume: %v", derr)
+		}
 		return fmt.Errorf("failed to update volume attachment: %s", err.Error())
 	}
 
@@ -216,7 +219,10 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	err = server.MountBlockDevice(volatt.Device, mountPoint, format)
 
 	if err != nil {
-		svc.Detach(volumename, hostName)
+		derr := svc.Detach(volumename, hostName)
+		if derr != nil {
+			log.Warnf("Error trying to detach volume: %v", derr)
+		}
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
 		return tbr
@@ -231,7 +237,12 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		log.Errorf("%+v", tbr)
 		return tbr
 	}
-	mtdVol.Attach(volatt)
+	err = mtdVol.Attach(volatt)
+	if err != nil {
+		tbr := errors.Wrap(err, "")
+		log.Errorf("%+v", tbr)
+		return tbr
+	}
 
 	return nil
 }

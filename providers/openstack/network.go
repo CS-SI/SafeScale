@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"log"
 	"strings"
 	"time"
@@ -256,6 +257,14 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		return fmt.Errorf("Failed to find network '%s' in metadata", networkRef)
 	}
 	networkID := m.Get().ID
+
+	err = networks.Get(client.Network, networkID).Err
+	if err != nil {
+		if strings.Contains(err.Error(), "Resource not found") {
+			return errors.Wrap(err, "Inconsistent data !!")
+		}
+	}
+
 	hosts, err := m.ListHosts()
 	if err != nil {
 		return err
@@ -277,17 +286,29 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		}
 	}
 
-	// TODO Unhandled error ?
-	client.DeleteGateway(networkID)
+	if gwID != "" {
+		err = networks.Get(client.Network, gwID).Err
+		if err != nil {
+			if strings.Contains(err.Error(), "Resource not found") {
+				return errors.Wrap(err, "Inconsistent gateway data !!")
+			}
+		}
+	}
+
+	// TODO Print unhandled error as a warning
+	err = client.DeleteGateway(networkID)
+	if err != nil {
+		log.Printf("Error deleting gateway: %s", ProviderErrorToString(err))
+	}
 
 	sns, err := client.ListSubnets(networkID)
 	if err != nil {
-		return fmt.Errorf("error deleting network: %s", ProviderErrorToString(err))
+		return fmt.Errorf("Error deleting network, listing subnets: %s", ProviderErrorToString(err))
 	}
 	for _, sn := range sns {
 		err := client.DeleteSubnet(sn.ID)
 		if err != nil {
-			return fmt.Errorf("error deleting network: %s", ProviderErrorToString(err))
+			return fmt.Errorf("Error deleting network, deleting subnets: %s", ProviderErrorToString(err))
 		}
 	}
 	err = networks.Delete(client.Network, networkID).ExtractErr()
@@ -326,20 +347,15 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	}
 	host, err := client.createHost(hostReq, true)
 	if err != nil {
-		return nil, fmt.Errorf("error creating gateway : %s", ProviderErrorToString(err))
+		return nil, fmt.Errorf("Error creating gateway : %s", ProviderErrorToString(err))
 	}
 	err = metadata.SaveGateway(providers.FromClient(client), host, req.NetworkID)
-
-	// If metadata creation fails, we delete the host
-	if err != nil {
-		defer func(err error) {
-			if err != nil{
-				client.DeleteHost(host.ID)
-			}
-		}(err)
-		return nil, err
-	}
-
+	// TODO, If metadata creation fails, we delete the host
+	defer func(err error) {
+		if err != nil{
+			client.DeleteHost(host.ID)
+		}
+	}(err)
 	return host, err
 }
 
@@ -359,6 +375,7 @@ func (client *Client) DeleteGateway(networkID string) error {
 	for err = nil; err != nil; _, err = client.GetHost(host.ID) {
 		time.Sleep(100 * time.Millisecond)
 	}
+
 	return m.Delete()
 }
 
