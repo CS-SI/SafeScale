@@ -18,6 +18,7 @@ package services
 
 import (
 	"fmt"
+
 	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -125,14 +126,17 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		KeyPair:    keypair,
 		TemplateID: tpls[0].ID,
 		GWName:     gwname,
-		}
+	}
 
-	gwGeneratedName := "gw-" + network.Name
-	log.Printf("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwGeneratedName)
+	if gwname == "" {
+		gwname = "gw-" + network.Name
+	}
+	log.Printf("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwname)
 
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
-		tbr := errors.Wrapf(err, "Gateway creation with name '%s' failed", gwGeneratedName)
+		defer svc.provider.DeleteNetwork(network.ID)
+		tbr := errors.Wrapf(err, "Gateway creation with name '%s' failed", gwname)
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
@@ -140,7 +144,6 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
-
 
 	ssh, err := svc.provider.GetSSHConfig(gw.ID)
 	if err != nil {
