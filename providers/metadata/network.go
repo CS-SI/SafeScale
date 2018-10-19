@@ -232,8 +232,9 @@ func (m *Network) detachGateway() error {
 	if m.inside == nil {
 		panic("m.inside is nil")
 	}
-	return m.inside.Delete(".", gatewayObjectName)
 
+	// TODO Check this
+	return m.inside.Delete(".", gatewayObjectName)
 }
 
 // AttachHost links host ID to the network
@@ -249,6 +250,8 @@ func (m *Network) DetachHost(hostID string) error {
 	if m.inside == nil {
 		panic("m.inside is nil!")
 	}
+
+	// TODO Check this
 	return m.inside.Delete(hostsFolderName, hostID)
 }
 

@@ -59,18 +59,26 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		CIDR:      cidr,
 	})
 	if err != nil {
-		return nil, err
+		tbr := errors.Wrap(err, "Error with CreateNetwork call")
+		log.Errorf("%+v", tbr)
+		return nil, tbr
 	}
 
 	defer func() {
 		if r := recover(); r != nil {
-			svc.provider.DeleteNetwork(network.ID)
+			derr := svc.provider.DeleteNetwork(network.ID)
+			if derr != nil {
+				log.Errorf("%+v", derr)
+			}
+
 			switch t := r.(type) {
 			case string:
 				err = fmt.Errorf("%q", t)
 			case error:
 				err = t
 			}
+
+			log.Errorf("%+v", err)
 		}
 	}()
 
@@ -81,7 +89,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		MinDiskSize: disk,
 	})
 	if err != nil {
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "Error selecting template")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
@@ -92,14 +100,18 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "Error searching image")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
 	keypairName := "kp_" + network.Name
 	// Makes sure keypair doesn't exist
-	svc.provider.DeleteKeyPair(keypairName)
+	derr := svc.provider.DeleteKeyPair(keypairName)
+	if derr != nil {
+		log.Warnf("Error trying to delete keypair, %v", derr)
+	}
+
 	keypair, err := svc.provider.CreateKeyPair(keypairName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
@@ -155,7 +167,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 	err = metadata.SaveNetwork(svc.provider, rv)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "Error saving network metadata")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}

@@ -492,7 +492,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	host, err := client.WaitHostReady(server.ID, 5*time.Minute)
 	if err != nil {
 		servers.Delete(client.Compute, server.ID)
-		return nil, fmt.Errorf("Timeout creating Host: %s", ProviderErrorToString(err))
+		return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
 	}
 	// Add gateway ID to Host definition
 	var gwID string

@@ -80,7 +80,6 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (
 		pbnetworks = append(pbnetworks, conv.ToPBNetwork(&network))
 	}
 	rv := &pb.NetworkList{Networks: pbnetworks}
-	log.Printf("End List Network")
 	return rv, nil
 }
 

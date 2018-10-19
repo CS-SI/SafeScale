@@ -154,7 +154,7 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 				}
 			}
 		} else {
-			log.Println("Error inspecting volume after delete failure")
+			log.Warn("Error inspecting volume after delete failure")
 		}
 
 		return nil, err

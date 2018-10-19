@@ -115,7 +115,6 @@ func (s *HostServiceServer) List(ctx context.Context, in *pb.HostListRequest) (*
 		pbhost = append(pbhost, conv.ToPBHost(&host))
 	}
 	rv := &pb.HostList{Hosts: pbhost}
-	log.Printf("End List hosts")
 	return rv, nil
 }
 

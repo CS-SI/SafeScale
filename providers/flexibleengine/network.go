@@ -662,7 +662,7 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	}
 	host, err := client.createHost(hostReq, true)
 	if err != nil {
-		return nil, fmt.Errorf("error creating gateway : %s", openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
 	}
 	err = metadata.SaveGateway(providers.FromClient(client), host, req.NetworkID)
 	return host, err
@@ -677,7 +677,7 @@ func (client *Client) GetGateway(networkID string) (*api.Host, error) {
 	if m != nil {
 		return m.Get(), nil
 	}
-	return nil, fmt.Errorf("failed to load gateway metadata")
+	return nil, fmt.Errorf("Failed to load gateway metadata")
 }
 
 // DeleteGateway deletes the gateway associated with network identified by ID
