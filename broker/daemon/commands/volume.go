@@ -62,7 +62,6 @@ func (s *VolumeServiceServer) List(ctx context.Context, in *pb.VolumeListRequest
 		pbvolumes = append(pbvolumes, conv.ToPBVolume(&volume))
 	}
 	rv := &pb.VolumeList{Volumes: pbvolumes}
-	log.Printf("End Volume List")
 	return rv, nil
 }
 
@@ -154,7 +153,7 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 				}
 			}
 		} else {
-			log.Warn("Error inspecting volume after delete failure")
+			log.Warnf("Error inspecting volume after delete failure: %v", nerr)
 		}
 
 		return nil, err
@@ -183,9 +182,8 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 		return nil, err
 	}
 	if volume == nil {
-		return nil, fmt.Errorf("Cannot inspect volume : No volume %s found!", ref)
+		return nil, fmt.Errorf("Cannot inspect volume : No volume '%s' found!", ref)
 	}
 
-	log.Printf("End Inspect volume: '%s'", ref)
 	return conv.ToPBVolumeInfo(volume, volattach), nil
 }

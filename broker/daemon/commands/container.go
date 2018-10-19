@@ -54,7 +54,6 @@ func (s *ContainerServiceServer) List(ctx context.Context, in *google_protobuf.E
 		return nil, tbr
 	}
 
-	log.Println("End container list")
 	return conv.ToPBContainerList(containers), nil
 }
 
@@ -72,7 +71,6 @@ func (s *ContainerServiceServer) Create(ctx context.Context, in *pb.Container) (
 		return nil, tbr
 	}
 
-	log.Println("End container container")
 	return &google_protobuf.Empty{}, nil
 }
 
@@ -90,7 +88,6 @@ func (s *ContainerServiceServer) Delete(ctx context.Context, in *pb.Container) (
 		return nil, tbr
 	}
 
-	log.Println("End delete container")
 	return &google_protobuf.Empty{}, nil
 }
 
@@ -108,7 +105,6 @@ func (s *ContainerServiceServer) Inspect(ctx context.Context, in *pb.Container) 
 		return nil, tbr
 	}
 
-	log.Println("End inspect container")
 	return conv.ToPBContainerMountPoint(resp), nil
 }
 
@@ -122,7 +118,6 @@ func (s *ContainerServiceServer) Mount(ctx context.Context, in *pb.ContainerMoun
 	service := services.NewContainerService(currentTenant.Client)
 	err := service.Mount(in.GetContainer(), in.GetHost().GetName(), in.GetPath())
 
-	log.Println("End Mount container")
 	return &google_protobuf.Empty{}, err
 }
 
@@ -136,6 +131,5 @@ func (s *ContainerServiceServer) UMount(ctx context.Context, in *pb.ContainerMou
 	service := services.NewContainerService(currentTenant.Client)
 	err := service.UMount(in.GetContainer(), in.GetHost().GetName())
 
-	log.Println("End UMount container")
 	return &google_protobuf.Empty{}, err
 }

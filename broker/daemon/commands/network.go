@@ -105,7 +105,6 @@ func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 		return nil, fmt.Errorf("Cannot inspect network : No network '%s' found", ref)
 	}
 
-	log.Printf("End Inspect Network: '%s'", ref)
 	return conv.ToPBNetwork(network), nil
 }
 

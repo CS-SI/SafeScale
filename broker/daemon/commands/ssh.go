@@ -44,7 +44,6 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 	service := services.NewSSHService(currentTenant.Client)
 	retcode, stdout, stderr, err := service.Run(in.GetHost().GetName(), in.GetCommand())
 
-	//log.Println("End ssh run")
 	return &pb.SshResponse{
 		Status:    int32(retcode),
 		OutputStd: stdout,
@@ -70,7 +69,7 @@ func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb
 	if err != nil {
 		return nil, err
 	}
-	//log.Println("End ssh copy")
+
 	return &pb.SshResponse{
 		Status:    int32(retcode),
 		OutputStd: stdout,
