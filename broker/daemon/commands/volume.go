@@ -138,8 +138,6 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 	service := services.NewVolumeService(currentTenant.Client)
 	err := service.Delete(ref)
 	if err != nil {
-
-		// TODO CONSIDER DEFINING A "GOOD" FORMAT FOR ERROR MESSAGES, VERBOSE MODES, ETC
 		vin, nerr := s.Inspect(ctx, in)
 		if nerr == nil {
 			if vin.Host != nil {
