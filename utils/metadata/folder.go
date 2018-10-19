@@ -190,7 +190,11 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 			return err
 		}
 		var buffer bytes.Buffer
-		buffer.ReadFrom(o.Content)
+		_, err = buffer.ReadFrom(o.Content)
+		if err != nil {
+			return err
+		}
+
 		err = callback(&buffer)
 		if err != nil {
 			return err

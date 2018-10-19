@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -148,7 +149,10 @@ func scanImages(tenant string, service *providers.Service, c chan error) {
 		return
 	}
 	f := fmt.Sprintf("%s/images.json", tenant)
-	ioutil.WriteFile(f, content, 0666)
+	nerr := ioutil.WriteFile(f, content, 0666)
+	if nerr != nil {
+		log.Warnf("Error writing file: %v", nerr)
+	}
 	c <- nil
 }
 
@@ -179,7 +183,10 @@ func getCPUInfo(tenant string, service *providers.Service, tpl api.HostTemplate,
 		fmt.Printf("[%s] host %s: error reading SSHConfig: %s\n", tenant, tpl.Name, err.Error())
 		return nil, err
 	}
-	ssh.WaitServerReady(1 * time.Minute)
+	nerr := ssh.WaitServerReady(1 * time.Minute)
+	if nerr != nil {
+		log.Warnf("Error waiting for server ready: %v", nerr)
+	}
 	c, err := ssh.Command(cmd)
 
 	//cmd, err := ssh.Command(cmd)
@@ -207,7 +214,10 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 	}
 
 	info := []*CPUInfo{}
-	service.DeleteKeyPair("key-scan")
+	nerr := service.DeleteKeyPair("key-scan")
+	if nerr != nil {
+		log.Warnf("Error deleting keypair: %v", nerr)
+	}
 	kp, err := service.CreateKeyPair("key-scan")
 	if err != nil {
 		c <- err
@@ -221,14 +231,20 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 	})
 	if err != nil {
 		c <- err
-		service.DeleteKeyPair("key-scan")
+		nerr := service.DeleteKeyPair("key-scan")
+		if nerr != nil {
+			log.Warnf("Error deleting keypair: %v", nerr)
+		}
 		return
 	}
 
 	img, err := service.SearchImage("Ubuntu 16.04")
 	if err != nil {
 		c <- err
-		service.DeleteKeyPair("key-scan")
+		nerr := service.DeleteKeyPair("key-scan")
+		if nerr != nil {
+			log.Warnf("Error deleting keypair: %v", nerr)
+		}
 		return
 	}
 
@@ -263,10 +279,19 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 	})
 
 	f := fmt.Sprintf("%s/templates.json", tenant)
-	ioutil.WriteFile(f, content, 0666)
+	nerr = ioutil.WriteFile(f, content, 0666)
+	if nerr != nil {
+		log.Warnf("Error writing file: %v", nerr)
+	}
 
-	service.DeleteNetwork(net.ID)
-	service.DeleteKeyPair("key-scan")
+	nerr = service.DeleteNetwork(net.ID)
+	if nerr != nil {
+		log.Warnf("Error deleting network: %v", nerr)
+	}
+	nerr = service.DeleteKeyPair("key-scan")
+	if nerr != nil {
+		log.Warnf("Error deleting keypair: %v", nerr)
+	}
 
 	if err != nil {
 		c <- err
@@ -277,8 +302,14 @@ func scanTemplates(tenant string, service *providers.Service, c chan error) {
 }
 
 func scanService(tenant string, service *providers.Service, c chan error) {
-	os.Remove(tenant)
-	os.Mkdir(tenant, 0777)
+	err := os.Remove(tenant)
+	if err != nil {
+		log.Warnf("Error removing file: %v", err)
+	}
+	err = os.Mkdir(tenant, 0777)
+	if err != nil {
+		log.Warnf("Error creating dir: %v", err)
+	}
 	cImage := make(chan error)
 	go scanImages(tenant, service, cImage)
 	cTpl := make(chan error)

@@ -34,6 +34,7 @@ import (
 	"syscall"
 	"text/template"
 	"time"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"golang.org/x/crypto/ssh"
@@ -178,9 +179,21 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, e
 	if err != nil {
 		return nil, err
 	}
-	f.WriteString(content)
-	f.Chmod(filemode)
-	f.Close()
+	_, err = f.WriteString(content)
+	if err != nil {
+		log.Warn("Error writing string: %v", err)
+	}
+
+	err = f.Chmod(filemode)
+	if err != nil {
+		log.Warn("Error changing directory: %v", err)
+	}
+
+	err = f.Close()
+	if err != nil {
+		log.Warn("Error closing file: %v", err)
+	}
+
 	return f, nil
 }
 
@@ -190,7 +203,10 @@ func isTunnelReady(port int) bool {
 	if err != nil {
 		return true
 	}
-	server.Close()
+	err = server.Close()
+	if err != nil {
+		log.Warn("Error closing server: %v", err)
+	}
 	return false
 
 }
@@ -258,7 +274,10 @@ func (c *SSHCommand) closeTunnels() error {
 // Wait releases any resources associated with the Cmd.
 func (c *SSHCommand) Wait() error {
 	err := c.cmd.Wait()
-	c.end()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warn("Error waiting for command end: %v", nerr)
+	}
 	return err
 
 }
@@ -266,7 +285,10 @@ func (c *SSHCommand) Wait() error {
 // Kill kills SSHCommand process and releases any resources associated with the SSHCommand.
 func (c *SSHCommand) Kill() error {
 	err := c.cmd.Process.Kill()
-	c.end()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warn("Error waiting for command end: %v", nerr)
+	}
 	return err
 }
 
@@ -296,7 +318,10 @@ func (c *SSHCommand) StdinPipe() (io.WriteCloser, error) {
 // If c.Stderr was nil, Output populates ExitError.Stderr.
 func (c *SSHCommand) Output() ([]byte, error) {
 	content, err := c.cmd.Output()
-	c.end()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warn("Error waiting for command end: %v", nerr)
+	}
 	return content, err
 }
 
@@ -304,7 +329,10 @@ func (c *SSHCommand) Output() ([]byte, error) {
 // output and standard error.
 func (c *SSHCommand) CombinedOutput() ([]byte, error) {
 	content, err := c.cmd.CombinedOutput()
-	c.end()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warn("Error waiting for command end: %v", nerr)
+	}
 	return content, err
 }
 
@@ -348,7 +376,10 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 	msgErr, _ := ioutil.ReadAll(stderr)
 
 	err = c.Wait()
-	c.end()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warn("Error waiting for command end: %v", nerr)
+	}
 	if err != nil {
 		msgError, retCode, erro := ExtractRetCode(err)
 		if erro != nil {
@@ -576,27 +607,42 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 	tunnels, sshConfig, err := ssh.createTunnels()
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		if keyFile != nil {
-			os.Remove(keyFile.Name())
+			nerr := os.Remove(keyFile.Name())
+			if nerr != nil {
+				log.Warnf("Error removing file %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
 	bash, err := exec.LookPath("bash")
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		if keyFile != nil {
-			os.Remove(keyFile.Name())
+			nerr := os.Remove(keyFile.Name())
+			if nerr != nil {
+				log.Warnf("Error removing file %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -607,7 +653,10 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 		args = []string{"-c", sshCmdString}
 	}
 	err = syscall.Exec(bash, args, nil)
-	os.Remove(keyFile.Name())
+	nerr := os.Remove(keyFile.Name())
+	if nerr != nil {
+		log.Warnf("Error removing file %v", nerr)
+	}
 	return err
 }
 
@@ -616,7 +665,10 @@ func (ssh *SSHConfig) Enter() error {
 	tunnels, sshConfig, err := ssh.createTunnels()
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -624,10 +676,16 @@ func (ssh *SSHConfig) Enter() error {
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, "", false)
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		if keyFile != nil {
-			os.Remove(keyFile.Name())
+			nerr := os.Remove(keyFile.Name())
+			if nerr != nil {
+				log.Warnf("Error removing file %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -635,10 +693,16 @@ func (ssh *SSHConfig) Enter() error {
 	bash, err := exec.LookPath("bash")
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		if keyFile != nil {
-			os.Remove(keyFile.Name())
+			nerr := os.Remove(keyFile.Name())
+			if nerr != nil {
+				log.Warnf("Error removing file %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -648,7 +712,10 @@ func (ssh *SSHConfig) Enter() error {
 	proc.Stdout = os.Stdout
 	proc.Stderr = os.Stderr
 	err = proc.Run()
-	os.Remove(keyFile.Name())
+	nerr := os.Remove(keyFile.Name())
+	if nerr != nil {
+		log.Warnf("Error removing file %v", nerr)
+	}
 	return err
 }
 
