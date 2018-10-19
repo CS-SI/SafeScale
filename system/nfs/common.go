@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"text/template"
 	"time"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -88,7 +89,10 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	if retcode != 0 {
 		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", stderr)
 	}
-	os.Remove(f.Name())
+	nerr := os.Remove(f.Name())
+	if nerr != nil {
+		log.Warn("Error deleting file: %v", nerr)
+	}
 
 	var cmd string
 	// if debug
