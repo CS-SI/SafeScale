@@ -181,17 +181,17 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, e
 	}
 	_, err = f.WriteString(content)
 	if err != nil {
-		log.Warn("Error writing string: %v", err)
+		log.Warnf("Error writing string: %v", err)
 	}
 
 	err = f.Chmod(filemode)
 	if err != nil {
-		log.Warn("Error changing directory: %v", err)
+		log.Warnf("Error changing directory: %v", err)
 	}
 
 	err = f.Close()
 	if err != nil {
-		log.Warn("Error closing file: %v", err)
+		log.Warnf("Error closing file: %v", err)
 	}
 
 	return f, nil
@@ -205,7 +205,7 @@ func isTunnelReady(port int) bool {
 	}
 	err = server.Close()
 	if err != nil {
-		log.Warn("Error closing server: %v", err)
+		log.Warnf("Error closing server: %v", err)
 	}
 	return false
 
@@ -276,7 +276,7 @@ func (c *SSHCommand) Wait() error {
 	err := c.cmd.Wait()
 	nerr := c.end()
 	if nerr != nil {
-		log.Warn("Error waiting for command end: %v", nerr)
+		log.Warnf("Error waiting for command end: %v", nerr)
 	}
 	return err
 
@@ -287,7 +287,7 @@ func (c *SSHCommand) Kill() error {
 	err := c.cmd.Process.Kill()
 	nerr := c.end()
 	if nerr != nil {
-		log.Warn("Error waiting for command end: %v", nerr)
+		log.Warnf("Error waiting for command end: %v", nerr)
 	}
 	return err
 }
@@ -320,7 +320,7 @@ func (c *SSHCommand) Output() ([]byte, error) {
 	content, err := c.cmd.Output()
 	nerr := c.end()
 	if nerr != nil {
-		log.Warn("Error waiting for command end: %v", nerr)
+		log.Warnf("Error waiting for command end: %v", nerr)
 	}
 	return content, err
 }
@@ -331,7 +331,7 @@ func (c *SSHCommand) CombinedOutput() ([]byte, error) {
 	content, err := c.cmd.CombinedOutput()
 	nerr := c.end()
 	if nerr != nil {
-		log.Warn("Error waiting for command end: %v", nerr)
+		log.Warnf("Error waiting for command end: %v", nerr)
 	}
 	return content, err
 }
@@ -378,7 +378,7 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 	err = c.Wait()
 	nerr := c.end()
 	if nerr != nil {
-		log.Warn("Error waiting for command end: %v", nerr)
+		log.Warnf("Error waiting for command end: %v", nerr)
 	}
 	if err != nil {
 		msgError, retCode, erro := ExtractRetCode(err)
