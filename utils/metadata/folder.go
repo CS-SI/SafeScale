@@ -145,7 +145,7 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 			return false, err
 		}
 		var buffer bytes.Buffer
-		buffer.ReadFrom(o.Content)
+		_, err = buffer.ReadFrom(o.Content)
 		if err != nil {
 			return true, err
 		}

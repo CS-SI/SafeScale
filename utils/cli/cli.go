@@ -167,7 +167,7 @@ func (c *Command) IntOption(option string, parameter string, def int) int {
 		if err == nil {
 			return val
 		}
-		fmt.Fprintf(os.Stderr, "Invalid integer value '%s' for option '%s'! Ignored.", strVal, option)
+		_, _ = fmt.Fprintf(os.Stderr, "Invalid integer value '%s' for option '%s'! Ignored.", strVal, option)
 	}
 	return def
 }

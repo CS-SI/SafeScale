@@ -20,7 +20,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/pkg/errors"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
 	"time"
@@ -278,7 +278,10 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 	}
 	err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
 	if err != nil {
-		client.DeleteHost(host.ID)
+		nerr := client.DeleteHost(host.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting host: %v", nerr)
+		}
 		return nil, fmt.Errorf("failed to create Host: %s", openstack.ProviderErrorToString(err))
 	}
 	return host, nil
@@ -415,7 +418,10 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	// Wait that host is ready, not just that the build is started
 	host, err := client.WaitHostReady(server.ID, time.Minute*5)
 	if err != nil {
-		client.DeleteHost(server.ID)
+		nerr := client.DeleteHost(server.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting host: %v", nerr)
+		}
 		return nil, fmt.Errorf("timeout waiting host '%s' ready: %s", request.Name, openstack.ProviderErrorToString(err))
 	}
 
@@ -432,14 +438,23 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	if request.PublicIP {
 		fip, err := client.attachFloatingIP(host)
 		if err != nil {
-			client.DeleteHost(host.ID)
+			nerr := client.DeleteHost(host.ID)
+			if nerr != nil {
+				log.Warnf("Error deleting host: %v", nerr)
+			}
 			return nil, fmt.Errorf("error attaching public IP for host '%s': %s", request.Name, openstack.ProviderErrorToString(err))
 		}
 		if isGateway {
 			err = client.enableHostRouterMode(host)
 			if err != nil {
-				client.DeleteHost(host.ID)
-				client.DeleteFloatingIP(fip.ID)
+				nerr := client.DeleteHost(host.ID)
+				if nerr != nil {
+					log.Warnf("Error deleting host: %v", nerr)
+				}
+				nerr = client.DeleteFloatingIP(fip.ID)
+				if nerr != nil {
+					log.Warnf("Error deleting floating ip: %v", nerr)
+				}
 				return nil, fmt.Errorf("error enabling gateway mode of host '%s': %s", request.Name, openstack.ProviderErrorToString(err))
 			}
 		}
@@ -585,7 +600,10 @@ func (client *Client) DeleteHost(ref string) error {
 		if err != nil {
 			continue
 		}
-		client.DeleteVolume(volume.ID)
+		nerr := client.DeleteVolume(volume.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting volume: %v", nerr)
+		}
 	}
 
 	return err
@@ -747,7 +765,10 @@ func (client *Client) attachFloatingIP(host *api.Host) (*FloatingIP, error) {
 
 	err = client.AssociateFloatingIP(host, fip.ID)
 	if err != nil {
-		client.DeleteFloatingIP(fip.ID)
+		nerr := client.DeleteFloatingIP(fip.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting floating ip: %v", nerr)
+		}
 		return nil, fmt.Errorf("failed to attach Floating IP to host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 

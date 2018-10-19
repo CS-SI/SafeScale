@@ -136,7 +136,10 @@ func (h *host) SSHConfig(name string) (*pb.SshConfig, error) {
 	service := pb.NewHostServiceClient(conn)
 	sshCfg, err := service.SSH(ctx, &pb.Reference{Name: name})
 	if err == nil {
-		sshCfgCache.Set(name, sshCfg)
+		nerr := sshCfgCache.Set(name, sshCfg)
+		if nerr != nil {
+			return sshCfg, nerr
+		}
 	}
 	return sshCfg, err
 }

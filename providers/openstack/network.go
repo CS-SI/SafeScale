@@ -87,7 +87,10 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 
 	sn, err := client.CreateSubnet(req.Name, network.ID, req.CIDR, req.IPVersion)
 	if err != nil {
-		client.DeleteNetwork(network.ID)
+		nerr := client.DeleteNetwork(network.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting network: %v", nerr)
+		}
 		return nil, fmt.Errorf("Error creating network %s: %s", req.Name, ProviderErrorToString(err))
 	}
 
@@ -99,7 +102,10 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	}
 	err = metadata.SaveNetwork(providers.FromClient(client), net)
 	if err != nil {
-		client.DeleteNetwork(network.ID)
+		nerr := client.DeleteNetwork(network.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting network: %v", nerr)
+		}
 		return nil, err
 	}
 	return net, nil
@@ -373,7 +379,10 @@ func (client *Client) DeleteGateway(networkID string) error {
 	}
 
 	host := m.Get()
-	client.DeleteHost(host.ID)
+	nerr := client.DeleteHost(host.ID)
+	if nerr != nil {
+		log.Warnf("Error deleting host: %v", nerr)
+	}
 	// Loop waiting for effective deletion of the host
 	for err = nil; err != nil; _, err = client.GetHost(host.ID) {
 		time.Sleep(100 * time.Millisecond)
@@ -445,13 +454,22 @@ func (client *Client) CreateSubnet(name string, networkID string, cidr string, i
 			NetworkID: client.ProviderNetworkID,
 		})
 		if err != nil {
-			client.DeleteSubnet(subnet.ID)
+			nerr := client.DeleteSubnet(subnet.ID)
+			if nerr != nil {
+				log.Warnf("Error deleting subnet: %v", nerr)
+			}
 			return nil, fmt.Errorf("Error creating subnet: %s", ProviderErrorToString(err))
 		}
 		err = client.AddSubnetToRouter(router.ID, subnet.ID)
 		if err != nil {
-			client.DeleteSubnet(subnet.ID)
-			client.DeleteRouter(router.ID)
+			nerr := client.DeleteSubnet(subnet.ID)
+			if nerr != nil {
+				log.Warnf("Error deleting subnet: %v", nerr)
+			}
+			nerr = client.DeleteRouter(router.ID)
+			if nerr != nil {
+				log.Warnf("Error deleting router: %v", nerr)
+			}
 			return nil, fmt.Errorf("Error creating subnet: %s", ProviderErrorToString(err))
 		}
 	}
@@ -487,7 +505,7 @@ func (client *Client) ListSubnets(netID string) ([]Subnet, error) {
 		NetworkID: netID,
 	})
 	var subnetList []Subnet
-	pager.EachPage(func(page pagination.Page) (bool, error) {
+	paginationErr := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := subnets.ExtractSubnets(page)
 		if err != nil {
 			return false, fmt.Errorf("Error listing subnets: %s", ProviderErrorToString(err))
@@ -504,6 +522,12 @@ func (client *Client) ListSubnets(netID string) ([]Subnet, error) {
 		}
 		return true, nil
 	})
+
+	// TODO previously we ignored the error here, consider returning nil, paginationErr
+	if paginationErr != nil {
+		log.Warnf("We have a pagination error !: %v", paginationErr)
+	}
+
 	return subnetList, nil
 }
 
