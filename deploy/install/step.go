@@ -60,10 +60,10 @@ type stepResults map[string]stepResult
 
 func (s stepResults) ErrorMessages() string {
 	output := ""
-	for _, k := range s {
+	for h, k := range s {
 		val := k.ErrorMessage()
 		if val != "" {
-			output += val + "\n"
+			output += h + ": " + val + "\n"
 		}
 	}
 	return output
