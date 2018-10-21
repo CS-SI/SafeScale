@@ -107,11 +107,6 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 
 	keypairName := "kp_" + network.Name
-	// Makes sure keypair doesn't exist
-	derr := svc.provider.DeleteKeyPair(keypairName)
-	if derr != nil {
-		log.Warnf("Error trying to delete keypair, %v", derr)
-	}
 
 	keypair, err := svc.provider.CreateKeyPair(keypairName)
 	if err != nil {
