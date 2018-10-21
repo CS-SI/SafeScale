@@ -153,9 +153,10 @@ func (f *Feature) DisplayFilename() string {
 	return filename
 }
 
-// Specs returns the data from the spec file
+// Specs returns a copy of the spec file (we don't want external use to modify Feature.specs)
 func (f *Feature) Specs() *viper.Viper {
-	return f.specs
+	roSpecs := *f.specs
+	return &roSpecs
 }
 
 // Applyable tells if the feature is installable on the target
@@ -322,25 +323,25 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 
 // installRequirements walks through requirements and installs them if needed
 func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
-	specs := f.Specs()
 	yamlKey := "feature.requirements.features"
-	if specs.IsSet(yamlKey) {
-		// if debug {
-		//	hostInstance, clusterInstance, nodeInstance := determineContext(t)
-		//	msgHead := fmt.Sprintf("Checking requirements of feature '%s'", c.DisplayName())
-		//	var msgTail string
-		//	if hostInstance != nil {
-		//		msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
-		//	}
-		//	if nodeInstance != nil {
-		//		msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
-		//	}
-		//	if clusterInstance != nil {
-		//		msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
-		//	}
-		//	log.Printf("%s %s...\n", msgHead, msgTail)
-		// }
-		for _, requirement := range specs.GetStringSlice(yamlKey) {
+	if f.specs.IsSet(yamlKey) {
+		// if debug
+		if false {
+			hostInstance, clusterInstance, nodeInstance := determineContext(t)
+			msgHead := fmt.Sprintf("Checking requirements of feature '%s'", f.DisplayName())
+			var msgTail string
+			if hostInstance != nil {
+				msgTail = fmt.Sprintf("on host '%s'", hostInstance.host.Name)
+			}
+			if nodeInstance != nil {
+				msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
+			}
+			if clusterInstance != nil {
+				msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
+			}
+			log.Printf("%s %s...\n", msgHead, msgTail)
+		}
+		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
 			needed, err := NewFeature(requirement)
 			if err != nil {
 				return fmt.Errorf("failed to find required feature '%s': %s", requirement, err.Error())
