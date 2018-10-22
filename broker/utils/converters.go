@@ -142,6 +142,13 @@ func ToPBHost(in *api.Host) *pb.Host {
 	}
 }
 
+func ToHostStatus(in *api.Host) *pb.HostStatus {
+	return &pb.HostStatus{
+		Name:       in.Name,
+		Status:     pb.HostState(in.State).String(),
+	}
+}
+
 // ToPBHostTemplate convert an template from api to protocolbuffer format
 func ToPBHostTemplate(in *api.HostTemplate) *pb.HostTemplate {
 	return &pb.HostTemplate{

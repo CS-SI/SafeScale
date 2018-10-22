@@ -20,7 +20,7 @@ import (
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	utils "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/broker/utils"
 
 	cache "github.com/CS-SI/SafeScale/utils"
 )
@@ -57,6 +57,22 @@ func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
 	defer cancel()
 	service := pb.NewHostServiceClient(conn)
 	return service.Inspect(ctx, &pb.Reference{Name: name})
+}
+
+// Get host status
+func (h *host) Status(name string, timeout time.Duration) (*pb.HostStatus, error) {
+	conn := utils.GetConnection()
+	defer conn.Close()
+	if timeout < utils.TimeoutCtxDefault {
+		timeout = utils.TimeoutCtxDefault
+	}
+	ctx, cancel := utils.GetContext(timeout)
+	defer cancel()
+	service := pb.NewHostServiceClient(conn)
+
+	theHost, theErr := service.Status(ctx, &pb.Reference{Name: name})
+
+	return theHost, theErr
 }
 
 // Reboots host
