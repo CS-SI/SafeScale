@@ -564,8 +564,7 @@ func (client *Client) CopyObject(containerSrc, objectSrc, objectDst string) erro
 func (client *Client) DeleteObject(container, object string) error {
 	_, err := objects.Delete(client.Container, container, object, objects.DeleteOpts{}).Extract()
 	if err != nil {
-		return fmt.Errorf("Error deleting objects %s of container %s: %s", object, container, ProviderErrorToString(err))
+		return fmt.Errorf("Error deleting object '%s' of container %s: %s", object, container, ProviderErrorToString(err))
 	}
 	return nil
-
 }

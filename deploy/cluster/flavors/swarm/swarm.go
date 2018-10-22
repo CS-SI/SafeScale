@@ -705,7 +705,7 @@ func (c *Cluster) asyncCreateMaster(index int, def pb.HostDefinition, timeout ti
 		done <- fmt.Errorf("scripted Master installation failed with error code %d", retcode)
 		return
 	}
-	log.Printf("[master #%d (%s)] systemrequirements successfully installed", index, host.Name)
+	log.Printf("[master #%d (%s)] system requirements successfully installed", index, host.Name)
 
 	values := install.Variables{
 		"Password": c.Core.AdminPassword,
