@@ -18,7 +18,6 @@ package services
 
 import (
 	"fmt"
-
 	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -60,7 +59,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		CIDR:      cidr,
 	})
 	if err != nil {
-		tbr := errors.Wrap(err, "Error with CreateNetwork call")
+		tbr := errors.Wrap(err, "Error creating network: Error with CreateNetwork call")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
@@ -90,18 +89,18 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		MinDiskSize: disk,
 	})
 	if err != nil {
-		tbr := errors.Wrap(err, "Error selecting template")
+		tbr := errors.Wrap(err, "Error creating network: Error selecting template")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	if len(tpls) < 1 {
-		tbr := errors.New(fmt.Sprintf("No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
+		tbr := errors.New(fmt.Sprintf("Error creating network: No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
-		tbr := errors.Wrap(err, "Error searching image")
+		tbr := errors.Wrap(err, "Error creating network: Error searching image")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
@@ -136,7 +135,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
 		defer svc.provider.DeleteNetwork(network.ID)
-		tbr := errors.Wrapf(err, "Gateway creation with name '%s' failed", gwname)
+		tbr := errors.Wrapf(err, "Error creating network: Gateway creation with name '%s' failed", gwname)
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
@@ -148,18 +147,20 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	ssh, err := svc.provider.GetSSHConfig(gw.ID)
 	if err != nil {
 		defer svc.provider.DeleteHost(gw.ID)
-		tbr := errors.Wrapf(err, "Error retrieving SSH config of gateway '%s'", gw.Name)
+		tbr := errors.Wrapf(err, "Error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
 	// TODO Test for failure with 15s !!!
 	err = ssh.WaitServerReady(utils.TimeoutCtxHost)
-	// err = ssh.WaitServerReady(time.Second * 15)
+	// err = ssh.WaitServerReady(time.Second * 3)
 	if err != nil {
-		tbr := errors.Wrapf(err, "Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
+		tbr := errors.Wrapf(err, "Error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
 		log.Errorf("%+v", tbr)
-		return nil, tbr
+
+		// Simplified error message
+		return nil, fmt.Errorf("Error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
 	}
 	log.Printf("SSH service of gateway '%s' started.", gw.Name)
 
@@ -170,7 +171,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 	err = metadata.SaveNetwork(svc.provider, rv)
 	if err != nil {
-		tbr := errors.Wrap(err, "Error saving network metadata")
+		tbr := errors.Wrap(err, "Error creating network: Error saving network metadata")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
