@@ -35,7 +35,6 @@ type HostAPI interface {
 	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*api.Host, error)
 	List(all bool) ([]api.Host, error)
 	Get(ref string) (*api.Host, error)
-	Status(ref string) (*api.Host, error)
 	Delete(ref string) error
 	SSH(ref string) (*system.SSHConfig, error)
 	Reboot(ref string) error
@@ -163,11 +162,6 @@ func (svc *HostService) List(all bool) ([]api.Host, error) {
 
 // Get returns the host identified by ref, ref can be the name or the id
 func (svc *HostService) Get(ref string) (*api.Host, error) {
-	return svc.provider.GetHost(ref)
-}
-
-// Get returns host status
-func (svc *HostService) Status(ref string) (*api.Host, error) {
 	return svc.provider.GetHost(ref)
 }
 
