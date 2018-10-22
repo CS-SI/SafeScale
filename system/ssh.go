@@ -29,13 +29,16 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
 	"text/template"
 	"time"
+
 	log "github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"golang.org/x/crypto/ssh"
 )
@@ -138,26 +141,28 @@ func SCPErrorString(retcode int) string {
 	return "Unqualified error"
 }
 
-// Close close ssh tunnel
+// Close closes ssh tunnel
 func (tunnel *sshTunnel) Close() error {
-	defer os.Remove(tunnel.keyFile.Name())
+	defer utils.LazyRemove(tunnel.keyFile.Name())
 
+	// Kills the process of the tunnel
 	err := tunnel.cmd.Process.Kill()
 	if err != nil {
+		log.Printf("tunnel.cmd.Process.Kill() failed: %s\n", reflect.TypeOf(err).String())
 		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
 	}
+	// Kills remaining processes if there are some
 	bytes, err := exec.Command("pgrep", "-f", tunnel.cmdString).Output()
-	if err != nil {
-		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
-	}
-	portStr := strings.Trim(string(bytes), "\n")
-	_, err = strconv.Atoi(portStr)
-	if err != nil {
-		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
-	}
-	err = exec.Command("kill", "-9", portStr).Run()
-	if err != nil {
-		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+	if err == nil {
+		portStr := strings.Trim(string(bytes), "\n")
+		_, err = strconv.Atoi(portStr)
+		if err == nil {
+			err = exec.Command("kill", "-9", portStr).Run()
+			if err != nil {
+				log.Printf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
+				return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+			}
+		}
 	}
 	return nil
 }
@@ -263,6 +268,9 @@ func (c *SSHCommand) closeTunnels() error {
 		err = t.Close()
 	}
 	//Tunnels are imbricated only last error is significant
+	if err != nil {
+		log.Printf("closeTunnels: %s\n", reflect.TypeOf(err).String())
+	}
 	return err
 }
 
@@ -394,12 +402,13 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 
 func (c *SSHCommand) end() error {
 	err1 := c.closeTunnels()
-	err2 := os.Remove(c.keyFile.Name())
+	err2 := utils.LazyRemove(c.keyFile.Name())
 	if err1 != nil {
-		return fmt.Errorf("Unable to close ssh tunnels : %s", err1.Error())
+		log.Printf("closeTunnels() failed: %s\n", reflect.TypeOf(err1).String())
+		return fmt.Errorf("Unable to close ssh tunnels: %s", err1.Error())
 	}
 	if err2 != nil {
-		return fmt.Errorf("Unable to close ssh tunnels : %s", err2.Error())
+		return fmt.Errorf("Unable to close ssh tunnels: %s", err2.Error())
 	}
 	return nil
 }
@@ -540,9 +549,8 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		if logErr == nil {
 			if retcode == 0 {
 				return fmt.Errorf("server '%s' is not ready yet : %s, Log content of file user_data.log: %s", ssh.Host, err.Error(), stdout)
-			} else {
-				return fmt.Errorf("server '%s' is not ready yet : %s, Error reading user_data.log: %s", ssh.Host, err.Error(), stderr)
 			}
+			return fmt.Errorf("server '%s' is not ready yet : %s, Error reading user_data.log: %s", ssh.Host, err.Error(), stderr)
 		}
 
 		return fmt.Errorf("server '%s' is not ready yet : %s", ssh.Host, err.Error())
@@ -623,7 +631,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 			}
 		}
 		if keyFile != nil {
-			nerr := os.Remove(keyFile.Name())
+			nerr := utils.LazyRemove(keyFile.Name())
 			if nerr != nil {
 				log.Warnf("Error removing file %v", nerr)
 			}
@@ -639,7 +647,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 			}
 		}
 		if keyFile != nil {
-			nerr := os.Remove(keyFile.Name())
+			nerr := utils.LazyRemove(keyFile.Name())
 			if nerr != nil {
 				log.Warnf("Error removing file %v", nerr)
 			}
@@ -653,9 +661,8 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 		args = []string{"-c", sshCmdString}
 	}
 	err = syscall.Exec(bash, args, nil)
-	nerr := os.Remove(keyFile.Name())
+	nerr := utils.LazyRemove(keyFile.Name())
 	if nerr != nil {
-		log.Warnf("Error removing file %v", nerr)
 	}
 	return err
 }
@@ -682,7 +689,7 @@ func (ssh *SSHConfig) Enter() error {
 			}
 		}
 		if keyFile != nil {
-			nerr := os.Remove(keyFile.Name())
+			nerr := utils.LazyRemove(keyFile.Name())
 			if nerr != nil {
 				log.Warnf("Error removing file %v", nerr)
 			}
@@ -699,7 +706,7 @@ func (ssh *SSHConfig) Enter() error {
 			}
 		}
 		if keyFile != nil {
-			nerr := os.Remove(keyFile.Name())
+			nerr := utils.LazyRemove(keyFile.Name())
 			if nerr != nil {
 				log.Warnf("Error removing file %v", nerr)
 			}
@@ -712,7 +719,7 @@ func (ssh *SSHConfig) Enter() error {
 	proc.Stdout = os.Stdout
 	proc.Stderr = os.Stderr
 	err = proc.Run()
-	nerr := os.Remove(keyFile.Name())
+	nerr := utils.LazyRemove(keyFile.Name())
 	if nerr != nil {
 		log.Warnf("Error removing file %v", nerr)
 	}

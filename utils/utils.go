@@ -41,15 +41,14 @@ func AbsPathify(inPath string) string {
 	for _, key := range found {
 		ks := ""
 		if strings.Contains(key, "{") {
-			ks = key[2:len(key)-1]
+			ks = key[2 : len(key)-1]
 		} else {
 			ks = key[1:]
 		}
 
 		if val, ok := overrides[ks]; ok {
 			inPath = strings.Replace(inPath, key, val, -1)
-		} else
-		{
+		} else {
 			inPath = strings.Replace(inPath, key, os.Getenv(ks), -1)
 		}
 	}
@@ -65,7 +64,6 @@ func AbsPathify(inPath string) string {
 
 	return ""
 }
-
 
 // TODO Remove this later
 func OriginalAbsPathify(inPath string) string {
