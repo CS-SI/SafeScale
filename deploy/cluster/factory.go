@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/k8s"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc"
+	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/swarm"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 )
 
@@ -46,8 +47,8 @@ func Get(name string) (clusterapi.Cluster, error) {
 	}
 
 	var instance clusterapi.Cluster
-	common := m.Get()
-	switch common.Flavor {
+	clusterCore := m.Get()
+	switch clusterCore.Flavor {
 	case Flavor.DCOS:
 		instance, err = dcos.Load(m)
 		if err != nil {
@@ -68,11 +69,13 @@ func Get(name string) (clusterapi.Cluster, error) {
 		if err != nil {
 			return nil, err
 		}
+	case Flavor.SWARM:
+		instance, err = swarm.Load(m)
+		if err != nil {
+			return nil, err
+		}
 	default:
-		found = false
-	}
-	if !found {
-		return nil, nil
+		return nil, fmt.Errorf("cluster Flavor '%s' not yet implemented", clusterCore.Flavor.String())
 	}
 	return instance, nil
 }
@@ -96,32 +99,33 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		return nil, err
 	}
 
+	req.Tenant = tenant.Name
 	switch req.Flavor {
 	case Flavor.DCOS:
-		req.Tenant = tenant.Name
 		instance, err = dcos.Create(req)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.BOH:
-		req.Tenant = tenant.Name
 		instance, err = boh.Create(req)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.OHPC:
-		req.Tenant = tenant.Name
 		instance, err = ohpc.Create(req)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.K8S:
-		req.Tenant = tenant.Name
 		instance, err = k8s.Create(req)
 		if err != nil {
 			return nil, err
 		}
-	//case Flavor.Swarm:
+	case Flavor.SWARM:
+		instance, err = swarm.Create(req)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("cluster Flavor '%s' not yet implemented", req.Flavor.String())
 	}
@@ -171,9 +175,15 @@ func List() ([]clusterapi.Cluster, error) {
 				return err
 			}
 		case Flavor.OHPC:
-			fallthrough
-		case Flavor.Swarm:
-			return fmt.Errorf("cluster Flavor '%s' not yet implemented", cluster.Flavor.String())
+			instance, err = ohpc.Load(cm)
+			if err != nil {
+				return err
+			}
+		case Flavor.SWARM:
+			instance, err = swarm.Load(cm)
+			if err != nil {
+				return err
+			}
 		}
 
 		clusterList = append(clusterList, instance)

@@ -270,7 +270,6 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 	// Create a KeyPair for the user cladm
 	kpName = "cluster_" + req.Name + "_cladm_key"
-	//svc.DeleteKeyPair(kpName)
 	kp, err = svc.CreateKeyPair(kpName)
 	if err != nil {
 		err = fmt.Errorf("failed to create Key Pair: %s", err.Error())
@@ -319,18 +318,23 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		err = brokerclient.DecorateError(err, "wait for remote ssh service to be ready", false)
 		goto cleanNetwork
 	}
-	feature, err = install.NewFeature("proxycache-server")
-	if err != nil {
-		goto cleanNetwork
-	}
-	target = install.NewHostTarget(pbutils.ToPBHost(gw))
-	results, err = feature.Add(target, install.Variables{}, install.Settings{})
-	if err != nil {
-		goto cleanNetwork
-	}
-	if !results.Successful() {
-		err = fmt.Errorf(results.AllErrorMessages())
-		goto cleanNetwork
+
+	//VPL: for now, disables unconditionally the proxycache
+	req.DisabledDefaultFeatures["proxycache"] = struct{}{}
+	if _, ok = req.DisabledDefaultFeatures["proxycache"]; !ok {
+		feature, err = install.NewFeature("proxycache-server")
+		if err != nil {
+			goto cleanNetwork
+		}
+		target = install.NewHostTarget(pbutils.ToPBHost(gw))
+		results, err = feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			goto cleanNetwork
+		}
+		if !results.Successful() {
+			err = fmt.Errorf(results.AllErrorMessages())
+			goto cleanNetwork
+		}
 	}
 
 	err = instance.updateMetadata(func() error {
@@ -505,43 +509,27 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 		return err
 	}
 
-	// install proxycache-client feature
-	feature, err := install.NewFeature("proxycache-client")
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
-		return fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
-	}
 	target := install.NewHostTarget(host)
-	results, err := feature.Add(target, install.Variables{}, install.Settings{})
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
-		return fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
-	}
-	if !results.Successful() {
-		msg := results.AllErrorMessages()
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
-		return fmt.Errorf(msg)
-	}
 
-	// install docker feature
-	feature, err = install.NewFeature("docker")
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to prepare feature 'docker': %s", 1, host.ID, err.Error())
-		return fmt.Errorf("failed to install feature 'docker': %s", err.Error())
-	}
-	results, err = feature.Add(target, install.Variables{
-		"Hostname": host.Name,
-		"Username": "cladm",
-		"Password": c.Core.AdminPassword,
-	}, install.Settings{})
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
-		return fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
-	}
-	if !results.Successful() {
-		msg := results.AllErrorMessages()
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
-		return fmt.Errorf(msg)
+	//VPL: for now disables unconditionally proxycache
+	c.Core.DisabledFeatures["proxycache"] = struct{}{}
+	if _, ok := c.Core.DisabledFeatures["proxycache"]; !ok {
+		// install proxycache-client feature
+		feature, err := install.NewFeature("proxycache-client")
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
+			return fmt.Errorf("failed to add feature 'proxycache-client': %s", err.Error())
+		}
+		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
+			return fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[master #%d (%s)] failed to add feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
+			return fmt.Errorf(msg)
+		}
 	}
 
 	// Installs OHPC requirements...
@@ -574,6 +562,27 @@ func (c *Cluster) createMaster(req *pb.HostDefinition) error {
 		}
 		log.Printf("[master #%d (%s)] installation failed (retcode=%d)", 1, host.Name, retcode)
 		return fmt.Errorf("scripted installation failed on master '%s' (retcode=%d)", host.Name, retcode)
+	}
+
+	// install docker feature
+	feature, err := install.NewFeature("docker")
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to prepare feature 'docker': %s", 1, host.ID, err.Error())
+		return fmt.Errorf("failed to install feature 'docker': %s", err.Error())
+	}
+	results, err := feature.Add(target, install.Variables{
+		"Hostname": host.Name,
+		"Username": "cladm",
+		"Password": c.Core.AdminPassword,
+	}, install.Settings{})
+	if err != nil {
+		log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
+		return fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+	}
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
+		log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
+		return fmt.Errorf(msg)
 	}
 
 	log.Printf("[master #%d (%s)] creation successful", 1, host.Name)
@@ -687,6 +696,32 @@ func (c *Cluster) asyncCreateNode(
 		return
 	}
 
+	target := install.NewHostTarget(host)
+
+	//VPL: for now, disables unconditionally proxycache
+	c.Core.DisabledFeatures["proxycache"] = struct{}{}
+	if _, ok := c.Core.DisabledFeatures["proxycache"]; !ok {
+		// install proxycache-client feature
+		feature, err := install.NewFeature("proxycache-client")
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
+			done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
+			return
+		}
+		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
+			done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+			return
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
+			done <- fmt.Errorf(msg)
+			return
+		}
+	}
+
 	// Installs OHPC requirements
 	installCommonRequirements, err := c.getInstallCommonRequirements()
 	if err != nil {
@@ -722,35 +757,14 @@ func (c *Cluster) asyncCreateNode(
 		return
 	}
 
-	// install proxycache-client feature
-	feature, err := install.NewFeature("proxycache-client")
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
-		done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
-		return
-	}
-	target := install.NewHostTarget(host)
-	results, err := feature.Add(target, install.Variables{}, install.Settings{})
-	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
-		return
-	}
-	if !results.Successful() {
-		msg := results.AllErrorMessages()
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
-		done <- fmt.Errorf(msg)
-		return
-	}
-
 	// install docker feature
-	feature, err = install.NewFeature("docker")
+	feature, err := install.NewFeature("docker")
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to prepare feature 'docker': %s", 1, host.ID, err.Error())
 		done <- fmt.Errorf("failed to install feature 'docker': %s", err.Error())
 		return
 	}
-	results, err = feature.Add(target, install.Variables{
+	results, err := feature.Add(target, install.Variables{
 		"Hostname": host.Name,
 		"Username": "cladm",
 		"Password": c.Core.AdminPassword,
@@ -955,11 +969,6 @@ func (c *Cluster) asyncInstallReverseProxy(host *providerapi.Host, done chan err
 // GetName returns the name of the cluster
 func (c *Cluster) GetName() string {
 	return c.Core.Name
-}
-
-// GetMasters returns a list of master servers
-func (c *Cluster) GetMasters() ([]string, error) {
-	return c.manager.MasterIDs, nil
 }
 
 // Start starts the cluster named 'name'

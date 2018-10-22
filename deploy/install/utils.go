@@ -306,10 +306,9 @@ func determineContext(t Target) (hT *HostTarget, cT *ClusterTarget, nT *NodeTarg
 }
 
 // Check if required parameters defined in specification file have been set in 'v'
-func checkParameters(c *Feature, v Variables) error {
-	specs := c.Specs()
-	if specs.IsSet("feature.parameters") {
-		params := specs.GetStringSlice("feature.parameters")
+func checkParameters(f *Feature, v Variables) error {
+	if f.specs.IsSet("feature.parameters") {
+		params := f.specs.GetStringSlice("feature.parameters")
 		for _, k := range params {
 			if _, ok := v[k]; !ok {
 				return fmt.Errorf("missing value for parameter '%s'", k)
@@ -326,7 +325,8 @@ func setImplicitParameters(t Target, v Variables) {
 		cluster := cT.cluster
 		config := cluster.GetConfig()
 		v["ClusterName"] = cluster.GetName()
-		v["Complexity"] = strings.ToLower(config.Complexity.String())
+		v["ClusterComplexity"] = strings.ToLower(config.Complexity.String())
+		v["ClusterFlavor"] = strings.ToLower(config.Flavor.String())
 		v["GatewayIP"] = config.GatewayIP
 		v["MasterIDs"] = cluster.ListMasterIDs()
 		v["MasterIPs"] = cluster.ListMasterIPs()

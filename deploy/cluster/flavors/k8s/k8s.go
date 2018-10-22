@@ -291,18 +291,19 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	// Saving cluster metadata, with status 'Creating'
 	instance = Cluster{
 		Core: &clusterapi.ClusterCore{
-			Name:          req.Name,
-			CIDR:          req.CIDR,
-			Flavor:        Flavor.K8S,
-			State:         ClusterState.Creating,
-			Complexity:    req.Complexity,
-			Tenant:        req.Tenant,
-			NetworkID:     req.NetworkID,
-			GatewayIP:     gw.GetPrivateIP(),
-			PublicIP:      gw.GetAccessIP(),
-			Keypair:       kp,
-			AdminPassword: cladmPassword,
-			NodesDef:      nodesDef,
+			Name:             req.Name,
+			CIDR:             req.CIDR,
+			Flavor:           Flavor.K8S,
+			State:            ClusterState.Creating,
+			Complexity:       req.Complexity,
+			Tenant:           req.Tenant,
+			NetworkID:        req.NetworkID,
+			GatewayIP:        gw.GetPrivateIP(),
+			PublicIP:         gw.GetAccessIP(),
+			Keypair:          kp,
+			AdminPassword:    cladmPassword,
+			NodesDef:         nodesDef,
+			DisabledFeatures: req.DisabledDefaultFeatures,
 		},
 		provider: svc,
 		manager:  &managerData{},
@@ -465,7 +466,7 @@ func (c *Cluster) asyncCreateNodes(count int, public bool, def pb.HostDefinition
 		nodeType = NodeType.PrivateNode
 		nodeTypeStr = "private"
 	}
-	fmt.Printf("Creating %d Kubernetes %s Node%s...\n", count, nodeTypeStr, countS)
+	fmt.Printf("Creating %d %s Node%s...\n", count, nodeTypeStr, countS)
 
 	var dones []chan error
 	var results []chan string
@@ -592,9 +593,12 @@ func (c *Cluster) asyncCreateMasters(count int, done chan error) {
 // }
 
 // createAndConfigureNode creates and configure a Node
-func (c *Cluster) createAndConfigureNode(index int, def pb.HostDefinition) (string, error) {
+func (c *Cluster) createAndConfigureNode(
+	index int, req pb.HostDefinition, timeout time.Duration,
+) (string, error) {
+
 	var nodeType NodeType.Enum
-	if def.Public {
+	if req.Public {
 		nodeType = NodeType.PublicNode
 	} else {
 		nodeType = NodeType.PrivateNode
@@ -605,7 +609,7 @@ func (c *Cluster) createAndConfigureNode(index int, def pb.HostDefinition) (stri
 
 	done := make(chan error)
 	result := make(chan string)
-	go c.asyncCreateNode(index, nodeType, def, timeoutCtxHost, result, done)
+	go c.asyncCreateNode(index, nodeType, req, timeout, result, done)
 	hostID := <-result
 	err := <-done
 	if err != nil {
@@ -618,6 +622,7 @@ func (c *Cluster) createAndConfigureNode(index int, def pb.HostDefinition) (stri
 
 // asyncCreateMaster adds a master node
 func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan error) {
+
 	log.Printf("[master #%d] starting creation...\n", index)
 
 	name, err := c.buildHostname("master", NodeType.Master)
@@ -657,7 +662,7 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 	}
 
 	// Installs K8S requirements
-	log.Printf("[master #%d (%s)] installing Kubernetes requirements...\n", index, host.Name)
+	log.Printf("[master #%d (%s)] installing requirements...\n", index, host.Name)
 	commonRequirements, err := c.getCommonRequirements()
 	if err != nil {
 		done <- err
@@ -682,54 +687,63 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 		done <- fmt.Errorf("scripted Node configuration failed with error code %d", retcode)
 		return
 	}
-	log.Printf("[master #%d (%s)] Kubernetes requirements installed successfully.\n", index, host.Name)
+	log.Printf("[master #%d (%s)] requirements installed successfully.\n", index, host.Name)
 
-	// remotedekstop is a feature, can be added after master creation; should be automatically install
-	// in perform, not deploy
-	// // Installs remotedesktop feature on each master
-	// log.Printf("[master #%d (%s)] installing feature 'remotedesktop'\n", index, host.Name)
-	// feature, err := install.NewFeature("remotedesktop")
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to instanciate feature 'remotedesktop': %s\n", index, host.Name, err.Error())
-	// 	done <- err
-	// 	return
-	// }
-	// target := install.NewHostTarget(host)
-	// results, err := feature.Add(target, install.Variables{
-	// 	"Username": "cladm",
-	// 	"Password": c.Core.AdminPassword,
-	// }, install.Settings{})
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
-	// 	done <- err
-	// 	return
-	// }
-	// if !results.Successful() {
-	// 	msg := results.AllErrorMessages()
-	// 	log.Printf("[master #%d (%s)] installation script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
-	// 	done <- fmt.Errorf(msg)
-	// }
-	// log.Printf("[master #%d (%s)] feature '%s' installed successfully\n", index, host.Name, feature.DisplayName())
+	// add feature remotedesktop, unless explicitly disabled
+	if _, ok := c.Core.DisabledFeatures["remotedesktop"]; !ok {
+		// Installs remotedesktop feature on each master
+		log.Printf("[master #%d (%s)] adding feature 'remotedesktop'\n", index, host.Name)
+		feature, err := install.NewFeature("remotedesktop")
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to instanciate feature 'remotedesktop': %s\n", index, host.Name, err.Error())
+			done <- err
+			return
+		}
+		target := install.NewHostTarget(host)
+		results, err := feature.Add(target, install.Variables{
+			"Username": "cladm",
+			"Password": c.Core.AdminPassword,
+		}, install.Settings{})
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to add feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
+			done <- err
+			return
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[master #%d (%s)] add script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
+			done <- fmt.Errorf(msg)
+		}
+		log.Printf("[master #%d (%s)] feature '%s' added successfully\n", index, host.Name, feature.DisplayName())
+	}
 
-	// // install proxycache-client feature
-	// feature, err := install.NewFeature("proxycache-client")
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
-	// 	done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
-	// }
-	// target := install.NewHostTarget(host)
-	// ok, results, err := feature.Add(target, values)
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
-	// 	done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
-	// 	return
-	// }
-	// if !ok {
-	// 	msg := results.Errors()
-	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
-	// 	done <- fmt.Errorf(msg)
-	// 	return
-	// }
+	// add feature proxycache-client unless explicitly disabled
+	c.Core.DisabledFeatures["proxycache"] = struct{}{}
+	if _, ok := c.Core.DisabledFeatures["proxycache"]; !ok {
+		feature, err := install.NewFeature("proxycache-client")
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
+			done <- fmt.Errorf("failed to add feature 'proxycache-client': %s", err.Error())
+		}
+		target := install.NewHostTarget(host)
+		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to add feature '%s': %s\n", index, host.Name, feature.DisplayName(), err.Error())
+			done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+			return
+		}
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to add feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
+			done <- err
+			return
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[master #%d (%s)] add script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
+			done <- fmt.Errorf(msg)
+			return
+		}
+	}
 
 	log.Printf("[master #%d (%s)] creation successful\n", index, host.Name)
 	done <- nil
@@ -737,7 +751,11 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 
 // asyncCreateNode creates a Node in the cluster
 // This function is intended to be call as a goroutine
-func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req pb.HostDefinition, timeout time.Duration, result chan string, done chan error) {
+func (c *Cluster) asyncCreateNode(
+	index int, nodeType NodeType.Enum, req pb.HostDefinition, timeout time.Duration,
+	result chan string, done chan error,
+) {
+
 	var publicIP bool
 	var nodeTypeStr string
 	if nodeType == NodeType.PublicNode {
@@ -751,7 +769,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req pb.Host
 	log.Printf("[%s node #%d] starting creation...\n", nodeTypeStr, index)
 
 	// Create the host
-	log.Printf("[%s node #%d] starting host creation...\n", nodeTypeStr, index)
+	log.Printf("[%s node #%d] starting host resource creation...\n", nodeTypeStr, index)
 	var err error
 	name, err := c.buildHostname("node", nodeType)
 	if err != nil {
@@ -763,7 +781,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req pb.Host
 	req.Name = name
 	req.Public = publicIP
 	req.Network = c.Core.NetworkID
-	host, err := brokerclient.New().Host.Create(req, brokerclient.DefaultExecutionTimeout)
+	host, err := brokerclient.New().Host.Create(req, timeout)
 	if err != nil {
 		err = brokerclient.DecorateError(err, "creation of host", true)
 		log.Printf("[%s node #%d] creation failed: %s\n", nodeTypeStr, index, err.Error())
@@ -800,31 +818,34 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req pb.Host
 		done <- fmt.Errorf("failed to update Cluster configuration: %s", err.Error())
 		return
 	}
-	log.Printf("[%s node #%d (%s)] host created successfully.\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] host resource created successfully.\n", nodeTypeStr, index, host.Name)
 
-	// // install proxycache-client feature
-	// feature, err := install.NewFeature("proxycache-client")
-	// if err != nil {
-	// 	log.Printf("[%s node #%d (%s)] failed to prepare feature 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
-	// 	done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
-	// 	return
-	// }
-	//target := install.NewHostTarget(host)
-	// ok, results, err := feature.Add(target, install.Variables{})
-	// if err != nil {
-	// 	log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
-	// 	done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
-	// 	return
-	// }
-	// if !ok {
-	// 	msg := results.Errors()
-	// 	log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
-	// 	done <- fmt.Errorf(msg)
-	// 	return
-	// }
+	// install proxycache-client feature
+	c.Core.DisabledFeatures["proxycache"] = struct{}{}
+	if _, ok := c.Core.DisabledFeatures["proxycache"]; !ok {
+		feature, err := install.NewFeature("proxycache-client")
+		if err != nil {
+			log.Printf("[%s node #%d (%s)] failed to prepare feature 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
+			done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
+			return
+		}
+		target := install.NewHostTarget(host)
+		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
+			done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+			return
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
+			done <- fmt.Errorf(msg)
+			return
+		}
+	}
 
 	// Installs K8S requirements
-	log.Printf("[%s node #%d (%s)] installing Kubernetes requirements...\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] installing requirements...\n", nodeTypeStr, index, host.Name)
 	commonRequirements, err := c.getCommonRequirements()
 	if err != nil {
 		done <- err
@@ -851,7 +872,7 @@ func (c *Cluster) asyncCreateNode(index int, nodeType NodeType.Enum, req pb.Host
 		done <- fmt.Errorf("scripted Node configuration failed with error code %d", retcode)
 		return
 	}
-	log.Printf("[%s node #%d (%s)] Kubernetes requirements installed successfully.\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] requirements installed successfully.\n", nodeTypeStr, index, host.Name)
 
 	log.Printf("[%s node #%d (%s)] creation successful.\n", nodeTypeStr, index, host.Name)
 	result <- host.ID
@@ -874,7 +895,7 @@ func (c *Cluster) asyncConfigureGateway(done chan error) {
 	}
 
 	// Installs reverseproxy
-	log.Println("[gateway] starting installation of feature 'reverseproxy'...")
+	log.Println("[gateway] adding feature 'reverseproxy'...")
 	feature, err := install.NewFeature("reverseproxy")
 	if err != nil {
 		msg := fmt.Sprintf("[gateway] failed to instanciate feature '%s': %s", feature.DisplayName(), err.Error())
@@ -994,11 +1015,6 @@ func (c *Cluster) getCommonRequirements() (*string, error) {
 		installCommonRequirementsContent = &result
 	}
 	return installCommonRequirementsContent, nil
-}
-
-// GetMasters returns a list of masters
-func (c *Cluster) GetMasters() ([]string, error) {
-	return c.manager.MasterIDs, nil
 }
 
 // Start starts the cluster named 'name'
@@ -1121,13 +1137,14 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 	var errors []string
 	var dones []chan error
 	var results []chan string
+	timeout := brokerclient.DefaultExecutionTimeout + time.Duration(2*count)*time.Minute
 	for i := 0; i < count; i++ {
 		r := make(chan string)
 		results = append(results, r)
 		d := make(chan error)
 		dones = append(dones, d)
 		go func(idx int, result chan string, done chan error) {
-			hostID, err := c.createAndConfigureNode(idx, hostReq)
+			hostID, err := c.createAndConfigureNode(idx, hostReq, timeout)
 			if err != nil {
 				result <- ""
 				done <- err
@@ -1172,7 +1189,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 	if err != nil {
 		return nil, err
 	}
-	log.Println("Installing feature 'kubernetes'...")
+	log.Println("Adding feature 'kubernetes'...")
 	addResults, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		return nil, err
@@ -1180,7 +1197,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 	if !addResults.Successful() {
 		return nil, fmt.Errorf(addResults.AllErrorMessages())
 	}
-	log.Println("Successfully installed feature 'kubernetes'")
+	log.Println("Successfully added feature 'kubernetes'")
 
 	return hosts, nil
 }
