@@ -70,7 +70,7 @@ func (s *HostServiceServer) Stop(ctx context.Context, in *pb.Reference) (*google
 		return nil, err
 	}
 
-	log.Printf("Host '%s' rebooted", ref)
+	log.Printf("Host '%s' stopped", ref)
 	return &google_protobuf.Empty{}, nil
 }
 
@@ -135,6 +135,31 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 
 	log.Printf("Host '%s' created", in.GetName())
 	return conv.ToPBHost(host), nil
+}
+
+// Inspect an host
+func (s *HostServiceServer) Status(ctx context.Context, in *pb.Reference) (*pb.HostStatus, error) {
+	log.Printf("Host Status called '%s'", in.Name)
+
+	ref := utils.GetReference(in)
+	if ref == "" {
+		return nil, fmt.Errorf("Cannot get host status : Neither name nor id given as reference")
+	}
+
+	if GetCurrentTenant() == nil {
+		return nil, fmt.Errorf("Cannot get host status : No tenant set")
+	}
+
+	hostService := services.NewHostService(currentTenant.Client)
+	host, err := hostService.Get(ref)
+	if err != nil {
+		return nil, err
+	}
+	if host == nil {
+		return nil, fmt.Errorf("Cannot get host status : No host '%s' found", ref)
+	}
+
+	return conv.ToHostStatus(host), nil
 }
 
 // Inspect an host

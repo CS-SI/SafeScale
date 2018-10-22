@@ -34,6 +34,7 @@ var HostCmd = cli.Command{
 		hostCreate,
 		hostDelete,
 		hostInspect,
+		hostStatus,
 		hostSsh,
 		hostReboot,
 		hostStart,
@@ -138,6 +139,28 @@ var hostInspect = cli.Command{
 			return fmt.Errorf("host name or ID required")
 		}
 		resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
+		if err != nil {
+			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
+		}
+
+		out, _ := json.Marshal(resp)
+		fmt.Println(string(out))
+
+		return nil
+	},
+}
+
+var hostStatus = cli.Command{
+	Name:      "status",
+	Usage:     "status Host",
+	ArgsUsage: "<Host_name|Host_ID>",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <Host_name>")
+			_ = cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("host name or ID required")
+		}
+		resp, err := client.New().Host.Status(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
 		}

@@ -127,6 +127,11 @@ message Host{
     string OsKind = 11; 
 }
 
+message HostStatus {
+    string Name = 1;
+    string Status = 2;
+}
+
 message HostList{
     repeated Host Hosts= 1;
 }
@@ -137,7 +142,6 @@ message SshConfig{
     string PrivateKey = 3;
     int32 Port = 4;
     SshConfig gateway = 5;
-
 }
 
 message HostListRequest{
@@ -147,6 +151,7 @@ message HostListRequest{
 service HostService{
     rpc Create(HostDefinition) returns (Host){}
     rpc Inspect(Reference) returns (Host){}
+    rpc Status(Reference) returns (HostStatus){}
     rpc List(HostListRequest) returns (HostList){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
     rpc Start(Reference) returns (google.protobuf.Empty){}
