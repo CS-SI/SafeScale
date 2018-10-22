@@ -79,13 +79,13 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(c *Feature, t Target, m Method.Enum, a Action.Enum, f alterCommandCB) (*worker, error) {
+func newWorker(f *Feature, t Target, m Method.Enum, a Action.Enum, cb alterCommandCB) (*worker, error) {
 	w := worker{
-		feature:   c,
+		feature:   f,
 		target:    t,
 		method:    m,
 		action:    a,
-		commandCB: f,
+		commandCB: cb,
 	}
 	hT, cT, nT := determineContext(t)
 	if cT != nil {
@@ -100,11 +100,10 @@ func newWorker(c *Feature, t Target, m Method.Enum, a Action.Enum, f alterComman
 	}
 
 	w.rootKey = "feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
-	specs := w.feature.Specs()
-	if !specs.IsSet(w.rootKey) {
+	if !f.specs.IsSet(w.rootKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), w.rootKey)
+		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), w.rootKey)
 	}
 
 	return &w, nil
@@ -236,7 +235,7 @@ func (w *worker) extractHostsFailingCheck(hosts []*pb.Host) ([]*pb.Host, error) 
 			return nil, d
 		}
 		if !r.Successful() {
-			concernedHosts = append(w.concernedMasters, h)
+			concernedHosts = append(concernedHosts, h)
 		}
 	}
 	return concernedHosts, nil
@@ -335,17 +334,16 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 	w.settings = s
 
 	results := Results{}
-	specs := w.feature.Specs()
 
 	// 'pace' tells the order of execution
-	pace := specs.GetString(w.rootKey + "." + yamlPaceKeyword)
+	pace := w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
 	if pace == "" {
 		return nil, fmt.Errorf("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
 	}
 
 	// 'steps' describes the steps of the action
 	stepsKey := w.rootKey + "." + yamlStepsKeyword
-	steps := specs.GetStringMap(stepsKey)
+	steps := w.feature.specs.GetStringMap(stepsKey)
 	if len(steps) <= 0 {
 		return nil, fmt.Errorf("nothing to do")
 	}
@@ -526,12 +524,11 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 // 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommanded)
 func (w *worker) validateContextForCluster() error {
-	specs := w.feature.Specs()
 	config := w.cluster.GetConfig()
 	clusterFlavor := config.Flavor
 	yamlKey := "feature.suitableFor.cluster"
-	if specs.IsSet(yamlKey) {
-		flavors := strings.Split(specs.GetString(yamlKey), ",")
+	if w.feature.specs.IsSet(yamlKey) {
+		flavors := strings.Split(w.feature.specs.GetString(yamlKey), ",")
 		for _, k := range flavors {
 			k = strings.ToLower(k)
 			str, err := Flavor.Parse(k)
@@ -549,11 +546,10 @@ func (w *worker) validateContextForHost() error {
 	if w.node {
 		return nil
 	}
-	specs := w.feature.Specs()
 	ok := false
 	yamlKey := "feature.suitableFor.host"
-	if specs.IsSet(yamlKey) {
-		value := strings.ToLower(specs.GetString(yamlKey))
+	if w.feature.specs.IsSet(yamlKey) {
+		value := strings.ToLower(w.feature.specs.GetString(yamlKey))
 		ok = value == "ok" || value == "yes" || value == "true" || value == "1"
 	}
 	if ok {
@@ -565,12 +561,11 @@ func (w *worker) validateContextForHost() error {
 }
 
 func (w *worker) validateClusterSizing() error {
-	specs := w.feature.Specs()
 	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(w.cluster.GetConfig().Flavor.String())
-	if !specs.IsSet(yamlKey) {
+	if !w.feature.specs.IsSet(yamlKey) {
 		return nil
 	}
-	sizing := specs.GetStringMap(yamlKey)
+	sizing := w.feature.specs.GetStringMap(yamlKey)
 	if anon, ok := sizing["minMasters"]; ok {
 		minMasters := anon.(int)
 		curMasters := len(w.cluster.ListMasterIDs())
@@ -597,8 +592,7 @@ func (w *worker) validateClusterSizing() error {
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
 func (w *worker) setReverseProxy() error {
-	specs := w.feature.Specs()
-	rules, ok := specs.Get("feature.proxy.rules").([]interface{})
+	rules, ok := w.feature.specs.Get("feature.proxy.rules").([]interface{})
 	if !ok || len(rules) <= 0 {
 		return nil
 	}

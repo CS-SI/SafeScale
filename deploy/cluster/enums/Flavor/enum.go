@@ -30,8 +30,8 @@ const (
 	DCOS
 	// K8S for a pure Kubernetes cluster
 	K8S
-	// Swarm for a pure docker swarm cluster
-	Swarm
+	// SWARM for a pure docker swarm cluster
+	SWARM
 	// BOH for a "Bunch Of Hosts", without cluster management
 	BOH
 	// OHPC for a OpenHPC cluster
@@ -42,7 +42,7 @@ var (
 	stringMap = map[string]Enum{
 		"dcos":  DCOS,
 		"k8s":   K8S,
-		"swarm": Swarm,
+		"swarm": SWARM,
 		"boh":   BOH,
 		"ohpc":  OHPC,
 	}
@@ -50,7 +50,7 @@ var (
 	enumMap = map[Enum]string{
 		DCOS:  "DCOS",
 		K8S:   "K8S",
-		Swarm: "Swarm",
+		SWARM: "SWARM",
 		BOH:   "BOH",
 		OHPC:  "OHPC",
 	}

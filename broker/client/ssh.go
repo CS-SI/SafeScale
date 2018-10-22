@@ -56,6 +56,16 @@ type ssh struct {
 
 // Run ...
 func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+	var (
+		retcode        int
+		stdout, stderr string
+	)
+
+	sshCfg, err := s.getHostSSHConfig(hostName)
+	if err != nil {
+		return 0, "", "", err
+	}
+
 	if executionTimeout < utils.TimeoutCtxHost {
 		executionTimeout = utils.TimeoutCtxHost
 	}
@@ -66,26 +76,14 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		connectionTimeout = executionTimeout + 1*time.Minute
 	}
 
-	host := &host{session: s.session}
-	cfg, err := host.SSHConfig(hostName)
-	if err != nil {
-		return 0, "", "", err
-	}
-	ssh := conv.ToSystemSshConfig(cfg)
-
 	_, cancel := utils.GetContext(executionTimeout)
 	defer cancel()
-
-	var (
-		retcode        int
-		stdout, stderr string
-	)
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			// Create the command
 			var sshCmd *system.SSHCommand
-			sshCmd, err = ssh.Command(command)
+			sshCmd, err := sshCfg.Command(command)
 			if err != nil {
 				return err
 			}
@@ -115,6 +113,15 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		}
 	}
 	return retcode, stdout, stderr, err
+}
+
+func (s *ssh) getHostSSHConfig(hostname string) (*system.SSHConfig, error) {
+	host := &host{session: s.session}
+	cfg, err := host.SSHConfig(hostname)
+	if err != nil {
+		return nil, err
+	}
+	return conv.ToSystemSshConfig(cfg), nil
 }
 
 const protocolSeparator = ":"
@@ -155,17 +162,6 @@ func extractPath(in string) (string, error) {
 
 // Copy ...
 func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
-	if executionTimeout < utils.TimeoutCtxHost {
-		executionTimeout = utils.TimeoutCtxHost
-	}
-	if connectionTimeout < DefaultConnectionTimeout {
-		connectionTimeout = DefaultConnectionTimeout
-	}
-	if connectionTimeout > executionTimeout {
-		connectionTimeout = executionTimeout
-	}
-
-	host := &host{session: s.session}
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -208,11 +204,20 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 		upload = true
 	}
 
-	cfg, err := host.SSHConfig(hostName)
+	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {
-		return -1, "", "", err
+		return 0, "", "", err
 	}
-	ssh := conv.ToSystemSshConfig(cfg)
+
+	if executionTimeout < utils.TimeoutCtxHost {
+		executionTimeout = utils.TimeoutCtxHost
+	}
+	if connectionTimeout < DefaultConnectionTimeout {
+		connectionTimeout = DefaultConnectionTimeout
+	}
+	if connectionTimeout > executionTimeout {
+		connectionTimeout = executionTimeout
+	}
 
 	_, cancel := utils.GetContext(executionTimeout)
 	defer cancel()
@@ -223,7 +228,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, err = ssh.Copy(remotePath, localPath, upload)
+			retcode, stdout, stderr, err = sshCfg.Copy(remotePath, localPath, upload)
 			// If an error occured, stop the loop and propagates this error
 			if err != nil {
 				retcode = -1
@@ -257,6 +262,7 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 	}
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
+
 	service := pb.NewHostServiceClient(conn)
 	sshConfig, err := service.SSH(ctx, &pb.Reference{Name: name})
 	if err != nil {
@@ -282,10 +288,10 @@ func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
-	host := &host{session: s.session}
-	cfg, err := host.SSHConfig(hostName)
+	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {
 		return err
 	}
-	return conv.ToSystemSshConfig(cfg).WaitServerReady(timeout)
+
+	return sshCfg.WaitServerReady(timeout)
 }

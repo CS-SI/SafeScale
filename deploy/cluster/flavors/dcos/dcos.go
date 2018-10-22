@@ -54,6 +54,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 )
 
 //go:generate rice embed-go
@@ -271,9 +272,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		mastersStatus                 error
 		nodesChannel                  chan error
 		nodesStatus                   error
-		// feature                     *install.Feature
-		// target                        install.Target
-		// results                       install.AddResults
+		feature                       *install.Feature
+		target                        install.Target
+		results                       install.Results
 	)
 	broker := brokerclient.New()
 
@@ -299,32 +300,35 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 	err = brokerclient.New().Ssh.WaitReady(gw.ID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
-		err = brokerclient.DecorateError(err, "wait for remote ssh service to be ready", false)
+		err = brokerclient.DecorateError(err, "wait for gateway ssh service to be ready", false)
 		goto cleanNetwork
 	}
-	// feature, err = install.NewFeature("proxycache-server")
-	// if err != nil {
-	// 	goto cleanNetwork
-	// }
-	// target = install.NewHostTarget(pbutils.ToPBHost(gw))
-	// ok, results, err = feature.Add(target, install.Variables{})
-	// if err != nil {
-	// 	goto cleanNetwork
-	// }
-	// if !ok {
-	// 	err = fmt.Errorf(results.Errors())
-	// 	goto cleanNetwork
-	// }
+
+	// VPL: for now, disable proxycache unconditionnaly
+	req.DisabledDefaultFeatures["proxycache"] = struct{}{}
+	if _, ok = req.DisabledDefaultFeatures["proxycache"]; !ok {
+		feature, err = install.NewFeature("proxycache-server")
+		if err != nil {
+			goto cleanNetwork
+		}
+		target = install.NewHostTarget(pbutils.ToPBHost(gw))
+		results, err = feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			goto cleanNetwork
+		}
+		if !results.Successful() {
+			err = fmt.Errorf(results.AllErrorMessages())
+			goto cleanNetwork
+		}
+	}
 
 	// Create a KeyPair for the user cladm
 	kpName = "cluster_" + req.Name + "_cladm_key"
-	//svc.DeleteKeyPair(kpName)
 	kp, err = svc.CreateKeyPair(kpName)
 	if err != nil {
 		err = fmt.Errorf("failed to create Key Pair: %s", err.Error())
 		goto cleanNetwork
 	}
-	//defer svc.DeleteKeyPair(kpName)
 
 	// Saving cluster metadata, with status 'Creating'
 	instance = Cluster{
@@ -748,52 +752,56 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 	}
 	log.Printf("[master #%d (%s)] DCOS requirements successfully installed", index, host.Name)
 
-	values := install.Variables{
-		"Password": c.Core.AdminPassword,
-	}
+	// values := install.Variables{
+	// 	"Password": c.Core.AdminPassword,
+	// }
 
-	// // install proxycache-client feature
-	// feature, err := install.NewFeature("proxycache-client")
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
-	// 	done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
-	// }
-	// target := install.NewHostTarget(host)
-	// ok, results, err := feature.Add(target, values)
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
-	// 	done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
-	// 	return
-	// }
-	// if !ok {
-	// 	msg := results.Errors()
-	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
-	// 	done <- fmt.Errorf(msg)
-	// 	return
-	// }
+	// VPL: for now, disables unconditionally proxycache
+	c.Core.DisabledFeatures["proxycache"] = struct{}{}
+	if _, ok := c.Core.DisabledFeatures["proxycache"]; !ok {
+		// install proxycache-client feature
+		feature, err := install.NewFeature("proxycache-client")
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
+			done <- fmt.Errorf("failed to add feature 'proxycache-client': %s", err.Error())
+		}
+		target := install.NewHostTarget(host)
+		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to add feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
+			done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+			return
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[master #%d (%s)] failed to add feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
+			done <- fmt.Errorf(msg)
+			return
+		}
+	}
 
 	// install docker feature
 	log.Printf("[master #%d (%s)] installing feature 'docker'", index, host.Name)
 	feature, err := install.NewFeature("docker")
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to prepare feature 'docker': %s", index, host.ID, err.Error())
-		done <- fmt.Errorf("failed to install feature 'docker': %s", err.Error())
+		done <- fmt.Errorf("failed to add feature 'docker': %s", err.Error())
 		return
 	}
 	target := install.NewHostTarget(host)
-	results, err := feature.Add(target, values, install.Settings{})
+	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", index, host.Name, feature.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+		log.Printf("[master #%d (%s)] failed to add feature '%s': %s\n", index, host.Name, feature.DisplayName(), err.Error())
+		done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 		return
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), msg)
+		log.Printf("[master #%d (%s)] failed to add feature '%s': %s", index, host.Name, feature.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
 		return
 	}
-	log.Printf("[master #%d (%s)] feature 'docker' installed successfully\n", index, host.Name)
+	log.Printf("[master #%d (%s)] feature 'docker' added successfully\n", index, host.Name)
 
 	log.Printf("[master #%d (%s)] creation successful\n", index, host.Name)
 	done <- nil
@@ -829,32 +837,32 @@ func (c *Cluster) asyncConfigureMaster(index int, host *pb.Host, done chan error
 		return
 	}
 
-	// remotedekstop is a feature, can be added after master creation; should be automatically install
-	// in perform, not deploy
-	// // Installs remotedesktop feature on each master
-	// log.Printf("[master #%d (%s)] installing feature 'remotedesktop'\n", index, host.Name)
-	// feature, err := install.NewFeature("remotedesktop")
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to instanciate feature 'remotedesktop': %s\n", index, host.Name, err.Error())
-	// 	done <- err
-	// 	return
-	// }
-	// target := install.NewHostTarget(host)
-	// results, err := feature.Add(target, install.Variables{
-	// 	"Username": "cladm",
-	// 	"Password": c.Core.AdminPassword,
-	// }, install.Settings{})
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
-	// 	done <- err
-	// 	return
-	// }
-	// if !results.Successful() {
-	// 	msg := results.AllErrorMessages()
-	// 	log.Printf("[master #%d (%s)] installation script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
-	// 	done <- fmt.Errorf(msg)
-	// }
-	// log.Printf("[master #%d (%s)] feature '%s' installed successfully\n", index, host.Name, feature.DisplayName())
+	if _, ok := c.Core.DisabledFeatures["remotedesktop"]; !ok {
+		// Adds remotedesktop feature on each master
+		log.Printf("[master #%d (%s)] adding feature 'remotedesktop'\n", index, host.Name)
+		feature, err := install.NewFeature("remotedesktop")
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to instanciate feature 'remotedesktop': %s\n", index, host.Name, err.Error())
+			done <- err
+			return
+		}
+		target := install.NewHostTarget(host)
+		results, err := feature.Add(target, install.Variables{
+			"Username": "cladm",
+			"Password": c.Core.AdminPassword,
+		}, install.Settings{})
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to add feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
+			done <- err
+			return
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[master #%d (%s)] addition script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
+			done <- fmt.Errorf(msg)
+		}
+		log.Printf("[master #%d (%s)] feature '%s' added successfully\n", index, host.Name, feature.DisplayName())
+	}
 
 	log.Printf("[master #%d (%s)] configuration successful\n", index, host.Name)
 	done <- nil
@@ -879,7 +887,7 @@ func (c *Cluster) asyncCreateNode(
 	log.Printf("[%s node #%d] starting creation...\n", nodeTypeStr, index)
 
 	// Create the host
-	log.Printf("[%s node #%d] starting host creation...\n", nodeTypeStr, index)
+	log.Printf("[%s node #%d] starting host resource creation...\n", nodeTypeStr, index)
 	var err error
 	req.Name, err = c.buildHostname("node", nodeType)
 	if err != nil {
@@ -928,10 +936,10 @@ func (c *Cluster) asyncCreateNode(
 		done <- fmt.Errorf("failed to update Cluster configuration: %s", err.Error())
 		return
 	}
-	log.Printf("[%s node #%d (%s)] host created successfully.\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] host resource created successfully.\n", nodeTypeStr, index, host.Name)
 
 	// Installs DCOS requirements
-	log.Printf("[%s node #%d (%s)] installing DCOS requirements...\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] installing requirements...\n", nodeTypeStr, index, host.Name)
 	installCommonRequirements, err := c.getInstallCommonRequirements()
 	if err != nil {
 		done <- err
@@ -966,50 +974,55 @@ func (c *Cluster) asyncCreateNode(
 		}
 		return
 	}
-	log.Printf("[%s node #%d (%s)] DCOS requirements installed successfully.\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] requirements installed successfully.\n", nodeTypeStr, index, host.Name)
 
-	// // install proxycache-client feature
-	// feature, err := install.NewFeature("proxycache-client")
-	// if err != nil {
-	// 	log.Printf("[%s node #%d (%s)] failed to prepare feature 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
-	// 	done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
-	// 	return
-	// }
-	target := install.NewHostTarget(host)
-	// ok, results, err := feature.Add(target, install.Variables{})
-	// if err != nil {
-	// 	log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
-	// 	done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
-	// 	return
-	// }
-	// if !ok {
-	// 	msg := results.Errors()
-	// 	log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
-	// 	done <- fmt.Errorf(msg)
-	// 	return
-	// }
+	var target install.Target
+	//VPL: proxycache is disabled unconditionnaly for now
+	c.Core.DisabledFeatures["proxycache"] = struct{}{}
+	if _, ok := c.Core.DisabledFeatures["proxycache"]; !ok {
+		// install proxycache-client feature
+		feature, err := install.NewFeature("proxycache-client")
+		if err != nil {
+			log.Printf("[%s node #%d (%s)] failed to prepare feature 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
+			done <- fmt.Errorf("failed to add feature 'proxycache-client': %s", err.Error())
+			return
+		}
+		target = install.NewHostTarget(host)
+		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			log.Printf("[%s node #%d (%s)] failed to add feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
+			done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+			return
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[%s node #%d (%s)] failed to add feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
+			done <- fmt.Errorf(msg)
+			return
+		}
+	}
 
 	// install docker feature
-	log.Printf("[%s node #%d (%s)] installing feature 'docker'...\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] adding feature 'docker'...\n", nodeTypeStr, index, host.Name)
 	feature, err := install.NewFeature("docker")
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to prepare feature 'docker': %s", nodeTypeStr, index, host.Name, err.Error())
-		done <- fmt.Errorf("failed to install feature 'docker': %s", err.Error())
+		done <- fmt.Errorf("failed to add feature 'docker': %s", err.Error())
 		return
 	}
 	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+		done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 		return
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
 		log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
-		done <- fmt.Errorf("failed to intall feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, msg)
+		done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, msg)
 		return
 	}
-	log.Printf("[%s node #%d (%s)] feature 'docker' installed successfully.\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] feature 'docker' added successfully.\n", nodeTypeStr, index, host.Name)
 
 	log.Printf("[%s node #%d (%s)] creation successful.\n", nodeTypeStr, index, host.Name)
 	result <- host.ID
@@ -1282,11 +1295,6 @@ func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 		installCommonRequirementsContent = &result
 	}
 	return installCommonRequirementsContent, nil
-}
-
-// GetMasters returns a list of masters
-func (c *Cluster) GetMasters() ([]string, error) {
-	return c.manager.MasterIDs, nil
 }
 
 // Start starts the cluster named 'name'

@@ -33,7 +33,7 @@ import (
 var (
 	hostName        string
 	hostInstance    *pb.Host
-	featureName     string
+	hostFeatureName string
 	hostServiceName string
 )
 
@@ -89,8 +89,8 @@ var hostFeatureCommand = &cli.Command{
 	},
 
 	Before: func(c *cli.Command) {
-		featureName = c.StringArgument("<pkgname>", "")
-		if featureName == "" {
+		hostFeatureName = c.StringArgument("<pkgname>", "")
+		if hostFeatureName == "" {
 			fmt.Fprintln(os.Stderr, "Invalid argument <pkgname>")
 			//helpHandler(nil, "")
 			os.Exit(int(ExitCode.InvalidArgument))
@@ -115,13 +115,13 @@ var hostFeatureAddCommand = &cli.Command{
 	Aliases: []string{"install"},
 
 	Process: func(c *cli.Command) {
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(hostFeatureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", hostFeatureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 		values := install.Variables{}
@@ -149,15 +149,15 @@ var hostFeatureAddCommand = &cli.Command{
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error installing feature '%s' on host '%s': %s\n", featureName, hostName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error installing feature '%s' on host '%s': %s\n", hostFeatureName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Feature '%s' installed successfully on host '%s'\n", featureName, hostName)
+			fmt.Printf("Feature '%s' installed successfully on host '%s'\n", hostFeatureName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
 
-		fmt.Printf("Failed to install feature '%s' on host '%s'\n", featureName, hostName)
+		fmt.Printf("Failed to install feature '%s' on host '%s'\n", hostFeatureName, hostName)
 		fmt.Println(results.AllErrorMessages())
 		os.Exit(int(ExitCode.Run))
 	},
@@ -171,13 +171,13 @@ var hostFeatureCheckCommand = &cli.Command{
 	Aliases: []string{"verify"},
 
 	Process: func(c *cli.Command) {
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(hostFeatureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", hostFeatureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 
@@ -203,14 +203,14 @@ var hostFeatureCheckCommand = &cli.Command{
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Check(target, values, install.Settings{})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error checking if feature '%s' is installed on '%s': %s\n", hostFeatureName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Feature '%s' is installed on '%s'\n", featureName, hostName)
+			fmt.Printf("Feature '%s' is installed on '%s'\n", hostFeatureName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
-		fmt.Printf("Feature '%s' is not installed on '%s'\n", featureName, hostName)
+		fmt.Printf("Feature '%s' is not installed on '%s'\n", hostFeatureName, hostName)
 		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)
@@ -227,13 +227,13 @@ var hostFeatureDeleteCommand = &cli.Command{
 	Aliases: []string{"destroy", "remove", "rm", "uninstall"},
 
 	Process: func(c *cli.Command) {
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(hostFeatureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(int(ExitCode.Run))
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
+			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", hostFeatureName)
 			os.Exit(int(ExitCode.NotFound))
 		}
 
@@ -259,14 +259,14 @@ var hostFeatureDeleteCommand = &cli.Command{
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Remove(target, values, install.Settings{})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
+			fmt.Fprintf(os.Stderr, "Error uninstalling feature '%s' on '%s': %s\n", hostFeatureName, hostName, err.Error())
 			os.Exit(int(ExitCode.RPC))
 		}
 		if results.Successful() {
-			fmt.Printf("Feature '%s' uninstalled successfully on '%s'\n", featureName, hostName)
+			fmt.Printf("Feature '%s' uninstalled successfully on '%s'\n", hostFeatureName, hostName)
 			os.Exit(int(ExitCode.OK))
 		}
-		fmt.Printf("Failed to uninstall feature '%s' from host '%s':\n", featureName, hostName)
+		fmt.Printf("Failed to uninstall feature '%s' from host '%s':\n", hostFeatureName, hostName)
 		msg := results.AllErrorMessages()
 		if msg != "" {
 			fmt.Println(msg)
