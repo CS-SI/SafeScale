@@ -122,7 +122,13 @@ func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 		return nil, tbr
 	}
 
-	nasid, _ := uuid.NewV4()
+	nasid, err := uuid.NewV4()
+	if err != nil {
+		tbr := errors.Wrap(err, "Error creating UID for NAS")
+		log.Errorf("%+v", tbr)
+		return nil, tbr
+	}
+
 	nas = &api.Nas{
 		ID:       nasid.String(),
 		Name:     name,
@@ -131,7 +137,6 @@ func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 		IsServer: true,
 	}
 
-	// TODO OPP Check this
 	err = srv.saveNASDefinition(*nas)
 	if err != nil {
 		tbr := errors.Wrap(err, "Error saving NAS definition")
@@ -195,7 +200,6 @@ func (srv *NasService) Delete(name string) (*api.Nas, error) {
 		return nil, tbr
 	}
 
-	// TODO OPP Check this
 	err = srv.removeNASDefinition(*nas)
 	if err != nil {
 		tbr := errors.Wrap(err, "")

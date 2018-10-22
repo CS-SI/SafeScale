@@ -54,6 +54,11 @@ func (s *NasServiceServer) Create(ctx context.Context, in *pb.NasDefinition) (*p
 		return nil, tbr
 	}
 
+	if nas == nil {
+		tbr := errors.Errorf("Cannot create NAS: unknown error")
+		return nil, tbr
+	}
+
 	return convert.ToPBNas(nas), err
 }
 
