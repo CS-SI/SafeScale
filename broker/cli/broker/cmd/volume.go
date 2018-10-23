@@ -92,16 +92,17 @@ var volumeDelete = cli.Command{
 	Usage:     "Delete volume",
 	ArgsUsage: "<Volume_name|Volume_ID>",
 	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
+		if c.NArg() < 1 {
 			fmt.Println("Missing mandatory argument <Volume_name|Volume_ID>")
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Volume name or ID required")
 		}
-		err := client.New().Volume.Delete(c.Args().First(), client.DefaultExecutionTimeout)
-		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "deletion of volume", true))
-		}
-		fmt.Printf("Volume '%s' deleted\n", c.Args().First())
+
+		var volumeList []string
+		volumeList = append(volumeList, c.Args().First())
+		volumeList = append(volumeList, c.Args().Tail()...)
+
+		_ = client.New().Volume.Delete(volumeList, client.DefaultExecutionTimeout)
 
 		return nil
 	},

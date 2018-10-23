@@ -77,15 +77,17 @@ var nasDelete = cli.Command{
 	Usage:     "Delete a nfs server on an host and expose a directory",
 	ArgsUsage: "<Nas_name>",
 	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
+		if c.NArg() < 1 {
 			fmt.Println("Missing mandatory argument <Nas_name>")
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas name required")
 		}
-		err := client.New().Nas.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
-		if err != nil {
-			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "deletion of nas", true))
-		}
+
+		var nasList []string
+		nasList = append(nasList, c.Args().First())
+		nasList = append(nasList, c.Args().Tail()...)
+
+		_ = client.New().Nas.Delete(nasList, client.DefaultExecutionTimeout)
 
 		return nil
 	},

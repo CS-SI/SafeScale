@@ -62,16 +62,17 @@ var networkDelete = cli.Command{
 	Usage:     "delete NETWORK",
 	ArgsUsage: "<network_name>",
 	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
+		if c.NArg() < 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Network name required")
 		}
-		err := client.New().Network.Delete(c.Args().First(), client.DefaultExecutionTimeout)
-		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "deletion of network", true))
-		}
-		fmt.Println(fmt.Sprintf("Network '%s' deleted", c.Args().First()))
+
+		var networkList []string
+		networkList = append(networkList, c.Args().First())
+		networkList = append(networkList, c.Args().Tail()...)
+
+		_ = client.New().Network.Delete(networkList, client.DefaultExecutionTimeout)
 
 		return nil
 	},
