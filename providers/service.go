@@ -379,7 +379,11 @@ func (srv *Service) CreateHostWithKeyPair(request api.HostRequest) (*api.Host, *
 	}
 
 	//Create temporary key pair
-	kpNameuuid, _ := uuid.NewV4()
+	kpNameuuid, err := uuid.NewV4()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	kpName := kpNameuuid.String()
 	kp, err := srv.CreateKeyPair(kpName)
 	if err != nil {
