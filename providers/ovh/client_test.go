@@ -65,6 +65,24 @@ func Test_GetTemplates(t *testing.T) {
 	}
 }
 
+// Test that we have templates with GPUs
+func Test_GetGpuTemplates(t *testing.T) {
+	cli, err := getClient()
+	require.Nil(t, err)
+	tpls, err := cli.Service.ListTemplates(true)
+	assert.NoError(t, err)
+	assert.True(t, len(tpls) > 0)
+
+	withGPU := false
+	for _, tpl := range tpls {
+		if tpl.GPUNumber > 0 {
+			withGPU = true
+		}
+	}
+
+	assert.True(t, withGPU)
+}
+
 func TemplateExists(name string) bool {
 	cli, _ := getClient()
 	tpls, _ := cli.Service.ListTemplates(false)
