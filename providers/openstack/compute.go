@@ -459,7 +459,11 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 
 	//If no key pair is supplied create one
 	if kp == nil {
-		id, _ := uuid.NewV4()
+		id, err := uuid.NewV4()
+		if err != nil {
+			return nil, fmt.Errorf("error creating UID : %v", err)
+		}
+
 		name := fmt.Sprintf("%s_%s", request.Name, id)
 		kp, err = client.CreateKeyPair(name)
 		if err != nil {

@@ -284,7 +284,13 @@ func (srv *NasService) Mount(name, hostName, path string) (*api.Nas, error) {
 		return nil, tbr
 	}
 
-	nasid, _ := uuid.NewV4()
+	nasid, err := uuid.NewV4()
+	if err != nil {
+		tbr := errors.Wrap(err, "Error creating UID for NAS")
+		log.Errorf("%+v", tbr)
+		return nil, tbr
+	}
+
 	client := &api.Nas{
 		ID:       nasid.String(),
 		Name:     name,
