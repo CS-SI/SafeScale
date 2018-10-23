@@ -1,4 +1,4 @@
-_cli_zsh_autocomplete() {
+_cli_zsh_autocomplete_broker() {
 
   local -a opts
   opts=("${(@f)$(_CLI_ZSH_AUTOCOMPLETE_HACK=1 ${words[@]:0:#words[@]-1} --generate-bash-completion)}")
@@ -8,4 +8,4 @@ _cli_zsh_autocomplete() {
   return
 }
 
-compdef _cli_zsh_autocomplete broker
+compdef _cli_zsh_autocomplete_broker broker

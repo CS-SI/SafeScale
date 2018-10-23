@@ -1,8 +1,6 @@
 #! /bin/bash
 
-: ${PROG:=$(basename ${BASH_SOURCE})}
-
-_cli_bash_autocomplete() {
+_cli_bash_autocomplete_broker() {
     local cur opts base
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -11,6 +9,4 @@ _cli_bash_autocomplete() {
     return 0
 }
 
-complete -F _cli_bash_autocomplete $PROG
-
-unset PROG
+complete -F _cli_bash_autocomplete_broker broker
