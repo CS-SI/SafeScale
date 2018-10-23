@@ -17,6 +17,8 @@
 package client
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -126,18 +128,38 @@ func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, e
 	return service.Create(ctx, &def)
 }
 
-// Delete ...
-func (h *host) Delete(name string, timeout time.Duration) error {
+// Delete deletes several hosts at the same time in goroutines
+func (h *host) Delete(names []string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewHostServiceClient(conn)
-	_, err := service.Delete(ctx, &pb.Reference{Name: name})
-	return err
+
+	var wg sync.WaitGroup
+
+	hostDeleter := func (aname string) {
+		defer wg.Done()
+		ctx, cancel := utils.GetContext(timeout)
+		defer cancel()
+		service := pb.NewHostServiceClient(conn)
+		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
+
+		if err != nil {
+			fmt.Printf("Error response from daemon : %v", DecorateError(err, "deletion of host", true))
+		} else {
+			fmt.Printf("Host '%s' deleted\n", aname)
+		}
+	}
+
+	wg.Add(len(names))
+	for _, target := range names {
+		go hostDeleter(target)
+	}
+
+	wg.Wait()
+
+	return nil
 }
 
 // SSHConfig ...

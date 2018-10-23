@@ -254,6 +254,7 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (client *Client) DeleteNetwork(networkRef string) error {
+	// TODO Add more detailed exceptions here
 	m, err := metadata.LoadNetwork(providers.FromClient(client), networkRef)
 	if err != nil {
 		return err
