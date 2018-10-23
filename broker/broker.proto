@@ -98,6 +98,8 @@ message HostDefinition{
     int32 Disk = 7;
     string ImageID = 9;
     bool Public = 10;
+    int32 GPUNumber = 11;
+    float Freq = 12;
 }
 
 enum HostState {
