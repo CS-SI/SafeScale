@@ -244,16 +244,18 @@ var hostDelete = cli.Command{
 	Usage:     "Delete host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
+		if c.NArg() < 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
-		err := client.New().Host.Delete(c.Args().First(), client.DefaultExecutionTimeout)
-		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "deletion of host", true))
-		}
-		fmt.Printf("Host '%s' deleted\n", c.Args().First())
+
+		var hostList []string
+		hostList = append(hostList, c.Args().First())
+		hostList = append(hostList, c.Args().Tail()...)
+
+		_  = client.New().Host.Delete(hostList, client.DefaultExecutionTimeout)
+
 		return nil
 	},
 }
