@@ -88,6 +88,9 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		networks = append(networks, n.ID)
 	}
 
+	// TODO GITHUB https://github.com/CS-SI/SafeScale/issues/30
+	// TODO Add GPU and Freq requirements here
+
 	tpls, err := svc.provider.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    cpu,
 		MinRAMSize:  ram,

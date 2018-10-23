@@ -126,6 +126,10 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 	}
 
 	hostService := services.NewHostService(currentTenant.Client)
+	
+	// TODO https://github.com/CS-SI/SafeScale/issues/30
+	// TODO GITHUB If we have to ask for GPU requirements and FREQ requirements, pb.HostDefinition has to change and the invocation of hostService.Create too...
+
 	host, err := hostService.Create(in.GetName(), in.GetNetwork(),
 		int(in.GetCPUNumber()), in.GetRAM(), int(in.GetDisk()), in.GetImageID(), in.GetPublic())
 
