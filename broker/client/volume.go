@@ -17,6 +17,8 @@
 package client
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -58,17 +60,37 @@ func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, er
 }
 
 // Delete ...
-func (v *volume) Delete(name string, timeout time.Duration) error {
+func (v *volume) Delete(names []string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
 	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewVolumeServiceClient(conn)
-	_, err := service.Delete(ctx, &pb.Reference{Name: name})
-	return err
+
+	var wg sync.WaitGroup
+
+	volDeleter := func (aname string) {
+		defer wg.Done()
+		ctx, cancel := utils.GetContext(timeout)
+		defer cancel()
+		volumeService := pb.NewVolumeServiceClient(conn)
+		_, err := volumeService.Delete(ctx, &pb.Reference{Name: aname})
+
+		if err != nil {
+			fmt.Printf("Error response from daemon : %v", DecorateError(err, "deletion of volume", true))
+		} else {
+			fmt.Printf("Volume '%s' deleted\n", aname)
+		}
+	}
+
+	wg.Add(len(names))
+	for _, target := range names {
+		go volDeleter(target)
+	}
+
+	wg.Wait()
+
+	return nil
 }
 
 // Create ...

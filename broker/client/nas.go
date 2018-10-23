@@ -17,6 +17,8 @@
 package client
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -47,19 +49,38 @@ func (n *nas) Create(def pb.NasDefinition, timeout time.Duration) error {
 	return err
 }
 
-// Delete ...
-func (n *nas) Delete(name string, timeout time.Duration) error {
+// Delete deletes several nas at the same time in goroutines
+func (n *nas) Delete(names []string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewNasServiceClient(conn)
 
-	_, err := service.Delete(ctx, &pb.NasName{Name: name})
-	return err
+	var wg sync.WaitGroup
+
+	nasDeleter := func (aname string) {
+		defer wg.Done()
+		ctx, cancel := utils.GetContext(timeout)
+		defer cancel()
+		nasService := pb.NewNasServiceClient(conn)
+		_, err := nasService.Delete(ctx, &pb.NasName{Name: aname})
+
+		if err != nil {
+			fmt.Printf("Error response from daemon : %v", DecorateError(err, "deletion of Nas", true))
+		} else {
+			fmt.Printf("Nas '%s' deleted\n", aname)
+		}
+	}
+
+	wg.Add(len(names))
+	for _, target := range names {
+		go nasDeleter(target)
+	}
+
+	wg.Wait()
+
+	return nil
 }
 
 // List ...

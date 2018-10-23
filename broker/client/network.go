@@ -17,6 +17,8 @@
 package client
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -44,18 +46,38 @@ func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error)
 	})
 }
 
-// Delete ...
-func (n *network) Delete(name string, timeout time.Duration) error {
+// Delete deletes several networks at the same time in goroutines
+func (n *network) Delete(names []string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	networkService := pb.NewNetworkServiceClient(conn)
-	_, err := networkService.Delete(ctx, &pb.Reference{Name: name})
-	return err
+
+	var wg sync.WaitGroup
+
+	netDeleter := func (aname string) {
+		defer wg.Done()
+		ctx, cancel := utils.GetContext(timeout)
+		defer cancel()
+		networkService := pb.NewNetworkServiceClient(conn)
+		_, err := networkService.Delete(ctx, &pb.Reference{Name: aname})
+
+		if err != nil {
+			fmt.Printf("Error response from daemon : %v", DecorateError(err, "deletion of network", true))
+		} else {
+			fmt.Printf("Network '%s' deleted\n", aname)
+		}
+	}
+
+	wg.Add(len(names))
+	for _, target := range names {
+		go netDeleter(target)
+	}
+
+	wg.Wait()
+
+	return nil
 }
 
 // Inspect ...
