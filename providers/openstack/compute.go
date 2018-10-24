@@ -22,9 +22,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/utils/retry"
 
@@ -399,13 +400,16 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 
 // createHost ...
 func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.Host, error) {
-	// We 1st check if name is not aleready used
+	msgFail := "Failed to create Jost resource: %s"
+	msgSuccess := "Host resource created successfully"
+
+	// First check if name is not already used
 	m, err := metadata.LoadHost(providers.FromClient(client), request.Name)
 	if err != nil {
 		return nil, err
 	}
 	if m != nil {
-		return nil, fmt.Errorf("A host already exists with name '%s'", request.Name)
+		return nil, fmt.Errorf(msgFail, fmt.Sprintf("a host already exists with name '%s'", request.Name))
 	}
 
 	// Optional network gateway
@@ -415,11 +419,11 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		gwServer, err := client.readGateway(request.NetworkIDs[0])
 
 		if err != nil {
-			return nil, fmt.Errorf("no private host can be created on a network without gateway")
+			return nil, fmt.Errorf(msgFail, "no private host can be created on a network without gateway")
 		}
 		m, err := metadata.LoadHost(providers.FromClient(client), gwServer.ID)
 		if err != nil {
-			return nil, fmt.Errorf("bad state, Gateway for network '%s' is not accessible", request.NetworkIDs[0])
+			return nil, fmt.Errorf(msgFail, fmt.Sprintf("bad state, Gateway for network '%s' is not accessible", request.NetworkIDs[0]))
 		}
 		if m != nil {
 			gw = m.Get()
@@ -433,7 +437,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 			return nil, err
 		}
 		if m == nil {
-			return nil, fmt.Errorf("failed to load metadata of network '%s'", request.NetworkIDs[0])
+			return nil, fmt.Errorf(msgFail, fmt.Sprintf("failed to load metadata of network '%s'", request.NetworkIDs[0]))
 		}
 		network := m.Get()
 		cidr = network.CIDR
@@ -467,7 +471,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		name := fmt.Sprintf("%s_%s", request.Name, id)
 		kp, err = client.CreateKeyPair(name)
 		if err != nil {
-			return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
+			return nil, fmt.Errorf(msgFail, ProviderErrorToString(err))
 		}
 	}
 
@@ -476,7 +480,6 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		return nil, err
 	}
 
-	//fmt.Println(string(userData))
 	// Create host
 	srvOpts := servers.CreateOpts{
 		Name:           request.Name,
@@ -486,21 +489,35 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		ImageRef:       request.ImageID,
 		UserData:       userData,
 	}
-	server, err := servers.Create(client.Compute, keypairs.CreateOptsExt{
-		CreateOptsBuilder: srvOpts,
-	}).Extract()
-	if err != nil {
-		if server != nil {
-			servers.Delete(client.Compute, server.ID)
-		}
-		return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
-	}
-	// Wait that Host is ready
-	host, err := client.WaitHostReady(server.ID, 5*time.Minute)
-	if err != nil {
-		servers.Delete(client.Compute, server.ID)
-		return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
-	}
+
+	// Retry creation until success, for 10 minutes
+	var host *api.Host
+	retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			server, err := servers.Create(client.Compute, keypairs.CreateOptsExt{
+				CreateOptsBuilder: srvOpts,
+			}).Extract()
+			if err != nil {
+				if server != nil {
+					servers.Delete(client.Compute, server.ID)
+				}
+				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
+				log.Errorf(msg)
+				return fmt.Errorf(msg)
+			}
+			// Wait that Host is ready
+			host, err = client.WaitHostReady(server.ID, 5*time.Minute)
+			if err != nil {
+				servers.Delete(client.Compute, server.ID)
+				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
+				log.Errorf(msg)
+				return fmt.Errorf(msg)
+			}
+			return nil
+		},
+		10*time.Minute,
+	)
+
 	// Add gateway ID to Host definition
 	var gwID string
 	if gw != nil {
@@ -517,7 +534,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		}).Extract()
 		if err != nil {
 			servers.Delete(client.Compute, host.ID)
-			return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
+			return nil, fmt.Errorf(msgFail, ProviderErrorToString(err))
 		}
 
 		// Associate floating IP to host
@@ -527,7 +544,9 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		if err != nil {
 			floatingips.Delete(client.Compute, ip.ID)
 			servers.Delete(client.Compute, host.ID)
-			return nil, fmt.Errorf("Error creating Host: %s", ProviderErrorToString(err))
+			msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
+			log.Errorf(msg)
+			return nil, fmt.Errorf(msg)
 		}
 
 		if IPVersion.IPv4.Is(ip.IP) {
@@ -536,6 +555,8 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 			host.AccessIPv6 = ip.IP
 		}
 	}
+	log.Infoln(msgSuccess)
+
 	return host, nil
 }
 
