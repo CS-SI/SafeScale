@@ -59,8 +59,7 @@ feature:
                                     ;;
                                 debian|ubuntu)
                                     sfWaitForApt && apt update && \
-                                    sfWaitForApt && apt install -y perl xfce4 firefox jq
-
+                                    sfWaitForApt && apt-mark hold xscreensaver && apt install -y perl xfce4 firefox jq
                                     ;;
                                 *)
                                     echo "unsupported OS type '$LINUX_KIND'"
