@@ -270,7 +270,7 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 	}
 	sshCfg := conv.ToSystemSshConfig(sshConfig)
 
-	return retry.WhileUnsuccessful255Delay5SecondsWithNotify(
+	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
 			return sshCfg.Enter()
 		},
