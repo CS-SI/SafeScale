@@ -717,7 +717,7 @@ func (c *Cluster) asyncCreateNode(
 	log.Printf("[%s node #%d (%s)] feature 'docker' installed successfully.\n", nodeTypeStr, index, host.Name)
 
 	log.Printf("[%s node #%d (%s)] creation successful\n", nodeTypeStr, index, host.Name)
-	result <- host.ID
+	result <- host.Name
 	done <- nil
 }
 
@@ -999,15 +999,14 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 		go c.asyncCreateNode(i+1, nodeType, hostDef, timeout, r, d)
 	}
 	for i := range dones {
-		hostID := <-results[i]
-		if hostID != "" {
-			hosts = append(hosts, hostID)
+		hostName := <-results[i]
+		if hostName != "" {
+			hosts = append(hosts, hostName)
 		}
 		err := <-dones[i]
 		if err != nil {
 			errors = append(errors, err.Error())
 		}
-
 	}
 	if len(errors) > 0 {
 		if len(hosts) > 0 {

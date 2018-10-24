@@ -77,8 +77,8 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 			case error:
 				err = t
 			}
-
-			log.Errorf("%+v", err)
+			tbr := errors.Wrap(err, "panic occured during network creation")
+			log.Errorf("%+v", tbr)
 		}
 	}()
 
@@ -106,7 +106,6 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 
 	keypairName := "kp_" + network.Name
-
 	keypair, err := svc.provider.CreateKeyPair(keypairName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")

@@ -171,12 +171,12 @@ func (c *Cluster) resetExtensions(core *clusterapi.ClusterCore) {
 	if core == nil {
 		return
 	}
-	anon := core.GetExtension(Extension.Flavor)
+	anon := core.GetExtension(Extension.FlavorV1)
 	if anon != nil {
 		manager := anon.(managerData)
 		c.manager = &manager
 		// Note: On Load(), need to replace Extensions that are structs to pointers to struct
-		core.SetExtension(Extension.Flavor, &manager)
+		core.SetExtension(Extension.FlavorV1, &manager)
 	}
 }
 
@@ -340,7 +340,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	err = instance.updateMetadata(func() error {
 		instance.Core.GatewayIP = gw.GetPrivateIP()
 		instance.Core.PublicIP = gw.GetAccessIP()
-		instance.SetExtension(Extension.Flavor, instance.manager)
+		instance.SetExtension(Extension.FlavorV1, instance.manager)
 		return nil
 	})
 	if err != nil {

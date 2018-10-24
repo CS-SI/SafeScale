@@ -558,13 +558,13 @@ func (c *Cluster) configureNodes(hosts []string) error {
 		return fmt.Errorf("failed to get token to join the swarm as worker")
 	}
 
-	for _, hostID := range hosts {
-		retcode, _, stderr, err := broker.Ssh.Run(hostID, joinCmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	for _, h := range hosts {
+		retcode, _, stderr, err := broker.Ssh.Run(h, joinCmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", hostID, err.Error())
+			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", h, err.Error())
 		}
 		if retcode != 0 {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", hostID, stderr)
+			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", h, stderr)
 		}
 	}
 
@@ -885,25 +885,28 @@ func (c *Cluster) asyncCreateNode(
 	feature, err := install.NewFeature("docker")
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to prepare feature 'docker': %s", nodeTypeStr, index, host.Name, err.Error())
+		result <- ""
 		done <- fmt.Errorf("failed to add feature 'docker': %s", err.Error())
 		return
 	}
 	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to add feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
+		result <- ""
 		done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 		return
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
 		log.Printf("[%s node #%d (%s)] failed to add feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
+		result <- ""
 		done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, msg)
 		return
 	}
 	log.Printf("[%s node #%d (%s)] feature 'docker' added successfully.\n", nodeTypeStr, index, host.Name)
 
 	log.Printf("[%s node #%d (%s)] creation successful.\n", nodeTypeStr, index, host.Name)
-	result <- host.ID
+	result <- host.Name
 	done <- nil
 }
 
@@ -1206,9 +1209,9 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 		go c.asyncCreateNode(i+1, nodeType, hostDef, timeout, r, d)
 	}
 	for i := range dones {
-		hostID := <-results[i]
-		if hostID != "" {
-			hosts = append(hosts, hostID)
+		hostName := <-results[i]
+		if hostName != "" {
+			hosts = append(hosts, hostName)
 		}
 		err := <-dones[i]
 		if err != nil {

@@ -18,17 +18,17 @@ package services
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 //go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services HostAPI
-
 
 //HostAPI defines API to manipulate hosts
 type HostAPI interface {
@@ -56,16 +56,19 @@ type HostService struct {
 	network  NetworkAPI
 }
 
+// Start starts a host
 func (svc *HostService) Start(ref string) error {
 	log.Printf("Starting host '%s'...", ref)
 	return svc.provider.StartHost(ref)
 }
 
+// Stop stops a host
 func (svc *HostService) Stop(ref string) error {
 	log.Printf("Stopping host '%s'...", ref)
 	return svc.provider.StopHost(ref)
 }
 
+// Reboot reboots a host
 func (svc *HostService) Reboot(ref string) error {
 	log.Println("Rebooting host '%s'...", ref)
 	return svc.provider.RebootHost(ref)

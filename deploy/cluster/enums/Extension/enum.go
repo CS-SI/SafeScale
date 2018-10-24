@@ -22,10 +22,13 @@ package Extension
 type Enum uint8
 
 const (
-	// Description contains optional additional info describing cluster (purpose, ...)
-	Description Enum = iota
-	// Flavor contains optional additional info used by the cluster manager software
-	Flavor
-	// Features contains optional additional info describing installed features on cluster
-	Features
+	_ = iota
+	// DescriptionV1 contains optional additional info describing cluster (purpose, ...)
+	DescriptionV1
+	// FlavorV1 contains optional additional info used by the cluster manager software
+	FlavorV1
+	// FeaturesV1 contains optional additional info describing installed features on cluster
+	FeaturesV1
+	// NasV1 contains optional additional info describing Nas and shared folders on cluster
+	NasV1
 )
