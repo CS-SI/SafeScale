@@ -1,7 +1,6 @@
-# Cluster creation
+# Cluster_creation.mp4
 
-This video shows the creation of a Kubernetes cluster composed of 1 gateway for the local network, 1 master and 1 node,
-with Remote Desktop on the master, and Reverse Proxy on the gateway.
+This video shows the creation of a Kubernetes cluster composed of 1 gateway for the local network, 1 master and 1 node, with Remote Desktop on the master, and Reverse Proxy on the gateway.
 
 It then adds these features :
 
