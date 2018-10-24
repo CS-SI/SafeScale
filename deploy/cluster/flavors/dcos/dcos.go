@@ -29,6 +29,7 @@ import (
 	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/CS-SI/SafeScale/utils/template"
 
@@ -333,18 +334,19 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	// Saving cluster metadata, with status 'Creating'
 	instance = Cluster{
 		Core: &clusterapi.ClusterCore{
-			Name:          req.Name,
-			CIDR:          req.CIDR,
-			Flavor:        Flavor.DCOS,
-			State:         ClusterState.Creating,
-			Complexity:    req.Complexity,
-			Tenant:        req.Tenant,
-			NetworkID:     req.NetworkID,
-			GatewayIP:     gw.GetPrivateIP(),
-			PublicIP:      gw.GetAccessIP(),
-			Keypair:       kp,
-			AdminPassword: cladmPassword,
-			NodesDef:      nodesDef,
+			Name:             req.Name,
+			CIDR:             req.CIDR,
+			Flavor:           Flavor.DCOS,
+			State:            ClusterState.Creating,
+			Complexity:       req.Complexity,
+			Tenant:           req.Tenant,
+			NetworkID:        req.NetworkID,
+			GatewayIP:        gw.GetPrivateIP(),
+			PublicIP:         gw.GetAccessIP(),
+			Keypair:          kp,
+			AdminPassword:    cladmPassword,
+			NodesDef:         nodesDef,
+			DisabledFeatures: req.DisabledDefaultFeatures,
 		},
 		provider: svc,
 		manager:  &managerData{},
@@ -483,6 +485,83 @@ cleanNetwork:
 		return nil, fmt.Errorf("cluster creation failed but no error bubbled up")
 	}
 	return nil, err
+}
+
+// Sanitize tries to rebuild manager struct based on what is available on ObjectStorage
+func Sanitize(data *metadata.Cluster) error {
+	svc, err := provideruse.GetProviderService()
+	if err != nil {
+		return err
+	}
+
+	core := data.Get()
+	instance := &Cluster{
+		Core:     core,
+		metadata: data,
+		provider: svc,
+	}
+	instance.resetExtensions(core)
+
+	spew.Dump(instance.manager)
+	if instance.manager == nil {
+		var mgw *providermetadata.Gateway
+		mgw, err := providermetadata.LoadGateway(svc, instance.Core.NetworkID)
+		if err != nil {
+			return err
+		}
+		gw := mgw.Get()
+		hm := providermetadata.NewHost(svc)
+		hosts := []*providerapi.Host{}
+		err = hm.Browse(func(h *providerapi.Host) error {
+			if strings.HasPrefix(h.Name, instance.Core.Name+"-") {
+				hosts = append(hosts, h)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if len(hosts) == 0 {
+			return fmt.Errorf("failed to find hosts belonging to cluster")
+		}
+
+		// We have hosts, fill the manager
+		masterIDs := []string{}
+		masterIPs := []string{}
+		privateNodeIPs := []string{}
+		publicNodeIPs := []string{}
+		for _, h := range hosts {
+			if strings.HasPrefix(h.Name, instance.Core.Name+"-master-") {
+				masterIDs = append(masterIDs, h.ID)
+				masterIPs = append(masterIPs, h.PrivateIPsV4[0])
+			} else if strings.HasPrefix(h.Name, instance.Core.Name+"-node-") {
+				privateNodeIPs = append(privateNodeIPs, h.PrivateIPsV4[0])
+			} else if strings.HasPrefix(h.Name, instance.Core.Name+"-pubnode-") {
+				publicNodeIPs = append(privateNodeIPs, h.PrivateIPsV4[0])
+			}
+		}
+		newManager := &managerData{
+			BootstrapID:      gw.ID,
+			BootstrapIP:      gw.PrivateIPsV4[0],
+			MasterIDs:        masterIDs,
+			MasterIPs:        masterIPs,
+			PrivateNodeIPs:   privateNodeIPs,
+			PublicNodeIPs:    publicNodeIPs,
+			MasterLastIndex:  len(masterIDs),
+			PrivateLastIndex: len(privateNodeIPs),
+			PublicLastIndex:  len(publicNodeIPs),
+		}
+		log.Printf("updating metadata...\n")
+		err = instance.updateMetadata(func() error {
+			instance.manager = newManager
+			instance.Core.SetExtension(Extension.Flavor, newManager)
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
+		}
+	}
+	return nil
 }
 
 func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.HostDefinition, done chan error) {
@@ -970,7 +1049,8 @@ func (c *Cluster) asyncCreateNode(
 	}
 	log.Printf("[%s node #%d (%s)] requirements installed successfully.\n", nodeTypeStr, index, host.Name)
 
-	var target install.Target
+	target := install.NewHostTarget(host)
+
 	//VPL: proxycache is disabled unconditionnaly for now
 	c.Core.DisabledFeatures["proxycache"] = struct{}{}
 	if _, ok := c.Core.DisabledFeatures["proxycache"]; !ok {
@@ -981,7 +1061,6 @@ func (c *Cluster) asyncCreateNode(
 			done <- fmt.Errorf("failed to add feature 'proxycache-client': %s", err.Error())
 			return
 		}
-		target = install.NewHostTarget(host)
 		results, err := feature.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
 			log.Printf("[%s node #%d (%s)] failed to add feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
@@ -1533,12 +1612,18 @@ func (c *Cluster) DeleteSpecificNode(ID string) error {
 
 // ListMasterIDs lists the IDs of the masters in the cluster
 func (c *Cluster) ListMasterIDs() []string {
-	return c.manager.MasterIDs
+	if c.manager != nil {
+		return c.manager.MasterIDs
+	}
+	return []string{}
 }
 
 // ListMasterIPs lists the IPs of the masters in the cluster
 func (c *Cluster) ListMasterIPs() []string {
-	return c.manager.MasterIPs
+	if c.manager != nil {
+		return c.manager.MasterIPs
+	}
+	return []string{}
 }
 
 // ListNodeIDs lists the IDs of the nodes in the cluster; if public is set, list IDs of public nodes
@@ -1553,10 +1638,13 @@ func (c *Cluster) ListNodeIDs(public bool) []string {
 // ListNodeIPs lists the IPs of the nodes in the cluster; if public is set, list IDs of public nodes
 // otherwise list IDs of private nodes
 func (c *Cluster) ListNodeIPs(public bool) []string {
-	if public {
-		return c.manager.PublicNodeIPs
+	if c.manager != nil {
+		if public {
+			return c.manager.PublicNodeIPs
+		}
+		return c.manager.PrivateNodeIPs
 	}
-	return c.manager.PrivateNodeIPs
+	return []string{}
 }
 
 // GetNode returns a node based on its ID
