@@ -191,3 +191,27 @@ func List() ([]clusterapi.Cluster, error) {
 	})
 	return clusterList, err
 }
+
+func Sanitize(name string) error {
+	m, err := metadata.NewCluster()
+	if err != nil {
+		return err
+	}
+	found, err := m.Read(name)
+	if err != nil {
+		return fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
+	}
+	if !found {
+		return fmt.Errorf("cluster '%s' not found", name)
+	}
+
+	clusterCore := m.Get()
+	switch clusterCore.Flavor {
+	case Flavor.DCOS:
+		return dcos.Sanitize(m)
+	default:
+		return fmt.Errorf("Sanitization of cluster Flavor '%s' not available", clusterCore.Flavor.String())
+	}
+	return nil
+
+}
