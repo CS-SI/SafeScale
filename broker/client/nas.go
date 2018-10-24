@@ -57,6 +57,8 @@ func (n *nas) Delete(names []string, timeout time.Duration) error {
 		timeout = utils.TimeoutCtxHost
 	}
 
+	timeout = timeout + (30 * time.Second * time.Duration(len(names)))
+
 	var wg sync.WaitGroup
 
 	nasDeleter := func (aname string) {

@@ -54,6 +54,8 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 		timeout = utils.TimeoutCtxHost
 	}
 
+	timeout = timeout + (30 * time.Second * time.Duration(len(names)))
+
 	var wg sync.WaitGroup
 
 	netDeleter := func (aname string) {

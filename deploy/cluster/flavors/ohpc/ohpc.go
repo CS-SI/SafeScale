@@ -461,18 +461,11 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 cleanNodes:
 	if !req.KeepOnFailure {
-		for _, id := range instance.Core.PublicNodeIDs {
-			// TODO Decide if it's convenient to delete in parallel
-			broker.Host.Delete([]string{id}, brokerclient.DefaultExecutionTimeout)
-		}
-		for _, id := range instance.Core.PrivateNodeIDs {
-			// TODO Decide if it's convenient to delete in parallel
-			broker.Host.Delete([]string{id}, brokerclient.DefaultExecutionTimeout)
-		}
-		for _, id := range instance.manager.MasterIDs {
-			// TODO Decide if it's convenient to delete in parallel
-			broker.Host.Delete([]string{id}, brokerclient.DefaultExecutionTimeout)
-		}
+		broker.Host.Delete(instance.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
+
+		broker.Host.Delete(instance.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
+
+		broker.Host.Delete(instance.manager.MasterIDs, brokerclient.DefaultExecutionTimeout)
 	}
 cleanNetwork:
 	if !req.KeepOnFailure {
@@ -1305,23 +1298,14 @@ func (c *Cluster) Delete() error {
 	broker := brokerclient.New()
 
 	// Deletes the public nodes
-	for _, n := range c.Core.PublicNodeIDs {
-		// TODO Decide if it's convenient to delete in parallel
-		broker.Host.Delete([]string{n}, brokerclient.DefaultExecutionTimeout)
-	}
+	broker.Host.Delete(c.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
 
 	// Deletes the private nodes
-	for _, n := range c.Core.PrivateNodeIDs {
-		// TODO Decide if it's convenient to delete in parallel
-		broker.Host.Delete([]string{n}, brokerclient.DefaultExecutionTimeout)
-	}
+	broker.Host.Delete(c.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
 
 	// Delete the Masters
 	if c.manager != nil {
-		for _, n := range c.manager.MasterIDs {
-			// TODO Decide if it's convenient to delete in parallel
-			broker.Host.Delete([]string{n}, brokerclient.DefaultExecutionTimeout)
-		}
+		broker.Host.Delete(c.manager.MasterIDs, brokerclient.DefaultExecutionTimeout)
 	}
 
 	// Deletes the network and gateway
