@@ -467,21 +467,12 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 cleanNodes:
 	if !req.KeepOnFailure {
-		for _, id := range instance.Core.PublicNodeIDs {
-			// TODO Decide if it's convenient to delete in parallel
-			broker.Host.Delete([]string{id}, brokerclient.DefaultExecutionTimeout)
-		}
-		for _, id := range instance.Core.PrivateNodeIDs {
-			// TODO Decide if it's convenient to delete in parallel
-			broker.Host.Delete([]string{id}, brokerclient.DefaultExecutionTimeout)
-		}
+		broker.Host.Delete(instance.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
+		broker.Host.Delete(instance.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
 	}
 cleanMasters:
 	if !req.KeepOnFailure {
-		for _, id := range instance.manager.MasterIDs {
-			// TODO Decide if it's convenient to delete in parallel
-			broker.Host.Delete([]string{id}, brokerclient.DefaultExecutionTimeout)
-		}
+		broker.Host.Delete(instance.manager.MasterIDs, brokerclient.DefaultExecutionTimeout)
 	}
 cleanNetwork:
 	if !req.KeepOnFailure {
@@ -1447,10 +1438,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 	if len(errors) > 0 {
 		if len(hosts) > 0 {
 			broker := brokerclient.New().Host
-			for _, hostID := range hosts {
-				// TODO Decide if it's convenient to delete in parallel
-				broker.Delete([]string{hostID}, brokerclient.DefaultExecutionTimeout)
-			}
+			broker.Delete(hosts, brokerclient.DefaultExecutionTimeout)
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
 	}
@@ -1656,21 +1644,14 @@ func (c *Cluster) Delete() error {
 		broker := brokerclient.New()
 
 		// Deletes the public nodes
-		for _, n := range c.Core.PublicNodeIDs {
-			// TODO Decide if it's convenient to delete in parallel
-			broker.Host.Delete([]string{n}, brokerclient.DefaultExecutionTimeout)
-		}
+		broker.Host.Delete(c.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
 
 		// Deletes the private nodes
-		for _, n := range c.Core.PrivateNodeIDs {
-			// TODO Decide if it's convenient to delete in parallel
-			broker.Host.Delete([]string{n}, brokerclient.DefaultExecutionTimeout)
-		}
+		broker.Host.Delete(c.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
 
 		// Deletes the masters
-		for _, n := range c.manager.MasterIDs {
-			// TODO Decide if it's convenient to delete in parallel
-			broker.Host.Delete([]string{n}, brokerclient.DefaultExecutionTimeout)
+		if c.manager != nil {
+			broker.Host.Delete(c.manager.MasterIDs, brokerclient.DefaultExecutionTimeout)
 		}
 
 		// Deletes the network and gateway

@@ -67,6 +67,8 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 		timeout = utils.TimeoutCtxDefault
 	}
 
+	timeout = timeout + (30 * time.Second * time.Duration(len(names)))
+
 	var wg sync.WaitGroup
 
 	volDeleter := func (aname string) {
