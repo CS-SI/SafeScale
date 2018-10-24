@@ -19,14 +19,15 @@ package nfs
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"os/exec"
 	"syscall"
 	"text/template"
 	"time"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/GeertJohan/go.rice"
 )
@@ -77,31 +78,47 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		return 255, "", "", fmt.Errorf("failed to execute template: %s", err.Error())
 	}
 	content := buffer.String()
+
+	// Copy script to remote host with retries if needed
 	f, err := system.CreateTempFileFromString(content, 0600)
 	if err != nil {
 		return 255, "", "", fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
 	filename := "/var/tmp/" + name
-	retcode, stdout, stderr, err := sshconfig.Copy(filename, f.Name(), true)
-	if err != nil {
-		return 255, "", "", err
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			retcode, _, stderr, err := sshconfig.Copy(filename, f.Name(), true)
+			if err != nil {
+				return err
+			}
+			if retcode != 0 {
+				return fmt.Errorf(stderr)
+			}
+			return nil
+		},
+		5*time.Minute,
+	)
+	if retryErr != nil {
+		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", err.Error())
 	}
-	if retcode != 0 {
-		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", stderr)
-	}
-	nerr := os.Remove(f.Name())
+
+	nerr := utils.LazyRemove(f.Name())
 	if nerr != nil {
 		log.Warnf("Error deleting file: %v", nerr)
 	}
 
-	var cmd string
+	// Execute script on remote host with retries if needed
+	var (
+		cmd, stdout, stderr string
+		retcode             int
+	)
 	// if debug
 	if false {
 		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s", filename, filename)
 	} else {
 		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; rm -f %s; exit $rc", filename, filename, filename)
 	}
-	retryErr := retry.Action(
+	retryErr = retry.Action(
 		func() error {
 			stdout = ""
 			stderr = ""
@@ -125,7 +142,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			}
 			return err
 		},
-		retry.PrevailDone(retry.Unsuccessful255(), retry.Timeout(1*time.Minute)),
+		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(1*time.Minute)),
 		retry.Constant(5*time.Second),
 		nil, nil, nil,
 	)
