@@ -515,7 +515,7 @@ var clusterExpandCommand = &cli.Command{
 			os.Exit(int(ExitCode.RPC))
 		}
 		jsoned, err := json.Marshal(&hosts)
-		if err != nil {
+		if err == nil {
 			fmt.Println(string(jsoned))
 		}
 		os.Exit(int(ExitCode.OK))
