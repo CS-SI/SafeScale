@@ -48,9 +48,9 @@ var HostCommand = &cli.Command{
 
 	Before: func(c *cli.Command) {
 		if !c.IsKeywordSet("list,ls") {
-			hostName = c.StringArgument("<host name or id>", "")
+			hostName = c.StringArgument("<host_name_or_id>", "")
 			if hostName == "" {
-				fmt.Fprintln(os.Stderr, "Invalid argument <host name or id>")
+				fmt.Fprintln(os.Stderr, "Invalid argument <host_name_or_id>")
 				os.Exit(int(ExitCode.InvalidArgument))
 			}
 			var err error
@@ -65,7 +65,7 @@ var HostCommand = &cli.Command{
 	Help: &cli.HelpContent{
 		Usage: `
 Usage: {{.ProgName}} host list|ls
-       {{.ProgName}} [options] host <host name or id> COMMAND
+       {{.ProgName}} [options] host <host_name_or_id> COMMAND
 `,
 		Commands: `
   feature  Manages SafeScale features
@@ -77,7 +77,7 @@ Run 'deploy host COMMAND --help' for more information on a command.`,
 	},
 }
 
-// hostFeatureCommand handles 'deploy host <host name or id> feature'
+// hostFeatureCommand handles 'deploy host <host_name_or_id> feature'
 var hostFeatureCommand = &cli.Command{
 	Keyword: "feature",
 	Aliases: []string{"package", "pkg"},
@@ -99,7 +99,7 @@ var hostFeatureCommand = &cli.Command{
 
 	Help: &cli.HelpContent{
 		Usage: `
-Usage: {{.ProgName}} [options] host <host name or id> feature,package,pkg <pkgname> COMMAND`,
+Usage: {{.ProgName}} [options] host <host_name_or_id> feature,package,pkg <pkgname> COMMAND`,
 		Commands: `
   add,install                         Installs the package on the host
   check                               Tells if the package is installed
@@ -109,7 +109,7 @@ Manages features (SafeScale packages) on a single host.`,
 	},
 }
 
-// hostFeatureAddCommand handles 'deploy host <host name or id> package <pkgname> add'
+// hostFeatureAddCommand handles 'deploy host <host_name_or_id> package <pkgname> add'
 var hostFeatureAddCommand = &cli.Command{
 	Keyword: "add",
 	Aliases: []string{"install"},
@@ -165,7 +165,7 @@ var hostFeatureAddCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostFeatureCheckCommand handles 'deploy host <host name or id> package <pkgname> check'
+// hostFeatureCheckCommand handles 'deploy host <host_name_or_id> package <pkgname> check'
 var hostFeatureCheckCommand = &cli.Command{
 	Keyword: "check",
 	Aliases: []string{"verify"},
@@ -221,7 +221,7 @@ var hostFeatureCheckCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostFeatureDeleteCommand handles 'deploy host <host name or id> package <pkgname> delete'
+// hostFeatureDeleteCommand handles 'deploy host <host_name_or_id> package <pkgname> delete'
 var hostFeatureDeleteCommand = &cli.Command{
 	Keyword: "delete",
 	Aliases: []string{"destroy", "remove", "rm", "uninstall"},
@@ -277,7 +277,7 @@ var hostFeatureDeleteCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostServiceCommand handles 'deploy host <host name or id> service'
+// hostServiceCommand handles 'deploy host <host_name_or_id> service'
 var hostServiceCommand = &cli.Command{
 	Keyword: "service",
 	Aliases: []string{"svc"},
@@ -303,13 +303,13 @@ var hostServiceCommand = &cli.Command{
 
 	Help: &cli.HelpContent{
 		Usage: `
-Usage: {{.ProgName}} [options] host <host name or id> service,svc [<arg>...]`,
+Usage: {{.ProgName}} [options] host <host_name_or_id> service,svc [<arg>...]`,
 		Description: `
 Manages services on a single host.`,
 	},
 }
 
-// hostServiceListCommand handles 'deploy host <host name or id> service list'
+// hostServiceListCommand handles 'deploy host <host_name_or_id> service list'
 var hostServiceListCommand = &cli.Command{
 	Keyword: "list",
 	Aliases: []string{"ls"},
@@ -322,7 +322,7 @@ var hostServiceListCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostServiceAvailableCommand handles 'deploy host <host name or id> service <svcname> available'
+// hostServiceAvailableCommand handles 'deploy host <host_name_or_id> service <svcname> available'
 var hostServiceAvailableCommand = &cli.Command{
 	Keyword: "available",
 	Aliases: []string{"avail", "installable"},
@@ -335,7 +335,7 @@ var hostServiceAvailableCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostServiceCheckCommand handles 'deploy host <host name or id> service <pkgname> check'
+// hostServiceCheckCommand handles 'deploy host <host_name_or_id> service <pkgname> check'
 var hostServiceCheckCommand = &cli.Command{
 	Keyword: "check",
 
@@ -347,7 +347,7 @@ var hostServiceCheckCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostServiceAddCommand handles 'deploy host <host name or id> services <svcname> add'
+// hostServiceAddCommand handles 'deploy host <host_name_or_id> services <svcname> add'
 var hostServiceAddCommand = &cli.Command{
 	Keyword: "add",
 	Aliases: []string{"install"},
@@ -360,7 +360,7 @@ var hostServiceAddCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostServiceDeleteCommand handles 'deploy host <host name or id> service <svcname> delete'
+// hostServiceDeleteCommand handles 'deploy host <host_name_or_id> service <svcname> delete'
 var hostServiceDeleteCommand = &cli.Command{
 	Keyword: "delete",
 	Aliases: []string{"destroy", "remove", "rm"},
@@ -373,7 +373,7 @@ var hostServiceDeleteCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostServiceStartCommand handles 'deploy host <host name or id> service <svcname> start'
+// hostServiceStartCommand handles 'deploy host <host_name_or_id> service <svcname> start'
 var hostServiceStartCommand = &cli.Command{
 	Keyword: "start",
 
@@ -385,7 +385,7 @@ var hostServiceStartCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostServiceStateCommand handles 'deploy host <host name or id> service <svcname> state'
+// hostServiceStateCommand handles 'deploy host <host_name_or_id> service <svcname> state'
 var hostServiceStateCommand = &cli.Command{
 	Keyword: "state",
 
@@ -397,7 +397,7 @@ var hostServiceStateCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostServiceStopCommand handles 'deploy host <host name or id> service <svcname> stop'
+// hostServiceStopCommand handles 'deploy host <host_name_or_id> service <svcname> stop'
 var hostServiceStopCommand = &cli.Command{
 	Keyword: "stop",
 
@@ -409,7 +409,7 @@ var hostServiceStopCommand = &cli.Command{
 	Help: &cli.HelpContent{},
 }
 
-// hostDockerCommand handles 'deploy host <host name or id> docker'
+// hostDockerCommand handles 'deploy host <host_name_or_id> docker'
 var hostDockerCommand = &cli.Command{
 	Keyword: "docker",
 
