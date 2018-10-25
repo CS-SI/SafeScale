@@ -504,7 +504,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				log.Warnf("[%s] host %s: error reading SSHConfig: %v\n", template.Name, template.Name, err.Error())
 				return err
 			}
-			nerr := ssh.WaitServerReady(2 * time.Minute)
+			nerr := ssh.WaitServerReady(time.Duration(concurrency - 1) * time.Minute)
 			if nerr != nil {
 				log.Warnf("Error waiting for server ready: %v", nerr)
 				return nerr
