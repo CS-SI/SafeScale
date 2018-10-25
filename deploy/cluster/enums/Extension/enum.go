@@ -19,7 +19,7 @@ package Extension
 //go:generate stringer -type=Enum
 
 // Enum represents the type of additional info for an host
-type Enum uint8
+type Enum uint
 
 const (
 	_ Enum = iota
