@@ -52,6 +52,13 @@ func NewNetworkService(api api.ClientAPI) NetworkAPI {
 
 // Create creates a network
 func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (apinetwork *api.Network, err error) {
+	// Verify that the network doesn't exist first
+	if exists, err := svc.provider.GetNetwork(net); exists != nil && err == nil {
+		tbr := errors.Errorf("A network already exists with name '%s'", net)
+		log.Errorf("%v", tbr)
+		return nil, tbr
+	}
+
 	// Create the network
 	network, err := svc.provider.CreateNetwork(api.NetworkRequest{
 		Name:      net,
