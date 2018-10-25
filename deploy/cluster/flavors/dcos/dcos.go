@@ -188,12 +188,12 @@ func (c *Cluster) resetExtensions(Core *clusterapi.ClusterCore) {
 	if Core == nil {
 		return
 	}
-	anon := Core.GetExtension(Extension.Flavor)
+	anon := Core.GetExtension(Extension.FlavorV1)
 	if anon != nil {
 		manager := anon.(managerData)
 		c.manager = &manager
 		// Note: On Load(), need to replace Extensions that are struct to pointers to struct
-		Core.SetExtension(Extension.Flavor, &manager)
+		Core.SetExtension(Extension.FlavorV1, &manager)
 	}
 }
 
@@ -351,7 +351,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		provider: svc,
 		manager:  &managerData{},
 	}
-	instance.SetExtension(Extension.Flavor, instance.manager)
+	instance.SetExtension(Extension.FlavorV1, instance.manager)
 	err = instance.updateMetadata(nil)
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
@@ -554,7 +554,7 @@ func Sanitize(data *metadata.Cluster) error {
 		log.Printf("updating metadata...\n")
 		err = instance.updateMetadata(func() error {
 			instance.manager = newManager
-			instance.Core.SetExtension(Extension.Flavor, newManager)
+			instance.Core.SetExtension(Extension.FlavorV1, newManager)
 			return nil
 		})
 		if err != nil {

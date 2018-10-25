@@ -22,7 +22,7 @@ package Extension
 type Enum uint8
 
 const (
-	_ = iota
+	_ Enum = iota
 	// DescriptionV1 contains optional additional info describing cluster (purpose, ...)
 	DescriptionV1
 	// FlavorV1 contains optional additional info used by the cluster manager software
