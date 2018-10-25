@@ -18,6 +18,7 @@ package providers
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"math"
 	"sort"
 	"strings"
@@ -459,6 +460,7 @@ func (srv *Service) getOrCreateDefaultNetwork() (*api.Network, error) {
 
 // CreateHost creates an host that fulfils the request
 func (srv *Service) CreateHost(request api.HostRequest) (*api.Host, error) {
+	log.Printf("Creating host '%s'...", request.Name)
 	if len(request.NetworkIDs) != 0 {
 		return srv.ClientAPI.CreateHost(request)
 	}
