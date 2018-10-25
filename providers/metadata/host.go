@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	log "github.com/sirupsen/logrus"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -183,7 +184,11 @@ func RemoveHost(svc *providers.Service, host *api.Host) error {
 	err := mn.Browse(func(network *api.Network) error {
 		nerr := mnb.Carry(network).DetachHost(host.ID)
 		if nerr != nil {
-			log.Warnf("Error while browsing network: %v", nerr)
+			if strings.Contains(nerr.Error(), "failed to remove metadata in Object Storage") {
+				log.Debugf("Error while browsing network: %v", nerr)
+			} else {
+				log.Warnf("Error while browsing network: %v", nerr)
+			}
 		}
 		return nil
 	})
