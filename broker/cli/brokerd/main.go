@@ -19,7 +19,7 @@ package main
 import (
 	"fmt"
 	"github.com/dlespiau/covertool/pkg/exit"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"os"
 	"os/signal"
@@ -129,7 +129,7 @@ func main() {
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
 
-	version := VERSION + "-" + BUILD_DATE
+	version := VERSION + ", build date: " + BUILD_DATE
 	log.Printf("Brokerd version: %s", version)
 	log.Println("Ready to serve :-)")
 	if err := s.Serve(lis); err != nil {
