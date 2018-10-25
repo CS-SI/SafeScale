@@ -522,8 +522,12 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	var gwID string
 	if gw != nil {
 		gwID = gw.ID
+		host.GatewayID = gwID
+	} else {
+		log.Debugf("There was a problem with gateway ID...")
+		host.GatewayID = ""
 	}
-	host.GatewayID = gwID
+
 	host.PrivateKey = kp.PrivateKey
 
 	// if Floating IP are not used or no public address is requested
