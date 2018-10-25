@@ -401,7 +401,7 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 // createHost ...
 func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.Host, error) {
 	msgFail := "Failed to create Host resource: %s"
-	msgSuccess := "Host resource created successfully"
+	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.Name)
 
 	// First check if name is not already used
 	m, err := metadata.LoadHost(providers.FromClient(client), request.Name)
