@@ -220,7 +220,6 @@ type getCPUInfoResult struct {
 }
 
 func getCPUInfo(tenant string, service *providers.Service, tpl api.HostTemplate, img *api.Image, key *api.KeyPair, networkID string) (*CPUInfo, error) {
-	//fmt.Printf("[%s] host %s: creating\n", tenant, tpl.Name)
 	host, err := service.CreateHost(api.HostRequest{
 		Name:       "scanhost",
 		PublicIP:   true,
@@ -230,7 +229,6 @@ func getCPUInfo(tenant string, service *providers.Service, tpl api.HostTemplate,
 		NetworkIDs: []string{networkID},
 	})
 	if err != nil {
-		//fmt.Printf("[%s] host %s: error creation: %s\n", tenant, tpl.Name, err.Error())
 		return nil, err
 	}
 	defer service.DeleteHost(host.ID)
@@ -485,23 +483,24 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		if net != nil {
 			log.Printf("Checking template %s\n", template.Name)
 
+			hostName := "scanhost-" + template.Name
 			host, err := service.CreateHost(api.HostRequest{
-				Name:       "scanhost-" + template.Name,
+				Name:       hostName,
 				PublicIP:   true,
 				ImageID:    img.ID,
 				TemplateID: template.ID,
 				NetworkIDs: []string{net.ID},
 			})
 
-			defer service.DeleteHost("scanhost-" + template.Name)
+			defer service.DeleteHost(hostName)
 			if err != nil {
-				log.Warnf("[%s] host %s: error creation: %v\n", template.Name, template.Name, err.Error())
+				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
 
 			ssh, err := service.GetSSHConfig(host.ID)
 			if err != nil {
-				log.Warnf("[%s] host %s: error reading SSHConfig: %v\n", template.Name, template.Name, err.Error())
+				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
 			nerr := ssh.WaitServerReady(time.Duration(concurrency - 1) * time.Minute)
@@ -573,5 +572,8 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 }
 
 func main() {
+	log.Printf("%s version %s\n", os.Args[0], VERSION)
+	log.Printf( "built %s\n", BUILD_DATE)
+
 	RunScanner()
 }

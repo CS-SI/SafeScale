@@ -1,4 +1,3 @@
-//line main.go:1
 /*
  * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
  *
@@ -129,6 +128,9 @@ func main() {
 
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
+
+	version := VERSION + "-" + BUILD_DATE
+	log.Printf("Brokerd version: %s", version)
 	log.Println("Ready to serve :-)")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)

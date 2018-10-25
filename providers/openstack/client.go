@@ -18,7 +18,7 @@ package openstack
 
 import (
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"reflect"
 
 	"github.com/CS-SI/SafeScale/providers/api"

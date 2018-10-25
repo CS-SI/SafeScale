@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/pkg/errors"
 	"strings"
 	"time"
 
@@ -492,7 +493,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 
 	// Retry creation until success, for 10 minutes
 	var host *api.Host
-	retry.WhileUnsuccessfulDelay5Seconds(
+	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			server, err := servers.Create(client.Compute, keypairs.CreateOptsExt{
 				CreateOptsBuilder: srvOpts,
@@ -502,7 +503,8 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 					servers.Delete(client.Compute, server.ID)
 				}
 				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
-				log.Errorf(msg)
+				// TODO Gotcha !!
+				log.Debugf(msg)
 				return fmt.Errorf(msg)
 			}
 			// Wait that Host is ready
@@ -510,13 +512,22 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 			if err != nil {
 				servers.Delete(client.Compute, server.ID)
 				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
-				log.Errorf(msg)
+				// TODO Gotcha !!
+				log.Debugf(msg)
 				return fmt.Errorf(msg)
 			}
 			return nil
 		},
 		10*time.Minute,
 	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if host == nil {
+		return nil, errors.New("Unexpected problem creating host...")
+	}
 
 	// Add gateway ID to Host definition
 	var gwID string

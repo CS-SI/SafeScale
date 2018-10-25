@@ -17,7 +17,7 @@
 package ovh
 
 import (
-	"log"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 
