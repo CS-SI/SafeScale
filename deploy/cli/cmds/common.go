@@ -16,9 +16,28 @@
 
 package cmds
 
+import (
+	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
+
+	"github.com/urfave/cli"
+)
+
 var (
 	// Verbose tells if user asks more verbosity
 	Verbose bool
 	// Debug tells if user asks debug information
 	Debug bool
+
+	featureName string
 )
+
+func extractFeatureArgument(c *cli.Context) error {
+	if c.NArg() < 2 {
+		return cli.NewExitError("Missing mandatory argument FEATURENAME", int(ExitCode.InvalidArgument))
+	}
+	featureName = c.Args().Get(1)
+	if featureName == "" {
+		return cli.NewExitError("Invalid argument FEATURENAME", int(ExitCode.InvalidArgument))
+	}
+	return nil
+}
