@@ -637,7 +637,7 @@ func (c *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
 		return nil, err
 	}
 	if m != nil {
-		return nil, fmt.Errorf("A network already exist with name '%s'", req.Name)
+		return nil, fmt.Errorf("A network already exists with name '%s'", req.Name)
 	}
 	vpcOut, err := c.EC2.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: aws.String(req.CIDR),
@@ -1346,7 +1346,7 @@ func (c *Client) removeVolumeName(id string) error {
 //- size is the size of the volume in GB
 //- volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (c *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
-	// Check if a volume already exist with the same name
+	// Check if a volume already exists with the same name
 	_volume, err := metadata.LoadVolume(providers.FromClient(client), request.Name)
 	if err != nil {
 		return nil, err

@@ -69,7 +69,7 @@ func sanitize(in string) (string, error) {
 //Create a nas
 func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 
-	// Check if a nas already exist with the same name
+	// Check if a nas already exists with the same name
 	nas, err := srv.findNas(name)
 	if err != nil {
 		tbr := errors.Wrap(err, "")

@@ -88,7 +88,7 @@ func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
-	// Check if a volume already exist with the same name
+	// Check if a volume already exists with the same name
 	volume, err := metadata.LoadVolume(providers.FromClient(client), request.Name)
 	if err != nil {
 		return nil, err

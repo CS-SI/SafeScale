@@ -69,7 +69,7 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		return nil, err
 	}
 	if _net != nil {
-		return nil, fmt.Errorf("A network already exist with name '%s'", req.Name)
+		return nil, fmt.Errorf("A network already exists with name '%s'", req.Name)
 	}
 
 	// We specify a name and that it should forward packets

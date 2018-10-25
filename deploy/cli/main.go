@@ -37,7 +37,7 @@ const (
 	globalOptions string = `
 Global options:
   -v,--verbose  Enable verbosity
-  -d,--debug    Enable debug suplemental information
+  -d,--debug    Enable debug supplemental information
 `
 
 	completeUsage string = `
@@ -64,10 +64,10 @@ Usage: deploy version
        deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> mount <mountpoint>
        deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> (umount|unmount)
        deploy [-vd] host help <command>
-       deploy [-vd] host <host name or id> feature <pkgname> (add|install) [(--param <param>)...]
-       deploy [-vd] host <host name or id> feature <pkgname> check
-       deploy [-vd] host <host name or id> feature <pkgname> (delete|destroy|remove|rm|uninstall)
-       deploy [-vd] host <host name or id> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
+       deploy [-vd] host <host_name_or_id> feature <pkgname> (add|install) [(--param <param>)...]
+       deploy [-vd] host <host_name_or_id> feature <pkgname> check
+       deploy [-vd] host <host_name_or_id> feature <pkgname> (delete|destroy|remove|rm|uninstall)
+       deploy [-vd] host <host_name_or_id> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
 
 Options:
   -C <complexity>,--complexity <complexity>               Defines complexity
@@ -121,5 +121,6 @@ Usage: {{.ProgName}} [options] <command>
 			},
 		},
 	})
+
 	app.Run(nil)
 }
