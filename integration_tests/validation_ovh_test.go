@@ -56,7 +56,7 @@ func Test_Basic(t *testing.T) {
 
 	out, err = getOutput("broker host create easyvm --public --net crazy")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "A host already exists"))
+	require.True(t, strings.Contains(out, "already exists"))
 
 	out, err = getOutput("broker host inspect easyvm")
 	require.Nil(t, err)
@@ -71,7 +71,7 @@ func Test_Basic(t *testing.T) {
 
 	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "A host already exists"))
+	require.True(t, strings.Contains(out, "already exists"))
 
 	out, err = getOutput("broker nas list")
 	require.Nil(t, err)
@@ -283,7 +283,7 @@ func Test_Delete_Volume_Mounted(t *testing.T) {
 
 	out, err = getOutput("broker host create easyvm --public --net crazy")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "A host already exists"))
+	require.True(t, strings.Contains(out, "already exists"))
 
 	out, err = getOutput("broker host inspect easyvm")
 	require.Nil(t, err)
@@ -298,7 +298,7 @@ func Test_Delete_Volume_Mounted(t *testing.T) {
 
 	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "A host already exists"))
+	require.True(t, strings.Contains(out, "already exists"))
 
 	out, err = getOutput("broker nas list")
 	require.Nil(t, err)
@@ -412,7 +412,7 @@ func Test_Basic_Until_NAS(t *testing.T) {
 
 	out, err = getOutput("broker host create easyvm --public --net crazy")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "A host already exists"))
+	require.True(t, strings.Contains(out, "already exists"))
 
 	out, err = getOutput("broker host inspect easyvm")
 	require.Nil(t, err)
@@ -427,7 +427,7 @@ func Test_Basic_Until_NAS(t *testing.T) {
 
 	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "A host already exists"))
+	require.True(t, strings.Contains(out, "already exists"))
 
 	out, err = getOutput("broker nas list")
 	require.Nil(t, err)
