@@ -113,6 +113,13 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		PublicIP:   public,
 		NetworkIDs: networks,
 	}
+
+	if exists, err := svc.provider.GetHostByName(name); exists != nil && err == nil{
+		tbr := errors.Errorf("Failure creating host: host '%s' already exists.", name)
+		log.Errorf("%v", tbr)
+		return nil, tbr
+	}
+
 	host, err := svc.provider.CreateHost(hostRequest)
 	if err != nil {
 		tbr := errors.Wrapf(err, "Compute resource creation failed: '%s'.", hostRequest.Name)
