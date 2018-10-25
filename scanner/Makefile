@@ -1,14 +1,15 @@
 GO?=go
+EXEC:=scanner
 
-all: scanner
+default: all
+
+all: clean
+	@$(GO) build -o $(EXEC)
 
 vet:
 	@$(GO) vet ./...
 
-scanner: scanner.go
-	$(GO) generate && $(GO) build
-
-.PHONY: clean
+.PHONY: clean vet
 
 clean:
 	@($(RM) scanner || true)
