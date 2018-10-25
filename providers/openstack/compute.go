@@ -400,7 +400,7 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 
 // createHost ...
 func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.Host, error) {
-	msgFail := "Failed to create Jost resource: %s"
+	msgFail := "Failed to create Host resource: %s"
 	msgSuccess := "Host resource created successfully"
 
 	// First check if name is not already used
