@@ -24,5 +24,3 @@ clean:
 	@(cd tests && $(MAKE) $@)
 	@(cd enums && $(MAKE) $@)
 	@($(RM) ./mocks/*.go || true)
-	@(for d in $(DIRECTORIES); do (cd $$d; $(RM) *_string.go || true); done)
-

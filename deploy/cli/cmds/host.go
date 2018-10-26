@@ -18,24 +18,19 @@ package cmds
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
 	// log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 
-	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
-
+	"github.com/CS-SI/SafeScale/deploy/cli/enums/ExitCode"
 	"github.com/CS-SI/SafeScale/deploy/install"
 )
 
 var (
-	hostName        string
-	hostInstance    *pb.Host
 	hostServiceName string
 )
 
@@ -71,22 +66,22 @@ func extractHostArgument(c *cli.Context) error {
 		if c.NArg() < 1 {
 			msg := "Missing mandatory argument HOSTNAME"
 			// _ = cli.ShowSubcommandHelp(c)
-			return cli.NewExitError(msg, int(ExitCode.InvalidArgument))
+			return exitError(msg, ExitCode.InvalidArgument)
 		}
 		hostName = c.Args().First()
 		if hostName == "" {
 			msg := "argument HOSTNAME invalid"
-			return cli.NewExitError(msg, int(ExitCode.InvalidArgument))
+			return exitError(msg, ExitCode.InvalidArgument)
 		}
 
 		var err error
 		hostInstance, err = brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			fmt.Printf("%s\n", err.Error())
-			return cli.NewExitError(err.Error(), int(ExitCode.RPC))
+			return exitError(err.Error(), ExitCode.RPC)
 		}
 		if hostInstance == nil {
-			return cli.NewExitError(fmt.Sprintf("Host '%s' not found.\n", clusterName), int(ExitCode.NotFound))
+			return exitError(fmt.Sprintf("Host '%s' not found.\n", clusterName), ExitCode.NotFound)
 		}
 	}
 	return nil
@@ -124,11 +119,11 @@ var hostAddFeatureCommand = cli.Command{
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(int(ExitCode.Run))
+			return exitError(err.Error(), ExitCode.Run)
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
-			os.Exit(int(ExitCode.NotFound))
+			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
+			return exitError(msg, ExitCode.NotFound)
 		}
 		values := install.Variables{}
 		params := c.StringSlice("param")
@@ -146,22 +141,25 @@ var hostAddFeatureCommand = cli.Command{
 		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
-			return cli.NewExitError(msg, int(ExitCode.RPC))
+			return exitError(msg, ExitCode.RPC)
 		}
 
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
-			msg := fmt.Sprintf("Error installing feature '%s' on host '%s': %s\n", featureName, hostName, err.Error())
-			return cli.NewExitError(msg, int(ExitCode.RPC))
+			msg := fmt.Sprintf("Error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
+			return exitError(msg, ExitCode.RPC)
 		}
 		if !results.Successful() {
-			msg := fmt.Sprintf("Failed to install feature '%s' on host '%s'\n%s", featureName, hostName, results.AllErrorMessages())
-			return cli.NewExitError(msg, int(ExitCode.Run))
+			msg := fmt.Sprintf("Failed to add feature '%s' on host '%s'", featureName, hostName)
+			if Debug || Verbose {
+				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+			}
+			return exitError(msg, ExitCode.Run)
 		}
 
-		msg := fmt.Sprintf("Feature '%s' installed successfully on host '%s'\n", featureName, hostName)
-		return cli.NewExitError(msg, int(ExitCode.OK))
+		fmt.Printf("Feature '%s' added successfully on host '%s'\n", featureName, hostName)
+		return nil
 	},
 }
 
@@ -192,12 +190,11 @@ var hostCheckFeatureCommand = cli.Command{
 
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(int(ExitCode.Run))
+			return exitError(err.Error(), ExitCode.Run)
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
-			os.Exit(int(ExitCode.NotFound))
+			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
+			return exitError(msg, ExitCode.NotFound)
 		}
 
 		values := install.Variables{}
@@ -213,24 +210,24 @@ var hostCheckFeatureCommand = cli.Command{
 		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
-			return cli.NewExitError(msg, int(ExitCode.RPC))
+			return exitError(msg, ExitCode.RPC)
 		}
 
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Check(target, values, install.Settings{})
 		if err != nil {
 			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
-			return cli.NewExitError(msg, int(ExitCode.RPC))
+			return exitError(msg, ExitCode.RPC)
 		}
 		if !results.Successful() {
-			fmt.Printf("Feature '%s' is not installed on '%s'\n", featureName, hostName)
-			if Debug {
-				log.Println(results.AllErrorMessages())
+			msg := fmt.Sprintf("Feature '%s' not found on host '%s'", featureName, hostName)
+			if Verbose || Debug {
+				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 			}
-			return cli.NewExitError("", int(ExitCode.NotFound))
+			return exitError(msg, ExitCode.NotFound)
 		}
 
-		fmt.Printf("Feature '%s' is installed on '%s'\n", featureName, hostName)
+		fmt.Printf("Feature '%s' found on host '%s'\n", featureName, hostName)
 		return nil
 	},
 }
@@ -262,11 +259,11 @@ var hostDeleteFeatureCommand = cli.Command{
 
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
-			return cli.NewExitError(err.Error(), int(ExitCode.Run))
+			return exitError(err.Error(), ExitCode.Run)
 		}
 		if feature == nil {
-			msg := fmt.Sprintf("Failed to find a feature named '%s'.\n", featureName)
-			return cli.NewExitError(msg, int(ExitCode.NotFound))
+			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
+			return exitError(msg, ExitCode.NotFound)
 		}
 
 		values := install.Variables{}
@@ -282,21 +279,24 @@ var hostDeleteFeatureCommand = cli.Command{
 		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
-			return cli.NewExitError(msg, int(ExitCode.RPC))
+			return exitError(msg, ExitCode.RPC)
 		}
 
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Remove(target, values, install.Settings{})
 		if err != nil {
 			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
-			return cli.NewExitError(msg, int(ExitCode.RPC))
+			return exitError(msg, ExitCode.RPC)
 		}
 		if !results.Successful() {
-			msg := fmt.Sprintf("Failed to delete feature '%s' from host '%s':\n%s", featureName, hostName, results.AllErrorMessages())
-			return cli.NewExitError(msg, int(ExitCode.Run))
+			msg := fmt.Sprintf("Failed to delete feature '%s' from host '%s'", featureName, hostName)
+			if Verbose || Debug {
+				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+			}
+			return exitError(msg, ExitCode.Run)
 		}
 
-		fmt.Printf("Feature '%s' deleted successfully on '%s'\n", featureName, hostName)
+		fmt.Printf("Feature '%s' deleted successfully on host '%s'\n", featureName, hostName)
 		return nil
 	},
 }
@@ -321,7 +321,7 @@ var hostDeleteFeatureCommand = cli.Command{
 // 		hostServiceName = c.StringArgument("<svcname>", "")
 // 		if hostServiceName == "" {
 // 			fmt.Println("Invalid argument <svcname>")
-// 			os.Exit(int(ExitCode.InvalidArgument))
+// 			os.Exit(ExitCode.InvalidArgument))
 // 		}
 // 	},
 
@@ -340,7 +340,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 // 	Process: func(c *cli.Command) {
 // 		fmt.Println("hostServiceListCommand not yet implemented")
-// 		os.Exit(int(ExitCode.NotImplemented))
+// 		os.Exit(ExitCode.NotImplemented))
 // 	},
 
 // 	Help: &cli.HelpContent{},
@@ -353,7 +353,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 // 	Process: func(c *cli.Command) {
 // 		fmt.Println("hostServiceAvailableCommand not yet implemented")
-// 		os.Exit(int(ExitCode.NotImplemented))
+// 		os.Exit(ExitCode.NotImplemented))
 // 	},
 
 // 	Help: &cli.HelpContent{},
@@ -365,7 +365,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 // 	Process: func(c *cli.Command) {
 // 		fmt.Println("hostServiceCheckCommand not yet implemented")
-// 		os.Exit(int(ExitCode.NotImplemented))
+// 		os.Exit(ExitCode.NotImplemented))
 // 	},
 
 // 	Help: &cli.HelpContent{},
@@ -378,7 +378,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 // 	Process: func(c *cli.Command) {
 // 		fmt.Println("hostServiceAddCommand not yet implemented")
-// 		os.Exit(int(ExitCode.NotImplemented))
+// 		os.Exit(ExitCode.NotImplemented))
 // 	},
 
 // 	Help: &cli.HelpContent{},
@@ -391,7 +391,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 // 	Process: func(c *cli.Command) {
 // 		fmt.Println("hostServiceDeleteCommand not yet implemented")
-// 		os.Exit(int(ExitCode.NotImplemented))
+// 		os.Exit(ExitCode.NotImplemented))
 // 	},
 
 // 	Help: &cli.HelpContent{},
@@ -403,7 +403,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 // 	Process: func(c *cli.Command) {
 // 		fmt.Println("hostServiceStartCommand not yet implemented")
-// 		os.Exit(int(ExitCode.NotImplemented))
+// 		os.Exit(ExitCode.NotImplemented))
 // 	},
 
 // 	Help: &cli.HelpContent{},
@@ -415,7 +415,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 // 	Process: func(c *cli.Command) {
 // 		fmt.Println("hostServiceStateCommand not yet implemented")
-// 		os.Exit(int(ExitCode.NotImplemented))
+// 		os.Exit(ExitCode.NotImplemented))
 // 	},
 
 // 	Help: &cli.HelpContent{},
@@ -427,7 +427,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 // 	Process: func(c *cli.Command) {
 // 		fmt.Println("hostServiceStopCommand not yet implemented")
-// 		os.Exit(int(ExitCode.NotImplemented))
+// 		os.Exit(ExitCode.NotImplemented))
 // 	},
 
 // 	Help: &cli.HelpContent{},
@@ -439,7 +439,7 @@ var hostDeleteFeatureCommand = cli.Command{
 
 // 	Process: func(c *cli.Command) {
 // 		fmt.Println("hostDockerCommand not yet implemented")
-// 		os.Exit(int(ExitCode.NotImplemented))
+// 		os.Exit(ExitCode.NotImplemented))
 // 	},
 
 // 	Help: &cli.HelpContent{},

@@ -7,6 +7,8 @@ VERSIONFILE := version.go
 
 .PHONY: clean vet
 
+DIRECTORIES := $(sort $(dir $(wildcard */)))
+
 default: all
 
 vet:
@@ -19,6 +21,7 @@ all: clean gensrc
 clean:
 	@$(RM) $(EXEC) || true
 	@$(RM) $(EXEC-COVER) || true
+	@(for d in $(DIRECTORIES); do (cd $$d; $(RM) *_string.go || true); done)
 
 gensrc:
 	@$(RM) $(VERSIONFILE) || true
