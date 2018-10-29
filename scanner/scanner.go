@@ -22,20 +22,20 @@ import (
 	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 
 	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
+	_ "github.com/zippoxer/bow"                 // Make dep happy
 )
 
 const cmdNumberOfCPU string = "lscpu | grep 'CPU(s):' | grep -v 'NUMA' | tr -d '[:space:]' | cut -d: -f2"
@@ -84,58 +84,6 @@ type CPUInfo struct {
 	RAMFreq        float64 `json:"ram_freq,omitempty"`
 	GPU            int     `json:"gpu,omitempty"`
 	GPUModel       string  `json:"gpu_model,omitempty"`
-}
-
-func parseOutput(output []byte) (*CPUInfo, error) {
-	str := strings.TrimSpace(string(output))
-
-	//	tokens := strings.Split(str, "\n")
-	tokens := strings.Split(str, "î")
-	if len(tokens) < 9 {
-		return nil, fmt.Errorf("parsing error: '%s'", str)
-	}
-	info := CPUInfo{}
-	var err error
-	info.NumberOfCPU, err = strconv.Atoi(tokens[0])
-	if err != nil {
-		return nil, fmt.Errorf("Parsing error: NumberOfCPU='%s' (from '%s')", tokens[0], str)
-	}
-	info.NumberOfCore, err = strconv.Atoi(tokens[1])
-	if err != nil {
-		return nil, fmt.Errorf("Parsing error: NumberOfCore='%s' (from '%s')", tokens[1], str)
-	}
-	info.NumberOfSocket, err = strconv.Atoi(tokens[2])
-	if err != nil {
-		return nil, fmt.Errorf("Parsing error: NumberOfSocket='%s' (from '%s')", tokens[2], str)
-	}
-	info.NumberOfCore = info.NumberOfCore * info.NumberOfSocket
-	info.CPUFrequency, err = strconv.ParseFloat(tokens[3], 64)
-	if err != nil {
-		return nil, fmt.Errorf("Parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
-	}
-	info.CPUFrequency = math.Ceil(info.CPUFrequency/100) / 10
-
-	info.CPUArch = tokens[4]
-	info.Hypervisor = tokens[5]
-	info.CPUModel = tokens[6]
-	info.RAMSize, err = strconv.ParseFloat(tokens[7], 64)
-	if err != nil {
-		return nil, fmt.Errorf("Parsing error: RAMSize='%s' (from '%s')", tokens[7], str)
-	}
-	info.RAMSize = math.Ceil(info.RAMSize / 1024 / 1024)
-	info.RAMFreq, err = strconv.ParseFloat(tokens[8], 64)
-	if err != nil {
-		info.RAMFreq = 0
-	}
-	fmt.Println(tokens[9])
-	gpuTokens := strings.Split(tokens[9], "%")
-	nb := len(gpuTokens)
-	if nb > 1 {
-		info.GPUModel = strings.TrimSpace(gpuTokens[0])
-		info.GPU = nb - 1
-	}
-
-	return &info, nil
 }
 
 func createCPUInfo(output string) (*CPUInfo, error) {
@@ -189,226 +137,12 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	return &info, nil
 }
 
-func scanImages(tenant string, service *providers.Service, c chan error) {
-	images, err := service.ListImages(false)
-	fmt.Println(tenant, "images:", len(images))
-	if err != nil {
-		c <- err
-		return
-	}
-	type ImageList struct {
-		Images []api.Image `json:"images,omitempty"`
-	}
-	content, err := json.Marshal(ImageList{
-		Images: images,
-	})
-	if err != nil {
-		c <- err
-		return
-	}
-	f := fmt.Sprintf("%s/images.json", tenant)
-	nerr := ioutil.WriteFile(f, content, 0666)
-	if nerr != nil {
-		log.Warnf("Error writing file: %v", nerr)
-	}
-	c <- nil
-}
-
-type getCPUInfoResult struct {
-	Err     error
-	CPUInfo *CPUInfo
-}
-
-func getCPUInfo(tenant string, service *providers.Service, tpl api.HostTemplate, img *api.Image, key *api.KeyPair, networkID string) (*CPUInfo, error) {
-	host, err := service.CreateHost(api.HostRequest{
-		Name:       "scanhost",
-		PublicIP:   true,
-		ImageID:    img.ID,
-		TemplateID: tpl.ID,
-		KeyPair:    key,
-		NetworkIDs: []string{networkID},
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer service.DeleteHost(host.ID)
-
-	ssh, err := service.GetSSHConfig(host.ID)
-	//fmt.Println("Reading SSH Config")
-	if err != nil {
-		fmt.Printf("[%s] host %s: error reading SSHConfig: %s\n", tenant, tpl.Name, err.Error())
-		return nil, err
-	}
-	nerr := ssh.WaitServerReady(1 * time.Minute)
-	if nerr != nil {
-		log.Warnf("Error waiting for server ready: %v", nerr)
-	}
-	c, err := ssh.Command(cmd)
-
-	//cmd, err := ssh.Command(cmd)
-	//fmt.Println(">>> CMD", cmd)
-	_, err = ssh.Command(cmd)
-	if err != nil {
-		fmt.Printf("[%s] host %s: error scanning: %s\n", tenant, tpl.Name, err.Error())
-		return nil, err
-	}
-	out, err := c.CombinedOutput()
-	//fmt.Println("parse: ", string(out), err)
-	if err != nil {
-		return nil, err
-	}
-	return parseOutput(out)
-}
-
-func scanTemplates(tenant string, service *providers.Service, c chan error) {
-	tpls, err := service.ListTemplates(false)
-	total := len(tpls)
-	fmt.Println(tenant, "Templates:", total)
-	if err != nil {
-		c <- err
-		return
-	}
-
-	info := []*CPUInfo{}
-	nerr := service.DeleteKeyPair("key-scan")
-	if nerr != nil {
-		log.Warnf("Error deleting keypair: %v", nerr)
-	}
-	kp, err := service.CreateKeyPair("key-scan")
-	if err != nil {
-		c <- err
-		return
-	}
-
-	net, err := service.CreateNetwork(api.NetworkRequest{
-		CIDR:      "192.168.0.0/24",
-		IPVersion: IPVersion.IPv4,
-		Name:      "net-scan",
-	})
-	if err != nil {
-		c <- err
-		nerr := service.DeleteKeyPair("key-scan")
-		if nerr != nil {
-			log.Warnf("Error deleting keypair: %v", nerr)
-		}
-		return
-	}
-
-	img, err := service.SearchImage("Ubuntu 16.04")
-	if err != nil {
-		c <- err
-		nerr := service.DeleteKeyPair("key-scan")
-		if nerr != nil {
-			log.Warnf("Error deleting keypair: %v", nerr)
-		}
-		return
-	}
-
-	ignored := 0
-	succeeded := 0
-	for _, tpl := range tpls {
-		fmt.Printf("[%s] scanning template %s\n", tenant, tpl.Name)
-		ci, err := getCPUInfo(tenant, service, tpl, img, kp, net.ID)
-		if err == nil {
-			ci.TemplateName = tpl.Name
-			ci.TemplateID = tpl.ID
-			info = append(info, ci)
-			succeeded++
-			fmt.Printf("[%s] scanning template %s: success: %v\n", tenant, tpl.Name, ci)
-		} else {
-			errStr := err.Error()
-			if errStr == "exit status 255" {
-				errStr = "SSH failed"
-			}
-			fmt.Printf("[%s] scanning template %s failure: %s\n", tenant, tpl.Name, errStr)
-		}
-	}
-
-	fmt.Printf("[%s] ALL RESULTS: %v\n", tenant, info)
-	fmt.Printf("[%s] total %d templaces scanned, %d succeeded, %d ignored, %d failed\n",
-		tenant, total, succeeded, ignored, total-succeeded-ignored)
-	type TplList struct {
-		Templates []*CPUInfo `json:"templates,omitempty"`
-	}
-	content, err := json.Marshal(TplList{
-		Templates: info,
-	})
-
-	f := fmt.Sprintf("%s/templates.json", tenant)
-	nerr = ioutil.WriteFile(f, content, 0666)
-	if nerr != nil {
-		log.Warnf("Error writing file: %v", nerr)
-	}
-
-	nerr = service.DeleteNetwork(net.ID)
-	if nerr != nil {
-		log.Warnf("Error deleting network: %v", nerr)
-	}
-	nerr = service.DeleteKeyPair("key-scan")
-	if nerr != nil {
-		log.Warnf("Error deleting keypair: %v", nerr)
-	}
-
-	if err != nil {
-		c <- err
-		return
-	}
-
-	c <- nil
-}
-
-func scanService(tenant string, service *providers.Service, c chan error) {
-	err := os.Remove(tenant)
-	if err != nil {
-		log.Warnf("Error removing file: %v", err)
-	}
-	err = os.Mkdir(tenant, 0777)
-	if err != nil {
-		log.Warnf("Error creating dir: %v", err)
-	}
-	cImage := make(chan error)
-	go scanImages(tenant, service, cImage)
-	cTpl := make(chan error)
-	go scanTemplates(tenant, service, cTpl)
-	errI := <-cImage
-	errT := <-cTpl
-	if errI != nil || errT != nil {
-		c <- fmt.Errorf("[%s] Errors during scan: %v, %v", tenant, errI, errT)
-	} else {
-		c <- nil
-	}
-}
-
-//Run runs the scan
-func Run() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	channels := []chan error{}
-	// TODO Fix check error
-	the_providers, _ := providers.Tenants()
-	for tenantname := range the_providers {
-		service, err := providers.GetService(tenantname)
-		if err != nil {
-			fmt.Printf("Unable to get service for tenant '%s': %s", tenantname, err.Error())
-		}
-		c := make(chan error)
-		go scanService(tenantname, service, c)
-		channels = append(channels, c)
-	}
-	for _, c := range channels {
-		err := <-c
-		if err != nil {
-			fmt.Printf("Error during scan: %s ", err.Error())
-		}
-	}
-	fmt.Println("\nScanning done.")
-}
-
 func RunScanner() {
 	var targeted_providers []string
 	the_providers, _ := providers.Tenants()
 
 	for tenantName := range the_providers {
-		if strings.Contains(tenantName, "test") {
+		if strings.Contains(tenantName, "-scannable") {
 			targeted_providers = append(targeted_providers, tenantName)
 		}
 	}
@@ -431,6 +165,16 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	service, err := providers.GetService(theTenant)
 	if err != nil {
 		log.Warnf("Unable to get service for tenant '%s': %s", theTenant, err.Error())
+		return err
+	}
+
+	err = dumpImages(service, theTenant)
+	if err != nil {
+		return err
+	}
+
+	err = dumpTemplates(service, theTenant)
+	if err != nil {
 		return err
 	}
 
@@ -505,23 +249,23 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			}
 			nerr := ssh.WaitServerReady(time.Duration(concurrency - 1) * time.Minute)
 			if nerr != nil {
-				log.Warnf("Error waiting for server ready: %v", nerr)
+				log.Warnf("template [%s] : Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
 			}
 			c, err := ssh.Command(cmd)
 			if err != nil {
-				log.Warnf("Problem creating ssh command: %v", err)
+				log.Warnf("template [%s] : Problem creating ssh command: %v", template.Name, err)
 				return err
 			}
 			_, cout, _, err := c.Run()
 			if err != nil {
-				log.Warnf("Problem running ssh command: %v", err)
+				log.Warnf("template [%s] : Problem running ssh command: %v", template.Name, err)
 				return err
 			}
 
 			daCpu, err := createCPUInfo(cout)
 			if err != nil {
-				log.Warnf("Problem building cpu info: %v", err)
+				log.Warnf("template [%s] : Problem building cpu info: %v", template.Name, err)
 				return err
 			}
 
@@ -534,12 +278,13 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 
 			daOut, err := json.MarshalIndent(daCpu, "", "\t")
 			if err != nil {
+				log.Warnf("template [%s] : Problem marshaling json data: %v", template.Name, err)
 				return err
 			}
 
 			nerr = ioutil.WriteFile( utils.AbsPathify("$HOME/.safescale/scanner/" +theTenant+ "#" + template.Name + ".json"), daOut, 0666)
 			if nerr != nil {
-				log.Warnf("Error writing file: %v", nerr)
+				log.Warnf("template [%s] : Error writing file: %v", template.Name, nerr)
 				return nerr
 			}
 		} else {
@@ -567,6 +312,62 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	}
 
 	wg.Wait()
+
+	return nil
+}
+
+
+func dumpTemplates(service *providers.Service, tenant string) error {
+	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+
+	type TemplateList struct {
+		Templates []api.HostTemplate `json:"templates,omitempty"`
+	}
+
+	templates, err := service.ListTemplates(false)
+	if err != nil {
+		return err
+	}
+
+	content, err := json.Marshal(TemplateList{
+		Templates: templates,
+	})
+
+	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", tenant)
+	f = utils.AbsPathify(f)
+
+	err = ioutil.WriteFile(f, content, 0666)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+
+func dumpImages(service *providers.Service, tenant string) error {
+	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+
+	type ImageList struct {
+		Images []api.Image `json:"images,omitempty"`
+	}
+
+	images, err := service.ListImages(false)
+	if err != nil {
+		return err
+	}
+
+	content, err := json.Marshal(ImageList{
+		Images: images,
+	})
+
+	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", tenant)
+	f = utils.AbsPathify(f)
+
+	err = ioutil.WriteFile(f, content, 0666)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

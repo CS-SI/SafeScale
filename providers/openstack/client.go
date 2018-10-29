@@ -18,12 +18,8 @@ package openstack
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"reflect"
-
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
-
 	"github.com/CS-SI/SafeScale/utils/metadata"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -135,7 +131,7 @@ func ProviderErrorToString(err error) string {
 	case *gc.ErrUnexpectedResponseCode:
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
 	default:
-		log.Printf("ProviderErrorToString(%s)\n", reflect.TypeOf(err))
+		// log.Debugf("Error code not yet handled specifically: ProviderErrorToString(%+v)\n", err)
 		return e.Error()
 	}
 }

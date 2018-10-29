@@ -100,7 +100,11 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[constraint]]
   name = "github.com/sirupsen/logrus"
-  version = "v1.1.1"
+  version = "=v1.1.1"
+
+[[constraint]]
+  name = "github.com/zippoxer/bow"
+  branch = "master"
 
 # TODO Fork & tag
 [[constraint]]
