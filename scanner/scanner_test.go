@@ -57,5 +57,5 @@ func TestCmds(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	Run()
+	RunScanner()
 }
