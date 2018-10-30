@@ -20,15 +20,17 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/broker/server/metadata"
 	"github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/iaas/provider/api"
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/pkg/errors"
+
 	log "github.com/sirupsen/logrus"
 )
 
-//go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services HostAPI
+//go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services HostAPI
 
 //HostAPI defines API to manipulate hosts
 type HostAPI interface {
@@ -52,7 +54,7 @@ func NewHostService(api api.ClientAPI) HostAPI {
 
 // HostService host service
 type HostService struct {
-	provider *providers.Service
+	provider *provider.Service
 	network  NetworkAPI
 }
 
@@ -114,7 +116,7 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		NetworkIDs: networks,
 	}
 
-	if exists, err := svc.provider.GetHostByName(name); exists != nil && err == nil{
+	if exists, err := svc.provider.GetHostByName(name); exists != nil && err == nil {
 		tbr := errors.Errorf("Failure creating host: host '%s' already exists.", name)
 		log.Errorf("%v", tbr)
 		return nil, tbr
@@ -123,6 +125,13 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	host, err := svc.provider.CreateHost(hostRequest)
 	if err != nil {
 		tbr := errors.Wrapf(err, "Compute resource creation failed: '%s'.", hostRequest.Name)
+		log.Errorf("%+v", tbr)
+		return nil, tbr
+	}
+	err := metadata.NewHost(svc.provider).Carry(host).Write()
+	if err != nil {
+		tbr := errors.Wrapf(err, "Metadata creation failed")
+		svc.provider.DeleteHost(hostRequest)
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
@@ -180,7 +189,16 @@ func (svc *HostService) Get(ref string) (*api.Host, error) {
 
 // Delete deletes host referenced by ref
 func (svc *HostService) Delete(ref string) error {
-	return svc.provider.DeleteHost(ref)
+	mh, err := metadata.NewHost(svc.provider).Read(ref)
+	if err != nil {
+		return err
+	}
+
+	err := svc.provider.DeleteHost(ref)
+	if err != nil {
+		return err
+	}
+	return mh.Delete()
 }
 
 // SSH returns ssh parameters to access the host referenced by ref
