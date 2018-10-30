@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/providers"
+	iaasapi "github.com/CS-SI/SafeScale/iaas/api"
 )
 
 // Item is an entry in the ObjectStorage
@@ -34,16 +34,16 @@ type Item struct {
 type ItemDecoderCallback func(buf *bytes.Buffer) (interface{}, error)
 
 // NewItem creates a new item with 'name' and in 'path'
-func NewItem(svc *providers.Service, path string) *Item {
+func NewItem(clt iaasapi.Client, path string) *Item {
 	return &Item{
-		folder:  NewFolder(svc, path),
+		folder:  NewFolder(clt, path),
 		payload: nil,
 	}
 }
 
 // GetService returns the service providers used by Item
-func (i *Item) GetService() *providers.Service {
-	return i.folder.GetService()
+func (i *Item) GetProviderClient() iaasapi.Client {
+	return i.folder.GetProviderClient()
 }
 
 // GetPath returns the path in the Object Storage where the Item is stored
@@ -91,7 +91,7 @@ func (i *Item) Delete(name string) error {
 // ReadFrom reads metadata of item from Object Storage in a subfolder
 func (i *Item) ReadFrom(path string, name string, callback ItemDecoderCallback) (bool, error) {
 	var data interface{}
-	found, err := i.folder.Read(path, name, func(buf *bytes.Buffer) error {
+	found, err := i.folder.Read(path, name, func(buf []byte) error {
 		var err error
 		data, err = callback(buf)
 		return err
@@ -122,7 +122,7 @@ func (i *Item) Write(name string) error {
 }
 
 // BrowseInto walks through a subfolder ogf item folder and executes a callback for each entry
-func (i *Item) BrowseInto(path string, callback func(*bytes.Buffer) error) error {
+func (i *Item) BrowseInto(path string, callback func([]byte) error) error {
 	if callback == nil {
 		panic("callback is nil!")
 	}
@@ -136,8 +136,8 @@ func (i *Item) BrowseInto(path string, callback func(*bytes.Buffer) error) error
 }
 
 // Browse walks through folder of item and executes a callback for each entry
-func (i *Item) Browse(callback func(*bytes.Buffer) error) error {
-	return i.BrowseInto(".", func(buf *bytes.Buffer) error {
+func (i *Item) Browse(callback func([]byte) error) error {
+	return i.BrowseInto(".", func(buf []byte) error {
 		return callback(buf)
 	})
 }
