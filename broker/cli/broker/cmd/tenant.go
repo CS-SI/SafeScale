@@ -45,8 +45,8 @@ var tenantList = cli.Command{
 		}
 		out, _ := json.Marshal(tenants.GetTenants())
 		fmt.Println(string(out))
-		return nil
 
+		return nil
 	},
 }
 

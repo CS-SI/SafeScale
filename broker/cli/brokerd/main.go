@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/dlespiau/covertool/pkg/exit"
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 	"net"
 	"os"
 	"os/signal"
@@ -32,6 +33,8 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+
+	_ "github.com/urfave/cli"
 )
 
 const (
@@ -90,7 +93,7 @@ func cleanup() {
 }
 
 // *** MAIN ***
-func main() {
+func work() {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -134,5 +137,27 @@ func main() {
 	log.Println("Ready to serve :-)")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
+	}
+}
+
+func main() {
+	app := cli.NewApp()
+
+	app.Flags = []cli.Flag{
+		cli.IntFlag{
+			Name:  "port, p",
+			Usage: "Bind to specified port `PORT`",
+			Value: 50051,
+		},
+	}
+
+	app.Action = func(c *cli.Context) error {
+		work()
+		return nil
+	}
+
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
 	}
 }

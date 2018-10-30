@@ -18,38 +18,12 @@ package main
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
 	"os"
 	"sort"
-	"time"
 
-	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
-
-	cli "github.com/urfave/cli"
-
-	context "golang.org/x/net/context"
-	"google.golang.org/grpc"
+	"github.com/urfave/cli"
 )
-
-const (
-	address           = "localhost:50051"
-	timeoutCtxDefault = 10 * time.Second
-	timeoutCtxHost    = 2 * time.Minute
-)
-
-func getConnection() *grpc.ClientConn {
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	return conn
-}
-
-func getContext(timeout time.Duration) (context.Context, context.CancelFunc) {
-	// Contact the server and print out its response.
-	return context.WithTimeout(context.Background(), timeout)
-}
 
 func main() {
 
@@ -63,7 +37,16 @@ func main() {
 			Email: "safescale@c-s.fr",
 		},
 	}
+
 	app.EnableBashCompletion = true
+
+	app.Flags = []cli.Flag{
+		cli.IntFlag{
+			Name:  "port, p",
+			Usage: "Bind to specified port `PORT`",
+			Value: 50051,
+		},
+	}
 
 	app.Commands = append(app.Commands, cmd.NetworkCmd)
 	sort.Sort(cli.CommandsByName(cmd.NetworkCmd.Subcommands))
