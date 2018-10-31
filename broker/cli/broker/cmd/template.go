@@ -42,7 +42,7 @@ var templateList = cli.Command{
 			Usage: "List all available templates in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
-		templates, err := client.New().Template.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		templates, err := client.New(c.GlobalInt("port")).Template.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of templates", false))
 		}

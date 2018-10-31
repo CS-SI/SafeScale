@@ -55,7 +55,7 @@ const (
 )
 
 // New returns an instance of broker Client
-func New() Client {
+func New(port int) Client {
 	s := &Session{}
 	s.Container = &container{session: s}
 	s.Host = &host{session: s}
@@ -66,6 +66,7 @@ func New() Client {
 	s.Volume = &volume{session: s}
 	s.Template = &template{session: s}
 	s.Image = &image{session: s}
+	s.brokerdPort = uint16(port)
 	return s
 }
 

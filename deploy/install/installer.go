@@ -23,11 +23,11 @@ import "github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 // Installer defines the API of an Installer
 type Installer interface {
 	// Check checks if the feature is installed
-	Check(*Feature, Target, Variables, Settings) (Results, error)
+	Check(int, *Feature, Target, Variables, Settings) (Results, error)
 	// Add executes installation of feature
-	Add(*Feature, Target, Variables, Settings) (Results, error)
+	Add(int, *Feature, Target, Variables, Settings) (Results, error)
 	// Remove executes deletion of feature
-	Remove(*Feature, Target, Variables, Settings) (Results, error)
+	Remove(int, *Feature, Target, Variables, Settings) (Results, error)
 }
 
 // installerMap keeps a map of available installers sorted by Method

@@ -75,7 +75,7 @@ func extractHostArgument(c *cli.Context) error {
 		}
 
 		var err error
-		hostInstance, err = brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
+		hostInstance, err = brokerclient.New(c.GlobalInt("port")).Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			fmt.Printf("%s\n", err.Error())
 			return exitError(err.Error(), ExitCode.RPC)
@@ -138,14 +138,14 @@ var hostAddFeatureCommand = cli.Command{
 		settings.SkipProxy = c.Bool("skip-proxy")
 
 		// Wait for SSH service on remote host first
-		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
+		err = brokerclient.New(c.GlobalInt("port")).Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
 			return exitError(msg, ExitCode.RPC)
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		results, err := feature.Add(target, values, settings)
+		results, err := feature.Add(c.GlobalInt("port"), target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 			return exitError(msg, ExitCode.RPC)
@@ -207,14 +207,14 @@ var hostCheckFeatureCommand = cli.Command{
 		}
 
 		// Wait for SSH service on remote host first
-		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
+		err = brokerclient.New(c.GlobalInt("port")).Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
 			return exitError(msg, ExitCode.RPC)
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		results, err := feature.Check(target, values, install.Settings{})
+		results, err := feature.Check(c.GlobalInt("port"), target, values, install.Settings{})
 		if err != nil {
 			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
 			return exitError(msg, ExitCode.RPC)
@@ -276,14 +276,14 @@ var hostDeleteFeatureCommand = cli.Command{
 		}
 
 		// Wait for SSH service on remote host first
-		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
+		err = brokerclient.New(c.GlobalInt("port")).Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
 			return exitError(msg, ExitCode.RPC)
 		}
 
 		target := install.NewHostTarget(hostInstance)
-		results, err := feature.Remove(target, values, install.Settings{})
+		results, err := feature.Remove(c.GlobalInt("port"), target, values, install.Settings{})
 		if err != nil {
 			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
 			return exitError(msg, ExitCode.RPC)

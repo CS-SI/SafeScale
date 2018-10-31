@@ -33,7 +33,7 @@ type volume struct {
 
 // List ...
 func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(v.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -48,7 +48,7 @@ func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
 
 // Inspect ...
 func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(v.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -61,7 +61,7 @@ func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, er
 
 // Delete ...
 func (v *volume) Delete(names []string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(v.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -97,7 +97,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 
 // Create ...
 func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Volume, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(v.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -110,7 +110,7 @@ func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Vol
 
 // Attach ...
 func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(v.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -124,7 +124,7 @@ func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
 
 // Detach ...
 func (v *volume) Detach(volumeName string, hostName string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(v.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault

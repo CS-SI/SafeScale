@@ -144,7 +144,7 @@ func parseTargets(specs *viper.Viper) (string, string, string, error) {
 }
 
 // UploadStringToRemoteFile creates a file 'filename' on remote 'host' with the content 'content'
-func UploadStringToRemoteFile(content string, host *pb.Host, filename string, owner, group, rights string) error {
+func UploadStringToRemoteFile(port int, content string, host *pb.Host, filename string, owner, group, rights string) error {
 	if content == "" {
 		panic("content is empty!")
 	}
@@ -159,7 +159,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 		return fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
 	to := fmt.Sprintf("%s:%s", host.Name, filename)
-	broker := brokerclient.New().Ssh
+	broker := brokerclient.New(port).Ssh
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
@@ -319,7 +319,7 @@ func checkParameters(f *Feature, v Variables) error {
 }
 
 // setImplicitParameters configures parameters that are implicitely defined, based on context
-func setImplicitParameters(t Target, v Variables) {
+func setImplicitParameters(port int, t Target, v Variables) {
 	hT, cT, nT := determineContext(t)
 	if cT != nil {
 		cluster := cT.cluster
@@ -335,7 +335,7 @@ func setImplicitParameters(t Target, v Variables) {
 			v["Password"] = config.AdminPassword
 		}
 		if _, ok := v["CIDR"]; !ok {
-			svc, err := provideruse.GetProviderService()
+			svc, err := provideruse.GetProviderService(port)
 			if err == nil {
 				mn, err := metadata.LoadNetwork(svc, config.NetworkID)
 				if err == nil {
@@ -355,7 +355,7 @@ func setImplicitParameters(t Target, v Variables) {
 		}
 		v["Hostname"] = host.Name
 		v["HostIP"] = host.PRIVATE_IP
-		gw := gatewayFromHost(host)
+		gw := gatewayFromHost(port, host)
 		if gw != nil {
 			v["GatewayIP"] = gw.PRIVATE_IP
 		}
@@ -365,8 +365,8 @@ func setImplicitParameters(t Target, v Variables) {
 	}
 }
 
-func gatewayFromHost(host *pb.Host) *pb.Host {
-	broker := brokerclient.New()
+func gatewayFromHost(port int, host *pb.Host) *pb.Host {
+	broker := brokerclient.New(port)
 	gwID := host.GetGatewayID()
 	// If host has no gateway, host is gateway
 	if gwID == "" {

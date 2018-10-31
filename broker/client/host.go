@@ -37,7 +37,7 @@ type host struct {
 
 // List ...
 func (h *host) List(all bool, timeout time.Duration) (*pb.HostList, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(h.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
@@ -50,7 +50,7 @@ func (h *host) List(all bool, timeout time.Duration) (*pb.HostList, error) {
 
 // Inspect ...
 func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(h.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -63,7 +63,7 @@ func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
 
 // Get host status
 func (h *host) Status(name string, timeout time.Duration) (*pb.HostStatus, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(h.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -79,7 +79,7 @@ func (h *host) Status(name string, timeout time.Duration) (*pb.HostStatus, error
 
 // Reboots host
 func (h *host) Reboot(name string, timeout time.Duration) (interface{}, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(h.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -92,7 +92,7 @@ func (h *host) Reboot(name string, timeout time.Duration) (interface{}, error) {
 
 // Start host
 func (h *host) Start(name string, timeout time.Duration) (interface{}, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(h.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -104,7 +104,7 @@ func (h *host) Start(name string, timeout time.Duration) (interface{}, error) {
 }
 
 func (h *host) Stop(name string, timeout time.Duration) (interface{}, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(h.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -117,7 +117,7 @@ func (h *host) Stop(name string, timeout time.Duration) (interface{}, error) {
 
 // Create ...
 func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(h.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
@@ -130,7 +130,7 @@ func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, e
 
 // Delete deletes several hosts at the same time in goroutines
 func (h *host) Delete(names []string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(h.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
@@ -169,7 +169,7 @@ func (h *host) SSHConfig(name string) (*pb.SshConfig, error) {
 	if anon, ok := sshCfgCache.Get(name); ok {
 		return anon.(*pb.SshConfig), nil
 	}
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(h.session.brokerdPort))
 	defer conn.Close()
 	ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
 	defer cancel()

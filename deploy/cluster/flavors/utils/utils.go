@@ -45,7 +45,7 @@ var (
 )
 
 // ExecuteScript executes the script template with the parameters on tarGetHost
-func ExecuteScript(
+func ExecuteScript(port int,
 	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	hostID string,
 ) (int, string, string, error) {
@@ -56,7 +56,7 @@ func ExecuteScript(
 	}
 	data["reserved_BashLibrary"] = bashLibrary
 
-	path, err := UploadTemplateToFile(box, funcMap, tmplName, data, hostID, tmplName)
+	path, err := UploadTemplateToFile(port, box, funcMap, tmplName, data, hostID, tmplName)
 	if err != nil {
 		return 0, "", "", err
 	}
@@ -67,11 +67,11 @@ func ExecuteScript(
 	} else {
 		cmd = fmt.Sprintf("sudo bash %s; rc=$?; rm %s; exit $rc", path, path)
 	}
-	return brokerclient.New().Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(20)*time.Minute)
+	return brokerclient.New(port).Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(20)*time.Minute)
 }
 
 // UploadTemplateToFile uploads a template named 'tmplName' coming from rice 'box' in a file to a remote host
-func UploadTemplateToFile(
+func UploadTemplateToFile(port int,
 	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	hostID string, fileName string,
 ) (string, error) {
@@ -79,7 +79,7 @@ func UploadTemplateToFile(
 	if box == nil {
 		panic("box is nil!")
 	}
-	broker := brokerclient.New()
+	broker := brokerclient.New(port)
 	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 	if err != err {
 		return "", fmt.Errorf("failed to get host information: %s", err)
@@ -101,7 +101,7 @@ func UploadTemplateToFile(
 	cmd := dataBuffer.String()
 	remotePath := tempFolder + fileName
 
-	err = install.UploadStringToRemoteFile(cmd, host, remotePath, "", "", "")
+	err = install.UploadStringToRemoteFile(port, cmd, host, remotePath, "", "", "")
 	if err != nil {
 		return "", err
 	}

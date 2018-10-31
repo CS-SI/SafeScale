@@ -173,7 +173,7 @@ func (f *Feature) Applyable(t Target) bool {
 
 // Check if feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
+func (f *Feature) Check(port int, t Target, v Variables, s Settings) (Results, error) {
 	cacheKey := f.DisplayName() + "@" + t.Name()
 	if anon, ok := checkCache.Get(cacheKey); ok {
 		return anon.(Results), nil
@@ -205,7 +205,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	// Inits implicit parameters
-	setImplicitParameters(t, myV)
+	setImplicitParameters(port, t, myV)
 
 	// Checks required parameters have value
 	err := checkParameters(f, myV)
@@ -213,14 +213,14 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 		return nil, err
 	}
 
-	results, err := installer.Check(f, t, myV, s)
+	results, err := installer.Check(port, f, t, myV, s)
 	checkCache.ForceSet(cacheKey, results)
 	return results, err
 }
 
 // Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
+func (f *Feature) Add(port int, t Target, v Variables, s Settings) (Results, error) {
 	methods := t.Methods()
 	var (
 		installer Installer
@@ -251,7 +251,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	// Inits implicit parameters
-	setImplicitParameters(t, myV)
+	setImplicitParameters(port, t, myV)
 
 	// Checks required parameters have value
 	err := checkParameters(f, myV)
@@ -259,7 +259,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 		return nil, err
 	}
 
-	results, err := f.Check(t, v, s)
+	results, err := f.Check(port, t, v, s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check feature '%s': %s", f.DisplayName(), err.Error())
 	}
@@ -269,12 +269,12 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	if !s.SkipFeatureRequirements {
-		err := f.installRequirements(t, v, s)
+		err := f.installRequirements(port, t, v, s)
 		if err != nil {
 			return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
 		}
 	}
-	results, err = installer.Add(f, t, myV, s)
+	results, err = installer.Add(port, f, t, myV, s)
 	if err == nil {
 		checkCache.ForceSet(f.DisplayName()+"@"+t.Name(), results)
 	}
@@ -282,7 +282,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 }
 
 // Remove uninstalls the feature from the target
-func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
+func (f *Feature) Remove(port int, t Target, v Variables, s Settings) (Results, error) {
 	methods := t.Methods()
 	var installer Installer
 	for _, method := range methods {
@@ -308,7 +308,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	// Inits implicit parameters
-	setImplicitParameters(t, myV)
+	setImplicitParameters(port, t, myV)
 
 	// Checks required parameters have value
 	err := checkParameters(f, myV)
@@ -316,13 +316,13 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 		return nil, err
 	}
 
-	results, err := installer.Remove(f, t, myV, s)
+	results, err := installer.Remove(port, f, t, myV, s)
 	checkCache.Reset(f.DisplayName() + "@" + t.Name())
 	return results, err
 }
 
 // installRequirements walks through requirements and installs them if needed
-func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
+func (f *Feature) installRequirements(port int, t Target, v Variables, s Settings) error {
 	yamlKey := "feature.requirements.features"
 	if f.specs.IsSet(yamlKey) {
 		// if debug
@@ -346,12 +346,12 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 			if err != nil {
 				return fmt.Errorf("failed to find required feature '%s': %s", requirement, err.Error())
 			}
-			results, err := needed.Check(t, v, s)
+			results, err := needed.Check(port, t, v, s)
 			if err != nil {
 				return fmt.Errorf("failed to check required feature '%s' for feature '%s': %s", requirement, f.DisplayName(), err.Error())
 			}
 			if !results.Successful() {
-				results, err := needed.Add(t, v, s)
+				results, err := needed.Add(port, t, v, s)
 				if err != nil {
 					return fmt.Errorf("failed to install required feature '%s': %s", requirement, err.Error())
 				}

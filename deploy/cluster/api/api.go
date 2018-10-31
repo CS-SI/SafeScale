@@ -58,41 +58,41 @@ type Cluster interface {
 	// GetName returns the name of the cluster
 	GetName() string
 	// Start starts the cluster
-	Start() error
+	Start(int) error
 	// Stop stops the cluster
-	Stop() error
+	Stop(int) error
 	// GetState returns the current state of the cluster
-	GetState() (ClusterState.Enum, error)
+	GetState(int) (ClusterState.Enum, error)
 	// GetNetworkID returns the ID of the network used by the cluster
 	GetNetworkID() string
 	// AddNode adds a node
-	AddNode(bool, *pb.HostDefinition) (string, error)
+	AddNode(int, bool, *pb.HostDefinition) (string, error)
 	// AddNodes adds several nodes
-	AddNodes(int, bool, *pb.HostDefinition) ([]string, error)
+	AddNodes(int, int, bool, *pb.HostDefinition) ([]string, error)
 	// DeleteLastNode deletes a node
-	DeleteLastNode(bool) error
+	DeleteLastNode(int, bool) error
 	// DeleteSpecificNode deletes a node identified by its ID
-	DeleteSpecificNode(string) error
+	DeleteSpecificNode(int, string) error
 	// ListMasterIDs lists the IDs of masters (if there is such masters in the flavor...)
 	ListMasterIDs() []string
 	// ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
 	ListMasterIPs() []string
 	// FindAvailableMaster returns ID of the first master available to execute order
-	FindAvailableMaster() (string, error)
+	FindAvailableMaster(int) (string, error)
 	// ListNodeIDs lists IDs of the nodes in the cluster
 	ListNodeIDs(bool) []string
 	// ListNodeIPs lists the IPs of the nodes in the cluster
 	ListNodeIPs(bool) []string
 	// FindAvailableNode returns ID of the first node available to execute order
-	FindAvailableNode(bool) (string, error)
+	FindAvailableNode(int, bool) (string, error)
 	// SearchNode tells if the ID of the host passed as parameter is a node
 	SearchNode(string, bool) bool
 	// GetNode returns a node based on its ID
-	GetNode(string) (*pb.Host, error)
+	GetNode(int, string) (*pb.Host, error)
 	// CountNodes counts the nodes of the cluster
 	CountNodes(bool) uint
 	// Delete allows to destroy infrastructure of cluster
-	Delete() error
+	Delete(int) error
 	// GetConfig ...
 	GetConfig() ClusterCore
 	// GetExtension returns additional info about parameter

@@ -135,16 +135,16 @@ func (w *worker) Host() (*pb.Host, error) {
 
 // identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
-func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
+func (w *worker) identifyAvailableMaster(port int) (*pb.Host, error) {
 	if w.cluster == nil {
 		return nil, nil
 	}
 	if w.availableMaster == nil {
-		hostID, err := w.cluster.FindAvailableMaster()
+		hostID, err := w.cluster.FindAvailableMaster(port)
 		if err != nil {
 			return nil, err
 		}
-		w.availableMaster, err = brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		w.availableMaster, err = brokerclient.New(port).Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +153,7 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 }
 
 // identifyAvailableNode finds a node available and will use this one during all the install session
-func (w *worker) identifyAvailableNode(public bool) (*pb.Host, error) {
+func (w *worker) identifyAvailableNode(port int, public bool) (*pb.Host, error) {
 	if w.cluster == nil {
 		return nil, nil
 	}
@@ -164,11 +164,11 @@ func (w *worker) identifyAvailableNode(public bool) (*pb.Host, error) {
 		found = w.availablePrivateNode != nil
 	}
 	if !found {
-		hostID, err := w.cluster.FindAvailableNode(public)
+		hostID, err := w.cluster.FindAvailableNode(port, public)
 		if err != nil {
 			return nil, err
 		}
-		host, err := brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		host, err := brokerclient.New(port).Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			return nil, err
 		}
@@ -186,16 +186,16 @@ func (w *worker) identifyAvailableNode(public bool) (*pb.Host, error) {
 
 // identifyConcernedMasters returns a list of all the hosts acting as masters and keep this list
 // during all the install session
-func (w *worker) identifyConcernedMasters() ([]*pb.Host, error) {
+func (w *worker) identifyConcernedMasters(port int) ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
 	if w.concernedMasters == nil {
-		hosts, err := w.identifyAllMasters()
+		hosts, err := w.identifyAllMasters(port)
 		if err != nil {
 			return nil, err
 		}
-		concernedHosts, err := w.extractHostsFailingCheck(hosts)
+		concernedHosts, err := w.extractHostsFailingCheck(port, hosts)
 		if err != nil {
 			return nil, err
 		}
@@ -207,7 +207,7 @@ func (w *worker) identifyConcernedMasters() ([]*pb.Host, error) {
 // extractHostsFailingCheck identifies from the list passed as parameter which
 // hosts fail feature check.
 // The checks are done in parallel.
-func (w *worker) extractHostsFailingCheck(hosts []*pb.Host) ([]*pb.Host, error) {
+func (w *worker) extractHostsFailingCheck(port int, hosts []*pb.Host) ([]*pb.Host, error) {
 	concernedHosts := []*pb.Host{}
 	dones := map[*pb.Host]chan error{}
 	results := map[*pb.Host]chan Results{}
@@ -218,7 +218,7 @@ func (w *worker) extractHostsFailingCheck(hosts []*pb.Host) ([]*pb.Host, error) 
 		results[h] = r
 		go func(host *pb.Host, res chan Results, done chan error) {
 			nodeTarget := NewNodeTarget(host)
-			results, err := w.feature.Check(nodeTarget, w.variables, w.settings)
+			results, err := w.feature.Check(port, nodeTarget, w.variables, w.settings)
 			if err != nil {
 				res <- nil
 				done <- err
@@ -243,13 +243,13 @@ func (w *worker) extractHostsFailingCheck(hosts []*pb.Host) ([]*pb.Host, error) 
 
 // identifyAllMasters returns a list of all the hosts acting as masters and keep this list
 // during all the install session
-func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
+func (w *worker) identifyAllMasters(port int) ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []*pb.Host{}
-		broker := brokerclient.New().Host
+		broker := brokerclient.New(port).Host
 		for _, i := range w.cluster.ListMasterIDs() {
 			host, err := broker.Inspect(i, brokerclient.DefaultExecutionTimeout)
 			if err != nil {
@@ -263,7 +263,7 @@ func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 
 // identifyConcernedNodes returns a list of all the hosts acting as public of private nodes and keep this list
 // during all the install session
-func (w *worker) identifyConcernedNodes(public bool) ([]*pb.Host, error) {
+func (w *worker) identifyConcernedNodes(port int, public bool) ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
@@ -274,11 +274,11 @@ func (w *worker) identifyConcernedNodes(public bool) ([]*pb.Host, error) {
 		found = w.concernedPrivateNodes != nil && len(w.concernedPrivateNodes) > 0
 	}
 	if !found {
-		hosts, err := w.identifyAllNodes(public)
+		hosts, err := w.identifyAllNodes(port, public)
 		if err != nil {
 			return nil, err
 		}
-		concernedHosts, err := w.extractHostsFailingCheck(hosts)
+		concernedHosts, err := w.extractHostsFailingCheck(port, hosts)
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +296,7 @@ func (w *worker) identifyConcernedNodes(public bool) ([]*pb.Host, error) {
 
 // identifyAllNodes returns a list of all the hosts acting as public of private nodes and keep this list
 // during all the install session
-func (w *worker) identifyAllNodes(public bool) ([]*pb.Host, error) {
+func (w *worker) identifyAllNodes(port int, public bool) ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
@@ -307,7 +307,7 @@ func (w *worker) identifyAllNodes(public bool) ([]*pb.Host, error) {
 		found = w.allPrivateNodes != nil && len(w.allPrivateNodes) > 0
 	}
 	if !found {
-		brokerhost := brokerclient.New().Host
+		brokerhost := brokerclient.New(port).Host
 		allHosts := []*pb.Host{}
 		for _, i := range w.cluster.ListNodeIDs(public) {
 			host, err := brokerhost.Inspect(i, brokerclient.DefaultExecutionTimeout)
@@ -329,7 +329,7 @@ func (w *worker) identifyAllNodes(public bool) ([]*pb.Host, error) {
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
+func (w *worker) Proceed(port int, v Variables, s Settings) (Results, error) {
 	w.variables = v
 	w.settings = s
 
@@ -351,7 +351,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 
 	// Applies reverseproxy rules to make it functional (feature may need it during the install)
 	if w.action == Action.Add && !s.SkipProxy {
-		err := w.setReverseProxy()
+		err := w.setReverseProxy(port)
 		if err != nil {
 			return nil, err
 		}
@@ -380,7 +380,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 		// Determine list of hosts concerned by the step
 		var hostsList []*pb.Host
 		if w.target.Type() == "node" {
-			hostsList, err = w.identifyHosts(map[string]string{"hosts": "1"})
+			hostsList, err = w.identifyHosts(port, map[string]string{"hosts": "1"})
 		} else {
 			anon, ok = stepMap[yamlTargetsKeyword]
 			if ok {
@@ -401,7 +401,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 				return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword)
 			}
 
-			hostsList, err = w.identifyHosts(stepT)
+			hostsList, err = w.identifyHosts(port, stepT)
 		}
 		if err != nil {
 			return nil, err
@@ -511,7 +511,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 			YamlKey:            stepKey,
 			Serial:             serial,
 		}
-		results[k], err = step.Run(hostsList, w.variables, w.settings)
+		results[k], err = step.Run(port, hostsList, w.variables, w.settings)
 		// If an error occured, don't do the remaining steps, fail immediately
 		if err != nil {
 			break
@@ -591,7 +591,7 @@ func (w *worker) validateClusterSizing() error {
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
-func (w *worker) setReverseProxy() error {
+func (w *worker) setReverseProxy(port int) error {
 	rules, ok := w.feature.specs.Get("feature.proxy.rules").([]interface{})
 	if !ok || len(rules) <= 0 {
 		return nil
@@ -603,19 +603,19 @@ func (w *worker) setReverseProxy() error {
 	)
 
 	if w.cluster != nil {
-		host, err := w.identifyAvailableMaster()
+		host, err := w.identifyAvailableMaster(port)
 		if err != nil {
 			return fmt.Errorf("failed to set reverse proxy: %s", err.Error())
 		}
-		gw = gatewayFromHost(host)
+		gw = gatewayFromHost(port, host)
 	} else {
-		gw = gatewayFromHost(w.host)
+		gw = gatewayFromHost(port, w.host)
 	}
 	if gw == nil {
 		return fmt.Errorf("failed to set reverse proxy, unable to determine gateway")
 	}
 
-	kc, err := NewKongController(gw)
+	kc, err := NewKongController(port, gw)
 	if err != nil {
 		return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
 	}
@@ -648,14 +648,14 @@ func (w *worker) setReverseProxy() error {
 				}
 			}
 		}
-		hosts, err := w.identifyHosts(targets)
+		hosts, err := w.identifyHosts(port, targets)
 		if err != nil {
 			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 		}
 		for _, h := range hosts {
 			w.variables["HostIP"] = h.PRIVATE_IP
 			w.variables["Hostname"] = h.Name
-			err := kc.Apply(rule, &(w.variables))
+			err := kc.Apply(port, rule, &(w.variables))
 			if err != nil {
 				return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 			}
@@ -665,7 +665,7 @@ func (w *worker) setReverseProxy() error {
 }
 
 // identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts
-func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
+func (w *worker) identifyHosts(port int, targets stepTargets) ([]*pb.Host, error) {
 	hostT, masterT, privnodeT, pubnodeT, err := targets.parse()
 	if err != nil {
 		return nil, err
@@ -685,16 +685,16 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 
 	switch masterT {
 	case "1":
-		host, err := w.identifyAvailableMaster()
+		host, err := w.identifyAvailableMaster(port)
 		if err != nil {
 			return nil, err
 		}
 		hostsList = append(hostsList, host)
 	case "*":
 		if w.action == Action.Add {
-			all, err = w.identifyConcernedMasters()
+			all, err = w.identifyConcernedMasters(port)
 		} else {
-			all, err = w.identifyAllMasters()
+			all, err = w.identifyAllMasters(port)
 		}
 		if err != nil {
 			return nil, err
@@ -704,16 +704,16 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 
 	switch privnodeT {
 	case "1":
-		host, err := w.identifyAvailableNode(false)
+		host, err := w.identifyAvailableNode(port,false)
 		if err != nil {
 			return nil, err
 		}
 		hostsList = append(hostsList, host)
 	case "*":
 		if w.action == Action.Add {
-			all, err = w.identifyConcernedNodes(false)
+			all, err = w.identifyConcernedNodes(port, false)
 		} else {
-			all, err = w.identifyAllNodes(false)
+			all, err = w.identifyAllNodes(port,false)
 		}
 		if err != nil {
 			return nil, err
@@ -723,12 +723,12 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 
 	switch pubnodeT {
 	case "1":
-		host, err := w.identifyAvailableNode(true)
+		host, err := w.identifyAvailableNode(port,true)
 		if err != nil {
 			return nil, err
 		}
 		nodeTarget := NewNodeTarget(host)
-		results, err := w.feature.Check(nodeTarget, w.variables, w.settings)
+		results, err := w.feature.Check(port, nodeTarget, w.variables, w.settings)
 		if err != nil {
 			return nil, err
 		}
@@ -737,9 +737,9 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		}
 	case "*":
 		if w.action == Action.Add {
-			all, err = w.identifyConcernedNodes(true)
+			all, err = w.identifyConcernedNodes(port,true)
 		} else {
-			all, err = w.identifyAllNodes(true)
+			all, err = w.identifyAllNodes(port,true)
 		}
 		if err != nil {
 			return nil, err
