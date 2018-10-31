@@ -33,8 +33,8 @@ import (
 )
 
 // Get returns the Cluster instance corresponding to the cluster named 'name'
-func Get(name string) (clusterapi.Cluster, error) {
-	m, err := metadata.NewCluster()
+func Get(port int, name string) (clusterapi.Cluster, error) {
+	m, err := metadata.NewCluster(port)
 	if err != nil {
 		return nil, err
 	}
@@ -50,27 +50,27 @@ func Get(name string) (clusterapi.Cluster, error) {
 	clusterCore := m.Get()
 	switch clusterCore.Flavor {
 	case Flavor.DCOS:
-		instance, err = dcos.Load(m)
+		instance, err = dcos.Load(port, m)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.K8S:
-		instance, err = k8s.Load(m)
+		instance, err = k8s.Load(port, m)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.BOH:
-		instance, err = boh.Load(m)
+		instance, err = boh.Load(port, m)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.OHPC:
-		instance, err = ohpc.Load(m)
+		instance, err = ohpc.Load(port, m)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.SWARM:
-		instance, err = swarm.Load(m)
+		instance, err = swarm.Load(port, m)
 		if err != nil {
 			return nil, err
 		}
@@ -81,7 +81,7 @@ func Get(name string) (clusterapi.Cluster, error) {
 }
 
 // Create creates a cluster following the parameters of the request
-func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
+func Create(port int, req clusterapi.Request) (clusterapi.Cluster, error) {
 	// Validates parameters
 	if req.Name == "" {
 		panic("req.Name is empty!")
@@ -94,7 +94,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 	log.Printf("Creating infrastructure for cluster '%s'", req.Name)
 
-	tenant, err := brokerclient.New().Tenant.Get(0)
+	tenant, err := brokerclient.New(port).Tenant.Get(0)
 	if err != nil {
 		return nil, err
 	}
@@ -102,27 +102,27 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	req.Tenant = tenant.Name
 	switch req.Flavor {
 	case Flavor.DCOS:
-		instance, err = dcos.Create(req)
+		instance, err = dcos.Create(port, req)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.BOH:
-		instance, err = boh.Create(req)
+		instance, err = boh.Create(port, req)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.OHPC:
-		instance, err = ohpc.Create(req)
+		instance, err = ohpc.Create(port, req)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.K8S:
-		instance, err = k8s.Create(req)
+		instance, err = k8s.Create(port, req)
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.SWARM:
-		instance, err = swarm.Create(req)
+		instance, err = swarm.Create(port, req)
 		if err != nil {
 			return nil, err
 		}
@@ -135,8 +135,8 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 }
 
 // Delete deletes the infrastructure of the cluster named 'name'
-func Delete(name string) error {
-	instance, err := Get(name)
+func Delete(port int, name string) error {
+	instance, err := Get(port, name)
 	if err != nil {
 		return fmt.Errorf("failed to find a cluster named '%s': %s", name, err.Error())
 	}
@@ -145,42 +145,42 @@ func Delete(name string) error {
 	}
 
 	// Deletes all the infrastructure built for the cluster
-	return instance.Delete()
+	return instance.Delete(port)
 }
 
 // List lists the clusters already created
-func List() ([]clusterapi.Cluster, error) {
+func List(port int) ([]clusterapi.Cluster, error) {
 	var clusterList []clusterapi.Cluster
-	m, err := metadata.NewCluster()
+	m, err := metadata.NewCluster(port)
 	if err != nil {
 		return clusterList, err
 	}
 	var instance clusterapi.Cluster
-	err = m.Browse(func(cm *metadata.Cluster) error {
+	err = m.Browse(port, func(cm *metadata.Cluster) error {
 		cluster := cm.Get()
 		switch cluster.Flavor {
 		case Flavor.DCOS:
-			instance, err = dcos.Load(cm)
+			instance, err = dcos.Load(port, cm)
 			if err != nil {
 				return err
 			}
 		case Flavor.BOH:
-			instance, err = boh.Load(cm)
+			instance, err = boh.Load(port, cm)
 			if err != nil {
 				return err
 			}
 		case Flavor.K8S:
-			instance, err = k8s.Load(cm)
+			instance, err = k8s.Load(port, cm)
 			if err != nil {
 				return err
 			}
 		case Flavor.OHPC:
-			instance, err = ohpc.Load(cm)
+			instance, err = ohpc.Load(port,cm)
 			if err != nil {
 				return err
 			}
 		case Flavor.SWARM:
-			instance, err = swarm.Load(cm)
+			instance, err = swarm.Load(port,cm)
 			if err != nil {
 				return err
 			}
@@ -192,8 +192,8 @@ func List() ([]clusterapi.Cluster, error) {
 	return clusterList, err
 }
 
-func Sanitize(name string) error {
-	m, err := metadata.NewCluster()
+func Sanitize(port int, name string) error {
+	m, err := metadata.NewCluster(port)
 	if err != nil {
 		return err
 	}
@@ -208,10 +208,8 @@ func Sanitize(name string) error {
 	clusterCore := m.Get()
 	switch clusterCore.Flavor {
 	case Flavor.DCOS:
-		return dcos.Sanitize(m)
+		return dcos.Sanitize(port, m)
 	default:
 		return fmt.Errorf("Sanitization of cluster Flavor '%s' not available", clusterCore.Flavor.String())
 	}
-	return nil
-
 }

@@ -42,7 +42,7 @@ type KongController struct {
 }
 
 // NewKongController ...
-func NewKongController(host *pb.Host) (*KongController, error) {
+func NewKongController(port int, host *pb.Host) (*KongController, error) {
 	if host == nil {
 		panic("host is nil!")
 	}
@@ -58,7 +58,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(host.Name, func() (interface{}, error) {
 			target := NewHostTarget(host)
-			results, err := rp.Check(target, Variables{}, Settings{})
+			results, err := rp.Check(port, target, Variables{}, Settings{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to check if feature 'reverseproxy' is installed on gateway: %s", err.Error())
 			}
@@ -75,13 +75,13 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 
 	return &KongController{
 		host:   host,
-		broker: brokerclient.New(),
+		broker: brokerclient.New(port),
 	}, nil
 }
 
 // Apply applies the rule to Kong proxy
 // Currently, support rule types service, route and upstream
-func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variables) error {
+func (k *KongController) Apply(port int, rule map[interface{}]interface{}, values *Variables) error {
 	ruleName := rule["name"].(string)
 	ruleType := rule["type"].(string)
 
@@ -117,13 +117,13 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		}
 		upstreamName := unjsoned["name"].(string)
 		url += upstreamName
-		response, err := k.get(ruleName, url)
+		response, err := k.get(port, ruleName, url)
 		if response == nil && err != nil {
 			return err
 		}
 		if msg, ok := response["message"]; ok {
 			if strings.ToLower(msg.(string)) == "not found" {
-				err := k.createUpstream(upstreamName, values)
+				err := k.createUpstream(port, upstreamName, values)
 				if err != nil {
 					return err
 				}
@@ -140,7 +140,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		return fmt.Errorf("syntax error in rule '%s': %s isn't a valid type", ruleName, ruleType)
 	}
 
-	_, err = k.post(ruleName, url, content, values)
+	_, err = k.post(port, ruleName, url, content, values)
 	if err != nil {
 		return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 	}
@@ -160,10 +160,10 @@ func (k *KongController) realizeRuleData(content string, v Variables) (string, e
 	return dataBuffer.String(), nil
 }
 
-func (k *KongController) createUpstream(name string, v *Variables) error {
+func (k *KongController) createUpstream(port int, name string, v *Variables) error {
 	upstreamData := map[string]string{"name": name}
 	jsoned, _ := json.Marshal(&upstreamData)
-	response, err := k.post(name, "upstreams/", string(jsoned), v)
+	response, err := k.post(port, name, "upstreams/", string(jsoned), v)
 	if response == nil && err != nil {
 		return err
 	}
@@ -173,10 +173,10 @@ func (k *KongController) createUpstream(name string, v *Variables) error {
 	return nil
 }
 
-func (k *KongController) get(name, url string) (map[string]interface{}, error) {
+func (k *KongController) get(port int, name, url string) (map[string]interface{}, error) {
 	// Now apply the rule to Kong
 	cmd := fmt.Sprintf(curlGet, url)
-	retcode, stdout, _, err := brokerclient.New().Ssh.Run(k.host.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, stdout, _, err := brokerclient.New(port).Ssh.Run(k.host.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -198,10 +198,10 @@ func (k *KongController) get(name, url string) (map[string]interface{}, error) {
 	return response, fmt.Errorf("get failed with HTTP error code '%s'", output[1])
 }
 
-func (k *KongController) post(name, url, data string, v *Variables) (map[string]interface{}, error) {
+func (k *KongController) post(port int, name, url, data string, v *Variables) (map[string]interface{}, error) {
 	// Now apply the rule to Kong
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, _, err := brokerclient.New().Ssh.Run(k.host.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, stdout, _, err := brokerclient.New(port).Ssh.Run(k.host.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}

@@ -36,7 +36,7 @@ type nas struct {
 
 // Create ...
 func (n *nas) Create(def pb.NasDefinition, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(n.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -51,7 +51,7 @@ func (n *nas) Create(def pb.NasDefinition, timeout time.Duration) error {
 
 // Delete deletes several nas at the same time in goroutines
 func (n *nas) Delete(names []string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(n.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
@@ -87,7 +87,7 @@ func (n *nas) Delete(names []string, timeout time.Duration) error {
 
 // List ...
 func (n *nas) List(timeout time.Duration) (*pb.NasList, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(n.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -100,7 +100,7 @@ func (n *nas) List(timeout time.Duration) (*pb.NasList, error) {
 
 // Mount ...
 func (n *nas) Mount(nasName, hostName, mountPoint string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(n.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -120,7 +120,7 @@ func (n *nas) Mount(nasName, hostName, mountPoint string, timeout time.Duration)
 
 // Unmount ...
 func (n *nas) Unmount(nasName, hostName string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(n.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -137,7 +137,7 @@ func (n *nas) Unmount(nasName, hostName string, timeout time.Duration) error {
 
 // Inspect ...
 func (n *nas) Inspect(name string, timeout time.Duration) (*pb.NasList, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(n.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault

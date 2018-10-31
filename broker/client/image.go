@@ -31,7 +31,7 @@ type image struct {
 
 // List return the list of availble images on the current tenant
 func (img *image) List(all bool, timeout time.Duration) (*pb.ImageList, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(img.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault

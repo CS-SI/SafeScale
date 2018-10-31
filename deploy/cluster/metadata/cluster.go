@@ -39,8 +39,8 @@ type Cluster struct {
 }
 
 // NewCluster creates a new Cluster metadata
-func NewCluster() (*Cluster, error) {
-	svc, err := provideruse.GetProviderService()
+func NewCluster(port int) (*Cluster, error) {
+	svc, err := provideruse.GetProviderService(port)
 	if err != nil {
 		return nil, err
 	}
@@ -135,14 +135,14 @@ func (m *Cluster) Get() *api.ClusterCore {
 }
 
 // Browse walks through cluster folder and executes a callback for each entry
-func (m *Cluster) Browse(callback func(*Cluster) error) error {
+func (m *Cluster) Browse(port int, callback func(*Cluster) error) error {
 	return m.item.Browse(func(buf *bytes.Buffer) error {
 		var data api.ClusterCore
 		err := gob.NewDecoder(buf).Decode(&data)
 		if err != nil {
 			return err
 		}
-		cm, err := NewCluster()
+		cm, err := NewCluster(port)
 		if err != nil {
 			return nil
 		}

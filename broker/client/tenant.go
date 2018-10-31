@@ -33,7 +33,7 @@ type tenant struct {
 
 // List ...
 func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(t.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -46,7 +46,7 @@ func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
 
 // Get ...
 func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(t.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -59,7 +59,7 @@ func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
 
 // Set ...
 func (t *tenant) Set(name string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(t.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault

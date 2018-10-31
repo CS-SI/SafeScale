@@ -33,7 +33,7 @@ type network struct {
 
 // List ...
 func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(n.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -48,7 +48,7 @@ func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error)
 
 // Delete deletes several networks at the same time in goroutines
 func (n *network) Delete(names []string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(n.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
@@ -84,7 +84,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 
 // Inspect ...
 func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(n.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -97,7 +97,7 @@ func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, erro
 
 // Create ...
 func (n *network) Create(def pb.NetworkDefinition, timeout time.Duration) (*pb.Network, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(n.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost

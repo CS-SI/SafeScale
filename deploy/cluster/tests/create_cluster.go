@@ -34,14 +34,14 @@ func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	clusterName := "test-cluster"
-	instance, err := cluster.Get(clusterName)
+	instance, err := cluster.Get(50051, clusterName)
 	if err != nil {
 		fmt.Printf("Failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
 		return
 	}
 	if instance == nil {
 		log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
-		instance, err = cluster.Create(clusterapi.Request{
+		instance, err = cluster.Create(50051, clusterapi.Request{
 			Name:       clusterName,
 			Complexity: Complexity.Small,
 			//Complexity: Complexity.Normal,
@@ -57,7 +57,7 @@ func Run() {
 		fmt.Printf("Cluster '%s' already created.\n", clusterName)
 	}
 
-	state, err := instance.GetState()
+	state, err := instance.GetState(50051)
 	if err != nil {
 		fmt.Println("Failed to get cluster state.")
 		return
@@ -65,7 +65,7 @@ func Run() {
 	fmt.Printf("Cluster state: %s\n", state.String())
 
 	// Creates a Private Agent Node
-	_, err = instance.AddNode(false, &pb.HostDefinition{
+	_, err = instance.AddNode(50051, false, &pb.HostDefinition{
 		CPUNumber: 2,
 		RAM:       8.0,
 		Disk:      60,

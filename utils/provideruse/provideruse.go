@@ -26,8 +26,8 @@ import (
 )
 
 // GetProviderService returns the service provider corresponding to the current Tenant
-func GetProviderService() (*providers.Service, error) {
-	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
+func GetProviderService(port int) (*providers.Service, error) {
+	tenant, err := brokerclient.New(port).Tenant.Get(brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -39,10 +39,10 @@ func GetProviderService() (*providers.Service, error) {
 }
 
 // WaitSSHServerReady waits for SSH server to be ready. After timeout, fails
-func WaitSSHServerReady(svc *providers.Service, hostID string, timeout time.Duration) error {
+func WaitSSHServerReady(port int, svc *providers.Service, hostID string, timeout time.Duration) error {
 	var err error
 	if svc == nil {
-		svc, err = GetProviderService()
+		svc, err = GetProviderService(port)
 		if err != nil {
 			return err
 		}

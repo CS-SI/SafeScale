@@ -37,9 +37,6 @@ import (
 	_ "github.com/urfave/cli"
 )
 
-const (
-	port = ":50051"
-)
 
 /*
 broker provider list
@@ -93,7 +90,7 @@ func cleanup() {
 }
 
 // *** MAIN ***
-func work() {
+func work(port int) {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -109,7 +106,7 @@ func work() {
 	}
 
 	log.Println("Starting server")
-	lis, err := net.Listen("tcp", port)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -152,7 +149,7 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		work()
+		work(c.GlobalInt("port"))
 		return nil
 	}
 

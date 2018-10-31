@@ -33,7 +33,7 @@ type container struct {
 
 // List ...
 func (c *container) List(timeout time.Duration) (*pb.ContainerList, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(c.session.brokerdPort))
 	defer conn.Close()
 	if timeout <= 0 {
 		timeout = utils.TimeoutCtxDefault
@@ -46,7 +46,7 @@ func (c *container) List(timeout time.Duration) (*pb.ContainerList, error) {
 
 // Create ...
 func (c *container) Create(name string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(c.session.brokerdPort))
 	defer conn.Close()
 	if timeout <= 0 {
 		timeout = utils.TimeoutCtxDefault
@@ -60,7 +60,7 @@ func (c *container) Create(name string, timeout time.Duration) error {
 
 // Delete ...
 func (c *container) Delete(name string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(c.session.brokerdPort))
 	defer conn.Close()
 	if timeout <= 0 {
 		timeout = utils.TimeoutCtxDefault
@@ -74,7 +74,7 @@ func (c *container) Delete(name string, timeout time.Duration) error {
 
 // Inspect ...
 func (c *container) Inspect(name string, timeout time.Duration) (*pb.ContainerMountingPoint, error) {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(c.session.brokerdPort))
 	defer conn.Close()
 	if timeout <= 0 {
 		timeout = utils.TimeoutCtxDefault
@@ -87,7 +87,7 @@ func (c *container) Inspect(name string, timeout time.Duration) (*pb.ContainerMo
 
 // Mount ...
 func (c *container) Mount(containerName, hostName, mountPoint string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(c.session.brokerdPort))
 	defer conn.Close()
 	if timeout <= 0 {
 		timeout = utils.TimeoutCtxDefault
@@ -107,7 +107,7 @@ func (c *container) Mount(containerName, hostName, mountPoint string, timeout ti
 
 // Unmount ...
 func (c *container) Unmount(containerName, hostName string, timeout time.Duration) error {
-	conn := utils.GetConnection()
+	conn := utils.GetConnection(int(c.session.brokerdPort))
 	defer conn.Close()
 	if timeout <= 0 {
 		timeout = utils.TimeoutCtxDefault

@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -27,7 +28,6 @@ import (
 )
 
 const (
-	address = "localhost:50051"
 	// TimeoutCtxDefault default timeout for grpc command invocation
 	TimeoutCtxDefault = 1 * time.Minute
 	// TimeoutCtxHost timeout for grpc command relative to host creation
@@ -35,9 +35,11 @@ const (
 )
 
 // GetConnection returns a connection to GRPC server
-func GetConnection() *grpc.ClientConn {
+func GetConnection(port int) *grpc.ClientConn {
+	realAddress := fmt.Sprintf("localhost:%d", port)
+
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(realAddress, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}

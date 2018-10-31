@@ -32,12 +32,6 @@ import (
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise provider ovh
 )
 
-const (
-	address           = "localhost:50051"
-	timeoutCtxDefault = 10 * time.Second
-	timeoutCtxHost    = 2 * time.Minute
-)
-
 func main() {
 
 	cli.VersionFlag = cli.BoolFlag{
@@ -58,6 +52,14 @@ func main() {
 		},
 	}
 	app.EnableBashCompletion = true
+
+	app.Flags = []cli.Flag{
+		cli.IntFlag{
+			Name:  "port, p",
+			Usage: "Bind to specified port `PORT`",
+			Value: 50051,
+		},
+	}
 
 	app.Commands = append(app.Commands, cmds.ClusterCommand)
 	sort.Sort(cli.CommandsByName(cmds.ClusterCommand.Subcommands))

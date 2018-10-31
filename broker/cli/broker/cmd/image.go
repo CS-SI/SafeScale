@@ -42,7 +42,7 @@ var imageList = cli.Command{
 			Usage: "List all available images in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
-		images, err := client.New().Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		images, err := client.New(c.GlobalInt("port")).Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of images", false))
 		}

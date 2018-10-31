@@ -98,7 +98,7 @@ func extractClusterArgument(c *cli.Context) error {
 		if clusterName == "" {
 			return cli.NewExitError("Invalid argument CLUSTERNAME", int(ExitCode.InvalidArgument))
 		}
-		clusterInstance, err = cluster.Get(clusterName)
+		clusterInstance, err = cluster.Get(c.GlobalInt("port"), clusterName)
 		if c.Command.HasName("create") && clusterInstance != nil {
 			msg := fmt.Sprintf("Cluster '%s' already exists", clusterName)
 			return cli.NewExitError(msg, int(ExitCode.Duplicate))
