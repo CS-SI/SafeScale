@@ -19,13 +19,17 @@ package metadata
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
+
+	log "github.com/sirupsen/logrus"
 )
+
+// ExtensionsMap is the type containing the extensions
+type ExtensionsMap map[uint]interface{}
 
 // Extensions ...
 type Extensions struct {
 	encoded []byte
-	decoded map[int]interface{}
+	decoded ExtensionsMap
 	changed bool
 }
 
@@ -33,7 +37,7 @@ type Extensions struct {
 func NewExtensions(raw []byte) *Extensions {
 	return &Extensions{
 		encoded: raw,
-		decoded: map[int]interface{}{},
+		decoded: ExtensionsMap{},
 	}
 }
 
@@ -58,21 +62,22 @@ func (ex *Extensions) encode() error {
 
 // Get gets the content of an extension
 // When the extension is not found, returns (nil,nil)
-func (ex *Extensions) Get(index int) (interface{}, error) {
+func (ex *Extensions) Get(index uint) interface{} {
 	if len(ex.encoded) > 0 && len(ex.decoded) == 0 {
 		err := ex.decode()
 		if err != nil {
-			return nil, err
+			log.Errorf("invalid data in extensions: %s", err.Error())
+			return nil
 		}
 	}
 	if anon, ok := ex.decoded[index]; ok {
-		return anon, nil
+		return anon
 	}
-	return nil, fmt.Errorf("extension not found")
+	return nil
 }
 
 // Set sets the value of an extension of the host
-func (ex *Extensions) Set(index int, data interface{}) error {
+func (ex *Extensions) Set(index uint, data interface{}) error {
 	if len(ex.encoded) > 0 && len(ex.decoded) == 0 {
 		err := ex.decode()
 		if err != nil {
@@ -94,4 +99,8 @@ func (ex *Extensions) ToBytes() ([]byte, error) {
 		ex.changed = false
 	}
 	return ex.encoded, nil
+}
+
+func init() {
+	gob.Register(ExtensionsMap{})
 }
