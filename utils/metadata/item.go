@@ -17,10 +17,9 @@
 package metadata
 
 import (
-	"bytes"
 	"sync"
 
-	iaasapi "github.com/CS-SI/SafeScale/iaas/api"
+	"github.com/CS-SI/SafeScale/providers/api"
 )
 
 // Item is an entry in the ObjectStorage
@@ -31,19 +30,19 @@ type Item struct {
 }
 
 // ItemDecoderCallback ...
-type ItemDecoderCallback func(buf *bytes.Buffer) (interface{}, error)
+type ItemDecoderCallback func([]byte) (interface{}, error)
 
 // NewItem creates a new item with 'name' and in 'path'
-func NewItem(clt iaasapi.Client, path string) *Item {
+func NewItem(client api.ClientAPI, path string) *Item {
 	return &Item{
-		folder:  NewFolder(clt, path),
+		folder:  NewFolder(client, path),
 		payload: nil,
 	}
 }
 
 // GetService returns the service providers used by Item
-func (i *Item) GetProviderClient() iaasapi.Client {
-	return i.folder.GetProviderClient()
+func (i *Item) GetService() api.ClientAPI {
+	return i.folder.GetService()
 }
 
 // GetPath returns the path in the Object Storage where the Item is stored
@@ -130,7 +129,7 @@ func (i *Item) BrowseInto(path string, callback func([]byte) error) error {
 	if path == "" {
 		path = "."
 	}
-	return i.folder.Browse(path, func(buf *bytes.Buffer) error {
+	return i.folder.Browse(path, func(buf []byte) error {
 		return callback(buf)
 	})
 }
