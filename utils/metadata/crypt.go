@@ -46,7 +46,7 @@ func decrypt(key, text []byte) ([]byte, error) {
 	text = text[aes.BlockSize:]
 	cfb := cipher.NewCFBDecrypter(block, iv)
 	cfb.XORKeyStream(text, text)
-	data, err = base64.StdEncoding.DecodeString(string(text))
+	data, err := base64.StdEncoding.DecodeString(string(text))
 	if err != nil {
 		return nil, err
 	}
