@@ -50,7 +50,6 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/golang/protobuf"
   version = "=v1.2.0"
 
-# TODO Fork & tag
 [[override]]
   name = "github.com/gophercloud/gophercloud"
   revision = "39db44929bf62867520de8607bd519217a78f802"
@@ -63,20 +62,17 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/jinzhu/gorm"
   version = "1.9.1"
 
-# TODO Fork & tag
 [[override]]
   name = "github.com/mjibson/go-dsp"
-  branch = "master"
+  revision = "11479a337f1259210b7c8f93f7bf2b0cc87b066e"
 
-# TODO Fork & tag
 [[override]]
   name = "github.com/pengux/check"
-  branch = "master"
+  revision = "53861b30913dfdf93e58e4379d510eba93261097"
 
-# TODO Fork & tag
 [[override]]
-  branch = "master"
   name = "github.com/satori/go.uuid"
+  revision = "36e9d2ebbde5e3f13ab2e25625fd453271d6522e"
 
 [[constraint]]
   name = "github.com/sethvargo/go-password"
@@ -103,23 +99,20 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   version = "=v1.1.1"
 
 [[constraint]]
-  name = "github.com/zippoxer/bow"
+  name = "github.com/nanobox-io/golang-scribble"
   branch = "master"
 
-# TODO Fork & tag
 [[constraint]]
-  branch = "master"
   name = "golang.org/x/crypto"
+  revision = "0e37d006457bf46f9e6692014ba72ef82c33022c"
 
-# TODO Fork & tag
 [[constraint]]
-  branch = "master"
   name = "golang.org/x/net"
+  revision = "4dfa2610cdf3b287375bbba5b8f2a14d3b01d8de"
 
-# TODO Fork & tag
 [[constraint]]
-  branch = "master"
   name = "golang.org/x/oauth2"
+  revision = "d2e6202438beef2727060aa7cabdd924d92ebfd9"
 
 [[override]]
   name = "google.golang.org/grpc"
