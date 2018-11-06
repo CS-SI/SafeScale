@@ -35,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 
 	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
-	_ "github.com/zippoxer/bow"                 // Make dep happy
 )
 
 const cmdNumberOfCPU string = "lscpu | grep 'CPU(s):' | grep -v 'NUMA' | tr -d '[:space:]' | cut -d: -f2"
@@ -157,6 +156,8 @@ func RunScanner() {
 	}
 
 	wtg.Wait()
+
+	collect()
 }
 
 func analyzeTenant(group *sync.WaitGroup, theTenant string) error {

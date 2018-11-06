@@ -206,10 +206,19 @@ var hostCreate = cli.Command{
 			Name:  "public",
 			Usage: "Create with public IP",
 		},
+		cli.IntFlag{
+			Name:  "gpu",
+			Value: 0,
+			Usage: "Number of GPU for the host",
+		},
+		cli.Float64Flag{
+			Name:  "cpu-freq",
+			Value: 0,
+			Usage: "Minimum cpu frequency required for the host",
+		},
 		cli.BoolFlag{
-			Name:   "gpu",
-			Usage:  "With GPU",
-			Hidden: true,
+			Name:  "force",
+			Usage: "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -226,6 +235,9 @@ var hostCreate = cli.Command{
 			Network:   c.String("net"),
 			Public:    c.Bool("public"),
 			RAM:       float32(c.Float64("ram")),
+			GPUNumber: int32(c.Int("gpu")),
+			Freq:      float32(c.Float64("cpu-freq")),
+			Force:    c.Bool("force"),
 		}
 		resp, err := client.New(c.GlobalInt("port")).Host.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
