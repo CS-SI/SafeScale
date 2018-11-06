@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/CS-SI/SafeScale/utils"
-	"github.com/dgraph-io/badger"
-	"github.com/zippoxer/bow"
+	"github.com/nanobox-io/golang-scribble"
+	_ "github.com/nanobox-io/golang-scribble"
 	"io/ioutil"
 	"log"
 	"os"
@@ -37,12 +37,10 @@ type StoredCPUInfo struct {
 func collect() {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
-	db, err := bow.Open(utils.AbsPathify("$HOME/.safescale/scanner/db"),
-		bow.SetBadgerOptions(badger.DefaultOptions))
+	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 
 	files, err := ioutil.ReadDir(utils.AbsPathify("$HOME/.safescale/scanner"))
 	if err != nil {
@@ -55,6 +53,9 @@ func collect() {
 		if strings.Contains(file.Name(), "#") {
 
 			theFile := fmt.Sprintf("$HOME/.safescale/scanner/%s", file.Name())
+
+			log.Printf("Storing: %s", file.Name())
+
 			byteValue, err := ioutil.ReadFile(utils.AbsPathify(theFile) )
 			if err != nil {
 				log.Fatal(err)
@@ -67,7 +68,7 @@ func collect() {
 
 			acpu.Id = acpu.ImageID
 
-			err = db.Bucket("images").Put(acpu)
+			err = db.Write("images", acpu.TemplateName, acpu)
 			if err != nil {
 				log.Fatal(err)
 			}

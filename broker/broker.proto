@@ -100,6 +100,7 @@ message HostDefinition{
     bool Public = 10;
     int32 GPUNumber = 11;
     float Freq = 12;
+    bool Force = 13;
 }
 
 enum HostState {
