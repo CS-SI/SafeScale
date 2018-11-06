@@ -123,11 +123,11 @@ deploy: common utils system providers broker
 
 perform: common utils system providers broker
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd perform && $(MAKE) all)# List of packages
+	@(cd perform && $(MAKE) all)
 
 scanner: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building scanner, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd scanner && $(MAKE) all)# List of packages
+	@(cd scanner && $(MAKE) all)
 
 clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
