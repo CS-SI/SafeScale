@@ -18,6 +18,7 @@ package providers_test
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/providers/cloudferro"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/providers/cloudwatt"
@@ -49,6 +50,7 @@ func TestGetService(t *testing.T) {
 	providers.Register("cloudwatt", &cloudwatt.Client{})
 	providers.Register("flexibleEngine", &flexibleengine.Client{})
 	providers.Register("opentelekom", &opentelekom.Client{})
+	providers.Register("cloudferro", &cloudferro.Client{})
 	ovh, err := providers.GetService("TestOvh")
 	require.Nil(t, err)
 	_, err = providers.GetService("TestCloudwatt")
@@ -68,6 +70,7 @@ func TestGetServiceErr(t *testing.T) {
 	defer deleteTenantFile()
 	providers.Register("ovh", &ovh.Client{})
 	providers.Register("cloudwatt", &cloudwatt.Client{})
+	providers.Register("cloudferro", &cloudferro.Client{})
 	_, err := providers.GetService("TestOhvehache")
 	require.Error(t, err)
 	_, err = providers.GetService("UnknownService")
