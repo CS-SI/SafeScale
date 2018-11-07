@@ -16,10 +16,13 @@
 
 package utils
 
+// TODO NOTICE Side-effects imports here
+
 // This file is used to automatically register all providers
 import (
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialise tenants
 )

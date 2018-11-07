@@ -16,6 +16,7 @@
 
 package main
 
+// TODO NOTICE Side-effects imports here
 import (
 	"log"
 	"os"
@@ -30,6 +31,7 @@ import (
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise provider flexibleengine
 	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise provider opentelekom
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise provider ovh
+	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialise provider cloudferro
 )
 
 func main() {
