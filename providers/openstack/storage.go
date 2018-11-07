@@ -453,11 +453,11 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 	if err != nil {
 		return nil, fmt.Errorf("Error getting object %s from %s : %s", name, container, ProviderErrorToString(err))
 	}
-	metadata := make(map[string]string)
+	recoveredMetadata := make(map[string]string)
 	for k, v := range res.Header {
 		if strings.HasPrefix(k, "X-Object-Meta-") {
 			key := strings.TrimPrefix(k, "X-Object-Meta-")
-			metadata[key] = v[0]
+			recoveredMetadata[key] = v[0]
 		}
 	}
 	header, err := res.Extract()
@@ -487,7 +487,7 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 	return &api.Object{
 		Content:       bytes.NewReader(content),
 		DeleteAt:      header.DeleteAt,
-		Metadata:      metadata,
+		Metadata:      recoveredMetadata,
 		Date:          header.Date,
 		LastModified:  header.LastModified,
 		ContentType:   header.ContentType,

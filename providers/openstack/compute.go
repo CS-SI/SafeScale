@@ -365,6 +365,10 @@ type userData struct {
 
 func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 	m, err := metadata.NewGateway(providers.FromClient(client), networkID)
+	if err != nil {
+		return nil, err
+	}
+
 	found, err := m.Read()
 	if err != nil {
 		return nil, err
