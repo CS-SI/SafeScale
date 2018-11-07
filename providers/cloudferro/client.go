@@ -26,11 +26,11 @@ import (
 provider.
 */
 type AuthOptions struct {
-	Username   string
-	Password   string
-	TenantName string
-	Region     string
-	DomainName string
+	Username    string
+	Password    string
+	TenantName  string
+	Region      string
+	DomainName  string
 	ProjectName string
 }
 
@@ -44,15 +44,14 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
 		IdentityEndpoint: IdentityEndpoint,
 		//UserID:           opts.OpenstackID,
-		Username:       opts.Username,
-		Password:       opts.Password,
-		DomainName:     opts.DomainName,
-		TenantName:     opts.ProjectName,
-		Region:         opts.Region,
-		FloatingIPPool: "public",
+		Username:   opts.Username,
+		Password:   opts.Password,
+		DomainName: opts.DomainName,
+		TenantName: opts.ProjectName,
+		Region:     opts.Region,
 	},
 		openstack.CfgOptions{
-			ProviderNetwork:           "public",
+			ProviderNetwork:           "external",
 			UseFloatingIP:             true,
 			UseLayer3Networking:       true,
 			AutoHostNetworkInterfaces: true,
@@ -85,10 +84,10 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	DomainName, _ := params["UserDomainName"].(string)
 	ProjectName, _ := params["ProjectName"].(string)
 	return AuthenticatedClient(AuthOptions{
-		Username:   Username,
-		Password:   Password,
-		Region:     Region,
-		DomainName: DomainName,
+		Username:    Username,
+		Password:    Password,
+		Region:      Region,
+		DomainName:  DomainName,
 		ProjectName: ProjectName,
 	})
 }
