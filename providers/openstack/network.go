@@ -364,10 +364,10 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	net, err := client.GetNetwork(req.NetworkID)
 	if err != nil {
 		log.Debugf("Error creating gateway: getting network: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Network %s not found %s", req.NetworkID, ProviderErrorToString(err)))
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway, getting network by id, Network '%s' not found '%s'", req.NetworkID, ProviderErrorToString(err)))
 	}
 	if net == nil {
-		return nil, fmt.Errorf("Network %s not found", req.NetworkID)
+		return nil, fmt.Errorf("Error creating gateway, Network %s not found", req.NetworkID)
 	}
 	gwname := req.GWName
 	if gwname == "" {
@@ -400,7 +400,7 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 
 	if err != nil {
 		log.Debugf("Error creating gateway: saving network metadata: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error saving gateway metadata: %s", ProviderErrorToString(err)))
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway: Error saving gateway metadata: %s", ProviderErrorToString(err)))
 	}
 
 	return host, nil
