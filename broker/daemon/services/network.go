@@ -167,6 +167,11 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 
 	// Gateway is ready to work, update Network metadata
 	rv, err := svc.Get(net)
+	if err != nil {
+		tbr := errors.Wrap(err, "Error getting network before metadata update")
+		log.Errorf("%+v", tbr)
+		return nil, tbr
+	}
 	if rv != nil {
 		rv.GatewayID = gw.ID
 	}

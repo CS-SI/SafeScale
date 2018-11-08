@@ -61,7 +61,6 @@ func GetService(tenantName string) (*Service, error) {
 		if name, ok := tenant["name"].(string); ok {
 			if name == tenantName {
 				tenantInCfg = true
-				fmt.Println("Good, found")
 				if provider, ok := tenant["client"].(string); ok {
 					clientProvider = provider
 					if client, ok := providers[provider]; ok {
