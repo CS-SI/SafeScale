@@ -495,8 +495,7 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 		Range: fmt.Sprintf("bytes=%s", sRanges),
 	})
 
-	// TODO Maybe sleeping fixes the issue...
-	time.Sleep(time.Second * 2)
+	// TODO Why we have a bad range ??
 
 	content, err := res.ExtractContent()
 	if err != nil {
