@@ -366,6 +366,10 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 		}
 	}(err)
 
+	if err != nil {
+		return nil, fmt.Errorf("Error saving gateway metadata: %s", ProviderErrorToString(err))
+	}
+
 	return host, err
 }
 
