@@ -20,10 +20,10 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"strings"
-
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/sirupsen/logrus"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
@@ -142,6 +142,7 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 	if found {
 		o, err := f.svc.GetObject(f.bucketName, f.absolutePath(path, name), nil)
 		if err != nil {
+			logrus.Errorf("Error reading metadata: getting object: %+v", err)
 			return false, err
 		}
 		var buffer bytes.Buffer
@@ -181,22 +182,26 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 				return nil
 			}
 		}
+		logrus.Errorf("Error browsing metadata: listing objects: %+v", err)
 		return err
 	}
 
 	for _, i := range list {
 		o, err := f.svc.GetObject(f.bucketName, i, nil)
 		if err != nil {
+			logrus.Errorf("Error browsing metadata: getting object: %+v", err)
 			return err
 		}
 		var buffer bytes.Buffer
 		_, err = buffer.ReadFrom(o.Content)
 		if err != nil {
+			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", err)
 			return err
 		}
 
 		err = callback(&buffer)
 		if err != nil {
+			logrus.Errorf("Error browsing metadata: running callback: %+v", err)
 			return err
 		}
 	}

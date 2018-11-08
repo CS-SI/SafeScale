@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
@@ -66,7 +67,8 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	// We 1st check if name is not aleready used
 	_net, err := metadata.LoadNetwork(providers.FromClient(client), req.Name)
 	if err != nil {
-		return nil, err
+		log.Debugf("Error creating network: loading metadata: %+v", err)
+		return nil, errors.Wrap(err, "Error creating network: loading metadata")
 	}
 	if _net != nil {
 		return nil, fmt.Errorf("A network already exists with name '%s'", req.Name)
@@ -82,16 +84,18 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	// Execute the operation and get back a networks.Network struct
 	network, err := networks.Create(client.Network, opts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating network %s: %s", req.Name, ProviderErrorToString(err))
+		log.Debugf("Error creating network: network create: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating network %s: %s", req.Name, ProviderErrorToString(err)))
 	}
 
 	sn, err := client.CreateSubnet(req.Name, network.ID, req.CIDR, req.IPVersion)
 	if err != nil {
+		log.Debugf("Error creating network: subnetwork create: %+v", err)
 		nerr := client.DeleteNetwork(network.ID)
 		if nerr != nil {
 			log.Warnf("Error deleting network: %v", nerr)
 		}
-		return nil, fmt.Errorf("Error creating network %s: %s", req.Name, ProviderErrorToString(err))
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating network %s: %s", req.Name, ProviderErrorToString(err)))
 	}
 
 	net := &api.Network{
@@ -102,11 +106,12 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	}
 	err = metadata.SaveNetwork(providers.FromClient(client), net)
 	if err != nil {
+		log.Debugf("Error creating network: subnetwork save metadata: %+v", err)
 		nerr := client.DeleteNetwork(network.ID)
 		if nerr != nil {
 			log.Warnf("Error deleting network: %v", nerr)
 		}
-		return nil, err
+		return nil, errors.Wrap(err, "Error creating network: subnetwork save metadata")
 	}
 	return net, nil
 }
@@ -116,7 +121,8 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 	// We first try looking for network from metadata
 	m, err := metadata.LoadNetwork(providers.FromClient(client), ref)
 	if err != nil {
-		return nil, err
+		log.Debugf("Error getting network: loading network metadata: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error getting network: loading network metadata"))
 	}
 	if m != nil {
 		return m.Get(), nil
@@ -127,14 +133,16 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 	network, err := networks.Get(client.Network, ref).Extract()
 	if err != nil {
 		if _, ok := err.(gc.ErrDefault404); !ok {
-			return nil, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
+			log.Debugf("Error getting network: getting network: %+v", err)
+			return nil, errors.Wrap(err, fmt.Sprintf("Error getting network: %s", ProviderErrorToString(err)))
 		}
 	}
 	if network != nil && network.ID != "" {
 
 		sns, err := client.ListSubnets(ref)
 		if err != nil {
-			return nil, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
+			log.Errorf("Error getting network: listing subnet: %+v", err)
+			return nil, errors.Wrap(err, fmt.Sprintf("Error getting network: %s", ProviderErrorToString(err)))
 		}
 		if len(sns) != 1 {
 			return nil, fmt.Errorf("Bad configuration, each network should have exactly one subnet")
@@ -156,7 +164,8 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 	// Last chance, we look at all network
 	nets, err := client.listAllNetworks()
 	if err != nil {
-		return nil, err
+		log.Debugf("Error getting network: listing all networks: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error getting network: listing all networks"))
 	}
 	for _, n := range nets {
 		if n.ID == ref || n.Name == ref {
@@ -219,8 +228,13 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 		}
 		return true, nil
 	})
-	if len(netList) == 0 && err != nil {
-		return nil, fmt.Errorf("Error listing networks: %s", ProviderErrorToString(err))
+	if len(netList) == 0 || err != nil {
+		if err != nil {
+			log.Debugf("Error listing networks: pagination error: %+v", err)
+			return nil, errors.Wrap(err, fmt.Sprintf("Error listing networks: %s", ProviderErrorToString(err)))
+		} else {
+			log.Warnf("Empty network list !")
+		}
 	}
 	return netList, nil
 }
@@ -249,15 +263,25 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 		netList = append(netList, *net)
 		return nil
 	})
+
+	if len(netList) == 0 || err != nil {
+		if err != nil {
+			log.Debugf("Error listing monitored networks: pagination error: %+v", err)
+			return nil, errors.Wrap(err, fmt.Sprintf("Error listing monitored networks: %s", ProviderErrorToString(err)))
+		} else {
+			log.Warnf("Empty network list !")
+		}
+	}
+
 	return netList, err
 }
 
 // DeleteNetwork deletes the network identified by id
 func (client *Client) DeleteNetwork(networkRef string) error {
-	// TODO Add more detailed exceptions here
 	m, err := metadata.LoadNetwork(providers.FromClient(client), networkRef)
 	if err != nil {
-		return err
+		log.Debugf("Error deleting network: loading network: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error deleting network: loading network"))
 	}
 	if m == nil {
 		return fmt.Errorf("Failed to find network '%s' in metadata", networkRef)
@@ -266,6 +290,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 
 	err = networks.Get(client.Network, networkID).Err
 	if err != nil {
+		log.Warnf("Error deleting network: getting network: %+v", err)
 		if strings.Contains(err.Error(), "Resource not found") {
 			log.Warnf("Inconsistent network data !!")
 		}
@@ -273,7 +298,8 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 
 	hosts, err := m.ListHosts()
 	if err != nil {
-		return err
+		log.Debugf("Error deleting network: listing hosts: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error deleting network: listing hosts"))
 	}
 	gwID := m.Get().GatewayID
 	if len(hosts) > 0 {
@@ -308,21 +334,25 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 
 	sns, err := client.ListSubnets(networkID)
 	if err != nil {
-		return fmt.Errorf("Error deleting network, listing subnets: %s", ProviderErrorToString(err))
+		log.Debugf("Error deleting network: listing subnets: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error deleting network, listing subnets: %s", ProviderErrorToString(err)))
 	}
 	for _, sn := range sns {
 		err := client.DeleteSubnet(sn.ID)
 		if err != nil {
-			return fmt.Errorf("Error deleting network, deleting subnets: %s", ProviderErrorToString(err))
+			log.Debugf("Error deleting network: deleting subnets: %+v", err)
+			return errors.Wrap(err, fmt.Sprintf("Error deleting network, deleting subnets: %s", ProviderErrorToString(err)))
 		}
 	}
 	err = networks.Delete(client.Network, networkID).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting network: %s", ProviderErrorToString(err))
+		log.Debugf("Error deleting network: extracting errors: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error deleting network: %s", ProviderErrorToString(err)))
 	}
 	err = m.Delete()
 	if err != nil {
-		return fmt.Errorf("Error deleting network: %s", ProviderErrorToString(err))
+		log.Debugf("Error deleting network: deletion: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error deleting network: %s", ProviderErrorToString(err)))
 	}
 
 	return nil
@@ -333,7 +363,8 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	// Ensure network exists
 	net, err := client.GetNetwork(req.NetworkID)
 	if err != nil {
-		return nil, fmt.Errorf("Network %s not found %s", req.NetworkID, ProviderErrorToString(err))
+		log.Debugf("Error creating gateway: getting network: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Network %s not found %s", req.NetworkID, ProviderErrorToString(err)))
 	}
 	if net == nil {
 		return nil, fmt.Errorf("Network %s not found", req.NetworkID)
@@ -352,7 +383,8 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	}
 	host, err := client.createHost(hostReq, true)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating gateway : %s", ProviderErrorToString(err))
+		log.Debugf("Error creating gateway: creating host: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
 	}
 	err = metadata.SaveGateway(providers.FromClient(client), host, req.NetworkID)
 
@@ -367,17 +399,19 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	}(err)
 
 	if err != nil {
-		return nil, fmt.Errorf("Error saving gateway metadata: %s", ProviderErrorToString(err))
+		log.Debugf("Error creating gateway: saving network metadata: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error saving gateway metadata: %s", ProviderErrorToString(err)))
 	}
 
-	return host, err
+	return host, nil
 }
 
 // DeleteGateway delete the public gateway of a private network
 func (client *Client) DeleteGateway(networkID string) error {
 	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
 	if err != nil {
-		return err
+		log.Debugf("Error deleting gateway: loading gateway: %+v", err)
+		return errors.Wrap(err, "Error deleting gateway: loading gateway")
 	}
 	if m == nil {
 		return nil
@@ -450,7 +484,8 @@ func (client *Client) CreateSubnet(name string, networkID string, cidr string, i
 	// Execute the operation and get back a subnets.Subnet struct
 	subnet, err := subnets.Create(client.Network, opts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating subnet: %s", ProviderErrorToString(err))
+		log.Debugf("Error creating subnet: subnet creation: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating subnet: %s", ProviderErrorToString(err)))
 	}
 
 	if client.Cfg.UseLayer3Networking {
@@ -459,14 +494,16 @@ func (client *Client) CreateSubnet(name string, networkID string, cidr string, i
 			NetworkID: client.ProviderNetworkID,
 		})
 		if err != nil {
+			log.Debugf("Error creating subnet: router creation: %+v", err)
 			nerr := client.DeleteSubnet(subnet.ID)
 			if nerr != nil {
 				log.Warnf("Error deleting subnet: %v", nerr)
 			}
-			return nil, fmt.Errorf("Error creating subnet: %s", ProviderErrorToString(err))
+			return nil, errors.Wrap(err, fmt.Sprintf("Error creating subnet: %s", ProviderErrorToString(err)))
 		}
 		err = client.AddSubnetToRouter(router.ID, subnet.ID)
 		if err != nil {
+			log.Debugf("Error creating subnet: add subnet to router: %+v", err)
 			nerr := client.DeleteSubnet(subnet.ID)
 			if nerr != nil {
 				log.Warnf("Error deleting subnet: %v", nerr)
@@ -475,7 +512,7 @@ func (client *Client) CreateSubnet(name string, networkID string, cidr string, i
 			if nerr != nil {
 				log.Warnf("Error deleting router: %v", nerr)
 			}
-			return nil, fmt.Errorf("Error creating subnet: %s", ProviderErrorToString(err))
+			return nil, errors.Wrap(err, fmt.Sprintf("Error creating subnet: %s", ProviderErrorToString(err)))
 		}
 	}
 
@@ -493,7 +530,8 @@ func (client *Client) GetSubnet(id string) (*Subnet, error) {
 	// Execute the operation and get back a subnets.Subnet struct
 	subnet, err := subnets.Get(client.Network, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting subnet: %s", ProviderErrorToString(err))
+		log.Debugf("Error getting subnet: getting subnet: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error getting subnet: %s", ProviderErrorToString(err)))
 	}
 	return &Subnet{
 		ID:        subnet.ID,
@@ -528,9 +566,13 @@ func (client *Client) ListSubnets(netID string) ([]Subnet, error) {
 		return true, nil
 	})
 
-	// TODO previously we ignored the error here, consider returning nil, paginationErr
-	if paginationErr != nil {
-		log.Warnf("We have a pagination error !: %v", paginationErr)
+	if (paginationErr != nil) || (len(subnetList) == 0) {
+		if paginationErr != nil {
+			log.Debugf("Error listing subnets: pagination error: %+v", paginationErr)
+			return nil, errors.Wrap(paginationErr, fmt.Sprintf("We have a pagination error !: %v", paginationErr))
+		} else {
+			log.Warnf("Empty subnet list")
+		}
 	}
 
 	return subnetList, nil
@@ -548,10 +590,12 @@ func (client *Client) DeleteSubnet(id string) error {
 	}
 	if router != nil {
 		if err := client.RemoveSubnetFromRouter(router.ID, id); err != nil {
-			return fmt.Errorf("Error deleting subnets: %s", ProviderErrorToString(err))
+			log.Debugf("Error deleting subnet: removing subnet: %+v", err)
+			return errors.Wrap(err, fmt.Sprintf("Error deleting subnets: %s", ProviderErrorToString(err)))
 		}
 		if err := client.DeleteRouter(router.ID); err != nil {
-			return fmt.Errorf("Error deleting subnets: %s", ProviderErrorToString(err))
+			log.Debugf("Error deleting subnet: deleting router: %+v", err)
+			return errors.Wrap(err, fmt.Sprintf("Error deleting subnets: %s", ProviderErrorToString(err)))
 		}
 	}
 	var err error
@@ -563,7 +607,8 @@ func (client *Client) DeleteSubnet(id string) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("Error deleting subnets: %s", ProviderErrorToString(err))
+		log.Debugf("Error deleting subnet: deleting subnet: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error deleting subnets: %s", ProviderErrorToString(err)))
 	}
 
 	return nil
@@ -583,7 +628,8 @@ func (client *Client) CreateRouter(req RouterRequest) (*Router, error) {
 	}
 	router, err := routers.Create(client.Network, opts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating Router: %s", ProviderErrorToString(err))
+		log.Debugf("Error deleting subnet: deleting subnet: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating Router: %s", ProviderErrorToString(err)))
 	}
 	return &Router{
 		ID:        router.ID,
@@ -598,7 +644,8 @@ func (client *Client) GetRouter(id string) (*Router, error) {
 
 	r, err := routers.Get(client.Network, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting Router: %s", ProviderErrorToString(err))
+		log.Debugf("Error getting router: get router: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error getting Router: %s", ProviderErrorToString(err)))
 	}
 	return &Router{
 		ID:        r.ID,
@@ -627,8 +674,11 @@ func (client *Client) ListRouters() ([]Router, error) {
 		}
 		return true, nil
 	})
-	if err != nil {
-		return nil, fmt.Errorf("Error listing volume types: %s", ProviderErrorToString(err))
+	if (err != nil) || (len(ns) == 0) {
+		if err != nil {
+			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
+		}
+		log.Warnf("Router list empty !")
 	}
 	return ns, nil
 }
@@ -637,7 +687,8 @@ func (client *Client) ListRouters() ([]Router, error) {
 func (client *Client) DeleteRouter(id string) error {
 	err := routers.Delete(client.Network, id).ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting Router: %s", ProviderErrorToString(err))
+		log.Debugf("Error deleting router: delete: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error deleting Router: %s", ProviderErrorToString(err)))
 	}
 	return nil
 }
@@ -648,7 +699,8 @@ func (client *Client) AddSubnetToRouter(routerID string, subnetID string) error 
 		SubnetID: subnetID,
 	}).Extract()
 	if err != nil {
-		return fmt.Errorf("Error addinter subnet: %s", ProviderErrorToString(err))
+		log.Debugf("Error adding subnet to router: adding interface: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error addinter subnet: %s", ProviderErrorToString(err)))
 	}
 	return nil
 }
@@ -659,7 +711,8 @@ func (client *Client) RemoveSubnetFromRouter(routerID string, subnetID string) e
 		SubnetID: subnetID,
 	}).Extract()
 	if err != nil {
-		return fmt.Errorf("Error addinter subnet: %s", ProviderErrorToString(err))
+		log.Debugf("Error removing subnet from router: removing interface: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error addinter subnet: %s", ProviderErrorToString(err)))
 	}
 	return nil
 }

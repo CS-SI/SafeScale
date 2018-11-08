@@ -21,12 +21,11 @@ import (
 	"encoding/gob"
 	"fmt"
 	"strings"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/utils/metadata"
-
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -238,8 +237,13 @@ func (m *Network) detachGateway() error {
 		panic("m.inside is nil")
 	}
 
-	// TODO Check this
-	return m.inside.Delete(".", gatewayObjectName)
+	err := m.inside.Delete(".", gatewayObjectName)
+
+	if err != nil {
+		log.Errorf("Error detaching gateway: deleting host folder: %+v", err)
+	}
+
+	return err
 }
 
 // AttachHost links host ID to the network
@@ -247,7 +251,13 @@ func (m *Network) AttachHost(host *api.Host) error {
 	if m.inside == nil {
 		panic("m.inside is nil!")
 	}
-	return m.inside.Write(hostsFolderName, host.ID, host)
+	err := m.inside.Write(hostsFolderName, host.ID, host)
+
+	if err != nil {
+		log.Errorf("Error attaching host metadata: writing host folder: %+v", err)
+	}
+
+	return err
 }
 
 // DetachHost unlinks host ID to network
@@ -256,8 +266,11 @@ func (m *Network) DetachHost(hostID string) error {
 		panic("m.inside is nil!")
 	}
 
-	// TODO Check this
-	return m.inside.Delete(hostsFolderName, hostID)
+	err := m.inside.Delete(hostsFolderName, hostID)
+	if err != nil {
+		log.Errorf("Error detaching host metadata: deleting host folder: %+v", err)
+	}
+	return err
 }
 
 // ListHosts returns the list of ID of hosts attached to the network (be careful: including gateway)
@@ -275,6 +288,10 @@ func (m *Network) ListHosts() ([]*api.Host, error) {
 		list = append(list, &host)
 		return nil
 	})
+
+	if err != nil {
+		log.Errorf("Error listing hosts: browsing hosts: %+v", err)
+	}
 	return list, err
 }
 

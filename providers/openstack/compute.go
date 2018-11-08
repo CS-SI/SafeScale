@@ -66,19 +66,21 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		imageList, err := images.ExtractImages(page)
 		if err != nil {
+			log.Errorf("Error listing images: %+v", err)
 			return false, err
 		}
 
 		for _, img := range imageList {
 			imgList = append(imgList, api.Image{ID: img.ID, Name: img.Name})
-
 		}
 		return true, nil
 	})
-	if len(imgList) == 0 {
+	if (len(imgList) == 0) || (err != nil){
 		if err != nil {
+			log.Errorf("Error listing images: %+v", err)
 			return nil, fmt.Errorf("Error listing images: %s", ProviderErrorToString(err))
 		}
+		log.Warnf("Image list empty !")
 	}
 	return imgList, nil
 }
@@ -87,6 +89,7 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 func (client *Client) GetImage(id string) (*api.Image, error) {
 	img, err := images.Get(client.Compute, id).Extract()
 	if err != nil {
+		log.Errorf("Error getting image: %+v", err)
 		return nil, fmt.Errorf("Error getting image: %s", ProviderErrorToString(err))
 	}
 	return &api.Image{ID: img.ID, Name: img.Name}, nil
@@ -105,6 +108,7 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 		10*time.Second,
 	)
 	if err != nil {
+		log.Errorf("Error getting template: %+v", err)
 		return nil, fmt.Errorf("error getting template: %s", ProviderErrorToString(err))
 	}
 	return &api.HostTemplate{
@@ -150,10 +154,12 @@ func (client *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 		}
 		return true, nil
 	})
-	if len(flvList) == 0 {
+	if (len(flvList) == 0) || (err != nil) {
 		if err != nil {
+			log.Errorf("Error listing templates: %+v", err)
 			return nil, err
 		}
+		log.Warnf("Template list empty !")
 	}
 	return flvList, nil
 }
@@ -186,6 +192,7 @@ func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
 func (client *Client) GetKeyPair(id string) (*api.KeyPair, error) {
 	kp, err := keypairs.Get(client.Compute, id).Extract()
 	if err != nil {
+		log.Errorf("Error getting keypair: %+v", err)
 		return nil, err
 	}
 	return &api.KeyPair{
@@ -222,10 +229,12 @@ func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
 		}
 		return true, nil
 	})
-	if len(kpList) == 0 {
+	if (len(kpList) == 0) || (err != nil) {
 		if err != nil {
+			log.Errorf("Error listing keypairs: %+v", err)
 			return nil, err
 		}
+		log.Warnf("No keypairs in the list !")
 	}
 	return kpList, nil
 }
@@ -234,6 +243,7 @@ func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
 func (client *Client) DeleteKeyPair(id string) error {
 	err := keypairs.Delete(client.Compute, id).ExtractErr()
 	if err != nil {
+		log.Errorf("Error deleting keypair: %+v", err)
 		return fmt.Errorf("Error deleting key pair: %s", ProviderErrorToString(err))
 	}
 	return nil
@@ -366,19 +376,24 @@ type userData struct {
 func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 	m, err := metadata.NewGateway(providers.FromClient(client), networkID)
 	if err != nil {
+		log.Errorf("Error reading gateway metadata: %+v", err)
 		return nil, err
 	}
 
 	found, err := m.Read()
 	if err != nil {
+		log.Errorf("Error reading gateway metadata: reading: %+v", err)
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("unable to find gateway of network '%s'", networkID)
+		err := fmt.Errorf("unable to find gateway of network '%s'", networkID)
+		log.Errorf("Error reading gateway metadata: not found : %+v", err)
+		return nil, err
 	}
 
 	gw, err := servers.Get(client.Compute, m.Get().ID).Extract()
 	if err != nil {
+		log.Errorf("Error reading gateway metadata: getting server : %+v", err)
 		return nil, fmt.Errorf("Error creating Host: Unable to get gateway: %s", ProviderErrorToString(err))
 	}
 	return gw, nil
@@ -388,6 +403,7 @@ func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 	host, err := client.createHost(request, false)
 	if err != nil {
+		log.Errorf("Error creating host: %+v", err)
 		return nil, err
 	}
 
@@ -397,6 +413,8 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 		if nerr != nil {
 			log.Warnf("Error deleting host: %v", nerr)
 		}
+
+		log.Errorf("Error creating host: save host: %+v", err)
 		return nil, fmt.Errorf("error creating host: %s", ProviderErrorToString(err))
 	}
 
@@ -411,10 +429,13 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	// First check if name is not already used
 	m, err := metadata.LoadHost(providers.FromClient(client), request.Name)
 	if err != nil {
+		log.Errorf("Error creating host: loading host: %+v", err)
 		return nil, err
 	}
 	if m != nil {
-		return nil, fmt.Errorf(msgFail, fmt.Sprintf("a host already exists with name '%s'", request.Name))
+		err := fmt.Errorf(msgFail, fmt.Sprintf("a host already exists with name '%s'", request.Name))
+		log.Errorf("Error creating host: load host: %+v", err)
+		return nil, err
 	}
 
 	// Optional network gateway
@@ -424,10 +445,13 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		gwServer, err := client.readGateway(request.NetworkIDs[0])
 
 		if err != nil {
-			return nil, fmt.Errorf(msgFail, "no private host can be created on a network without gateway")
+			log.Errorf("Error creating host: read gateway: %+v", err)
+			err := fmt.Errorf(msgFail, "no private host can be created on a network without gateway")
+			return nil, err
 		}
 		m, err := metadata.LoadHost(providers.FromClient(client), gwServer.ID)
 		if err != nil {
+			log.Errorf("Error creating host: load host: %+v", err)
 			return nil, fmt.Errorf(msgFail, fmt.Sprintf("bad state, Gateway for network '%s' is not accessible", request.NetworkIDs[0]))
 		}
 		if m != nil {
@@ -439,6 +463,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	if isGateway {
 		m, err := metadata.LoadNetwork(providers.FromClient(client), request.NetworkIDs[0])
 		if err != nil {
+			log.Errorf("Error creating host: load network: %+v", err)
 			return nil, err
 		}
 		if m == nil {
@@ -470,18 +495,21 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	if kp == nil {
 		id, err := uuid.NewV4()
 		if err != nil {
+			log.Errorf("Error creating host: error creating UID: %+v", err)
 			return nil, fmt.Errorf("error creating UID : %v", err)
 		}
 
 		name := fmt.Sprintf("%s_%s", request.Name, id)
 		kp, err = client.CreateKeyPair(name)
 		if err != nil {
+			log.Errorf("Error creating host: creating key pair: %+v", err)
 			return nil, fmt.Errorf(msgFail, ProviderErrorToString(err))
 		}
 	}
 
 	userData, err := userdata.Prepare(client, request, isGateway, kp, gw, cidr)
 	if err != nil {
+		log.Errorf("Error creating host: preparing user data: %+v", err)
 		return nil, err
 	}
 
@@ -507,7 +535,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 					servers.Delete(client.Compute, server.ID)
 				}
 				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
-				// TODO Gotcha !!
+
 				log.Debugf(msg)
 				return fmt.Errorf(msg)
 			}
@@ -516,7 +544,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 			if err != nil {
 				servers.Delete(client.Compute, server.ID)
 				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
-				// TODO Gotcha !!
+
 				log.Debugf(msg)
 				return fmt.Errorf(msg)
 			}
@@ -526,6 +554,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 	)
 
 	if err != nil {
+		log.Errorf("Error creating host: timeout: %+v", err)
 		return nil, err
 	}
 
@@ -552,7 +581,9 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 			Pool: client.Opts.FloatingIPPool,
 		}).Extract()
 		if err != nil {
+			// TODO Don't ignore deleteresult
 			servers.Delete(client.Compute, host.ID)
+			log.Errorf("Error creating host: floating ip: %+v", err)
 			return nil, fmt.Errorf(msgFail, ProviderErrorToString(err))
 		}
 
@@ -743,9 +774,11 @@ func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, err
 func (client *Client) DeleteHost(ref string) error {
 	m, err := metadata.LoadHost(providers.FromClient(client), ref)
 	if err != nil {
+		log.Errorf("Error deleting host: getting host metadata: %+v", err)
 		return err
 	}
 	if m == nil {
+		log.Errorf("Error deleting host: no host found: %+v", err)
 		return fmt.Errorf("Failed to find host '%s' in metadata", ref)
 	}
 
@@ -759,10 +792,12 @@ func (client *Client) DeleteHost(ref string) error {
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
+					log.Errorf("Error deleting host: dissociate: %+v", err)
 					return fmt.Errorf("error deleting host %s : %s", host.Name, ProviderErrorToString(err))
 				}
 				err = floatingips.Delete(client.Compute, fip.ID).ExtractErr()
 				if err != nil {
+					log.Errorf("Error deleting host: delete floating ip: %+v", err)
 					return fmt.Errorf("error deleting host %s : %s", host.Name, ProviderErrorToString(err))
 				}
 			}
@@ -837,6 +872,7 @@ func (client *Client) StopHost(ref string) error {
 
 	m, err := metadata.LoadHost(providers.FromClient(client), ref)
 	if err != nil {
+		log.Errorf("Error getting ssh config: loading host metadata: %+v", err)
 		return err
 	}
 	if m != nil {
@@ -846,6 +882,7 @@ func (client *Client) StopHost(ref string) error {
 
 	err = startstop.Stop(client.Compute, id).ExtractErr()
 	if err != nil {
+		log.Errorf("Error stopping host: stopping host: %+v", err)
 		return fmt.Errorf("error stopping host : %s", ProviderErrorToString(err))
 	}
 	return nil
@@ -867,7 +904,7 @@ func (client *Client) RebootHost(ref string) error {
 	err = servers.Reboot(client.Compute, id, servers.RebootOpts{Type: "HARD"}).ExtractErr()
 	if err != nil {
 		ftErr := fmt.Errorf("error rebooting host [%s]: %s", id, ProviderErrorToString(err))
-		log.Println(ftErr)
+		log.Error(ftErr)
 		return ftErr
 	}
 	return nil
@@ -889,6 +926,7 @@ func (client *Client) StartHost(ref string) error {
 
 	err = startstop.Start(client.Compute, id).ExtractErr()
 	if err != nil {
+		log.Errorf("Error starting host: starting host: %+v", err)
 		return fmt.Errorf("error starting host : %s", ProviderErrorToString(err))
 	}
 
@@ -907,6 +945,7 @@ func (client *Client) getSSHConfig(host *api.Host) (*system.SSHConfig, error) {
 	if host.GatewayID != "" {
 		gw, err := client.GetHost(host.GatewayID)
 		if err != nil {
+			log.Errorf("Error getting ssh config: getting host: %+v", err)
 			return nil, err
 		}
 		ip := gw.GetAccessIP()
@@ -927,6 +966,7 @@ func (client *Client) getSSHConfig(host *api.Host) (*system.SSHConfig, error) {
 func (client *Client) GetSSHConfig(id string) (*system.SSHConfig, error) {
 	host, err := client.GetHost(id)
 	if err != nil {
+		log.Errorf("Error getting ssh config: getting host: %+v", err)
 		return nil, err
 	}
 	return client.getSSHConfig(host)

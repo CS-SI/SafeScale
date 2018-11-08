@@ -19,6 +19,7 @@ package cloudferro
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
@@ -43,18 +44,23 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	IdentityEndpoint := "https://cf2.cloudferro.com:5000/v3"
 	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
 		IdentityEndpoint: IdentityEndpoint,
-		//UserID:           opts.OpenstackID,
 		Username:   opts.Username,
 		Password:   opts.Password,
 		DomainName: opts.DomainName,
 		TenantName: opts.ProjectName,
 		Region:     opts.Region,
+		FloatingIPPool: "public",
 	},
 		openstack.CfgOptions{
 			ProviderNetwork:           "external",
 			UseFloatingIP:             true,
 			UseLayer3Networking:       true,
 			AutoHostNetworkInterfaces: true,
+			VolumeSpeeds: map[string]VolumeSpeed.Enum{
+				"standard":   VolumeSpeed.COLD,
+				"performant": VolumeSpeed.HDD,
+			},
+			DNSList: []string{"1.1.1.1"},
 		},
 	)
 
