@@ -490,12 +490,19 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 	for _, r := range ranges {
 		rList = append(rList, r.String())
 	}
+
 	sRanges := strings.Join(rList, ",")
-	res := objects.Download(client.Container, container, name, objects.DownloadOpts{
-		Range: fmt.Sprintf("bytes=%s", sRanges),
-	})
+	log.Debugf("Getting object from object conainer: downloading the range [%s]", sRanges)
 
 	// TODO Why we have a bad range ??
+	var res objects.DownloadResult
+	if len(sRanges) == 0 {
+		res = objects.Download(client.Container, container, name, objects.DownloadOpts{})
+	} else {
+		res = objects.Download(client.Container, container, name, objects.DownloadOpts{
+			Range: fmt.Sprintf("bytes=%s", sRanges),
+		})
+	}
 
 	content, err := res.ExtractContent()
 	if err != nil {
@@ -596,7 +603,7 @@ func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]
 			log.Debugf("Error listing objects: pagination error: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing objects of container '%s': %s", container, ProviderErrorToString(err)))
 		}
-		log.Warnf("Object list empty !")
+		log.Debugf("Listing Storage Objects: Object list empty !")
 	}
 	return objectList, nil
 }
