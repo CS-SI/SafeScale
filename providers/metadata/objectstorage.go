@@ -16,9 +16,18 @@
 
 package metadata
 
-const (
-	//ByIDFolderName tells in what folder to put 'byID' information
-	ByIDFolderName = "byID"
-	//ByNameFolderName tells in what folder to store 'byName' information
-	ByNameFolderName = "byName"
+import (
+	"os"
+	"strings"
 )
+
+// BuildMetadataBucketName builds the name of the bucket/container that will store metadata
+// id must be a unique identifier of the tenant (not the tenant itself, probability of having same
+// name for 2 different customers isn't zero; this can be domain or project name)
+func BuildMetadataBucketName(id string) string {
+	name := BucketNamePrefix + "-" + id
+	if suffix, ok := os.LookupEnv("SAFESCALE_METADATA_SUFFIX"); ok {
+		name += "." + suffix
+	}
+	return strings.ToLower(name)
+}

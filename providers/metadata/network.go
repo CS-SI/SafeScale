@@ -17,15 +17,15 @@
 package metadata
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/utils/metadata"
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkExtension"
+	"github.com/CS-SI/SafeScale/utils/metadata"
 )
 
 const (
@@ -35,16 +35,16 @@ const (
 	gatewayObjectName = "gw"
 )
 
-//Network links Object Storage folder and Network
+// Network links Object Storage folder and Network
 type Network struct {
-	name   string
-	id     string
 	item   *metadata.Item
 	inside *metadata.Folder
+	name   *string
+	id     *string
 }
 
 // NewNetwork creates an instance of network.Metadata
-func NewNetwork(svc *providers.Service) *Network {
+func NewNetwork(svc api.ClientAPI) *Network {
 	return &Network{
 		item: metadata.NewItem(svc, networksFolderName),
 	}
@@ -59,7 +59,7 @@ func (m *Network) GetPath() string {
 }
 
 // Carry links a Network instance to the Metadata instance
-func (m *Network) Carry(network *api.Network) *Network {
+func (m *Network) Carry(network *model.Network) *Network {
 	if network == nil {
 		panic("network parameter is nil!")
 	}
@@ -68,23 +68,18 @@ func (m *Network) Carry(network *api.Network) *Network {
 	}
 
 	m.item.Carry(network)
-	m.id = network.ID
-	m.name = network.Name
-	insidePath := strings.Trim(m.item.GetPath()+"/"+m.id, "/")
-	m.inside = metadata.NewFolder(m.item.GetService(), insidePath)
+	m.id = &network.ID
+	m.name = &network.Name
+	m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+*m.id, "/"))
 	return m
 }
 
-// Get returns the Network instance linked to metadata
-func (m *Network) Get() *api.Network {
+// Get returns the model.Network instance linked to metadata
+func (m *Network) Get() *model.Network {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	n, ok := m.item.Get().(*api.Network)
-	if ok {
-		return n
-	}
-	panic(fmt.Sprintf("invalid content in metadata of network '%s'", m.name))
+	return m.item.Get().(*model.Network)
 }
 
 // Write updates the metadata corresponding to the network in the Object Storage
@@ -92,22 +87,21 @@ func (m *Network) Write() error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-
-	err := m.item.WriteInto(ByIDFolderName, m.id)
+	err := m.item.WriteInto(ByIDFolderName, *m.id)
 	if err != nil {
 		return err
 	}
-	return m.item.WriteInto(ByNameFolderName, m.name)
+	return m.item.WriteInto(ByNameFolderName, *m.name)
 }
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (m *Network) Reload() error {
-	found, err := m.ReadByID(m.id)
+	found, err := m.ReadByID(*m.id)
 	if err != nil {
 		return err
 	}
 	if !found {
-		return fmt.Errorf("the metadata of Network '%s' vanished", m.name)
+		return fmt.Errorf("the metadata of Network '%s' vanished", *m.name)
 	}
 	return nil
 }
@@ -118,13 +112,13 @@ func (m *Network) ReadByID(id string) (bool, error) {
 		panic("m.item is nil!")
 	}
 
-	var data api.Network
-	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf *bytes.Buffer) (interface{}, error) {
-		err := gob.NewDecoder(buf).Decode(&data)
+	var network model.Network
+	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
+		err := (&network).Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &data, nil
+		return &network, nil
 	})
 	if err != nil {
 		return false, err
@@ -132,8 +126,8 @@ func (m *Network) ReadByID(id string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.id = id
-	m.name = data.Name
+	m.id = &network.ID
+	m.name = &network.Name
 	m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+id, "/"))
 	return true, nil
 }
@@ -144,13 +138,13 @@ func (m *Network) ReadByName(name string) (bool, error) {
 		panic("m.item is nil!")
 	}
 
-	var data api.Network
-	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf *bytes.Buffer) (interface{}, error) {
-		err := gob.NewDecoder(buf).Decode(&data)
+	var network model.Network
+	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
+		err := (&network).Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &data, nil
+		return &network, nil
 	})
 	if err != nil {
 		return false, err
@@ -158,9 +152,9 @@ func (m *Network) ReadByName(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.name = name
-	m.id = data.ID
-	m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+m.id, "/"))
+	m.name = &network.Name
+	m.id = &network.ID
+	m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+*m.id, "/"))
 	return true, nil
 }
 
@@ -171,18 +165,18 @@ func (m *Network) Delete() error {
 	}
 
 	// First delete network/<id> folder if it exists
-	nerr := m.item.Delete(m.id)
+	nerr := m.item.Delete(*m.id)
 	if nerr != nil {
 		log.Warnf("Error deleting network: %v", nerr)
 	}
 
 	// then delete the entry in 'ByIDFolderName' folder
-	err := m.item.DeleteFrom(ByIDFolderName, m.id)
+	err := m.item.DeleteFrom(ByIDFolderName, *m.id)
 	if err != nil {
 		return err
 	}
 	// at last delete the entry in 'ByNameFolderName' folder
-	err = m.item.DeleteFrom(ByNameFolderName, m.name)
+	err = m.item.DeleteFrom(ByNameFolderName, *m.name)
 	if err != nil {
 		return err
 	}
@@ -190,37 +184,41 @@ func (m *Network) Delete() error {
 }
 
 // Browse walks through all the metadata objects in network
-func (m *Network) Browse(callback func(*api.Network) error) error {
+func (m *Network) Browse(callback func(*model.Network) error) error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
 
-	return m.item.BrowseInto(ByIDFolderName, func(buf *bytes.Buffer) error {
-		var net api.Network
-		err := gob.NewDecoder(buf).Decode(&net)
+	return m.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
+		network := model.Network{}
+		err := (&network).Deserialize(buf)
 		if err != nil {
 			return err
 		}
-		return callback(&net)
+		return callback(&network)
 	})
 }
 
 // attachGateway register an host metadata as the Gateway for the network
-func (m *Network) attachGateway(host *Host) error {
+func (m *Network) attachGateway(mh *Host) error {
 	if m.inside == nil {
 		panic("m.inside is nil!")
 	}
-	return m.inside.Write(".", gatewayObjectName, host.Get())
+	data, err := mh.Get().Serialize()
+	if err != nil {
+		return err
+	}
+	return m.inside.Write(".", gatewayObjectName, data)
 }
 
 // getGateway returns the host acting as a gateway for the network
-func (m *Network) getGateway() (bool, *api.Host, error) {
+func (m *Network) getGateway() (bool, *model.Host, error) {
 	if m.inside == nil {
 		panic("m.inside is nil!")
 	}
-	var host api.Host
-	found, err := m.inside.Read(".", gatewayObjectName, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&host)
+	var host model.Host
+	found, err := m.inside.Read(".", gatewayObjectName, func(buf []byte) error {
+		return (&host).Deserialize(buf)
 	})
 	if err != nil {
 		return false, nil, err
@@ -273,17 +271,15 @@ func (m *Network) detachGateway() error {
 }
 
 // AttachHost links host ID to the network
-func (m *Network) AttachHost(host *api.Host) error {
+func (m *Network) AttachHost(host *model.Host) error {
 	if m.inside == nil {
 		panic("m.inside is nil!")
 	}
-	err := m.inside.Write(hostsFolderName, host.ID, host)
-
+	data, err := host.Serialize()
 	if err != nil {
-		log.Errorf("Error attaching host metadata: writing host folder: %+v", err)
+		return err
 	}
-
-	return err
+	return m.inside.Write(hostsFolderName, host.ID, data)
 }
 
 // DetachHost unlinks host ID to network
@@ -307,14 +303,14 @@ func (m *Network) DetachHost(hostID string) error {
 }
 
 // ListHosts returns the list of ID of hosts attached to the network (be careful: including gateway)
-func (m *Network) ListHosts() ([]*api.Host, error) {
+func (m *Network) ListHosts() ([]*model.Host, error) {
 	if m.inside == nil {
 		panic("m.inside is nil!")
 	}
-	var list []*api.Host
-	err := m.inside.Browse(hostsFolderName, func(buf *bytes.Buffer) error {
-		var host api.Host
-		err := gob.NewDecoder(buf).Decode(&host)
+	var list []*model.Host
+	err := m.inside.Browse(hostsFolderName, func(buf []byte) error {
+		host := model.Host{}
+		err := (&host).Deserialize(buf)
 		if err != nil {
 			return err
 		}
@@ -339,19 +335,17 @@ func (m *Network) Release() {
 }
 
 // SaveNetwork saves the Network definition in Object Storage
-func SaveNetwork(svc *providers.Service, net *api.Network) error {
-	log.Printf("Saving network '%s' definition in object storage...", net.Name)
+func SaveNetwork(svc api.ClientAPI, net *model.Network) error {
 	return NewNetwork(svc).Carry(net).Write()
 }
 
 // RemoveNetwork removes the Network definition from Object Storage
-func RemoveNetwork(svc *providers.Service, net *api.Network) error {
-	log.Printf("Removing network '%s' definition from object storage...", net.Name)
+func RemoveNetwork(svc api.ClientAPI, net *model.Network) error {
 	return NewNetwork(svc).Carry(net).Delete()
 }
 
-// LoadNetworkById gets the Network definition from Object Storage
-func LoadNetworkByID(svc *providers.Service, networkID string) (*Network, error) {
+// LoadNetworkByID gets the Network definition from Object Storage
+func LoadNetworkByID(svc api.ClientAPI, networkID string) (*Network, error) {
 	m := NewNetwork(svc)
 	found, err := m.ReadByID(networkID)
 	if err != nil {
@@ -364,7 +358,7 @@ func LoadNetworkByID(svc *providers.Service, networkID string) (*Network, error)
 }
 
 // LoadNetworkByName gets the Network definition from Object Storage
-func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, error) {
+func LoadNetworkByName(svc api.ClientAPI, networkname string) (*Network, error) {
 	m := NewNetwork(svc)
 	found, err := m.ReadByName(networkname)
 	if err != nil {
@@ -377,7 +371,7 @@ func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, er
 }
 
 // LoadNetwork gets the Network definition from Object Storage
-func LoadNetwork(svc *providers.Service, ref string) (*Network, error) {
+func LoadNetwork(svc api.ClientAPI, ref string) (*Network, error) {
 	m, err := LoadNetworkByID(svc, ref)
 	if err != nil {
 		return nil, err
@@ -404,7 +398,7 @@ type Gateway struct {
 }
 
 // NewGateway creates an instance of metadata.Gateway
-func NewGateway(svc *providers.Service, networkID string) (*Gateway, error) {
+func NewGateway(svc api.ClientAPI, networkID string) (*Gateway, error) {
 	network := NewNetwork(svc)
 	found, err := network.ReadByID(networkID)
 	if err != nil {
@@ -421,13 +415,13 @@ func NewGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 }
 
 // Carry links a Network instance to the Metadata instance
-func (m *Gateway) Carry(host *api.Host) *Gateway {
+func (m *Gateway) Carry(host *model.Host) *Gateway {
 	m.host.Carry(host)
 	return m
 }
 
-// Get returns the *api.Host linked to the metadata
-func (m *Gateway) Get() *api.Host {
+// Get returns the *model.Host linked to the metadata
+func (m *Gateway) Get() *model.Host {
 	if m.host == nil {
 		panic("m.host is nil!")
 	}
@@ -505,7 +499,7 @@ func (m *Gateway) Release() {
 }
 
 // LoadGateway returns the metadata of the Gateway of a network
-func LoadGateway(svc *providers.Service, networkID string) (*Gateway, error) {
+func LoadGateway(svc api.ClientAPI, networkID string) (*Gateway, error) {
 	m, err := NewGateway(svc, networkID)
 	if err != nil {
 		return nil, err
@@ -521,7 +515,7 @@ func LoadGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 }
 
 // SaveGateway saves the metadata of a gateway
-func SaveGateway(svc *providers.Service, host *api.Host, networkID string) error {
+func SaveGateway(svc api.ClientAPI, host *model.Host, networkID string) error {
 	m, err := NewGateway(svc, networkID)
 	if err != nil {
 		return err
@@ -530,10 +524,19 @@ func SaveGateway(svc *providers.Service, host *api.Host, networkID string) error
 	n := NewNetwork(svc)
 	ok, err := n.ReadByID(networkID)
 	if !ok || err != nil {
-		return fmt.Errorf("metadata about the  '%s' doesn't exist anymore", networkID)
+		return fmt.Errorf("metadata about the network '%s' doesn't exist anymore", networkID)
 	}
-	net := n.Get()
-	net.GatewayID = host.ID
+	network := n.Get()
+	networkV1 := model.NetworkExtensionNetworkV1{}
+	err = network.Extensions.Get(NetworkExtension.NetworkV1, &networkV1)
+	if err != nil {
+		return err
+	}
+	networkV1.GatewayID = host.ID
+	err = network.Extensions.Set(NetworkExtension.NetworkV1, &networkV1)
+	if err != nil {
+		return err
+	}
 	err = n.Write()
 	if err != nil {
 		return err

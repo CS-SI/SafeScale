@@ -25,6 +25,7 @@ import (
 	"text/template"
 
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
 	rice "github.com/GeertJohan/go.rice"
 )
@@ -34,9 +35,9 @@ type userData struct {
 	// User is the name of the default user (api.DefaultUser)
 	User string
 	// Key is the public key used to create the Host
-	Key string
+	PublicKey string
 	//PKey is the private key used to create the Host
-	PKey string
+	PrivateKey string
 	// ConfIF, if set to true, configure all interfaces to DHCP
 	ConfIF bool
 	// IsGateway, if set to true, activate IP frowarding
@@ -60,7 +61,7 @@ var userdataTemplate *template.Template
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func Prepare(
-	client api.ClientAPI, request api.HostRequest, isGateway bool, kp *api.KeyPair, gw *api.Host, cidr string,
+	client api.ClientAPI, request model.HostRequest, isGateway bool, kp *model.KeyPair, gw *model.Host, cidr string,
 ) ([]byte, error) {
 
 	// Generate password for user gpac
@@ -86,11 +87,7 @@ func Prepare(
 	// Determine Gateway IP
 	ip := ""
 	if gw != nil {
-		if len(gw.PrivateIPsV4) > 0 {
-			ip = gw.PrivateIPsV4[0]
-		} else if len(gw.PrivateIPsV6) > 0 {
-			ip = gw.PrivateIPsV6[0]
-		}
+		ip = gw.GetPrivateIP()
 	}
 
 	config, err := client.GetCfgOpts()
@@ -128,9 +125,9 @@ func Prepare(
 	}
 
 	data := userData{
-		User:       api.DefaultUser,
-		Key:        strings.Trim(kp.PublicKey, "\n"),
-		PKey:       strings.Trim(kp.PrivateKey, "\n"),
+		User:       model.DefaultUser,
+		PublicKey:  strings.Trim(kp.PublicKey, "\n"),
+		PrivateKey: strings.Trim(kp.PrivateKey, "\n"),
 		ConfIF:     !autoHostNetworkInterfaces,
 		IsGateway:  isGateway && !useLayer3Networking,
 		AddGateway: !request.PublicIP && !useLayer3Networking,
