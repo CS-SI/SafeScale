@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	logr "github.com/sirupsen/logrus"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
@@ -253,8 +255,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	return retcode, stdout, stderr, err
 }
 
-// Connect ...
-func (s *ssh) Connect(name string, timeout time.Duration) error {
+func (s *ssh) getSShConfigFromName(name string, timeout time.Duration) (*system.SSHConfig, error) {
 	conn := utils.GetConnection(int(s.session.brokerdPort))
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
@@ -266,9 +267,17 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 	service := pb.NewHostServiceClient(conn)
 	sshConfig, err := service.SSH(ctx, &pb.Reference{Name: name})
 	if err != nil {
+		return nil, err
+	}
+	return conv.ToSystemSshConfig(sshConfig), nil
+}
+
+// Connect ...
+func (s *ssh) Connect(name string, timeout time.Duration) error {
+	sshCfg, err := s.getSShConfigFromName(name, timeout)
+	if err != nil {
 		return err
 	}
-	sshCfg := conv.ToSystemSshConfig(sshConfig)
 
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
@@ -282,6 +291,38 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 		},
 	)
 }
+
+func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) error {
+	sshCfg, err := s.getSShConfigFromName(name, timeout)
+	if err != nil {
+		return err
+	}
+	sshCfg.Port = remotePort
+	sshCfg.LocalPort = localPort
+
+	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
+		func() error {
+			tunnels, _, err := sshCfg.CreateTunnels()
+			if err != nil {
+				for _, t := range tunnels {
+					nerr := t.Close()
+					if nerr != nil {
+						logr.Warnf("Error closing ssh tunnel: %v", nerr)
+					}
+				}
+				return fmt.Errorf("Unable to create command : %s", err.Error())
+			}
+			return nil
+		},
+		2*time.Minute,
+		func(t retry.Try, v Verdict.Enum) {
+			if v == Verdict.Retry {
+				log.Printf("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
+			}
+		},
+	)
+}
+
 
 // WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
 func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {

@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"strconv"
 
 	"github.com/CS-SI/SafeScale/broker/client"
 	utils "github.com/CS-SI/SafeScale/broker/utils"
@@ -36,6 +37,7 @@ var SSHCmd = cli.Command{
 		sshRun,
 		sshCopy,
 		sshConnect,
+		sshTunnel,
 	},
 }
 
@@ -124,6 +126,40 @@ var sshConnect = cli.Command{
 			return fmt.Errorf("host name required")
 		}
 		err := client.New(c.GlobalInt("port")).Ssh.Connect(c.Args().Get(0), 0)
+		if err != nil {
+			err = client.DecorateError(err, "ssh connect", false)
+		}
+		return err
+	},
+}
+
+var sshTunnel = cli.Command{
+	Name:		"tunnel",
+	Usage:		"Create a ssh tunnel between admin host and a host in the cloud",
+	ArgsUsage:	"<Host_name|Host_ID>",
+	Action: func(c *cli.Context) error{
+		if c.NArg() != 3 {
+			fmt.Println("Missing mandatory argument")
+			_ = cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("Missing arguments")
+		}
+		strLocalPort := c.Args().Get(1)
+		localPort, err := strconv.Atoi(strLocalPort)
+		if err != nil || 0 > localPort || localPort > 65535 {
+			fmt.Printf("%s is not a valid port\n", strLocalPort)
+			_ = cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("wrong value of localport")
+		}
+		strRemotePort := c.Args().Get(2)
+		remotePort, err := strconv.Atoi(strRemotePort)
+		if err != nil || 0 > remotePort || remotePort > 65535 {
+			fmt.Printf("%s is not a valid port\n", strRemotePort)
+			_ = cli.ShowSubcommandHelp(c)
+			return fmt.Errorf("wrong value of remoteport")
+		}
+
+		//c.GlobalInt("port") is the grpc port aka. 50051
+		err = client.New(c.GlobalInt("port")).Ssh.CreateTunnel(c.Args().Get(0), localPort, remotePort, 0)
 		if err != nil {
 			err = client.DecorateError(err, "ssh connect", false)
 		}
