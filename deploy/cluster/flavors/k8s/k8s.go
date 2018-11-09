@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"runtime"
 	"strconv"
 	"strings"
@@ -29,7 +28,10 @@ import (
 	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
+	log "github.com/sirupsen/logrus"
 
+	pb "github.com/CS-SI/SafeScale/broker"
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
@@ -38,19 +40,13 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
 	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
-
 	"github.com/CS-SI/SafeScale/deploy/install"
-
 	"github.com/CS-SI/SafeScale/providers"
-	providerapi "github.com/CS-SI/SafeScale/providers/api"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
-
+	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
-
-	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 )
 
 //go:generate rice embed-go
@@ -120,7 +116,7 @@ type Cluster struct {
 	provider *providers.Service
 
 	// gateway ...
-	gateway *providerapi.Host
+	gateway *model.Host
 }
 
 // GetNetworkID returns the ID of the network used by the cluster
@@ -238,9 +234,9 @@ func Create(port int, req clusterapi.Request) (clusterapi.Cluster, error) {
 	var (
 		instance                      Cluster
 		masterCount, privateNodeCount int
-		kp                            *providerapi.KeyPair
+		kp                            *model.KeyPair
 		kpName                        string
-		gw                            *providerapi.Host
+		gw                            *model.Host
 		m                             *providermetadata.Gateway
 		ok                            bool
 		gatewayChannel                chan error
@@ -641,7 +637,7 @@ func (c *Cluster) asyncCreateMaster(port int, index int, timeout time.Duration, 
 	// Update cluster definition in Object Storage
 	err = c.updateMetadata(port, func() error {
 		c.manager.MasterIDs = append(c.manager.MasterIDs, host.ID)
-		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PRIVATE_IP)
+		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PrivateIP)
 		return nil
 	})
 	if err != nil {
@@ -789,10 +785,10 @@ func (c *Cluster) asyncCreateNode(port int,
 		// Registers the new Agent in the cluster struct
 		if nodeType == NodeType.PublicNode {
 			c.Core.PublicNodeIDs = append(c.Core.PublicNodeIDs, host.ID)
-			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PRIVATE_IP)
+			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PrivateIP)
 		} else {
 			c.Core.PrivateNodeIDs = append(c.Core.PrivateNodeIDs, host.ID)
-			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PRIVATE_IP)
+			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PrivateIP)
 		}
 		return nil
 	})
@@ -877,12 +873,18 @@ func (c *Cluster) asyncCreateNode(port int,
 func (c *Cluster) asyncConfigureGateway(port int, done chan error) {
 	log.Printf("[gateway] starting configuration...")
 
-	err := provideruse.WaitSSHServerReady(port, c.provider, c.gateway.ID, 5*time.Minute)
+	brokerCltHost := brokerclient.New().Host
+	sshCfg, err := brokerCltHost.SSHConfig(c.gateway.ID)
 	if err != nil {
 		done <- err
 		return
 	}
-	host, err := brokerclient.New(port).Host.Inspect(c.gateway.ID, brokerclient.DefaultExecutionTimeout)
+	err = sshCfg.WaitServerReady(5 * time.Minute)
+	if err != nil {
+		done <- err
+		return
+	}
+	host, err := brokerCltHost.Inspect(c.gateway.ID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		done <- err
 		return
@@ -1062,21 +1064,25 @@ func (c *Cluster) ForceGetState(port int) (ClusterState.Enum, error) {
 		ran     bool // Tells if command has been run on remote host
 	)
 
+	brokerClt := brokerclient.New()
+	brokerCltHost := brokerClt.Host
 	cmd := fmt.Sprintf("%s kubectl get nodes", adminCmd)
-	ssh := brokerclient.New(port).Ssh
 	for _, id := range c.manager.MasterIDs {
-		err := provideruse.WaitSSHServerReady(port, c.provider, id, 2*time.Minute)
-		if err == nil {
-			if err != nil {
-				continue
-			}
-			retcode, _, stderr, err = ssh.Run(id, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
-			if err != nil {
-				continue
-			}
-			ran = true
-			break
+		sshCfg, err := brokerCltHost.SSHConfig(id)
+		if err != nil {
+			continue
 		}
+
+		err = sshCfg.WaitServerReady(2 * time.Minute)
+		if err != nil {
+			continue
+		}
+		retcode, _, stderr, err = brokerClt.Ssh.Run(id, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+		if err != nil {
+			continue
+		}
+		ran = true
+		break
 	}
 
 	err := c.updateMetadata(port, func() error {
@@ -1197,37 +1203,53 @@ func (c *Cluster) AddNodes(port int, count int, public bool, req *pb.HostDefinit
 }
 
 // FindAvailableMaster returns the ID of a master available
-func (c *Cluster) FindAvailableMaster(port int) (string, error) {
-	var masterID string
+func (c *Cluster) FindAvailableMaster() (string, error) {
+	masterID := ""
+	found := false
+	brokerCltHost := brokerclient.New().Host
 	for _, masterID = range c.manager.MasterIDs {
-		err := provideruse.WaitSSHServerReady(port, c.provider, masterID, 2*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(masterID)
+		if err != nil {
+			log.Errorf("failed to get ssh config of master '%s': %s", masterID, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 			return "", err
 		}
+		found = true
 		break
 	}
-	if masterID == "" {
+	if !found {
 		return "", fmt.Errorf("failed to find available master")
 	}
 	return masterID, nil
 }
 
 // FindAvailableNode returns the ID of a node available
-func (c *Cluster) FindAvailableNode(port int, public bool) (string, error) {
-	var hostID string
+func (c *Cluster) FindAvailableNode(public bool) (string, error) {
+	hostID := ""
+	found := false
+	brokerCltHost := brokerclient.New().Host
 	for _, hostID = range c.ListNodeIDs(public) {
-		err := provideruse.WaitSSHServerReady(port, c.provider, hostID, 2*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(hostID)
+		if err != nil {
+			log.Errorf("failed to get ssh config for node '%s': %s", hostID, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 		}
+		found = true
 		break
 	}
-	if hostID == "" {
+	if !found {
 		return "", fmt.Errorf("failed to find available node")
 	}
 	return hostID, nil

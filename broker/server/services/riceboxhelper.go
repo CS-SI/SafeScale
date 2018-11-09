@@ -74,7 +74,8 @@ func exec(script string, data interface{}, hostid string, provider *providers.Se
 		return tbr
 	}
 	// retrieve ssh config to perform some commands
-	ssh, err := provider.GetSSHConfig(hostid)
+	sshSvc := NewSSHService(provider)
+	ssh, err := sshSvc.GetConfig(hostid)
 	if err != nil {
 		// TODO Use more explicit error
 		tbr := errors.Wrap(err, "")

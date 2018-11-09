@@ -20,7 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/broker/daemon/services"
+	"github.com/CS-SI/SafeScale/broker/server/services"
+	"github.com/CS-SI/SafeScale/providers"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -46,7 +47,7 @@ func (s *NasServiceServer) Create(ctx context.Context, in *pb.NasDefinition) (*p
 		return nil, fmt.Errorf("Cannot create NAS : No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.Client)
+	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	nas, err := nasService.Create(in.GetNas().GetName(), in.GetHost().GetName(), in.GetPath())
 
 	if err != nil {
@@ -69,7 +70,7 @@ func (s *NasServiceServer) Delete(ctx context.Context, in *pb.NasName) (*pb.NasD
 		return nil, fmt.Errorf("Cannot delete NAS : No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.Client)
+	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 
 	if _, noNas := nasService.Inspect(in.GetName()); noNas != nil {
 		return nil, fmt.Errorf("Cannot delete NAS : NAS '%s' not found", in.GetName())
@@ -91,7 +92,7 @@ func (s *NasServiceServer) List(ctx context.Context, in *google_protobuf.Empty) 
 		return nil, fmt.Errorf("Cannot list NAS : No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.Client)
+	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	nass, err := nasService.List()
 
 	if err != nil {
@@ -116,7 +117,7 @@ func (s *NasServiceServer) Mount(ctx context.Context, in *pb.NasDefinition) (*pb
 		return nil, fmt.Errorf("Cannot mount NAS : No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.Client)
+	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	nas, err := nasService.Mount(in.GetNas().GetName(), in.GetHost().GetName(), in.GetPath())
 
 	if err != nil {
@@ -133,7 +134,7 @@ func (s *NasServiceServer) UMount(ctx context.Context, in *pb.NasDefinition) (*p
 		return nil, fmt.Errorf("Cannot unmount NAS : No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.Client)
+	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	nas, err := nasService.UMount(in.GetNas().GetName(), in.GetHost().GetName())
 
 	if err != nil {
@@ -150,7 +151,7 @@ func (s *NasServiceServer) Inspect(ctx context.Context, in *pb.NasName) (*pb.Nas
 		return nil, fmt.Errorf("Cannot inspect NAS : No tenant set")
 	}
 
-	nasService := services.NewNasService(currentTenant.Client)
+	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	nass, err := nasService.Inspect(in.GetName())
 
 	if err != nil {

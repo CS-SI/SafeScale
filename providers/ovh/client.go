@@ -19,7 +19,9 @@ package ovh
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
@@ -100,7 +102,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"classic":    VolumeSpeed.COLD,
 				"high-speed": VolumeSpeed.HDD,
 			},
-			MetadataBucketName: api.BuildMetadataBucketName(opts.ApplicationKey),
+			MetadataBucketName: metadata.BuildMetadataBucketName(opts.ApplicationKey),
 		},
 	)
 
@@ -139,12 +141,12 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 }
 
 // GetCfgOpts return configuration parameters
-func (client *Client) GetCfgOpts() (api.Config, error) {
+func (client *Client) GetCfgOpts() (model.Config, error) {
 	return client.osclt.GetCfgOpts()
 }
 
 // GetAuthOpts returns the auth options
-func (client *Client) GetAuthOpts() (api.Config, error) {
+func (client *Client) GetAuthOpts() (model.Config, error) {
 	return client.osclt.GetAuthOpts()
 }
 

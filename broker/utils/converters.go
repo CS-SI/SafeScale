@@ -17,8 +17,12 @@
 package utils
 
 import (
+	log "github.com/sirupsen/logrus"
+
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
+	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkExtension"
 	"github.com/CS-SI/SafeScale/system"
 )
 
@@ -53,7 +57,7 @@ func ToSystemSshConfig(from *pb.SshConfig) *system.SSHConfig {
 }
 
 // ToPBVolume converts an api.Volume to a *Volume
-func ToPBVolume(in *api.Volume) *pb.Volume {
+func ToPBVolume(in *model.Volume) *pb.Volume {
 	return &pb.Volume{
 		ID:    in.ID,
 		Name:  in.Name,
@@ -63,7 +67,7 @@ func ToPBVolume(in *api.Volume) *pb.Volume {
 }
 
 // ToPBVolumeAttachment converts an api.Volume to a *Volume
-func ToPBVolumeAttachment(in *api.VolumeAttachment) *pb.VolumeAttachment {
+func ToPBVolumeAttachment(in *model.VolumeAttachment) *pb.VolumeAttachment {
 	return &pb.VolumeAttachment{
 		Volume:    &pb.Reference{ID: in.VolumeID},
 		Host:      &pb.Reference{ID: in.ServerID},
@@ -73,7 +77,7 @@ func ToPBVolumeAttachment(in *api.VolumeAttachment) *pb.VolumeAttachment {
 }
 
 // ToPBVolumeInfo merges and converts an api.Volume and an api.VolumeAttachment to a *VolumeInfo
-func ToPBVolumeInfo(volume *api.Volume, volumeAttch *api.VolumeAttachment) *pb.VolumeInfo {
+func ToPBVolumeInfo(volume *model.Volume, volumeAttch *model.VolumeAttachment) *pb.VolumeInfo {
 	if volumeAttch != nil {
 		return &pb.VolumeInfo{
 			ID:        volume.ID,
@@ -107,7 +111,7 @@ func ToPBContainerList(in []string) *pb.ContainerList {
 }
 
 // ToPBContainerMountPoint convert a ContainerInfo into a ContainerMountingPoint
-func ToPBContainerMountPoint(in *api.ContainerInfo) *pb.ContainerMountingPoint {
+func ToPBContainerMountPoint(in *model.ContainerInfo) *pb.ContainerMountingPoint {
 	return &pb.ContainerMountingPoint{
 		Container: in.Name,
 		Path:      in.MountPoint,
@@ -116,7 +120,7 @@ func ToPBContainerMountPoint(in *api.ContainerInfo) *pb.ContainerMountingPoint {
 }
 
 // ToPBNas convert a Nas from api to protocolbuffer format
-func ToPBNas(in *api.Nas) *pb.NasDefinition {
+func ToPBNas(in *model.Nas) *pb.NasDefinition {
 	return &pb.NasDefinition{
 		ID:       in.ID,
 		Nas:      &pb.NasName{Name: in.Name},
@@ -127,30 +131,41 @@ func ToPBNas(in *api.Nas) *pb.NasDefinition {
 }
 
 // ToPBHost convert an host from api to protocolbuffer format
-func ToPBHost(in *api.Host) *pb.Host {
+func ToPBHost(in *model.Host) *pb.Host {
+	heNetworkV1 := model.HostExtensionNetworkV1{}
+	err := in.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	if err != nil {
+		return nil
+	}
+	heSizingV1 := model.HostExtensionSizingV1{}
+	err = in.Extensions.Get(HostExtension.SizingV1, &heSizingV1)
+	if err != nil {
+		return nil
+	}
 	return &pb.Host{
-		CPU:        int32(in.Size.Cores),
-		Disk:       int32(in.Size.DiskSize),
-		GatewayID:  in.GatewayID,
+		CPU:        int32(heSizingV1.AllocatedSize.Cores),
+		Disk:       int32(heSizingV1.AllocatedSize.DiskSize),
+		GatewayID:  heNetworkV1.DefaultGatewayID,
 		ID:         in.ID,
-		PUBLIC_IP:  in.GetPublicIP(),
-		PRIVATE_IP: in.GetPrivateIP(),
+		PublicIP:   in.GetPublicIP(),
+		PrivateIP:  in.GetPrivateIP(),
 		Name:       in.Name,
 		PrivateKey: in.PrivateKey,
-		RAM:        in.Size.RAMSize,
-		State:      pb.HostState(in.State),
+		RAM:        heSizingV1.AllocatedSize.RAMSize,
+		State:      pb.HostState(in.LastState),
 	}
 }
 
-func ToHostStatus(in *api.Host) *pb.HostStatus {
+// ToHostStatus ...
+func ToHostStatus(in *model.Host) *pb.HostStatus {
 	return &pb.HostStatus{
-		Name:       in.Name,
-		Status:     pb.HostState(in.State).String(),
+		Name:   in.Name,
+		Status: pb.HostState(in.LastState).String(),
 	}
 }
 
 // ToPBHostTemplate convert an template from api to protocolbuffer format
-func ToPBHostTemplate(in *api.HostTemplate) *pb.HostTemplate {
+func ToPBHostTemplate(in *model.HostTemplate) *pb.HostTemplate {
 	return &pb.HostTemplate{
 		ID:      in.ID,
 		Name:    in.Name,
@@ -163,7 +178,7 @@ func ToPBHostTemplate(in *api.HostTemplate) *pb.HostTemplate {
 }
 
 // ToPBImage convert an image from api to protocolbuffer format
-func ToPBImage(in *api.Image) *pb.Image {
+func ToPBImage(in *model.Image) *pb.Image {
 	return &pb.Image{
 		ID:   in.ID,
 		Name: in.Name,
@@ -171,11 +186,17 @@ func ToPBImage(in *api.Image) *pb.Image {
 }
 
 //ToPBNetwork convert a network from api to protocolbuffer format
-func ToPBNetwork(in *api.Network) *pb.Network {
+func ToPBNetwork(in *model.Network) *pb.Network {
+	networkV1 := model.NetworkExtensionNetworkV1{}
+	err := in.Extensions.Get(NetworkExtension.NetworkV1, &networkV1)
+	if err != nil {
+		log.Errorf(err.Error())
+		return nil
+	}
 	return &pb.Network{
 		ID:        in.ID,
 		Name:      in.Name,
 		CIDR:      in.CIDR,
-		GatewayID: in.GatewayID,
+		GatewayID: networkV1.GatewayID,
 	}
 }

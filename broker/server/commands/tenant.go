@@ -19,6 +19,7 @@ package commands
 import (
 	"context"
 	"fmt"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/providers"

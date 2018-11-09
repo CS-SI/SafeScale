@@ -237,7 +237,7 @@ func (is *step) Run(port int, hosts []*pb.Host, v Variables, s Settings) (stepRe
 			if false {
 				log.Printf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 			}
-			v["HostIP"] = h.PRIVATE_IP
+			v["HostIP"] = h.PrivateIP
 			v["Hostname"] = h.Name
 			results[h.Name] = is.runOnHost(port, h, v)
 			//if debug {
@@ -256,7 +256,7 @@ func (is *step) Run(port int, hosts []*pb.Host, v Variables, s Settings) (stepRe
 			if false {
 				log.Printf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 			}
-			v["HostIP"] = h.PRIVATE_IP
+			v["HostIP"] = h.PrivateIP
 			v["Hostname"] = h.Name
 			d := make(chan stepResult)
 			dones[h.Name] = d

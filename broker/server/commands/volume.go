@@ -19,15 +19,17 @@ package commands
 import (
 	"context"
 	"fmt"
-	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/daemon/services"
-	"github.com/CS-SI/SafeScale/broker/utils"
-	conv "github.com/CS-SI/SafeScale/broker/utils"
+
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
-
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/server/services"
+	"github.com/CS-SI/SafeScale/broker/utils"
+	conv "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 )
 
 // broker volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
@@ -50,7 +52,7 @@ func (s *VolumeServiceServer) List(ctx context.Context, in *pb.VolumeListRequest
 	if tenant == nil {
 		return nil, fmt.Errorf("Cannot list volumes : No tenant set")
 	}
-	service := VolumeServiceCreator(tenant.Client)
+	service := VolumeServiceCreator(providers.FromClient(tenant.Client))
 	volumes, err := service.List(in.GetAll())
 	if err != nil {
 		return nil, err
@@ -73,7 +75,7 @@ func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 		return nil, fmt.Errorf("Cannot create volume : No tenant set")
 	}
 
-	service := VolumeServiceCreator(tenant.Client)
+	service := VolumeServiceCreator(providers.FromClient(tenant.Client))
 	vol, err := service.Create(in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
 	if err != nil {
 		return nil, err
@@ -92,7 +94,7 @@ func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachmen
 		return nil, fmt.Errorf("Cannot attach volume : No tenant set")
 	}
 
-	service := services.NewVolumeService(currentTenant.Client)
+	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
 	err := service.Attach(in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat())
 
 	if err != nil {
@@ -111,7 +113,7 @@ func (s *VolumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachmen
 		return nil, fmt.Errorf("Cannot detach volume : No tenant set")
 	}
 
-	service := services.NewVolumeService(currentTenant.Client)
+	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
 	err := service.Detach(in.GetVolume().GetName(), in.GetHost().GetName())
 
 	if err != nil {
@@ -133,9 +135,9 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		return nil, fmt.Errorf("Cannot delete volume : No tenant set")
+		return nil, fmt.Errorf("cannot delete volume: no tenant set")
 	}
-	service := services.NewVolumeService(currentTenant.Client)
+	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
 	err := service.Delete(ref)
 	if err != nil {
 		vin, nerr := s.Inspect(ctx, in)
@@ -143,15 +145,15 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 			if vin.Host != nil {
 				hostName := utils.GetReference(vin.Host)
 
-				hostService := services.NewHostService(currentTenant.Client)
+				hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 				hap, ign := hostService.Get(hostName)
 
 				if ign == nil {
-					return nil, fmt.Errorf("Cannot delete volume '%s' because it's mounted on VM '%s'\nDetails: %s", in.Name, hap.Name, err)
+					return nil, fmt.Errorf("cannot delete volume '%s' because it's mounted on Host '%s'\nDetails: %s", in.Name, hap.Name, err)
 				}
 			}
 		} else {
-			log.Warnf("Error inspecting volume after delete failure: %v", nerr)
+			log.Warnf("error inspecting volume after delete failure: %v", nerr)
 		}
 
 		return nil, err
@@ -166,21 +168,21 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Cannot inspect volume : Neither name nor id given as reference")
+		return nil, fmt.Errorf("cannot inspect volume: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		return nil, fmt.Errorf("Cannot inspect volume : No tenant set")
+		return nil, fmt.Errorf("cannot inspect volume: No tenant set")
 	}
 
-	service := services.NewVolumeService(currentTenant.Client)
+	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
 	volume, volattach, err := service.Inspect(ref)
 	if err != nil {
 		return nil, err
 	}
 	if volume == nil {
-		return nil, fmt.Errorf("Cannot inspect volume : No volume '%s' found!", ref)
+		return nil, fmt.Errorf("cannot inspect volume: no volume '%s' found", ref)
 	}
 
 	return conv.ToPBVolumeInfo(volume, volattach), nil

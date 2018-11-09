@@ -26,8 +26,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/dlespiau/covertool/pkg/exit"
+	log "github.com/sirupsen/logrus"
+
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/daemon/commands"
+	"github.com/CS-SI/SafeScale/broker/server/commands"
 
 	"github.com/CS-SI/SafeScale/providers"
 

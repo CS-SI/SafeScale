@@ -76,7 +76,7 @@ S3AccessKeyPassword = "your_S3_password"
 
 To launch the SafeScale broker's daemon simply execute the following command:
 ```bash
-${GOPATH:-$HOME}/src/github.com/CS-SI/SafeScale/broker/daemon/brokerd &
+${GOPATH:-$HOME}/src/github.com/CS-SI/SafeScale/broker/server/brokerd &
 ```
 It should display in your terminal (with your current date and time):
 ```

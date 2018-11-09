@@ -18,15 +18,15 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkExtension"
 
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
@@ -62,10 +62,10 @@ type Subnet struct {
 	NetworkID string `json:"network_id,omitempty"`
 }
 
-//CreateNetwork creates a network named name
-func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
-	// We 1st check if name is not aleready used
-	_net, err := metadata.LoadNetwork(providers.FromClient(client), req.Name)
+// CreateNetwork creates a network named name
+func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
+	// We 1st check if name is not already used
+	_net, err := metadata.LoadNetwork(client, req.Name)
 	if err != nil {
 		log.Errorf("Error creating network: loading metadata: %+v", err)
 		return nil, errors.Wrap(err, "Error creating network: loading metadata")
@@ -98,13 +98,13 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating network %s: %s", req.Name, ProviderErrorToString(err)))
 	}
 
-	net := &api.Network{
-		ID:        network.ID,
-		Name:      network.Name,
-		CIDR:      sn.Mask,
+	net := model.NewNetwork()
+	net.ID = network.ID
+	net.Name = network.Name
+	net.CIDR = sn.Mask
+	err = net.Extensions.Set(NetworkExtension.NetworkV1, &model.NetworkExtensionNetworkV1{
 		IPVersion: sn.IPVersion,
-	}
-	err = metadata.SaveNetwork(providers.FromClient(client), net)
+	})
 	if err != nil {
 		log.Errorf("Error creating network: subnetwork save metadata: %+v", err)
 		nerr := client.DeleteNetwork(network.ID)
@@ -113,21 +113,20 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 		}
 		return nil, errors.Wrap(err, "Error creating network: subnetwork save metadata")
 	}
+
+	err = metadata.SaveNetwork(client, net)
+	if err != nil {
+		nerr := client.DeleteNetwork(network.ID)
+		if nerr != nil {
+			log.Warnf("Error deleting network: %v", nerr)
+		}
+		return nil, err
+	}
 	return net, nil
 }
 
-//GetNetwork returns the network identified by ref (id or name)
-func (client *Client) GetNetwork(ref string) (*api.Network, error) {
-	// We first try looking for network from metadata
-	m, err := metadata.LoadNetwork(providers.FromClient(client), ref)
-	if err != nil {
-		log.Errorf("Error getting network: loading network metadata: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting network: loading network metadata"))
-	}
-	if m != nil {
-		return m.Get(), nil
-	}
-
+// GetNetwork returns the network identified by ref (id or name)
+func (client *Client) GetNetwork(ref string) (*model.Network, error) {
 	// If not found, we look for any network from provider
 	// 1st try with id
 	network, err := networks.Get(client.Network, ref).Extract()
@@ -138,7 +137,6 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 		}
 	}
 	if network != nil && network.ID != "" {
-
 		sns, err := client.ListSubnets(ref)
 		if err != nil {
 			log.Errorf("Error getting network: listing subnet: %+v", err)
@@ -152,13 +150,18 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 		// if err != nil {
 		// 	return nil, fmt.Errorf("Bad configuration, no gateway associated to this network")
 		// }
-		return &api.Network{
-			ID:        network.ID,
-			Name:      network.Name,
-			CIDR:      sn.Mask,
+		net := model.NewNetwork()
+		net.ID = network.ID
+		net.Name = network.Name
+		net.CIDR = sn.Mask
+		err = net.Extensions.Set(NetworkExtension.NetworkV1, &model.NetworkExtensionNetworkV1{
 			IPVersion: sn.IPVersion,
 			// GatewayID: network.GatewayId,
-		}, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return net, nil
 	}
 
 	// Last chance, we look at all network
@@ -169,7 +172,7 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 	}
 	for _, n := range nets {
 		if n.ID == ref || n.Name == ref {
-			return &n, err
+			return n, err
 		}
 	}
 
@@ -177,23 +180,23 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 	return nil, nil
 }
 
-//ListNetworks lists available networks
-func (client *Client) ListNetworks(all bool) ([]api.Network, error) {
+// ListNetworks lists available networks
+func (client *Client) ListNetworks(all bool) ([]*model.Network, error) {
 	if all {
 		return client.listAllNetworks()
 	}
 	return client.listMonitoredNetworks()
 }
 
-//listAllNetworks lists available networks
-func (client *Client) listAllNetworks() ([]api.Network, error) {
+// listAllNetworks lists available networks
+func (client *Client) listAllNetworks() ([]*model.Network, error) {
 	// We have the option of filtering the network list. If we want the full
 	// collection, leave it as an empty struct
 	opts := networks.ListOpts{}
 
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := networks.List(client.Network, opts)
-	var netList []api.Network
+	var netList []*model.Network
 	// Define an anonymous function to be executed on each page's iteration
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		networkList, err := networks.ExtractNetworks(page)
@@ -202,7 +205,6 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 		}
 
 		for _, n := range networkList {
-
 			sns, err := client.ListSubnets(n.ID)
 			if err != nil {
 				return false, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
@@ -218,13 +220,18 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 			// if err != nil {
 			// 	return false, fmt.Errorf("Error getting network: %s", ProviderErrorToString(err))
 			// }
-			netList = append(netList, api.Network{
-				ID:        n.ID,
-				Name:      n.Name,
-				CIDR:      sn.Mask,
+			net := model.NewNetwork()
+			net.ID = n.ID
+			net.Name = n.Name
+			net.CIDR = sn.Mask
+			err = net.Extensions.Set(NetworkExtension.NetworkV1, &model.NetworkExtensionNetworkV1{
 				IPVersion: sn.IPVersion,
 				// GatewayID: gwID,
 			})
+			if err != nil {
+				return false, err
+			}
+			netList = append(netList, net)
 		}
 		return true, nil
 	})
@@ -239,28 +246,27 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 	return netList, nil
 }
 
-//listMonitoredNetworks lists available networks created by SafeScale (ie those registered in object storage)
-func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
-	var netList []api.Network
+// listMonitoredNetworks lists available networks created by SafeScale (ie those registered in object storage)
+func (client *Client) listMonitoredNetworks() ([]*model.Network, error) {
+	var netList []*model.Network
 
-	m := metadata.NewNetwork(providers.FromClient(client))
-	err := m.Browse(func(net *api.Network) error {
-		// Get info about the gateway associated to this network
-		mgw, err := metadata.NewGateway(providers.FromClient(client), net.ID)
-		if err != nil {
-			log.Print(err.Error())
-			return nil
-		}
-		ok, err := mgw.Read()
+	m := metadata.NewNetwork(client)
+	err := m.Browse(func(net *model.Network) error {
+		// // Get info about the gateway associated to this network
+		// mgw, err := metadata.NewGateway(client, net.ID)
+		// if err != nil {
+		// 	log.Print(err.Error())
+		// 	return nil
+		// }
+		// ok, err := mgw.Read()
 
-		if ok && (err == nil) {
-			gwhost := mgw.Get()
+		// if ok && (err == nil) {
+		// 	gwhost := mgw.Get()
+		// 	// Update GatewayId field
+		// 	net.GatewayID = gwhost.ID
+		// }
 
-			// Update GatewayId field
-			net.GatewayID = gwhost.ID
-		}
-
-		netList = append(netList, *net)
+		netList = append(netList, net)
 		return nil
 	})
 
@@ -278,15 +284,17 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (client *Client) DeleteNetwork(networkRef string) error {
-	m, err := metadata.LoadNetwork(providers.FromClient(client), networkRef)
+	// TODO Add more detailed exceptions here
+	mn, err := metadata.LoadNetwork(client, networkRef)
 	if err != nil {
 		log.Errorf("Error deleting network '%s': failure loading network metadata: %+v", networkRef, err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting network '%s': failure loading network metadata", networkRef))
 	}
-	if m == nil {
-		return fmt.Errorf("Error deleting network '%s': Failed to find network '%s' in metadata", networkRef, networkRef)
+	if mn == nil {
+		return fmt.Errorf("Failed to find network '%s' in metadata", networkRef)
 	}
-	networkID := m.Get().ID
+	network := mn.Get()
+	networkID := network.ID
 
 	err = networks.Get(client.Network, networkID).Err
 	if err != nil {
@@ -296,12 +304,17 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		}
 	}
 
-	hosts, err := m.ListHosts()
+	neNetworkV1 := model.NetworkExtensionNetworkV1{}
+	err = network.Extensions.Get(NetworkExtension.NetworkV1, &neNetworkV1)
 	if err != nil {
-		log.Errorf("Error deleting network: listing hosts: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error deleting network: listing hosts"))
+		return fmt.Errorf("failed to get gateway ID of network '%s' in metadata", networkRef)
 	}
-	gwID := m.Get().GatewayID
+	gwID := neNetworkV1.GatewayID
+
+	hosts, err := mn.ListHosts()
+	if err != nil {
+		return err
+	}
 	if len(hosts) > 0 {
 		var allhosts []string
 		for _, i := range hosts {
@@ -318,12 +331,11 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		}
 	}
 
-	err = client.DeleteGateway(networkID)
-	if err != nil {
-		log.Errorf("Error deleting network '%s': %+v", networkRef, err)
-	}
-
 	if gwID != "" {
+		err = client.DeleteGateway(networkID)
+		if err != nil {
+			log.Warnf("Error deleting gateway: %s", ProviderErrorToString(err))
+		}
 		err = networks.Get(client.Network, gwID).Err
 		if err != nil {
 			if strings.Contains(err.Error(), "Resource not found") {
@@ -349,7 +361,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		log.Errorf("Error deleting network: extracting errors: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting network: %s", ProviderErrorToString(err)))
 	}
-	err = m.Delete()
+	err = mn.Delete()
 	if err != nil {
 		log.Errorf("Error deleting network: deletion: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting network: %s", ProviderErrorToString(err)))
@@ -359,7 +371,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
+func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
 	// Ensure network exists
 	net, err := client.GetNetwork(req.NetworkID)
 	if err != nil {
@@ -373,24 +385,24 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	if gwname == "" {
 		gwname = "gw-" + net.Name
 	}
-	hostReq := api.HostRequest{
-		ImageID:    req.ImageID,
-		KeyPair:    req.KeyPair,
-		Name:       gwname,
-		TemplateID: req.TemplateID,
-		NetworkIDs: []string{req.NetworkID},
-		PublicIP:   true,
+	hostReq := model.HostRequest{
+		ImageID:      req.ImageID,
+		KeyPair:      req.KeyPair,
+		ResourceName: gwname,
+		TemplateID:   req.TemplateID,
+		NetworkIDs:   []string{req.NetworkID},
+		PublicIP:     true,
 	}
 	host, err := client.createHost(hostReq, true)
 	if err != nil {
 		log.Errorf("Error creating gateway: creating host: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
 	}
-	err = metadata.SaveGateway(providers.FromClient(client), host, req.NetworkID)
+	err = metadata.SaveGateway(client, host, req.NetworkID)
 
 	// delete the host when found problem saving metadata
 	defer func(err error) {
-		if err != nil{
+		if err != nil {
 			nerr := client.DeleteHost(host.ID)
 			if nerr != nil {
 				log.Warnf("Problem cleaning up after failure saving metadata : trying to delete host: %v", nerr)
@@ -408,7 +420,7 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 
 // DeleteGateway delete the public gateway of a private network
 func (client *Client) DeleteGateway(networkID string) error {
-	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
+	m, err := metadata.LoadGateway(client, networkID)
 	if err != nil {
 		// log.Errorf("Error deleting gateway: failure loading gateway metadata: %+v", err)
 		return errors.Wrap(err, "Error deleting gateway: failure loading gateway metadata")
@@ -428,6 +440,10 @@ func (client *Client) DeleteGateway(networkID string) error {
 		for err = nil; err != nil; _, err = client.GetHost(host.ID) {
 			time.Sleep(100 * time.Millisecond)
 		}
+	}
+	// Loop waiting for effective deletion of the host
+	for err = nil; err != nil; err = client.UpdateHost(host) {
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	return m.Delete()

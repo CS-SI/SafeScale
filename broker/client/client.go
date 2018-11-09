@@ -79,19 +79,16 @@ func DecorateError(err error, action string, maySucceed bool) error {
 			msg += " (may eventually succeed)"
 		}
 		return fmt.Errorf(msg, action, DefaultExecutionTimeout)
-	} else {
-		msg := err.Error()
-		if strings.Index(msg, "desc = ") != -1 {
-			pos := strings.Index(msg, "desc = ") + 7
-			msg = msg[pos:]
+	}
+	msg := err.Error()
+	if strings.Index(msg, "desc = ") != -1 {
+		pos := strings.Index(msg, "desc = ") + 7
+		msg = msg[pos:]
 
-			if strings.Index(msg, " :") == 0 {
-				msg = msg[2:]
-			}
-
-			return errors.New(msg)
-
+		if strings.Index(msg, " :") == 0 {
+			msg = msg[2:]
 		}
+		return errors.New(msg)
 	}
 	return err
 }
