@@ -14,20 +14,22 @@
  * limitations under the License.
  */
 
-package HostExtension
+package HostState
 
 //go:generate stringer -type=Enum
 
-// Enum represents the type of additional info for an host
-type Enum uint8
+//Enum represents the state of an host
+type Enum int
 
 const (
-	_ Enum = iota
-
-	// DescriptionV1 contains optional additional info describing host (creation date, purpose, ...)
-	DescriptionV1
-	// NetworkV1 contains network information about the host
-	NetworkV1
-	// FeaturesV1 contains optional additional info describing installed components
-	FeaturesV1
+	// STOPPED when host is stopped
+	STOPPED Enum = iota
+	// STARTING when host is starting
+	STARTING
+	// STARTED when host is started
+	STARTED
+	// STOPPING when host is stopping
+	STOPPING
+	// ERROR when host is in error state*/
+	ERROR
 )
