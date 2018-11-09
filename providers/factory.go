@@ -50,6 +50,7 @@ func Tenants() (map[string]string, error) {
 // GetService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
 func GetService(tenantName string) (*Service, error) {
+	log.Infof("Getting service from tenant: %s", tenantName)
 	tenants, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
