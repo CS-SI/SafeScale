@@ -24,7 +24,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"runtime"
 	"strconv"
 	"strings"
@@ -32,9 +31,12 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
+	log "github.com/sirupsen/logrus"
 
+	pb "github.com/CS-SI/SafeScale/broker"
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
-
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
@@ -42,21 +44,14 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
 	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
-
 	"github.com/CS-SI/SafeScale/deploy/install"
-
 	"github.com/CS-SI/SafeScale/providers"
-	providerapi "github.com/CS-SI/SafeScale/providers/api"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
-
+	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/template"
-
-	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 )
 
 //go:generate rice embed-go
@@ -195,7 +190,7 @@ func Create(port int, req clusterapi.Request) (clusterapi.Cluster, error) {
 		CPUNumber: 4,
 		RAM:       15.0,
 		Disk:      100,
-		ImageID:   "Ubuntu 17.10",
+		ImageID:   "Ubuntu 16.04",
 	}
 	if req.NodesDef != nil {
 		if req.NodesDef.CPUNumber > nodesDef.CPUNumber {
@@ -239,9 +234,9 @@ func Create(port int, req clusterapi.Request) (clusterapi.Cluster, error) {
 		instance         Cluster
 		masterCount      int
 		privateNodeCount int
-		kp               *providerapi.KeyPair
+		kp               *model.KeyPair
 		kpName           string
-		gw               *providerapi.Host
+		gw               *model.Host
 		m                *providermetadata.Gateway
 		ok               bool
 		gatewayChannel   chan error
@@ -549,7 +544,7 @@ func (c *Cluster) configureNodes(port int, hosts []string) error {
 			if err != nil {
 				return err
 			}
-			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", strings.Trim(token, "\n"), host.GetPRIVATE_IP())
+			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", strings.Trim(token, "\n"), host.GetPrivateIP())
 			break
 		}
 		log.Printf("failed to get token from '%s': %s\n", master, stderr)
@@ -660,7 +655,7 @@ func (c *Cluster) asyncCreateMaster(port int, index int, def pb.HostDefinition, 
 	// Update cluster definition in Object Storage
 	err = c.updateMetadata(port, func() error {
 		c.manager.MasterIDs = append(c.manager.MasterIDs, host.ID)
-		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PRIVATE_IP)
+		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PrivateIP)
 		return nil
 	})
 	if err != nil {
@@ -801,10 +796,10 @@ func (c *Cluster) asyncCreateNode(port int,
 		// Registers the new Agent in the cluster struct
 		if nodeType == NodeType.PublicNode {
 			c.Core.PublicNodeIDs = append(c.Core.PublicNodeIDs, host.ID)
-			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PRIVATE_IP)
+			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PrivateIP)
 		} else {
 			c.Core.PrivateNodeIDs = append(c.Core.PrivateNodeIDs, host.ID)
-			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PRIVATE_IP)
+			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PrivateIP)
 		}
 		return nil
 	})
@@ -914,7 +909,12 @@ func (c *Cluster) asyncCreateNode(port int,
 func (c *Cluster) asyncInstallGateway(port int, gw *pb.Host, done chan error) {
 	log.Printf("[gateway] starting installation...")
 
-	err := provideruse.WaitSSHServerReady(port, c.provider, gw.ID, 5*time.Minute)
+	sshCfg, err := brokerclient.New().Host.SSHConfig(gw.ID)
+	if err != nil {
+		done <- err
+		return
+	}
+	err = sshCfg.WaitServerReady(5 * time.Minute)
 	if err != nil {
 		done <- err
 		return
@@ -1352,38 +1352,54 @@ func (c *Cluster) GetConfig() clusterapi.ClusterCore {
 }
 
 // FindAvailableMaster returns the ID of the first master available for execution
-func (c *Cluster) FindAvailableMaster(port int) (string, error) {
-	var masterID string
+func (c *Cluster) FindAvailableMaster() (string, error) {
+	masterID := ""
+	found := false
+	brokerCltHost := brokerclient.New().Host
 	for _, masterID = range c.manager.MasterIDs {
-		err := provideruse.WaitSSHServerReady(port, c.provider, masterID, 2*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(masterID)
+		if err != nil {
+			log.Errorf("failed to get ssh config for master '%s': %s", masterID, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 			return "", err
 		}
+		found = true
 		break
 	}
-	if masterID == "" {
+	if !found {
 		return "", fmt.Errorf("failed to find available master")
 	}
 	return masterID, nil
 }
 
 // FindAvailableNode returns the ID of a node available
-func (c *Cluster) FindAvailableNode(port int, public bool) (string, error) {
-	var hostID string
+func (c *Cluster) FindAvailableNode(public bool) (string, error) {
+	hostID := ""
+	found := false
+	brokerCltHost := brokerclient.New().Host
 	for _, hostID = range c.ListNodeIDs(public) {
-		err := provideruse.WaitSSHServerReady(port, c.provider, hostID, 5*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(hostID)
+		if err != nil {
+			log.Errorf("failed to get ssh config of node '%s': %s", hostID, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 			return "", err
 		}
+		found = true
 		break
 	}
-	if hostID == "" {
+	if !found {
 		return "", fmt.Errorf("failed to find available node")
 	}
 	return hostID, nil

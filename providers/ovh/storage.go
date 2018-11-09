@@ -17,25 +17,25 @@
 package ovh
 
 import (
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 )
 
 // CreateVolume creates a block volume
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
+func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
 	return client.osclt.CreateVolume(request)
 }
 
 // GetVolume returns the volume identified by id
-func (client *Client) GetVolume(id string) (*api.Volume, error) {
+func (client *Client) GetVolume(id string) (*model.Volume, error) {
 	return client.osclt.GetVolume(id)
 }
 
 //ListVolumes return the list of all volume known on the current tenant (all=ture)
 //or 'only' thode monitored by safescale (all=false) ie those monitored by metadata
-func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
+func (client *Client) ListVolumes(all bool) ([]model.Volume, error) {
 	return client.osclt.ListVolumes(all)
 }
 
@@ -48,17 +48,17 @@ func (client *Client) DeleteVolume(id string) error {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
+func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (*model.VolumeAttachment, error) {
 	return client.osclt.CreateVolumeAttachment(request)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (client *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment, error) {
+func (client *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachment, error) {
 	return client.osclt.GetVolumeAttachment(serverID, id)
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttachment, error) {
+func (client *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error) {
 	return client.osclt.ListVolumeAttachments(serverID)
 }
 
@@ -88,7 +88,7 @@ func (client *Client) GetContainerMetadata(name string) (map[string]string, erro
 }
 
 // GetContainer get container info
-func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
+func (client *Client) GetContainer(name string) (*model.ContainerInfo, error) {
 	return client.osclt.GetContainer(name)
 }
 
@@ -98,27 +98,27 @@ func (client *Client) ListContainers() ([]string, error) {
 }
 
 // PutObject put an object into an object container
-func (client *Client) PutObject(container string, obj api.Object) error {
+func (client *Client) PutObject(container string, obj model.Object) error {
 	return client.osclt.PutObject(container, obj)
 }
 
 // UpdateObjectMetadata update an object into an object container
-func (client *Client) UpdateObjectMetadata(container string, obj api.Object) error {
+func (client *Client) UpdateObjectMetadata(container string, obj model.Object) error {
 	return client.osclt.UpdateObjectMetadata(container, obj)
 }
 
 // GetObject get  object content from an object container
-func (client *Client) GetObject(container string, name string, ranges []api.Range) (*api.Object, error) {
+func (client *Client) GetObject(container string, name string, ranges []model.Range) (*model.Object, error) {
 	return client.osclt.GetObject(container, name, ranges)
 }
 
 // GetObjectMetadata get  object metadata from an object container
-func (client *Client) GetObjectMetadata(container string, name string) (*api.Object, error) {
+func (client *Client) GetObjectMetadata(container string, name string) (*model.Object, error) {
 	return client.osclt.GetObjectMetadata(container, name)
 }
 
 // ListObjects list objects of a container
-func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]string, error) {
+func (client *Client) ListObjects(container string, filter model.ObjectFilter) ([]string, error) {
 	return client.osclt.ListObjects(container, filter)
 }
 

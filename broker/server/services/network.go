@@ -18,40 +18,47 @@ package services
 
 import (
 	"fmt"
+
+	"github.com/pkg/errors"
+
+	log "github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/metadata"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkExtension"
 )
 
-//go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services NetworkAPI
+//go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services NetworkAPI
 
-//NetworkAPI defines API to manage networks
+// NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*api.Network, error)
-	List(all bool) ([]api.Network, error)
-	Get(ref string) (*api.Network, error)
+	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*model.Network, error)
+	List(all bool) ([]*model.Network, error)
+	Get(ref string) (*model.Network, error)
 	Delete(ref string) error
 }
 
-// NetworkService an instance of NetworkAPI
+// NetworkService an implementation of NetworkAPI
 type NetworkService struct {
 	provider  *providers.Service
 	ipVersion IPVersion.Enum
 }
 
 // NewNetworkService Creates new Network service
-func NewNetworkService(api api.ClientAPI) NetworkAPI {
+func NewNetworkService(api *providers.Service) NetworkAPI {
 	return &NetworkService{
-		provider: providers.FromClient(api),
+		provider: api,
 	}
 }
 
 // Create creates a network
-func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (apinetwork *api.Network, err error) {
+func (svc *NetworkService) Create(
+	net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string,
+) (apinetwork *model.Network, err error) {
+
 	// Verify that the network doesn't exist first
 	if exists, err := svc.provider.GetNetwork(net); exists != nil && err == nil {
 		tbr := errors.Errorf("A network already exists with name '%s'", net)
@@ -60,7 +67,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 
 	// Create the network
-	network, err := svc.provider.CreateNetwork(api.NetworkRequest{
+	network, err := svc.provider.CreateNetwork(model.NetworkRequest{
 		Name:      net,
 		IPVersion: ipVersion,
 		CIDR:      cidr,
@@ -90,7 +97,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}()
 
 	// Create a gateway
-	tpls, err := svc.provider.SelectTemplatesBySize(api.SizingRequirements{
+	tpls, err := svc.provider.SelectTemplatesBySize(model.SizingRequirements{
 		MinCores:    cpu,
 		MinRAMSize:  ram,
 		MinDiskSize: disk,
@@ -120,7 +127,10 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		return nil, tbr
 	}
 
-	gwRequest := api.GWRequest{
+	if gwname == "" {
+		gwname = "gw-" + network.Name
+	}
+	gwRequest := model.GWRequest{
 		ImageID:    img.ID,
 		NetworkID:  network.ID,
 		KeyPair:    keypair,
@@ -128,9 +138,6 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		GWName:     gwname,
 	}
 
-	if gwname == "" {
-		gwname = "gw-" + network.Name
-	}
 	log.Printf("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwname)
 
 	log.Printf("Requesting the creation of a gateway '%s' with '%s'", gwname, img.ID)
@@ -146,7 +153,8 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
 
-	ssh, err := svc.provider.GetSSHConfig(gw.ID)
+	sshSvc := NewSSHService(svc.provider)
+	ssh, err := sshSvc.GetConfig(gw.ID)
 	if err != nil {
 		defer svc.provider.DeleteHost(gw.ID)
 		tbr := errors.Wrapf(err, "Error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
@@ -174,8 +182,18 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		return nil, tbr
 	}
 	if rv != nil {
-		rv.GatewayID = gw.ID
+		networkV1 := model.NetworkExtensionNetworkV1{}
+		err = rv.Extensions.Get(NetworkExtension.NetworkV1, &networkV1)
+		if err != nil {
+			return nil, err
+		}
+		networkV1.GatewayID = gw.ID
+		err = rv.Extensions.Set(NetworkExtension.NetworkV1, &networkV1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update gateway id of network '%s': %v", net, err)
+		}
 	}
+
 	err = metadata.SaveNetwork(svc.provider, rv)
 	if err != nil {
 		tbr := errors.Wrap(err, "Error creating network: Error saving network metadata")
@@ -187,12 +205,12 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 }
 
 // List returns the network list
-func (svc *NetworkService) List(all bool) ([]api.Network, error) {
+func (svc *NetworkService) List(all bool) ([]*model.Network, error) {
 	return svc.provider.ListNetworks(all)
 }
 
 // Get returns the network identified by ref, ref can be the name or the id
-func (svc *NetworkService) Get(ref string) (*api.Network, error) {
+func (svc *NetworkService) Get(ref string) (*model.Network, error) {
 	return svc.provider.GetNetwork(ref)
 }
 

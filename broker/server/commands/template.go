@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/daemon/services"
+	"github.com/CS-SI/SafeScale/broker/server/services"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	log "github.com/sirupsen/logrus"
 )

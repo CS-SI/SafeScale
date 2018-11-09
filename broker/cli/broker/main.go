@@ -17,12 +17,18 @@
 package main
 
 import (
-	"fmt"
-	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
 	"os"
+	"fmt"
 	"sort"
 
-	"github.com/urfave/cli"
+	log "github.com/sirupsen/logrus"
+
+	cli "github.com/urfave/cli"
+
+	context "golang.org/x/net/context"
+	"google.golang.org/grpc"
+
+	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
 )
 
 func main() {

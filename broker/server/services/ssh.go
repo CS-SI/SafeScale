@@ -18,42 +18,106 @@ package services
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 
+	//"github.com/davecgh/go-spew/spew"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 
 	"github.com/CS-SI/SafeScale/system"
-
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
 )
 
 const protocolSeparator = ":"
 
-//go:generate mockgen -destination=../mocks/mock_sshapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services SSHAPI
+//go:generate mockgen -destination=../mocks/mock_sshapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services SSHAPI
 
 // SSHAPI defines ssh management API
 type SSHAPI interface {
-	Connect(name string) error
-	Run(cmd string) (string, string, int, error)
-	Copy(from string, to string)
-}
-
-// NewSSHService creates a SSH service
-func NewSSHService(api api.ClientAPI) *SSHService {
-	return &SSHService{
-		provider:    providers.FromClient(api),
-		hostService: NewHostService(api),
-	}
+	// Connect(name string) error
+	Run(hostname, cmd string) (int, string, string, error)
+	Copy(from string, to string) (int, string, string, error)
+	GetConfig(interface{}) (*system.SSHConfig, error)
 }
 
 // SSHService SSH service
 type SSHService struct {
 	provider    *providers.Service
 	hostService HostAPI
+}
+
+// NewSSHService ...
+func NewSSHService(api *providers.Service) *SSHService {
+	return newSSHService(api, nil)
+}
+
+// newSSHService creates a SSH service
+func newSSHService(api *providers.Service, hostService HostAPI) *SSHService {
+	return &SSHService{
+		provider: api,
+	}
+}
+
+// GetConfig creates SSHConfig to connect to an host
+func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, error) {
+	var host *model.Host
+
+	switch hostParam.(type) {
+	case string:
+		mh, err := metadata.LoadHost(svc.provider, hostParam.(string))
+		if err != nil {
+			return nil, err
+		}
+		host = mh.Get()
+	case *model.Host:
+		host = hostParam.(*model.Host)
+	default:
+		panic("param must be a string or a *model.Host!")
+	}
+
+	sshConfig := system.SSHConfig{
+		PrivateKey: host.PrivateKey,
+		Port:       22,
+		Host:       host.GetAccessIP(),
+		User:       model.DefaultUser,
+	}
+	heNetworkV1 := model.HostExtensionNetworkV1{}
+	err := host.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	if err != nil {
+		return nil, err
+	}
+	if heNetworkV1.DefaultGatewayID != "" {
+		mgw, err := metadata.LoadHost(svc.provider, heNetworkV1.DefaultGatewayID)
+		if err != nil {
+			return nil, err
+		}
+		gw := mgw.Get()
+		GatewayConfig := system.SSHConfig{
+			PrivateKey: gw.PrivateKey,
+			Port:       22,
+			Host:       gw.GetAccessIP(),
+			User:       model.DefaultUser,
+		}
+		sshConfig.GatewayConfig = &GatewayConfig
+	}
+	return &sshConfig, nil
+}
+
+// WaitServerReady waits for remote SSH server to be ready. After timeout, fails
+func (svc *SSHService) WaitServerReady(hostParam interface{}, timeout time.Duration) error {
+	var err error
+	sshSvc := NewSSHService(svc.provider)
+	ssh, err := sshSvc.GetConfig(hostParam)
+	if err != nil {
+		return fmt.Errorf("failed to read SSH config: %s", err.Error())
+	}
+	return ssh.WaitServerReady(timeout)
 }
 
 // Run tries to execute command 'cmd' on the host
@@ -68,7 +132,7 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := svc.provider.GetSSHConfig(host.ID)
+	ssh, err := svc.GetConfig(host)
 
 	if err != nil {
 		return 0, "", "", err
@@ -184,7 +248,7 @@ func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := svc.provider.GetSSHConfig(host.ID)
+	ssh, err := svc.GetConfig(host.ID)
 	if err != nil {
 		return 0, "", "", err
 	}

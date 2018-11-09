@@ -18,30 +18,31 @@ package services
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"regexp"
 
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 )
 
-//go:generate mockgen -destination=../mocks/mock_containerapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services ContainerAPI
+//go:generate mockgen -destination=../mocks/mock_containerapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services ContainerAPI
 
 //ContainerAPI defines API to manipulate containers
 type ContainerAPI interface {
 	List() ([]string, error)
 	Create(string) error
 	Delete(string) error
-	Inspect(string) (*api.ContainerInfo, error)
+	Inspect(string) (*model.ContainerInfo, error)
 	Mount(string, string, string) error
 	UMount(string, string) error
 }
 
 //NewContainerService creates a Container service
-func NewContainerService(api api.ClientAPI) ContainerAPI {
+func NewContainerService(api *providers.Service) ContainerAPI {
 	return &ContainerService{
-		provider: providers.FromClient(api),
+		provider: api,
 	}
 }
 
@@ -51,33 +52,33 @@ type ContainerService struct {
 }
 
 // List retrieves all available containers
-func (srv *ContainerService) List() ([]string, error) {
-	return srv.provider.ListContainers()
+func (svc *ContainerService) List() ([]string, error) {
+	return svc.provider.ListContainers()
 }
 
 // Create a container
-func (srv *ContainerService) Create(name string) error {
-	container, _ := srv.provider.GetContainer(name)
+func (svc *ContainerService) Create(name string) error {
+	container, _ := svc.provider.GetContainer(name)
 	if container != nil {
-		return providers.ResourceAlreadyExistsError("Container", name)
+		return model.ResourceAlreadyExistsError("Container", name)
 	}
-	return srv.provider.CreateContainer(name)
+	return svc.provider.CreateContainer(name)
 }
 
 // Delete a container
-func (srv *ContainerService) Delete(name string) error {
-	return srv.provider.DeleteContainer(name)
+func (svc *ContainerService) Delete(name string) error {
+	return svc.provider.DeleteContainer(name)
 }
 
 // Inspect a container
-func (srv *ContainerService) Inspect(name string) (*api.ContainerInfo, error) {
-	return srv.provider.GetContainer(name)
+func (svc *ContainerService) Inspect(name string) (*model.ContainerInfo, error) {
+	return svc.provider.GetContainer(name)
 }
 
 // Mount a container on an host on the given mount point
-func (srv *ContainerService) Mount(containerName, hostName, path string) error {
+func (svc *ContainerService) Mount(containerName, hostName, path string) error {
 	// Check container existence
-	_, err := srv.Inspect(containerName)
+	_, err := svc.Inspect(containerName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
@@ -85,7 +86,7 @@ func (srv *ContainerService) Mount(containerName, hostName, path string) error {
 	}
 
 	// Get Host ID
-	hostService := NewHostService(srv.provider)
+	hostService := NewHostService(svc.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
 		return fmt.Errorf("no host found with name or id '%s'", hostName)
@@ -93,11 +94,11 @@ func (srv *ContainerService) Mount(containerName, hostName, path string) error {
 
 	// Create mount point
 	mountPoint := path
-	if path == api.DefaultContainerMountPoint {
-		mountPoint = api.DefaultContainerMountPoint + containerName
+	if path == model.DefaultContainerMountPoint {
+		mountPoint = model.DefaultContainerMountPoint + containerName
 	}
 
-	authOpts, _ := srv.provider.GetAuthOpts()
+	authOpts, _ := svc.provider.GetAuthOpts()
 	authurlCfg, _ := authOpts.Config("AuthUrl")
 	authurl := authurlCfg.(string)
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
@@ -110,7 +111,7 @@ func (srv *ContainerService) Mount(containerName, hostName, path string) error {
 	regionCfg, _ := authOpts.Config("Region")
 	region := regionCfg.(string)
 
-	cfgOpts, _ := srv.provider.GetCfgOpts()
+	cfgOpts, _ := svc.provider.GetCfgOpts()
 	objStorageProtocolCfg, _ := cfgOpts.Config("S3Protocol")
 	objStorageProtocol := objStorageProtocolCfg.(string)
 
@@ -134,13 +135,13 @@ func (srv *ContainerService) Mount(containerName, hostName, path string) error {
 		S3Protocol: objStorageProtocol,
 	}
 
-	return exec("mount_object_storage.sh", data, host.ID, srv.provider)
+	return exec("mount_object_storage.sh", data, host.ID, providers.FromClient(svc.provider))
 }
 
 //UMount a container
-func (srv *ContainerService) UMount(containerName, hostName string) error {
+func (svc *ContainerService) UMount(containerName, hostName string) error {
 	// Check container existence
-	_, err := srv.Inspect(containerName)
+	_, err := svc.Inspect(containerName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
@@ -148,7 +149,7 @@ func (srv *ContainerService) UMount(containerName, hostName string) error {
 	}
 
 	// Get Host ID
-	hostService := NewHostService(srv.provider)
+	hostService := NewHostService(svc.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
 		return fmt.Errorf("no host found with name or id '%s'", hostName)
@@ -160,5 +161,5 @@ func (srv *ContainerService) UMount(containerName, hostName string) error {
 		Container: containerName,
 	}
 
-	return exec("umount_object_storage.sh", data, host.ID, srv.provider)
+	return exec("umount_object_storage.sh", data, host.ID, providers.FromClient(svc.provider))
 }

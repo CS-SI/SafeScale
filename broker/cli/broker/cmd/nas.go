@@ -22,7 +22,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 
 	"github.com/urfave/cli"
 )
@@ -48,7 +48,7 @@ var nasCreate = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: api.DefaultNasExposedPath,
+			Value: model.DefaultNasExposedPath,
 			Usage: "Path to be exported",
 		},
 	},
@@ -115,7 +115,7 @@ var nasMount = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: api.DefaultNasMountPath,
+			Value: model.DefaultNasMountPath,
 			Usage: "Path to be mounted",
 		},
 	},

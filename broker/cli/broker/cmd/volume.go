@@ -23,7 +23,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/urfave/cli"
 )
 
@@ -160,7 +160,7 @@ var volumeAttach = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: api.DefaultVolumeMountPoint,
+			Value: model.DefaultVolumeMountPoint,
 			Usage: "Mount point of the volume",
 		},
 		cli.StringFlag{

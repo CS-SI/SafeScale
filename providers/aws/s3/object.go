@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 
 	"github.com/aws/aws-sdk-go/aws"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
@@ -37,7 +37,7 @@ func createTagging(m map[string]string) string {
 }
 
 //PutObject put an object into an object container
-func PutObject(service *awss3.S3, container string, obj api.Object) error {
+func PutObject(service *awss3.S3, container string, obj model.Object) error {
 	//Manage object life cycle
 	expires := obj.DeleteAt != time.Time{}
 	if expires {
@@ -81,7 +81,7 @@ func PutObject(service *awss3.S3, container string, obj api.Object) error {
 }
 
 //UpdateObjectMetadata update an object into an object container
-func UpdateObjectMetadata(service *awss3.S3, container string, obj api.Object) error {
+func UpdateObjectMetadata(service *awss3.S3, container string, obj model.Object) error {
 	//meta, err := c.GetObjectMetadata(container, obj.Name
 	tags := []*awss3.Tag{}
 	for k, v := range obj.Metadata {
@@ -123,7 +123,7 @@ func pInt64(p *int64) int64 {
 }
 
 //GetObject get object content from an object container
-func GetObject(service *awss3.S3, container string, name string, ranges []api.Range) (*api.Object, error) {
+func GetObject(service *awss3.S3, container string, name string, ranges []model.Range) (*model.Object, error) {
 	var rList []string
 	for _, r := range ranges {
 		rList = append(rList, r.String())
@@ -142,7 +142,7 @@ func GetObject(service *awss3.S3, container string, name string, ranges []api.Ra
 	if err != nil {
 		return nil, err
 	}
-	return &api.Object{
+	return &model.Object{
 		Content:       aws.ReadSeekCloser(out.Body),
 		ContentLength: pInt64(out.ContentLength),
 		ContentType:   pStr(out.ContentType),
@@ -155,7 +155,7 @@ func GetObject(service *awss3.S3, container string, name string, ranges []api.Ra
 }
 
 //GetObjectMetadata get  object metadata from an object container
-func GetObjectMetadata(service *awss3.S3, container string, name string) (*api.Object, error) {
+func GetObjectMetadata(service *awss3.S3, container string, name string) (*model.Object, error) {
 	tagging, err := service.GetObjectTagging(&awss3.GetObjectTaggingInput{
 		Bucket: aws.String(container),
 		Key:    aws.String(name),
@@ -177,7 +177,7 @@ func GetObjectMetadata(service *awss3.S3, container string, name string) (*api.O
 			meta[*t.Key] = *t.Value
 		}
 	}
-	return &api.Object{
+	return &model.Object{
 		Name:     name,
 		Metadata: meta,
 		Date:     date,
@@ -186,7 +186,7 @@ func GetObjectMetadata(service *awss3.S3, container string, name string) (*api.O
 }
 
 //ListObjects list objects of a container
-func ListObjects(service *awss3.S3, container string, filter api.ObjectFilter) ([]string, error) {
+func ListObjects(service *awss3.S3, container string, filter model.ObjectFilter) ([]string, error) {
 	var objs []string
 
 	var prefix string

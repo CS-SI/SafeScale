@@ -22,15 +22,12 @@ import (
 	txttmpl "text/template"
 	"time"
 
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-
-	"github.com/CS-SI/SafeScale/deploy/install"
-
-	"github.com/CS-SI/SafeScale/utils/template"
-
-	"github.com/CS-SI/SafeScale/system"
-
 	rice "github.com/GeertJohan/go.rice"
+
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/deploy/install"
+	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils/template"
 )
 
 const (

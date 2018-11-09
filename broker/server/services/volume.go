@@ -18,50 +18,50 @@ package services
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/metadata"
-
-	"github.com/CS-SI/SafeScale/system/nfs"
-
-	"github.com/CS-SI/SafeScale/utils/retry"
-
 	"github.com/deckarep/golang-set"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/system/nfs"
+	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
-//go:generate mockgen -destination=../mocks/mock_volumeapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services VolumeAPI
+//go:generate mockgen -destination=../mocks/mock_volumeapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services VolumeAPI
 
 //VolumeAPI defines API to manipulate hosts
 type VolumeAPI interface {
 	Delete(ref string) error
-	Get(ref string) (*api.Volume, error)
-	Inspect(ref string) (*api.Volume, *api.VolumeAttachment, error)
-	List(all bool) ([]api.Volume, error)
-	Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error)
+	Get(ref string) (*model.Volume, error)
+	Inspect(ref string) (*model.Volume, *model.VolumeAttachment, error)
+	List(all bool) ([]model.Volume, error)
+	Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error)
 	Attach(volume string, host string, path string, format string) error
 	Detach(volume string, host string) error
-}
-
-//NewVolumeService creates a Volume service
-func NewVolumeService(api api.ClientAPI) VolumeAPI {
-	return &VolumeService{
-		provider: providers.FromClient(api),
-	}
 }
 
 //VolumeService volume service
 type VolumeService struct {
 	provider *providers.Service
+	sshSvc   SSHAPI
+}
+
+// NewVolumeService creates a Volume service
+func NewVolumeService(api *providers.Service) VolumeAPI {
+	return &VolumeService{
+		provider: providers.FromClient(api),
+		sshSvc:   newSSHService(api, nil),
+	}
 }
 
 //List returns the network list
-func (svc *VolumeService) List(all bool) ([]api.Volume, error) {
+func (svc *VolumeService) List(all bool) ([]model.Volume, error) {
 	return svc.provider.ListVolumes(all)
 }
 
@@ -81,7 +81,7 @@ func (svc *VolumeService) Delete(ref string) error {
 }
 
 //Get returns the volume identified by ref, ref can be the name or the id
-func (svc *VolumeService) Get(ref string) (*api.Volume, error) {
+func (svc *VolumeService) Get(ref string) (*model.Volume, error) {
 	m, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
@@ -95,7 +95,7 @@ func (svc *VolumeService) Get(ref string) (*api.Volume, error) {
 }
 
 //Inspect returns the volume identified by ref and its attachment (if any)
-func (svc *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachment, error) {
+func (svc *VolumeService) Inspect(ref string) (*model.Volume, *model.VolumeAttachment, error) {
 	mtdvol, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		return nil, nil, err
@@ -113,8 +113,8 @@ func (svc *VolumeService) Inspect(ref string) (*api.Volume, *api.VolumeAttachmen
 }
 
 // Create a volume
-func (svc *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error) {
-	return svc.provider.CreateVolume(api.VolumeRequest{
+func (svc *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error) {
+	return svc.provider.CreateVolume(model.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
@@ -131,7 +131,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return tbr
 	}
 	if volume == nil {
-		return errors.Wrap(providers.ResourceNotFoundError("volume", volumename), "Cannot attach volume")
+		return errors.Wrap(model.ResourceNotFoundError("volume", volumename), "Cannot attach volume")
 	}
 
 	// Get Host ID
@@ -143,7 +143,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return tbr
 	}
 	if host == nil {
-		return errors.Wrap(providers.ResourceNotFoundError("host", hostName), "Cannot attach volume")
+		return errors.Wrap(model.ResourceNotFoundError("host", hostName), "Cannot attach volume")
 	}
 
 	// Note: most providers are not able to tell the real device name the volume
@@ -154,7 +154,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return fmt.Errorf("failed to get list of connected disks: %s", err)
 	}
 
-	volatt, err := svc.provider.CreateVolumeAttachment(api.VolumeAttachmentRequest{
+	volatt, err := svc.provider.CreateVolumeAttachment(model.VolumeAttachmentRequest{
 		Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
 		ServerID: host.ID,
 		VolumeID: volume.ID,
@@ -199,11 +199,11 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 
 	// Create mount point
 	mountPoint := path
-	if path == api.DefaultVolumeMountPoint {
-		mountPoint = api.DefaultVolumeMountPoint + volume.Name
+	if path == model.DefaultVolumeMountPoint {
+		mountPoint = model.DefaultVolumeMountPoint + volume.Name
 	}
 
-	sshConfig, err := svc.provider.GetSSHConfig(host.ID)
+	sshConfig, err := svc.sshSvc.GetConfig(host.ID)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
@@ -247,17 +247,16 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	return nil
 }
 
-func (svc *VolumeService) listAttachedDevices(host *api.Host) (mapset.Set, error) {
+func (svc *VolumeService) listAttachedDevices(host *model.Host) (mapset.Set, error) {
 	var (
 		retcode        int
 		stdout, stderr string
 		err            error
 	)
-	sshService := NewSSHService(svc.provider)
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			retcode, stdout, stderr, err = sshService.Run(host.ID, cmd)
+			retcode, stdout, stderr, err = svc.sshSvc.Run(host.ID, cmd)
 			if err != nil {
 				tbr := errors.Wrap(err, "")
 				log.Errorf("%+v", tbr)
@@ -288,14 +287,14 @@ func (svc *VolumeService) listAttachedDevices(host *api.Host) (mapset.Set, error
 func (svc *VolumeService) Detach(volumename string, hostName string) error {
 	vol, err := svc.Get(volumename)
 	if err != nil {
-		return errors.Wrap(providers.ResourceNotFoundError("volume", volumename), "Cannot detach volume")
+		return errors.Wrap(model.ResourceNotFoundError("volume", volumename), "Cannot detach volume")
 	}
 
 	// Get Host ID
 	hostService := NewHostService(svc.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return errors.Wrap(providers.ResourceNotFoundError("host", hostName), "Cannot detach volume")
+		return errors.Wrap(model.ResourceNotFoundError("host", hostName), "Cannot detach volume")
 	}
 
 	// providerVA, err := svc.provider.GetVolumeAttachment(host.ID, vol.ID)
@@ -308,7 +307,7 @@ func (svc *VolumeService) Detach(volumename string, hostName string) error {
 	}
 	volatt := mdVA.Get()
 
-	sshConfig, err := svc.provider.GetSSHConfig(host.ID)
+	sshConfig, err := svc.sshSvc.GetConfig(host.ID)
 	if err != nil {
 		tbr := errors.Wrap(err, "error getting ssh config")
 		log.Errorf("%+v", tbr)

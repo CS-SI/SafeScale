@@ -18,27 +18,28 @@ package ovh
 
 import (
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 )
 
 // CreateNetwork creates a network named name
-func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
+func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
 	return client.osclt.CreateNetwork(req)
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (client *Client) GetNetwork(ref string) (*api.Network, error) {
+func (client *Client) GetNetwork(ref string) (*model.Network, error) {
 	return client.osclt.GetNetwork(ref)
 }
 
 // ListNetworks lists available networks
-func (client *Client) ListNetworks(all bool) ([]api.Network, error) {
+func (client *Client) ListNetworks(all bool) ([]*model.Network, error) {
 	return client.osclt.ListNetworks(all)
 }
 
@@ -48,7 +49,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
+func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
 	return client.osclt.CreateGateway(req)
 }
 
