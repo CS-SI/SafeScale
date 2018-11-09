@@ -16,58 +16,60 @@
 
 package templates
 
-import "github.com/CS-SI/SafeScale/providers/api"
+import (
+	"github.com/CS-SI/SafeScale/providers/model"
+)
 
-//Filter ...
+// Filter ...
 type Filter struct {
 	filter Predicate
 }
 
-//Predicate ...
-type Predicate func(img api.HostTemplate) bool
+// Predicate ...
+type Predicate func(img model.HostTemplate) bool
 
-//NewFilter creates a new filter with the given predicate
+// NewFilter creates a new filter with the given predicate
 func NewFilter(predicate Predicate) *Filter {
 	return &Filter{filter: predicate}
 }
 
-//Not ...
+// Not ...
 func (f *Filter) Not() *Filter {
 	oldFilter := f.filter
-	f.filter = func(in api.HostTemplate) bool {
+	f.filter = func(in model.HostTemplate) bool {
 		return !oldFilter(in)
 	}
 	return f
 }
 
-//And ...
+// And ...
 func (f *Filter) And(other *Filter) *Filter {
 	oldFilter := f.filter
-	f.filter = func(in api.HostTemplate) bool {
+	f.filter = func(in model.HostTemplate) bool {
 		return oldFilter(in) && (*other).filter(in)
 	}
 	return f
 }
 
-//Or ...
+// Or ...
 func (f *Filter) Or(other *Filter) *Filter {
 	oldFilter := f.filter
-	f.filter = func(in api.HostTemplate) bool {
+	f.filter = func(in model.HostTemplate) bool {
 		return oldFilter(in) || (*other).filter(in)
 	}
 	return f
 }
 
-//NotFilter ...
+// Not ...
 func Not(f Predicate) Predicate {
-	return func(in api.HostTemplate) bool {
+	return func(in model.HostTemplate) bool {
 		return !f(in)
 	}
 }
 
-//OrFilter ..
+// OrFilter ..
 func OrFilter(filters ...Predicate) Predicate {
-	return func(in api.HostTemplate) bool {
+	return func(in model.HostTemplate) bool {
 		for _, f := range filters {
 			if f(in) {
 				return true
@@ -77,9 +79,9 @@ func OrFilter(filters ...Predicate) Predicate {
 	}
 }
 
-//AndFilter ...
+// AndFilter ...
 func AndFilter(filters ...Predicate) Predicate {
-	return func(in api.HostTemplate) bool {
+	return func(in model.HostTemplate) bool {
 		for _, f := range filters {
 			if !f(in) {
 				return false
@@ -89,9 +91,9 @@ func AndFilter(filters ...Predicate) Predicate {
 	}
 }
 
-//FilterImages ...
-func FilterTemplates(templates []api.HostTemplate, f *Filter) []api.HostTemplate {
-	res := make([]api.HostTemplate, 0)
+// FilterTemplates ...
+func FilterTemplates(templates []model.HostTemplate, f *Filter) []model.HostTemplate {
+	res := make([]model.HostTemplate, 0)
 	for _, template := range templates {
 
 		if f.filter(template) {
