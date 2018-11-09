@@ -536,7 +536,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 				}
 				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
 
-				log.Debugf(msg)
+				log.Warnf(msg)
 				return fmt.Errorf(msg)
 			}
 			// Wait that Host is ready
@@ -545,7 +545,7 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 				servers.Delete(client.Compute, server.ID)
 				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
 
-				log.Debugf(msg)
+				log.Warnf(msg)
 				return fmt.Errorf(msg)
 			}
 			return nil

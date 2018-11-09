@@ -133,6 +133,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 	}
 	log.Printf("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwname)
 
+	log.Printf("Requesting the creation of a gateway '%s' with '%s'", gwname, img.ID)
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
 		defer svc.provider.DeleteNetwork(network.ID)

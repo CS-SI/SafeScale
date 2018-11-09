@@ -19,9 +19,10 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"text/template"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"text/template"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/GeertJohan/go.rice"
@@ -34,30 +35,26 @@ func getBoxContent(script string, data interface{}) (string, error) {
 
 	box, err := rice.FindBox("broker_scripts")
 	if err != nil {
-		// TODO Use more explicit error
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "Unable to find script broker_scripts")
 		log.Errorf("%+v", tbr)
 		return "", tbr
 	}
 	scriptContent, err := box.String(script)
 	if err != nil {
-		// TODO Use more explicit error
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "Unable to recover script content")
 		log.Errorf("%+v", tbr)
 		return "", tbr
 	}
 	tpl, err := template.New("TemplateName").Parse(scriptContent)
 	if err != nil {
-		// TODO Use more explicit error
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "Unable to parse script content")
 		log.Errorf("%+v", tbr)
 		return "", tbr
 	}
 
 	var buffer bytes.Buffer
 	if err = tpl.Execute(&buffer, data); err != nil {
-		// TODO Use more explicit error
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "Error in script execution")
 		log.Errorf("%+v", tbr)
 		return "", tbr
 	}

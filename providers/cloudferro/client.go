@@ -49,7 +49,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 		DomainName: opts.DomainName,
 		TenantName: opts.ProjectName,
 		Region:     opts.Region,
-		FloatingIPPool: "public",
+		FloatingIPPool: "external",
 	},
 		openstack.CfgOptions{
 			ProviderNetwork:           "external",
@@ -60,7 +60,6 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"standard":   VolumeSpeed.COLD,
 				"performant": VolumeSpeed.HDD,
 			},
-			DNSList: []string{"1.1.1.1"},
 		},
 	)
 
