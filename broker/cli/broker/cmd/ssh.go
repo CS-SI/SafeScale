@@ -137,8 +137,18 @@ var sshConnect = cli.Command{
 var sshTunnel = cli.Command{
 	Name:		"tunnel",
 	Usage:		"Create a ssh tunnel between admin host and a host in the cloud",
-	ArgsUsage:	"<Host_name|Host_ID local_port  remote_port>",
+	ArgsUsage:	"<Host_name|Host_ID --local local_port  --remote remote_port>",
 	Flags: []cli.Flag{
+		cli.IntFlag{
+			Name:  "local",
+			Value: 8080,
+			Usage: "local tunnel's port, if not set all",
+		},
+		cli.IntFlag{
+			Name:  "remote",
+			Value: 8080,
+			Usage: "remote tunnel's port, if not set all",
+		},
 		cli.StringFlag{
 			Name:  "timeout",
 			Value: "1",
@@ -146,32 +156,31 @@ var sshTunnel = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error{
-		if c.NArg() != 3 {
+		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument")
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Missing arguments")
 		}
-		strLocalPort := c.Args().Get(1)
-		localPort, err := strconv.Atoi(strLocalPort)
-		if err != nil || 0 > localPort || localPort > 65535 {
-			fmt.Printf("%s is not a valid port\n", strLocalPort)
+
+		localPort := c.Int("local")
+		if 0 > localPort || localPort > 65535 {
+			fmt.Printf("%d is not a valid port\n", localPort)
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("wrong value of localport")
 		}
-		strRemotePort := c.Args().Get(2)
-		remotePort, err := strconv.Atoi(strRemotePort)
-		if err != nil || 0 > remotePort || remotePort > 65535 {
-			fmt.Printf("%s is not a valid port\n", strRemotePort)
+
+		remotePort := c.Int("remote")
+		if 0 > localPort || localPort > 65535 {
+			fmt.Printf("%d is not a valid port\n", remotePort)
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("wrong value of remoteport")
 		}
-		timeout := utils.TimeoutCtxDefault
-		if c.IsSet("timeout") {
-			timeout = time.Duration(c.Float64("timeout")) * time.Minute
-		}
+
+		timeout := time.Duration(c.Float64("timeout")) * time.Minute
+
 
 		//c.GlobalInt("port") is the grpc port aka. 50051
-		err = client.New(c.GlobalInt("port")).Ssh.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
+		err := client.New(c.GlobalInt("port")).Ssh.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
 		if err != nil {
 			err = client.DecorateError(err, "ssh tunnel", false)
 		}
@@ -184,14 +193,14 @@ var sshClose = cli.Command{
 	Usage:     "Close one or several ssh tunnel",
 	ArgsUsage: "<Host_name|Host_ID> --local local_port --remote remote_port",
 	Flags: []cli.Flag{
-		cli.IntFlag{
+		cli.StringFlag{
 			Name:  "local",
-			Value: -1,
+			Value: ".*",
 			Usage: "local tunnel's port, if not set all",
 		},
-		cli.IntFlag{
+		cli.StringFlag{
 			Name:  "remote",
-			Value: -1,
+			Value: ".*",
 			Usage: "remote tunnel's port, if not set all",
 		},
 		cli.StringFlag{
@@ -201,36 +210,33 @@ var sshClose = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		var strLocalPort string = ".*"
-		var strRemotePort string = ".*"
-
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument")
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Missing arguments")
 		}
+
+		strLocalPort := c.String("local")
 		if c.IsSet("local") {
-			strLocalPort = c.String("local")
 			localPort, err := strconv.Atoi(strLocalPort)
-			if err != nil || -1 > localPort || localPort > 65535 {
+			if err != nil || 0 > localPort || localPort > 65535 {
 				fmt.Printf("%d is not a valid port\n", localPort)
 				_ = cli.ShowSubcommandHelp(c)
 				return fmt.Errorf("wrong value of localport")
 			}
 		}
+
+		strRemotePort := c.String("remote")
 		if c.IsSet("remote") {
-			strRemotePort = c.String("remote")
 			remotePort, err := strconv.Atoi(strRemotePort)
-			if err != nil || -1 > remotePort || remotePort > 65535 {
+			if err != nil || 0 > remotePort || remotePort > 65535 {
 				fmt.Printf("%d is not a valid port\n", remotePort)
 				_ = cli.ShowSubcommandHelp(c)
 				return fmt.Errorf("wrong value of remoteport")
 			}
 		}
-		timeout := utils.TimeoutCtxDefault
-		if c.IsSet("timeout") {
-			timeout = time.Duration(c.Float64("timeout")) * time.Minute
-		}
+
+		timeout := time.Duration(c.Float64("timeout")) * time.Minute
 
 		//c.GlobalInt("port") is the grpc port aka. 50051
 		err := client.New(c.GlobalInt("port")).Ssh.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
