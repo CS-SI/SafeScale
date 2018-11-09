@@ -19,11 +19,13 @@ package commands
 import (
 	"context"
 	"fmt"
+
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/system"
 	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/daemon/services"
+	"github.com/CS-SI/SafeScale/broker/server/services"
 )
 
 // broker ssh connect host2
@@ -41,7 +43,7 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 		return nil, fmt.Errorf("Cannot execute ssh command : No tenant set")
 	}
 
-	service := services.NewSSHService(currentTenant.Client)
+	service := services.NewSSHService(providers.FromClient(currentTenant.Client))
 	retcode, stdout, stderr, err := service.Run(in.GetHost().GetName(), in.GetCommand())
 
 	return &pb.SshResponse{
@@ -58,7 +60,7 @@ func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb
 		return nil, fmt.Errorf("Cannot copy ssh : No tenant set")
 	}
 
-	service := services.NewSSHService(currentTenant.Client)
+	service := services.NewSSHService(providers.FromClient(currentTenant.Client))
 	retcode, stdout, stderr, err := service.Copy(in.GetSource(), in.GetDestination())
 	if err != nil {
 		return nil, err

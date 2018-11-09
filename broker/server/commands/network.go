@@ -19,15 +19,17 @@ package commands
 import (
 	"context"
 	"fmt"
-	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/daemon/services"
-	"github.com/CS-SI/SafeScale/broker/utils"
-	conv "github.com/CS-SI/SafeScale/broker/utils"
+
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
-
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/server/services"
+	"github.com/CS-SI/SafeScale/broker/utils"
+	conv "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 )
 
 // broker network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
@@ -46,7 +48,7 @@ func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 		return nil, fmt.Errorf("Cannot create network : No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(currentTenant.Client)
+	networkAPI := services.NewNetworkService(providers.FromClient(currentTenant.Client))
 	network, err := networkAPI.Create(in.GetName(), in.GetCIDR(), IPVersion.IPv4,
 		int(in.Gateway.GetCPU()), in.GetGateway().GetRAM(), int(in.GetGateway().GetDisk()), in.GetGateway().GetImageID(), in.GetGateway().GetName())
 
@@ -66,7 +68,7 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (
 		return nil, fmt.Errorf("Cannot list networks : No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(currentTenant.Client)
+	networkAPI := services.NewNetworkService(providers.FromClient(currentTenant.Client))
 
 	networks, err := networkAPI.List(in.GetAll())
 	if err != nil {
@@ -77,7 +79,7 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (
 
 	// Map api.Network to pb.Network
 	for _, network := range networks {
-		pbnetworks = append(pbnetworks, conv.ToPBNetwork(&network))
+		pbnetworks = append(pbnetworks, conv.ToPBNetwork(network))
 	}
 	rv := &pb.NetworkList{Networks: pbnetworks}
 	return rv, nil
@@ -96,7 +98,7 @@ func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*
 		return nil, fmt.Errorf("Cannot inspect network : No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(currentTenant.Client)
+	networkAPI := services.NewNetworkService(providers.FromClient(currentTenant.Client))
 	network, err := networkAPI.Get(ref)
 	if err != nil {
 		return nil, err
@@ -121,7 +123,7 @@ func (s *NetworkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*g
 		return nil, fmt.Errorf("Cannot delete network : No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(currentTenant.Client)
+	networkAPI := services.NewNetworkService(providers.FromClient(currentTenant.Client))
 	err := networkAPI.Delete(ref)
 	if err != nil {
 		return nil, err

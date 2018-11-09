@@ -36,24 +36,6 @@ type ssh struct {
 	session *Session
 }
 
-// func systemSSH(bsc *broker.SshConfig, err error) (*system.SSHConfig, error) {
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if bsc == nil {
-// 		return nil, nil
-// 	}
-
-// 	g, _ := systemSSH(bsc.Gateway, nil)
-// 	return &system.SSHConfig{
-// 		GatewayConfig: g,
-// 		Host:          bsc.Host,
-// 		Port:          int(bsc.Port),
-// 		PrivateKey:    bsc.PrivateKey,
-// 		User:          bsc.User,
-// 	}, nil
-// }
-
 // Run ...
 func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
 	var (
@@ -121,7 +103,7 @@ func (s *ssh) getHostSSHConfig(hostname string) (*system.SSHConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return conv.ToSystemSshConfig(cfg), nil
+	return cfg, nil
 }
 
 const protocolSeparator = ":"

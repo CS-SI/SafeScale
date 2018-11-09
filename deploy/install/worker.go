@@ -621,7 +621,7 @@ func (w *worker) setReverseProxy(port int) error {
 	}
 
 	// Sets the values useable in any cases
-	w.variables["GatewayIP"] = gw.PUBLIC_IP
+	w.variables["GatewayIP"] = gw.PublicIP
 
 	// Now submits all the rules to reverse proxy
 	for _, r := range rules {
@@ -653,7 +653,7 @@ func (w *worker) setReverseProxy(port int) error {
 			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 		}
 		for _, h := range hosts {
-			w.variables["HostIP"] = h.PRIVATE_IP
+			w.variables["HostIP"] = h.PrivateIP
 			w.variables["Hostname"] = h.Name
 			err := kc.Apply(port, rule, &(w.variables))
 			if err != nil {

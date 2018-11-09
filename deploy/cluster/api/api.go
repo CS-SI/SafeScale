@@ -19,14 +19,12 @@ package api
 import (
 	"encoding/gob"
 
-	providerapi "github.com/CS-SI/SafeScale/providers/api"
-
+	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
-
-	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/providers/model"
 )
 
 // Request defines what kind of Cluster is wanted
@@ -122,7 +120,7 @@ type ClusterCore struct {
 	// Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
 	Complexity Complexity.Enum `json:"complexity"`
 	// Keypair contains the key-pair used inside the Cluster
-	Keypair *providerapi.KeyPair `json:"keypair,omitempty"`
+	Keypair *model.KeyPair `json:"keypair,omitempty"`
 	// State of the cluster
 	State ClusterState.Enum `json:"state,omitempty"`
 	// Tenant is the name of the tenant
@@ -147,6 +145,16 @@ type ClusterCore struct {
 	DisabledFeatures map[string]struct{} `json:"disabled_features"`
 	// Extensions contains additional info about the cluster
 	Extensions ExtensionMap `json:"infos,omitempty"`
+}
+
+// Serialize ...
+func (c *ClusterCore) Serialize() ([]byte, error) {
+	return model.SerializeToJSON(c)
+}
+
+// Deserialize ...
+func (c *ClusterCore) Deserialize(buf []byte) error {
+	return model.DeserializeFromJSON(buf, c)
 }
 
 // GetName returns the name of the cluster

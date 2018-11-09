@@ -22,24 +22,15 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/pkg/errors"
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/pkg/errors"
+
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/utils/retry"
-
 	uuid "github.com/satori/go.uuid"
-
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
-	metadata "github.com/CS-SI/SafeScale/providers/metadata"
-	"github.com/CS-SI/SafeScale/providers/userdata"
-
-	"github.com/CS-SI/SafeScale/system"
 
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
@@ -51,16 +42,26 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/userdata"
+	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
 // ListImages lists available OS images
-func (client *Client) ListImages(all bool) ([]api.Image, error) {
+func (client *Client) ListImages(all bool) ([]model.Image, error) {
 	opts := images.ListOpts{}
 
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := images.List(client.Compute, opts)
 
-	var imgList []api.Image
+	var imgList []model.Image
 
 	// Define an anonymous function to be executed on each page's iteration
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -71,7 +72,8 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 		}
 
 		for _, img := range imageList {
-			imgList = append(imgList, api.Image{ID: img.ID, Name: img.Name})
+			imgList = append(imgList, model.Image{ID: img.ID, Name: img.Name})
+
 		}
 		return true, nil
 	})
@@ -86,17 +88,17 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 }
 
 // GetImage returns the Image referenced by id
-func (client *Client) GetImage(id string) (*api.Image, error) {
+func (client *Client) GetImage(id string) (*model.Image, error) {
 	img, err := images.Get(client.Compute, id).Extract()
 	if err != nil {
 		log.Debugf("Error getting image: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting image: %s", ProviderErrorToString(err)))
 	}
-	return &api.Image{ID: img.ID, Name: img.Name}, nil
+	return &model.Image{ID: img.ID, Name: img.Name}, nil
 }
 
 // GetTemplate returns the Template referenced by id
-func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
+func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
 	err := retry.WhileUnsuccessfulDelay1Second(
@@ -111,8 +113,8 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 		log.Debugf("Error getting template: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("error getting template: %s", ProviderErrorToString(err)))
 	}
-	return &api.HostTemplate{
-		HostSize: api.HostSize{
+	return &model.HostTemplate{
+		HostSize: model.HostSize{
 			Cores:    flv.VCPUs,
 			RAMSize:  float32(flv.RAM) / 1000.0,
 			DiskSize: flv.Disk,
@@ -124,13 +126,13 @@ func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (client *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
+func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 	opts := flavors.ListOpts{}
 
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := flavors.ListDetail(client.Compute, opts)
 
-	var flvList []api.HostTemplate
+	var flvList []model.HostTemplate
 
 	// Define an anonymous function to be executed on each page's iteration
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -141,8 +143,8 @@ func (client *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 
 		for _, flv := range flavorList {
 
-			flvList = append(flvList, api.HostTemplate{
-				HostSize: api.HostSize{
+			flvList = append(flvList, model.HostTemplate{
+				HostSize: model.HostSize{
 					Cores:    flv.VCPUs,
 					RAMSize:  float32(flv.RAM) / 1000.0,
 					DiskSize: flv.Disk,
@@ -165,7 +167,7 @@ func (client *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 }
 
 // CreateKeyPair creates and import a key pair
-func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
+func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := privateKey.PublicKey
 	pub, _ := ssh.NewPublicKey(&publicKey)
@@ -180,7 +182,7 @@ func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
 		},
 	)
 	priKey := string(priKeyPem)
-	return &api.KeyPair{
+	return &model.KeyPair{
 		ID:         name,
 		Name:       name,
 		PublicKey:  pubKey,
@@ -189,13 +191,13 @@ func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
 }
 
 // GetKeyPair returns the key pair identified by id
-func (client *Client) GetKeyPair(id string) (*api.KeyPair, error) {
+func (client *Client) GetKeyPair(id string) (*model.KeyPair, error) {
 	kp, err := keypairs.Get(client.Compute, id).Extract()
 	if err != nil {
 		log.Debugf("Error getting keypair: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting keypair"))
 	}
-	return &api.KeyPair{
+	return &model.KeyPair{
 		ID:         kp.Name,
 		Name:       kp.Name,
 		PrivateKey: kp.PrivateKey,
@@ -204,12 +206,11 @@ func (client *Client) GetKeyPair(id string) (*api.KeyPair, error) {
 }
 
 // ListKeyPairs lists available key pairs
-func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
-
+func (client *Client) ListKeyPairs() ([]model.KeyPair, error) {
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := keypairs.List(client.Compute)
 
-	var kpList []api.KeyPair
+	var kpList []model.KeyPair
 
 	// Define an anonymous function to be executed on each page's iteration
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -219,7 +220,7 @@ func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
 		}
 
 		for _, kp := range keyList {
-			kpList = append(kpList, api.KeyPair{
+			kpList = append(kpList, model.KeyPair{
 				ID:         kp.Name,
 				Name:       kp.Name,
 				PublicKey:  kp.PublicKey,
@@ -249,8 +250,8 @@ func (client *Client) DeleteKeyPair(id string) error {
 	return nil
 }
 
-// toHostSize converts flavor attributes returned by OpenStack driver into api.Host
-func (client *Client) toHostSize(flavor map[string]interface{}) api.HostSize {
+// toHostSize converts flavor attributes returned by OpenStack driver into mdel.Host
+func (client *Client) toHostSize(flavor map[string]interface{}) model.HostSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
 		tpl, err := client.GetTemplate(fid)
@@ -259,13 +260,13 @@ func (client *Client) toHostSize(flavor map[string]interface{}) api.HostSize {
 		}
 	}
 	if _, ok := flavor["vcpus"]; ok {
-		return api.HostSize{
+		return model.HostSize{
 			Cores:    flavor["vcpus"].(int),
 			DiskSize: flavor["disk"].(int),
 			RAMSize:  flavor["ram"].(float32) / 1000.0,
 		}
 	}
-	return api.HostSize{}
+	return model.HostSize{}
 }
 
 // toHostState converts host status returned by OpenStack driver into HostState enum
@@ -284,13 +285,25 @@ func toHostState(status string) HostState.Enum {
 	}
 }
 
-// convertAdresses converts adresses returned by the OpenStack driver arrange them by version in a map
-func (client *Client) convertAdresses(addresses map[string]interface{}) (map[IPVersion.Enum][]string, string, string) {
-	addrs := make(map[IPVersion.Enum][]string)
-	var AcccessIPv4 string
-	var AcccessIPv6 string
-	for n, obj := range addresses {
+// interpretAddresses converts adresses returned by the OpenStack driver
+// Returns string slice containing the name of the networks, string map of IP addresses
+// (indexed on network name), public ipv4 and ipv6 (if they exists)
+func (client *Client) interpretAddresses(
+	addresses map[string]interface{},
+) ([]string, map[IPVersion.Enum]map[string]string, string, string) {
 
+	var (
+		networks    = []string{}
+		addrs       = map[IPVersion.Enum]map[string]string{}
+		AcccessIPv4 string
+		AcccessIPv6 string
+	)
+
+	addrs[IPVersion.IPv4] = map[string]string{}
+	addrs[IPVersion.IPv4] = map[string]string{}
+
+	for n, obj := range addresses {
+		networks = append(networks, n)
 		for _, networkAddresses := range obj.([]interface{}) {
 			address := networkAddresses.(map[string]interface{})
 			version := address["version"].(float64)
@@ -305,51 +318,127 @@ func (client *Client) convertAdresses(addresses map[string]interface{}) (map[IPV
 			} else {
 				switch version {
 				case 4:
-					addrs[IPVersion.IPv4] = append(addrs[IPVersion.IPv4], fixedIP)
+					addrs[IPVersion.IPv4][n] = fixedIP
 				case 6:
-					addrs[IPVersion.IPv6] = append(addrs[IPVersion.IPv4], fixedIP)
+					addrs[IPVersion.IPv6][n] = fixedIP
 				}
 			}
-
 		}
 	}
-	return addrs, AcccessIPv4, AcccessIPv6
+	return networks, addrs, AcccessIPv4, AcccessIPv6
 }
 
-// toHost converts an OpenStack server into api Host
-func (client *Client) toHost(server *servers.Server) *api.Host {
-	adresses, ipv4, ipv6 := client.convertAdresses(server.Addresses)
-	if ipv4 != "" {
-		server.AccessIPv4 = ipv4
+// complementHost complements Host data with content of server parameter
+func (client *Client) complementHost(host *model.Host, server *servers.Server) error {
+	networks, addresses, ipv4, ipv6 := client.interpretAddresses(server.Addresses)
+
+	// Updates intrinsic data of host if needed
+	if host.ID == "" {
+		host.ID = server.ID
 	}
-	if ipv6 != "" {
-		server.AccessIPv6 = ipv6
+	if host.Name == "" {
+		host.Name = server.Name
+	}
+	if host.PublicIPv4 == "" {
+		host.PublicIPv4 = ipv4
+	}
+	if host.PublicIPv6 == "" {
+		host.PublicIPv6 = ipv6
+	}
+	host.LastState = toHostState(server.Status)
+
+	// Updates Host Extension DescriptionV1
+	heDescriptionV1 := model.HostExtensionDescriptionV1{}
+	// if host.Extensions.Lookup(HostExtension.SizingV1) {
+	err := host.Extensions.Get(HostExtension.DescriptionV1, &heDescriptionV1)
+	if err != nil {
+		return err
+	}
+	// }
+	heDescriptionV1.Created = server.Created
+	heDescriptionV1.Updated = server.Updated
+	err = host.Extensions.Set(HostExtension.DescriptionV1, &heDescriptionV1)
+	if err != nil {
+		return err
 	}
 
-	host := api.Host{
-		ID:           server.ID,
-		Name:         server.Name,
-		PrivateIPsV4: adresses[IPVersion.IPv4],
-		PrivateIPsV6: adresses[IPVersion.IPv6],
-		AccessIPv4:   server.AccessIPv4,
-		AccessIPv6:   server.AccessIPv6,
-		Size:         client.toHostSize(server.Flavor),
-		State:        toHostState(server.Status),
+	// Updates Host Extension SizingV1
+	heSizingV1 := model.HostExtensionSizingV1{}
+	// if host.Extensions.Lookup(HostExtension.SizingV1) {
+	err = host.Extensions.Get(HostExtension.SizingV1, &heSizingV1)
+	if err != nil {
+		return err
 	}
-	m, err := metadata.LoadHost(providers.FromClient(client), server.ID)
-	if err == nil && m != nil {
-		hostDef := m.Get()
-		host.GatewayID = hostDef.GatewayID
-		host.PrivateKey = hostDef.PrivateKey
-		//Floating IP management
-		if host.AccessIPv4 == "" {
-			host.AccessIPv4 = hostDef.AccessIPv4
-		}
-		if host.AccessIPv6 == "" {
-			host.AccessIPv6 = hostDef.AccessIPv6
-		}
+	// }
+	heSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
+	err = host.Extensions.Set(HostExtension.SizingV1, &heSizingV1)
+	if err != nil {
+		return err
 	}
-	return &host
+
+	// Updates Host Extension NetworkV1
+	heNetworkV1 := model.HostExtensionNetworkV1{}
+	// if host.Extensions.Lookup(HostExtension.NetworkV1) {
+	err = host.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	if err != nil {
+		return nil
+	}
+	// }
+
+	// networks contains network names, by HostExtensionNetworkV1.IPxAddresses has to be
+	// indexed on network ID. Tries to convert if possible, if we already have correspondance
+	// between network ID and network Name in Host definition
+	if len(heNetworkV1.NetworksByName) > 0 {
+		ipv4Addresses := map[string]string{}
+		ipv6Addresses := map[string]string{}
+		for netname, netid := range heNetworkV1.NetworksByName {
+			if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
+				ipv4Addresses[netid] = ip
+			} else if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
+				ipv4Addresses[netid] = ip
+			} else {
+				ipv4Addresses[netid] = ""
+			}
+
+			if ip, ok := addresses[IPVersion.IPv6][netid]; ok {
+				ipv6Addresses[netid] = ip
+			} else if ip, ok := addresses[IPVersion.IPv6][netname]; ok {
+				ipv6Addresses[netid] = ip
+			} else {
+				ipv6Addresses[netid] = ""
+			}
+		}
+		heNetworkV1.IPv4Addresses = ipv4Addresses
+		heNetworkV1.IPv6Addresses = ipv6Addresses
+	} else {
+		networksByName := map[string]string{}
+		ipv4Addresses := map[string]string{}
+		ipv6Addresses := map[string]string{}
+		for _, netname := range networks {
+			networksByName[netname] = ""
+
+			if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
+				ipv4Addresses[netname] = ip
+			} else {
+				ipv4Addresses[netname] = ""
+			}
+
+			if ip, ok := addresses[IPVersion.IPv6][netname]; ok {
+				ipv6Addresses[netname] = ip
+			} else {
+				ipv6Addresses[netname] = ""
+			}
+		}
+		heNetworkV1.NetworksByName = networksByName
+		// IPvxAddresses are here indexed by names... At least we have them...
+		heNetworkV1.IPv4Addresses = ipv4Addresses
+		heNetworkV1.IPv6Addresses = ipv6Addresses
+	}
+	err = host.Extensions.Set(HostExtension.NetworkV1, &heNetworkV1)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // userData is the structure to apply to userdata.sh template
@@ -374,12 +463,7 @@ type userData struct {
 }
 
 func (client *Client) readGateway(networkID string) (*servers.Server, error) {
-	m, err := metadata.NewGateway(providers.FromClient(client), networkID)
-	if err != nil {
-		log.Debugf("Error reading gateway metadata: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error reading gateway metadata"))
-	}
-
+	m, err := metadata.NewGateway(client, networkID)
 	found, err := m.Read()
 	if err != nil {
 		log.Debugf("Error reading gateway metadata: reading: %+v", err)
@@ -400,14 +484,14 @@ func (client *Client) readGateway(networkID string) (*servers.Server, error) {
 }
 
 // CreateHost creates an host satisfying request
-func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
+func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	host, err := client.createHost(request, false)
 	if err != nil {
 		log.Debugf("Error creating host: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host"))
 	}
 
-	err = metadata.SaveHost(providers.FromClient(client), host, request.NetworkIDs[0])
+	err = metadata.SaveHost(client, host)
 	if err != nil {
 		nerr := client.DeleteHost(host.ID)
 		if nerr != nil {
@@ -422,55 +506,57 @@ func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 }
 
 // createHost ...
-func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.Host, error) {
+func (client *Client) createHost(request model.HostRequest, isGateway bool) (*model.Host, error) {
 	msgFail := "Failed to create Host resource: %s"
-	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.Name)
+	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
+
+	if isGateway && !request.PublicIP {
+		return nil, fmt.Errorf("can't create a gateway without public IP")
+	}
 
 	// First check if name is not already used
-	m, err := metadata.LoadHost(providers.FromClient(client), request.Name)
+	mh, err := metadata.LoadHost(client, request.ResourceName)
 	if err != nil {
 		log.Debugf("Error creating host: loading host: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: loading host"))
 	}
-	if m != nil {
-		err := fmt.Errorf(msgFail, fmt.Sprintf("a host already exists with name '%s'", request.Name))
-		log.Debugf("Error creating host: load host: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: load host"))
+	if mh != nil {
+		return nil, fmt.Errorf(msgFail, fmt.Sprintf("a host already exists with name '%s'", request.ResourceName))
 	}
 
+	// The Default Network is the first of the provided list, by convention
+	defaultNetworkID := request.NetworkIDs[0]
+
 	// Optional network gateway
-	var gw *api.Host
+	var defaultGateway *model.Host
 	// If the host is not public it has to be created on a network owning a Gateway
 	if !request.PublicIP {
-		gwServer, err := client.readGateway(request.NetworkIDs[0])
-
+		mgw, err := metadata.LoadGateway(client, defaultNetworkID)
 		if err != nil {
 			log.Debugf("Error creating host: read gateway: %+v", err)
 			err := fmt.Errorf(msgFail, "no private host can be created on a network without gateway")
 			return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: read gateway"))
 		}
-		m, err := metadata.LoadHost(providers.FromClient(client), gwServer.ID)
-		if err != nil {
-			log.Debugf("Error creating host: load host: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf(msgFail, fmt.Sprintf("bad state, Gateway for network '%s' is not accessible", request.NetworkIDs[0])))
-		}
-		if m != nil {
-			gw = m.Get()
+		if mgw != nil {
+			defaultGateway = mgw.Get()
 		}
 	}
+
 	// If a gateway is created, we need the CIDR for the userdata
-	var cidr string
+	var (
+		cidr           string
+		defaultNetwork *model.Network
+	)
+	mn, err := metadata.LoadNetwork(client, defaultNetworkID)
+	if err != nil {
+		return nil, err
+	}
+	if mn == nil {
+		return nil, fmt.Errorf(msgFail, fmt.Sprintf("failed to load metadata of network '%s'", defaultNetworkID))
+	}
+	defaultNetwork = mn.Get()
 	if isGateway {
-		m, err := metadata.LoadNetwork(providers.FromClient(client), request.NetworkIDs[0])
-		if err != nil {
-			log.Debugf("Error creating host: load network: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: load network"))
-		}
-		if m == nil {
-			return nil, fmt.Errorf(msgFail, fmt.Sprintf("failed to load metadata of network '%s'", request.NetworkIDs[0]))
-		}
-		network := m.Get()
-		cidr = network.CIDR
+		cidr = defaultNetwork.CIDR
 	}
 
 	var nets []servers.Network
@@ -488,34 +574,39 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		})
 	}
 
-	// Prepare key pair
-	kp := request.KeyPair
-
-	//If no key pair is supplied create one
-	if kp == nil {
+	// If no key pair is supplied create one
+	if request.KeyPair == nil {
 		id, err := uuid.NewV4()
 		if err != nil {
 			log.Debugf("Error creating host: error creating UID: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("error creating UID : %v", err))
 		}
 
-		name := fmt.Sprintf("%s_%s", request.Name, id)
-		kp, err = client.CreateKeyPair(name)
+		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
+		request.KeyPair, err = client.CreateKeyPair(name)
 		if err != nil {
 			log.Debugf("Error creating host: creating key pair: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
 		}
 	}
 
-	userData, err := userdata.Prepare(client, request, isGateway, kp, gw, cidr)
+	// --- prepares data structures for Provider usage ---
+
+	// Constructs userdata content
+	userData, err := userdata.Prepare(client, request, isGateway, request.KeyPair, defaultGateway, cidr)
 	if err != nil {
 		log.Debugf("Error creating host: preparing user data: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: preparing user data"))
 	}
 
+	template, err := client.GetTemplate(request.TemplateID)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get image: %s", ProviderErrorToString(err))
+	}
+
 	// Create host
 	srvOpts := servers.CreateOpts{
-		Name:           request.Name,
+		Name:           request.ResourceName,
 		SecurityGroups: []string{client.SecurityGroup.Name},
 		Networks:       nets,
 		FlavorRef:      request.TemplateID,
@@ -523,8 +614,61 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		UserData:       userData,
 	}
 
+	// --- Initializes model.Host ---
+
+	host := model.NewHost()
+	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
+
+	heNetworkV1 := model.HostExtensionNetworkV1{}
+
+	// Tells if the host is a gateway
+	heNetworkV1.IsGateway = isGateway
+
+	// Add gateway ID to Host definition
+	if defaultGateway != nil {
+		heNetworkV1.DefaultGatewayID = defaultGateway.ID
+	}
+
+	// Adds default network information
+	heNetworkV1.DefaultNetworkID = defaultNetworkID
+	heNetworkV1.NetworksByID = map[string]string{defaultNetwork.ID: defaultNetwork.Name}
+	heNetworkV1.NetworksByName = map[string]string{defaultNetwork.Name: defaultNetwork.ID}
+
+	// Adds other network information to Host definition
+	for _, netID := range request.NetworkIDs {
+		if netID != defaultNetworkID {
+			mn, err := metadata.LoadNetwork(client, netID)
+			if err != nil {
+				return nil, err
+			}
+			if mn == nil {
+				return nil, fmt.Errorf("failed to load metadata of network '%s'", netID)
+			}
+			name := mn.Get().Name
+			heNetworkV1.NetworksByID[netID] = name
+			heNetworkV1.NetworksByName[name] = netID
+		}
+	}
+
+	// Updates Host Extension NetworkV1 in host instance
+	err = host.Extensions.Set(HostExtension.NetworkV1, &heNetworkV1)
+	if err != nil {
+		return nil, err
+	}
+
+	// Adds Host Extension SizingV1
+	err = host.Extensions.Set(HostExtension.SizingV1, &model.HostExtensionSizingV1{
+		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
+		Template:      request.TemplateID,
+		AllocatedSize: template.HostSize,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// --- query provider for host creation ---
+
 	// Retry creation until success, for 10 minutes
-	var host *api.Host
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			server, err := servers.Create(client.Compute, keypairs.CreateOptsExt{
@@ -539,8 +683,10 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 				log.Warnf(msg)
 				return fmt.Errorf(msg)
 			}
-			// Wait that Host is ready
-			host, err = client.WaitHostReady(server.ID, 5*time.Minute)
+			host.ID = server.ID
+
+			// Wait that Host is ready, not just that the build is started
+			host, err = client.WaitHostReady(host, 5*time.Minute)
 			if err != nil {
 				servers.Delete(client.Compute, server.ID)
 				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
@@ -552,27 +698,13 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		},
 		10*time.Minute,
 	)
-
 	if err != nil {
 		log.Debugf("Error creating host: timeout: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
-
 	if host == nil {
-		return nil, errors.New("Unexpected problem creating host...")
+		return nil, errors.New("unexpected problem creating host")
 	}
-
-	// Add gateway ID to Host definition
-	var gwID string
-	if gw != nil {
-		gwID = gw.ID
-		host.GatewayID = gwID
-	} else {
-		log.Debugf("There was a problem with gateway ID...")
-		host.GatewayID = ""
-	}
-
-	host.PrivateKey = kp.PrivateKey
 
 	// if Floating IP are not used or no public address is requested
 	if client.Cfg.UseFloatingIP && request.PublicIP {
@@ -600,9 +732,9 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		}
 
 		if IPVersion.IPv4.Is(ip.IP) {
-			host.AccessIPv4 = ip.IP
+			host.PublicIPv4 = ip.IP
 		} else if IPVersion.IPv6.Is(ip.IP) {
-			host.AccessIPv6 = ip.IP
+			host.PublicIPv6 = ip.IP
 		}
 	}
 	log.Infoln(msgSuccess)
@@ -611,59 +743,58 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 }
 
 // WaitHostReady waits an host achieve ready state
-func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.Host, error) {
+// hostParam can be an ID of host, or an instance of *model.Host; any other type will panic
+func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration) (*model.Host, error) {
 	var (
-		server *servers.Server
-		err    error
-		broken bool
+		host *model.Host
+		err  error
 	)
-
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
-		func() error {
-			server, err = servers.Get(client.Compute, hostID).Extract()
-			if err != nil {
-				return err
-			}
-			if server.Status == "ERROR" {
-				broken = true
-				return nil
-			}
-			if server.Status != "ACTIVE" {
-				return fmt.Errorf("host '%s' is in state '%s'", server.Name, server.Status)
-			}
-			return nil
-		},
-		timeout,
-	)
-	if retryErr != nil {
-		return nil, errors.Wrap(retryErr, fmt.Sprintf("Retry error"))
+	switch hostParam.(type) {
+	case string:
+		host = model.NewHost()
+		host.ID = hostParam.(string)
+	case *model.Host:
+		host = hostParam.(*model.Host)
+	default:
+		panic("hostParam must be a string or a *model.Host!")
 	}
-	if broken {
-		return nil, fmt.Errorf("host '%s' is in '%s' state", server.Name, server.Status)
-	}
-	return client.toHost(server), nil
-}
-
-// GetHost returns the host identified by id
-func (client *Client) GetHost(ref string) (*api.Host, error) {
-	var (
-		server *servers.Server
-		err    error
-		id     string
-	)
-
-	m, err := metadata.LoadHost(providers.FromClient(client), ref)
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting host: loading host metadata"))
-	}
-	if m == nil {
-		return nil, providers.ResourceNotFoundError("host", ref)
-	}
-	id = m.Get().ID
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			server, err = servers.Get(client.Compute, id).Extract()
+			err = client.UpdateHost(host)
+			if err != nil {
+				return err
+			}
+			if host.LastState != HostState.STARTED {
+				return fmt.Errorf("not in ready state (current state: %s)", host.LastState.String())
+			}
+			return nil
+		},
+		2*time.Second,
+		timeout,
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case retry.ErrTimeout:
+			return nil, fmt.Errorf("timeout waiting to get host '%s' information after %v", host.Name, timeout)
+		}
+		return nil, retryErr
+	}
+	err = client.UpdateHost(host)
+	return host, err
+}
+
+// UpdateHost updates the data inside host with the data from provider
+// TODO: move this method on the model.Host struct
+func (client *Client) UpdateHost(host *model.Host) error {
+	var (
+		server *servers.Server
+		err    error
+	)
+
+	retryErr := retry.WhileUnsuccessful(
+		func() error {
+			server, err = servers.Get(client.Compute, host.ID).Extract()
 			if err != nil {
 				switch err.(type) {
 				case gc.ErrDefault404:
@@ -676,10 +807,15 @@ func (client *Client) GetHost(ref string) (*api.Host, error) {
 					return err
 				}
 				// Any other error stops the retry
-				err = fmt.Errorf("Error getting host '%s': %s", id, ProviderErrorToString(err))
+				err = fmt.Errorf("Error getting host '%s': %s", host.ID, ProviderErrorToString(err))
 				return nil
 			}
-			return nil
+			//spew.Dump(server)
+			if server.Status != "ERROR" && server.Status != "CREATING" {
+				host.LastState = toHostState(server.Status)
+				return nil
+			}
+			return fmt.Errorf("server not ready yet")
 		},
 		10*time.Second,
 		1*time.Second,
@@ -687,17 +823,45 @@ func (client *Client) GetHost(ref string) (*api.Host, error) {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return nil, errors.Wrap(retryErr, fmt.Sprintf("failed to get host '%s' information after 10s: %s", id, err.Error()))
+			return fmt.Errorf("failed to get host '%s' information after 10s: %s", host.ID, err.Error())
 		}
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting host: getting compute client"))
+		return err
 	}
-	return client.toHost(server), nil
+	err = client.complementHost(host, server)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-//ListHosts lists available hosts
-func (client *Client) ListHosts(all bool) ([]api.Host, error) {
+// GetHostState returns the current state of host identified by id
+// hostParam can be a string or an instance of *model.Host; any other type will panic
+func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error) {
+	var (
+		host *model.Host
+		err  error
+	)
+
+	switch hostParam.(type) {
+	case string:
+		host := model.NewHost()
+		host.ID = hostParam.(string)
+	case *model.Host:
+		host = hostParam.(*model.Host)
+	default:
+		panic("hostParam must be a string or a *model.Host!")
+	}
+	err = client.UpdateHost(host)
+	if err != nil {
+		return HostState.ERROR, err
+	}
+	return host.LastState, nil
+}
+
+// ListHosts lists available hosts
+func (client *Client) ListHosts(all bool) ([]*model.Host, error) {
 	if all {
 		return client.listAllHosts()
 	}
@@ -705,9 +869,9 @@ func (client *Client) ListHosts(all bool) ([]api.Host, error) {
 }
 
 // listAllHosts lists available hosts
-func (client *Client) listAllHosts() ([]api.Host, error) {
+func (client *Client) listAllHosts() ([]*model.Host, error) {
 	pager := servers.List(client.Compute, servers.ListOpts{})
-	var hosts []api.Host
+	var hosts []*model.Host
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := servers.ExtractServers(page)
 		if err != nil {
@@ -715,7 +879,12 @@ func (client *Client) listAllHosts() ([]api.Host, error) {
 		}
 
 		for _, srv := range list {
-			hosts = append(hosts, *client.toHost(&srv))
+			h := model.NewHost()
+			err := client.complementHost(h, &srv)
+			if err != nil {
+				return false, err
+			}
+			hosts = append(hosts, h)
 		}
 		return true, nil
 	})
@@ -729,11 +898,11 @@ func (client *Client) listAllHosts() ([]api.Host, error) {
 }
 
 // listMonitoredHosts lists available hosts created by SafeScale (ie registered in object storage)
-func (client *Client) listMonitoredHosts() ([]api.Host, error) {
-	var hosts []api.Host
+func (client *Client) listMonitoredHosts() ([]*model.Host, error) {
+	var hosts []*model.Host
 	m := metadata.NewHost(providers.FromClient(client))
-	err := m.Browse(func(host *api.Host) error {
-		hosts = append(hosts, *host)
+	err := m.Browse(func(host *model.Host) error {
+		hosts = append(hosts, host)
 		return nil
 	})
 	if err != nil {
@@ -775,7 +944,7 @@ func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, err
 
 // DeleteHost deletes the host identified by id
 func (client *Client) DeleteHost(ref string) error {
-	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	m, err := metadata.LoadHost(client, ref)
 	if err != nil {
 		log.Debugf("Error deleting host: getting host metadata: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting host: getting host metadata"))
@@ -873,14 +1042,13 @@ func (client *Client) StopHost(ref string) error {
 	log.Println("Received stop petition")
 	id := ref
 
-	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	m, err := metadata.LoadHost(client, ref)
 	if err != nil {
 		log.Debugf("Error getting ssh config: loading host metadata: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error getting ssh config: loading host metadata"))
 	}
 	if m != nil {
-		host := m.Get()
-		id = host.ID
+		id = m.Get().ID
 	}
 
 	err = startstop.Stop(client.Compute, id).ExtractErr()
@@ -891,17 +1059,17 @@ func (client *Client) StopHost(ref string) error {
 	return nil
 }
 
+// RebootHost ...
 func (client *Client) RebootHost(ref string) error {
 	log.Println("Received reboot petition")
 	id := ref
 
-	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	m, err := metadata.LoadHost(client, ref)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Error rebooting host: loading host"))
 	}
 	if m != nil {
-		host := m.Get()
-		id = host.ID
+		id = m.Get().ID
 	}
 
 	err = servers.Reboot(client.Compute, id, servers.RebootOpts{Type: "HARD"}).ExtractErr()
@@ -918,13 +1086,12 @@ func (client *Client) StartHost(ref string) error {
 	log.Println("Received start petition")
 	id := ref
 
-	m, err := metadata.LoadHost(providers.FromClient(client), ref)
+	m, err := metadata.LoadHost(client, ref)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Error starting host: loading host"))
 	}
 	if m != nil {
-		host := m.Get()
-		id = host.ID
+		id = m.Get().ID
 	}
 
 	err = startstop.Start(client.Compute, id).ExtractErr()
@@ -936,41 +1103,55 @@ func (client *Client) StartHost(ref string) error {
 	return nil
 }
 
-func (client *Client) getSSHConfig(host *api.Host) (*system.SSHConfig, error) {
+func (client *Client) getSSHConfig(host *model.Host) (*system.SSHConfig, error) {
+	spew.Dump(host)
 
-	ip := host.GetAccessIP()
 	sshConfig := system.SSHConfig{
 		PrivateKey: host.PrivateKey,
 		Port:       22,
-		Host:       ip,
-		User:       api.DefaultUser,
+		Host:       host.GetAccessIP(),
+		User:       model.DefaultUser,
 	}
-	if host.GatewayID != "" {
-		gw, err := client.GetHost(host.GatewayID)
+	heNetworkV1 := model.HostExtensionNetworkV1{}
+	err := host.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	if err != nil {
+		return nil, err
+	}
+	if heNetworkV1.DefaultGatewayID != "" {
+		mgw, err := metadata.LoadHost(client, heNetworkV1.DefaultGatewayID)
 		if err != nil {
 			log.Debugf("Error getting ssh config: getting host: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error getting ssh config: getting host"))
 		}
-		ip := gw.GetAccessIP()
+		gw := mgw.Get()
 		GatewayConfig := system.SSHConfig{
 			PrivateKey: gw.PrivateKey,
 			Port:       22,
-			User:       api.DefaultUser,
-			Host:       ip,
+			User:       model.DefaultUser,
+			Host:       gw.GetAccessIP(),
 		}
 		sshConfig.GatewayConfig = &GatewayConfig
 	}
-
 	return &sshConfig, nil
-
 }
 
-//GetSSHConfig creates SSHConfig to connect an host
-func (client *Client) GetSSHConfig(id string) (*system.SSHConfig, error) {
-	host, err := client.GetHost(id)
-	if err != nil {
-		log.Debugf("Error getting ssh config: getting host: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting ssh config: getting host"))
-	}
-	return client.getSSHConfig(host)
-}
+// // GetSSHConfig creates SSHConfig to connect an host
+// func (client *Client) GetSSHConfig(param interface{}) (*system.SSHConfig, error) {
+// 	var (
+// 		host *model.Host
+// 	)
+
+// 	switch param.(type) {
+// 	case string:
+// 		mh, err := metadata.LoadHost(client, param.(string))
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		host = mh.Get()
+// 	case *model.Host:
+// 		host = param.(*model.Host)
+// 	default:
+// 		panic("param must be a string or a *model.Host!")
+// 	}
+// 	return client.getSSHConfig(host)
+// }

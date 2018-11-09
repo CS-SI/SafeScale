@@ -21,4 +21,6 @@ const (
 	ByIDFolderName = "byID"
 	//ByNameFolderName tells in what folder to store 'byName' information
 	ByNameFolderName = "byName"
+	// BucketNamePrefix is the begining of the name of the bucket for Metadata
+	BucketNamePrefix = "0.safescale"
 )

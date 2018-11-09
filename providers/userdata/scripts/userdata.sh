@@ -88,8 +88,8 @@ create_user() {
     echo "{{ .User }} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
 
     mkdir /home/{{ .User }}/.ssh
-    echo "{{ .Key }}" >>/home/{{ .User }}/.ssh/authorized_keys
-    echo "{{ .PKey }}" >/home/{{ .User }}/.ssh/id_rsa
+    echo "{{ .PublicKey }}" >>/home/{{ .User }}/.ssh/authorized_keys
+    echo "{{ .PrivateKey }}" >/home/{{ .User }}/.ssh/id_rsa
     chmod 0700 /home/{{ .User }}/.ssh
     chmod -R 0600 /home/{{ .User }}/.ssh/*
 

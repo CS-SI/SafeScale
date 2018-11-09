@@ -337,9 +337,8 @@ var clusterCreateCommand = cli.Command{
 		if flavor == Flavor.DCOS {
 			// DCOS forces to use RHEL/CentOS/CoreOS, and we've chosen to use CentOS, so ignore --os option
 			los = ""
-		} else if los == "" {
-			los = "ubuntu1604"
 		}
+
 		cpu := int32(c.Uint("cpu"))
 		ram := float32(c.Float64("ram"))
 		disk := int32(c.Uint("disk"))

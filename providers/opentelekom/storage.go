@@ -17,24 +17,24 @@
 package opentelekom
 
 import (
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 )
 
 // CreateVolumeAttachment attaches a volume to an host
 //- 'name' of the volume attachment
 //- 'volume' to attach
 //- 'host' on which the volume is attached
-func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
+func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (*model.VolumeAttachment, error) {
 	return client.feclt.CreateVolumeAttachment(request)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (client *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment, error) {
+func (client *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachment, error) {
 	return client.feclt.GetVolumeAttachment(serverID, id)
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttachment, error) {
+func (client *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error) {
 	return client.feclt.ListVolumeAttachments(serverID)
 }
 
@@ -53,7 +53,7 @@ func (client *Client) DeleteVolume(id string) error {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 // - imageID is the ID of the image to initialize the volume with
-func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
+func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
 	return client.feclt.CreateVolume(request)
 }
 
@@ -62,17 +62,17 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 // - imageID is the ID of the image to initialize the volume with
-func (client *Client) ExCreateVolume(request api.VolumeRequest, imageID string) (*api.Volume, error) {
+func (client *Client) ExCreateVolume(request model.VolumeRequest, imageID string) (*model.Volume, error) {
 	return client.feclt.ExCreateVolume(request, imageID)
 }
 
 // GetVolume returns the volume identified by id
-func (client *Client) GetVolume(id string) (*api.Volume, error) {
+func (client *Client) GetVolume(id string) (*model.Volume, error) {
 	return client.feclt.GetVolume(id)
 }
 
 // ListVolumes list available volumes
-func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
+func (client *Client) ListVolumes(all bool) ([]model.Volume, error) {
 	return client.feclt.ListVolumes(all)
 }
 
@@ -82,7 +82,7 @@ func (client *Client) CreateContainer(name string) error {
 }
 
 // GetContainer get container info
-func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
+func (client *Client) GetContainer(name string) (*model.ContainerInfo, error) {
 	//	return s3.GetContainer(awss3.New(client.S3Session), name)
 	return client.feclt.GetContainer(name)
 }
@@ -98,27 +98,27 @@ func (client *Client) ListContainers() ([]string, error) {
 }
 
 // PutObject put an object into an object container
-func (client *Client) PutObject(container string, obj api.Object) error {
+func (client *Client) PutObject(container string, obj model.Object) error {
 	return client.feclt.PutObject(container, obj)
 }
 
 // UpdateObjectMetadata update an object into an object container
-func (client *Client) UpdateObjectMetadata(container string, obj api.Object) error {
+func (client *Client) UpdateObjectMetadata(container string, obj model.Object) error {
 	return client.feclt.UpdateObjectMetadata(container, obj)
 }
 
 // GetObject get object content from an object container
-func (client *Client) GetObject(container string, name string, ranges []api.Range) (*api.Object, error) {
+func (client *Client) GetObject(container string, name string, ranges []model.Range) (*model.Object, error) {
 	return client.feclt.GetObject(container, name, ranges)
 }
 
 // GetObjectMetadata get  object metadata from an object container
-func (client *Client) GetObjectMetadata(container string, name string) (*api.Object, error) {
+func (client *Client) GetObjectMetadata(container string, name string) (*model.Object, error) {
 	return client.feclt.GetObjectMetadata(container, name)
 }
 
 // ListObjects list objects of a container
-func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]string, error) {
+func (client *Client) ListObjects(container string, filter model.ObjectFilter) ([]string, error) {
 	return client.feclt.ListObjects(container, filter)
 }
 

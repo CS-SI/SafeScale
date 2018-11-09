@@ -19,13 +19,14 @@ package services
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 )
 
-//go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services TemplateAPI
+//go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services TemplateAPI
 
 //TemplateAPI defines API to manipulate hosts
 type TemplateAPI interface {
-	List(all bool) ([]api.HostTemplate, error)
+	List(all bool) ([]model.HostTemplate, error)
 }
 
 //NewTemplateService creates a template service
@@ -41,6 +42,6 @@ type TemplateService struct {
 }
 
 // List returns the template list
-func (srv *TemplateService) List(all bool) ([]api.HostTemplate, error) {
+func (srv *TemplateService) List(all bool) ([]model.HostTemplate, error) {
 	return srv.provider.ListTemplates(all)
 }
