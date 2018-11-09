@@ -16,58 +16,60 @@
 
 package images
 
-import "github.com/CS-SI/SafeScale/providers/api"
+import (
+	"github.com/CS-SI/SafeScale/providers/model"
+)
 
-//Filter ...
+// Filter ...
 type Filter struct {
 	filter Predicate
 }
 
-//Predicate ...
-type Predicate func(img api.Image) bool
+// Predicate ...
+type Predicate func(img model.Image) bool
 
-//NewFilter creates a new filter with the given predicate
+// NewFilter creates a new filter with the given predicate
 func NewFilter(predicate Predicate) *Filter {
 	return &Filter{filter: predicate}
 }
 
-//Not ...
+// Not ...
 func (f *Filter) Not() *Filter {
 	oldFilter := f.filter
-	f.filter = func(in api.Image) bool {
+	f.filter = func(in model.Image) bool {
 		return !oldFilter(in)
 	}
 	return f
 }
 
-//And ...
+// And ...
 func (f *Filter) And(other *Filter) *Filter {
 	oldFilter := f.filter
-	f.filter = func(in api.Image) bool {
+	f.filter = func(in model.Image) bool {
 		return oldFilter(in) && (*other).filter(in)
 	}
 	return f
 }
 
-//Or ...
+// Or ...
 func (f *Filter) Or(other *Filter) *Filter {
 	oldFilter := f.filter
-	f.filter = func(in api.Image) bool {
+	f.filter = func(in model.Image) bool {
 		return oldFilter(in) || (*other).filter(in)
 	}
 	return f
 }
 
-//NotFilter ...
+// Not ...
 func Not(f Predicate) Predicate {
-	return func(in api.Image) bool {
+	return func(in model.Image) bool {
 		return !f(in)
 	}
 }
 
-//OrFilter ..
+// OrFilter ..
 func OrFilter(filters ...Predicate) Predicate {
-	return func(in api.Image) bool {
+	return func(in model.Image) bool {
 		for _, f := range filters {
 			if f(in) {
 				return true
@@ -77,9 +79,9 @@ func OrFilter(filters ...Predicate) Predicate {
 	}
 }
 
-//AndFilter ...
+// AndFilter ...
 func AndFilter(filters ...Predicate) Predicate {
-	return func(in api.Image) bool {
+	return func(in model.Image) bool {
 		for _, f := range filters {
 			if !f(in) {
 				return false
@@ -89,9 +91,9 @@ func AndFilter(filters ...Predicate) Predicate {
 	}
 }
 
-//FilterImages ...
-func FilterImages(images []api.Image, f *Filter) []api.Image {
-	res := make([]api.Image, 0)
+// FilterImages ...
+func FilterImages(images []model.Image, f *Filter) []model.Image {
+	res := make([]model.Image, 0)
 	for _, img := range images {
 
 		if f.filter(img) {

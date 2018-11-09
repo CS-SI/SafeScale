@@ -17,12 +17,11 @@
 package metadata
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 
 	"github.com/CS-SI/SafeScale/utils/metadata"
 )
@@ -35,19 +34,19 @@ const (
 // Nas links Object Storage folder and Network
 type Nas struct {
 	item *metadata.Item
-	name string
-	id   string
+	name *string
+	id   *string
 }
 
 // NewNas creates an instance of metadata.Nas
-func NewNas(svc *providers.Service) *Nas {
+func NewNas(svc api.ClientAPI) *Nas {
 	return &Nas{
 		item: metadata.NewItem(svc, nasFolderName),
 	}
 }
 
 // Carry links a Nas instance to the Metadata instance
-func (m *Nas) Carry(nas *api.Nas) *Nas {
+func (m *Nas) Carry(nas *model.Nas) *Nas {
 	if nas == nil {
 		panic("nas is nil!")
 	}
@@ -55,17 +54,17 @@ func (m *Nas) Carry(nas *api.Nas) *Nas {
 		panic("m.item is nil!")
 	}
 	m.item.Carry(nas)
-	m.name = nas.Name
-	m.id = nas.ID
+	m.name = &nas.Name
+	m.id = &nas.ID
 	return m
 }
 
 // Get returns the Nas instance linked to metadata
-func (m *Nas) Get() *api.Nas {
+func (m *Nas) Get() *model.Nas {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	if n, ok := m.item.Get().(*api.Nas); ok {
+	if n, ok := m.item.Get().(*model.Nas); ok {
 		return n
 	}
 	panic("invalid content in metadata!")
@@ -76,11 +75,11 @@ func (m *Nas) Write() error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	err := m.item.WriteInto(ByIDFolderName, m.id)
+	err := m.item.WriteInto(ByIDFolderName, *m.id)
 	if err != nil {
 		return err
 	}
-	return m.item.WriteInto(ByNameFolderName, m.name)
+	return m.item.WriteInto(ByNameFolderName, *m.name)
 }
 
 // ReadByID reads the metadata of a nas identified by ID from Object Storage
@@ -88,13 +87,13 @@ func (m *Nas) ReadByID(id string) (bool, error) {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	var data api.Nas
-	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf *bytes.Buffer) (interface{}, error) {
-		err := gob.NewDecoder(buf).Decode(&data)
+	var nas model.Nas
+	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
+		err := (&nas).Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &data, nil
+		return &nas, nil
 	})
 	if err != nil {
 		return false, err
@@ -102,8 +101,7 @@ func (m *Nas) ReadByID(id string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.id = id
-	m.name = data.Name
+	m.Carry(&nas)
 	return true, nil
 }
 
@@ -112,13 +110,13 @@ func (m *Nas) ReadByName(name string) (bool, error) {
 	if m.item == nil {
 		panic("m.name is nil!")
 	}
-	var data api.Nas
-	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf *bytes.Buffer) (interface{}, error) {
-		err := gob.NewDecoder(buf).Decode(&data)
+	var nas model.Nas
+	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
+		err := (&nas).Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &data, nil
+		return &nas, nil
 	})
 	if err != nil {
 		return false, err
@@ -126,25 +124,24 @@ func (m *Nas) ReadByName(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.name = name
-	m.id = data.ID
+	m.Carry(&nas)
 	return true, nil
 }
 
 // Delete updates the metadata corresponding to the nas
 func (m *Nas) Delete() error {
-	err := m.item.DeleteFrom(ByIDFolderName, m.id)
+	err := m.item.DeleteFrom(ByIDFolderName, *m.id)
 	if err != nil {
 		return err
 	}
-	return m.item.DeleteFrom(ByNameFolderName, m.name)
+	return m.item.DeleteFrom(ByNameFolderName, *m.name)
 }
 
 // Browse walks through nas folder and executes a callback for each entries
-func (m *Nas) Browse(callback func(*api.Nas) error) error {
-	return m.item.BrowseInto(ByNameFolderName, func(buf *bytes.Buffer) error {
-		var nas api.Nas
-		err := gob.NewDecoder(buf).Decode(&nas)
+func (m *Nas) Browse(callback func(*model.Nas) error) error {
+	return m.item.BrowseInto(ByNameFolderName, func(buf []byte) error {
+		nas := model.Nas{}
+		err := (&nas).Deserialize(buf)
 		if err != nil {
 			return err
 		}
@@ -153,22 +150,22 @@ func (m *Nas) Browse(callback func(*api.Nas) error) error {
 }
 
 // AddClient adds a client to the Nas definition in Object Storage
-func (m *Nas) AddClient(nas *api.Nas) error {
-	return NewNas(m.item.GetService()).Carry(nas).item.WriteInto(m.id, nas.ID)
+func (m *Nas) AddClient(nas *model.Nas) error {
+	return NewNas(m.item.GetService()).Carry(nas).item.WriteInto(*m.id, nas.ID)
 	// return m.item.WriteInto(m.id, nas.ID)
 }
 
 //RemoveClient removes a client to the Nas definition in Object Storage
-func (m *Nas) RemoveClient(nas *api.Nas) error {
-	return m.item.DeleteFrom(m.id, nas.ID)
+func (m *Nas) RemoveClient(nas *model.Nas) error {
+	return m.item.DeleteFrom(*m.id, nas.ID)
 }
 
 //Listclients returns the list of ID of hosts clients of the NAS server
-func (m *Nas) Listclients() ([]*api.Nas, error) {
-	var list []*api.Nas
-	err := m.item.BrowseInto(m.id, func(buf *bytes.Buffer) error {
-		var nas api.Nas
-		err := gob.NewDecoder(buf).Decode(&nas)
+func (m *Nas) Listclients() ([]*model.Nas, error) {
+	var list []*model.Nas
+	err := m.item.BrowseInto(*m.id, func(buf []byte) error {
+		nas := model.Nas{}
+		err := (&nas).Deserialize(buf)
 		if err != nil {
 			return err
 		}
@@ -179,11 +176,11 @@ func (m *Nas) Listclients() ([]*api.Nas, error) {
 }
 
 // FindClient returns the client hosted by the Host whose name is given
-func (m *Nas) FindClient(hostName string) (*api.Nas, error) {
-	var client *api.Nas
-	err := m.item.BrowseInto(m.id, func(buf *bytes.Buffer) error {
-		var nas api.Nas
-		err := gob.NewDecoder(buf).Decode(&nas)
+func (m *Nas) FindClient(hostName string) (*model.Nas, error) {
+	var client *model.Nas
+	err := m.item.BrowseInto(*m.id, func(buf []byte) error {
+		nas := model.Nas{}
+		err := (&nas).Deserialize(buf)
 		if err != nil {
 			return err
 		}
@@ -197,7 +194,7 @@ func (m *Nas) FindClient(hostName string) (*api.Nas, error) {
 		return nil, err
 	}
 	if client == nil {
-		return nil, fmt.Errorf("No client found for nas '%s' on host '%s'", m.name, hostName)
+		return nil, fmt.Errorf("no client found for nas '%s' on host '%s'", *m.name, hostName)
 	}
 	return client, nil
 }
@@ -213,7 +210,7 @@ func (m *Nas) Release() {
 }
 
 // SaveNas saves the Nas definition in Object Storage
-func SaveNas(svc *providers.Service, nas *api.Nas) error {
+func SaveNas(svc *providers.Service, nas *model.Nas) error {
 	err := NewNas(svc).Carry(nas).Write()
 	if err != nil {
 		return err
@@ -222,7 +219,7 @@ func SaveNas(svc *providers.Service, nas *api.Nas) error {
 }
 
 // RemoveNas removes the Nas definition from Object Storage
-func RemoveNas(svc *providers.Service, nas *api.Nas) error {
+func RemoveNas(svc *providers.Service, nas *model.Nas) error {
 	return NewNas(svc).Carry(nas).Delete()
 }
 
@@ -247,11 +244,11 @@ func LoadNas(svc *providers.Service, ref string) (*Nas, error) {
 }
 
 // MountNas add the client nas to the Nas definition from Object Storage
-func MountNas(svc *providers.Service, client *api.Nas, nas *api.Nas) error {
-	return NewNas(svc).Carry(nas).AddClient(client)
+func MountNas(svc *providers.Service, client *model.Nas, server *model.Nas) error {
+	return NewNas(svc).Carry(server).AddClient(client)
 }
 
 // UmountNas remove the client nas to the Nas definition from Object Storage
-func UmountNas(svc *providers.Service, client *api.Nas, nas *api.Nas) error {
-	return NewNas(svc).Carry(nas).RemoveClient(client)
+func UmountNas(svc *providers.Service, client *model.Nas, server *model.Nas) error {
+	return NewNas(svc).Carry(server).RemoveClient(client)
 }
