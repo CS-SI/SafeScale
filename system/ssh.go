@@ -119,7 +119,7 @@ type SSHConfig struct {
 }
 
 // SSHTunnel a SSH tunnel
-type sshTunnel struct {
+type SSHTunnel struct {
 	port      int
 	cmd       *exec.Cmd
 	cmdString string
@@ -143,7 +143,7 @@ func SCPErrorString(retcode int) string {
 }
 
 // Close closes ssh tunnel
-func (tunnel *sshTunnel) Close() error {
+func (tunnel *SSHTunnel) Close() error {
 	defer utils.LazyRemove(tunnel.keyFile.Name())
 
 	// Kills the process of the tunnel
@@ -219,7 +219,7 @@ func isTunnelReady(port int) bool {
 
 // createTunnel create SSH from local host to remote host through gateway
 // if localPort is set to 0 then it's  automatically choosed
-func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
+func createTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
 		return nil, err
@@ -253,7 +253,7 @@ func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
 	}
-	return &sshTunnel{
+	return &SSHTunnel{
 		port:      localPort,
 		cmd:       cmd,
 		cmdString: cmdString,
@@ -264,7 +264,7 @@ func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 // SSHCommand defines a SSH command
 type SSHCommand struct {
 	cmd     *exec.Cmd
-	tunnels []*sshTunnel
+	tunnels []*SSHTunnel
 	keyFile *os.File
 }
 
@@ -285,7 +285,7 @@ func (c *SSHCommand) closeTunnels() error {
 // The returned error is nil if the command runs, has no problems copying stdin, stdout, and stderr, and exits with a zero exit status.
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
-// Wait releases any resources associated with the Cmd.
+// Wait releases any resources associated with the cmd.
 func (c *SSHCommand) Wait() error {
 	err := c.cmd.Wait()
 	nerr := c.end()
@@ -419,7 +419,7 @@ func (c *SSHCommand) end() error {
 	return nil
 }
 
-func recCreateTunnels(ssh *SSHConfig, tunnels *[]*sshTunnel) (*sshTunnel, error) {
+func recCreateTunnels(ssh *SSHConfig, tunnels *[]*SSHTunnel) (*SSHTunnel, error) {
 	if ssh != nil {
 		tunnel, err := recCreateTunnels(ssh.GatewayConfig, tunnels)
 		if err != nil {
@@ -446,8 +446,8 @@ func recCreateTunnels(ssh *SSHConfig, tunnels *[]*sshTunnel) (*sshTunnel, error)
 
 }
 
-func (ssh *SSHConfig) CreateTunnels() ([]*sshTunnel, *SSHConfig, error) {
-	var tunnels []*sshTunnel
+func (ssh *SSHConfig) CreateTunnels() ([]*SSHTunnel, *SSHConfig, error) {
+	var tunnels []*SSHTunnel
 	tunnel, err := recCreateTunnels(ssh, &tunnels)
 	if err != nil {
 		if err != nil {
@@ -499,12 +499,12 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 
 }
 
-// Command returns the Cmd struct to execute cmdString remotely
+// Command returns the cmd struct to execute cmdString remotely
 func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
 	return ssh.command(cmdString, false)
 }
 
-// SudoCommand returns the Cmd struct to execute cmdString remotely. Command is executed with sudo
+// SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
 func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
 	return ssh.command(cmdString, true)
 }
@@ -576,7 +576,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		return 0, "", "", fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
 
-	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}{{.LocalPath}} {{.User}}@{{.Host}}:{{.RemotePath}}{{else}}{{.User}}@{{.Host}}:{{.RemotePath}} {{.LocalPath}}{{end}}")
+	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.port}} {{.Options}} {{if .IsUpload}}{{.LocalPath}} {{.User}}@{{.Host}}:{{.RemotePath}}{{else}}{{.User}}@{{.Host}}:{{.RemotePath}} {{.LocalPath}}{{end}}")
 	if err != nil {
 		return 0, "", "", fmt.Errorf("Error parsing command template: %s", err.Error())
 	}
