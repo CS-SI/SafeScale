@@ -23,7 +23,8 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/utils"
-
+	conv "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/system"
 	cache "github.com/CS-SI/SafeScale/utils"
 )
 
@@ -140,7 +141,7 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 
 	var wg sync.WaitGroup
 
-	hostDeleter := func (aname string) {
+	hostDeleter := func(aname string) {
 		defer wg.Done()
 		ctx, cancel := utils.GetContext(timeout)
 		defer cancel()
@@ -165,16 +166,17 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 }
 
 // SSHConfig ...
-func (h *host) SSHConfig(name string) (*pb.SshConfig, error) {
+func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 	if anon, ok := sshCfgCache.Get(name); ok {
-		return anon.(*pb.SshConfig), nil
+		return anon.(*system.SSHConfig), nil
 	}
 	conn := utils.GetConnection(int(h.session.brokerdPort))
 	defer conn.Close()
 	ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
 	defer cancel()
 	service := pb.NewHostServiceClient(conn)
-	sshCfg, err := service.SSH(ctx, &pb.Reference{Name: name})
+	pbSSHCfg, err := service.SSH(ctx, &pb.Reference{Name: name})
+	sshCfg := conv.ToSystemSshConfig(pbSSHCfg)
 	if err == nil {
 		nerr := sshCfgCache.Set(name, sshCfg)
 		if nerr != nil {

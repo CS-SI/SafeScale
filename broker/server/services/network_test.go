@@ -17,12 +17,13 @@
 package services
 
 import (
+	"testing"
+
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/mocks"
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNetworkService_List_with_brokerd_running(t *testing.T) {
@@ -51,7 +52,7 @@ func TestNetworkService_List_with_NO_brokerd_running(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	mockClientAPI := mocks.NewMockClientAPI(mockCtrl)
-	the_error := errors.New("Could not get network list: rpc error: code = Unavailable desc = all SubConns are in TransientFailure, latest connection error: connection error: desc = \"transport: Error while dialing dial tcp 127.0.0.1:50051: connect: connection refused\"")
+	theError := errors.New("Could not get network list: rpc error: code = Unavailable desc = all SubConns are in TransientFailure, latest connection error: connection error: desc = \"transport: Error while dialing dial tcp 127.0.0.1:50051: connect: connection refused\"")
 
 	ness := &NetworkService{
 		provider: &providers.Service{
@@ -59,7 +60,7 @@ func TestNetworkService_List_with_NO_brokerd_running(t *testing.T) {
 		},
 	}
 
-	mockClientAPI.EXPECT().ListNetworks(false).Return(nil, the_error).Times(1)
+	mockClientAPI.EXPECT().ListNetworks(false).Return(nil, theError).Times(1)
 
 	result, daerr := ness.provider.ListNetworks(false)
 

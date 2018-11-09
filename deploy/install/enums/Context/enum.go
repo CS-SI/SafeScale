@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-package NetworkExtension
+package Context
 
 //go:generate stringer -type=Enum
 
-// Enum represents the type of additional info for an host
 type Enum uint8
 
 const (
 	_ Enum = iota
 
-	// DescriptionV1 contains optional additional info describing network (creation date, purpose, ...)
-	DescriptionV1
+	// Host indicates the context of feature addition is on host
+	Host
+	// Cluster indicates the context of feature addition is on cluster
+	Cluster
 )

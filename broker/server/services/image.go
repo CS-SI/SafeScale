@@ -19,16 +19,16 @@ package services
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 )
 
-//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/broker/daemon/services ImageAPI
+//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services ImageAPI
 
-
-//ImageAPI defines API to manipulate hosts
+// ImageAPI defines API to manipulate hosts
 type ImageAPI interface {
-	List(all bool) ([]api.Image, error)
-	Select(osfilter string) (*api.Image, error)
-	Filter(osfilter string) ([]api.Image, error)
+	List(all bool) ([]model.Image, error)
+	Select(osfilter string) (*model.Image, error)
+	Filter(osfilter string) ([]model.Image, error)
 }
 
 //NewImageService creates an host service
@@ -44,16 +44,16 @@ type ImageService struct {
 }
 
 // List returns the image list
-func (srv *ImageService) List(all bool) ([]api.Image, error) {
+func (srv *ImageService) List(all bool) ([]model.Image, error) {
 	return srv.provider.ListImages(all)
 }
 
 //Select selects the image that best fits osname
-func (srv *ImageService) Select(osname string) (*api.Image, error) {
+func (srv *ImageService) Select(osname string) (*model.Image, error) {
 	return nil, nil
 }
 
 //Filter filters the images that do not fit osname
-func (srv *ImageService) Filter(osname string) ([]api.Image, error) {
+func (srv *ImageService) Filter(osname string) ([]model.Image, error) {
 	return nil, nil
 }

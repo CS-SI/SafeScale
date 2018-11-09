@@ -25,11 +25,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
@@ -88,9 +87,9 @@ func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
+func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
 	// Check if a volume already exists with the same name
-	volume, err := metadata.LoadVolume(providers.FromClient(client), request.Name)
+	volume, err := metadata.LoadVolume(client, request.Name)
 	if err != nil {
 		log.Debugf("Error creating volume, loading volume metadata: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume, loading volume metadata"))
@@ -109,14 +108,14 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 		log.Debugf("Error creating volume: volume creation invocation: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume : %s", ProviderErrorToString(err)))
 	}
-	v := api.Volume{
+	v := model.Volume{
 		ID:    vol.ID,
 		Name:  vol.Name,
 		Size:  vol.Size,
 		Speed: client.getVolumeSpeed(vol.VolumeType),
 		State: toVolumeState(vol.Status),
 	}
-	err = metadata.SaveVolume(providers.FromClient(client), &v)
+	err = metadata.SaveVolume(client, &v)
 	if err != nil {
 		nerr := client.DeleteVolume(v.ID)
 		if nerr != nil {
@@ -130,13 +129,13 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 }
 
 // GetVolume returns the volume identified by id
-func (client *Client) GetVolume(id string) (*api.Volume, error) {
+func (client *Client) GetVolume(id string) (*model.Volume, error) {
 	vol, err := volumes.Get(client.Volume, id).Extract()
 	if err != nil {
 		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", ProviderErrorToString(err)))
 	}
-	av := api.Volume{
+	av := model.Volume{
 		ID:    vol.ID,
 		Name:  vol.Name,
 		Size:  vol.Size,
@@ -148,7 +147,7 @@ func (client *Client) GetVolume(id string) (*api.Volume, error) {
 
 //ListVolumes return the list of all volume known on the current tenant (all=ture)
 //or 'only' thode monitored by safescale (all=false) ie those monitored by metadata
-func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
+func (client *Client) ListVolumes(all bool) ([]model.Volume, error) {
 	if all {
 		return client.listAllVolumes()
 	}
@@ -157,8 +156,8 @@ func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
 }
 
 // ListVolumes list available volumes
-func (client *Client) listAllVolumes() ([]api.Volume, error) {
-	var vs []api.Volume
+func (client *Client) listAllVolumes() ([]model.Volume, error) {
+	var vs []model.Volume
 	err := volumes.List(client.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumes.ExtractVolumes(page)
 		if err != nil {
@@ -166,7 +165,7 @@ func (client *Client) listAllVolumes() ([]api.Volume, error) {
 			return false, err
 		}
 		for _, vol := range list {
-			av := api.Volume{
+			av := model.Volume{
 				ID:    vol.ID,
 				Name:  vol.Name,
 				Size:  vol.Size,
@@ -190,10 +189,10 @@ func (client *Client) listAllVolumes() ([]api.Volume, error) {
 }
 
 // listMonitoredVolumess lists available Volumes created by SafeScale (ie registered in object storage)
-func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
-	var vols []api.Volume
-	m := metadata.NewVolume(providers.FromClient(client))
-	err := m.Browse(func(vol *api.Volume) error {
+func (client *Client) listMonitoredVolumes() ([]model.Volume, error) {
+	var vols []model.Volume
+	m := metadata.NewVolume(client)
+	err := m.Browse(func(vol *model.Volume) error {
 		vols = append(vols, *vol)
 		return nil
 	})
@@ -210,14 +209,14 @@ func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(id string) error {
-	volume, err := metadata.LoadVolume(providers.FromClient(client), id)
+	volume, err := metadata.LoadVolume(client, id)
 	if err != nil {
 		log.Debugf("Error deleting volume: loading metadata: %+v", err)
 		return errors.Wrap(err, "Error deleting volume: loading metadata")
 	}
 	if volume == nil {
 		log.Debugf("Error deleting volume: volume not found: %+v", err)
-		return errors.Wrap(err, providers.ResourceNotFoundError("volume", id).Error())
+		return model.ResourceNotFoundError("volume", id)
 	}
 
 	err = volumes.Delete(client.Volume, id).ExtractErr()
@@ -225,7 +224,7 @@ func (client *Client) DeleteVolume(id string) error {
 		log.Debugf("Error deleting volume: actual delete call: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting volume: %s", ProviderErrorToString(err)))
 	}
-	err = metadata.RemoveVolume(providers.FromClient(client), id)
+	err = metadata.RemoveVolume(client, id)
 	if err != nil {
 		log.Debugf("Error deleting volume: removing volume metadata: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting volume: %s", ProviderErrorToString(err)))
@@ -237,7 +236,7 @@ func (client *Client) DeleteVolume(id string) error {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
+func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (*model.VolumeAttachment, error) {
 	// Create the attachment
 	va, err := volumeattach.Create(client.Compute, request.ServerID, volumeattach.CreateOpts{
 		VolumeID: request.VolumeID,
@@ -247,7 +246,7 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, ProviderErrorToString(err)))
 	}
 
-	vaapi := &api.VolumeAttachment{
+	vaapi := &model.VolumeAttachment{
 		ID:       va.ID,
 		ServerID: va.ServerID,
 		VolumeID: va.VolumeID,
@@ -256,12 +255,12 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 
 	// Update the metadata
 
-	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), request.VolumeID)
+	mtdVol, err := metadata.LoadVolume(client, request.VolumeID)
 	if err != nil {
 
 		// Detach volume
-		detach_err := volumeattach.Delete(client.Compute, va.ServerID, va.ID).ExtractErr()
-		if detach_err != nil {
+		detachErr := volumeattach.Delete(client.Compute, va.ServerID, va.ID).ExtractErr()
+		if detachErr != nil {
 			log.Debugf("Error creating volume attachment: attachment deletion: %+v", detach_err)
 			return nil, errors.Wrap(detach_err, fmt.Sprintf("Error deleting volume attachment %s: %s", va.ID, ProviderErrorToString(detach_err)))
 		}
@@ -272,8 +271,8 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 	err = mtdVol.Attach(vaapi)
 	if err != nil {
 		// Detach volume
-		detach_err := volumeattach.Delete(client.Compute, va.ServerID, va.ID).ExtractErr()
-		if detach_err != nil {
+		detachErr := volumeattach.Delete(client.Compute, va.ServerID, va.ID).ExtractErr()
+		if detachErr != nil {
 			log.Debugf("Error creating volume attachemnt: attachment deletion: %+v", detach_err)
 			return nil, errors.Wrap(detach_err, fmt.Sprintf("Error deleting volume attachment %s: %s", va.ID, ProviderErrorToString(detach_err)))
 		}
@@ -286,13 +285,13 @@ func (client *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (client *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment, error) {
+func (client *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachment, error) {
 	va, err := volumeattach.Get(client.Compute, serverID, id).Extract()
 	if err != nil {
 		log.Debugf("Error getting volume attachment: get call: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
 	}
-	return &api.VolumeAttachment{
+	return &model.VolumeAttachment{
 		ID:       va.ID,
 		ServerID: va.ServerID,
 		VolumeID: va.VolumeID,
@@ -301,8 +300,8 @@ func (client *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttac
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttachment, error) {
-	var vs []api.VolumeAttachment
+func (client *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error) {
+	var vs []model.VolumeAttachment
 	err := volumeattach.List(client.Compute, serverID).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumeattach.ExtractVolumeAttachments(page)
 		if err != nil {
@@ -310,7 +309,7 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttach
 			return false, errors.Wrap(err, "Error listing volume attachment: extracting attachments")
 		}
 		for _, va := range list {
-			ava := api.VolumeAttachment{
+			ava := model.VolumeAttachment{
 				ID:       va.ID,
 				ServerID: va.ServerID,
 				VolumeID: va.VolumeID,
@@ -341,7 +340,7 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 		return errors.Wrap(err, fmt.Sprintf("Error deleting volume attachment %s: %s", id, ProviderErrorToString(err)))
 	}
 
-	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), id)
+	mtdVol, err := metadata.LoadVolume(client, id)
 	if err != nil {
 		log.Debugf("Error deleting volume attachment: loading metadata: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting volume attachment %s: %s", id, ProviderErrorToString(err)))
@@ -404,7 +403,7 @@ func (client *Client) GetContainerMetadata(name string) (map[string]string, erro
 }
 
 // GetContainer get container info
-func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
+func (client *Client) GetContainer(name string) (*model.ContainerInfo, error) {
 	meta, err := containers.Get(client.Container, name, containers.GetOpts{}).ExtractMetadata()
 	_ = meta
 
@@ -412,7 +411,7 @@ func (client *Client) GetContainer(name string) (*api.ContainerInfo, error) {
 		log.Debugf("Error getting container: getting container call: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting container %s: %s", name, ProviderErrorToString(err)))
 	}
-	return &api.ContainerInfo{
+	return &model.ContainerInfo{
 		Name:       name,
 		Host:       "TODO Host",
 		MountPoint: "TODO mountpoint",
@@ -450,7 +449,7 @@ func (client *Client) ListContainers() ([]string, error) {
 }
 
 // PutObject put an object into an object container
-func (client *Client) PutObject(container string, obj api.Object) error {
+func (client *Client) PutObject(container string, obj model.Object) error {
 	var ti time.Time
 	opts := objects.CreateOpts{
 		Metadata:    obj.Metadata,
@@ -469,7 +468,7 @@ func (client *Client) PutObject(container string, obj api.Object) error {
 }
 
 // UpdateObjectMetadata update an object into an object container
-func (client *Client) UpdateObjectMetadata(container string, obj api.Object) error {
+func (client *Client) UpdateObjectMetadata(container string, obj model.Object) error {
 	var ti time.Time
 	opts := objects.UpdateOpts{
 		Metadata: obj.Metadata,
@@ -486,7 +485,7 @@ func (client *Client) UpdateObjectMetadata(container string, obj api.Object) err
 }
 
 // GetObject get  object content from an object container
-func (client *Client) GetObject(container string, name string, ranges []api.Range) (*api.Object, error) {
+func (client *Client) GetObject(container string, name string, ranges []model.Range) (*model.Object, error) {
 	var rList []string
 	for _, r := range ranges {
 		rList = append(rList, r.String())
@@ -540,7 +539,7 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 		content = buff.Bytes()
 	}
 
-	return &api.Object{
+	return &model.Object{
 		Content:       bytes.NewReader(content),
 		DeleteAt:      header.DeleteAt,
 		Metadata:      recoveredMetadata,
@@ -552,7 +551,7 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 }
 
 // GetObjectMetadata get  object metadata from an object container
-func (client *Client) GetObjectMetadata(container string, name string) (*api.Object, error) {
+func (client *Client) GetObjectMetadata(container string, name string) (*model.Object, error) {
 
 	res := objects.Get(client.Container, container, name, objects.GetOpts{})
 	meta, err := res.ExtractMetadata()
@@ -567,7 +566,7 @@ func (client *Client) GetObjectMetadata(container string, name string) (*api.Obj
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting object content: %s", ProviderErrorToString(err)))
 	}
 
-	return &api.Object{
+	return &model.Object{
 		DeleteAt:      header.DeleteAt,
 		Metadata:      meta,
 		Date:          header.Date,
@@ -578,7 +577,7 @@ func (client *Client) GetObjectMetadata(container string, name string) (*api.Obj
 }
 
 // ListObjects list objects of a container
-func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]string, error) {
+func (client *Client) ListObjects(container string, filter model.ObjectFilter) ([]string, error) {
 	// We have the option of filtering objects by their attributes
 	opts := &objects.ListOpts{
 		Full:   false,

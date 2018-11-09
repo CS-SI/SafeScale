@@ -122,12 +122,12 @@ message Host{
     int32 CPU = 3;
     float RAM = 4;
     int32 Disk = 5;
-    string PUBLIC_IP = 6;
-    string PRIVATE_IP = 7;
+    string PublicIP = 6;
+    string PrivateIP = 7;
     HostState State = 8;
     string PrivateKey = 9;
     string GatewayID = 10;
-    string OsKind = 11; 
+    string OsKind = 11;
 }
 
 message HostStatus {

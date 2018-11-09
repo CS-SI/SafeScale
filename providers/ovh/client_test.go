@@ -19,10 +19,11 @@ package ovh_test
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 
@@ -307,11 +308,11 @@ func Test_StartHost(t *testing.T) {
 
 }
 
-// GetSSHConfig creates SSHConfig from host
-func Test_GetSSHConfig(t *testing.T) {
-	// TODO Implement Test
+// // GetSSHConfig creates SSHConfig from host
+// func Test_GetSSHConfig(t *testing.T) {
+// 	// TODO Implement Test
 
-}
+// }
 
 // CreateVolume creates a block volume
 // - name is the name of the volume

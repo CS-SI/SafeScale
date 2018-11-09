@@ -29,11 +29,9 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/providers/metadata"
-
+	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
-
-	"github.com/CS-SI/SafeScale/system"
 )
 
 const (
@@ -339,7 +337,8 @@ func setImplicitParameters(port int, t Target, v Variables) {
 			if err == nil {
 				mn, err := metadata.LoadNetwork(svc, config.NetworkID)
 				if err == nil {
-					v["CIDR"] = mn.Get().CIDR
+					n := mn.Get()
+					v["CIDR"] = n.CIDR
 				}
 			} else {
 				fmt.Fprintf(os.Stderr, "failed to determine network CIDR")
@@ -354,10 +353,10 @@ func setImplicitParameters(port int, t Target, v Variables) {
 			host = hT.host
 		}
 		v["Hostname"] = host.Name
-		v["HostIP"] = host.PRIVATE_IP
-		gw := gatewayFromHost(port, host)
+		v["HostIP"] = host.PrivateIP
+		gw := gatewayFromHost(host)
 		if gw != nil {
-			v["GatewayIP"] = gw.PRIVATE_IP
+			v["GatewayIP"] = gw.PrivateIP
 		}
 		if _, ok := v["Username"]; !ok {
 			v["Username"] = "gpac"

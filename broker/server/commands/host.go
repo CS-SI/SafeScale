@@ -20,11 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/daemon/services"
+	"github.com/CS-SI/SafeScale/broker/server/services"
 	"github.com/CS-SI/SafeScale/broker/utils"
 
 	conv "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/providers"
 	safeutils "github.com/CS-SI/SafeScale/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/nanobox-io/golang-scribble"
@@ -63,6 +65,7 @@ type StoredCPUInfo struct {
 	GPUModel       string  `json:"gpu_model,omitempty"`
 }
 
+// Start ...
 func (s *HostServiceServer) Start(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Start host called '%s'", in.Name)
 
@@ -71,7 +74,7 @@ func (s *HostServiceServer) Start(ctx context.Context, in *pb.Reference) (*googl
 	}
 
 	ref := utils.GetReference(in)
-	hostAPI := services.NewHostService(currentTenant.Client)
+	hostAPI := services.NewHostService(providers.FromClient(currentTenant.Client))
 
 	err := hostAPI.Start(ref)
 	if err != nil {
@@ -82,6 +85,7 @@ func (s *HostServiceServer) Start(ctx context.Context, in *pb.Reference) (*googl
 	return &google_protobuf.Empty{}, nil
 }
 
+// Stop ...
 func (s *HostServiceServer) Stop(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Stop host called '%s'", in.Name)
 
@@ -90,7 +94,7 @@ func (s *HostServiceServer) Stop(ctx context.Context, in *pb.Reference) (*google
 	}
 
 	ref := utils.GetReference(in)
-	hostAPI := services.NewHostService(currentTenant.Client)
+	hostAPI := services.NewHostService(providers.FromClient(currentTenant.Client))
 
 	err := hostAPI.Stop(ref)
 	if err != nil {
@@ -101,6 +105,7 @@ func (s *HostServiceServer) Stop(ctx context.Context, in *pb.Reference) (*google
 	return &google_protobuf.Empty{}, nil
 }
 
+// Reboot ...
 func (s *HostServiceServer) Reboot(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Reboot host called, '%s'", in.Name)
 
@@ -109,7 +114,7 @@ func (s *HostServiceServer) Reboot(ctx context.Context, in *pb.Reference) (*goog
 	}
 
 	ref := utils.GetReference(in)
-	hostAPI := services.NewHostService(currentTenant.Client)
+	hostAPI := services.NewHostService(providers.FromClient(currentTenant.Client))
 
 	err := hostAPI.Reboot(ref)
 	if err != nil {
@@ -128,7 +133,7 @@ func (s *HostServiceServer) List(ctx context.Context, in *pb.HostListRequest) (*
 		return nil, fmt.Errorf("Cannot list hosts : No tenant set")
 	}
 
-	hostAPI := services.NewHostService(currentTenant.Client)
+	hostAPI := services.NewHostService(providers.FromClient(currentTenant.Client))
 
 	hosts, err := hostAPI.List(in.GetAll())
 	if err != nil {
@@ -139,7 +144,7 @@ func (s *HostServiceServer) List(ctx context.Context, in *pb.HostListRequest) (*
 
 	// Map api.Host to pb.Host
 	for _, host := range hosts {
-		pbhost = append(pbhost, conv.ToPBHost(&host))
+		pbhost = append(pbhost, conv.ToPBHost(host))
 	}
 	rv := &pb.HostList{Hosts: pbhost}
 	return rv, nil
@@ -152,7 +157,7 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 		return nil, fmt.Errorf("Cannot create host : No tenant set")
 	}
 
-	hostService := services.NewHostService(currentTenant.Client)
+	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 
 	askedForSpecificScannerInfo := in.GetGPUNumber() > 0 || in.GetFreq() != 0
 	if askedForSpecificScannerInfo {
@@ -211,7 +216,6 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 
 	host, err := hostService.Create(in.GetName(), in.GetNetwork(),
 		int(in.GetCPUNumber()), in.GetRAM(), int(in.GetDisk()), in.GetImageID(), in.GetPublic())
-
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +224,7 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 	return conv.ToPBHost(host), nil
 }
 
-// Inspect an host
+// Status of a host
 func (s *HostServiceServer) Status(ctx context.Context, in *pb.Reference) (*pb.HostStatus, error) {
 	log.Printf("Host Status called '%s'", in.Name)
 
@@ -233,7 +237,7 @@ func (s *HostServiceServer) Status(ctx context.Context, in *pb.Reference) (*pb.H
 		return nil, fmt.Errorf("Cannot get host status : No tenant set")
 	}
 
-	hostService := services.NewHostService(currentTenant.Client)
+	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 	host, err := hostService.Get(ref)
 	if err != nil {
 		return nil, err
@@ -258,7 +262,7 @@ func (s *HostServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.
 		return nil, fmt.Errorf("Cannot inspect host : No tenant set")
 	}
 
-	hostService := services.NewHostService(currentTenant.Client)
+	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 	host, err := hostService.Get(ref)
 	if err != nil {
 		return nil, err
@@ -282,7 +286,7 @@ func (s *HostServiceServer) Delete(ctx context.Context, in *pb.Reference) (*goog
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot delete host : No tenant set")
 	}
-	hostService := services.NewHostService(currentTenant.Client)
+	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 	err := hostService.Delete(ref)
 	if err != nil {
 		return nil, err
@@ -303,7 +307,7 @@ func (s *HostServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshC
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot ssh host : No tenant set")
 	}
-	hostService := services.NewHostService(currentTenant.Client)
+	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 	sshConfig, err := hostService.SSH(ref)
 	if err != nil {
 		return nil, err

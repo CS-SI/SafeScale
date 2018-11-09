@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"runtime"
 	"strconv"
 	"strings"
@@ -29,7 +28,7 @@ import (
 	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
-	"github.com/davecgh/go-spew/spew"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/utils/template"
 
@@ -46,8 +45,9 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/install"
 
 	"github.com/CS-SI/SafeScale/providers"
-	providerapi "github.com/CS-SI/SafeScale/providers/api"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
 
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
@@ -262,9 +262,9 @@ func Create(port int, req clusterapi.Request) (clusterapi.Cluster, error) {
 	var (
 		instance                      Cluster
 		masterCount, privateNodeCount int
-		kp                            *providerapi.KeyPair
+		kp                            *model.KeyPair
 		kpName                        string
-		gw                            *providerapi.Host
+		gw                            *model.Host
 		m                             *providermetadata.Gateway
 		ok                            bool
 		bootstrapChannel              chan error
@@ -276,6 +276,7 @@ func Create(port int, req clusterapi.Request) (clusterapi.Cluster, error) {
 		feature                       *install.Feature
 		target                        install.Target
 		results                       install.Results
+		heNetworkV1                   model.HostExtensionNetworkV1
 	)
 	broker := brokerclient.New(port)
 
@@ -357,12 +358,15 @@ func Create(port int, req clusterapi.Request) (clusterapi.Cluster, error) {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
 		goto cleanNetwork
 	}
-
-	err = instance.updateMetadata(port, func() error {
+	err = gw.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	if err != nil {
+		goto cleanNetwork
+	}
+	err = instance.updateMetadata(func() error {
 		// Saves gateway information in cluster metadata
 		instance.Core.PublicIP = gw.GetAccessIP()
 		instance.manager.BootstrapID = gw.ID
-		instance.manager.BootstrapIP = gw.PrivateIPsV4[0]
+		instance.manager.BootstrapIP = heNetworkV1.IPv4Addresses[heNetworkV1.DefaultNetworkID]
 		return nil
 	})
 	if err != nil {
@@ -502,7 +506,6 @@ func Sanitize(port int, data *metadata.Cluster) error {
 	}
 	instance.resetExtensions(core)
 
-	spew.Dump(instance.manager)
 	if instance.manager == nil {
 		var mgw *providermetadata.Gateway
 		mgw, err := providermetadata.LoadGateway(svc, instance.Core.NetworkID)
@@ -511,8 +514,8 @@ func Sanitize(port int, data *metadata.Cluster) error {
 		}
 		gw := mgw.Get()
 		hm := providermetadata.NewHost(svc)
-		hosts := []*providerapi.Host{}
-		err = hm.Browse(func(h *providerapi.Host) error {
+		hosts := []*model.Host{}
+		err = hm.Browse(func(h *model.Host) error {
 			if strings.HasPrefix(h.Name, instance.Core.Name+"-") {
 				hosts = append(hosts, h)
 			}
@@ -530,19 +533,28 @@ func Sanitize(port int, data *metadata.Cluster) error {
 		masterIPs := []string{}
 		privateNodeIPs := []string{}
 		publicNodeIPs := []string{}
+		heNetworkV1 := model.HostExtensionNetworkV1{}
 		for _, h := range hosts {
+			err = h.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+			if err != nil {
+				return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
+			}
 			if strings.HasPrefix(h.Name, instance.Core.Name+"-master-") {
 				masterIDs = append(masterIDs, h.ID)
-				masterIPs = append(masterIPs, h.PrivateIPsV4[0])
+				masterIPs = append(masterIPs, heNetworkV1.IPv4Addresses[heNetworkV1.DefaultNetworkID])
 			} else if strings.HasPrefix(h.Name, instance.Core.Name+"-node-") {
-				privateNodeIPs = append(privateNodeIPs, h.PrivateIPsV4[0])
+				privateNodeIPs = append(privateNodeIPs, heNetworkV1.IPv4Addresses[heNetworkV1.DefaultNetworkID])
 			} else if strings.HasPrefix(h.Name, instance.Core.Name+"-pubnode-") {
-				publicNodeIPs = append(privateNodeIPs, h.PrivateIPsV4[0])
+				publicNodeIPs = append(privateNodeIPs, heNetworkV1.IPv4Addresses[heNetworkV1.DefaultNetworkID])
 			}
+		}
+		err = gw.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+		if err != nil {
+			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
 		}
 		newManager := &managerData{
 			BootstrapID:      gw.ID,
-			BootstrapIP:      gw.PrivateIPsV4[0],
+			BootstrapIP:      heNetworkV1.IPv4Addresses[heNetworkV1.DefaultNetworkID],
 			MasterIDs:        masterIDs,
 			MasterIPs:        masterIPs,
 			PrivateNodeIPs:   privateNodeIPs,
@@ -777,7 +789,7 @@ func (c *Cluster) asyncCreateMaster(port int, index int, timeout time.Duration, 
 	// Update cluster definition in Object Storage
 	err = c.updateMetadata(port, func() error {
 		c.manager.MasterIDs = append(c.manager.MasterIDs, host.ID)
-		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PRIVATE_IP)
+		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PrivateIP)
 		return nil
 	})
 	if err != nil {
@@ -986,10 +998,10 @@ func (c *Cluster) asyncCreateNode(port int,
 		// Registers the new Agent in the cluster struct
 		if nodeType == NodeType.PublicNode {
 			c.Core.PublicNodeIDs = append(c.Core.PublicNodeIDs, host.ID)
-			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PRIVATE_IP)
+			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PrivateIP)
 		} else {
 			c.Core.PrivateNodeIDs = append(c.Core.PrivateNodeIDs, host.ID)
-			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PRIVATE_IP)
+			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PrivateIP)
 		}
 		return nil
 	})
@@ -1151,12 +1163,18 @@ func (c *Cluster) asyncConfigureNode(port int, index int, host *pb.Host, nodeTyp
 func (c *Cluster) asyncPrepareGateway(port int, done chan error) {
 	log.Printf("[bootstrap] starting preparation...")
 
-	err := provideruse.WaitSSHServerReady(port, c.provider, c.manager.BootstrapID, 5*time.Minute)
+	brokerCltHost := brokerclient.New().Host
+	sshCfg, err := brokerCltHost.SSHConfig(c.manager.BootstrapID)
 	if err != nil {
 		done <- err
 		return
 	}
-	host, err := brokerclient.New(port).Host.Inspect(c.manager.BootstrapID, brokerclient.DefaultExecutionTimeout)
+	err = sshCfg.WaitServerReady(5 * time.Minute)
+	if err != nil {
+		done <- err
+		return
+	}
+	host, err := brokerCltHost.Inspect(c.manager.BootstrapID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		done <- err
 		return
@@ -1422,14 +1440,20 @@ func (c *Cluster) ForceGetState(port int) (ClusterState.Enum, error) {
 	)
 
 	cmd := "/opt/mesosphere/bin/dcos-diagnostics --diag"
-	ssh := brokerclient.New(port).Ssh
+	brokerClt := brokerclient.New()
+	brokerCltHost := brokerClt.Host
 	for _, id := range c.manager.MasterIDs {
-		err := provideruse.WaitSSHServerReady(port, c.provider, id, 2*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(id)
+		if err != nil {
+			log.Errorf("failed to get ssh config to connect to master '%s': %s", id, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err == nil {
 			if err != nil {
 				continue
 			}
-			retcode, _, stderr, err = ssh.Run(id, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+			retcode, _, stderr, err = brokerClt.Ssh.Run(id, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 			if err != nil {
 				continue
 			}
@@ -1526,37 +1550,53 @@ func (c *Cluster) AddNodes(port int, count int, public bool, req *pb.HostDefinit
 }
 
 // FindAvailableMaster returns the ID of a master available
-func (c *Cluster) FindAvailableMaster(port int) (string, error) {
-	var masterID string
+func (c *Cluster) FindAvailableMaster() (string, error) {
+	masterID := ""
+	found := false
+	brokerCltHost := brokerclient.New().Host
 	for _, masterID = range c.manager.MasterIDs {
-		err := provideruse.WaitSSHServerReady(port, c.provider, masterID, 2*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(masterID)
+		if err != nil {
+			log.Errorf("failed to get ssh config of master '%s': %s", masterID, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 			return "", err
 		}
+		found = true
 		break
 	}
-	if masterID == "" {
+	if !found {
 		return "", fmt.Errorf("failed to find available master")
 	}
 	return masterID, nil
 }
 
 // FindAvailableNode returns the ID of a node available
-func (c *Cluster) FindAvailableNode(port int, public bool) (string, error) {
-	var hostID string
+func (c *Cluster) FindAvailableNode(public bool) (string, error) {
+	hostID := ""
+	found := false
+	brokerCltHost := brokerclient.New().Host
 	for _, hostID = range c.ListNodeIDs(public) {
-		err := provideruse.WaitSSHServerReady(port, c.provider, hostID, 2*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(hostID)
+		if err != nil {
+			log.Errorf("failed to get ssh config for host '%s': %s", hostID, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 		}
+		found = true
 		break
 	}
-	if hostID == "" {
+	if !found {
 		return "", fmt.Errorf("failed to find available node")
 	}
 	return hostID, nil

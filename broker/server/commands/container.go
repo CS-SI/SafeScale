@@ -19,8 +19,10 @@ package commands
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/broker/daemon/services"
+
+	"github.com/CS-SI/SafeScale/broker/server/services"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -39,7 +41,6 @@ import (
 //ContainerServiceServer is the container service grpc server
 type ContainerServiceServer struct{}
 
-
 //List available containers
 func (s *ContainerServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.ContainerList, error) {
 	log.Printf("Container list called")
@@ -47,7 +48,7 @@ func (s *ContainerServiceServer) List(ctx context.Context, in *google_protobuf.E
 		return nil, fmt.Errorf("Cannot list containers : No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.Client)
+	service := services.NewContainerService(providers.FromClient(currentTenant.Client))
 	containers, err := service.List()
 	if err != nil {
 		tbr := errors.Wrap(err, "Cannot list containers")
@@ -64,7 +65,7 @@ func (s *ContainerServiceServer) Create(ctx context.Context, in *pb.Container) (
 		return nil, fmt.Errorf("Cannot create container : No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.Client)
+	service := services.NewContainerService(providers.FromClient(currentTenant.Client))
 	err := service.Create(in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "Cannot create container")
@@ -81,7 +82,7 @@ func (s *ContainerServiceServer) Delete(ctx context.Context, in *pb.Container) (
 		return nil, fmt.Errorf("Cannot delete container : No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.Client)
+	service := services.NewContainerService(providers.FromClient(currentTenant.Client))
 	err := service.Delete(in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "Cannot delete container")
@@ -98,7 +99,7 @@ func (s *ContainerServiceServer) Inspect(ctx context.Context, in *pb.Container) 
 		return nil, fmt.Errorf("Cannot inspect containers : No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.Client)
+	service := services.NewContainerService(providers.FromClient(currentTenant.Client))
 	resp, err := service.Inspect(in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "Cannot inspect container")
@@ -115,7 +116,7 @@ func (s *ContainerServiceServer) Mount(ctx context.Context, in *pb.ContainerMoun
 		return nil, fmt.Errorf("Cannot mount containers : No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.Client)
+	service := services.NewContainerService(providers.FromClient(currentTenant.Client))
 	err := service.Mount(in.GetContainer(), in.GetHost().GetName(), in.GetPath())
 
 	return &google_protobuf.Empty{}, err
@@ -128,7 +129,7 @@ func (s *ContainerServiceServer) UMount(ctx context.Context, in *pb.ContainerMou
 		return nil, fmt.Errorf("Cannot unmount container : No tenant set")
 	}
 
-	service := services.NewContainerService(currentTenant.Client)
+	service := services.NewContainerService(providers.FromClient(currentTenant.Client))
 	err := service.UMount(in.GetContainer(), in.GetHost().GetName())
 
 	return &google_protobuf.Empty{}, err

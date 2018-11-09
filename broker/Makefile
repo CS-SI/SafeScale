@@ -25,4 +25,4 @@ cli:	sdk
 clean:
 	@(cd cli && $(MAKE) $@)
 	@($(RM) broker_pb2.py || true)
-	@(cd daemon && $(MAKE) $@)
+	@(cd server && $(MAKE) $@)

@@ -24,7 +24,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"runtime"
 	"strconv"
 	"strings"
@@ -32,9 +31,13 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
+	log "github.com/sirupsen/logrus"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 
+	pb "github.com/CS-SI/SafeScale/broker"
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
@@ -43,21 +46,14 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh/enums/ErrorCode"
 	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
-
 	"github.com/CS-SI/SafeScale/deploy/install"
-
 	"github.com/CS-SI/SafeScale/providers"
-	providerapi "github.com/CS-SI/SafeScale/providers/api"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
-
+	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/template"
-
-	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 )
 
 //go:generate rice embed-go
@@ -193,7 +189,7 @@ func Create(port int, req clusterapi.Request) (clusterapi.Cluster, error) {
 	var (
 		instance         Cluster
 		privateNodeCount int
-		gw               *providerapi.Host
+		gw               *model.Host
 		m                *providermetadata.Gateway
 		// masterChannel    chan error
 		// masterStatus     error
@@ -202,7 +198,7 @@ func Create(port int, req clusterapi.Request) (clusterapi.Cluster, error) {
 		nodesStatus error
 		ok          bool
 		kpName      string
-		kp          *providerapi.KeyPair
+		kp          *model.KeyPair
 		err         error
 		feature     *install.Feature
 		target      install.Target
@@ -438,7 +434,7 @@ func (c *Cluster) createMaster(port int, req pb.HostDefinition) error {
 	// Registers the new master in the cluster struct
 	err = c.updateMetadata(port, func() error {
 		c.manager.MasterIDs = append(c.manager.MasterIDs, host.ID)
-		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PRIVATE_IP)
+		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PrivateIP)
 		return nil
 	})
 	if err != nil {
@@ -610,10 +606,10 @@ func (c *Cluster) asyncCreateNode(port int,
 	err = c.updateMetadata(port, func() error {
 		if nodeType == NodeType.PublicNode {
 			c.Core.PublicNodeIDs = append(c.Core.PublicNodeIDs, host.ID)
-			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PRIVATE_IP)
+			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PrivateIP)
 		} else {
 			c.Core.PrivateNodeIDs = append(c.Core.PrivateNodeIDs, host.ID)
-			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PRIVATE_IP)
+			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PrivateIP)
 		}
 		return nil
 	})
@@ -807,8 +803,13 @@ func (c *Cluster) buildHostname(port int, core string, nodeType NodeType.Enum) (
 }
 
 // asyncInstallReverseProxy installs the feature reverseproxy on network gateway
-func (c *Cluster) asyncInstallReverseProxy(port int, host *providerapi.Host, done chan error) {
-	err := provideruse.WaitSSHServerReady(port, c.provider, host.ID, 5*time.Minute)
+func (c *Cluster) asyncInstallReverseProxy(host *model.Host, done chan error) {
+	sshCfg, err := brokerclient.New().Host.SSHConfig(host.ID)
+	if err != nil {
+		done <- err
+		return
+	}
+	err = sshCfg.WaitServerReady(5 * time.Minute)
 	if err != nil {
 		done <- err
 		return
@@ -1136,38 +1137,53 @@ func (c *Cluster) GetConfig() clusterapi.ClusterCore {
 }
 
 // FindAvailableMaster returns the ID of the first master available for execution
-func (c *Cluster) FindAvailableMaster(port int) (string, error) {
-	var masterID string
+func (c *Cluster) FindAvailableMaster() (string, error) {
+	masterID := ""
+	found := false
+	brokerCltHost := brokerclient.New().Host
 	for _, masterID = range c.manager.MasterIDs {
-		err := provideruse.WaitSSHServerReady(port, c.provider, masterID, 2*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(masterID)
+		if err != nil {
+			log.Errorf("failed to get ssh config for master '%s': %s", masterID, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 			return "", err
 		}
+		found = true
 		break
 	}
-	if masterID == "" {
+	if !found {
 		return "", fmt.Errorf("failed to find available master")
 	}
 	return masterID, nil
 }
 
 // FindAvailableNode returns the ID of a node available
-func (c *Cluster) FindAvailableNode(port int, public bool) (string, error) {
-	var hostID string
+func (c *Cluster) FindAvailableNode(public bool) (string, error) {
+	hostID := ""
+	found := false
+	brokerCltHost := brokerclient.New().Host
 	for _, hostID = range c.ListNodeIDs(public) {
-		err := provideruse.WaitSSHServerReady(port, c.provider, hostID, 5*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(hostID)
+		if err != nil {
+			return "", err
+		}
+		err = sshCfg.WaitServerReady(5 * time.Minute)
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 			return "", err
 		}
+		found = true
 		break
 	}
-	if hostID == "" {
+	if !found {
 		return "", fmt.Errorf("failed to find available node")
 	}
 	return hostID, nil

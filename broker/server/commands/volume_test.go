@@ -17,17 +17,17 @@ package commands_test
 
 import (
 	"errors"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/providers"
-
-	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/daemon/commands"
-	"github.com/CS-SI/SafeScale/broker/daemon/services"
-	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/server/commands"
+	"github.com/CS-SI/SafeScale/broker/server/services"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 )
 
 type MyMockedVolService struct {
@@ -35,17 +35,17 @@ type MyMockedVolService struct {
 	err error
 }
 
-func (m *MyMockedVolService) Create(name string, size int, speed VolumeSpeed.Enum) (*api.Volume, error) {
+func (m *MyMockedVolService) Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error) {
 	m.Called(name, size, speed)
 
-	return &api.Volume{Name: name,
+	return &model.Volume{Name: name,
 		Size:  size,
 		Speed: speed}, m.err
 }
 func (m *MyMockedVolService) Delete(name string) error {
 	return nil
 }
-func (m *MyMockedVolService) List() ([]api.Volume, error) {
+func (m *MyMockedVolService) List() ([]model.Volume, error) {
 	return nil, nil
 }
 func (m *MyMockedVolService) Attach(volume string, host string, path string, format string) error {
@@ -54,8 +54,8 @@ func (m *MyMockedVolService) Attach(volume string, host string, path string, for
 func (m *MyMockedVolService) Detach(volume string, host string) error {
 	return nil
 }
-func (m *MyMockedVolService) Get(ref string) (*api.Volume, error) {
-	return &api.Volume{}, nil
+func (m *MyMockedVolService) Get(ref string) (*model.Volume, error) {
+	return &model.Volume{}, nil
 }
 
 func TestCreate(t *testing.T) {
@@ -66,7 +66,7 @@ func TestCreate(t *testing.T) {
 	old := commands.VolumeServiceCreator
 	defer func() { commands.VolumeServiceCreator = old }()
 
-	commands.VolumeServiceCreator = func(api api.ClientAPI) services.VolumeAPI {
+	commands.VolumeServiceCreator = func(api *providers.Service) services.VolumeAPI {
 		return nil
 		// TODO Fix this
 		// return myMockedVolService
@@ -106,7 +106,7 @@ func TestCreate_Err(t *testing.T) {
 	old := commands.VolumeServiceCreator
 	defer func() { commands.VolumeServiceCreator = old }()
 
-	commands.VolumeServiceCreator = func(api api.ClientAPI) services.VolumeAPI {
+	commands.VolumeServiceCreator = func(api *providers.Service) services.VolumeAPI {
 		// TODO Fix this
 		return nil
 		// return myMockedVolService

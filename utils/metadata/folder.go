@@ -18,7 +18,6 @@ package metadata
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -30,21 +29,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
-
-// InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
-// id contains a unique identifier of the tenant (something coming from the provider, not the tenant name)
-func InitializeBucket(svc api.ClientAPI) error {
-	//	svc := providers.FromClient(client)
-	cfg, err := svc.GetCfgOpts()
-	if err != nil {
-		fmt.Printf("failed to get client options: %s\n", err.Error())
-	}
-	anon, found := cfg.Get("MetadataBucket")
-	if !found || anon.(string) == "" {
-		return fmt.Errorf("failed to get value of option 'MetadataBucket'")
-	}
-	return svc.CreateContainer(anon.(string))
-}
 
 // Folder describes a metadata folder
 type Folder struct {
@@ -73,13 +57,16 @@ func NewFolder(svc api.ClientAPI, path string) *Folder {
 		panic("config option 'MetadataBucket' is not set!")
 	}
 	cryptKey, crypt := cfg.Get("MetadataKey")
-	return &Folder{
+	f := &Folder{
 		path:       strings.Trim(path, "/"),
 		svc:        svc,
 		bucketName: name.(string),
 		crypt:      crypt,
-		cryptKey:   []byte(cryptKey.(string)),
 	}
+	if crypt {
+		f.cryptKey = []byte(cryptKey.(string))
+	}
+	return f
 }
 
 // GetService returns the service used by the folder
@@ -156,7 +143,7 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 		var buffer bytes.Buffer
 		_, err = buffer.ReadFrom(o.Content)
 		if err != nil {
-			return true, err
+			return false, err
 		}
 		data := buffer.Bytes()
 		if f.crypt {
@@ -171,19 +158,21 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 }
 
 // Write writes the content in Object Storage
-func (f *Folder) Write(path string, name string, content interface{}) error {
-	var buffer bytes.Buffer
-	err := gob.NewEncoder(&buffer).Encode(content)
-	if err != nil {
-		return err
-	}
-	data := buffer.Bytes()
+func (f *Folder) Write(path string, name string, content []byte) error {
+	var (
+		data []byte
+		err  error
+	)
+
 	if f.crypt {
-		data, err = encrypt(f.cryptKey, data)
+		data, err = encrypt(f.cryptKey, content)
 		if err != nil {
 			return err
 		}
+	} else {
+		data = content
 	}
+
 	return f.svc.PutObject(f.bucketName, model.Object{
 		Name:    f.absolutePath(path, name),
 		Content: bytes.NewReader(data),

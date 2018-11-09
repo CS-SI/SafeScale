@@ -533,7 +533,6 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			cmd, _ := ssh.Command("sudo cat /var/tmp/user_data.done")
-
 			retcode, _, stderr, err := cmd.Run()
 			if err != nil {
 				return err
@@ -542,6 +541,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 				if retcode == 255 {
 					return fmt.Errorf("ssh not ready")
 				}
+				log.Warnln(stderr)
 				return fmt.Errorf("%s", stderr)
 			}
 			return nil
@@ -550,7 +550,6 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 	)
 	if err != nil {
 		logCmd, _ := ssh.Command("sudo cat /var/tmp/user_data.log")
-
 		retcode, stdout, stderr, logErr := logCmd.Run()
 		if logErr == nil {
 			if retcode == 0 {

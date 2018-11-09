@@ -20,17 +20,18 @@ import (
 	"sync"
 
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 )
 
 // Item is an entry in the ObjectStorage
 type Item struct {
-	payload interface{}
+	payload model.Serializable
 	folder  *Folder
 	lock    sync.Mutex
 }
 
 // ItemDecoderCallback ...
-type ItemDecoderCallback func([]byte) (interface{}, error)
+type ItemDecoderCallback func([]byte) (model.Serializable, error)
 
 // NewItem creates a new item with 'name' and in 'path'
 func NewItem(client api.ClientAPI, path string) *Item {
@@ -51,9 +52,14 @@ func (i *Item) GetPath() string {
 }
 
 // Carry links metadata with cluster struct
-func (i *Item) Carry(data interface{}) *Item {
+func (i *Item) Carry(data model.Serializable) *Item {
 	i.payload = data
 	return i
+}
+
+// Reset ...
+func (i *Item) Reset() {
+	i.payload = nil
 }
 
 // Get returns payload in item
@@ -89,7 +95,7 @@ func (i *Item) Delete(name string) error {
 
 // ReadFrom reads metadata of item from Object Storage in a subfolder
 func (i *Item) ReadFrom(path string, name string, callback ItemDecoderCallback) (bool, error) {
-	var data interface{}
+	var data model.Serializable
 	found, err := i.folder.Read(path, name, func(buf []byte) error {
 		var err error
 		data, err = callback(buf)
@@ -112,7 +118,11 @@ func (i *Item) Read(name string, callback ItemDecoderCallback) (bool, error) {
 
 // WriteInto saves the content of Item in a subfolder to the Object Storage
 func (i *Item) WriteInto(path string, name string) error {
-	return i.folder.Write(path, name, i.payload)
+	data, err := i.payload.Serialize()
+	if err != nil {
+		return err
+	}
+	return i.folder.Write(path, name, data)
 }
 
 // Write saves the content of Item to the Object Storage

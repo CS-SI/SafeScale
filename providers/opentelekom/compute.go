@@ -17,23 +17,27 @@
 package opentelekom
 
 import (
-	"github.com/CS-SI/SafeScale/providers/api"
-
-	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 )
 
 // CreateHost creates a new host
-func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
+func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	return client.feclt.CreateHost(request)
 }
 
-// GetHost returns the host identified by id
-func (client *Client) GetHost(id string) (*api.Host, error) {
-	return client.feclt.GetHost(id)
+// UpdateHost returns the host identified by id or updates an already existing *model.Host instance
+func (client *Client) UpdateHost(host *model.Host) error {
+	return client.feclt.UpdateHost(host)
+}
+
+// GetHostState ...
+func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error) {
+	return client.feclt.GetHostState(hostParam)
 }
 
 // ListHosts lists available hosts
-func (client *Client) ListHosts(all bool) ([]api.Host, error) {
+func (client *Client) ListHosts(all bool) ([]*model.Host, error) {
 	return client.feclt.ListHosts(all)
 }
 
@@ -42,23 +46,24 @@ func (client *Client) DeleteHost(id string) error {
 	return client.feclt.DeleteHost(id)
 }
 
-// GetSSHConfig creates SSHConfig to connect an host by its ID
-func (client *Client) GetSSHConfig(id string) (*system.SSHConfig, error) {
-	return client.feclt.GetSSHConfig(id)
-}
+// // GetSSHConfig creates SSHConfig to connect an host by its ID
+// // Param can be type string or *model.Host; any other type will panic
+// func (client *Client) GetSSHConfig(hostParam interface{}) (*system.SSHConfig, error) {
+// 	return client.feclt.GetSSHConfig(hostParam)
+// }
 
 // CreateKeyPair creates and import a key pair
-func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
+func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
 	return client.feclt.CreateKeyPair(name)
 }
 
 // GetKeyPair returns the key pair identified by id
-func (client *Client) GetKeyPair(id string) (*api.KeyPair, error) {
+func (client *Client) GetKeyPair(id string) (*model.KeyPair, error) {
 	return client.feclt.GetKeyPair(id)
 }
 
 // ListKeyPairs lists available key pairs
-func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
+func (client *Client) ListKeyPairs() ([]model.KeyPair, error) {
 	return client.feclt.ListKeyPairs()
 }
 
@@ -68,23 +73,23 @@ func (client *Client) DeleteKeyPair(id string) error {
 }
 
 // GetImage returns the Image referenced by id
-func (client *Client) GetImage(id string) (*api.Image, error) {
+func (client *Client) GetImage(id string) (*model.Image, error) {
 	return client.feclt.GetImage(id)
 }
 
 // ListImages lists available OS images
-func (client *Client) ListImages(all bool) ([]api.Image, error) {
+func (client *Client) ListImages(all bool) ([]model.Image, error) {
 	return client.feclt.ListImages(all)
 }
 
 // GetTemplate returns the Template referenced by id
-func (client *Client) GetTemplate(id string) (*api.HostTemplate, error) {
+func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 	return client.feclt.GetTemplate(id)
 }
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (client *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
+func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 	return client.feclt.ListTemplates(all)
 }
 
@@ -98,6 +103,7 @@ func (client *Client) StartHost(id string) error {
 	return client.feclt.StartHost(id)
 }
 
+// RebootHost ...
 func (client *Client) RebootHost(id string) error {
 	return client.feclt.RebootHost(id)
 }
