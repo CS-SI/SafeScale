@@ -113,6 +113,7 @@ type SSHConfig struct {
 	Host          string
 	PrivateKey    string
 	Port          int
+	LocalPort	  int
 	GatewayConfig *SSHConfig
 	cmdTpl        string
 }
@@ -167,7 +168,7 @@ func (tunnel *sshTunnel) Close() error {
 	return nil
 }
 
-// GetFreePort get a frre port
+// GetFreePort get a free port
 func getFreePort() (int, error) {
 	listener, err := net.Listen("tcp", ":0")
 	defer listener.Close()
@@ -216,20 +217,25 @@ func isTunnelReady(port int) bool {
 
 }
 
-// createTunnel create SSH from local host to remote host throw gateway
+// createTunnel create SSH from local host to remote host through gateway
+// if localPort is set to 0 then it's  automatically choosed
 func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
 		return nil, err
 	}
-	freePort, err := getFreePort()
-	if err != nil {
-		return nil, err
+	localPort := cfg.LocalPort
+	if localPort == 0 {
+		localPort, err = getFreePort()
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	options := "-q -oServerAliveInterval=60 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 	cmdString := fmt.Sprintf("ssh -i %s -NL %d:%s:%d %s@%s %s -p %d",
 		f.Name(),
-		freePort,
+		localPort,
 		cfg.Host,
 		cfg.Port,
 		cfg.GatewayConfig.User,
@@ -244,11 +250,11 @@ func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 		return nil, err
 	}
 
-	for nbiter := 0; !isTunnelReady(freePort) && nbiter < 100; nbiter++ {
+	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
 	}
 	return &sshTunnel{
-		port:      freePort,
+		port:      localPort,
 		cmd:       cmd,
 		cmdString: cmdString,
 		keyFile:   f,
@@ -440,7 +446,7 @@ func recCreateTunnels(ssh *SSHConfig, tunnels *[]*sshTunnel) (*sshTunnel, error)
 
 }
 
-func (ssh *SSHConfig) createTunnels() ([]*sshTunnel, *SSHConfig, error) {
+func (ssh *SSHConfig) CreateTunnels() ([]*sshTunnel, *SSHConfig, error) {
 	var tunnels []*sshTunnel
 	tunnel, err := recCreateTunnels(ssh, &tunnels)
 	if err != nil {
@@ -504,7 +510,7 @@ func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
 }
 
 func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, error) {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -560,7 +566,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 
 // Copy copy a file/directory from/to local to/from remote
 func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, string, string, error) {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		return 0, "", "", fmt.Errorf("Unable to create tunnels : %s", err.Error())
 	}
@@ -612,7 +618,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 
 // Exec executes the cmd using ssh
 func (ssh *SSHConfig) Exec(cmdString string) error {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		for _, t := range tunnels {
 			nerr := t.Close()
@@ -669,7 +675,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 
 // Enter Enter to interactive shell
 func (ssh *SSHConfig) Enter() error {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		for _, t := range tunnels {
 			nerr := t.Close()
@@ -726,13 +732,14 @@ func (ssh *SSHConfig) Enter() error {
 	return err
 }
 
+
 // CommandContext is like Command but includes a context.
 //
 // The provided context is used to kill the process (by calling
 // os.Process.Kill) if the context becomes done before the command
 // completes on its own.
 func (ssh *SSHConfig) CommandContext(ctx context.Context, cmdString string) (*SSHCommand, error) {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
