@@ -39,7 +39,7 @@ var tenantList = cli.Command{
 	Name:  "list",
 	Usage: "List available tenants",
 	Action: func(c *cli.Context) error {
-		tenants, err := client.New(c.GlobalInt("port")).Tenant.List(client.DefaultExecutionTimeout)
+		tenants, err := client.New().Tenant.List(client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of tenants", false))
 		}
@@ -54,7 +54,7 @@ var tenantGet = cli.Command{
 	Name:  "get",
 	Usage: "Get current tenant",
 	Action: func(c *cli.Context) error {
-		tenant, err := client.New(c.GlobalInt("port")).Tenant.Get(client.DefaultExecutionTimeout)
+		tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "get tenant", false))
 		}
@@ -74,7 +74,7 @@ var tenantSet = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Tenant name required")
 		}
-		err := client.New(c.GlobalInt("port")).Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
+		err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "set tenant", false))
 		}

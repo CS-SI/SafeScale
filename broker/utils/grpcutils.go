@@ -35,8 +35,9 @@ const (
 )
 
 // GetConnection returns a connection to GRPC server
-func GetConnection(port int) *grpc.ClientConn {
-	realAddress := fmt.Sprintf("localhost:%d", port)
+func GetConnection() *grpc.ClientConn {
+	//realAddress := fmt.Sprintf("localhost:%d", port)
+	realAddress := fmt.Sprintf("localhost:50051")
 
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(realAddress, grpc.WithInsecure())

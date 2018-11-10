@@ -19,22 +19,22 @@ package openstack
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/CS-SI/SafeScale/providers/metadata"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/containers"
 	"github.com/gophercloud/gophercloud/openstack/objectstorage/v1/objects"
 	"github.com/gophercloud/gophercloud/pagination"
+
+	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
@@ -177,7 +177,7 @@ func (client *Client) listAllVolumes() ([]model.Volume, error) {
 		}
 		return true, nil
 	})
-	if err != nil || len(vs) == 0{
+	if err != nil || len(vs) == 0 {
 		if err != nil {
 			log.Debugf("Error listing volumes: list invocation: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
@@ -261,8 +261,8 @@ func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentReque
 		// Detach volume
 		detachErr := volumeattach.Delete(client.Compute, va.ServerID, va.ID).ExtractErr()
 		if detachErr != nil {
-			log.Debugf("Error creating volume attachment: attachment deletion: %+v", detach_err)
-			return nil, errors.Wrap(detach_err, fmt.Sprintf("Error deleting volume attachment %s: %s", va.ID, ProviderErrorToString(detach_err)))
+			log.Debugf("Error creating volume attachment: attachment deletion: %+v", detachErr)
+			return nil, errors.Wrap(detachErr, fmt.Sprintf("Error deleting volume attachment %s: %s", va.ID, ProviderErrorToString(detachErr)))
 		}
 
 		log.Debugf("Error creating volume attachment: loading metadata: %+v", err)
@@ -273,8 +273,8 @@ func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentReque
 		// Detach volume
 		detachErr := volumeattach.Delete(client.Compute, va.ServerID, va.ID).ExtractErr()
 		if detachErr != nil {
-			log.Debugf("Error creating volume attachemnt: attachment deletion: %+v", detach_err)
-			return nil, errors.Wrap(detach_err, fmt.Sprintf("Error deleting volume attachment %s: %s", va.ID, ProviderErrorToString(detach_err)))
+			log.Debugf("Error creating volume attachemnt: attachment deletion: %+v", detachErr)
+			return nil, errors.Wrap(detachErr, fmt.Sprintf("Error deleting volume attachment %s: %s", va.ID, ProviderErrorToString(detachErr)))
 		}
 
 		log.Debugf("Error creating volume attachment: volume attachment call: %+v", err)

@@ -66,13 +66,13 @@ var sshRun = cli.Command{
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
-		retcode, stdout, stderr, err := client.New(c.GlobalInt("port")).Ssh.Run(c.Args().Get(0), c.String("c"), client.DefaultConnectionTimeout, timeout)
+		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), client.DefaultConnectionTimeout, timeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "ssh run", false))
 		}
 
 		fmt.Println(stdout)
-		_, _ =fmt.Fprintln(os.Stderr, stderr)
+		_, _ = fmt.Fprintln(os.Stderr, stderr)
 
 		os.Exit(retcode)
 		return nil
@@ -107,7 +107,7 @@ var sshCopy = cli.Command{
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
-		_, _, _, err := client.New(c.GlobalInt("port")).Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), client.DefaultConnectionTimeout, timeout)
+		_, _, _, err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), client.DefaultConnectionTimeout, timeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "ssh copy", true))
 		}
@@ -126,7 +126,7 @@ var sshConnect = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name required")
 		}
-		err := client.New(c.GlobalInt("port")).Ssh.Connect(c.Args().Get(0), 0)
+		err := client.New().Ssh.Connect(c.Args().Get(0), 0)
 		if err != nil {
 			err = client.DecorateError(err, "ssh connect", false)
 		}
