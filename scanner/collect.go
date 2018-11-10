@@ -3,23 +3,25 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/nanobox-io/golang-scribble"
-	_ "github.com/nanobox-io/golang-scribble"
 	"io/ioutil"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/utils"
+	"github.com/nanobox-io/golang-scribble"
+	_ "github.com/nanobox-io/golang-scribble"
 )
 
+// StoredCPUInfo ...
 type StoredCPUInfo struct {
-	Id      string `bow:"key"`
+	Id           string `bow:"key"`
 	TenantName   string `json:"tenant_name,omitempty"`
 	TemplateID   string `json:"template_id,omitempty"`
 	TemplateName string `json:"template_name,omitempty"`
-	ImageID   string `json:"image_id,omitempty"`
-	ImageName string `json:"image_name,omitempty"`
-	LastUpdated string `json:"last_updated,omitempty"`
+	ImageID      string `json:"image_id,omitempty"`
+	ImageName    string `json:"image_name,omitempty"`
+	LastUpdated  string `json:"last_updated,omitempty"`
 
 	NumberOfCPU    int     `json:"number_of_cpu,omitempty"`
 	NumberOfCore   int     `json:"number_of_core,omitempty"`
@@ -56,7 +58,7 @@ func collect() {
 
 			log.Printf("Storing: %s", file.Name())
 
-			byteValue, err := ioutil.ReadFile(utils.AbsPathify(theFile) )
+			byteValue, err := ioutil.ReadFile(utils.AbsPathify(theFile))
 			if err != nil {
 				log.Fatal(err)
 			}

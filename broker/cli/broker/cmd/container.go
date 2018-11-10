@@ -44,7 +44,7 @@ var containerList = cli.Command{
 	Name:  "list",
 	Usage: "List containers",
 	Action: func(c *cli.Context) error {
-		resp, err := client.New(c.GlobalInt("port")).Container.List(0)
+		resp, err := client.New().Container.List(0)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "list of containers", false))
 		}
@@ -65,7 +65,7 @@ var containerCreate = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
-		err := client.New(c.GlobalInt("port")).Container.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
+		err := client.New().Container.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "creation of container", true))
 		}
@@ -83,7 +83,7 @@ var containerDelete = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
-		err := client.New(c.GlobalInt("port")).Container.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
+		err := client.New().Container.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "deletion of container", true))
 		}
@@ -101,7 +101,7 @@ var containerInspect = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container name required")
 		}
-		resp, err := client.New(c.GlobalInt("port")).Container.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
+		resp, err := client.New().Container.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "inspection of container", false))
 		}
@@ -129,7 +129,7 @@ var containerMount = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container and Host name required")
 		}
-		err := client.New(c.GlobalInt("port")).Container.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
+		err := client.New().Container.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "mount of container", true))
 		}
@@ -148,7 +148,7 @@ var containerUnmount = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Container and Host name required")
 		}
-		err := client.New(c.GlobalInt("port")).Container.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
+		err := client.New().Container.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "unmount of container", true))
 		}

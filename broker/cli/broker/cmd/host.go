@@ -52,7 +52,7 @@ var hostStart = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
-		resp, err := client.New(c.GlobalInt("port")).Host.Start(c.Args().First(), client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Start(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
 		}
@@ -74,7 +74,7 @@ var hostStop = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
-		resp, err := client.New(c.GlobalInt("port")).Host.Stop(c.Args().First(), client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Stop(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
 		}
@@ -96,7 +96,7 @@ var hostReboot = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
-		resp, err := client.New(c.GlobalInt("port")).Host.Reboot(c.Args().First(), client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Reboot(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
 		}
@@ -117,7 +117,7 @@ var hostList = cli.Command{
 			Usage: "List all hosts on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		hosts, err := client.New(c.GlobalInt("port")).Host.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		hosts, err := client.New().Host.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of hosts", false))
 		}
@@ -138,7 +138,7 @@ var hostInspect = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
-		resp, err := client.New(c.GlobalInt("port")).Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
 		}
@@ -160,7 +160,7 @@ var hostStatus = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
-		resp, err := client.New(c.GlobalInt("port")).Host.Status(c.Args().First(), client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Status(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of host", false))
 		}
@@ -237,9 +237,9 @@ var hostCreate = cli.Command{
 			RAM:       float32(c.Float64("ram")),
 			GPUNumber: int32(c.Int("gpu")),
 			Freq:      float32(c.Float64("cpu-freq")),
-			Force:    c.Bool("force"),
+			Force:     c.Bool("force"),
 		}
-		resp, err := client.New(c.GlobalInt("port")).Host.Create(def, client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "creation of host", true))
 		}
@@ -266,7 +266,7 @@ var hostDelete = cli.Command{
 		hostList = append(hostList, c.Args().First())
 		hostList = append(hostList, c.Args().Tail()...)
 
-		_  = client.New(c.GlobalInt("port")).Host.Delete(hostList, client.DefaultExecutionTimeout)
+		_ = client.New().Host.Delete(hostList, client.DefaultExecutionTimeout)
 
 		return nil
 	},
@@ -282,7 +282,7 @@ var hostSsh = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host name or ID required")
 		}
-		resp, err := client.New(c.GlobalInt("port")).Host.SSHConfig(c.Args().First())
+		resp, err := client.New().Host.SSHConfig(c.Args().First())
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "ssh config of host", false))
 		}

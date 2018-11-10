@@ -46,7 +46,7 @@ var networkList = cli.Command{
 			Usage: "List all Networks on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		networks, err := client.New(c.GlobalInt("port")).Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		networks, err := client.New().Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of networks", false))
 		}
@@ -72,7 +72,7 @@ var networkDelete = cli.Command{
 		networkList = append(networkList, c.Args().First())
 		networkList = append(networkList, c.Args().Tail()...)
 
-		_ = client.New(c.GlobalInt("port")).Network.Delete(networkList, client.DefaultExecutionTimeout)
+		_ = client.New().Network.Delete(networkList, client.DefaultExecutionTimeout)
 
 		return nil
 	},
@@ -88,7 +88,7 @@ var networkInspect = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Network name required")
 		}
-		network, err := client.New(c.GlobalInt("port")).Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
+		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of network", false))
 		}
@@ -153,7 +153,7 @@ var networkCreate = cli.Command{
 				Name:    c.String("gwname"),
 			},
 		}
-		network, err := client.New(c.GlobalInt("port")).Network.Create(netdef, client.DefaultExecutionTimeout)
+		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "creation of network", true))
 		}

@@ -223,7 +223,7 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(port int, hosts []*pb.Host, v Variables, s Settings) (stepResults, error) {
+func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, error) {
 	//if debug
 	if false {
 		log.Printf("running step '%s' on %d hosts...", is.Name, len(hosts))
@@ -239,7 +239,7 @@ func (is *step) Run(port int, hosts []*pb.Host, v Variables, s Settings) (stepRe
 			}
 			v["HostIP"] = h.PrivateIP
 			v["Hostname"] = h.Name
-			results[h.Name] = is.runOnHost(port, h, v)
+			results[h.Name] = is.runOnHost(h, v)
 			//if debug {
 			if false {
 				if !results[h.Name].Successful() {
@@ -261,7 +261,7 @@ func (is *step) Run(port int, hosts []*pb.Host, v Variables, s Settings) (stepRe
 			d := make(chan stepResult)
 			dones[h.Name] = d
 			go func(host *pb.Host, done chan stepResult) {
-				done <- is.runOnHost(port, host, v)
+				done <- is.runOnHost(host, v)
 			}(h, d)
 		}
 		for k, d := range dones {
@@ -279,7 +279,7 @@ func (is *step) Run(port int, hosts []*pb.Host, v Variables, s Settings) (stepRe
 	return results, nil
 }
 
-func (is *step) runOnHost(port int, host *pb.Host, v Variables) stepResult {
+func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, v)
 	if err != nil {
@@ -288,7 +288,7 @@ func (is *step) runOnHost(port int, host *pb.Host, v Variables) stepResult {
 
 	// If options file is defined, upload it to the remote host
 	if is.OptionsFileContent != "" {
-		err := UploadStringToRemoteFile(port, is.OptionsFileContent, host, "/var/tmp/options.json", "cladm", "gpac", "ug+rw-x,o-rwx")
+		err := UploadStringToRemoteFile(is.OptionsFileContent, host, "/var/tmp/options.json", "cladm", "gpac", "ug+rw-x,o-rwx")
 		if err != nil {
 			return stepResult{success: false, err: err}
 		}
@@ -296,7 +296,7 @@ func (is *step) runOnHost(port int, host *pb.Host, v Variables) stepResult {
 
 	// Uploads then executes command
 	filename := fmt.Sprintf("/var/tmp/%s.feature.%s_%s.sh", is.Worker.feature.BaseFilename(), strings.ToLower(is.Action.String()), is.Name)
-	err = UploadStringToRemoteFile(port, command, host, filename, "", "", "")
+	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
 	if err != nil {
 		return stepResult{success: false, err: err}
 	}
@@ -308,7 +308,7 @@ func (is *step) runOnHost(port int, host *pb.Host, v Variables) stepResult {
 	}
 
 	// Executes the script on the remote host
-	retcode, _, _, err := brokerclient.New(port).Ssh.Run(host.Name, command, brokerclient.DefaultConnectionTimeout, is.WallTime)
+	retcode, _, _, err := brokerclient.New().Ssh.Run(host.Name, command, brokerclient.DefaultConnectionTimeout, is.WallTime)
 	if err != nil {
 		return stepResult{success: false, err: err}
 	}

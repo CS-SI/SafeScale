@@ -22,8 +22,8 @@ import (
 )
 
 // GetProviderService returns the service provider corresponding to the current Tenant
-func GetProviderService(port int) (*providers.Service, error) {
-	tenant, err := brokerclient.New(port).Tenant.Get(brokerclient.DefaultExecutionTimeout)
+func GetProviderService() (*providers.Service, error) {
+	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
