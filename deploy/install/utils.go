@@ -142,7 +142,7 @@ func parseTargets(specs *viper.Viper) (string, string, string, error) {
 }
 
 // UploadStringToRemoteFile creates a file 'filename' on remote 'host' with the content 'content'
-func UploadStringToRemoteFile(port int, content string, host *pb.Host, filename string, owner, group, rights string) error {
+func UploadStringToRemoteFile(content string, host *pb.Host, filename string, owner, group, rights string) error {
 	if content == "" {
 		panic("content is empty!")
 	}
@@ -157,7 +157,7 @@ func UploadStringToRemoteFile(port int, content string, host *pb.Host, filename 
 		return fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
 	to := fmt.Sprintf("%s:%s", host.Name, filename)
-	broker := brokerclient.New(port).Ssh
+	broker := brokerclient.New().Ssh
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
@@ -317,7 +317,7 @@ func checkParameters(f *Feature, v Variables) error {
 }
 
 // setImplicitParameters configures parameters that are implicitely defined, based on context
-func setImplicitParameters(port int, t Target, v Variables) {
+func setImplicitParameters(t Target, v Variables) {
 	hT, cT, nT := determineContext(t)
 	if cT != nil {
 		cluster := cT.cluster
@@ -333,7 +333,7 @@ func setImplicitParameters(port int, t Target, v Variables) {
 			v["Password"] = config.AdminPassword
 		}
 		if _, ok := v["CIDR"]; !ok {
-			svc, err := provideruse.GetProviderService(port)
+			svc, err := provideruse.GetProviderService()
 			if err == nil {
 				mn, err := metadata.LoadNetwork(svc, config.NetworkID)
 				if err == nil {
@@ -364,8 +364,8 @@ func setImplicitParameters(port int, t Target, v Variables) {
 	}
 }
 
-func gatewayFromHost(port int, host *pb.Host) *pb.Host {
-	broker := brokerclient.New(port)
+func gatewayFromHost(host *pb.Host) *pb.Host {
+	broker := brokerclient.New()
 	gwID := host.GetGatewayID()
 	// If host has no gateway, host is gateway
 	if gwID == "" {

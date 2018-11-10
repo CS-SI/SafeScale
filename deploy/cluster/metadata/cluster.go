@@ -38,8 +38,8 @@ type Cluster struct {
 }
 
 // NewCluster creates a new Cluster metadata
-func NewCluster(port int) (*Cluster, error) {
-	svc, err := provideruse.GetProviderService(port)
+func NewCluster() (*Cluster, error) {
+	svc, err := provideruse.GetProviderService()
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (m *Cluster) Browse(callback func(*Cluster) error) error {
 		if err != nil {
 			return err
 		}
-		cm, err := NewCluster(port)
+		cm, err := NewCluster()
 		if err != nil {
 			return err
 		}

@@ -18,9 +18,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/dlespiau/covertool/pkg/exit"
-	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"net"
 	"os"
 	"os/signal"
@@ -28,18 +25,14 @@ import (
 
 	"github.com/dlespiau/covertool/pkg/exit"
 	log "github.com/sirupsen/logrus"
-
-	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/server/commands"
-
-	"github.com/CS-SI/SafeScale/providers"
-
+	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	_ "github.com/urfave/cli"
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/server/commands"
+	"github.com/CS-SI/SafeScale/providers"
 )
-
 
 /*
 broker provider list
@@ -93,7 +86,7 @@ func cleanup() {
 }
 
 // *** MAIN ***
-func work(port int) {
+func work() {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -109,7 +102,8 @@ func work(port int) {
 	}
 
 	log.Println("Starting server")
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	//lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -144,15 +138,15 @@ func main() {
 	app := cli.NewApp()
 
 	app.Flags = []cli.Flag{
-		cli.IntFlag{
-			Name:  "port, p",
-			Usage: "Bind to specified port `PORT`",
-			Value: 50051,
-		},
+		// cli.IntFlag{
+		// 	Name:  "port, p",
+		// 	Usage: "Bind to specified port `PORT`",
+		// 	Value: 50051,
+		// },
 	}
 
 	app.Action = func(c *cli.Context) error {
-		work(c.GlobalInt("port"))
+		work()
 		return nil
 	}
 

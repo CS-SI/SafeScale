@@ -137,13 +137,14 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	return &info, nil
 }
 
+// RunScanner ...
 func RunScanner() {
 	var targetedProviders []string
 	theProviders, _ := providers.Tenants()
 
-	for tenantName := range the_providers {
+	for tenantName := range theProviders {
 		if strings.Contains(tenantName, "-scannable") {
-			targeted_providers = append(targeted_providers, tenantName)
+			targetedProviders = append(targetedProviders, tenantName)
 		}
 	}
 
@@ -319,12 +320,11 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	return nil
 }
 
-
 func dumpTemplates(service *providers.Service, tenant string) error {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	type TemplateList struct {
-		Templates []api.HostTemplate `json:"templates,omitempty"`
+		Templates []model.HostTemplate `json:"templates,omitempty"`
 	}
 
 	templates, err := service.ListTemplates(false)
@@ -347,12 +347,11 @@ func dumpTemplates(service *providers.Service, tenant string) error {
 	return nil
 }
 
-
 func dumpImages(service *providers.Service, tenant string) error {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	type ImageList struct {
-		Images []api.Image `json:"images,omitempty"`
+		Images []model.Image `json:"images,omitempty"`
 	}
 
 	images, err := service.ListImages(false)

@@ -18,9 +18,6 @@ package openstack
 
 import (
 	"fmt"
-	"reflect"
-
-	log "github.com/sirupsen/logrus"
 
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -68,7 +65,7 @@ type AuthOptions struct {
 	// cache your credentials in memory, and to allow Gophercloud to attempt to
 	// re-authenticate automatically if/when your token expires.  If you set it to
 	// false, it will not cache these settings, but re-authentication will not be
-	// possible.  This setting defaults to false.
+	// possible. This setting defaults to false.
 	//
 	// NOTE: The reauth function will try to re-authenticate endlessly if left unchecked.
 	// The way to limit the number of attempts is to provide a custom HTTP client to the provider client

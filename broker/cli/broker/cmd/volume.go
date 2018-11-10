@@ -50,7 +50,7 @@ var volumeList = cli.Command{
 			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		resp, err := client.New(c.GlobalInt("port")).Volume.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		resp, err := client.New().Volume.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of volumes", false))
 		}
@@ -75,7 +75,7 @@ var volumeInspect = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Volume name or ID required")
 		}
-		volumeInfo, err := client.New(c.GlobalInt("port")).Volume.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
+		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of volume", false))
 		}
@@ -102,7 +102,7 @@ var volumeDelete = cli.Command{
 		volumeList = append(volumeList, c.Args().First())
 		volumeList = append(volumeList, c.Args().Tail()...)
 
-		_ = client.New(c.GlobalInt("port")).Volume.Delete(volumeList, client.DefaultExecutionTimeout)
+		_ = client.New().Volume.Delete(volumeList, client.DefaultExecutionTimeout)
 
 		return nil
 	},
@@ -142,7 +142,7 @@ var volumeCreate = cli.Command{
 			Speed: pb.VolumeSpeed(volSpeed),
 		}
 
-		volume, err := client.New(c.GlobalInt("port")).Volume.Create(def, client.DefaultExecutionTimeout)
+		volume, err := client.New().Volume.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "creation of volume", true))
 		}
@@ -181,7 +181,7 @@ var volumeAttach = cli.Command{
 			Host:      &pb.Reference{Name: c.Args().Get(1)},
 			Volume:    &pb.Reference{Name: c.Args().Get(0)},
 		}
-		err := client.New(c.GlobalInt("port")).Volume.Attach(def, client.DefaultExecutionTimeout)
+		err := client.New().Volume.Attach(def, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "attach of volume", true))
 		}
@@ -201,7 +201,7 @@ var volumeDetach = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("volume and host names required")
 		}
-		err := client.New(c.GlobalInt("port")).Volume.Detach(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
+		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "unattach of volume", true))
 		}

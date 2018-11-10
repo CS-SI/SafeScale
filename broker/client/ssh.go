@@ -240,8 +240,9 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	return retcode, stdout, stderr, err
 }
 
-func (s *ssh) getSShConfigFromName(name string, timeout time.Duration) (*system.SSHConfig, error) {
-	conn := utils.GetConnection(int(s.session.brokerdPort))
+// Connect ...
+func (s *ssh) Connect(name string, timeout time.Duration) error {
+	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
