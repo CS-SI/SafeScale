@@ -91,7 +91,7 @@ func extractClusterArgument(c *cli.Context) error {
 		}
 
 		var err error
-		clusterInstance, err = cluster.Get(c.GlobalInt("port"), clusterName)
+		clusterInstance, err = cluster.Get(clusterName)
 		if c.Command.HasName("create") && clusterInstance != nil {
 			return exitError(fmt.Sprintf("Cluster '%s' already exists.\n", clusterName), ExitCode.Duplicate)
 		}
@@ -113,7 +113,7 @@ var clusterListCommand = cli.Command{
 	Usage:   "List available clusters",
 
 	Action: func(c *cli.Context) error {
-		list, err := cluster.List(c.GlobalInt("port"))
+		list, err := cluster.List()
 		if err != nil {
 			return exitError("Failed to get cluster list", ExitCode.RPC)
 		}
@@ -181,7 +181,7 @@ var clusterInspectCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		err = outputClusterConfig(c.GlobalInt("port"))
+		err = outputClusterConfig()
 		if err != nil {
 			return exitError(err.Error(), ExitCode.Run)
 		}
@@ -190,8 +190,8 @@ var clusterInspectCommand = cli.Command{
 }
 
 // outputClusterConfig displays cluster configuration after filtering and completing some fields
-func outputClusterConfig(port int) error {
-	toFormat, err := convertStructToMap(port, clusterInstance.GetConfig())
+func outputClusterConfig() error {
+	toFormat, err := convertStructToMap(clusterInstance.GetConfig())
 	if err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func outputClusterConfig(port int) error {
 
 // convertStructToMap converts a struct to its equivalent in map[string]interface{},
 // with fields converted to string and used as keys
-func convertStructToMap(port int, src interface{}) (map[string]interface{}, error) {
+func convertStructToMap(src interface{}) (map[string]interface{}, error) {
 	jsoned, err := json.Marshal(src)
 	if err != nil {
 		return map[string]interface{}{}, err
@@ -224,10 +224,10 @@ func convertStructToMap(port int, src interface{}) (map[string]interface{}, erro
 	if err == nil {
 		target := install.NewClusterTarget(clusterInstance)
 		var results install.Results
-		results, err := feature.Check(port, target, install.Variables{}, install.Settings{})
+		results, err := feature.Check(target, install.Variables{}, install.Settings{})
 		found = err == nil && results.Successful()
 		if found {
-			brkclt := brokerclient.New(port).Host
+			brkclt := brokerclient.New().Host
 			remoteDesktops := []string{}
 			gwPublicIP := clusterInstance.GetConfig().PublicIP
 			for _, id := range clusterInstance.ListMasterIDs() {
@@ -352,7 +352,7 @@ var clusterCreateCommand = cli.Command{
 				ImageID:   los,
 			}
 		}
-		clusterInstance, err = cluster.Create(c.GlobalInt("port"), api.Request{
+		clusterInstance, err = cluster.Create(api.Request{
 			Name:                    clusterName,
 			Complexity:              complexity,
 			CIDR:                    cidr,
@@ -363,13 +363,13 @@ var clusterCreateCommand = cli.Command{
 		})
 		if err != nil {
 			if clusterInstance != nil {
-				clusterInstance.Delete(c.GlobalInt("port"))
+				clusterInstance.Delete()
 			}
 			msg := fmt.Sprintf("failed to create cluster: %s\n", err.Error())
 			return exitError(msg, ExitCode.Run)
 		}
 
-		toFormat, err := convertStructToMap(c.GlobalInt("port"), clusterInstance.GetConfig())
+		toFormat, err := convertStructToMap(clusterInstance.GetConfig())
 		if err != nil {
 			return exitError(err.Error(), ExitCode.Run)
 		}
@@ -431,7 +431,7 @@ var clusterDeleteCommand = cli.Command{
 			log.Println("'-f,--force' does nothing yet")
 		}
 
-		err = clusterInstance.Delete(c.GlobalInt("port"))
+		err = clusterInstance.Delete()
 		if err != nil {
 			return exitError(err.Error(), ExitCode.RPC)
 		}
@@ -461,7 +461,7 @@ var clusterStopCommand = cli.Command{
 			return err
 		}
 
-		err = clusterInstance.Stop(c.GlobalInt("port"))
+		err = clusterInstance.Stop()
 		if err != nil {
 			return exitError(err.Error(), ExitCode.RPC)
 		}
@@ -490,7 +490,7 @@ var clusterStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		err = clusterInstance.Start(c.GlobalInt("port"))
+		err = clusterInstance.Start()
 		if err != nil {
 			return exitError(err.Error(), ExitCode.RPC)
 		}
@@ -517,7 +517,7 @@ var clusterStateCommand = cli.Command{
 			return err
 		}
 
-		state, err := clusterInstance.GetState(c.GlobalInt("port"))
+		state, err := clusterInstance.GetState()
 		if err != nil {
 			msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
 			return exitError(msg, ExitCode.RPC)
@@ -620,7 +620,7 @@ var clusterExpandCommand = cli.Command{
 				ImageID:   los,
 			}
 		}
-		hosts, err := clusterInstance.AddNodes(c.GlobalInt("port"), count, public, nodeRequest)
+		hosts, err := clusterInstance.AddNodes(count, public, nodeRequest)
 		if err != nil {
 			return exitError(err.Error(), ExitCode.RPC)
 		}
@@ -694,7 +694,7 @@ var clusterShrinkCommand = cli.Command{
 		fmt.Printf("Deleting %d %s node%s from Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
 		var msgs []string
 		for i := uint(0); i < count; i++ {
-			err := clusterInstance.DeleteLastNode(c.GlobalInt("port"), public)
+			err := clusterInstance.DeleteLastNode(public)
 			if err != nil {
 				msgs = append(msgs, fmt.Sprintf("Failed to delete node #%d: %s", i+1, err.Error()))
 			}
@@ -849,7 +849,7 @@ var clusterDcosCommand = cli.Command{
 		}
 		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i dcos " + strings.Join(args, " ")
-		return executeCommand(c.GlobalInt("port"), cmdStr)
+		return executeCommand(cmdStr)
 	},
 }
 
@@ -875,7 +875,7 @@ var clusterKubectlCommand = cli.Command{
 
 		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i kubectl " + strings.Join(args, " ")
-		return executeCommand(c.GlobalInt("port"), cmdStr)
+		return executeCommand(cmdStr)
 	},
 }
 
@@ -902,13 +902,13 @@ var clusterRunCommand = cli.Command{
 	},
 }
 
-func executeCommand(port int, command string) error {
+func executeCommand(command string) error {
 	masters := clusterInstance.ListMasterIDs()
 	if len(masters) <= 0 {
 		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetName())
 		return exitError(msg, ExitCode.Run)
 	}
-	brokerssh := brokerclient.New(port).Ssh
+	brokerssh := brokerclient.New().Ssh
 	for i, m := range masters {
 		retcode, stdout, stderr, err := brokerssh.Run(m, command, brokerclient.DefaultConnectionTimeout, 5*time.Minute)
 		if err != nil {
@@ -983,7 +983,7 @@ var clusterAddFeatureCommand = cli.Command{
 		settings.SkipProxy = c.Bool("skip-proxy")
 
 		target := install.NewClusterTarget(clusterInstance)
-		results, err := feature.Add(c.GlobalInt("port"), target, values, settings)
+		results, err := feature.Add(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
 			return exitError(msg, ExitCode.RPC)
@@ -1044,7 +1044,7 @@ var clusterCheckFeatureCommand = cli.Command{
 		settings := install.Settings{}
 
 		target := install.NewClusterTarget(clusterInstance)
-		results, err := feature.Check(c.GlobalInt("port"), target, values, settings)
+		results, err := feature.Check(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
 			return exitError(msg, ExitCode.RPC)
@@ -1105,7 +1105,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 		settings.SkipProxy = true
 
 		target := install.NewClusterTarget(clusterInstance)
-		results, err := feature.Remove(c.GlobalInt("port"), target, values, settings)
+		results, err := feature.Remove(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())
 			return exitError(msg, ExitCode.RPC)
@@ -1163,7 +1163,7 @@ var clusterNodeCommand = cli.Command{
 			}
 
 			var err error
-			hostInstance, err = brokerclient.New(c.GlobalInt("port")).Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
+			hostInstance, err = brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
 			if err != nil {
 				msg := fmt.Sprintf("Failed to list nodes of cluster '%s'", clusterName)
 				return exitError(msg, ExitCode.RPC)
@@ -1203,7 +1203,7 @@ var clusterNodeListCommand = cli.Command{
 		public := c.Bool("public")
 		all := c.Bool("all")
 
-		broker := brokerclient.New(c.GlobalInt("port")).Host
+		broker := brokerclient.New().Host
 		formatted := []map[string]interface{}{}
 
 		if all || !public {
@@ -1270,7 +1270,7 @@ var clusterNodeInspectCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
-		host, err := brokerclient.New(c.GlobalInt("port")).Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
+		host, err := brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			return exitError("Failed to get node information", ExitCode.RPC)
 		}
@@ -1334,7 +1334,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 			log.Println("'-f,--force' does nothing yet")
 		}
 
-		err := clusterInstance.Delete(c.GlobalInt("port"))
+		err := clusterInstance.Delete()
 		if err != nil {
 			return exitError(err.Error(), ExitCode.RPC)
 		}

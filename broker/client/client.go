@@ -40,9 +40,9 @@ type Session struct {
 	Image     *image
 
 	// For future use...
-	brokerdAddress string
-	brokerdPort    uint16
-	tenantName     string
+	// brokerdAddress string
+	// brokerdPort    uint16
+	tenantName string
 }
 
 // Client is a instance of Session used temporarily until the session logic in brokerd is implemented
@@ -55,7 +55,7 @@ const (
 )
 
 // New returns an instance of broker Client
-func New(port int) Client {
+func New() Client {
 	s := &Session{}
 	s.Container = &container{session: s}
 	s.Host = &host{session: s}
@@ -66,7 +66,7 @@ func New(port int) Client {
 	s.Volume = &volume{session: s}
 	s.Template = &template{session: s}
 	s.Image = &image{session: s}
-	s.brokerdPort = uint16(port)
+	//s.brokerdPort = uint16(port)
 	return s
 }
 

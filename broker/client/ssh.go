@@ -237,7 +237,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 
 // Connect ...
 func (s *ssh) Connect(name string, timeout time.Duration) error {
-	conn := utils.GetConnection(int(s.session.brokerdPort))
+	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
