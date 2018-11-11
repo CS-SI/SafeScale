@@ -300,11 +300,25 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 	if err != nil {
 		return err
 	}
+
+	if sshCfg.GatewayConfig == nil {
+		sshCfg.GatewayConfig = &system.SSHConfig{
+			User:			sshCfg.User,
+			Host:			sshCfg.Host,
+			PrivateKey:    	sshCfg.PrivateKey,
+			Port:          	sshCfg.Port,
+			GatewayConfig: 	nil,
+		}
+	}
+	sshCfg.Host = "127.0.0.1"
 	sshCfg.Port = remotePort
 	sshCfg.LocalPort = localPort
 
+
+
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
+
 			tunnels, _, err := sshCfg.CreateTunnels()
 			if err != nil {
 				for _, t := range tunnels {
@@ -315,6 +329,7 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 				}
 				return fmt.Errorf("Unable to create command : %s", err.Error())
 			}
+
 			return nil
 		},
 		2*time.Minute,
@@ -332,7 +347,18 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 		return err
 	}
 
-	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.Host, remotePort, sshCfg.User, sshCfg.GatewayConfig.Host)
+	if sshCfg.GatewayConfig == nil {
+		sshCfg.GatewayConfig = &system.SSHConfig{
+			User:			sshCfg.User,
+			Host:			sshCfg.Host,
+			PrivateKey:    	sshCfg.PrivateKey,
+			Port:          	sshCfg.Port,
+			GatewayConfig: 	nil,
+		}
+		sshCfg.Host = "127.0.0.1"
+	}
+
+	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.Host, remotePort, sshCfg.GatewayConfig.User, sshCfg.GatewayConfig.Host)
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
 	if err == nil {
