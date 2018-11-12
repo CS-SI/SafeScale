@@ -85,4 +85,4 @@ docs/.nojekyll
 docs/Other
 
 # version info
-version.go
+scanner/version.go
