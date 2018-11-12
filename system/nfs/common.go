@@ -99,7 +99,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		5*time.Minute,
 	)
 	if retryErr != nil {
-		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", err.Error())
+		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
 	}
 
 	nerr := utils.LazyRemove(f.Name())

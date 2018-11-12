@@ -674,7 +674,7 @@ func (client *Client) oscltDeleteHost(id string) error {
 				switch innerRetryErr.(type) {
 				case retry.ErrTimeout:
 					// retry deletion...
-					return fmt.Errorf("failed to acknowledge host '%s' deletion! %s", id, err.Error())
+					return fmt.Errorf("failed to acknowledge host '%s' deletion! %s", id, innerRetryErr.Error())
 				default:
 					return innerRetryErr
 				}
@@ -688,7 +688,7 @@ func (client *Client) oscltDeleteHost(id string) error {
 		3*time.Minute,
 	)
 	if outerRetryErr != nil {
-		log.Printf("failed to remove host '%s': %s", id, err.Error())
+		log.Printf("failed to remove host '%s': %s", id, outerRetryErr.Error())
 		return err
 	}
 	return nil

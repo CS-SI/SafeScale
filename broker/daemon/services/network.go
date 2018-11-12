@@ -84,11 +84,12 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 			case error:
 				err = t
 			}
-			tbr := errors.Wrap(err, "panic occured during network creation")
+			tbr := errors.Wrap(err, "panic occurred during network creation")
 			log.Errorf("%+v", tbr)
 		}
 	}()
 
+	// TODO GITHUB Look at selection...
 	// Create a gateway
 	tpls, err := svc.provider.SelectTemplatesBySize(api.SizingRequirements{
 		MinCores:    cpu,
@@ -104,7 +105,13 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		tbr := errors.New(fmt.Sprintf("Error creating network: No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
 		log.Errorf("%+v", tbr)
 		return nil, tbr
+	} else {
+		for pos, atempl := range(tpls) {
+			// TODO GITHUB Move to debug later
+			log.Printf("Alternative [%d]: Template '%s' with %d cores, %f RAM, and %d GB Disk", pos, atempl.Name, atempl.Cores, atempl.RAMSize, atempl.DiskSize)
+		}
 	}
+
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
 		tbr := errors.Wrap(err, "Error creating network: Error searching image")
@@ -120,6 +127,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		return nil, tbr
 	}
 
+	log.Printf("Selected Template '%s' with %d cores, %f RAM, and %d GB Disk", tpls[0].Name, tpls[0].Cores, tpls[0].RAMSize, tpls[0].DiskSize)
 	gwRequest := api.GWRequest{
 		ImageID:    img.ID,
 		NetworkID:  network.ID,
