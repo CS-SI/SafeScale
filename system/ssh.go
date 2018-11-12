@@ -113,12 +113,13 @@ type SSHConfig struct {
 	Host          string
 	PrivateKey    string
 	Port          int
+	LocalPort	  int
 	GatewayConfig *SSHConfig
 	cmdTpl        string
 }
 
 // SSHTunnel a SSH tunnel
-type sshTunnel struct {
+type SSHTunnel struct {
 	port      int
 	cmd       *exec.Cmd
 	cmdString string
@@ -142,7 +143,7 @@ func SCPErrorString(retcode int) string {
 }
 
 // Close closes ssh tunnel
-func (tunnel *sshTunnel) Close() error {
+func (tunnel *SSHTunnel) Close() error {
 	defer utils.LazyRemove(tunnel.keyFile.Name())
 
 	// Kills the process of the tunnel
@@ -167,7 +168,7 @@ func (tunnel *sshTunnel) Close() error {
 	return nil
 }
 
-// GetFreePort get a frre port
+// GetFreePort get a free port
 func getFreePort() (int, error) {
 	listener, err := net.Listen("tcp", ":0")
 	defer listener.Close()
@@ -216,20 +217,25 @@ func isTunnelReady(port int) bool {
 
 }
 
-// createTunnel create SSH from local host to remote host throw gateway
-func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
+// createTunnel create SSH from local host to remote host through gateway
+// if localPort is set to 0 then it's  automatically choosed
+func createTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
 		return nil, err
 	}
-	freePort, err := getFreePort()
-	if err != nil {
-		return nil, err
+	localPort := cfg.LocalPort
+	if localPort == 0 {
+		localPort, err = getFreePort()
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	options := "-q -oServerAliveInterval=60 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 	cmdString := fmt.Sprintf("ssh -i %s -NL %d:%s:%d %s@%s %s -p %d",
 		f.Name(),
-		freePort,
+		localPort,
 		cfg.Host,
 		cfg.Port,
 		cfg.GatewayConfig.User,
@@ -244,11 +250,11 @@ func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 		return nil, err
 	}
 
-	for nbiter := 0; !isTunnelReady(freePort) && nbiter < 100; nbiter++ {
+	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
 	}
-	return &sshTunnel{
-		port:      freePort,
+	return &SSHTunnel{
+		port:      localPort,
 		cmd:       cmd,
 		cmdString: cmdString,
 		keyFile:   f,
@@ -258,7 +264,7 @@ func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 // SSHCommand defines a SSH command
 type SSHCommand struct {
 	cmd     *exec.Cmd
-	tunnels []*sshTunnel
+	tunnels []*SSHTunnel
 	keyFile *os.File
 }
 
@@ -279,7 +285,7 @@ func (c *SSHCommand) closeTunnels() error {
 // The returned error is nil if the command runs, has no problems copying stdin, stdout, and stderr, and exits with a zero exit status.
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
-// Wait releases any resources associated with the Cmd.
+// Wait releases any resources associated with the cmd.
 func (c *SSHCommand) Wait() error {
 	err := c.cmd.Wait()
 	nerr := c.end()
@@ -413,7 +419,7 @@ func (c *SSHCommand) end() error {
 	return nil
 }
 
-func recCreateTunnels(ssh *SSHConfig, tunnels *[]*sshTunnel) (*sshTunnel, error) {
+func recCreateTunnels(ssh *SSHConfig, tunnels *[]*SSHTunnel) (*SSHTunnel, error) {
 	if ssh != nil {
 		tunnel, err := recCreateTunnels(ssh.GatewayConfig, tunnels)
 		if err != nil {
@@ -440,8 +446,8 @@ func recCreateTunnels(ssh *SSHConfig, tunnels *[]*sshTunnel) (*sshTunnel, error)
 
 }
 
-func (ssh *SSHConfig) createTunnels() ([]*sshTunnel, *SSHConfig, error) {
-	var tunnels []*sshTunnel
+func (ssh *SSHConfig) CreateTunnels() ([]*SSHTunnel, *SSHConfig, error) {
+	var tunnels []*SSHTunnel
 	tunnel, err := recCreateTunnels(ssh, &tunnels)
 	if err != nil {
 		if err != nil {
@@ -493,18 +499,18 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 
 }
 
-// Command returns the Cmd struct to execute cmdString remotely
+// Command returns the cmd struct to execute cmdString remotely
 func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
 	return ssh.command(cmdString, false)
 }
 
-// SudoCommand returns the Cmd struct to execute cmdString remotely. Command is executed with sudo
+// SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
 func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
 	return ssh.command(cmdString, true)
 }
 
 func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, error) {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -560,7 +566,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 
 // Copy copy a file/directory from/to local to/from remote
 func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, string, string, error) {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		return 0, "", "", fmt.Errorf("Unable to create tunnels : %s", err.Error())
 	}
@@ -570,7 +576,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		return 0, "", "", fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
 
-	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}{{.LocalPath}} {{.User}}@{{.Host}}:{{.RemotePath}}{{else}}{{.User}}@{{.Host}}:{{.RemotePath}} {{.LocalPath}}{{end}}")
+	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.port}} {{.Options}} {{if .IsUpload}}{{.LocalPath}} {{.User}}@{{.Host}}:{{.RemotePath}}{{else}}{{.User}}@{{.Host}}:{{.RemotePath}} {{.LocalPath}}{{end}}")
 	if err != nil {
 		return 0, "", "", fmt.Errorf("Error parsing command template: %s", err.Error())
 	}
@@ -612,7 +618,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 
 // Exec executes the cmd using ssh
 func (ssh *SSHConfig) Exec(cmdString string) error {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		for _, t := range tunnels {
 			nerr := t.Close()
@@ -669,7 +675,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 
 // Enter Enter to interactive shell
 func (ssh *SSHConfig) Enter() error {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		for _, t := range tunnels {
 			nerr := t.Close()
@@ -726,13 +732,14 @@ func (ssh *SSHConfig) Enter() error {
 	return err
 }
 
+
 // CommandContext is like Command but includes a context.
 //
 // The provided context is used to kill the process (by calling
 // os.Process.Kill) if the context becomes done before the command
 // completes on its own.
 func (ssh *SSHConfig) CommandContext(ctx context.Context, cmdString string) (*SSHCommand, error) {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
