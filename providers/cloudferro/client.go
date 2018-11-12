@@ -33,6 +33,7 @@ type AuthOptions struct {
 	Region      string
 	DomainName  string
 	ProjectName string
+	ProjectID   string
 }
 
 // func parseOpenRC(openrc string) (*openstack.AuthOptions, error) {
@@ -60,6 +61,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"standard":   VolumeSpeed.COLD,
 				"performant": VolumeSpeed.HDD,
 			},
+			MetadataBucketName: api.BuildMetadataBucketName(opts.ProjectID),
 		},
 	)
 
@@ -88,12 +90,14 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	Region, _ := params["Region"].(string)
 	DomainName, _ := params["UserDomainName"].(string)
 	ProjectName, _ := params["ProjectName"].(string)
+	ProjectID, _ := params["ProjectID"].(string)
 	return AuthenticatedClient(AuthOptions{
 		Username:    Username,
 		Password:    Password,
 		Region:      Region,
 		DomainName:  DomainName,
 		ProjectName: ProjectName,
+		ProjectID:   ProjectID,
 	})
 }
 
@@ -105,6 +109,7 @@ func (c *Client) GetCfgOpts() (api.Config, error) {
 	cfg.Set("S3Protocol", c.Cfg.S3Protocol)
 	cfg.Set("AutoHostNetworkInterfaces", c.Cfg.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", c.Cfg.UseLayer3Networking)
+	cfg.Set("MetadataBucket", c.Cfg.MetadataBucketName)
 
 	return cfg, nil
 }
