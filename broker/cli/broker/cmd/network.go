@@ -121,7 +121,7 @@ var networkCreate = cli.Command{
 		},
 		cli.IntFlag{
 			Name:  "disk",
-			Value: 100,
+			Value: 16,
 			Usage: "Disk space for the gateway",
 		},
 		cli.StringFlag{
