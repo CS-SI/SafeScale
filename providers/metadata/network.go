@@ -307,11 +307,13 @@ func (m *Network) Release() {
 
 // SaveNetwork saves the Network definition in Object Storage
 func SaveNetwork(svc *providers.Service, net *api.Network) error {
+	log.Printf("Saving network '%s' definition in object storage...", net.Name)
 	return NewNetwork(svc).Carry(net).Write()
 }
 
 // RemoveNetwork removes the Network definition from Object Storage
 func RemoveNetwork(svc *providers.Service, net *api.Network) error {
+	log.Printf("Removing network '%s' definition from object storage...", net.Name)
 	return NewNetwork(svc).Carry(net).Delete()
 }
 

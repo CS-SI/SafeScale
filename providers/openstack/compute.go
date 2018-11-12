@@ -687,7 +687,7 @@ func (client *Client) GetHost(ref string) (*api.Host, error) {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return nil, errors.Wrap(retryErr, fmt.Sprintf("failed to get host '%s' information after 10s: %s", id, err.Error()))
+			return nil, errors.Wrap(retryErr, fmt.Sprintf("failed to get host '%s' information after 10s: %s", id, retryErr.Error()))
 		}
 	}
 	if err != nil {
@@ -848,7 +848,7 @@ func (client *Client) DeleteHost(ref string) error {
 				switch innerRetryErr.(type) {
 				case retry.ErrTimeout:
 					// retry deletion...
-					return fmt.Errorf("failed to acknowledge host '%s' deletion! %s", host.Name, err.Error())
+					return fmt.Errorf("failed to acknowledge host '%s' deletion! %s", host.Name, innerRetryErr.Error())
 				default:
 					return innerRetryErr
 				}
@@ -862,7 +862,7 @@ func (client *Client) DeleteHost(ref string) error {
 		3*time.Minute,
 	)
 	if outerRetryErr != nil {
-		log.Debugf("failed to remove host '%s': %s", host.Name, err.Error())
+		log.Debugf("failed to remove host '%s': %s", host.Name, outerRetryErr.Error())
 		return errors.Wrap(err, fmt.Sprintf("Error deleting host: retry error"))
 	}
 	return metadata.RemoveHost(providers.FromClient(client), host)
