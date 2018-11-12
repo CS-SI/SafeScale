@@ -83,3 +83,6 @@ docs/*.md
 docs/*.html
 docs/.nojekyll
 docs/Other
+
+# version info
+version.go
