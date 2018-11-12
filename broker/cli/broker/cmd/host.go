@@ -190,12 +190,12 @@ var hostCreate = cli.Command{
 		cli.Float64Flag{
 			Name:  "ram",
 			Value: 1,
-			Usage: "RAM for the host",
+			Usage: "RAM for the host (GB)",
 		},
 		cli.IntFlag{
 			Name:  "disk",
 			Value: 100,
-			Usage: "Disk space for the host",
+			Usage: "Disk space for the host (MB)",
 		},
 		cli.StringFlag{
 			Name:  "os",
