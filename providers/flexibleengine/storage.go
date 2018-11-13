@@ -22,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/aws/s3"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
@@ -49,28 +48,28 @@ func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentReque
 	if mtdVol == nil {
 		return nil, errors.Wrap(model.ResourceNotFoundError("volume", request.VolumeID), "Cannot create volume attachment")
 	}
-	_volumeAttachment, err := mtdVol.GetAttachment()
+	_volumeAttachment, err := mtdVol.GetAttachments()
 	if err != nil {
 		return nil, err
 	}
-	if _volumeAttachment != nil && _volumeAttachment.ID != "" {
-		return nil, fmt.Errorf("Volume '%s' already has an attachment on '%s", _volumeAttachment.VolumeID, _volumeAttachment.ServerID)
+	if len(_volumeAttachment) > 0 {
+		return nil, fmt.Errorf("Volume '%s' already attached to host(s)", request.VolumeID)
 	}
 
-	mdtHost, err := metadata.LoadHost(providers.FromClient(client), request.ServerID)
+	mdtHost, err := metadata.LoadHost(client, request.HostID)
 	if err != nil {
 		return nil, err
 	}
 	if mdtHost == nil {
-		return nil, errors.Wrap(model.ResourceNotFoundError("host", request.ServerID), "Cannot create volume attachment")
+		return nil, errors.Wrap(model.ResourceNotFoundError("host", request.HostID), "Cannot create volume attachment")
 	}
 
 	// return client.osclt.CreateVolumeAttachment(request)
-	va, err := volumeattach.Create(client.osclt.Compute, request.ServerID, volumeattach.CreateOpts{
+	va, err := volumeattach.Create(client.osclt.Compute, request.HostID, volumeattach.CreateOpts{
 		VolumeID: request.VolumeID,
 	}).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("Error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, openstack.ProviderErrorToString(err))
 	}
 
 	volumeAttachment := &model.VolumeAttachment{
@@ -116,7 +115,7 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 		return fmt.Errorf("Error deleting volume attachment %s: %s", id, openstack.ProviderErrorToString(err))
 	}
 
-	mtdVol, err := metadata.LoadVolume(providers.FromClient(client), id)
+	mtdVol, err := metadata.LoadVolume(client, id)
 	if err != nil {
 		return fmt.Errorf("Error deleting volume attachment %s: %s", id, openstack.ProviderErrorToString(err))
 	}
@@ -131,7 +130,7 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 
 // DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(id string) error {
-	volume, err := metadata.LoadVolume(providers.FromClient(client), id)
+	volume, err := metadata.LoadVolume(client, id)
 	if err != nil {
 		return err
 	}
@@ -204,7 +203,7 @@ func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
 	vol, err := client.ExCreateVolume(request, "")
 
-	err = metadata.SaveVolume(providers.FromClient(client), vol)
+	err = metadata.SaveVolume(client, vol)
 	if err != nil {
 		nerr := client.DeleteVolume(vol.ID)
 		if nerr != nil {

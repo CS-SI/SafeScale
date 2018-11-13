@@ -553,12 +553,12 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		retcode, stdout, stderr, logErr := logCmd.Run()
 		if logErr == nil {
 			if retcode == 0 {
-				return fmt.Errorf("server '%s' is not ready yet : %s, Log content of file user_data.log: %s", ssh.Host, err.Error(), stdout)
+				return fmt.Errorf("server '%s' is not ready yet: %s, Log content of file user_data.log: %s", ssh.Host, err.Error(), stdout)
 			}
-			return fmt.Errorf("server '%s' is not ready yet : %s, Error reading user_data.log: %s", ssh.Host, err.Error(), stderr)
+			return fmt.Errorf("server '%s' is not ready yet: %s, Error reading user_data.log: %s", ssh.Host, err.Error(), stderr)
 		}
 
-		return fmt.Errorf("server '%s' is not ready yet : %s", ssh.Host, err.Error())
+		return fmt.Errorf("server '%s' is not ready yet: %s", ssh.Host, err.Error())
 	}
 	return nil
 }

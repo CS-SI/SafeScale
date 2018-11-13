@@ -14,14 +14,11 @@
  * limitations under the License.
  */
 
-package NetworkExtension
-
-// Enum represents the type of additional info for a network
-type Enum string
+package VolumeProperty
 
 const (
-	// DescriptionV1 contains optional additional info describing host (purpose, ...)
+	// DescriptionV1 specifies optional additional info describing volume (purpose, ...)
 	DescriptionV1 = "1"
-	// NetworkV1 contains optional additional network related info
-	NetworkV1 = "2"
+	// AttachedV1 contains additional information about hosts attaching the volume
+	AttachedV1 = "2"
 )

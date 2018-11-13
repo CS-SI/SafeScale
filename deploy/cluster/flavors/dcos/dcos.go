@@ -47,7 +47,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
@@ -276,7 +277,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		feature                       *install.Feature
 		target                        install.Target
 		results                       install.Results
-		heNetworkV1                   model.HostExtensionNetworkV1
+		hpNetworkV1                   propsv1.HostNetwork
 	)
 	broker := brokerclient.New()
 
@@ -358,7 +359,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
 		goto cleanNetwork
 	}
-	err = gw.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	err = gw.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
 		goto cleanNetwork
 	}
@@ -366,7 +367,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		// Saves gateway information in cluster metadata
 		instance.Core.PublicIP = gw.GetAccessIP()
 		instance.manager.BootstrapID = gw.ID
-		instance.manager.BootstrapIP = heNetworkV1.IPv4Addresses[heNetworkV1.DefaultNetworkID]
+		instance.manager.BootstrapIP = hpNetworkV1.IPv4Addresses[hpNetworkV1.DefaultNetworkID]
 		return nil
 	})
 	if err != nil {
@@ -533,28 +534,29 @@ func Sanitize(data *metadata.Cluster) error {
 		masterIPs := []string{}
 		privateNodeIPs := []string{}
 		publicNodeIPs := []string{}
-		heNetworkV1 := model.HostExtensionNetworkV1{}
+		hpNetworkV1 := propsv1.HostNetwork{}
+		defaultNetworkIP := hpNetworkV1.IPv4Addresses[hpNetworkV1.DefaultNetworkID]
 		for _, h := range hosts {
-			err = h.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+			err = h.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 			if err != nil {
 				return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
 			}
 			if strings.HasPrefix(h.Name, instance.Core.Name+"-master-") {
 				masterIDs = append(masterIDs, h.ID)
-				masterIPs = append(masterIPs, heNetworkV1.IPv4Addresses[heNetworkV1.DefaultNetworkID])
+				masterIPs = append(masterIPs, defaultNetworkIP)
 			} else if strings.HasPrefix(h.Name, instance.Core.Name+"-node-") {
-				privateNodeIPs = append(privateNodeIPs, heNetworkV1.IPv4Addresses[heNetworkV1.DefaultNetworkID])
+				privateNodeIPs = append(privateNodeIPs, defaultNetworkIP)
 			} else if strings.HasPrefix(h.Name, instance.Core.Name+"-pubnode-") {
-				publicNodeIPs = append(privateNodeIPs, heNetworkV1.IPv4Addresses[heNetworkV1.DefaultNetworkID])
+				publicNodeIPs = append(privateNodeIPs, defaultNetworkIP)
 			}
 		}
-		err = gw.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+		err = gw.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 		if err != nil {
 			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
 		}
 		newManager := &managerData{
 			BootstrapID:      gw.ID,
-			BootstrapIP:      heNetworkV1.IPv4Addresses[heNetworkV1.DefaultNetworkID],
+			BootstrapIP:      defaultNetworkIP,
 			MasterIDs:        masterIDs,
 			MasterIPs:        masterIPs,
 			PrivateNodeIPs:   privateNodeIPs,

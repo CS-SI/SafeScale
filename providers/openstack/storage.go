@@ -181,9 +181,8 @@ func (client *Client) listAllVolumes() ([]model.Volume, error) {
 		if err != nil {
 			log.Debugf("Error listing volumes: list invocation: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
-		} else {
-			// log.Debugf("Complete volume list empty")
 		}
+		log.Warnf("Complete volume list empty")
 	}
 	return vs, nil
 }
@@ -200,9 +199,8 @@ func (client *Client) listMonitoredVolumes() ([]model.Volume, error) {
 		if err != nil {
 			log.Debugf("Error listing monitored volumes: browsing volumes: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volumes : %s", ProviderErrorToString(err)))
-		} else {
-			// log.Debugf("Volume list empty !")
 		}
+		log.Warnf("Volume list empty !")
 	}
 	return vols, nil
 }
@@ -238,12 +236,12 @@ func (client *Client) DeleteVolume(id string) error {
 // - 'host' on which the volume is attached
 func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (*model.VolumeAttachment, error) {
 	// Create the attachment
-	va, err := volumeattach.Create(client.Compute, request.ServerID, volumeattach.CreateOpts{
+	va, err := volumeattach.Create(client.Compute, request.HostID, volumeattach.CreateOpts{
 		VolumeID: request.VolumeID,
 	}).Extract()
 	if err != nil {
 		log.Debugf("Error creating volume attachment: actual attachment creation: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, ProviderErrorToString(err)))
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, ProviderErrorToString(err)))
 	}
 
 	vaapi := &model.VolumeAttachment{
