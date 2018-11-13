@@ -107,8 +107,7 @@ func (svc *NetworkService) Create(net string, cidr string, ipVersion IPVersion.E
 		return nil, tbr
 	} else {
 		for pos, atempl := range(tpls) {
-			// TODO GITHUB Move to debug later
-			log.Printf("Alternative [%d]: Template '%s' with %d cores, %f RAM, and %d GB Disk", pos, atempl.Name, atempl.Cores, atempl.RAMSize, atempl.DiskSize)
+			log.Debugf("Alternative [%d]: Template '%s' with %d cores, %f RAM, and %d GB Disk", pos, atempl.Name, atempl.Cores, atempl.RAMSize, atempl.DiskSize)
 		}
 	}
 

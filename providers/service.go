@@ -309,15 +309,13 @@ func (srv *Service) SelectTemplatesBySize(sizing api.SizingRequirements) ([]api.
 		return nil, err
 	}
 
-	// TODO GITHUB Move to debug later
-	log.Printf("Looking for machine with: %d cores, %f RAM, and %d Disk", sizing.MinCores, sizing.MinRAMSize, sizing.MinDiskSize)
+	log.Debugf("Looking for machine with: %d cores, %f RAM, and %d Disk", sizing.MinCores, sizing.MinRAMSize, sizing.MinDiskSize)
 
 	for _, tpl := range tpls {
 		if tpl.Cores >= sizing.MinCores && (tpl.DiskSize == 0 || tpl.DiskSize >= sizing.MinDiskSize) && tpl.RAMSize >= sizing.MinRAMSize {
 			selectedTpls = append(selectedTpls, tpl)
 		} else {
-			// TODO GITHUB Move to debug later
-			log.Printf("Discard machine template '%s' with : %d cores, %f RAM, and %d Disk", tpl.Name, tpl.Cores, tpl.RAMSize, tpl.DiskSize)
+			log.Debugf("Discard machine template '%s' with : %d cores, %f RAM, and %d Disk", tpl.Name, tpl.Cores, tpl.RAMSize, tpl.DiskSize)
 		}
 	}
 	sort.Sort(ByRankDRF(selectedTpls))
