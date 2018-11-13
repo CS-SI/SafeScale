@@ -177,7 +177,7 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 	}
 
 	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
-	volume, volattach, err := service.Inspect(ref)
+	volume, err := service.Inspect(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -185,5 +185,5 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 		return nil, fmt.Errorf("cannot inspect volume: no volume '%s' found", ref)
 	}
 
-	return conv.ToPBVolumeInfo(volume, volattach), nil
+	return conv.ToPBVolumeInfo(volume, nil), nil
 }

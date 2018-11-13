@@ -18,7 +18,6 @@ package commands
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -27,10 +26,7 @@ import (
 
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
-	safeutils "github.com/CS-SI/SafeScale/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/nanobox-io/golang-scribble"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"os"
 )
@@ -43,14 +39,15 @@ import (
 // HostServiceServer host service server grpc
 type HostServiceServer struct{}
 
+// StoredCPUInfo ...
 type StoredCPUInfo struct {
-	Id      string `bow:"key"`
+	Id           string `bow:"key"`
 	TenantName   string `json:"tenant_name,omitempty"`
 	TemplateID   string `json:"template_id,omitempty"`
 	TemplateName string `json:"template_name,omitempty"`
-	ImageID   string `json:"image_id,omitempty"`
-	ImageName string `json:"image_name,omitempty"`
-	LastUpdated string `json:"last_updated,omitempty"`
+	ImageID      string `json:"image_id,omitempty"`
+	ImageName    string `json:"image_name,omitempty"`
+	LastUpdated  string `json:"last_updated,omitempty"`
 
 	NumberOfCPU    int     `json:"number_of_cpu,omitempty"`
 	NumberOfCore   int     `json:"number_of_core,omitempty"`

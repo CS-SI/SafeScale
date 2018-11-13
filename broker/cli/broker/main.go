@@ -17,16 +17,11 @@
 package main
 
 import (
-	"os"
 	"fmt"
+	"os"
 	"sort"
 
-	log "github.com/sirupsen/logrus"
-
 	cli "github.com/urfave/cli"
-
-	context "golang.org/x/net/context"
-	"google.golang.org/grpc"
 
 	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
 )

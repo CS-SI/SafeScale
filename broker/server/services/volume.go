@@ -28,25 +28,28 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/system/nfs"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
 //go:generate mockgen -destination=../mocks/mock_volumeapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services VolumeAPI
 
-//VolumeAPI defines API to manipulate hosts
+// VolumeAPI defines API to manipulate hosts
 type VolumeAPI interface {
 	Delete(ref string) error
 	Get(ref string) (*model.Volume, error)
-	Inspect(ref string) (*model.Volume, *model.VolumeAttachment, error)
+	Inspect(ref string) (*model.Volume, error)
 	List(all bool) ([]model.Volume, error)
 	Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error)
 	Attach(volume string, host string, path string, format string) error
 	Detach(volume string, host string) error
 }
 
-//VolumeService volume service
+// VolumeService volume service
 type VolumeService struct {
 	provider *providers.Service
 	sshSvc   SSHAPI
@@ -60,12 +63,12 @@ func NewVolumeService(api *providers.Service) VolumeAPI {
 	}
 }
 
-//List returns the network list
+// List returns the network list
 func (svc *VolumeService) List(all bool) ([]model.Volume, error) {
 	return svc.provider.ListVolumes(all)
 }
 
-//Delete deletes volume referenced by ref
+// Delete deletes volume referenced by ref
 func (svc *VolumeService) Delete(ref string) error {
 	vol, err := svc.Get(ref)
 	if err != nil {
@@ -77,39 +80,42 @@ func (svc *VolumeService) Delete(ref string) error {
 		return fmt.Errorf("Volume '%s' does not exist", ref)
 	}
 
+	vpAttachmentsV1 := propsv1.VolumeAttachments{}
+	err = vol.Properties.Get(VolumeProperty.AttachedV1, &vpAttachmentsV1)
+	if err != nil {
+		return err
+	}
+
+	if len(vpAttachmentsV1.HostIDs) > 0 {
+		return fmt.Errorf("can't delete volume '%s', still attached", ref)
+	}
 	return svc.provider.DeleteVolume(vol.ID)
 }
 
-//Get returns the volume identified by ref, ref can be the name or the id
+// Get returns the volume identified by ref, ref can be the name or the id
 func (svc *VolumeService) Get(ref string) (*model.Volume, error) {
-	m, err := metadata.LoadVolume(svc.provider, ref)
+	mv, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
-	if m == nil {
+	if mv == nil {
 		return nil, nil
 	}
-	return m.Get(), nil
+	return mv.Get(), nil
 }
 
-//Inspect returns the volume identified by ref and its attachment (if any)
-func (svc *VolumeService) Inspect(ref string) (*model.Volume, *model.VolumeAttachment, error) {
+// Inspect returns the volume identified by ref and its attachment (if any)
+func (svc *VolumeService) Inspect(ref string) (*model.Volume, error) {
 	mtdvol, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if mtdvol == nil {
-		return nil, nil, nil
+		return nil, nil
 	}
-
-	va, err := mtdvol.GetAttachment()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return mtdvol.Get(), va, nil
+	return mtdvol.Get(), nil
 }
 
 // Create a volume
@@ -156,7 +162,7 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 
 	volatt, err := svc.provider.CreateVolumeAttachment(model.VolumeAttachmentRequest{
 		Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
-		ServerID: host.ID,
+		HostID:   host.ID,
 		VolumeID: volume.ID,
 	})
 	if err != nil {
@@ -188,14 +194,14 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	// Updates volume attachment metadata
 	deviceName := newDisk.ToSlice()[0].(string)
 	volatt.Device = "/dev/" + deviceName
-	err = metadata.SaveVolumeAttachment(svc.provider, volatt)
-	if err != nil {
-		derr := svc.Detach(volumename, hostName)
-		if derr != nil {
-			log.Warnf("Failure trying to detach volume: %v", derr)
-		}
-		return fmt.Errorf("failed to update volume attachment: %s", err.Error())
-	}
+	// err = metadata.SaveVolumeAttachment(svc.provider, volatt)
+	// if err != nil {
+	// 	derr := svc.Detach(volumename, hostName)
+	// 	if derr != nil {
+	// 		log.Warnf("Failure trying to detach volume: %v", derr)
+	// 	}
+	// 	return fmt.Errorf("failed to update volume attachment: %s", err.Error())
+	// }
 
 	// Create mount point
 	mountPoint := path
@@ -285,28 +291,18 @@ func (svc *VolumeService) listAttachedDevices(host *model.Host) (mapset.Set, err
 
 // Detach detach the volume identified by ref, ref can be the name or the id
 func (svc *VolumeService) Detach(volumename string, hostName string) error {
-	vol, err := svc.Get(volumename)
+	mv, err := metadata.LoadVolume(svc.provider, volumename)
 	if err != nil {
 		return errors.Wrap(model.ResourceNotFoundError("volume", volumename), "Cannot detach volume")
 	}
+	volume := mv.Get()
 
 	// Get Host ID
-	hostService := NewHostService(svc.provider)
-	host, err := hostService.Get(hostName)
+	mh, err := metadata.LoadHost(svc.provider, hostName)
 	if err != nil {
 		return errors.Wrap(model.ResourceNotFoundError("host", hostName), "Cannot detach volume")
 	}
-
-	// providerVA, err := svc.provider.GetVolumeAttachment(host.ID, vol.ID)
-	// if err != nil {
-	// 	return fmt.Errorf("error getting volume attachment: %s", err)
-	// }
-	mdVA, err := metadata.LoadVolumeAttachment(svc.provider, host.ID, vol.ID)
-	if err != nil {
-		return fmt.Errorf("error getting volume attachment: %s", err)
-	}
-	volatt := mdVA.Get()
-
+	host := mh.Get()
 	sshConfig, err := svc.sshSvc.GetConfig(host.ID)
 	if err != nil {
 		tbr := errors.Wrap(err, "error getting ssh config")
@@ -314,19 +310,79 @@ func (svc *VolumeService) Detach(volumename string, hostName string) error {
 		return tbr
 	}
 
+	// Unmounts volume from host and updates Host property VolumesV1...
+	hpVolumesV1 := propsv1.HostVolumes{}
+	err = host.Properties.Get(HostProperty.VolumesV1, &hpVolumesV1)
+	if err != nil {
+		return err
+	}
+	// Unmount the Block Device (using nfs.Server...)
 	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
 		tbr := errors.Wrap(err, "error creating nfs service")
 		log.Errorf("%+v", tbr)
 		return tbr
 	}
-	err = server.UnmountBlockDevice(volatt.Device)
+
+	hpVolume, found := hpVolumesV1.VolumeByID[volume.ID]
+	if !found {
+		return fmt.Errorf("volume '%s' is not attached to host '%s'", volume.Name, host.Name)
+	}
+
+	err = server.UnmountBlockDevice(hpVolume.Device)
 	if err != nil {
 		tbr := errors.Wrap(err, "error unmounting block device")
 		log.Errorf("%+v", tbr)
 		return tbr
 	}
 
-	// Finaly delete the attachment
-	return svc.provider.DeleteVolumeAttachment(host.ID, vol.ID)
+	// Delete the attachment
+	err = svc.provider.DeleteVolumeAttachment(host.ID, volume.ID)
+	if err != nil {
+		return err
+	}
+
+	// Removes the volume from the host attachments
+	delete(hpVolumesV1.VolumeByID, hpVolume.ID)
+	delete(hpVolumesV1.VolumeByName, hpVolume.Name)
+	delete(hpVolumesV1.VolumeByDevice, hpVolume.Device)
+	delete(hpVolumesV1.DeviceByID, hpVolume.ID)
+
+	err = host.Properties.Set(HostProperty.VolumesV1, &hpVolumesV1)
+	if err != nil {
+		return err
+	}
+
+	// Updates Volume property propsv1.Attached
+	vpAttachedV1 := propsv1.VolumeAttachments{}
+	err = volume.Properties.Get(VolumeProperty.AttachedV1, &vpAttachedV1)
+	if err != nil {
+		return err
+	}
+
+	i := ""
+	k := 0
+	found = false
+	for k, i = range vpAttachedV1.HostIDs {
+		if i == host.ID {
+			found = true
+			break
+		}
+	}
+	if found {
+		vpAttachedV1.HostIDs = append(vpAttachedV1.HostIDs[:k], vpAttachedV1.HostIDs[k+1:]...)
+	}
+	// If not found, continue as if the job has be done... because it is done :-)
+
+	err = volume.Properties.Set(VolumeProperty.AttachedV1, &vpAttachedV1)
+	if err != nil {
+		return err
+	}
+
+	// Updates metadata
+	err = metadata.SaveHost(svc.provider, host)
+	if err != nil {
+		return err
+	}
+	return metadata.SaveVolume(svc.provider, volume)
 }
