@@ -51,6 +51,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 		TenantName: opts.ProjectName,
 		Region:     opts.Region,
 		FloatingIPPool: "external",
+		AllowReauth: true,
 	},
 		openstack.CfgOptions{
 			ProviderNetwork:           "external",
@@ -58,8 +59,8 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 			UseLayer3Networking:       true,
 			AutoHostNetworkInterfaces: true,
 			VolumeSpeeds: map[string]VolumeSpeed.Enum{
-				"standard":   VolumeSpeed.COLD,
-				"performant": VolumeSpeed.HDD,
+				"HDD":    VolumeSpeed.COLD,
+				"SSD": VolumeSpeed.HDD,
 			},
 			MetadataBucketName: api.BuildMetadataBucketName(opts.ProjectID),
 		},
