@@ -135,10 +135,10 @@ func (svc *ContainerService) Mount(containerName, hostName, path string) error {
 		S3Protocol: objStorageProtocol,
 	}
 
-	return exec("mount_object_storage.sh", data, host.ID, providers.FromClient(svc.provider))
+	return exec("mount_object_storage.sh", data, host.ID, svc.provider)
 }
 
-//UMount a container
+// UMount a container
 func (svc *ContainerService) UMount(containerName, hostName string) error {
 	// Check container existence
 	_, err := svc.Inspect(containerName)
@@ -161,5 +161,5 @@ func (svc *ContainerService) UMount(containerName, hostName string) error {
 		Container: containerName,
 	}
 
-	return exec("umount_object_storage.sh", data, host.ID, providers.FromClient(svc.provider))
+	return exec("umount_object_storage.sh", data, host.ID, svc.provider)
 }
