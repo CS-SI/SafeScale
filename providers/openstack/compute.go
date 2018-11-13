@@ -43,12 +43,12 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -77,7 +77,7 @@ func (client *Client) ListImages(all bool) ([]model.Image, error) {
 		}
 		return true, nil
 	})
-	if (len(imgList) == 0) || (err != nil){
+	if (len(imgList) == 0) || (err != nil) {
 		if err != nil {
 			log.Debugf("Error listing images: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing images: %s", ProviderErrorToString(err)))
@@ -114,13 +114,15 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 		return nil, errors.Wrap(err, fmt.Sprintf("error getting template: %s", ProviderErrorToString(err)))
 	}
 	return &model.HostTemplate{
-		HostSize: model.HostSize{
-			Cores:    flv.VCPUs,
-			RAMSize:  float32(flv.RAM) / 1000.0,
-			DiskSize: flv.Disk,
+		HostTemplate: propsv1.HostTemplate{
+			HostSize: propsv1.HostSize{
+				Cores:    flv.VCPUs,
+				RAMSize:  float32(flv.RAM) / 1000.0,
+				DiskSize: flv.Disk,
+			},
+			ID:   flv.ID,
+			Name: flv.Name,
 		},
-		ID:   flv.ID,
-		Name: flv.Name,
 	}, nil
 }
 
@@ -144,13 +146,15 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 		for _, flv := range flavorList {
 
 			flvList = append(flvList, model.HostTemplate{
-				HostSize: model.HostSize{
-					Cores:    flv.VCPUs,
-					RAMSize:  float32(flv.RAM) / 1000.0,
-					DiskSize: flv.Disk,
+				HostTemplate: propsv1.HostTemplate{
+					HostSize: propsv1.HostSize{
+						Cores:    flv.VCPUs,
+						RAMSize:  float32(flv.RAM) / 1000.0,
+						DiskSize: flv.Disk,
+					},
+					ID:   flv.ID,
+					Name: flv.Name,
 				},
-				ID:   flv.ID,
-				Name: flv.Name,
 			})
 
 		}
@@ -251,7 +255,7 @@ func (client *Client) DeleteKeyPair(id string) error {
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into mdel.Host
-func (client *Client) toHostSize(flavor map[string]interface{}) model.HostSize {
+func (client *Client) toHostSize(flavor map[string]interface{}) propsv1.HostSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
 		tpl, err := client.GetTemplate(fid)
@@ -260,13 +264,13 @@ func (client *Client) toHostSize(flavor map[string]interface{}) model.HostSize {
 		}
 	}
 	if _, ok := flavor["vcpus"]; ok {
-		return model.HostSize{
+		return propsv1.HostSize{
 			Cores:    flavor["vcpus"].(int),
 			DiskSize: flavor["disk"].(int),
 			RAMSize:  flavor["ram"].(float32) / 1000.0,
 		}
 	}
-	return model.HostSize{}
+	return propsv1.HostSize{}
 }
 
 // toHostState converts host status returned by OpenStack driver into HostState enum
@@ -339,59 +343,53 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 	if host.Name == "" {
 		host.Name = server.Name
 	}
-	if host.PublicIPv4 == "" {
-		host.PublicIPv4 = ipv4
-	}
-	if host.PublicIPv6 == "" {
-		host.PublicIPv6 = ipv6
-	}
+
 	host.LastState = toHostState(server.Status)
 
-	// Updates Host Extension DescriptionV1
-	heDescriptionV1 := model.HostExtensionDescriptionV1{}
-	// if host.Extensions.Lookup(HostExtension.SizingV1) {
-	err := host.Extensions.Get(HostExtension.DescriptionV1, &heDescriptionV1)
+	// Updates Host Property propsv1.HostDescription
+	hpDescriptionV1 := propsv1.BlankHostDescription
+	err := host.Properties.Get(HostProperty.DescriptionV1, &hpDescriptionV1)
 	if err != nil {
 		return err
 	}
-	// }
-	heDescriptionV1.Created = server.Created
-	heDescriptionV1.Updated = server.Updated
-	err = host.Extensions.Set(HostExtension.DescriptionV1, &heDescriptionV1)
-	if err != nil {
-		return err
-	}
-
-	// Updates Host Extension SizingV1
-	heSizingV1 := model.HostExtensionSizingV1{}
-	// if host.Extensions.Lookup(HostExtension.SizingV1) {
-	err = host.Extensions.Get(HostExtension.SizingV1, &heSizingV1)
-	if err != nil {
-		return err
-	}
-	// }
-	heSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
-	err = host.Extensions.Set(HostExtension.SizingV1, &heSizingV1)
+	hpDescriptionV1.Created = server.Created
+	hpDescriptionV1.Updated = server.Updated
+	err = host.Properties.Set(HostProperty.DescriptionV1, &hpDescriptionV1)
 	if err != nil {
 		return err
 	}
 
-	// Updates Host Extension NetworkV1
-	heNetworkV1 := model.HostExtensionNetworkV1{}
-	// if host.Extensions.Lookup(HostExtension.NetworkV1) {
-	err = host.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	// Updates Host Property propsv1.HostSizing
+	hpSizingV1 := propsv1.BlankHostSizing
+	err = host.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
 	if err != nil {
-		return nil
+		return err
 	}
-	// }
+	hpSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
+	err = host.Properties.Set(HostProperty.SizingV1, &hpSizingV1)
+	if err != nil {
+		return err
+	}
 
+	// Updates Host Property propsv1.HostNetwork
+	hpNetworkV1 := propsv1.BlankHostNetwork
+	err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	if err != nil {
+		return err
+	}
+	if hpNetworkV1.PublicIPv4 == "" {
+		hpNetworkV1.PublicIPv4 = ipv4
+	}
+	if hpNetworkV1.PublicIPv6 == "" {
+		hpNetworkV1.PublicIPv6 = ipv6
+	}
 	// networks contains network names, by HostExtensionNetworkV1.IPxAddresses has to be
 	// indexed on network ID. Tries to convert if possible, if we already have correspondance
 	// between network ID and network Name in Host definition
-	if len(heNetworkV1.NetworksByName) > 0 {
+	if len(hpNetworkV1.NetworksByName) > 0 {
 		ipv4Addresses := map[string]string{}
 		ipv6Addresses := map[string]string{}
-		for netname, netid := range heNetworkV1.NetworksByName {
+		for netname, netid := range hpNetworkV1.NetworksByName {
 			if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
 				ipv4Addresses[netid] = ip
 			} else if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
@@ -408,8 +406,8 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 				ipv6Addresses[netid] = ""
 			}
 		}
-		heNetworkV1.IPv4Addresses = ipv4Addresses
-		heNetworkV1.IPv6Addresses = ipv6Addresses
+		hpNetworkV1.IPv4Addresses = ipv4Addresses
+		hpNetworkV1.IPv6Addresses = ipv6Addresses
 	} else {
 		networksByName := map[string]string{}
 		ipv4Addresses := map[string]string{}
@@ -429,16 +427,13 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 				ipv6Addresses[netname] = ""
 			}
 		}
-		heNetworkV1.NetworksByName = networksByName
+		hpNetworkV1.NetworksByName = networksByName
 		// IPvxAddresses are here indexed by names... At least we have them...
-		heNetworkV1.IPv4Addresses = ipv4Addresses
-		heNetworkV1.IPv6Addresses = ipv6Addresses
+		hpNetworkV1.IPv4Addresses = ipv4Addresses
+		hpNetworkV1.IPv6Addresses = ipv6Addresses
 	}
-	err = host.Extensions.Set(HostExtension.NetworkV1, &heNetworkV1)
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
 }
 
 // userData is the structure to apply to userdata.sh template
@@ -599,9 +594,9 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: preparing user data"))
 	}
 
-	template, err := client.GetTemplate(request.TemplateID)
+	_, err = client.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get image: %s", ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to get image: %s", ProviderErrorToString(err))
 	}
 
 	// Create host
@@ -619,20 +614,20 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 	host := model.NewHost()
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 
-	heNetworkV1 := model.HostExtensionNetworkV1{}
+	hpNetworkV1 := propsv1.BlankHostNetwork
 
 	// Tells if the host is a gateway
-	heNetworkV1.IsGateway = isGateway
+	hpNetworkV1.IsGateway = isGateway
 
 	// Add gateway ID to Host definition
 	if defaultGateway != nil {
-		heNetworkV1.DefaultGatewayID = defaultGateway.ID
+		hpNetworkV1.DefaultGatewayID = defaultGateway.ID
 	}
 
 	// Adds default network information
-	heNetworkV1.DefaultNetworkID = defaultNetworkID
-	heNetworkV1.NetworksByID = map[string]string{defaultNetwork.ID: defaultNetwork.Name}
-	heNetworkV1.NetworksByName = map[string]string{defaultNetwork.Name: defaultNetwork.ID}
+	hpNetworkV1.DefaultNetworkID = defaultNetworkID
+	hpNetworkV1.NetworksByID = map[string]string{defaultNetwork.ID: defaultNetwork.Name}
+	hpNetworkV1.NetworksByName = map[string]string{defaultNetwork.Name: defaultNetwork.ID}
 
 	// Adds other network information to Host definition
 	for _, netID := range request.NetworkIDs {
@@ -645,23 +640,12 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 				return nil, fmt.Errorf("failed to load metadata of network '%s'", netID)
 			}
 			name := mn.Get().Name
-			heNetworkV1.NetworksByID[netID] = name
-			heNetworkV1.NetworksByName[name] = netID
+			hpNetworkV1.NetworksByID[netID] = name
+			hpNetworkV1.NetworksByName[name] = netID
 		}
 	}
-
 	// Updates Host Extension NetworkV1 in host instance
-	err = host.Extensions.Set(HostExtension.NetworkV1, &heNetworkV1)
-	if err != nil {
-		return nil, err
-	}
-
-	// Adds Host Extension SizingV1
-	err = host.Extensions.Set(HostExtension.SizingV1, &model.HostExtensionSizingV1{
-		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
-		Template:      request.TemplateID,
-		AllocatedSize: template.HostSize,
-	})
+	err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
 		return nil, err
 	}
@@ -731,12 +715,29 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 			return nil, errors.Wrap(err, fmt.Sprintf(msg))
 		}
 
+		err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+		if err != nil {
+			return nil, err
+		}
 		if IPVersion.IPv4.Is(ip.IP) {
-			host.PublicIPv4 = ip.IP
+			hpNetworkV1.PublicIPv4 = ip.IP
 		} else if IPVersion.IPv6.Is(ip.IP) {
-			host.PublicIPv6 = ip.IP
+			hpNetworkV1.PublicIPv6 = ip.IP
+		}
+		
+		// Updates Host Extension NetworkV1 in host instance
+		err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
+		if err != nil {
+			return nil, err
 		}
 	}
+
+	// Updates Host Extension NetworkV1 in host instance
+	err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
+	if err != nil {
+		return nil, err
+	}
+
 	log.Infoln(msgSuccess)
 
 	return host, nil
@@ -900,7 +901,7 @@ func (client *Client) listAllHosts() ([]*model.Host, error) {
 // listMonitoredHosts lists available hosts created by SafeScale (ie registered in object storage)
 func (client *Client) listMonitoredHosts() ([]*model.Host, error) {
 	var hosts []*model.Host
-	m := metadata.NewHost(providers.FromClient(client))
+	m := metadata.NewHost(client)
 	err := m.Browse(func(host *model.Host) error {
 		hosts = append(hosts, host)
 		return nil
@@ -1034,7 +1035,7 @@ func (client *Client) DeleteHost(ref string) error {
 		log.Debugf("failed to remove host '%s': %s", host.Name, err.Error())
 		return errors.Wrap(err, fmt.Sprintf("Error deleting host: retry error"))
 	}
-	return metadata.RemoveHost(providers.FromClient(client), host)
+	return metadata.RemoveHost(client, host)
 }
 
 // StopHost stops the host identified by id
@@ -1112,13 +1113,13 @@ func (client *Client) getSSHConfig(host *model.Host) (*system.SSHConfig, error) 
 		Host:       host.GetAccessIP(),
 		User:       model.DefaultUser,
 	}
-	heNetworkV1 := model.HostExtensionNetworkV1{}
-	err := host.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	hpNetworkV1 := propsv1.HostNetwork{}
+	err := host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
 		return nil, err
 	}
-	if heNetworkV1.DefaultGatewayID != "" {
-		mgw, err := metadata.LoadHost(client, heNetworkV1.DefaultGatewayID)
+	if hpNetworkV1.DefaultGatewayID != "" {
+		mgw, err := metadata.LoadHost(client, hpNetworkV1.DefaultGatewayID)
 		if err != nil {
 			log.Debugf("Error getting ssh config: getting host: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error getting ssh config: getting host"))

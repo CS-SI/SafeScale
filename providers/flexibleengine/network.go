@@ -26,13 +26,10 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers"
 	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkExtension"
 	"github.com/CS-SI/SafeScale/providers/openstack"
-
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 
@@ -207,9 +204,7 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	network.ID = subnet.ID
 	network.Name = subnet.Name
 	network.CIDR = subnet.CIDR
-	err = network.Extensions.Set(NetworkExtension.NetworkV1, &model.NetworkExtensionNetworkV1{
-		IPVersion: fromIntIPVersion(subnet.IPVersion),
-	})
+	network.IPVersion = fromIntIPVersion(subnet.IPVersion)
 	err = metadata.SaveNetwork(client, network)
 	if err != nil {
 		nerr := client.DeleteNetwork(subnet.ID)
@@ -266,12 +261,7 @@ func (client *Client) GetNetwork(ref string) (*model.Network, error) {
 		net.ID = subnet.ID
 		net.Name = subnet.Name
 		net.CIDR = subnet.CIDR
-		err = net.Extensions.Set(NetworkExtension.NetworkV1, &model.NetworkExtensionNetworkV1{
-			IPVersion: fromIntIPVersion(subnet.IPVersion),
-		})
-		if err != nil {
-			return nil, err
-		}
+		net.IPVersion = fromIntIPVersion(subnet.IPVersion)
 		return net, nil
 	}
 
@@ -310,9 +300,7 @@ func (client *Client) listAllNetworks() ([]*model.Network, error) {
 		net.ID = subnet.ID
 		net.Name = subnet.Name
 		net.CIDR = subnet.CIDR
-		err = net.Extensions.Set(NetworkExtension.NetworkV1, &model.NetworkExtensionNetworkV1{
-			IPVersion: fromIntIPVersion(subnet.IPVersion),
-		})
+		net.IPVersion = fromIntIPVersion(subnet.IPVersion)
 		networkList = append(networkList, net)
 	}
 	return networkList, nil
@@ -321,7 +309,7 @@ func (client *Client) listAllNetworks() ([]*model.Network, error) {
 // listMonitoredNetworks lists available networks created by SafeScale (ie those registered in object storage)
 func (client *Client) listMonitoredNetworks() ([]*model.Network, error) {
 	var netList []*model.Network
-	m := metadata.NewNetwork(providers.FromClient(client))
+	m := metadata.NewNetwork(client)
 	err := m.Browse(func(net *model.Network) error {
 		netList = append(netList, net)
 		return nil
@@ -343,12 +331,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 	}
 	network := mn.Get()
 	networkID := network.ID
-	neNetworkV1 := model.NetworkExtensionNetworkV1{}
-	err = network.Extensions.Get(NetworkExtension.NetworkV1, &neNetworkV1)
-	if err != nil {
-		return err
-	}
-	gwID := neNetworkV1.GatewayID
+	gwID := network.GatewayID
 
 	hosts, err := mn.ListHosts()
 	if err != nil {
@@ -714,7 +697,7 @@ func (client *Client) GetGateway(networkID string) (*model.Host, error) {
 
 // DeleteGateway deletes the gateway associated with network identified by ID
 func (client *Client) DeleteGateway(networkID string) error {
-	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
+	m, err := metadata.LoadGateway(client, networkID)
 	if err != nil {
 		return err
 	}

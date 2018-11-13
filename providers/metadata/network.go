@@ -24,7 +24,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkExtension"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 )
 
@@ -66,7 +65,9 @@ func (m *Network) Carry(network *model.Network) *Network {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-
+	if network.Properties != nil {
+		network.Properties = model.NewExtensions()
+	}
 	m.item.Carry(network)
 	m.id = &network.ID
 	m.name = &network.Name
@@ -494,16 +495,7 @@ func SaveGateway(svc api.ClientAPI, host *model.Host, networkID string) error {
 		return fmt.Errorf("metadata about the network '%s' doesn't exist anymore", networkID)
 	}
 	network := n.Get()
-	networkV1 := model.NetworkExtensionNetworkV1{}
-	err = network.Extensions.Get(NetworkExtension.NetworkV1, &networkV1)
-	if err != nil {
-		return err
-	}
-	networkV1.GatewayID = host.ID
-	err = network.Extensions.Set(NetworkExtension.NetworkV1, &networkV1)
-	if err != nil {
-		return err
-	}
+	network.GatewayID = host.ID
 	err = n.Write()
 	if err != nil {
 		return err

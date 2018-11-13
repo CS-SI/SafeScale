@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-package HostExtension
+package propertiesv1
 
-// Enum represents the type of additional info for an host
-type Enum string
-
-const (
-	// DescriptionV1 contains (optional) additional info describing host (purpose, ...)
-	DescriptionV1 = "1"
-	// NetworkV1 contains additional info about the network of the host
-	NetworkV1 = "2"
-	// SizingV1 contains additional info about the sizing of the host
-	SizingV1 = "3"
-	// FeaturesV1 contains optional additional info describing installed features on a host
-	FeaturesV1 = "4"
+import (
+	"time"
 )
+
+// NetworkDescription contains additional information describing the network, in V1
+// not FROZEN yet
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with needed supplemental fields
+type NetworkDescription struct {
+	Purpose string    `json:"purpose,omitempty"` // contains the purpose of this network
+	Created time.Time `json:"created,omitempty"` // Contains the date of creation if the network
+}
