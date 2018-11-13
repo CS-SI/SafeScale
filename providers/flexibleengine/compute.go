@@ -32,9 +32,10 @@ import (
 	filters "github.com/CS-SI/SafeScale/providers/filters/images"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
 
@@ -425,21 +426,30 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 	host := model.NewHost()
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 
-	heNetworkV1 := model.HostExtensionNetworkV1{}
-	heNetworkV1.IsGateway = isGateway
+	hpNetworkV1 := propsv1.HostNetwork{}
+	hpNetworkV1.IsGateway = isGateway
 
-	// Add gateway ID to Host definition
+	// Add gateway information to Host definition
+	defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
-		heNetworkV1.DefaultGatewayID = defaultGateway.ID
+		hpNetworkV1.DefaultGatewayID = defaultGateway.ID
+
+		hpGatewayNetworkV1 := propsv1.BlankHostNetwork
+		err = defaultGateway.Properties.Get(HostProperty.NetworkV1, &hpGatewayNetworkV1)
+		if err != nil {
+			return nil, err
+		}
+		defaultGatewayPrivateIP = hpGatewayNetworkV1.IPv4Addresses[defaultNetworkID]
+		if defaultGatewayPrivateIP == "" {
+			defaultGatewayPrivateIP = hpGatewayNetworkV1.IPv6Addresses[defaultNetworkID]
+		}
 	}
-	// } else {
-	// 	log.Debugf("There was a problem with gateway ID...")
-	// }
 
 	// Adds default network information
-	heNetworkV1.DefaultNetworkID = defaultNetworkID
-	heNetworkV1.NetworksByID = map[string]string{defaultNetwork.ID: defaultNetwork.Name}
-	heNetworkV1.NetworksByName = map[string]string{defaultNetwork.Name: defaultNetwork.ID}
+	hpNetworkV1.DefaultNetworkID = defaultNetworkID
+	hpNetworkV1.DefaultGatewayAccessIP = defaultGatewayPrivateIP
+	hpNetworkV1.NetworksByID = map[string]string{defaultNetwork.ID: defaultNetwork.Name}
+	hpNetworkV1.NetworksByName = map[string]string{defaultNetwork.Name: defaultNetwork.ID}
 
 	// Adds other network information to Host definition
 	for _, netID := range request.NetworkIDs {
@@ -452,19 +462,18 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 				return nil, fmt.Errorf("failed to load metadata of network '%s'", netID)
 			}
 			name := mn.Get().Name
-			heNetworkV1.NetworksByID[netID] = name
-			heNetworkV1.NetworksByName[name] = netID
+			hpNetworkV1.NetworksByID[netID] = name
+			hpNetworkV1.NetworksByName[name] = netID
 		}
 	}
-
 	// Updates Host Extension NetworkV1 in host instance
-	err = host.Extensions.Set(HostExtension.NetworkV1, &heNetworkV1)
+	err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
 		return nil, err
 	}
 
 	// Adds Host Extension SizingV1
-	err = host.Extensions.Set(HostExtension.SizingV1, &model.HostExtensionSizingV1{
+	err = host.Properties.Set(HostProperty.SizingV1, &propsv1.HostSizing{
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		Template:      request.TemplateID,
 		AllocatedSize: template.HostSize,
@@ -525,6 +534,17 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 			}
 			return nil, fmt.Errorf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 		}
+
+		err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+		if err != nil {
+			return nil, err
+		}
+		if IPVersion.IPv4.Is(fip.PublicIPAddress) {
+			hpNetworkV1.PublicIPv4 = fip.PublicIPAddress
+		} else if IPVersion.IPv6.Is(fip.PublicIPAddress) {
+			hpNetworkV1.PublicIPv6 = fip.PublicIPAddress
+		}
+
 		if isGateway {
 			err = client.enableHostRouterMode(host)
 			if err != nil {
@@ -538,6 +558,12 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 				}
 				return nil, fmt.Errorf("error enabling gateway mode of host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 			}
+		}
+
+		// Updates Host Extension NetworkV1 in host instance
+		err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -633,53 +659,53 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 	if host.Name == "" {
 		host.Name = server.Name
 	}
-	if host.PublicIPv4 == "" {
-		host.PublicIPv4 = ipv4
-	}
-	if host.PublicIPv6 == "" {
-		host.PublicIPv6 = ipv6
-	}
+
 	host.LastState = toHostState(server.Status)
 
-	// Updates Host Extension DescriptionV1
-	heDescriptionV1 := model.HostExtensionDescriptionV1{}
-	err = host.Extensions.Get(HostExtension.DescriptionV1, &heDescriptionV1)
+	// Updates Host Property propsv1.HostDescription
+	heDescriptionV1 := propsv1.HostDescription{}
+	err = host.Properties.Get(string(HostProperty.DescriptionV1), &heDescriptionV1)
 	if err != nil {
 		return err
 	}
 	heDescriptionV1.Created = server.Created
 	heDescriptionV1.Updated = server.Updated
-	err = host.Extensions.Set(HostExtension.DescriptionV1, &heDescriptionV1)
+	err = host.Properties.Set(string(HostProperty.DescriptionV1), &heDescriptionV1)
 	if err != nil {
 		return err
 	}
 
-	// Updates Host Extension SizingV1
-	heSizingV1 := model.HostExtensionSizingV1{}
-	err = host.Extensions.Get(HostExtension.SizingV1, &heSizingV1)
+	// Updates Host Property propsv1.HostSizing
+	heSizingV1 := propsv1.HostSizing{}
+	err = host.Properties.Get(HostProperty.SizingV1, &heSizingV1)
 	if err != nil {
 		return err
 	}
-	heSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
-	err = host.Extensions.Set(HostExtension.SizingV1, &heSizingV1)
+	heSizingV1.AllocatedSize = client.toHostSize(server.Flavor).HostSize
+	err = host.Properties.Set(HostProperty.SizingV1, &heSizingV1)
 	if err != nil {
 		return err
 	}
 
-	// Updates Host Extension NetworkV1
-	heNetworkV1 := model.HostExtensionNetworkV1{}
-	err = host.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	// Updates Host Property HostNetwork
+	hpNetworkV1 := propsv1.HostNetwork{}
+	err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
 		return nil
 	}
-
+	if hpNetworkV1.PublicIPv4 == "" {
+		hpNetworkV1.PublicIPv4 = ipv4
+	}
+	if hpNetworkV1.PublicIPv6 == "" {
+		hpNetworkV1.PublicIPv6 = ipv6
+	}
 	// networks contains network names, by HostExtensionNetworkV1.IPxAddresses has to be
 	// indexed on network ID. Tries to convert if possible, if we already have correspondance
 	// between network ID and network Name in Host definition
-	if len(heNetworkV1.NetworksByName) > 0 {
+	if len(hpNetworkV1.NetworksByName) > 0 {
 		ipv4Addresses := map[string]string{}
 		ipv6Addresses := map[string]string{}
-		for netname, netid := range heNetworkV1.NetworksByName {
+		for netname, netid := range hpNetworkV1.NetworksByName {
 			if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
 				ipv4Addresses[netid] = ip
 			} else if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
@@ -696,8 +722,8 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 				ipv6Addresses[netid] = ""
 			}
 		}
-		heNetworkV1.IPv4Addresses = ipv4Addresses
-		heNetworkV1.IPv6Addresses = ipv6Addresses
+		hpNetworkV1.IPv4Addresses = ipv4Addresses
+		hpNetworkV1.IPv6Addresses = ipv6Addresses
 	} else {
 		networksByName := map[string]string{}
 		ipv4Addresses := map[string]string{}
@@ -717,12 +743,12 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 				ipv6Addresses[netname] = ""
 			}
 		}
-		heNetworkV1.NetworksByName = networksByName
+		hpNetworkV1.NetworksByName = networksByName
 		// IPvxAddresses are here indexed by names... At least we have them...
-		heNetworkV1.IPv4Addresses = ipv4Addresses
-		heNetworkV1.IPv6Addresses = ipv6Addresses
+		hpNetworkV1.IPv4Addresses = ipv4Addresses
+		hpNetworkV1.IPv6Addresses = ipv6Addresses
 	}
-	err = host.Extensions.Set(HostExtension.NetworkV1, &heNetworkV1)
+	err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
 		return err
 	}
@@ -845,11 +871,12 @@ func (client *Client) DeleteHost(ref string) error {
 
 	host := m.Get()
 	id := host.ID
-	// Retrieve the list of attached volumes before deleting the host
-	volumeAttachments, err := client.ListVolumeAttachments(id)
-	if err != nil {
-		return err
-	}
+
+	// // Retrieve the list of attached volumes before deleting the host
+	// volumeAttachments, err := client.ListVolumeAttachments(id)
+	// if err != nil {
+	// 	return err
+	// }
 
 	err = client.oscltDeleteHost(id)
 	if err != nil {
@@ -860,17 +887,17 @@ func (client *Client) DeleteHost(ref string) error {
 		return err
 	}
 
-	// In FlexibleEngine, volumes may not be always automatically removed, so take care of them
-	for _, va := range volumeAttachments {
-		volume, err := client.GetVolume(va.VolumeID)
-		if err != nil {
-			continue
-		}
-		nerr := client.DeleteVolume(volume.ID)
-		if nerr != nil {
-			log.Warnf("Error deleting volume: %v", nerr)
-		}
-	}
+	// // In FlexibleEngine, volumes may not be always automatically removed, so take care of them
+	// for _, va := range volumeAttachments {
+	// 	volume, err := client.GetVolume(va.VolumeID)
+	// 	if err != nil {
+	// 		continue
+	// 	}
+	// 	nerr := client.DeleteVolume(volume.ID)
+	// 	if nerr != nil {
+	// 		log.Warnf("Failed to delete volume '%s': %v", volume.Name, nerr)
+	// 	}
+	// }
 
 	return err
 }
@@ -937,7 +964,7 @@ func (client *Client) oscltDeleteHost(id string) error {
 				switch innerRetryErr.(type) {
 				case retry.ErrTimeout:
 					// retry deletion...
-					return fmt.Errorf("host '%s' not deleted after %v!: %s", id, 1*time.Minute, err.Error())
+					return fmt.Errorf("host '%s' not deleted after %v", id, 1*time.Minute)
 				default:
 					return innerRetryErr
 				}
@@ -964,13 +991,13 @@ func (client *Client) getSSHConfig(host *model.Host) (*system.SSHConfig, error) 
 		Host:       host.GetAccessIP(),
 		User:       model.DefaultUser,
 	}
-	heNetworkV1 := model.HostExtensionNetworkV1{}
-	err := host.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	hpNetworkV1 := propsv1.HostNetwork{}
+	err := host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
 		return nil, err
 	}
-	if heNetworkV1.DefaultGatewayID != "" {
-		mgw, err := metadata.LoadHost(client, heNetworkV1.DefaultGatewayID)
+	if hpNetworkV1.DefaultGatewayID != "" {
+		mgw, err := metadata.LoadHost(client, hpNetworkV1.DefaultGatewayID)
 		if err != nil {
 			return nil, err
 		}
@@ -1053,19 +1080,7 @@ func (client *Client) attachFloatingIP(host *model.Host) (*FloatingIP, error) {
 		}
 		return nil, fmt.Errorf("failed to attach Floating IP to host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
-
-	updateAccessIPsOfHost(host, fip.PublicIPAddress)
-
 	return fip, nil
-}
-
-// updateAccessIPsOfHost updates the IP address(es) to use to access the host
-func updateAccessIPsOfHost(host *model.Host, ip string) {
-	if IPVersion.IPv4.Is(ip) {
-		host.PublicIPv4 = ip
-	} else if IPVersion.IPv6.Is(ip) {
-		host.PublicIPv6 = ip
-	}
 }
 
 // EnableHostRouterMode enables the host to act as a router/gateway.
@@ -1151,13 +1166,15 @@ func (client *Client) toHostSize(flavor map[string]interface{}) model.HostSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
 		tpl, _ := client.GetTemplate(fid)
-		return tpl.HostSize
+		return model.HostSize{HostSize: tpl.HostSize}
 	}
 	if _, ok := flavor["vcpus"]; ok {
 		return model.HostSize{
-			Cores:    flavor["vcpus"].(int),
-			DiskSize: flavor["disk"].(int),
-			RAMSize:  flavor["ram"].(float32) / 1000.0,
+			HostSize: propsv1.HostSize{
+				Cores:    flavor["vcpus"].(int),
+				DiskSize: flavor["disk"].(int),
+				RAMSize:  flavor["ram"].(float32) / 1000.0,
+			},
 		}
 	}
 	return model.HostSize{}
@@ -1215,14 +1232,14 @@ func toHostState(status string) HostState.Enum {
 // 		PrivateIPsV4: adresses[IPVersion.IPv4],
 // 		PrivateIPsV6: adresses[IPVersion.IPv6],
 // 	}
-// 	err := host.Extensions.Set(HostExtension.NetworkV1, &networkV1)
+// 	err := host.Properties.Set(HostProperty.NetworkV1, &networkV1)
 // 	if err != nil {
 // 		log.Errorf(err.Error())
 // 	}
 // 	sizingV1 := model.HostExtensionSizingV1{
 // 		AllocatedSize: client.toHostSize(server.Flavor),
 // 	}
-// 	err = host.Extensions.Set(HostExtension.SizingV1, &sizingV1)
+// 	err = host.Properties.Set(HostProperty.SizingV1, &sizingV1)
 // 	if err != nil {
 // 		log.Errorf(err.Error())
 // 	}
