@@ -576,7 +576,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		return 0, "", "", fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
 
-	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.port}} {{.Options}} {{if .IsUpload}}{{.LocalPath}} {{.User}}@{{.Host}}:{{.RemotePath}}{{else}}{{.User}}@{{.Host}}:{{.RemotePath}} {{.LocalPath}}{{end}}")
+	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}{{.LocalPath}} {{.User}}@{{.Host}}:{{.RemotePath}}{{else}}{{.User}}@{{.Host}}:{{.RemotePath}} {{.LocalPath}}{{end}}")
 	if err != nil {
 		return 0, "", "", fmt.Errorf("Error parsing command template: %s", err.Error())
 	}
@@ -605,6 +605,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	}
 
 	sshCmdString := copyCommand.String()
+	log.Debugf("Running ssh command: [%s]", sshCmdString)
 
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
