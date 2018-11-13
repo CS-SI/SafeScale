@@ -69,6 +69,8 @@ feature:
                                     sfRetry 5m 3 "sfWaitForApt && apt-get update"
                                     sfRetry 5m 3 "sfWaitForApt && apt-get install -qqy docker-ce jq"
                                     [ $? -ne 0 ] && exit 194
+                                    mkdir /etc/docker
+                                    echo -e "{\n\t\"iptables\": false\n}" > ~/daemon.json && mv ~/daemon.json /etc/docker/daemon.json
 
                                     systemctl enable docker
                                     systemctl start docker
@@ -77,6 +79,9 @@ feature:
                                     yum install -y yum-utils device-mapper-persistent-data lvm2 || exit 192
                                     yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || exit 193
                                     yum install -y docker-ce jq || exit 194
+                                    mkdir /etc/docker
+                                    echo -e "{\n\t\"iptables\": false\n}" > ~/daemon.json && mv ~/daemon.json /etc/docker/daemon.json
+
                                     systemctl enable docker
                                     systemctl start docker
                                     ;;
@@ -84,6 +89,9 @@ feature:
                                     dnf install -y dnf-plugins-core || exit 192
                                     dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo || exit 193
                                     dnf install -y docker-ce jq || exit 194
+                                    mkdir /etc/docker
+                                    echo -e "{\n\t\"iptables\": false\n}" > ~/daemon.json && mv ~/daemon.json /etc/docker/daemon.json
+
                                     systemctl enable docker
                                     systemctl start docker
                                     ;;
