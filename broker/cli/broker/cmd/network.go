@@ -48,7 +48,7 @@ var networkList = cli.Command{
 	Action: func(c *cli.Context) error {
 		networks, err := client.New().Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of networks", false))
+			return client.DecorateError(err, "list of networks", false)
 		}
 		out, _ := json.Marshal(networks.GetNetworks())
 		fmt.Println(string(out))
@@ -90,7 +90,7 @@ var networkInspect = cli.Command{
 		}
 		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of network", false))
+			return client.DecorateError(err, "inspection of network", false)
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))
@@ -155,7 +155,7 @@ var networkCreate = cli.Command{
 		}
 		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "creation of network", true))
+			return client.DecorateError(err, "creation of network", true)
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))

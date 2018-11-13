@@ -35,7 +35,7 @@ type nas struct {
 }
 
 // Create ...
-func (n *nas) Create(def pb.NasDefinition, timeout time.Duration) error {
+func (n *nas) Create(def pb.NasExportDefinition, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
@@ -66,7 +66,7 @@ func (n *nas) Delete(names []string, timeout time.Duration) error {
 		ctx, cancel := utils.GetContext(timeout)
 		defer cancel()
 		nasService := pb.NewNasServiceClient(conn)
-		_, err := nasService.Delete(ctx, &pb.NasName{Name: aname})
+		_, err := nasService.Delete(ctx, &pb.NasExportName{Name: aname})
 
 		if err != nil {
 			fmt.Printf("Error response from daemon : %v", DecorateError(err, "deletion of Nas", true))
@@ -79,14 +79,13 @@ func (n *nas) Delete(names []string, timeout time.Duration) error {
 	for _, target := range names {
 		go nasDeleter(target)
 	}
-
 	wg.Wait()
 
 	return nil
 }
 
 // List ...
-func (n *nas) List(timeout time.Duration) (*pb.NasList, error) {
+func (n *nas) List(timeout time.Duration) (*pb.NasExportList, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
@@ -99,7 +98,7 @@ func (n *nas) List(timeout time.Duration) (*pb.NasList, error) {
 }
 
 // Mount ...
-func (n *nas) Mount(nasName, hostName, mountPoint string, timeout time.Duration) error {
+func (n *nas) Mount(def pb.NasMountDefinition, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
@@ -108,18 +107,12 @@ func (n *nas) Mount(nasName, hostName, mountPoint string, timeout time.Duration)
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
 	service := pb.NewNasServiceClient(conn)
-	def := pb.NasDefinition{
-		Nas:  &pb.NasName{Name: nasName},
-		Host: &pb.Reference{Name: hostName},
-		Path: mountPoint,
-	}
-
 	_, err := service.Mount(ctx, &def)
 	return err
 }
 
 // Unmount ...
-func (n *nas) Unmount(nasName, hostName string, timeout time.Duration) error {
+func (n *nas) Unmount(def pb.NasMountDefinition, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
@@ -128,15 +121,12 @@ func (n *nas) Unmount(nasName, hostName string, timeout time.Duration) error {
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
 	service := pb.NewNasServiceClient(conn)
-	_, err := service.UMount(ctx, &pb.NasDefinition{
-		Nas:  &pb.NasName{Name: nasName},
-		Host: &pb.Reference{Name: hostName},
-	})
+	_, err := service.Unmount(ctx, &def)
 	return err
 }
 
 // Inspect ...
-func (n *nas) Inspect(name string, timeout time.Duration) (*pb.NasList, error) {
+func (n *nas) Inspect(name string, timeout time.Duration) (*pb.NasExportList, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
@@ -145,7 +135,5 @@ func (n *nas) Inspect(name string, timeout time.Duration) (*pb.NasList, error) {
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
 	service := pb.NewNasServiceClient(conn)
-	return service.Inspect(ctx, &pb.NasName{
-		Name: name,
-	})
+	return service.Inspect(ctx, &pb.NasExportName{Name: name})
 }

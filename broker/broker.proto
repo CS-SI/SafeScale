@@ -314,27 +314,35 @@ service SshService{
 //broker nas list
 //broker nas inspect nas1
 
-message NasName{
+message NasExportName{
     string Name = 1;
 }
 
-message NasDefinition{
+message NasExportDefinition{
     string ID = 1;
-    NasName Nas = 2;
+    NasExportName Name = 2;
     Reference Host = 3;
-    string path = 4;
-    bool isServer = 5;
+    string Path = 4;
+    string Type = 5;
+    string Acls = 6;
 }
 
-message NasList{
-    repeated NasDefinition nasList = 1;
+message NasExportList{
+    repeated NasExportDefinition ExportList = 1;
 }
 
+message NasMountDefinition{
+    Reference Host = 1;
+    NasExportName Name = 2;
+    string Path = 3;
+    string Type = 4;
+    string Options = 5;
+}
 service NasService{
-    rpc Create(NasDefinition) returns (NasDefinition){}
-    rpc Delete(NasName) returns (NasDefinition){}
-    rpc List(google.protobuf.Empty) returns (NasList){}
-    rpc Mount(NasDefinition) returns (NasDefinition){}
-    rpc UMount(NasDefinition) returns (NasDefinition){}
-    rpc Inspect(NasName) returns (NasList){}
+    rpc Create(NasExportDefinition) returns (NasExportDefinition){}
+    rpc Delete(NasExportName) returns (google.protobuf.Empty){}
+    rpc List(google.protobuf.Empty) returns (NasExportList){}
+    rpc Mount(NasMountDefinition) returns (NasMountDefinition){}
+    rpc Unmount(NasMountDefinition) returns (google.protobuf.Empty){}
+    rpc Inspect(NasExportName) returns (NasExportList){}
 }

@@ -27,7 +27,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 
@@ -87,13 +88,13 @@ func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 		Host:       host.GetAccessIP(),
 		User:       model.DefaultUser,
 	}
-	heNetworkV1 := model.HostExtensionNetworkV1{}
-	err := host.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	hpNetworkV1 := propsv1.BlankHostNetwork
+	err := host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
 		return nil, err
 	}
-	if heNetworkV1.DefaultGatewayID != "" {
-		mgw, err := metadata.LoadHost(svc.provider, heNetworkV1.DefaultGatewayID)
+	if hpNetworkV1.DefaultGatewayID != "" {
+		mgw, err := metadata.LoadHost(svc.provider, hpNetworkV1.DefaultGatewayID)
 		if err != nil {
 			return nil, err
 		}

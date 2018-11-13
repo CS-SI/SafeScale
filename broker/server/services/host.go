@@ -31,7 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/system"
 )
 
@@ -80,7 +81,10 @@ func (svc *HostService) Reboot(ref string) error {
 }
 
 // Create creates a host
-func (svc *HostService) Create(name string, net string, cpu int, ram float32, disk int, los string, public bool) (*model.Host, error) {
+func (svc *HostService) Create(
+	name string, net string, cpu int, ram float32, disk int, los string, public bool,
+) (*model.Host, error) {
+
 	log.Infof("Creating compute resource '%s' ...", name)
 	networks := []string{}
 	if len(net) != 0 {
@@ -133,18 +137,19 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		return nil, tbr
 	}
 
-	// Updates host extension SizingV1
-	sizingV1 := model.HostExtensionSizingV1{}
-	err = host.Extensions.Get(HostExtension.SizingV1, &sizingV1)
+	// Updates property propsv1.HostSizing
+	hpSizingV1 := propsv1.BlankHostSizing
+	err = host.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
 	if err != nil {
 		return nil, err
 	}
-	sizingV1.RequestedSize = model.HostSize{
+	hpSizingV1.Template = hostRequest.TemplateID
+	hpSizingV1.RequestedSize = propsv1.HostSize{
 		Cores:    cpu,
 		RAMSize:  ram,
 		DiskSize: disk,
 	}
-	err = host.Extensions.Set(HostExtension.SizingV1, &sizingV1)
+	err = host.Properties.Set(HostProperty.SizingV1, &hpSizingV1)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +168,7 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 	} else {
 		creator = "unknown@" + hostname
 	}
-	err = host.Extensions.Set(HostExtension.DescriptionV1, model.HostExtensionDescriptionV1{
+	err = host.Properties.Set(string(HostProperty.DescriptionV1), &propsv1.HostDescription{
 		Created: time.Now(),
 		Creator: creator,
 	})
@@ -175,14 +180,14 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		if err == nil {
 			gatewayID = mgw.Get().ID
 		}
-		heNetworkV1 := model.HostExtensionNetworkV1{}
-		err = host.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+		hpNetworkV1 := propsv1.BlankHostNetwork
+		err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 		if err != nil {
 			return nil, err
 		}
-		// networkV1.Networks = networks
-		heNetworkV1.DefaultGatewayID = gatewayID
-		err = host.Extensions.Set(HostExtension.NetworkV1, &heNetworkV1)
+		// hpNetworkV1.Networks = networks
+		hpNetworkV1.DefaultGatewayID = gatewayID
+		err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
 		if err != nil {
 			return nil, err
 		}
