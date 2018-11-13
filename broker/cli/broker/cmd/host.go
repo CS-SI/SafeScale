@@ -19,6 +19,10 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/deploy/install"
+	"github.com/CS-SI/SafeScale/deploy/cli/enums/ExitCode"
+	"log"
+	"strings"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
@@ -220,13 +224,24 @@ var hostCreate = cli.Command{
 			Name:  "force",
 			Usage: "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
 		},
+		//TODO list available features
+		cli.StringFlag{
+			Name:  "features",
+			Usage: "Add one or several feature on your host : feature1|feature2|feature3",
+		},
 	},
 	Action: func(c *cli.Context) error {
+		mapFeatureNames := map[string]string{
+			"docker": "docker",
+			"nvidia": "nvidiadocker",
+		}
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("host and network name are required")
 		}
+		hostName := c.Args().Get(1)
+
 		def := pb.HostDefinition{
 			Name:      c.Args().First(),
 			CPUNumber: int32(c.Int("cpu")),
@@ -242,6 +257,36 @@ var hostCreate = cli.Command{
 		resp, err := client.New(c.GlobalInt("port")).Host.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "creation of host", true))
+		}
+
+		if c.IsSet("features") {
+			features := strings.Split(c.String("features"), "|")
+			for _, feature := range features {
+				featureName := mapFeatureNames[feature]
+				feature, err := install.NewFeature(featureName)
+				if err != nil {
+					log.Printf("Failed to instanciate feature '%s'\n", featureName)
+					return err
+				}
+				target := install.NewHostTarget(resp)
+				settings := install.Settings{}
+				settings.SkipProxy = c.Bool("skip-proxy")
+				results, err := feature.Add(c.GlobalInt("port"), target, install.Variables{}, install.Settings{})
+				if err != nil {
+					msg := fmt.Sprintf("Error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
+					return cli.NewExitError(msg, int(ExitCode.RPC))
+				}
+				if !results.Successful() {
+					msg := fmt.Sprintf("Failed to add feature '%s' on host '%s'", featureName, hostName)
+					//Debug
+					if true {
+						msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+					}
+					return cli.NewExitError(msg, int(ExitCode.RPC))
+				}
+
+				fmt.Printf("Feature '%s' added successfully on host '%s'\n", featureName, hostName)
+			}
 		}
 
 		out, _ := json.Marshal(resp)
