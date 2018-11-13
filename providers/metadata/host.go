@@ -23,7 +23,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 )
 
@@ -51,7 +52,9 @@ func (m *Host) Carry(host *model.Host) *Host {
 	if host == nil {
 		panic("host is nil!")
 	}
-
+	if host.Properties == nil {
+		host.Properties = model.NewExtensions()
+	}
 	m.item.Carry(host)
 	m.name = &host.Name
 	m.id = &host.ID
@@ -167,13 +170,13 @@ func SaveHost(svc api.ClientAPI, host *model.Host) error {
 	if err != nil {
 		return err
 	}
-	heNetworkV1 := model.HostExtensionNetworkV1{}
-	err = host.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	hpNetworkV1 := propsv1.BlankHostNetwork
+	err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
 		return err
 	}
 	mn := NewNetwork(svc)
-	for netID := range heNetworkV1.NetworksByID {
+	for netID := range hpNetworkV1.NetworksByID {
 		found, err := mn.ReadByID(netID)
 		if err != nil {
 			return err

@@ -33,7 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkExtension"
 )
 
 //RouterRequest represents a router request
@@ -103,9 +102,7 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	net.ID = network.ID
 	net.Name = network.Name
 	net.CIDR = sn.Mask
-	err = net.Extensions.Set(NetworkExtension.NetworkV1, &model.NetworkExtensionNetworkV1{
-		IPVersion: sn.IPVersion,
-	})
+	net.IPVersion = sn.IPVersion
 	if err != nil {
 		log.Debugf("Error creating network: subnetwork save metadata: %+v", err)
 		nerr := client.DeleteNetwork(network.ID)
@@ -155,13 +152,8 @@ func (client *Client) GetNetwork(ref string) (*model.Network, error) {
 		net.ID = network.ID
 		net.Name = network.Name
 		net.CIDR = sn.Mask
-		err = net.Extensions.Set(NetworkExtension.NetworkV1, &model.NetworkExtensionNetworkV1{
-			IPVersion: sn.IPVersion,
-			// GatewayID: network.GatewayId,
-		})
-		if err != nil {
-			return nil, err
-		}
+		net.IPVersion = sn.IPVersion
+		//net.GatewayID = network.GatewayId
 		return net, nil
 	}
 
@@ -225,13 +217,8 @@ func (client *Client) listAllNetworks() ([]*model.Network, error) {
 			net.ID = n.ID
 			net.Name = n.Name
 			net.CIDR = sn.Mask
-			err = net.Extensions.Set(NetworkExtension.NetworkV1, &model.NetworkExtensionNetworkV1{
-				IPVersion: sn.IPVersion,
-				// GatewayID: gwID,
-			})
-			if err != nil {
-				return false, err
-			}
+			net.IPVersion = sn.IPVersion
+			// GatewayID: gwID,
 			netList = append(netList, net)
 		}
 		return true, nil
@@ -240,9 +227,8 @@ func (client *Client) listAllNetworks() ([]*model.Network, error) {
 		if err != nil {
 			log.Debugf("Error listing networks: pagination error: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing networks: %s", ProviderErrorToString(err)))
-		} else {
-			log.Debugf("Listing all networks: Empty network list !")
 		}
+		log.Debugf("Listing all networks: Empty network list !")
 	}
 	return netList, nil
 }
@@ -275,9 +261,8 @@ func (client *Client) listMonitoredNetworks() ([]*model.Network, error) {
 		if err != nil {
 			log.Debugf("Error listing monitored networks: pagination error: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing monitored networks: %s", ProviderErrorToString(err)))
-		} else {
-			log.Debugf("Listing monitored networks: Empty network list !")
 		}
+		log.Debugf("Listing monitored networks: Empty network list !")
 	}
 
 	return netList, err
@@ -305,12 +290,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		}
 	}
 
-	neNetworkV1 := model.NetworkExtensionNetworkV1{}
-	err = network.Extensions.Get(NetworkExtension.NetworkV1, &neNetworkV1)
-	if err != nil {
-		return fmt.Errorf("failed to get gateway ID of network '%s' in metadata", networkRef)
-	}
-	gwID := neNetworkV1.GatewayID
+	gwID := network.GatewayID
 
 	hosts, err := mn.ListHosts()
 	if err != nil {
@@ -583,9 +563,8 @@ func (client *Client) ListSubnets(netID string) ([]Subnet, error) {
 		if paginationErr != nil {
 			log.Debugf("Error listing subnets: pagination error: %+v", paginationErr)
 			return nil, errors.Wrap(paginationErr, fmt.Sprintf("We have a pagination error !: %v", paginationErr))
-		} else {
-			log.Debugf("Listing subnets: Empty subnet list !")
 		}
+		log.Debugf("Listing subnets: Empty subnet list !")
 	}
 
 	return subnetList, nil

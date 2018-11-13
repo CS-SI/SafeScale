@@ -534,7 +534,6 @@ func SimilarityScore(ref string, s string) float64 {
 // InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
 // id contains a unique identifier of the tenant (something coming from the provider, not the tenant name)
 func InitializeBucket(svc api.ClientAPI) error {
-	//	svc := providers.FromClient(client)
 	cfg, err := svc.GetCfgOpts()
 	if err != nil {
 		fmt.Printf("failed to get client options: %s\n", err.Error())

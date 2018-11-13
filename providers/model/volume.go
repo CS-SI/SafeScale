@@ -17,8 +17,6 @@
 package model
 
 import (
-	"time"
-
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 )
@@ -30,15 +28,6 @@ type VolumeRequest struct {
 	Speed VolumeSpeed.Enum `json:"speed,omitempty"`
 }
 
-// VolumeExtensionDescriptionV1 contains additional information describing the volume, in V1
-// not FROZEN yet
-// Note: if tagged as FROZEN, must not be changed ever.
-//       Create a new version instead with needed supplemental fields
-type VolumeExtensionDescriptionV1 struct {
-	Purpose  string
-	Creation time.Time
-}
-
 // Volume represents a block volume
 type Volume struct {
 	ID    string           `json:"id,omitempty"`
@@ -46,14 +35,14 @@ type Volume struct {
 	Size  int              `json:"size,omitempty"`
 	Speed VolumeSpeed.Enum `json:"speed,omitempty"`
 	State VolumeState.Enum `json:"state,omitempty"`
-	// Extensions contains optional supplemental information (cf. metadata.Extensions)
-	Extensions *Extensions `json:"extensions,omitempty"`
+	// Properties contains optional supplemental information
+	Properties *Extensions `json:"extensions,omitempty"`
 }
 
 // NewVolume ...
 func NewVolume() *Volume {
 	return &Volume{
-		Extensions: NewExtensions(),
+		Properties: NewExtensions(),
 	}
 }
 
@@ -64,14 +53,21 @@ func (v *Volume) Serialize() ([]byte, error) {
 
 // Deserialize reads json code and restores an Host
 func (v *Volume) Deserialize(buf []byte) error {
-	return DeserializeFromJSON(buf, v)
+	err := DeserializeFromJSON(buf, v)
+	if err != nil {
+		return err
+	}
+	if v.Properties == nil {
+		v.Properties = NewExtensions()
+	}
+	return nil
 }
 
 // VolumeAttachmentRequest represents a volume attachment request
 type VolumeAttachmentRequest struct {
 	Name     string `json:"name,omitempty"`
-	VolumeID string `json:"volume,omitempty"`
-	ServerID string `json:"host,omitempty"`
+	VolumeID string `json:"volume_id,omitempty"`
+	HostID   string `json:"host_id,omitempty"`
 }
 
 // VolumeAttachment represents a volume attachment
@@ -85,12 +81,12 @@ type VolumeAttachment struct {
 	Format     string `json:"format,omitempty"`
 }
 
-// Serialize serializes Host instance into bytes (output json code)
-func (va *VolumeAttachment) Serialize() ([]byte, error) {
-	return SerializeToJSON(va)
-}
+// // Serialize serializes Host instance into bytes (output json code)
+// func (va *VolumeAttachment) Serialize() ([]byte, error) {
+// 	return SerializeToJSON(va)
+// }
 
-// Deserialize reads json code and restores a VolumeAttachment
-func (va *VolumeAttachment) Deserialize(buf []byte) error {
-	return DeserializeFromJSON(buf, va)
-}
+// // Deserialize reads json code and restores a VolumeAttachment
+// func (va *VolumeAttachment) Deserialize(buf []byte) error {
+// 	return DeserializeFromJSON(buf, va)
+// }
