@@ -58,14 +58,14 @@ var nasCreate = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas and Host name required")
 		}
-		def := pb.NasDefinition{
-			Nas:  &pb.NasName{Name: c.Args().Get(0)},
+		def := pb.NasExportDefinition{
+			Name: &pb.NasExportName{Name: c.Args().Get(0)},
 			Host: &pb.Reference{Name: c.Args().Get(1)},
 			Path: c.String("path"),
 		}
 		err := client.New().Nas.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "creation of nas", true))
+			return client.DecorateError(err, "creation of nas", true)
 		}
 
 		return nil
@@ -97,11 +97,11 @@ var nasList = cli.Command{
 	Name:  "list",
 	Usage: "List all created nas",
 	Action: func(c *cli.Context) error {
-		nass, err := client.New().Nas.List(0)
+		nases, err := client.New().Nas.List(0)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "list of nas", false))
 		}
-		out, _ := json.Marshal(nass.GetNasList())
+		out, _ := json.Marshal(nases)
 		fmt.Println(string(out))
 
 		return nil
@@ -125,7 +125,13 @@ var nasMount = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas and Host name required")
 		}
-		err := client.New().Nas.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
+		def := pb.NasMountDefinition{
+			Host: &pb.Reference{Name: c.Args().Get(1)},
+			Name: &pb.NasExportName{Name: c.Args().Get(1)},
+			Path: c.String("path"),
+			Type: "nfs",
+		}
+		err := client.New().Nas.Mount(def, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "mount of nas", true))
 		}
@@ -143,7 +149,11 @@ var nasUnmount = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas and Host name required")
 		}
-		err := client.New().Nas.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
+		def := pb.NasMountDefinition{
+			Host: &pb.Reference{Name: c.Args().Get(1)},
+			Name: &pb.NasExportName{Name: c.Args().Get(0)},
+		}
+		err := client.New().Nas.Unmount(def, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "unmount of nas", true))
 		}
@@ -162,11 +172,11 @@ var nasInspect = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("Nas name required")
 		}
-		nass, err := client.New().Nas.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
+		export, err := client.New().Nas.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "inspection of nas", false))
 		}
-		out, _ := json.Marshal(nass.GetNasList())
+		out, _ := json.Marshal(export)
 		fmt.Println(string(out))
 
 		return nil

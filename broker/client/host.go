@@ -149,7 +149,7 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
 
 		if err != nil {
-			fmt.Printf("Error response from daemon : %v", DecorateError(err, "deletion of host", true))
+			fmt.Printf("%v\n", DecorateError(err, "deletion of host", true))
 		} else {
 			fmt.Printf("Host '%s' deleted\n", aname)
 		}

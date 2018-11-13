@@ -28,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkExtension"
 )
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services NetworkAPI
@@ -57,7 +56,7 @@ func NewNetworkService(api *providers.Service) NetworkAPI {
 // Create creates a network
 func (svc *NetworkService) Create(
 	net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string,
-) (apinetwork *model.Network, err error) {
+) (*model.Network, error) {
 
 	// Verify that the network doesn't exist first
 	if exists, err := svc.provider.GetNetwork(net); exists != nil && err == nil {
@@ -175,33 +174,27 @@ func (svc *NetworkService) Create(
 	log.Printf("SSH service of gateway '%s' started.", gw.Name)
 
 	// Gateway is ready to work, update Network metadata
-	rv, err := svc.Get(net)
-	if err != nil {
-		tbr := errors.Wrap(err, "Error getting network before metadata update")
-		log.Errorf("%+v", tbr)
-		return nil, tbr
-	}
-	if rv != nil {
-		networkV1 := model.NetworkExtensionNetworkV1{}
-		err = rv.Extensions.Get(NetworkExtension.NetworkV1, &networkV1)
-		if err != nil {
-			return nil, err
-		}
-		networkV1.GatewayID = gw.ID
-		err = rv.Extensions.Set(NetworkExtension.NetworkV1, &networkV1)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update gateway id of network '%s': %v", net, err)
-		}
-	}
+	// rv, err := svc.Get(net)
+	// if err != nil {
+	// 	tbr := errors.Wrap(err, "Error getting network before metadata update")
+	// 	log.Errorf("%+v", tbr)
+	// 	return nil, tbr
+	// }
+	// if rv != nil {
+	// 	rv.GatewayID = gw.ID
+	// }
+	network.GatewayID = gw.ID
 
-	err = metadata.SaveNetwork(svc.provider, rv)
+	//	err = metadata.SaveNetwork(svc.provider, rv)
+	err = metadata.SaveNetwork(svc.provider, network)
 	if err != nil {
 		tbr := errors.Wrap(err, "Error creating network: Error saving network metadata")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
-	return rv, err
+	//	return rv, err
+	return network, err
 }
 
 // List returns the network list

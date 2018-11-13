@@ -114,7 +114,7 @@ func (s *TenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*goog
 
 	clientAPI, err := providers.GetService(in.GetName())
 	if err != nil {
-		return nil, fmt.Errorf("Unable to set tenant '%s': %s", in.GetName(), err.Error())
+		return &google_protobuf.Empty{}, fmt.Errorf("Unable to set tenant '%s': %s", in.GetName(), err.Error())
 	}
 	currentTenant = &Tenant{name: in.GetName(), Client: clientAPI}
 	log.Printf("Current tenant is now '%s'", in.GetName())

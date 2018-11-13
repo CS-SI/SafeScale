@@ -18,7 +18,6 @@ package commands
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -26,10 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/broker/utils"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
-	safeutils "github.com/CS-SI/SafeScale/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/nanobox-io/golang-scribble"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -41,14 +37,15 @@ import (
 // HostServiceServer host service server grpc
 type HostServiceServer struct{}
 
+// StoredCPUInfo ...
 type StoredCPUInfo struct {
-	Id      string `bow:"key"`
+	Id           string `bow:"key"`
 	TenantName   string `json:"tenant_name,omitempty"`
 	TemplateID   string `json:"template_id,omitempty"`
 	TemplateName string `json:"template_name,omitempty"`
-	ImageID   string `json:"image_id,omitempty"`
-	ImageName string `json:"image_name,omitempty"`
-	LastUpdated string `json:"last_updated,omitempty"`
+	ImageID      string `json:"image_id,omitempty"`
+	ImageName    string `json:"image_name,omitempty"`
+	LastUpdated  string `json:"last_updated,omitempty"`
 
 	NumberOfCPU    int     `json:"number_of_cpu,omitempty"`
 	NumberOfCore   int     `json:"number_of_core,omitempty"`
@@ -157,47 +154,47 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 
 	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 
-	db, err := scribble.New(safeutils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// db, err := scribble.New(safeutils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	image_list, err := db.ReadAll("images")
-	if err != nil {
-		fmt.Println("Error", err)
-	}
+	// imageList, err := db.ReadAll("images")
+	// if err != nil {
+	// 	fmt.Println("Error", err)
+	// }
 
-	if in.GetGPUNumber() > 0 && in.GetFreq() != 0 {
-		if !in.Force && (len(image_list) == 0) {
-			noScannerDb := fmt.Sprintf("No scanner database available !. Run scanner to create one.")
-			log.Error(noScannerDb)
-			return nil, errors.New(noScannerDb)
-		}
-	}
+	// if in.GetGPUNumber() > 0 && in.GetFreq() != 0 {
+	// 	if !in.Force && (len(imageList) == 0) {
+	// 		noScannerDb := fmt.Sprintf("No scanner database available! Run scanner to create one.")
+	// 		log.Error(noScannerDb)
+	// 		return nil, errors.New(noScannerDb)
+	// 	}
+	// }
 
-	images := []StoredCPUInfo{}
-	for _, f := range image_list {
-		imageFound := StoredCPUInfo{}
-		if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
-			fmt.Println("Error", err)
-		}
+	// images := []StoredCPUInfo{}
+	// for _, f := range imageList {
+	// 	imageFound := StoredCPUInfo{}
+	// 	if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
+	// 		fmt.Println("Error", err)
+	// 	}
 
-		if imageFound.GPU < int(in.GetGPUNumber()) {
-			continue
-		}
+	// 	if imageFound.GPU < int(in.GetGPUNumber()) {
+	// 		continue
+	// 	}
 
-		if imageFound.CPUFrequency < float64(in.GetFreq()) {
-			continue
-		}
+	// 	if imageFound.CPUFrequency < float64(in.GetFreq()) {
+	// 		continue
+	// 	}
 
-		images = append(images, imageFound)
-	}
+	// 	images = append(images, imageFound)
+	// }
 
-	if !in.Force && (len(images) == 0) {
-		noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !", in.GetGPUNumber(), in.GetFreq())
-		log.Error(noHostError)
-		return nil, errors.New(noHostError)
-	}
+	// if !in.Force && (len(images) == 0) {
+	// 	noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !", in.GetGPUNumber(), in.GetFreq())
+	// 	log.Error(noHostError)
+	// 	return nil, errors.New(noHostError)
+	// }
 
 	// TODO https://github.com/CS-SI/SafeScale/issues/30
 	// TODO GITHUB If we have to ask for GPU requirements and FREQ requirements, pb.HostDefinition has to change and the invocation of hostService.Create too...

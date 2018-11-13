@@ -21,8 +21,8 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostExtension"
-	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkExtension"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/system"
 )
 
@@ -76,26 +76,37 @@ func ToPBVolumeAttachment(in *model.VolumeAttachment) *pb.VolumeAttachment {
 	}
 }
 
-// ToPBVolumeInfo merges and converts an api.Volume and an api.VolumeAttachment to a *VolumeInfo
-func ToPBVolumeInfo(volume *model.Volume, volumeAttch *model.VolumeAttachment) *pb.VolumeInfo {
-	if volumeAttch != nil {
-		return &pb.VolumeInfo{
-			ID:        volume.ID,
-			Name:      volume.Name,
-			Size:      int32(volume.Size),
-			Speed:     pb.VolumeSpeed(volume.Speed),
-			Host:      &pb.Reference{ID: volumeAttch.ServerID},
-			MountPath: volumeAttch.MountPoint,
-			Device:    volumeAttch.Device,
-			Format:    volumeAttch.Format,
-		}
-	}
-	return &pb.VolumeInfo{
+// ToPBVolumeInfo converts an api.Volume to a *VolumeInfo
+func ToPBVolumeInfo(volume *model.Volume, host *model.Host) *pb.VolumeInfo {
+	pbvi := &pb.VolumeInfo{
 		ID:    volume.ID,
 		Name:  volume.Name,
 		Size:  int32(volume.Size),
 		Speed: pb.VolumeSpeed(volume.Speed),
 	}
+	if host != nil {
+		pbvi.Host = &pb.Reference{ID: host.ID}
+		hpVolumesV1 := propsv1.BlankHostVolumes
+		err := host.Properties.Get(HostProperty.VolumesV1, &hpVolumesV1)
+		if err != nil {
+			log.Errorf("error occured during convertion to protobuf: %s", err.Error())
+			return nil
+		}
+
+		if device, ok := hpVolumesV1.DeviceByID[volume.ID]; ok {
+			mounts := propsv1.BlankHostMounts
+			err := host.Properties.Get(HostProperty.MountsV1, &mounts)
+			if err != nil {
+				log.Errorf("error occured during convertion to protobuf: %s", err.Error())
+				return nil
+			}
+			mount := mounts.MountsByPath[mounts.MountsByDevice[device]]
+			pbvi.Device = device
+			pbvi.MountPath = mount.Path
+			pbvi.Format = mount.FileSystem
+		}
+	}
+	return pbvi
 }
 
 // ToPBContainerList convert a list of string into a *ContainerLsit
@@ -119,39 +130,49 @@ func ToPBContainerMountPoint(in *model.ContainerInfo) *pb.ContainerMountingPoint
 	}
 }
 
-// ToPBNas convert a Nas from api to protocolbuffer format
-func ToPBNas(in *model.Nas) *pb.NasDefinition {
-	return &pb.NasDefinition{
-		ID:       in.ID,
-		Nas:      &pb.NasName{Name: in.Name},
-		Host:     &pb.Reference{Name: in.Host},
-		Path:     in.Path,
-		IsServer: in.IsServer,
+// ToPBNasExport convert an export from api to protocolbuffer format
+func ToPBNasExport(hostName string, export propsv1.HostExport) *pb.NasExportDefinition {
+	return &pb.NasExportDefinition{
+		ID:   export.ID,
+		Name: &pb.NasExportName{Name: export.Name},
+		Host: &pb.Reference{Name: hostName},
+		Path: export.Path,
+		Type: "nfs",
+	}
+}
+
+// ToPBNasMount convert a host mount to protocolbuffer format
+func ToPBNasMount(exportName string, hostName string, mount *propsv1.HostMount) *pb.NasMountDefinition {
+	return &pb.NasMountDefinition{
+		Name: &pb.NasExportName{Name: exportName},
+		Host: &pb.Reference{Name: hostName},
+		Path: mount.Path,
+		Type: "nfs",
 	}
 }
 
 // ToPBHost convert an host from api to protocolbuffer format
 func ToPBHost(in *model.Host) *pb.Host {
-	heNetworkV1 := model.HostExtensionNetworkV1{}
-	err := in.Extensions.Get(HostExtension.NetworkV1, &heNetworkV1)
+	hpNetworkV1 := propsv1.BlankHostNetwork
+	err := in.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
 		return nil
 	}
-	heSizingV1 := model.HostExtensionSizingV1{}
-	err = in.Extensions.Get(HostExtension.SizingV1, &heSizingV1)
+	hpSizingV1 := propsv1.BlankHostSizing
+	err = in.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
 	if err != nil {
 		return nil
 	}
 	return &pb.Host{
-		CPU:        int32(heSizingV1.AllocatedSize.Cores),
-		Disk:       int32(heSizingV1.AllocatedSize.DiskSize),
-		GatewayID:  heNetworkV1.DefaultGatewayID,
+		CPU:        int32(hpSizingV1.AllocatedSize.Cores),
+		Disk:       int32(hpSizingV1.AllocatedSize.DiskSize),
+		GatewayID:  hpNetworkV1.DefaultGatewayID,
 		ID:         in.ID,
 		PublicIP:   in.GetPublicIP(),
 		PrivateIP:  in.GetPrivateIP(),
 		Name:       in.Name,
 		PrivateKey: in.PrivateKey,
-		RAM:        heSizingV1.AllocatedSize.RAMSize,
+		RAM:        hpSizingV1.AllocatedSize.RAMSize,
 		State:      pb.HostState(in.LastState),
 	}
 }
@@ -187,16 +208,10 @@ func ToPBImage(in *model.Image) *pb.Image {
 
 //ToPBNetwork convert a network from api to protocolbuffer format
 func ToPBNetwork(in *model.Network) *pb.Network {
-	networkV1 := model.NetworkExtensionNetworkV1{}
-	err := in.Extensions.Get(NetworkExtension.NetworkV1, &networkV1)
-	if err != nil {
-		log.Errorf(err.Error())
-		return nil
-	}
 	return &pb.Network{
 		ID:        in.ID,
 		Name:      in.Name,
 		CIDR:      in.CIDR,
-		GatewayID: networkV1.GatewayID,
+		GatewayID: in.GatewayID,
 	}
 }
