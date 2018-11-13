@@ -89,9 +89,11 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		func() error {
 			retcode, _, stderr, err := sshconfig.Copy(filename, f.Name(), true)
 			if err != nil {
+				log.Errorf("Ssh operation failed: %s", err.Error())
 				return err
 			}
 			if retcode != 0 {
+				log.Debugf("Script copy failed: %s", stderr)
 				return fmt.Errorf(stderr)
 			}
 			return nil
