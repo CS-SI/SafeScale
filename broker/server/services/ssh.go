@@ -49,17 +49,11 @@ type SSHAPI interface {
 
 // SSHService SSH service
 type SSHService struct {
-	provider    *providers.Service
-	hostService HostAPI
+	provider *providers.Service
 }
 
 // NewSSHService ...
 func NewSSHService(api *providers.Service) *SSHService {
-	return newSSHService(api, nil)
-}
-
-// newSSHService creates a SSH service
-func newSSHService(api *providers.Service, hostService HostAPI) *SSHService {
 	return &SSHService{
 		provider: api,
 	}
@@ -127,7 +121,8 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 	var retCode int
 	var err error
 
-	host, err := svc.hostService.Get(hostName)
+	hostSvc := NewHostService(svc.provider)
+	host, err := hostSvc.Get(hostName)
 	if err != nil {
 		return 0, "", "", fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
@@ -243,7 +238,8 @@ func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
 		upload = true
 	}
 
-	host, err := svc.hostService.Get(hostName)
+	hostSvc := NewHostService(svc.provider)
+	host, err := hostSvc.Get(hostName)
 	if err != nil {
 		return 0, "", "", fmt.Errorf("no host found with name or id '%s'", hostName)
 	}

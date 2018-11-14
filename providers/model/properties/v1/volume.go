@@ -31,7 +31,13 @@ type VolumeDescription struct {
 	Created time.Time
 }
 
+// BlankVolumeDescription ...
+var BlankVolumeDescription = VolumeDescription{}
+
 // VolumeAttachments contains host ids where the volume is attached
 type VolumeAttachments struct {
 	HostIDs []string `json:"host_ids,omitempty"`
 }
+
+// BlankVolumeAttachments ...
+var BlankVolumeAttachments = VolumeAttachments{HostIDs: []string{}}

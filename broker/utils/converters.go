@@ -93,7 +93,7 @@ func ToPBVolumeInfo(volume *model.Volume, host *model.Host) *pb.VolumeInfo {
 			return nil
 		}
 
-		if device, ok := hpVolumesV1.DeviceByID[volume.ID]; ok {
+		if device, ok := hpVolumesV1.DevicesByID[volume.ID]; ok {
 			mounts := propsv1.BlankHostMounts
 			err := host.Properties.Get(HostProperty.MountsV1, &mounts)
 			if err != nil {

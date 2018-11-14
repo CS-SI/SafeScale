@@ -121,9 +121,9 @@ var BlankHostSystem = HostSystem{}
 
 // HostVolume contains information about attached volume
 type HostVolume struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Device string `json:"device"`
+	AttachID string `json:"id"`     // contains the ID of the volume attachment
+	Name     string `json:"name"`   // contains the name of the volume
+	Device   string `json:"device"` // contains the device on the host
 }
 
 // BlankHostVolume ...
@@ -134,18 +134,18 @@ var BlankHostVolume = HostVolume{}
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostVolumes struct {
-	VolumeByID     map[string]HostVolume // contains the volume name of the attached volume, indexed by ID
-	VolumeByName   map[string]string     // contains the ID of attached volume, indexed by volume name
-	VolumeByDevice map[string]string     // contains the ID of attached volume, indexed by device
-	DeviceByID     map[string]string     // contains the device of attached volume, indexed by ID
+	VolumesByID     map[string]HostVolume `json:"volumes_by_id"`     // contains the volume name of the attached volume, indexed by ID
+	VolumesByName   map[string]string     `json:"volumes_by_name"`   // contains the ID of attached volume, indexed by volume name
+	VolumesByDevice map[string]string     `json:"volumes_by_device"` // contains the ID of attached volume, indexed by device
+	DevicesByID     map[string]string     `json:"devices_by_id"`     // contains the device of attached volume, indexed by ID
 }
 
 // BlankHostVolumes ...
 var BlankHostVolumes = HostVolumes{
-	VolumeByID:     map[string]HostVolume{},
-	VolumeByName:   map[string]string{},
-	VolumeByDevice: map[string]string{},
-	DeviceByID:     map[string]string{},
+	VolumesByID:     map[string]HostVolume{},
+	VolumesByName:   map[string]string{},
+	VolumesByDevice: map[string]string{},
+	DevicesByID:     map[string]string{},
 }
 
 // HostMount stores information about a device mount (being local or remote)
@@ -153,16 +153,12 @@ var BlankHostVolumes = HostVolumes{
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostMount struct {
-	// Local tells if the mount is local
-	Local bool `json:"local"`
-	// Device is the name of the device (/dev/... for local mount, host:/path for remote mount)
-	Device string `json:"device,omitempty"`
-	// Path is the mount point of the device
-	Path string `json:"mountpoint,omitempty"`
-	// FileSystem tells the filesystem used
-	FileSystem string `json:"file_system,omitempty"`
-	// Options contains the mount options
-	Options string `json:"options,omitempty"`
+	Local      bool   `json:"local"`             // Local tells if the mount is local
+	Device     string `json:"device"`            // Device is the name of the device (/dev/... for local mount, host:/path for remote mount)
+	Path       string `json:"mountpoint"`        // Path is the mount point of the device
+	FileSystem string `json:"file_system"`       // FileSystem tells the filesystem used
+	Options    string `json:"options,omitempty"` // Options contains the mount options
+
 }
 
 // BlankHostMount ...

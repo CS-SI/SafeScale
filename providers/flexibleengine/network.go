@@ -182,6 +182,7 @@ func (client *Client) DeleteVPC(id string) error {
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
+	log.Infof("providers.flexibleengine.CreateNetwork(%s) called\n", req.Name)
 	subnet, err := client.findSubnetByName(req.Name)
 	if subnet == nil && err != nil {
 		return nil, err
@@ -199,6 +200,15 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
+	defer func() {
+		if err != nil {
+			derr := client.deleteSubnet(subnet.ID)
+			if derr != nil {
+				log.Errorf("failed to delete subnet '%s': %v", subnet.Name, derr)
+			}
+		}
+	}()
+
 	// Creates Network Extension NetworkV1
 	network := model.NewNetwork()
 	network.ID = subnet.ID
@@ -207,10 +217,6 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	network.IPVersion = fromIntIPVersion(subnet.IPVersion)
 	err = metadata.SaveNetwork(client, network)
 	if err != nil {
-		nerr := client.DeleteNetwork(subnet.ID)
-		if nerr != nil {
-			log.Warnf("Error deleting network: %v", nerr)
-		}
 		return nil, err
 	}
 
@@ -322,6 +328,8 @@ func (client *Client) listMonitoredNetworks() ([]*model.Network, error) {
 
 // DeleteNetwork consists to delete subnet in FlexibleEngine VPC
 func (client *Client) DeleteNetwork(networkRef string) error {
+	log.Infof("providers.flexibleengine.Delete(%s) called\n", networkRef)
+
 	mn, err := metadata.LoadNetwork(client, networkRef)
 	if err != nil {
 		return err
@@ -367,6 +375,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 	if err != nil {
 		return fmt.Errorf("Error deleting network: %s", openstack.ProviderErrorToString(err))
 	}
+
 	return nil
 }
 

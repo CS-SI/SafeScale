@@ -27,7 +27,9 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 )
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services NetworkAPI
@@ -58,6 +60,8 @@ func (svc *NetworkService) Create(
 	net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string,
 ) (*model.Network, error) {
 
+	log.Infof("Creating network '%s'", net)
+
 	// Verify that the network doesn't exist first
 	if exists, err := svc.provider.GetNetwork(net); exists != nil && err == nil {
 		tbr := errors.Errorf("A network already exists with name '%s'", net)
@@ -72,26 +76,36 @@ func (svc *NetworkService) Create(
 		CIDR:      cidr,
 	})
 	if err != nil {
-		tbr := errors.Wrap(err, "Error creating network: Error with CreateNetwork call")
-		log.Errorf("%+v", tbr)
-		return nil, tbr
+		//tbr := errors.Wrap(err, "Error creating network: ")
+		//log.Errorf("%+v", tbr)
+		//return nil, tbr
+		log.Errorf("%+v", err)
+		return nil, err
 	}
 
+	// Starting from here, delete network if exiting with err
 	defer func() {
-		if r := recover(); r != nil {
+		// r := recover()
+		// if r != nil {
+		// 	derr := svc.provider.DeleteNetwork(network.ID)
+		// 	if derr != nil {
+		// 		log.Errorf("%+v", derr)
+		// 	}
+
+		// 	switch t := r.(type) {
+		// 	case string:
+		// 		err = fmt.Errorf("%q", t)
+		// 	case error:
+		// 		err = t
+		// 	}
+		// 	tbr := errors.Wrap(err, "panic occured during network creation")
+		// 	log.Errorf("%+v", tbr)
+		// } else
+		if err != nil {
 			derr := svc.provider.DeleteNetwork(network.ID)
 			if derr != nil {
-				log.Errorf("%+v", derr)
+				log.Errorf("Failed to delete network: %+v", derr)
 			}
-
-			switch t := r.(type) {
-			case string:
-				err = fmt.Errorf("%q", t)
-			case error:
-				err = t
-			}
-			tbr := errors.Wrap(err, "panic occured during network creation")
-			log.Errorf("%+v", tbr)
 		}
 	}()
 
@@ -137,25 +151,49 @@ func (svc *NetworkService) Create(
 		GWName:     gwname,
 	}
 
-	log.Printf("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwname)
+	log.Infof("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwname)
 
-	log.Printf("Requesting the creation of a gateway '%s' with '%s'", gwname, img.ID)
+	log.Infof("Requesting the creation of a gateway '%s' with image '%s'", gwname, img.ID)
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
-		defer svc.provider.DeleteNetwork(network.ID)
+		//defer svc.provider.DeleteNetwork(network.ID)
 		tbr := errors.Wrapf(err, "Error creating network: Gateway creation with name '%s' failed", gwname)
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
+	// Starting from here, deletes the gateway if exiting with error
+	defer func() {
+		if err != nil {
+			err := svc.provider.DeleteGateway(network.ID)
+			if err != nil {
+				log.Errorf("failed to delete gateway '%s': %v", gw.Name, err)
+			}
+		}
+	}()
+
+	// Updates gw requested sizing
+	hpSizingV1 := propsv1.BlankHostSizing
+	err = gw.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error creating network")
+	}
+	hpSizingV1.RequestedSize = propsv1.HostSize{
+		Cores:    cpu,
+		RAMSize:  ram,
+		DiskSize: disk,
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error creating network")
+	}
+
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
-
 	sshSvc := NewSSHService(svc.provider)
 	ssh, err := sshSvc.GetConfig(gw.ID)
 	if err != nil {
-		defer svc.provider.DeleteHost(gw.ID)
+		//defer svc.provider.DeleteHost(gw.ID)
 		tbr := errors.Wrapf(err, "Error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
 		log.Errorf("%+v", tbr)
 		return nil, tbr
@@ -171,7 +209,7 @@ func (svc *NetworkService) Create(
 		// Simplified error message
 		return nil, fmt.Errorf("Error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
 	}
-	log.Printf("SSH service of gateway '%s' started.", gw.Name)
+	log.Infof("SSH service of gateway '%s' started.", gw.Name)
 
 	// Gateway is ready to work, update Network metadata
 	// rv, err := svc.Get(net)
@@ -193,8 +231,8 @@ func (svc *NetworkService) Create(
 		return nil, tbr
 	}
 
-	//	return rv, err
-	return network, err
+	log.Infof("Network '%s' created successfully", net)
+	return network, nil
 }
 
 // List returns the network list
