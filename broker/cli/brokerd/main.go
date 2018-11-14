@@ -31,6 +31,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/server/commands"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 )
 
@@ -95,13 +96,13 @@ func work() {
 		exit.Exit(1)
 	}()
 
-	log.Println("Checking configuration")
+	log.Infoln("Checking configuration")
 	_, err := providers.Tenants()
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 
-	log.Println("Starting server")
+	log.Infoln("Starting server")
 	//lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
@@ -109,7 +110,7 @@ func work() {
 	}
 	s := grpc.NewServer()
 
-	log.Println("Registering services")
+	log.Infoln("Registering services")
 	pb.RegisterTenantServiceServer(s, &commands.TenantServiceServer{})
 	pb.RegisterNetworkServiceServer(s, &commands.NetworkServiceServer{})
 	pb.RegisterHostServiceServer(s, &commands.HostServiceServer{})
@@ -126,23 +127,48 @@ func work() {
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
 
-	version := VERSION + ", build date: " + BUILD_DATE
-	log.Printf("Brokerd version: %s", version)
-	log.Println("Ready to serve :-)")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
+	version := VERSION + ", build date: " + BUILD_DATE
+	fmt.Printf("Brokerd version: %s\nReady to serve :-)\n", version)
 }
 
 func main() {
 	app := cli.NewApp()
 
+	cli.VersionFlag = cli.BoolFlag{
+		Name:  "version, V",
+		Usage: "Print program version",
+	}
+
 	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "verbose, v",
+			Usage: "Increase verbosity",
+		},
+		cli.BoolFlag{
+			Name:  "debug, d",
+			Usage: "Show debug information",
+		},
 		// cli.IntFlag{
 		// 	Name:  "port, p",
 		// 	Usage: "Bind to specified port `PORT`",
 		// 	Value: 50051,
 		// },
+	}
+
+	app.Before = func(c *cli.Context) error {
+		log.SetLevel(log.WarnLevel)
+		if c.GlobalBool("verbose") {
+			log.SetLevel(log.InfoLevel)
+			utils.Verbose = true
+		}
+		if c.GlobalBool("debug") {
+			log.SetLevel(log.DebugLevel)
+			utils.Debug = true
+		}
+		return nil
 	}
 
 	app.Action = func(c *cli.Context) error {

@@ -52,14 +52,12 @@ type VolumeAPI interface {
 // VolumeService volume service
 type VolumeService struct {
 	provider *providers.Service
-	sshSvc   SSHAPI
 }
 
 // NewVolumeService creates a Volume service
 func NewVolumeService(api *providers.Service) VolumeAPI {
 	return &VolumeService{
 		provider: providers.FromClient(api),
-		sshSvc:   newSSHService(api, nil),
 	}
 }
 
@@ -159,7 +157,6 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 	if err != nil {
 		return fmt.Errorf("failed to get list of connected disks: %s", err)
 	}
-
 	volatt, err := svc.provider.CreateVolumeAttachment(model.VolumeAttachmentRequest{
 		Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
 		HostID:   host.ID,
@@ -169,7 +166,29 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return fmt.Errorf("failed to create host-volume attachment: %v", err)
 	}
 
-	// Waits to acknowledge the volume is really attached to host
+	// Starting from here, remove volume attachment if exit with error
+	defer func() {
+		if err != nil {
+			derr := svc.provider.DeleteVolumeAttachment(host.ID, volatt.ID)
+			if err != nil {
+				log.Errorf("failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+			}
+		}
+	}()
+
+	// Updates volume properties
+	vpAttachedV1 := propsv1.BlankVolumeAttachments
+	err = volume.Properties.Get(VolumeProperty.AttachedV1, &vpAttachedV1)
+	if err != nil {
+		return err
+	}
+	vpAttachedV1.HostIDs = append(vpAttachedV1.HostIDs, host.ID)
+	err = volume.Properties.Set(VolumeProperty.AttachedV1, &vpAttachedV1)
+	if err != nil {
+		return err
+	}
+
+	// Retries to acknowledge the volume is really attached to host
 	var newDisk mapset.Set
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
@@ -191,17 +210,27 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		return fmt.Errorf("failed to acknowledge the disk attachment after %s", 2*time.Minute)
 	}
 
-	// Updates volume attachment metadata
-	deviceName := newDisk.ToSlice()[0].(string)
-	volatt.Device = "/dev/" + deviceName
-	// err = metadata.SaveVolumeAttachment(svc.provider, volatt)
-	// if err != nil {
-	// 	derr := svc.Detach(volumename, hostName)
-	// 	if derr != nil {
-	// 		log.Warnf("Failure trying to detach volume: %v", derr)
-	// 	}
-	// 	return fmt.Errorf("failed to update volume attachment: %s", err.Error())
-	// }
+	// Recovers real device name from the system
+	deviceName := "/dev/" + newDisk.ToSlice()[0].(string)
+
+	// Saves volume information in property
+	hpVolumesV1 := propsv1.BlankHostVolumes
+	err = host.Properties.Get(HostProperty.VolumesV1, &hpVolumesV1)
+	if err != nil {
+		return err
+	}
+	hpVolumesV1.VolumesByID[volume.ID] = propsv1.HostVolume{
+		AttachID: volatt.ID,
+		Name:     volume.Name,
+		Device:   deviceName,
+	}
+	hpVolumesV1.VolumesByName[volume.Name] = volume.ID
+	hpVolumesV1.VolumesByDevice[deviceName] = volume.ID
+	hpVolumesV1.DevicesByID[volume.ID] = deviceName
+	err = host.Properties.Set(HostProperty.VolumesV1, &hpVolumesV1)
+	if err != nil {
+		return err
+	}
 
 	// Create mount point
 	mountPoint := path
@@ -209,7 +238,8 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		mountPoint = model.DefaultVolumeMountPoint + volume.Name
 	}
 
-	sshConfig, err := svc.sshSvc.GetConfig(host.ID)
+	sshSvc := NewSSHService(svc.provider)
+	sshConfig, err := sshSvc.GetConfig(host.ID)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
@@ -222,34 +252,46 @@ func (svc *VolumeService) Attach(volumename, hostName, path, format string) erro
 		log.Errorf("%+v", tbr)
 		return tbr
 	}
-	err = server.MountBlockDevice(volatt.Device, mountPoint, format)
-
+	err = server.MountBlockDevice(deviceName, mountPoint, format)
 	if err != nil {
-		derr := svc.Detach(volumename, hostName)
-		if derr != nil {
-			log.Warnf("Error trying to detach volume: %v", derr)
+		tbr := errors.Wrap(err, "")
+		log.Errorf("%+v", tbr)
+		return tbr
+	}
+
+	// Starting from here, unmount block device if exit with error
+	defer func() {
+		if err != nil {
+			derr := server.UnmountBlockDevice(volatt.ID)
+			if derr != nil {
+				log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+			}
 		}
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return tbr
+	}()
+
+	// Updates host properties
+	hpMountsV1 := propsv1.BlankHostMounts
+	err = host.Properties.Get(HostProperty.MountsV1, &hpMountsV1)
+	if err != nil {
+		return err
+	}
+	hpMountsV1.MountsByPath[mountPoint] = propsv1.HostMount{}
+	hpMountsV1.MountsByDevice[deviceName] = mountPoint
+	err = host.Properties.Set(HostProperty.MountsV1, &hpMountsV1)
+	if err != nil {
+		return err
 	}
 
-	// Update volume attachement info with mountpoint
-	volatt.MountPoint = mountPoint
-	volatt.Format = format
-	mtdVol, err := metadata.LoadVolume(svc.provider, volumename)
+	err = metadata.SaveVolume(svc.provider, volume)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return tbr
+		return err
 	}
-	err = mtdVol.Attach(volatt)
+	err = metadata.SaveHost(svc.provider, host)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return tbr
+		return err
 	}
 
+	log.Infof("Volume '%s' successfully attached to host '%s' as device '%s'", volume.Name, host.Name, deviceName)
 	return nil
 }
 
@@ -260,9 +302,10 @@ func (svc *VolumeService) listAttachedDevices(host *model.Host) (mapset.Set, err
 		err            error
 	)
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
+	sshSvc := NewSSHService(svc.provider)
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			retcode, stdout, stderr, err = svc.sshSvc.Run(host.ID, cmd)
+			retcode, stdout, stderr, err = sshSvc.Run(host.ID, cmd)
 			if err != nil {
 				tbr := errors.Wrap(err, "")
 				log.Errorf("%+v", tbr)
@@ -303,7 +346,9 @@ func (svc *VolumeService) Detach(volumename string, hostName string) error {
 		return errors.Wrap(model.ResourceNotFoundError("host", hostName), "Cannot detach volume")
 	}
 	host := mh.Get()
-	sshConfig, err := svc.sshSvc.GetConfig(host.ID)
+
+	sshSvc := NewSSHService(svc.provider)
+	sshConfig, err := sshSvc.GetConfig(host.ID)
 	if err != nil {
 		tbr := errors.Wrap(err, "error getting ssh config")
 		log.Errorf("%+v", tbr)
@@ -311,11 +356,7 @@ func (svc *VolumeService) Detach(volumename string, hostName string) error {
 	}
 
 	// Unmounts volume from host and updates Host property VolumesV1...
-	hpVolumesV1 := propsv1.HostVolumes{}
-	err = host.Properties.Get(HostProperty.VolumesV1, &hpVolumesV1)
-	if err != nil {
-		return err
-	}
+
 	// Unmount the Block Device (using nfs.Server...)
 	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
@@ -324,37 +365,55 @@ func (svc *VolumeService) Detach(volumename string, hostName string) error {
 		return tbr
 	}
 
-	hpVolume, found := hpVolumesV1.VolumeByID[volume.ID]
+	// Unmount and detach
+	hpVolumesV1 := propsv1.BlankHostVolumes
+	err = host.Properties.Get(HostProperty.VolumesV1, &hpVolumesV1)
+	if err != nil {
+		return err
+	}
+	volProp, found := hpVolumesV1.VolumesByID[volume.ID]
 	if !found {
 		return fmt.Errorf("volume '%s' is not attached to host '%s'", volume.Name, host.Name)
 	}
 
-	err = server.UnmountBlockDevice(hpVolume.Device)
+	// Unmount...
+	err = server.UnmountBlockDevice(volProp.Device)
 	if err != nil {
 		tbr := errors.Wrap(err, "error unmounting block device")
 		log.Errorf("%+v", tbr)
 		return tbr
 	}
 
-	// Delete the attachment
-	err = svc.provider.DeleteVolumeAttachment(host.ID, volume.ID)
+	// ... then detach
+	err = svc.provider.DeleteVolumeAttachment(host.ID, volProp.AttachID)
 	if err != nil {
 		return err
 	}
 
-	// Removes the volume from the host attachments
-	delete(hpVolumesV1.VolumeByID, hpVolume.ID)
-	delete(hpVolumesV1.VolumeByName, hpVolume.Name)
-	delete(hpVolumesV1.VolumeByDevice, hpVolume.Device)
-	delete(hpVolumesV1.DeviceByID, hpVolume.ID)
-
+	// Updates host properties
+	delete(hpVolumesV1.VolumesByID, volume.ID)
+	delete(hpVolumesV1.VolumesByName, volume.Name)
+	delete(hpVolumesV1.VolumesByDevice, volProp.Device)
+	delete(hpVolumesV1.DevicesByID, volume.ID)
 	err = host.Properties.Set(HostProperty.VolumesV1, &hpVolumesV1)
 	if err != nil {
 		return err
 	}
+	hpMountsV1 := propsv1.BlankHostMounts
+	err = host.Properties.Get(HostProperty.MountsV1, &hpMountsV1)
+	if err != nil {
+		return err
+	}
+	mount := hpMountsV1.MountsByPath[hpMountsV1.MountsByDevice[volProp.Device]]
+	delete(hpMountsV1.MountsByDevice, mount.Device)
+	delete(hpMountsV1.MountsByPath, mount.Path)
+	err = host.Properties.Set(HostProperty.MountsV1, &hpMountsV1)
+	if err != nil {
+		return err
+	}
 
-	// Updates Volume property propsv1.Attached
-	vpAttachedV1 := propsv1.VolumeAttachments{}
+	// Updates
+	vpAttachedV1 := propsv1.BlankVolumeAttachments
 	err = volume.Properties.Get(VolumeProperty.AttachedV1, &vpAttachedV1)
 	if err != nil {
 		return err
@@ -373,7 +432,6 @@ func (svc *VolumeService) Detach(volumename string, hostName string) error {
 		vpAttachedV1.HostIDs = append(vpAttachedV1.HostIDs[:k], vpAttachedV1.HostIDs[k+1:]...)
 	}
 	// If not found, continue as if the job has be done... because it is done :-)
-
 	err = volume.Properties.Set(VolumeProperty.AttachedV1, &vpAttachedV1)
 	if err != nil {
 		return err

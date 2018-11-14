@@ -75,6 +75,17 @@ var ClusterCommand = cli.Command{
 		clusterAddFeatureCommand,
 		clusterDeleteFeatureCommand,
 	},
+	Before: func(c *cli.Context) error {
+		if c.GlobalBool("verbose") {
+			log.SetLevel(log.InfoLevel)
+			Verbose = true
+		}
+		if c.GlobalBool("debug") {
+			log.SetLevel(log.DebugLevel)
+			Debug = true
+		}
+		return nil
+	},
 }
 
 func extractClusterArgument(c *cli.Context) error {

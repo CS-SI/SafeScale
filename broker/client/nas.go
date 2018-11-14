@@ -69,9 +69,9 @@ func (n *nas) Delete(names []string, timeout time.Duration) error {
 		_, err := nasService.Delete(ctx, &pb.NasExportName{Name: aname})
 
 		if err != nil {
-			fmt.Printf("Error response from daemon : %v", DecorateError(err, "deletion of Nas", true))
+			fmt.Println(DecorateError(err, "deletion of Nas", true).Error())
 		} else {
-			fmt.Printf("Nas '%s' deleted\n", aname)
+			fmt.Printf("Nas '%s' successfully deleted\n", aname)
 		}
 	}
 

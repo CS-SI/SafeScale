@@ -621,12 +621,14 @@ func (client *Client) CopyObject(containerSrc, objectSrc, objectDst string) erro
 	return nil
 }
 
-// DeleteObject deleta an object from a container
+// DeleteObject deletes an object from a container
 func (client *Client) DeleteObject(container, object string) error {
+	log.Debugf("providers.openstack.DeleteObject(%s:%s) called", container, object)
+
 	_, err := objects.Delete(client.Container, container, object, objects.DeleteOpts{}).Extract()
 	if err != nil {
-		log.Debugf("Error deleting object: delete call: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error deleting object '%s' of container %s: %s", object, container, ProviderErrorToString(err)))
+		log.Debugf("Error deleting object: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error deleting object '%s:%s': %s", container, object, ProviderErrorToString(err)))
 	}
 	return nil
 }

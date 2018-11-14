@@ -38,8 +38,9 @@ var NetworkCmd = cli.Command{
 }
 
 var networkList = cli.Command{
-	Name:  "list",
-	Usage: "List existing Networks (created by SafeScale)",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List existing Networks (created by SafeScale)",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all",
@@ -59,6 +60,7 @@ var networkList = cli.Command{
 
 var networkDelete = cli.Command{
 	Name:      "delete",
+	Aliases:   []string{"rm, remove"},
 	Usage:     "delete NETWORK",
 	ArgsUsage: "<network_name>",
 	Action: func(c *cli.Context) error {
@@ -101,6 +103,7 @@ var networkInspect = cli.Command{
 
 var networkCreate = cli.Command{
 	Name:      "create",
+	Aliases:   []string{"new"},
 	Usage:     "create a network",
 	ArgsUsage: "<network_name>",
 	Flags: []cli.Flag{

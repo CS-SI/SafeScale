@@ -113,8 +113,9 @@ var hostReboot = cli.Command{
 }
 
 var hostList = cli.Command{
-	Name:  "list",
-	Usage: "List available hosts (created by SafeScale)",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available hosts (created by SafeScale)",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all",
@@ -178,6 +179,7 @@ var hostStatus = cli.Command{
 
 var hostCreate = cli.Command{
 	Name:      "create",
+	Aliases:   []string{"new"},
 	Usage:     "create a new host",
 	ArgsUsage: "<Host_name>",
 	Flags: []cli.Flag{
@@ -299,6 +301,7 @@ var hostCreate = cli.Command{
 
 var hostDelete = cli.Command{
 	Name:      "delete",
+	Aliases:   []string{"rm, remove"},
 	Usage:     "Delete host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
