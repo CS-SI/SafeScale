@@ -80,7 +80,7 @@ func (client *Client) ListImages(all bool) ([]api.Image, error) {
 			log.Debugf("Error listing images: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing images: %s", ProviderErrorToString(err)))
 		}
-		log.Warnf("Image list empty !")
+		// log.Debugf("Image list empty !")
 	}
 	return imgList, nil
 }
@@ -159,7 +159,7 @@ func (client *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 			log.Debugf("Error listing templates: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing templates"))
 		}
-		log.Warnf("Template list empty !")
+		// log.Debugf("Template list empty !")
 	}
 	return flvList, nil
 }
@@ -568,7 +568,6 @@ func (client *Client) createHost(request api.HostRequest, isGateway bool) (*api.
 		gwID = gw.ID
 		host.GatewayID = gwID
 	} else {
-		log.Debugf("There was a problem with gateway ID...")
 		host.GatewayID = ""
 	}
 

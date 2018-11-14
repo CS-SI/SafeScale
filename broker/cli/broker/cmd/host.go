@@ -198,7 +198,7 @@ var hostCreate = cli.Command{
 		},
 		cli.IntFlag{
 			Name:  "disk",
-			Value: 100,
+			Value: 16,
 			Usage: "Disk space for the host (MB)",
 		},
 		cli.StringFlag{

@@ -17,5 +17,13 @@
 # block_device_unmount.sh
 # Unmount a block device and removes the corresponding entry from /etc/fstab
 
+set -u -o pipefail
+
+function print_error {
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+}
+trap print_error ERR
+
 umount -l -f {{.Device}} && \
 sed -i '\:^{{.Device}}:d' /etc/fstab
