@@ -97,20 +97,21 @@ func (srv *NasService) Create(name, hostName, path string) (*api.Nas, error) {
 
 	sshConfig, err := srv.provider.GetSSHConfig(host.ID)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "Error getting NAS ssh config")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 
 	server, err := nfs.NewServer(sshConfig)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "Error creating NAS structure")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
+
 	err = server.Install()
 	if err != nil {
-		tbr := errors.Wrap(err, "")
+		tbr := errors.Wrap(err, "Error installing nas")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
