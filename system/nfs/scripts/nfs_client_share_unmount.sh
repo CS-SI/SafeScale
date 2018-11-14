@@ -18,5 +18,13 @@
 #
 # Unconfigures and unmounts a remote access to a NFS share
 
+set -u -o pipefail
+
+function print_error {
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+}
+trap print_error ERR
+
 umount -fl {{.Host}}:{{.Share}}
 sed -i '\#^{{.Host}}:{{.Share}}#d' /etc/fstab
