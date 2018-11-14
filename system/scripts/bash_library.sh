@@ -86,6 +86,7 @@ sfAsyncStart() {
     local log=${1}.log
     local duration=$2
     shift 2
+    #/usr/bin/tim is only set on ubuntu (not debian)
     timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
     eval "$pid=$!"
 }

@@ -49,7 +49,7 @@ feature:
                             esac
 
             add:
-                pace: docker-ce,docker-compose
+                pace: docker-ce
                 steps:
                     docker-ce:
                         serial: true
@@ -63,7 +63,7 @@ feature:
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfRetry 5m 3 "sfWaitForApt && apt-get update"
-                                    sfRetry 5m 3 apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common || exit 192
+                                    sfRetry 5m 3 "apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common" || exit 192
                                     sfRetry 5m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || exit 193
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
                                     sfRetry 5m 3 "sfWaitForApt && apt-get update"
@@ -102,34 +102,8 @@ feature:
                             esac
                             exit 0
 
-                    docker-compose:
-                        targets:
-                            hosts: yes
-                            masters: all
-                            privateNodes: all
-                            publicNodes: all
-                        run: |
-                            case $LINUX_KIND in
-                                debian|ubuntu)
-                                    VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r")
-                                    [ $? -ne 0 ] && exit 192
-                                    URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
-                                    sfDownload "$URL" docker-compose 3m 5 || exit 193
-                                    chmod +x docker-compose && mv docker-compose /usr/bin
-                                    ;;
-                                centos|rhel)
-                                    yum install -y epel-release python-pip
-                                    pip install docker-compose
-                                    ;;
-                                *)
-                                    echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 195
-                                    ;;
-                            esac
-                            exit 0
-
             remove:
-                pace: docker-ce,docker-compose
+                pace: docker-ce
                 steps:
                     docker-ce:
                         targets:
@@ -153,14 +127,6 @@ feature:
                                     exit 1
                                     ;;
                             esac
-                    docker-compose:
-                        targets:
-                            hosts: yes
-                            masters: all
-                            privateNodes: all
-                            publicNodes: all
-                        run: |
-                            rm -f /usr/local/bin/docker-compose
 
     service:
         start: |

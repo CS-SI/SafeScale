@@ -26,6 +26,7 @@ func init() {
 
 	allEmbedded = []*Feature{
 		dockerFeature(),
+		dockerComposeFeature(),
 		nVidiaDockerFeature(),
 		mpichOsPkgFeature(),
 		mpichBuildFeature(),
