@@ -233,7 +233,8 @@ var hostCreate = cli.Command{
 	Action: func(c *cli.Context) error {
 		mapFeatureNames := map[string]string{
 			"docker": "docker",
-			"nvidia": "nvidiadocker",
+			"docker-compose": "docker-compose",
+			"nvidiadocker": "nvidiadocker",
 		}
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
