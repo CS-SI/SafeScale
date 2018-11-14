@@ -19,7 +19,9 @@ package nfs
 import (
 	"bytes"
 	"fmt"
+	"github.com/pkg/errors"
 	"os/exec"
+	"strings"
 	"syscall"
 	"text/template"
 	"time"
@@ -87,11 +89,13 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	filename := "/var/tmp/" + name
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			retcode, _, stderr, err := sshconfig.Copy(filename, f.Name(), true)
+			retcode, stdout, stderr, err := sshconfig.Copy(filename, f.Name(), true)
 			if err != nil {
-				return err
+				log.Errorf("Ssh operation failed: %s", err.Error())
+				return errors.Wrapf(err, "Ssh operation failed: %s", err.Error())
 			}
 			if retcode != 0 {
+				log.Debugf("Script copy failed: %s, %s", stdout, stderr)
 				return fmt.Errorf(stderr)
 			}
 			return nil
@@ -147,17 +151,36 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		nil, nil, nil,
 	)
 	if retryErr != nil {
-		return 255, "", "", retryErr
+		switch retryErr.(type) {
+		case retry.ErrTimeout:
+			log.Errorf("Timeout running remote script '%s'", name)
+			return 255, stdout, stderr, retryErr
+		default:
+			return 255, stdout, stderr, retryErr
+		}
 	}
+
 	return retcode, stdout, stderr, err
 }
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
 	if err != nil {
-		return err
+		log.Debugf("Standard output: [%s]", stdout)
+		log.Debugf("Standard error: [%s]", stderr)
+
+		// TODO Simplification of error message
+		collected := ""
+		errLines := strings.Split(stderr,"\n")
+		for _, errline := range errLines {
+			if strings.Contains(errline, "An error occurred in line") {
+				collected += errline + ";"
+			}
+		}
+
+		return errors.Wrapf(err, "%s: std error [%s]", msg, collected)
 	}
 	if retcode != 0 {
-		return fmt.Errorf("%s: %s", msg, stderr)
+		return fmt.Errorf("%s: Errorcode [%d], std error [%s], std output [%s]", msg, retcode, stderr, stdout)
 	}
 	return nil
 }

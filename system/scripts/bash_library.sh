@@ -300,7 +300,7 @@ sfDetectFacts() {
         which lspci &>/dev/null && {
             FACTS["nVidia GPU"]=$(lspci | grep nvidia 2>/dev/null)
         }
-        return
+        return 0
     }
 }
 

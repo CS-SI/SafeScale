@@ -605,6 +605,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	}
 
 	sshCmdString := copyCommand.String()
+	log.Debugf("Running ssh command: [%s]", sshCmdString)
 
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{

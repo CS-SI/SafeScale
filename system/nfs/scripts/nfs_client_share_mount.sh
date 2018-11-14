@@ -18,6 +18,14 @@
 #
 # Declares a remote share mount and mount it
 
+set -u -o pipefail
+
+function print_error {
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+}
+trap print_error ERR
+
 mkdir -p "{{.MountPoint}}" && \
 mount -o noac "{{.Host}}:{{.Share}}" "{{.MountPoint}}" && \
 echo "{{.Host}}:{{.Share}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,noac 0   0" >>/etc/fstab

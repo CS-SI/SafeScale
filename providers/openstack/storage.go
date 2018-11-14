@@ -173,6 +173,7 @@ func (client *Client) listAllVolumes() ([]api.Volume, error) {
 				Speed: client.getVolumeSpeed(vol.VolumeType),
 				State: toVolumeState(vol.Status),
 			}
+			log.Debugf("Building volume list")
 			vs = append(vs, av)
 		}
 		return true, nil
@@ -182,7 +183,7 @@ func (client *Client) listAllVolumes() ([]api.Volume, error) {
 			log.Debugf("Error listing volumes: list invocation: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
 		} else {
-			log.Warnf("Complete volume list empty")
+			// log.Debugf("Complete volume list empty")
 		}
 	}
 	return vs, nil
@@ -201,7 +202,7 @@ func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
 			log.Debugf("Error listing monitored volumes: browsing volumes: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volumes : %s", ProviderErrorToString(err)))
 		} else {
-			log.Warnf("Volume list empty !")
+			// log.Debugf("Volume list empty !")
 		}
 	}
 	return vols, nil
@@ -492,9 +493,7 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 	}
 
 	sRanges := strings.Join(rList, ",")
-	log.Debugf("Getting object from object conainer: downloading the range [%s]", sRanges)
 
-	// TODO Why we have a bad range ??
 	var res objects.DownloadResult
 	if len(sRanges) == 0 {
 		res = objects.Download(client.Container, container, name, objects.DownloadOpts{})
@@ -506,7 +505,7 @@ func (client *Client) GetObject(container string, name string, ranges []api.Rang
 
 	content, err := res.ExtractContent()
 	if err != nil {
-		log.Debugf("Error getting object: content extraction call: %+v", err)
+		log.Debugf("Error getting object: content extraction call, downloaded range [%s]: %+v", sRanges, err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting object %s from %s : %s", name, container, ProviderErrorToString(err)))
 	}
 	recoveredMetadata := make(map[string]string)
@@ -603,7 +602,7 @@ func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]
 			log.Debugf("Error listing objects: pagination error: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing objects of container '%s': %s", container, ProviderErrorToString(err)))
 		}
-		log.Debugf("Listing Storage Objects: Object list empty !")
+		// log.Debugf("Listing Storage Objects: Object list empty !")
 	}
 	return objectList, nil
 }

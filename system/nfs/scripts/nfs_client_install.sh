@@ -16,6 +16,14 @@
 #
 # Installs and configures
 
+set -u -o pipefail
+
+function print_error {
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+}
+trap print_error ERR
+
 {{.reserved_BashLibrary}}
 
 echo "Install NFS client"

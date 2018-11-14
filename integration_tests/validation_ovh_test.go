@@ -437,3 +437,85 @@ func Test_Basic_Until_NAS(t *testing.T) {
 	out, err = getOutput("broker nas  create bnastest easyvm")
 	require.Nil(t, err)
 }
+
+
+func Test_Basic_Until_Volume(t *testing.T) {
+	tearDown()
+
+	brokerd_launched, err := isBrokerdLaunched()
+	if !brokerd_launched {
+		fmt.Println("This requires that you launch brokerd in background and set the tenant")
+		require.True(t, brokerd_launched)
+	}
+	require.Nil(t, err)
+
+	in_path, err := canBeRun("broker")
+	require.Nil(t, err)
+
+	require.True(t, brokerd_launched)
+	require.True(t, in_path)
+
+	out, err := getOutput("broker tenant list")
+	require.Nil(t, err)
+	require.True(t, len(out) > 0)
+
+	out, err = getOutput("broker tenant get")
+	if err != nil {
+		fmt.Println("This requires that you set the right tenant before launching the tests")
+		require.Nil(t, err)
+	}
+	require.True(t, len(out) > 0)
+
+	out, err = getOutput("broker network list")
+	require.Nil(t, err)
+
+	fmt.Println("Creating network crazy...")
+
+	out, err = getOutput("broker network create crazy")
+	require.Nil(t, err)
+
+	out, err = getOutput("broker network create crazy")
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "A network already exist"))
+
+	fmt.Println("Creating VM easyVM...")
+
+	out, err = getOutput("broker host create easyvm --public --net crazy")
+	require.Nil(t, err)
+
+	out, err = getOutput("broker host create easyvm --public --net crazy")
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "already exists"))
+
+	out, err = getOutput("broker host inspect easyvm")
+	require.Nil(t, err)
+
+	easyvm := HostInfo{}
+	json.Unmarshal([]byte(out), &easyvm)
+
+	fmt.Println("Creating VM complexvm...")
+
+	out, err = getOutput("broker host create complexvm --public --net crazy")
+	require.Nil(t, err)
+
+	out, err = getOutput("broker host create complexvm --public --net crazy")
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "already exists"))
+
+	out, err = getOutput("broker volume list")
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "null"))
+
+	fmt.Println("Creating Volume volumetest...")
+
+	out, err = getOutput("broker volume  create volumetest")
+	require.Nil(t, err)
+
+	out, err = getOutput("broker volume list")
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "volumetest"))
+}
+
+func Test_Cleanup(t *testing.T) {
+	tearDown()
+}
