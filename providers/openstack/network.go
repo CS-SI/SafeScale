@@ -678,7 +678,7 @@ func (client *Client) ListRouters() ([]Router, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
 		}
-		log.Warnf("Router list empty !")
+		// log.Debugf("Router list empty !")
 	}
 	return ns, nil
 }

@@ -183,7 +183,7 @@ func (client *Client) listAllVolumes() ([]api.Volume, error) {
 			log.Debugf("Error listing volumes: list invocation: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
 		} else {
-			log.Warnf("Complete volume list empty")
+			// log.Debugf("Complete volume list empty")
 		}
 	}
 	return vs, nil
@@ -202,7 +202,7 @@ func (client *Client) listMonitoredVolumes() ([]api.Volume, error) {
 			log.Debugf("Error listing monitored volumes: browsing volumes: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volumes : %s", ProviderErrorToString(err)))
 		} else {
-			log.Warnf("Volume list empty !")
+			// log.Debugf("Volume list empty !")
 		}
 	}
 	return vols, nil
@@ -602,7 +602,7 @@ func (client *Client) ListObjects(container string, filter api.ObjectFilter) ([]
 			log.Debugf("Error listing objects: pagination error: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing objects of container '%s': %s", container, ProviderErrorToString(err)))
 		}
-		log.Debugf("Listing Storage Objects: Object list empty !")
+		// log.Debugf("Listing Storage Objects: Object list empty !")
 	}
 	return objectList, nil
 }
