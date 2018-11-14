@@ -18,20 +18,20 @@ package main
 
 // TODO NOTICE Side-effects imports here
 import (
-	"log"
 	"os"
 	"sort"
 	"time"
 
-	"github.com/CS-SI/SafeScale/deploy/cli/cmds"
-
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
+	"github.com/CS-SI/SafeScale/deploy/cli/cmds"
+
+	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialise provider cloudferro
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise provider cloudwatt
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise provider flexibleengine
 	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise provider opentelekom
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise provider ovh
-	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialise provider cloudferro
 )
 
 func main() {
@@ -56,11 +56,36 @@ func main() {
 	app.EnableBashCompletion = true
 
 	app.Flags = []cli.Flag{
-		cli.IntFlag{
-			Name:  "port, p",
-			Usage: "Bind to specified port `PORT`",
-			Value: 50051,
+		cli.BoolFlag{
+			Name:  "version, V",
+			Usage: "Prints program version",
 		},
+		cli.BoolFlag{
+			Name:  "verbose, v",
+			Usage: "Increase verbosity",
+		},
+		cli.BoolFlag{
+			Name:  "debug, d",
+			Usage: "Displays debug log",
+		},
+		// cli.IntFlag{
+		// 	Name:  "port, p",
+		// 	Usage: "Bind to specified port `PORT`",
+		// 	Value: 50051,
+		// },
+	}
+
+	app.Before = func(c *cli.Context) error {
+		log.SetLevel(log.WarnLevel)
+		if c.GlobalBool("verbose") {
+			log.SetLevel(log.InfoLevel)
+			cmds.Verbose = true
+		}
+		if c.GlobalBool("debug") {
+			log.SetLevel(log.DebugLevel)
+			cmds.Debug = true
+		}
+		return nil
 	}
 
 	app.Commands = append(app.Commands, cmds.ClusterCommand)
