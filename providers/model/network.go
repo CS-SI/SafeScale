@@ -57,6 +57,8 @@ type NetworkRequest struct {
 	IPVersion IPVersion.Enum `json:"ip_version,omitempty"`
 	// CIDR mask
 	CIDR string `json:"cidr,omitempty"`
+	// DNSServers
+	DNSServers []string `json:"dns_servers,omitempty"`
 }
 
 // Network representes a virtual network

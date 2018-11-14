@@ -422,8 +422,7 @@ func (svc *Service) getOrCreateDefaultNetwork() (*model.Network, error) {
 
 // CreateHost creates an host that fulfils the request
 func (svc *Service) CreateHost(request model.HostRequest) (*model.Host, error) {
-	log.Printf("In Service.CreateHost(): svc=%x, svc.ClientAPI=%x\n", svc, svc.ClientAPI)
-	log.Printf("type(svc)=%s, type(svc.ClientAPI=%s\n", reflect.TypeOf(svc).String(), reflect.TypeOf(svc.ClientAPI).String())
+	log.Printf("service.CreateHost(): type(svc)=%s, type(svc.ClientAPI=%s\n", reflect.TypeOf(svc).String(), reflect.TypeOf(svc.ClientAPI).String())
 	// log.Printf("Creating host '%s'...", request.Name)
 	if len(request.NetworkIDs) == 0 {
 		net, err := svc.getOrCreateDefaultNetwork()

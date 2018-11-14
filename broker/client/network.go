@@ -66,7 +66,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 		_, err := networkService.Delete(ctx, &pb.Reference{Name: aname})
 
 		if err != nil {
-			fmt.Printf("Error response from daemon : %v", DecorateError(err, "deletion of network", true))
+			fmt.Println(DecorateError(err, "deletion of network", true).Error())
 		} else {
 			fmt.Printf("Network '%s' deleted\n", aname)
 		}

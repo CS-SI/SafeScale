@@ -99,7 +99,7 @@ var nasList = cli.Command{
 	Action: func(c *cli.Context) error {
 		nases, err := client.New().Nas.List(0)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "list of nas", false))
+			return client.DecorateError(err, "list of nas", false)
 		}
 		out, _ := json.Marshal(nases)
 		fmt.Println(string(out))
@@ -133,7 +133,7 @@ var nasMount = cli.Command{
 		}
 		err := client.New().Nas.Mount(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "mount of nas", true))
+			return client.DecorateError(err, "mount of nas", true)
 		}
 		return nil
 	},
@@ -155,7 +155,7 @@ var nasUnmount = cli.Command{
 		}
 		err := client.New().Nas.Unmount(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "unmount of nas", true))
+			return client.DecorateError(err, "unmount of nas", true)
 		}
 
 		return nil
@@ -174,7 +174,7 @@ var nasInspect = cli.Command{
 		}
 		export, err := client.New().Nas.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon: %v", client.DecorateError(err, "inspection of nas", false))
+			return client.DecorateError(err, "inspection of nas", false)
 		}
 		out, _ := json.Marshal(export)
 		fmt.Println(string(out))

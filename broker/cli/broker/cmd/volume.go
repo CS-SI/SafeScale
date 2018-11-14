@@ -42,8 +42,9 @@ var VolumeCmd = cli.Command{
 }
 
 var volumeList = cli.Command{
-	Name:  "list",
-	Usage: "List available volumes",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available volumes",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all",
@@ -52,7 +53,7 @@ var volumeList = cli.Command{
 	Action: func(c *cli.Context) error {
 		resp, err := client.New().Volume.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of volumes", false))
+			return client.DecorateError(err, "list of volumes", false)
 		}
 
 		var volumes []*volumeDisplayable
@@ -77,7 +78,7 @@ var volumeInspect = cli.Command{
 		}
 		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of volume", false))
+			return client.DecorateError(err, "inspection of volume", false)
 		}
 
 		out, _ := json.Marshal(toDisplaybleVolumeInfo(volumeInfo))
@@ -89,6 +90,7 @@ var volumeInspect = cli.Command{
 
 var volumeDelete = cli.Command{
 	Name:      "delete",
+	Aliases:   []string{"rm", "remove"},
 	Usage:     "Delete volume",
 	ArgsUsage: "<Volume_name|Volume_ID>",
 	Action: func(c *cli.Context) error {
@@ -144,7 +146,7 @@ var volumeCreate = cli.Command{
 
 		volume, err := client.New().Volume.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "creation of volume", true))
+			return client.DecorateError(err, "creation of volume", true)
 		}
 		out, _ := json.Marshal(toDisplaybleVolume(volume))
 		fmt.Println(string(out))
@@ -156,7 +158,7 @@ var volumeCreate = cli.Command{
 var volumeAttach = cli.Command{
 	Name:      "attach",
 	Usage:     "Attach a volume to an host",
-	ArgsUsage: "<Volume_name|Volume_ID>, <Host_name|Host_ID>",
+	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
@@ -183,7 +185,7 @@ var volumeAttach = cli.Command{
 		}
 		err := client.New().Volume.Attach(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "attach of volume", true))
+			return client.DecorateError(err, "attach of volume", true)
 		}
 		fmt.Printf("Volume '%s' attached to host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 
@@ -203,7 +205,7 @@ var volumeDetach = cli.Command{
 		}
 		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "unattach of volume", true))
+			return client.DecorateError(err, "unattach of volume", true)
 		}
 		fmt.Printf("Volume '%s' detached from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 

@@ -681,7 +681,7 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 	if err != nil {
 		return err
 	}
-	heSizingV1.AllocatedSize = client.toHostSize(server.Flavor).HostSize
+	heSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
 	err = host.Properties.Set(HostProperty.SizingV1, &heSizingV1)
 	if err != nil {
 		return err
@@ -1162,22 +1162,20 @@ func (client *Client) getOpenstackPortID(host *model.Host) (*string, error) {
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into api.Host
-func (client *Client) toHostSize(flavor map[string]interface{}) model.HostSize {
+func (client *Client) toHostSize(flavor map[string]interface{}) propsv1.HostSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
 		tpl, _ := client.GetTemplate(fid)
-		return model.HostSize{HostSize: tpl.HostSize}
+		return tpl.HostSize
 	}
 	if _, ok := flavor["vcpus"]; ok {
-		return model.HostSize{
-			HostSize: propsv1.HostSize{
-				Cores:    flavor["vcpus"].(int),
-				DiskSize: flavor["disk"].(int),
-				RAMSize:  flavor["ram"].(float32) / 1000.0,
-			},
+		return propsv1.HostSize{
+			Cores:    flavor["vcpus"].(int),
+			DiskSize: flavor["disk"].(int),
+			RAMSize:  flavor["ram"].(float32) / 1000.0,
 		}
 	}
-	return model.HostSize{}
+	return propsv1.BlankHostSize
 }
 
 // toHostState converts host status returned by FlexibleEngine driver into HostState enum

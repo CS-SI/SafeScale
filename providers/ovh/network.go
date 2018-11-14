@@ -17,19 +17,16 @@
 package ovh
 
 import (
-	"fmt"
-
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/openstack"
-
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 )
 
 // CreateNetwork creates a network named name
 func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
+	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
+	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
+	if len(req.DNSServers) == 0 {
+		req.DNSServers = []string{"0.0.0.0"}
+	}
 	return client.osclt.CreateNetwork(req)
 }
 
@@ -56,113 +53,4 @@ func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
 // DeleteGateway delete the public gateway of a private network
 func (client *Client) DeleteGateway(networkID string) error {
 	return client.osclt.DeleteGateway(networkID)
-}
-
-// CreateSubnet creates a sub network
-//- netID ID of the parent network
-//- name is the name of the sub network
-//- mask is a network mask defined in CIDR notation
-func (client *Client) CreateSubnet(name string, networkID string, cidr string, ipVersion IPVersion.Enum) (*openstack.Subnet, error) {
-	// You must associate a new subnet with an existing network - to do this you
-	// need its UUID. You must also provide a well-formed CIDR value.
-	//addr, _, err := net.ParseCIDR(mask)
-	dhcp := true
-	opts := subnets.CreateOpts{
-		NetworkID:      networkID,
-		CIDR:           cidr,
-		IPVersion:      openstack.ToGopherIPversion(ipVersion),
-		Name:           name,
-		EnableDHCP:     &dhcp,
-		DNSNameservers: []string{"0.0.0.0"},
-	}
-
-	if !client.osclt.Cfg.UseLayer3Networking {
-		noGateway := ""
-		opts.GatewayIP = &noGateway
-	}
-
-	// Execute the operation and get back a subnets.Subnet struct
-	subnet, err := subnets.Create(client.osclt.Network, opts).Extract()
-	if err != nil {
-		return nil, fmt.Errorf("Error creating subnet: %s", openstack.ProviderErrorToString(err))
-	}
-
-	if client.osclt.Cfg.UseLayer3Networking {
-		router, err := client.CreateRouter(openstack.RouterRequest{
-			Name:      subnet.ID,
-			NetworkID: client.osclt.ProviderNetworkID,
-		})
-		if err != nil {
-			nerr := client.DeleteSubnet(subnet.ID)
-			if nerr != nil {
-				log.Warnf("Error deleting subnet: %v", nerr)
-			}
-			return nil, fmt.Errorf("Error creating subnet: %s", openstack.ProviderErrorToString(err))
-		}
-		err = client.AddSubnetToRouter(router.ID, subnet.ID)
-		if err != nil {
-			nerr := client.DeleteSubnet(subnet.ID)
-			if nerr != nil {
-				log.Warnf("Error deleting subnet: %v", nerr)
-			}
-			nerr = client.DeleteRouter(router.ID)
-			if nerr != nil {
-				log.Warnf("Error deleting router: %v", nerr)
-			}
-			return nil, fmt.Errorf("Error creating subnet: %s", openstack.ProviderErrorToString(err))
-		}
-	}
-
-	return &openstack.Subnet{
-		ID:        subnet.ID,
-		Name:      subnet.Name,
-		IPVersion: openstack.FromIntIPversion(subnet.IPVersion),
-		Mask:      subnet.CIDR,
-		NetworkID: subnet.NetworkID,
-	}, nil
-}
-
-// GetSubnet returns the sub network identified by id
-func (client *Client) GetSubnet(id string) (*openstack.Subnet, error) {
-	return client.osclt.GetSubnet(id)
-}
-
-// ListSubnets lists available sub networks of network net
-func (client *Client) ListSubnets(netID string) ([]openstack.Subnet, error) {
-	return client.osclt.ListSubnets(netID)
-}
-
-// DeleteSubnet deletes the sub network identified by id
-func (client *Client) DeleteSubnet(id string) error {
-	return client.osclt.DeleteSubnet(id)
-}
-
-// CreateRouter creates a router satisfying req
-func (client *Client) CreateRouter(req openstack.RouterRequest) (*openstack.Router, error) {
-	return client.osclt.CreateRouter(req)
-}
-
-// GetRouter returns the router identified by id
-func (client *Client) GetRouter(id string) (*openstack.Router, error) {
-	return client.osclt.GetRouter(id)
-}
-
-// ListRouters lists available routers
-func (client *Client) ListRouters() ([]openstack.Router, error) {
-	return client.osclt.ListRouters()
-}
-
-// DeleteRouter deletes the router identified by id
-func (client *Client) DeleteRouter(id string) error {
-	return client.osclt.DeleteRouter(id)
-}
-
-// AddSubnetToRouter attaches subnet to router
-func (client *Client) AddSubnetToRouter(routerID string, subnetID string) error {
-	return client.osclt.AddSubnetToRouter(routerID, subnetID)
-}
-
-// RemoveSubnetFromRouter detachesa subnet from router interface
-func (client *Client) RemoveSubnetFromRouter(routerID string, subnetID string) error {
-	return client.osclt.RemoveSubnetFromRouter(routerID, subnetID)
 }

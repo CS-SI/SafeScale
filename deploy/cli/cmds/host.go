@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	// log "github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
@@ -43,6 +43,17 @@ var HostCommand = cli.Command{
 		hostCheckFeatureCommand,
 		hostAddFeatureCommand,
 		hostDeleteFeatureCommand,
+	},
+	Before: func(c *cli.Context) error {
+		if c.GlobalBool("verbose") {
+			log.SetLevel(log.InfoLevel)
+			Verbose = true
+		}
+		if c.GlobalBool("debug") {
+			log.SetLevel(log.DebugLevel)
+			Debug = true
+		}
+		return nil
 	},
 
 	// 	Help: &cli.HelpContent{

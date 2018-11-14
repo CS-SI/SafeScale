@@ -253,9 +253,15 @@ func (svc *HostService) List(all bool) ([]*model.Host, error) {
 func (svc *HostService) Get(ref string) (*model.Host, error) {
 	// Uses metadata to recover Host id
 	mh := metadata.NewHost(svc.provider)
-	found, err := mh.ReadByName(ref)
+	found, err := mh.ReadByID(ref)
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		found, err = mh.ReadByName(ref)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if !found {
 		return nil, fmt.Errorf("host '%s' not found", ref)
