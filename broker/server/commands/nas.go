@@ -42,11 +42,11 @@ type NasServiceServer struct{}
 
 // Create call nas service creation
 func (s *NasServiceServer) Create(ctx context.Context, in *pb.NasExportDefinition) (*pb.NasExportDefinition, error) {
-	log.Printf("Create NAS called, name: '%s'", in.GetName().GetName())
+	log.Debugf("Create NAS '%s' called", in.GetName().GetName())
+
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot create NAS : No tenant set")
 	}
-
 	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	export, err := nasService.Create(in.GetName().GetName(), in.GetHost().GetName(), in.GetPath())
 
@@ -64,36 +64,38 @@ func (s *NasServiceServer) Create(ctx context.Context, in *pb.NasExportDefinitio
 
 // Delete call nas service deletion
 func (s *NasServiceServer) Delete(ctx context.Context, in *pb.NasExportName) (*google_protobuf.Empty, error) {
-	log.Printf("Delete NAS called, name '%s'", in.GetName())
+	log.Debugf("Delete NAS '%s' called", in.GetName())
+
 	if GetCurrentTenant() == nil {
-		return &google_protobuf.Empty{}, fmt.Errorf("Cannot delete NAS : No tenant set")
+		return &google_protobuf.Empty{}, fmt.Errorf("Can't delete NAS: no tenant set")
 	}
 
 	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	_, _, err := nasService.Inspect(in.GetName())
 	if err != nil {
-		return &google_protobuf.Empty{}, errors.Wrap(err, fmt.Sprintf("Cannot delete NAS export '%s'", in.GetName()))
+		return &google_protobuf.Empty{}, errors.Wrap(err, fmt.Sprintf("Can't delete NAS export '%s'", in.GetName()))
 	}
 
 	err = nasService.Delete(in.GetName())
 	if err != nil {
-		return &google_protobuf.Empty{}, errors.Wrap(err, fmt.Sprintf("Cannot delete NAS export '%s'", in.GetName()))
+		return &google_protobuf.Empty{}, errors.Wrap(err, fmt.Sprintf("Can't delete NAS export '%s'", in.GetName()))
 	}
 	return &google_protobuf.Empty{}, nil
 }
 
 // List return the list of all available nas
 func (s *NasServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.NasExportList, error) {
-	log.Infof("List NAS called")
+	log.Debugf("List NAS called")
+
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot list NAS : No tenant set")
+		return nil, fmt.Errorf("Can't list NAS exports: no tenant set")
 	}
 
 	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	exports, err := nasService.List()
 
 	if err != nil {
-		tbr := errors.Wrap(err, "Cannot list NAS")
+		tbr := errors.Wrap(err, "Can't list NAS exports")
 		return nil, tbr
 	}
 
@@ -111,16 +113,17 @@ func (s *NasServiceServer) List(ctx context.Context, in *google_protobuf.Empty) 
 
 // Mount mount exported directory from nas on a local directory of the given host
 func (s *NasServiceServer) Mount(ctx context.Context, in *pb.NasMountDefinition) (*pb.NasMountDefinition, error) {
-	log.Infof("Mount NAS called, name '%s'", in.GetName().GetName())
+	log.Debugf("Mount NAS export '%s' called", in.GetName().GetName())
+
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot mount NAS : No tenant set")
+		return nil, fmt.Errorf("Can't mount NAS export: no tenant set")
 	}
 
 	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	mount, err := nasService.Mount(in.GetName().GetName(), in.GetHost().GetName(), in.GetPath())
 
 	if err != nil {
-		tbr := errors.Wrap(err, "Cannot mount NAS")
+		tbr := errors.Wrap(err, "Can't mount NAS export")
 		return nil, tbr
 	}
 	return convert.ToPBNasMount(in.GetName().GetName(), in.GetHost().GetName(), mount), err
@@ -128,35 +131,37 @@ func (s *NasServiceServer) Mount(ctx context.Context, in *pb.NasMountDefinition)
 
 // Unmount unmounts remotely exported directory from the given host
 func (s *NasServiceServer) Unmount(ctx context.Context, in *pb.NasMountDefinition) (*google_protobuf.Empty, error) {
-	log.Infof("Unmount NAS export name '%s' called.", in.GetName().GetName())
+	log.Debugf("Unmount NAS export '%s' called.", in.GetName().GetName())
+
 	if GetCurrentTenant() == nil {
-		err := fmt.Errorf("Cannot unmount NAS export '%s': No tenant set", in.GetName().GetName())
+		err := fmt.Errorf("Can't unmount NAS export '%s': no tenant set", in.GetName().GetName())
 		return &google_protobuf.Empty{}, err
 	}
 
 	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	err := nasService.Unmount(in.GetName().GetName(), in.GetHost().GetName())
 	if err != nil {
-		return &google_protobuf.Empty{}, errors.Wrap(err, "Cannot unmount NAS export")
+		return &google_protobuf.Empty{}, errors.Wrap(err, "Can't unmount NAS export")
 	}
 	return &google_protobuf.Empty{}, nil
 }
 
 // Inspect shows the detail of a nfs server and all connected clients
 func (s *NasServiceServer) Inspect(ctx context.Context, in *pb.NasExportName) (*pb.NasExportList, error) {
-	log.Infof("Inspect NAS export '%s' called", in.GetName())
+	log.Debugf("Inspect NAS export '%s' called", in.GetName())
+
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot inspect NAS export: No tenant set")
+		return nil, fmt.Errorf("Can't inspect NAS export '%s': no tenant set", in.GetName())
 	}
 
 	nasService := services.NewNasService(providers.FromClient(currentTenant.Client))
 	nas, export, err := nasService.Inspect(in.GetName())
 	if err != nil {
-		err := errors.Wrap(err, fmt.Sprintf("Cannot inspect NAS export '%s'", in.GetName()))
+		err := errors.Wrap(err, fmt.Sprintf("Can't inspect NAS export '%s'", in.GetName()))
 		return nil, err
 	}
 
 	// Map propsv1.HostExport to pb.NasExport
-	list := &pb.NasExportList{ExportList: []*pb.NasExportDefinition{convert.ToPBNasExport(nas.Name, export)}}
+	list := &pb.NasExportList{ExportList: []*pb.NasExportDefinition{convert.ToPBNasExport(nas.ID, export)}}
 	return list, nil
 }

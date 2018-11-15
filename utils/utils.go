@@ -102,3 +102,11 @@ func ExtractRetCode(err error) (string, int, error) {
 	}
 	return msg, retCode, fmt.Errorf("Error is not an 'ExitError'")
 }
+
+// Plural returns 's' if value > 0, "" otherwise
+func Plural(value int) string {
+	if value > 0 {
+		return "s"
+	}
+	return ""
+}

@@ -48,7 +48,12 @@ func ResourceNotFoundError(resource string, name string) ResourceNotFound {
 	}
 }
 func (e ResourceNotFound) Error() string {
-	return fmt.Sprintf("Unable to find %s '%s'", e.ResourceType, e.Name)
+	tmpl := "Unable to find %s"
+	if e.Name != "" {
+		tmpl += " '%s'"
+		return fmt.Sprintf(tmpl, e.ResourceType, e.Name)
+	}
+	return fmt.Sprintf(tmpl, e.ResourceType)
 }
 
 // ResourceNotAvailable resource not available error
