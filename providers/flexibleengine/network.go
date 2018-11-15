@@ -347,7 +347,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 		return err
 	}
 	if mn == nil {
-		return errors.Wrap(model.ResourceNotFoundError("network", networkRef), "Cannot delete network")
+		return errors.Wrap(model.ResourceNotFoundError("network", networkRef), "Can't delete network")
 	}
 	network := mn.Get()
 	networkID := network.ID

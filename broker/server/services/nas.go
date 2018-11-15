@@ -21,8 +21,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
-
 	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
@@ -32,8 +30,10 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/system/nfs"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 //go:generate mockgen -destination=../mocks/mock_nasapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services NasAPI
@@ -69,16 +69,21 @@ func sanitize(in string) (string, error) {
 }
 
 // Create a nas export on host
-func (svc *NasService) Create(name, hostName, path string) (*propsv1.HostExport, error) {
+func (svc *NasService) Create(exportName, hostName, path string) (*propsv1.HostExport, error) {
 	// Check if a nas already exists with the same name
-	nasHostID, err := svc.findNas(name)
+	nasName, err := svc.findNas(exportName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
-	if nasHostID == "" {
-		return nil, model.ResourceAlreadyExistsError("NAS", name)
+	if nasName != "" {
+		return nil, model.ResourceAlreadyExistsError("NAS export", exportName)
+	}
+	hostSvc := NewHostService(svc.provider)
+	nas, err := hostSvc.Get(hostName)
+	if err != nil {
+		return nil, err
 	}
 
 	// Sanitize path
@@ -89,39 +94,28 @@ func (svc *NasService) Create(name, hostName, path string) (*propsv1.HostExport,
 		return nil, tbr
 	}
 
-	// Load host information
-	hostSvc := NewHostService(svc.provider)
-	host, err := hostSvc.Get(hostName)
-	if err != nil || host == nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return nil, tbr
-	}
-
+	// Installs NFS Server software if needed
 	sshSvc := NewSSHService(svc.provider)
-	sshConfig, err := sshSvc.GetConfig(host)
+	sshConfig, err := sshSvc.GetConfig(nas)
 	if err != nil {
 		tbr := errors.Wrap(err, "Error getting NAS ssh config")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
-
-	server, err := nfs.NewServer(sshConfig)
+	nfsServer, err := nfs.NewServer(sshConfig)
 	if err != nil {
 		tbr := errors.Wrap(err, "Error creating NAS structure")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
-
 	hpNasV1 := propsv1.BlankHostNas
-	err = host.Properties.Get(HostProperty.NasV1, &hpNasV1)
+	err = nas.Properties.Get(HostProperty.NasV1, &hpNasV1)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(hpNasV1.ExportsByID) == 0 {
 		// Host endorses the Nas role for the first time
-		err = server.Install()
+		err = nfsServer.Install()
 		if err != nil {
 			tbr := errors.Wrap(err, "")
 			log.Errorf("%+v", tbr)
@@ -129,7 +123,7 @@ func (svc *NasService) Create(name, hostName, path string) (*propsv1.HostExport,
 		}
 	}
 
-	err = server.AddShare(exportedPath, "")
+	err = nfsServer.AddShare(exportedPath, "")
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
@@ -138,7 +132,7 @@ func (svc *NasService) Create(name, hostName, path string) (*propsv1.HostExport,
 
 	// Create export struct
 	export := propsv1.BlankHostExport
-	export.Name = name
+	export.Name = exportName
 	exportID, err := uuid.NewV4()
 	if err != nil {
 		tbr := errors.Wrap(err, "Error creating UID for NAS")
@@ -153,16 +147,20 @@ func (svc *NasService) Create(name, hostName, path string) (*propsv1.HostExport,
 	hpNasV1.ExportsByName[export.Name] = export.ID
 
 	// Updates Host Property propsv1.HostNas
-	err = host.Properties.Set(HostProperty.NasV1, &hpNasV1)
+	err = nas.Properties.Set(HostProperty.NasV1, &hpNasV1)
 	if err != nil {
 		return nil, err
 	}
 
-	err = metadata.SaveHost(svc.provider, host)
+	err = metadata.SaveHost(svc.provider, nas)
 	if err != nil {
 		tbr := errors.Wrap(err, "Error saving NAS metadata")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
+	}
+	err = metadata.SaveNas(svc.provider, nas.Name, export.ID, export.Name)
+	if err != nil {
+		return nil, err
 	}
 
 	return &export, nil
@@ -189,7 +187,7 @@ func (svc *NasService) Delete(name string) error {
 		for k := range export.ClientsByName {
 			list = append(list, k)
 		}
-		return fmt.Errorf("cannot delete nas export '%s' because clients are still using it: %s", name, strings.Join(list, ","))
+		return fmt.Errorf("host%s still using it: %s", utils.Plural(len(list)), strings.Join(list, ","))
 	}
 
 	sshSvc := NewSSHService(svc.provider)
@@ -228,8 +226,8 @@ func (svc *NasService) Delete(name string) error {
 		log.Errorf("%+v", tbr)
 		return tbr
 	}
-
-	return err
+	// Remove Nas metadata
+	return metadata.RemoveNas(svc.provider, nas.ID, export.ID, export.Name)
 }
 
 // List return the list of all exports from all NASes
@@ -249,6 +247,10 @@ func (svc *NasService) List() (map[string]map[string]propsv1.HostExport, error) 
 	}
 
 	// Now walks through the hosts acting as Nas
+	if len(hosts) == 0 {
+		return nil, nil
+	}
+
 	for k := range hosts {
 		mh, err := metadata.LoadHost(svc.provider.ClientAPI, k)
 		if err != nil {
@@ -268,14 +270,14 @@ func (svc *NasService) List() (map[string]map[string]propsv1.HostExport, error) 
 }
 
 // Mount a directory exported by a nas on a local directory of an host
-func (svc *NasService) Mount(name, hostName, path string) (*propsv1.HostMount, error) {
+func (svc *NasService) Mount(exportName, hostName, path string) (*propsv1.HostMount, error) {
 	// Sanitize path
 	mountPath, err := sanitize(path)
 	if err != nil {
 		return nil, fmt.Errorf("Invalid path to be mounted: '%s' : '%s'", path, err)
 	}
 
-	nasHostID, err := svc.findNas(name)
+	nasHostID, err := svc.findNas(exportName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
@@ -296,21 +298,20 @@ func (svc *NasService) Mount(name, hostName, path string) (*propsv1.HostMount, e
 		return nil, fmt.Errorf("there is already an export mounted in '%s'", path)
 	}
 
-	source, err := hostSvc.Get(nasHostID)
+	nas, err := hostSvc.Get(nasHostID)
 	if err != nil {
-		return nil, errors.Wrap(model.ResourceNotFoundError("host", nasHostID), "Cannot Mount NAS")
+		return nil, errors.Wrap(model.ResourceNotFoundError("host", nasHostID), "Can't Mount NAS")
 	}
 	hpNasV1 := propsv1.BlankHostNas
-	err = source.Properties.Get(HostProperty.NasV1, &hpNasV1)
+	err = nas.Properties.Get(HostProperty.NasV1, &hpNasV1)
 	if err != nil {
-		return nil, errors.Wrap(err, "Cannot mount NAS")
+		return nil, errors.Wrap(err, "Can't mount NAS")
 	}
-	_, found := hpNasV1.ExportsByID[hpNasV1.ExportsByName[name]]
+	_, found := hpNasV1.ExportsByID[hpNasV1.ExportsByName[exportName]]
 	if !found {
-		return nil, errors.Wrap(fmt.Errorf("failed to find an export called '%s'", name), "Cannot mount NAS")
+		return nil, errors.Wrap(fmt.Errorf("failed to find an export called '%s'", exportName), "Can't mount NAS")
 	}
-	export := hpNasV1.ExportsByID[hpNasV1.ExportsByName[name]]
-
+	export := hpNasV1.ExportsByID[hpNasV1.ExportsByName[exportName]]
 	sshSvc := NewSSHService(svc.provider)
 	sshConfig, err := sshSvc.GetConfig(target)
 	if err != nil {
@@ -333,7 +334,7 @@ func (svc *NasService) Mount(name, hostName, path string) (*propsv1.HostMount, e
 		return nil, tbr
 	}
 
-	err = nsfclient.Mount(source.GetAccessIP(), export.Path, mountPath)
+	err = nsfclient.Mount(nas.GetAccessIP(), export.Path, mountPath)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
@@ -342,14 +343,14 @@ func (svc *NasService) Mount(name, hostName, path string) (*propsv1.HostMount, e
 
 	export.ClientsByName[target.Name] = target.ID
 	export.ClientsByID[target.ID] = target.Name
-	err = source.Properties.Set(HostProperty.NasV1, &hpNasV1)
+	err = nas.Properties.Set(HostProperty.NasV1, &hpNasV1)
 	if err != nil {
 		return nil, errors.Wrap(err, "Cannot mount NAS")
 	}
 
 	mount := propsv1.BlankHostMount
 	mount.Local = false
-	mount.Device = source.Name + ":" + export.Path
+	mount.Device = nas.Name + ":" + export.Path
 	mount.Path = mountPath
 	mount.FileSystem = "nfs"
 	hpMountsV1.MountsByPath[mount.Path] = mount
@@ -359,33 +360,11 @@ func (svc *NasService) Mount(name, hostName, path string) (*propsv1.HostMount, e
 		return nil, errors.Wrap(err, "Cannot mount NAS")
 	}
 
-	// nasid, err := uuid.NewV4()
-	// if err != nil {
-	// 	tbr := errors.Wrap(err, "Error creating UID for NAS")
-	// 	log.Errorf("%+v", tbr)
-	// 	return nil, tbr
-	// }
-
-	// client := &model.Nas{
-	// 	ID:       nasid.String(),
-	// 	Name:     name,
-	// 	Host:     host.Name,
-	// 	Path:     mountPath,
-	// 	IsServer: false,
-	// }
-
-	// err = metadata.MountNas(svc.provider, client, nas)
-	// if err != nil {
-	// 	tbr := errors.Wrap(err, "")
-	// 	log.Errorf("%+v", tbr)
-	// 	return client, tbr
-	// }
-
 	err = metadata.SaveHost(svc.provider.ClientAPI, target)
 	if err != nil {
 		return nil, err
 	}
-	err = metadata.SaveHost(svc.provider.ClientAPI, source)
+	err = metadata.SaveHost(svc.provider.ClientAPI, nas)
 	if err != nil {
 		return nil, err
 	}
@@ -442,18 +421,6 @@ func (svc *NasService) Unmount(name, hostName string) error {
 
 	}
 
-	// client, err := svc.findClient(name, hostName)
-	// if err != nil {
-	// 	tbr := errors.Wrap(err, "")
-	// 	log.Errorf("%+v", tbr)
-	// 	return nil, tbr
-	// }
-
-	// nfsServer, err := hostSvc.Get(nas.Host)
-	// if err != nil {
-	// 	return nil, errors.Wrap(model.ResourceNotFoundError("host", nas.Host), "Cannot detach NAS")
-	// }
-
 	sshSvc := NewSSHService(svc.provider)
 	sshConfig, err := sshSvc.GetConfig(target.ID)
 	if err != nil {
@@ -502,83 +469,48 @@ func (svc *NasService) Unmount(name, hostName string) error {
 		return errors.Wrap(err, "Cannot detach NAS")
 	}
 
-	// err = metadata.UmountNas(svc.provider, client, nas)
-	// if err != nil {
-	// 	tbr := errors.Wrap(err, "")
-	// 	log.Errorf("%+v", tbr)
-	// 	return client, tbr
-	// }
-
 	return nil
 }
 
 // Inspect returns the host defines as NAS 'name'
-func (svc *NasService) Inspect(name string) (*model.Host, propsv1.HostExport, error) {
-	hostID, err := metadata.LoadNas(svc.provider, name)
+func (svc *NasService) Inspect(exportName string) (*model.Host, propsv1.HostExport, error) {
+	hostName, err := metadata.LoadNas(svc.provider, exportName)
 	if err != nil {
 		tbr := errors.Wrap(err, "Error loading NAS metadata")
 		log.Errorf("%+v", tbr)
 		return nil, propsv1.BlankHostExport, tbr
 	}
-	if hostID == "" {
-		tbr := errors.Wrap(model.ResourceNotFoundError("NAS", name), "Cannot inspect NAS")
-		return nil, propsv1.BlankHostExport, tbr
+	if hostName == "" {
+		return nil, propsv1.BlankHostExport, model.ResourceNotFoundError("NAS export", "")
 	}
 
-	mh, err := metadata.LoadHost(svc.provider, hostID)
+	hostSvc := NewHostService(svc.provider)
+	nas, err := hostSvc.Get(hostName)
 	if err != nil {
-		return nil, propsv1.BlankHostExport, errors.Wrap(err, "Cannot inspect NAS")
-	}
-	host := mh.Get()
-	if host == nil {
-		return nil, propsv1.BlankHostExport, errors.Wrap(fmt.Errorf("failed to find data of host"), "Cannot inspect NAS")
+		return nil, propsv1.BlankHostExport, errors.Wrap(err, "Can't inspect NAS")
 	}
 	hpNasV1 := propsv1.BlankHostNas
-	err = host.Properties.Get(HostProperty.NasV1, &hpNasV1)
+	err = nas.Properties.Get(HostProperty.NasV1, &hpNasV1)
 	if err != nil {
-		return nil, propsv1.BlankHostExport, errors.Wrap(err, "Cannot inspect NAS")
+		return nil, propsv1.BlankHostExport, errors.Wrap(err, "Can't inspect NAS")
 	}
-	exportID, found := hpNasV1.ExportsByName[name]
+	exportID, found := hpNasV1.ExportsByName[exportName]
 	if !found {
-		exportID = name
+		exportID = exportName
 		_, found = hpNasV1.ExportsByID[exportID]
 	}
 	if !found {
-		return nil, propsv1.BlankHostExport, errors.Wrap(err, "Cannot inspect NAS")
+		return nil, propsv1.BlankHostExport, errors.Wrap(err, "Can't inspect NAS")
 	}
-	return host, hpNasV1.ExportsByID[exportID], nil
+	return nas, hpNasV1.ExportsByID[exportID], nil
 }
 
 func (svc *NasService) findNas(name string) (string, error) {
-	hostID, err := metadata.LoadNas(svc.provider, name)
+	hostName, err := metadata.LoadNas(svc.provider, name)
 	if err != nil {
-		tbr := errors.Wrap(err, "Cannot load NAS")
+		tbr := errors.Wrap(err, "Failed to load NAS metadata")
 		log.Errorf("%+v", tbr)
 		return "", tbr
 	}
-	if hostID == "" {
-		return "", nil
-	}
-	return hostID, nil
+	return hostName, nil
 }
-
-// func (svc *NasService) findClient(nasName, hostName string) (*model.Nas, error) {
-// 	mtdnas, err := metadata.LoadNas(svc.provider, nasName)
-// 	if err != nil {
-// 		tbr := errors.Wrap(err, "Cannot load NAS")
-// 		log.Errorf("%+v", tbr)
-// 		return nil, tbr
-// 	}
-// 	if mtdnas == nil {
-// 		return nil, errors.Wrap(model.ResourceNotFoundError("NAS", nasName), "Cannot load NAS")
-// 	}
-
-// 	client, err := mtdnas.FindClient(hostName)
-// 	if err != nil {
-// 		tbr := errors.Wrap(err, "")
-// 		log.Errorf("%+v", tbr)
-// 		return client, tbr
-// 	}
-
-// 	return client, err
-// }
