@@ -24,6 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/providers/model"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 //ContainerCmd container command
@@ -46,7 +47,7 @@ var containerList = cli.Command{
 	Action: func(c *cli.Context) error {
 		resp, err := client.New().Container.List(0)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "list of containers", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "list of containers", false).Error())
 		}
 
 		out, _ := json.Marshal(resp)
@@ -63,11 +64,11 @@ var containerCreate = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Container_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Container name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		err := client.New().Container.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "creation of container", true))
+			return clitools.ExitOnRPC(client.DecorateError(err, "creation of container", true).Error())
 		}
 		return nil
 	},
@@ -81,11 +82,11 @@ var containerDelete = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Container_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Container name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		err := client.New().Container.Delete(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "deletion of container", true))
+			return clitools.ExitOnRPC(client.DecorateError(err, "deletion of container", true).Error())
 		}
 		return nil
 	},
@@ -99,11 +100,11 @@ var containerInspect = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Container_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Container name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		resp, err := client.New().Container.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "inspection of container", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of container", false).Error())
 		}
 
 		out, _ := json.Marshal(resp)
@@ -127,11 +128,11 @@ var containerMount = cli.Command{
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Container_name> and/or <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Container and Host name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		err := client.New().Container.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "mount of container", true))
+			return clitools.ExitOnRPC(client.DecorateError(err, "mount of container", true).Error())
 		}
 		fmt.Printf("Container '%s' mounted on '%s' on host '%s'\n", c.Args().Get(0), c.String("path"), c.Args().Get(1))
 		return nil
@@ -146,11 +147,11 @@ var containerUnmount = cli.Command{
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Container_name> and/or <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Container and Host name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		err := client.New().Container.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "unmount of container", true))
+			return clitools.ExitOnRPC(client.DecorateError(err, "unmount of container", true).Error())
 		}
 		fmt.Printf("Container '%s' unmounted from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 		return nil

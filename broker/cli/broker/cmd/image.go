@@ -20,8 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/urfave/cli"
+
+	"github.com/CS-SI/SafeScale/broker/client"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // ImageCmd command
@@ -44,7 +46,7 @@ var imageList = cli.Command{
 	Action: func(c *cli.Context) error {
 		images, err := client.New().Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return client.DecorateError(err, "list of images", false)
+			return clitools.ExitOnRPC(client.DecorateError(err, "list of images", false).Error())
 		}
 		out, _ := json.Marshal(images.GetImages())
 		fmt.Println(string(out))

@@ -95,7 +95,7 @@ type ClientAPI interface {
 	//- name of the volume attachment
 	//- volume to attach
 	//- host on which the volume is attached
-	CreateVolumeAttachment(request model.VolumeAttachmentRequest) (*model.VolumeAttachment, error)
+	CreateVolumeAttachment(request model.VolumeAttachmentRequest) (string, error)
 	// GetVolumeAttachment returns the volume attachment identified by id
 	GetVolumeAttachment(serverID, id string) (*model.VolumeAttachment, error)
 	// ListVolumeAttachments lists available volume attachment

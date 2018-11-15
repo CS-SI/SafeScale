@@ -39,13 +39,13 @@ import (
 // broker volume inspect v1
 // broker volume update v1 --speed="HDD" --size=1000
 
-//VolumeServiceServer is the volume service grps server
+// VolumeServiceServer is the volume service grps server
 type VolumeServiceServer struct{}
 
-//VolumeServiceCreator is the function tu use to create a VolumeService instance
+// VolumeServiceCreator is the function tu use to create a VolumeService instance
 var VolumeServiceCreator = services.NewVolumeService
 
-//List the available volumes
+// List the available volumes
 func (s *VolumeServiceServer) List(ctx context.Context, in *pb.VolumeListRequest) (*pb.VolumeList, error) {
 	log.Printf("Volume List called")
 	tenant := GetCurrentTenant()
@@ -67,7 +67,7 @@ func (s *VolumeServiceServer) List(ctx context.Context, in *pb.VolumeListRequest
 	return rv, nil
 }
 
-//Create a new volume
+// Create a new volume
 func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
 	log.Printf("Create Volume called '%s'", in.Name)
 	tenant := GetCurrentTenant()
@@ -85,7 +85,7 @@ func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 	return conv.ToPBVolume(vol), nil
 }
 
-//Attach a volume to an host and create a mount point
+// Attach a volume to an host and create a mount point
 func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*google_protobuf.Empty, error) {
 	log.Printf("Attach volume called '%s', '%s'", in.Host.Name, in.MountPath)
 
@@ -104,7 +104,7 @@ func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachmen
 	return &google_protobuf.Empty{}, nil
 }
 
-//Detach a volume from an host. It umount associated mountpoint
+// Detach a volume from an host. It umount associated mountpoint
 func (s *VolumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachment) (*google_protobuf.Empty, error) {
 	log.Printf("Detach volume called '%s', '%s'", in.Host.Name, in.Volume.Name)
 
@@ -124,45 +124,29 @@ func (s *VolumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachmen
 	return &google_protobuf.Empty{}, nil
 }
 
-//Delete a volume
+// Delete a volume
 func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Volume delete called '%s'", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Cannot delete volume : Neither name nor id given as reference")
+		return nil, fmt.Errorf("Cannot delete volume: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		return nil, fmt.Errorf("cannot delete volume: no tenant set")
+		return nil, fmt.Errorf("cannot delete volume '%s': no tenant set", ref)
 	}
 	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
 	err := service.Delete(ref)
 	if err != nil {
-		vin, nerr := s.Inspect(ctx, in)
-		if nerr == nil {
-			if vin.Host != nil {
-				hostName := utils.GetReference(vin.Host)
-
-				hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
-				hap, ign := hostService.Get(hostName)
-
-				if ign == nil {
-					return nil, fmt.Errorf("cannot delete volume '%s' because it's mounted on Host '%s'\nDetails: %s", in.Name, hap.Name, err)
-				}
-			}
-		} else {
-			log.Warnf("error inspecting volume after delete failure: %v", nerr)
-		}
-
-		return nil, err
+		return &google_protobuf.Empty{}, fmt.Errorf("Can't delete volume '%s': %s", ref, err.Error())
 	}
 	log.Printf("Volume '%s' deleted", ref)
 	return &google_protobuf.Empty{}, nil
 }
 
-//Inspect a volume
+// Inspect a volume
 func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VolumeInfo, error) {
 	log.Printf("Inspect Volume called '%s'", in.Name)
 
@@ -177,7 +161,7 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 	}
 
 	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
-	volume, err := service.Inspect(ref)
+	volume, mounts, err := service.Inspect(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -185,5 +169,5 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 		return nil, fmt.Errorf("cannot inspect volume: no volume '%s' found", ref)
 	}
 
-	return conv.ToPBVolumeInfo(volume, nil), nil
+	return conv.ToPBVolumeInfo(volume, mounts), nil
 }

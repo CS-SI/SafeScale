@@ -17,7 +17,10 @@
 package cmds
 
 import (
-	"github.com/CS-SI/SafeScale/deploy/cli/enums/ExitCode"
+	"fmt"
+	"os"
+
+	clitools "github.com/CS-SI/SafeScale/utils"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 
@@ -37,16 +40,14 @@ var (
 
 func extractFeatureArgument(c *cli.Context) error {
 	if c.NArg() < 2 {
-		return exitError("Missing mandatory argument FEATURENAME", ExitCode.InvalidArgument)
+		fmt.Fprintln(os.Stderr, "Missing mandatory argument FEATURENAME")
+		_ = cli.ShowSubcommandHelp(c)
+		return clitools.ExitOnInvalidArgument()
 	}
 	featureName = c.Args().Get(1)
 	if featureName == "" {
-		return exitError("Invalid argument FEATURENAME", ExitCode.InvalidArgument)
+		fmt.Fprintln(os.Stderr, "Invalid argument FEATURENAME")
+		return clitools.ExitOnInvalidArgument()
 	}
 	return nil
-}
-
-// exitError ...
-func exitError(msg string, exitcode ExitCode.Enum) error {
-	return cli.NewExitError(msg, int(exitcode))
 }

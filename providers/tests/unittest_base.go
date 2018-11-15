@@ -539,45 +539,45 @@ func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	assert.Nil(t, err)
 	//defer clt.DeleteVolume(v.ID)
 	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
-	va, err := tester.Service.CreateVolumeAttachment(model.VolumeAttachmentRequest{
+	vaID, err := tester.Service.CreateVolumeAttachment(model.VolumeAttachmentRequest{
 		Name:     "Attachment1",
 		HostID:   host.ID,
 		VolumeID: v.ID,
 	})
-	defer tester.Service.DeleteVolumeAttachment(host.ID, va.ID)
+	defer tester.Service.DeleteVolumeAttachment(host.ID, vaID)
 	assert.Nil(t, err)
-	assert.NotEmpty(t, va.Device)
-	va2, err := tester.Service.CreateVolumeAttachment(model.VolumeAttachmentRequest{
+	// assert.NotEmpty(t, va.Device)
+	va2ID, err := tester.Service.CreateVolumeAttachment(model.VolumeAttachmentRequest{
 		Name:     "Attachment2",
 		HostID:   host.ID,
 		VolumeID: v2.ID,
 	})
-	defer tester.Service.DeleteVolumeAttachment(host.ID, va2.ID)
+	defer tester.Service.DeleteVolumeAttachment(host.ID, va2ID)
 	assert.Nil(t, err)
-	assert.NotEmpty(t, va2.Device)
+	// assert.NotEmpty(t, va2.Device)
 	val, err := tester.Service.GetVolumeAttachment(host.ID, v.ID)
 	assert.Nil(t, err)
-	assert.Equal(t, va.ID, val.ID)
-	assert.Equal(t, va.Name, val.Name)
-	assert.Equal(t, va.Device, val.Device)
-	assert.Equal(t, va.ServerID, val.ServerID)
-	assert.Equal(t, va.VolumeID, val.VolumeID)
+	assert.Equal(t, vaID, val.ID)
+	// assert.Equal(t, va.Name, val.Name)
+	// assert.Equal(t, va.Device, val.Device)
+	// assert.Equal(t, va.ServerID, val.ServerID)
+	// assert.Equal(t, va.VolumeID, val.VolumeID)
 	assert.Nil(t, err)
 	lst, err := tester.Service.ListVolumeAttachments(host.ID)
 	assert.Equal(t, 2, len(lst))
 	for _, val := range lst {
-		if val.ID == va.ID {
-			assert.Equal(t, va.ID, val.ID)
-			assert.Equal(t, va.Name, val.Name)
-			assert.Equal(t, va.Device, val.Device)
-			assert.Equal(t, va.ServerID, val.ServerID)
-			assert.Equal(t, va.VolumeID, val.VolumeID)
-		} else if val.ID == va2.ID {
-			assert.Equal(t, va2.ID, val.ID)
-			assert.Equal(t, va2.Name, val.Name)
-			assert.Equal(t, va2.Device, val.Device)
-			assert.Equal(t, va2.ServerID, val.ServerID)
-			assert.Equal(t, va2.VolumeID, val.VolumeID)
+		if val.ID == vaID {
+			assert.Equal(t, vaID, val.ID)
+			// assert.Equal(t, va.Name, val.Name)
+			// assert.Equal(t, va.Device, val.Device)
+			// assert.Equal(t, va.ServerID, val.ServerID)
+			// assert.Equal(t, va.VolumeID, val.VolumeID)
+		} else if val.ID == va2ID {
+			assert.Equal(t, va2ID, val.ID)
+			// assert.Equal(t, va2.Name, val.Name)
+			// assert.Equal(t, va2.Device, val.Device)
+			// assert.Equal(t, va2.ServerID, val.ServerID)
+			// assert.Equal(t, va2.VolumeID, val.VolumeID)
 		} else {
 			t.Fail()
 		}

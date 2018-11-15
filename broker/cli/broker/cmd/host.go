@@ -24,9 +24,11 @@ import (
 	"log"
 	"strings"
 
+	"github.com/urfave/cli"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
-	"github.com/urfave/cli"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // HostCmd command
@@ -54,11 +56,11 @@ var hostStart = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("host name or ID required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		resp, err := client.New().Host.Start(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "inspection of host", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of host", false).Error())
 		}
 
 		out, _ := json.Marshal(resp)
@@ -76,11 +78,11 @@ var hostStop = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("host name or ID required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		resp, err := client.New().Host.Stop(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "inspection of host", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of host", false).Error())
 		}
 
 		out, _ := json.Marshal(resp)
@@ -98,11 +100,11 @@ var hostReboot = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("host name or ID required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		resp, err := client.New().Host.Reboot(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "inspection of host", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of host", false).Error())
 		}
 
 		out, _ := json.Marshal(resp)
@@ -124,7 +126,7 @@ var hostList = cli.Command{
 	Action: func(c *cli.Context) error {
 		hosts, err := client.New().Host.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "list of hosts", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "list of hosts", false).Error())
 		}
 		out, _ := json.Marshal(hosts.GetHosts())
 		fmt.Println(string(out))
@@ -141,11 +143,11 @@ var hostInspect = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("host name or ID required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "inspection of host", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of host", false).Error())
 		}
 
 		out, _ := json.Marshal(resp)
@@ -163,11 +165,11 @@ var hostStatus = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("host name or ID required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		resp, err := client.New().Host.Status(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "inspection of host", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of host", false).Error())
 		}
 
 		out, _ := json.Marshal(resp)
@@ -241,7 +243,7 @@ var hostCreate = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("host and network name are required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		hostName := c.Args().Get(1)
 
@@ -259,7 +261,7 @@ var hostCreate = cli.Command{
 		}
 		resp, err := client.New().Host.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "creation of host", true))
+			return clitools.ExitOnRPC(client.DecorateError(err, "creation of host", true).Error())
 		}
 
 		if c.IsSet("features") {
@@ -308,14 +310,17 @@ var hostDelete = cli.Command{
 		if c.NArg() < 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("host name or ID required")
+			return clitools.ExitOnInvalidArgument()
 		}
 
 		var hostList []string
 		hostList = append(hostList, c.Args().First())
 		hostList = append(hostList, c.Args().Tail()...)
 
-		_ = client.New().Host.Delete(hostList, client.DefaultExecutionTimeout)
+		err := client.New().Host.Delete(hostList, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.ExitOnRPC(client.DecorateError(err, "deletion of host", false).Error())
+		}
 
 		return nil
 	},
@@ -329,11 +334,11 @@ var hostSsh = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("host name or ID required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		resp, err := client.New().Host.SSHConfig(c.Args().First())
 		if err != nil {
-			return fmt.Errorf("%v", client.DecorateError(err, "ssh config of host", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "ssh config of host", false).Error())
 		}
 		out, _ := json.Marshal(resp)
 		fmt.Println(string(out))

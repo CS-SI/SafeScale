@@ -60,8 +60,6 @@ func (svc *NetworkService) Create(
 	net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string,
 ) (*model.Network, error) {
 
-	log.Infof("Creating network '%s'", net)
-
 	// Verify that the network doesn't exist first
 	if exists, err := svc.provider.GetNetwork(net); exists != nil && err == nil {
 		tbr := errors.Errorf("A network already exists with name '%s'", net)
@@ -235,7 +233,6 @@ func (svc *NetworkService) Create(
 		return nil, tbr
 	}
 
-	log.Infof("Network '%s' created successfully", net)
 	return network, nil
 }
 
