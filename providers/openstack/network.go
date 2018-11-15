@@ -233,7 +233,7 @@ func (client *Client) listAllNetworks() ([]api.Network, error) {
 			log.Debugf("Error listing networks: pagination error: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing networks: %s", ProviderErrorToString(err)))
 		} else {
-			log.Debugf("Listing all networks: Empty network list !")
+			// log.Debugf("Listing all networks: Empty network list !")
 		}
 	}
 	return netList, nil
@@ -269,7 +269,7 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 			log.Debugf("Error listing monitored networks: pagination error: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing monitored networks: %s", ProviderErrorToString(err)))
 		} else {
-			log.Debugf("Listing monitored networks: Empty network list !")
+			// log.Debugf("Listing monitored networks: Empty network list !")
 		}
 	}
 
@@ -571,7 +571,7 @@ func (client *Client) ListSubnets(netID string) ([]Subnet, error) {
 			log.Debugf("Error listing subnets: pagination error: %+v", paginationErr)
 			return nil, errors.Wrap(paginationErr, fmt.Sprintf("We have a pagination error !: %v", paginationErr))
 		} else {
-			log.Debugf("Listing subnets: Empty subnet list !")
+			// log.Debugf("Listing subnets: Empty subnet list !")
 		}
 	}
 
