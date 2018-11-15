@@ -102,15 +102,15 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/nanobox-io/golang-scribble"
   branch = "master"
 
-[[constraint]]
+[[override]]
   name = "golang.org/x/crypto"
   revision = "0e37d006457bf46f9e6692014ba72ef82c33022c"
 
-[[constraint]]
+[[override]]
   name = "golang.org/x/net"
   revision = "4dfa2610cdf3b287375bbba5b8f2a14d3b01d8de"
 
-[[constraint]]
+[[override]]
   name = "golang.org/x/oauth2"
   revision = "d2e6202438beef2727060aa7cabdd924d92ebfd9"
 
