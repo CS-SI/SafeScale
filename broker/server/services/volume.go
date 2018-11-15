@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/system/nfs"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
@@ -86,11 +87,7 @@ func (svc *VolumeService) Delete(ref string) error {
 
 	nbAttach := len(vpAttachmentsV1.HostIDs)
 	if nbAttach > 0 {
-		plural := ""
-		if nbAttach > 1 {
-			plural = "s"
-		}
-		return fmt.Errorf("still attached on %d host%s", nbAttach, plural)
+		return fmt.Errorf("still attached on %d host%s", nbAttach, utils.Plural(nbAttach))
 	}
 	return svc.provider.DeleteVolume(vol.ID)
 }
@@ -385,6 +382,9 @@ func (svc *VolumeService) listAttachedDevices(host *model.Host) (mapset.Set, err
 func (svc *VolumeService) Detach(volumename, hostName string) error {
 	mv, err := metadata.LoadVolume(svc.provider, volumename)
 	if err != nil {
+		return errors.Wrap(model.ResourceNotFoundError("volume", volumename), "Can't detach volume")
+	}
+	if mv == nil {
 		return errors.Wrap(model.ResourceNotFoundError("volume", volumename), "Can't detach volume")
 	}
 	volume := mv.Get()

@@ -116,11 +116,11 @@ func (s *NetworkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*g
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Cannot delete network : Neither name nor id given as reference")
+		return nil, fmt.Errorf("Can't delete network: neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot delete network : No tenant set")
+		return nil, fmt.Errorf("Can't delete network: no tenant set")
 	}
 
 	networkAPI := services.NewNetworkService(providers.FromClient(currentTenant.Client))

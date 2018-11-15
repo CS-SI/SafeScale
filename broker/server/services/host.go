@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -27,13 +29,14 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/broker/client"
-	"github.com/CS-SI/SafeScale/broker/utils"
+	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 //go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services HostAPI
@@ -221,7 +224,7 @@ func (svc *HostService) Create(
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
-	err = sshCfg.WaitServerReady(utils.TimeoutCtxHost)
+	err = sshCfg.WaitServerReady(brokerutils.TimeoutCtxHost)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
@@ -271,16 +274,100 @@ func (svc *HostService) Get(ref string) (*model.Host, error) {
 
 // Delete deletes host referenced by ref
 func (svc *HostService) Delete(ref string) error {
-	mh, err := metadata.LoadHost(svc.provider, ref)
+	host, err := svc.Get(ref)
 	if err != nil {
 		return err
 	}
 
+	// Don't remove a host acting as a NAS with exported folders
+	hpNasV1 := propsv1.BlankHostNas
+	err = host.Properties.Get(HostProperty.NasV1, &hpNasV1)
+	if err != nil {
+		return err
+	}
+	if len(hpNasV1.ExportsByID) > 0 {
+		return fmt.Errorf("host is a NAS and export at least one folder")
+	}
+
+	// Don't remove a host with volumes attached
+	// TODO?: automatic detach ?
+	hpVolumesV1 := propsv1.BlankHostVolumes
+	err = host.Properties.Get(HostProperty.VolumesV1, &hpVolumesV1)
+	if err != nil {
+		return err
+	}
+	nbAttached := len(hpVolumesV1.VolumesByID)
+	if nbAttached > 0 {
+		return fmt.Errorf("host has %d volume%s attached", nbAttached, utils.Plural(nbAttached))
+	}
+
+	// Don't remove a host that is a gateway
+	hpNetworkV1 := propsv1.BlankHostNetwork
+	err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	if err != nil {
+		return err
+	}
+	if hpNetworkV1.IsGateway {
+		return fmt.Errorf("can't delete host, it's a gateway that can't be deleted but with its network")
+	}
+
+	// If host mounted NAS exports, unmounts them before anything else
+	hpMountsV1 := propsv1.BlankHostMounts
+	err = host.Properties.Get(HostProperty.MountsV1, &hpMountsV1)
+	if err != nil {
+		return err
+	}
+	nasSvc := NewNasService(svc.provider)
+	for _, i := range hpMountsV1.MountsByPath {
+		if i.Local {
+			continue
+		}
+
+		// Decompose device name to get NAS export name
+		parts := strings.Split(i.Device, ":")
+		exportName := path.Base(parts[1])
+		if exportName == "." || exportName == "/" {
+			return fmt.Errorf("inconsistent metadata content")
+		}
+
+		// Gets NAS export data
+		nas, export, err := nasSvc.Inspect(exportName)
+		if err != nil {
+			return err
+		}
+
+		// Unmounts NAS export from host
+		err = nasSvc.Unmount(exportName, host.Name)
+		if err != nil {
+			return err
+		}
+
+		// Updates host property propsv1.HostNas
+		hpNasV1 := propsv1.HostNas{}
+		err = nas.Properties.Get(HostProperty.NasV1, &hpNasV1)
+		if err != nil {
+			return err
+		}
+		delete(hpNasV1.ExportsByID, export.ID)
+		delete(hpNasV1.ExportsByName, export.Name)
+		err = nas.Properties.Set(HostProperty.NasV1, &hpNasV1)
+		if err != nil {
+			return err
+		}
+
+		// Updates NAS host metadata
+		err = metadata.SaveHost(svc.provider, nas)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Conditions are met, delete host
 	err = svc.provider.DeleteHost(ref)
 	if err != nil {
 		return err
 	}
-	return mh.Delete()
+	return metadata.NewHost(svc.provider).Carry(host).Delete()
 }
 
 // SSH returns ssh parameters to access the host referenced by ref
