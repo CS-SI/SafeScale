@@ -780,7 +780,6 @@ func (client *Client) DeleteHost(ref string) error {
 		return errors.Wrap(err, fmt.Sprintf("Error deleting host: getting host metadata"))
 	}
 	if m == nil {
-		log.Debugf("Error deleting host: no host found: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Failed to find host '%s' in metadata", ref))
 	}
 
