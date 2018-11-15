@@ -18,11 +18,12 @@
 feature:
     name: nVidia-Docker2
     suitableFor:
-        hosts: yes
+        host: yes
         cluster: all
     requirements:
         features:
             - docker
+            - docker-compose
     install:
         bash:
             check:
@@ -30,7 +31,7 @@ feature:
                 steps:
                     pkg:
                         targets:
-                            host: yes
+                            hosts: yes
                             masters: no
                             privateNodes: all
                             publicNodes: all

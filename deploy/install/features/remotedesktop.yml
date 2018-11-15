@@ -18,6 +18,7 @@ feature:
     requirements:
         features:
             - docker
+            - docker-compose
     suitableFor:
         host: yes
         cluster: all

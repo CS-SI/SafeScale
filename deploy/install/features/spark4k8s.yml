@@ -21,6 +21,7 @@ feature:
     requirements:
         features:
             - docker
+            - docker-compose
             - kubernetes
         cluster:
             small:
