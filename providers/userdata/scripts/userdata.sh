@@ -14,6 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -u -o pipefail
+
+function print_error {
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+}
+trap print_error ERR
+
 # Redirects outputs to /var/tmp/user_data.log
 exec 1<&-
 exec 2<&-
