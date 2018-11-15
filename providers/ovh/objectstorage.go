@@ -20,53 +20,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 )
 
-// CreateVolume creates a block volume
-// - name is the name of the volume
-// - size is the size of the volume in GB
-// - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
-	return client.osclt.CreateVolume(request)
-}
-
-// GetVolume returns the volume identified by id
-func (client *Client) GetVolume(id string) (*model.Volume, error) {
-	return client.osclt.GetVolume(id)
-}
-
-//ListVolumes return the list of all volume known on the current tenant (all=ture)
-//or 'only' thode monitored by safescale (all=false) ie those monitored by metadata
-func (client *Client) ListVolumes(all bool) ([]model.Volume, error) {
-	return client.osclt.ListVolumes(all)
-}
-
-// DeleteVolume deletes the volume identified by id
-func (client *Client) DeleteVolume(id string) error {
-	return client.osclt.DeleteVolume(id)
-}
-
-// CreateVolumeAttachment attaches a volume to an host
-// - 'name' of the volume attachment
-// - 'volume' to attach
-// - 'host' on which the volume is attached
-func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (*model.VolumeAttachment, error) {
-	return client.osclt.CreateVolumeAttachment(request)
-}
-
-// GetVolumeAttachment returns the volume attachment identified by id
-func (client *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachment, error) {
-	return client.osclt.GetVolumeAttachment(serverID, id)
-}
-
-// ListVolumeAttachments lists available volume attachment
-func (client *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error) {
-	return client.osclt.ListVolumeAttachments(serverID)
-}
-
-// DeleteVolumeAttachment deletes the volume attachment identifed by id
-func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
-	return client.osclt.DeleteVolumeAttachment(serverID, id)
-}
-
 // CreateContainer creates an object container
 func (client *Client) CreateContainer(name string) error {
 	return client.osclt.CreateContainer(name)

@@ -38,9 +38,6 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
-
-	"github.com/CS-SI/SafeScale/system"
-
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	uuid "github.com/satori/go.uuid"
@@ -984,34 +981,34 @@ func (client *Client) oscltDeleteHost(id string) error {
 	return nil
 }
 
-func (client *Client) getSSHConfig(host *model.Host) (*system.SSHConfig, error) {
-	sshConfig := system.SSHConfig{
-		PrivateKey: host.PrivateKey,
-		Port:       22,
-		Host:       host.GetAccessIP(),
-		User:       model.DefaultUser,
-	}
-	hpNetworkV1 := propsv1.HostNetwork{}
-	err := host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
-	if err != nil {
-		return nil, err
-	}
-	if hpNetworkV1.DefaultGatewayID != "" {
-		mgw, err := metadata.LoadHost(client, hpNetworkV1.DefaultGatewayID)
-		if err != nil {
-			return nil, err
-		}
-		gw := mgw.Get()
-		GatewayConfig := system.SSHConfig{
-			PrivateKey: gw.PrivateKey,
-			Port:       22,
-			User:       model.DefaultUser,
-			Host:       gw.GetAccessIP(),
-		}
-		sshConfig.GatewayConfig = &GatewayConfig
-	}
-	return &sshConfig, nil
-}
+// func (client *Client) getSSHConfig(host *model.Host) (*system.SSHConfig, error) {
+// 	sshConfig := system.SSHConfig{
+// 		PrivateKey: host.PrivateKey,
+// 		Port:       22,
+// 		Host:       host.GetAccessIP(),
+// 		User:       model.DefaultUser,
+// 	}
+// 	hpNetworkV1 := propsv1.HostNetwork{}
+// 	err := host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if hpNetworkV1.DefaultGatewayID != "" {
+// 		mgw, err := metadata.LoadHost(client, hpNetworkV1.DefaultGatewayID)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		gw := mgw.Get()
+// 		GatewayConfig := system.SSHConfig{
+// 			PrivateKey: gw.PrivateKey,
+// 			Port:       22,
+// 			User:       model.DefaultUser,
+// 			Host:       gw.GetAccessIP(),
+// 		}
+// 		sshConfig.GatewayConfig = &GatewayConfig
+// 	}
+// 	return &sshConfig, nil
+// }
 
 // // GetSSHConfig creates SSHConfig to connect an host
 // func (client *Client) GetSSHConfig(param interface{}) (*system.SSHConfig, error) {

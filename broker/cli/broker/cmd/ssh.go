@@ -22,10 +22,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/CS-SI/SafeScale/broker/client"
-	utils "github.com/CS-SI/SafeScale/broker/utils"
-
 	"github.com/urfave/cli"
+
+	"github.com/CS-SI/SafeScale/broker/client"
+	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // SSHCmd ssh command
@@ -57,21 +58,23 @@ var sshRun = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("host name required")
+			return clitools.ExitOnInvalidArgument()
 		}
-		timeout := utils.TimeoutCtxHost
+		timeout := brokerutils.TimeoutCtxHost
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
 		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), client.DefaultConnectionTimeout, timeout)
 		if err != nil {
-			return client.DecorateError(err, "ssh run", false)
+			return clitools.ExitOnRPC(client.DecorateError(err, "ssh run", false).Error())
 		}
 
 		fmt.Println(stdout)
-		_, _ = fmt.Fprintln(os.Stderr, stderr)
+		fmt.Fprintln(os.Stderr, stderr)
 
-		os.Exit(retcode)
+		if retcode != 0 {
+			return cli.NewExitError("", retcode)
+		}
 		return nil
 	},
 }
@@ -98,15 +101,15 @@ var sshCopy = cli.Command{
 		if c.NArg() != 2 {
 			fmt.Println("2 arguments (from and to) are required")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("2 arguments (from and to) are required")
+			return clitools.ExitOnInvalidArgument()
 		}
-		timeout := utils.TimeoutCtxHost
+		timeout := brokerutils.TimeoutCtxHost
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
 		_, _, _, err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), client.DefaultConnectionTimeout, timeout)
 		if err != nil {
-			return client.DecorateError(err, "ssh copy", true)
+			return clitools.ExitOnRPC(client.DecorateError(err, "ssh copy", true).Error())
 		}
 		fmt.Printf("Copy of '%s' to '%s' done\n", c.Args().Get(0), c.Args().Get(1))
 		return nil
@@ -121,11 +124,11 @@ var sshConnect = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("host name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		err := client.New().Ssh.Connect(c.Args().Get(0), 0)
 		if err != nil {
-			err = client.DecorateError(err, "ssh connect", false)
+			err = clitools.ExitOnRPC(client.DecorateError(err, "ssh connect", false).Error())
 		}
 		return err
 	},

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package utils
 
 import (
@@ -29,7 +30,6 @@ import (
 
 // AbsPathify ...
 func AbsPathify(inPath string) string {
-
 	r, _ := regexp.Compile("(\\$[\\{]{1}[A-Z]+[\\}]{1})|(\\$[A-Z]+)")
 	found := r.FindAllString(inPath, -1)
 

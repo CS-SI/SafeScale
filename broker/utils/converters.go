@@ -17,8 +17,6 @@
 package utils
 
 import (
-	log "github.com/sirupsen/logrus"
-
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
@@ -77,33 +75,21 @@ func ToPBVolumeAttachment(in *model.VolumeAttachment) *pb.VolumeAttachment {
 }
 
 // ToPBVolumeInfo converts an api.Volume to a *VolumeInfo
-func ToPBVolumeInfo(volume *model.Volume, host *model.Host) *pb.VolumeInfo {
+func ToPBVolumeInfo(volume *model.Volume, mounts map[string]propsv1.HostMount) *pb.VolumeInfo {
 	pbvi := &pb.VolumeInfo{
 		ID:    volume.ID,
 		Name:  volume.Name,
 		Size:  int32(volume.Size),
 		Speed: pb.VolumeSpeed(volume.Speed),
 	}
-	if host != nil {
-		pbvi.Host = &pb.Reference{ID: host.ID}
-		hpVolumesV1 := propsv1.BlankHostVolumes
-		err := host.Properties.Get(HostProperty.VolumesV1, &hpVolumesV1)
-		if err != nil {
-			log.Errorf("error occured during convertion to protobuf: %s", err.Error())
-			return nil
-		}
-
-		if device, ok := hpVolumesV1.DevicesByID[volume.ID]; ok {
-			mounts := propsv1.BlankHostMounts
-			err := host.Properties.Get(HostProperty.MountsV1, &mounts)
-			if err != nil {
-				log.Errorf("error occured during convertion to protobuf: %s", err.Error())
-				return nil
-			}
-			mount := mounts.MountsByPath[mounts.MountsByDevice[device]]
-			pbvi.Device = device
+	if len(mounts) > 0 {
+		for k, mount := range mounts {
+			pbvi.Host = &pb.Reference{Name: k}
 			pbvi.MountPath = mount.Path
+			pbvi.Device = mount.Device
 			pbvi.Format = mount.FileSystem
+
+			break
 		}
 	}
 	return pbvi
