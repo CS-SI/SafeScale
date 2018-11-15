@@ -63,6 +63,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"SSD": VolumeSpeed.HDD,
 			},
 			MetadataBucketName: api.BuildMetadataBucketName(opts.ProjectID),
+			DNSList: []string{"1.1.1.1", "8.8.8.8"},
 		},
 	)
 
