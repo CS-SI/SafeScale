@@ -57,8 +57,12 @@ var volumeList = cli.Command{
 		if err != nil {
 			return clitools.ExitOnRPC(client.DecorateError(err, "list of volumes", false).Error())
 		}
-
-		out, _ := json.Marshal(volumes)
+		var out []byte
+		if len(volumes.Volumes) == 0 {
+			out, _ = json.Marshal(nil)
+		} else {
+			out, _ = json.Marshal(volumes)
+		}
 		fmt.Println(string(out))
 		return nil
 	},

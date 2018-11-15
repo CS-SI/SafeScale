@@ -70,6 +70,7 @@ var nasCreate = cli.Command{
 			return clitools.ExitOnRPC(client.DecorateError(err, "creation of nas", true).Error())
 		}
 
+		fmt.Println("Nas successfully created.")
 		return nil
 	},
 }
@@ -102,11 +103,26 @@ var nasList = cli.Command{
 	Name:  "list",
 	Usage: "List all created nas",
 	Action: func(c *cli.Context) error {
-		nases, err := client.New().Nas.List(0)
+		list, err := client.New().Nas.List(0)
 		if err != nil {
 			return clitools.ExitOnRPC(client.DecorateError(err, "list of nas", false).Error())
 		}
-		out, _ := json.Marshal(nases)
+		var out []byte
+		if len(list.ExportList) == 0 {
+			out, _ = json.Marshal(nil)
+		} else {
+			var output []map[string]interface{}
+			for _, i := range list.ExportList {
+				output = append(output, map[string]interface{}{
+					"ID":   i.GetID(),
+					"Name": i.GetName().GetName(),
+					"Host": i.GetHost().GetName(),
+					"Path": i.GetPath(),
+					"Type": i.GetType(),
+				})
+			}
+			out, _ = json.Marshal(output)
+		}
 		fmt.Println(string(out))
 
 		return nil
@@ -132,7 +148,7 @@ var nasMount = cli.Command{
 		}
 		def := pb.NasMountDefinition{
 			Host: &pb.Reference{Name: c.Args().Get(1)},
-			Name: &pb.NasExportName{Name: c.Args().Get(1)},
+			Name: &pb.NasExportName{Name: c.Args().Get(0)},
 			Path: c.String("path"),
 			Type: "nfs",
 		}
@@ -177,11 +193,26 @@ var nasInspect = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
-		export, err := client.New().Nas.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
+		list, err := client.New().Nas.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
 			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of nas", false).Error())
 		}
-		out, _ := json.Marshal(export)
+		var out []byte
+		if len(list.ExportList) == 0 {
+			out, _ = json.Marshal(nil)
+		} else {
+			var output []map[string]interface{}
+			for _, i := range list.ExportList {
+				output = append(output, map[string]interface{}{
+					"ID":   i.GetID(),
+					"Name": i.GetName().GetName(),
+					"Host": i.GetHost().GetName(),
+					"Path": i.GetPath(),
+					"Type": i.GetType(),
+				})
+			}
+			out, _ = json.Marshal(output)
+		}
 		fmt.Println(string(out))
 
 		return nil
