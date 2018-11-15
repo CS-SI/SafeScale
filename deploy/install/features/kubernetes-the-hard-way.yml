@@ -21,6 +21,7 @@ feature:
     requirements:
         packages:
             - docker
+            - docker-compose
     install:
         bash:
             check: |
