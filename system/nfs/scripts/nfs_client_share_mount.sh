@@ -26,6 +26,15 @@ function print_error {
 }
 trap print_error ERR
 
+function dns_fallback {
+    grep nameserver /etc/resolv.conf && return 0
+    echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
+    sudo cp /tmp/resolv.conf /etc/resolv.conf
+    return 0
+}
+
+dns_fallback
+
 mkdir -p "{{.MountPoint}}" && \
 mount -o noac "{{.Host}}:{{.Share}}" "{{.MountPoint}}" && \
 echo "{{.Host}}:{{.Share}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,noac 0   0" >>/etc/fstab
