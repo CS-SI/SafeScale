@@ -70,8 +70,17 @@ func (i *Item) DeleteFrom(path string, name string) error {
 	if path == "" {
 		path = "."
 	}
-	return i.folder.Delete(path, name)
 
+	if there, err := i.folder.Search(path, name); err != nil || !there {
+		if err != nil {
+			return err
+		}
+		if !there {
+			return nil
+		}
+	}
+
+	return i.folder.Delete(path, name)
 }
 
 // Delete removes a metadata
