@@ -130,12 +130,12 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Cannot delete volume: neither name nor id given as reference")
+		return nil, fmt.Errorf("Can't delete volume: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		return nil, fmt.Errorf("cannot delete volume '%s': no tenant set", ref)
+		return nil, fmt.Errorf("can't delete volume '%s': no tenant set", ref)
 	}
 	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
 	err := service.Delete(ref)

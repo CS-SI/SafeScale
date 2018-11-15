@@ -65,7 +65,7 @@ func (s *HostServiceServer) Start(ctx context.Context, in *pb.Reference) (*googl
 	log.Printf("Start host called '%s'", in.Name)
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot start host : No tenant set")
+		return nil, fmt.Errorf("Can't start host: no tenant set")
 	}
 
 	ref := utils.GetReference(in)
@@ -85,7 +85,7 @@ func (s *HostServiceServer) Stop(ctx context.Context, in *pb.Reference) (*google
 	log.Printf("Stop host called '%s'", in.Name)
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot stop host : No tenant set")
+		return nil, fmt.Errorf("Can't stop host: no tenant set")
 	}
 
 	ref := utils.GetReference(in)
@@ -105,7 +105,7 @@ func (s *HostServiceServer) Reboot(ctx context.Context, in *pb.Reference) (*goog
 	log.Printf("Reboot host called, '%s'", in.Name)
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot reboot host : No tenant set")
+		return nil, fmt.Errorf("Can't reboot host: no tenant set")
 	}
 
 	ref := utils.GetReference(in)
@@ -125,7 +125,7 @@ func (s *HostServiceServer) List(ctx context.Context, in *pb.HostListRequest) (*
 	log.Printf("List hosts called")
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot list hosts : No tenant set")
+		return nil, fmt.Errorf("Can't list hosts: no tenant set")
 	}
 
 	hostAPI := services.NewHostService(providers.FromClient(currentTenant.Client))
@@ -149,7 +149,7 @@ func (s *HostServiceServer) List(ctx context.Context, in *pb.HostListRequest) (*
 func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
 	log.Printf("Create host called '%s'", in.Name)
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot create host : No tenant set")
+		return nil, fmt.Errorf("Can't create host: no tenant set")
 	}
 
 	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
@@ -215,11 +215,11 @@ func (s *HostServiceServer) Status(ctx context.Context, in *pb.Reference) (*pb.H
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Cannot get host status : Neither name nor id given as reference")
+		return nil, fmt.Errorf("Can't get host status: neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot get host status : No tenant set")
+		return nil, fmt.Errorf("Can't get host status: no tenant set")
 	}
 
 	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
@@ -228,7 +228,7 @@ func (s *HostServiceServer) Status(ctx context.Context, in *pb.Reference) (*pb.H
 		return nil, err
 	}
 	if host == nil {
-		return nil, fmt.Errorf("Cannot get host status : No host '%s' found", ref)
+		return nil, fmt.Errorf("Can't get host status: no host '%s' found", ref)
 	}
 
 	return conv.ToHostStatus(host), nil
@@ -240,11 +240,11 @@ func (s *HostServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Cannot inspect host : Neither name nor id given as reference")
+		return nil, fmt.Errorf("Can't inspect host: neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot inspect host : No tenant set")
+		return nil, fmt.Errorf("Can't inspect host: no tenant set")
 	}
 
 	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
@@ -253,7 +253,7 @@ func (s *HostServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.
 		return nil, err
 	}
 	if host == nil {
-		return nil, fmt.Errorf("Cannot inspect host : No host '%s' found", ref)
+		return nil, fmt.Errorf("Can't inspect host: no host '%s' found", ref)
 	}
 
 	return conv.ToPBHost(host), nil
@@ -265,11 +265,11 @@ func (s *HostServiceServer) Delete(ctx context.Context, in *pb.Reference) (*goog
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Cannot delete host : Neither name nor id given as reference")
+		return nil, fmt.Errorf("Can't delete host: neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot delete host : No tenant set")
+		return nil, fmt.Errorf("Can't delete host: no tenant set")
 	}
 	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 	err := hostService.Delete(ref)
@@ -286,11 +286,11 @@ func (s *HostServiceServer) SSH(ctx context.Context, in *pb.Reference) (*pb.SshC
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Cannot ssh host : Neither name nor id given as reference")
+		return nil, fmt.Errorf("Can't ssh to host: neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot ssh host : No tenant set")
+		return nil, fmt.Errorf("Can't ssh host: no tenant set")
 	}
 	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 	sshConfig, err := hostService.SSH(ref)

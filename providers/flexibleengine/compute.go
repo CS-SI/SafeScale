@@ -863,7 +863,7 @@ func (client *Client) DeleteHost(ref string) error {
 		return err
 	}
 	if m == nil {
-		return errors.Wrap(model.ResourceNotFoundError("host", ref), "Cannot delete host")
+		return errors.Wrap(model.ResourceNotFoundError("host", ref), "Can't delete host")
 	}
 
 	host := m.Get()

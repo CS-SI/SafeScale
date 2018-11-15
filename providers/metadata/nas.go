@@ -44,7 +44,7 @@ func NewNas(svc api.ClientAPI) *Nas {
 }
 
 type exportItem struct {
-	HostID     string `json:"id"`          // contains the ID of the host serving the export
+	HostName   string `json:"name"`        // contains the Name of the host serving the export
 	ExportID   string `json:"export_id"`   // contains the ID of the export
 	ExportName string `json:"export_name"` // contains the name of the export
 }
@@ -60,9 +60,9 @@ func (n *exportItem) Deserialize(buf []byte) error {
 }
 
 // Carry links an export instance to the Metadata instance
-func (mn *Nas) Carry(hostID, exportID, exportName string) *Nas {
-	if hostID == "" {
-		panic("hostID is empty!")
+func (mn *Nas) Carry(hostName, exportID, exportName string) *Nas {
+	if hostName == "" {
+		panic("hostName is empty!")
 	}
 	if exportID == "" {
 		panic("exportID is empty!")
@@ -74,7 +74,7 @@ func (mn *Nas) Carry(hostID, exportID, exportName string) *Nas {
 		panic("mn.item is nil!")
 	}
 	ni := exportItem{
-		HostID:     hostID,
+		HostName:   hostName,
 		ExportID:   exportID,
 		ExportName: exportName,
 	}
@@ -90,7 +90,7 @@ func (mn *Nas) Get() string {
 		panic("mn.item is nil!")
 	}
 	if ei, ok := mn.item.Get().(*exportItem); ok {
-		return ei.HostID
+		return ei.HostName
 	}
 	panic("invalid content in metadata!")
 }
@@ -126,7 +126,7 @@ func (mn *Nas) ReadByID(id string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	mn.Carry(ei.HostID, ei.ExportID, ei.ExportName)
+	mn.Carry(ei.HostName, ei.ExportID, ei.ExportName)
 	return true, nil
 }
 
@@ -149,7 +149,7 @@ func (mn *Nas) ReadByName(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	mn.Carry(ei.HostID, ei.ExportID, ei.ExportName)
+	mn.Carry(ei.HostName, ei.ExportID, ei.ExportName)
 	return true, nil
 }
 
@@ -170,7 +170,7 @@ func (mn *Nas) Browse(callback func(string, string) error) error {
 		if err != nil {
 			return err
 		}
-		return callback(ei.HostID, ei.ExportID)
+		return callback(ei.HostName, ei.ExportID)
 	})
 }
 
@@ -234,19 +234,19 @@ func (mn *Nas) Release() {
 	mn.item.Release()
 }
 
-// // SaveNas saves the Nas definition in Object Storage
-// func SaveNas(svc *providers.Service, nas *model.Nas) error {
-// 	err := NewNas(svc).Carry(nas).Write()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
+// SaveNas saves the Nas definition in Object Storage
+func SaveNas(svc *providers.Service, hostName, exportID, exportName string) error {
+	err := NewNas(svc).Carry(hostName, exportID, exportName).Write()
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
-// // RemoveNas removes the Nas definition from Object Storage
-// func RemoveNas(svc *providers.Service, nas *model.Nas) error {
-// 	return NewNas(svc).Carry(nas).Delete()
-// }
+// RemoveNas removes the Nas definition from Object Storage
+func RemoveNas(svc *providers.Service, hostName, exportID, exportName string) error {
+	return NewNas(svc).Carry(hostName, exportID, exportName).Delete()
+}
 
 // LoadNas returns the host ID hosting export 'ref' read from Object Storage
 func LoadNas(svc *providers.Service, ref string) (string, error) {
