@@ -231,19 +231,45 @@ func (m *Network) getGateway() (bool, *api.Host, error) {
 	return true, &host, nil
 }
 
+func (m *Network) existGateway() (bool, error) {
+	if m.inside == nil {
+		panic("m.inside is nil!")
+	}
+	var host api.Host
+	found, err := m.inside.Read(".", gatewayObjectName, func(buf *bytes.Buffer) error {
+		return gob.NewDecoder(buf).Decode(&host)
+	})
+	if err != nil {
+		return false, err
+	}
+	if !found {
+		return false, nil
+	}
+	return true, nil
+}
+
 // detachGateway detaches the host used as gateway of the network
 func (m *Network) detachGateway() error {
 	if m.inside == nil {
 		panic("m.inside is nil")
 	}
 
-	err := m.inside.Delete(".", gatewayObjectName)
-
+	exists, err := m.existGateway()
 	if err != nil {
-		log.Errorf("Error detaching gateway: deleting host folder: %+v", err)
+		return err
 	}
 
-	return err
+	if exists {
+		err := m.inside.Delete(".", gatewayObjectName)
+
+		if err != nil {
+			log.Errorf("Error detaching gateway: deleting host folder: %+v", err)
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 // AttachHost links host ID to the network
@@ -264,6 +290,13 @@ func (m *Network) AttachHost(host *api.Host) error {
 func (m *Network) DetachHost(hostID string) error {
 	if m.inside == nil {
 		panic("m.inside is nil!")
+	}
+
+	if there, err := m.inside.Search(hostsFolderName, hostID); err != nil || !there {
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	err := m.inside.Delete(hostsFolderName, hostID)
