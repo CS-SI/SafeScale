@@ -29,16 +29,15 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-
-	"github.com/CS-SI/SafeScale/deploy/cli/enums/ExitCode"
 	"github.com/CS-SI/SafeScale/deploy/cluster"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/install"
-
 	"github.com/CS-SI/SafeScale/utils"
+	clitools "github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
 )
 
 const (
@@ -75,43 +74,33 @@ var ClusterCommand = cli.Command{
 		clusterAddFeatureCommand,
 		clusterDeleteFeatureCommand,
 	},
-	Before: func(c *cli.Context) error {
-		if c.GlobalBool("verbose") {
-			log.SetLevel(log.InfoLevel)
-			Verbose = true
-		}
-		if c.GlobalBool("debug") {
-			log.SetLevel(log.DebugLevel)
-			Debug = true
-		}
-		return nil
-	},
 }
 
 func extractClusterArgument(c *cli.Context) error {
 	if !c.Command.HasName("list") {
 		if c.NArg() < 1 {
-			msg := "Missing mandatory argument CLUSTERNAME"
-			// _ = cli.ShowSubcommandHelp(c)
-			return exitError(msg, ExitCode.InvalidArgument)
+			fmt.Fprintf(os.Stderr, "Missing mandatory argument CLUSTERNAME")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
 		}
 		clusterName = c.Args().First()
 		if clusterName == "" {
-			msg := "Invalid argument CLUSTERNAME"
-			return exitError(msg, ExitCode.InvalidArgument)
+			fmt.Fprintf(os.Stderr, "Invalid argument CLUSTERNAME")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
 		}
 
 		var err error
 		clusterInstance, err = cluster.Get(clusterName)
 		if c.Command.HasName("create") && clusterInstance != nil {
-			return exitError(fmt.Sprintf("Cluster '%s' already exists.\n", clusterName), ExitCode.Duplicate)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
 		}
 		if err != nil {
 			msg := fmt.Sprintf("Failed to query for cluster '%s': %s\n", clusterName, err.Error())
-			return exitError(msg, ExitCode.RPC)
+			return clitools.ExitOnRPC(msg)
 		}
 		if !c.Command.HasName("create") && clusterInstance == nil {
-			return exitError(fmt.Sprintf("Cluster '%s' not found.\n", clusterName), ExitCode.NotFound)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
 		}
 	}
 	return nil
@@ -126,16 +115,16 @@ var clusterListCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		list, err := cluster.List()
 		if err != nil {
-			return exitError("Failed to get cluster list", ExitCode.RPC)
+			return clitools.ExitOnRPC("Failed to get cluster list")
 		}
 		jsoned, err := json.Marshal(list)
 		if err != nil {
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		var toFormat []interface{}
 		err = json.Unmarshal(jsoned, &toFormat)
 		if err != nil {
-			return exitError(fmt.Sprintf("Failed to interpret list: %s", err.Error()), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("Failed to interpret list: %s", err.Error()))
 		}
 		var formatted []interface{}
 		for _, value := range toFormat {
@@ -145,7 +134,7 @@ var clusterListCommand = cli.Command{
 		jsoned, err = json.Marshal(formatted)
 		if err != nil {
 			fmt.Printf("%v\n", err)
-			return exitError(fmt.Sprintf("Failed to convert list to json: %s", err.Error()), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("Failed to convert list to json: %s", err.Error()))
 		}
 		fmt.Println(string(jsoned))
 		return nil
@@ -194,7 +183,7 @@ var clusterInspectCommand = cli.Command{
 		}
 		err = outputClusterConfig()
 		if err != nil {
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		return nil
 	},
@@ -210,7 +199,7 @@ func outputClusterConfig() error {
 
 	jsoned, err := json.Marshal(formatted)
 	if err != nil {
-		return err
+		return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 	}
 	fmt.Println(string(jsoned))
 	return nil
@@ -318,7 +307,7 @@ var clusterCreateCommand = cli.Command{
 		complexity, err := Complexity.Parse(complexityStr)
 		if err != nil {
 			msg := fmt.Sprintf("Invalid option --complexity|-C: %s\n", err.Error())
-			return exitError(msg, ExitCode.InvalidOption)
+			return clitools.ExitOnInvalidOption(msg)
 		}
 
 		flavorStr := c.String("flavor")
@@ -328,7 +317,7 @@ var clusterCreateCommand = cli.Command{
 		flavor, err := Flavor.Parse(flavorStr)
 		if err != nil {
 			msg := fmt.Sprintf("Invalid option --flavor|-F: %s\n", err.Error())
-			return exitError(msg, ExitCode.InvalidOption)
+			return clitools.ExitOnInvalidOption(msg)
 		}
 
 		keep := c.Bool("keep-on-failure")
@@ -377,12 +366,12 @@ var clusterCreateCommand = cli.Command{
 				clusterInstance.Delete()
 			}
 			msg := fmt.Sprintf("failed to create cluster: %s\n", err.Error())
-			return exitError(msg, ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 		}
 
 		toFormat, err := convertStructToMap(clusterInstance.GetConfig())
 		if err != nil {
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		formatted := formatClusterConfig(toFormat)
 		if !Debug {
@@ -391,7 +380,7 @@ var clusterCreateCommand = cli.Command{
 		}
 		jsoned, err := json.Marshal(formatted)
 		if err != nil {
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		fmt.Println(string(jsoned))
 		return nil
@@ -444,7 +433,7 @@ var clusterDeleteCommand = cli.Command{
 
 		err = clusterInstance.Delete()
 		if err != nil {
-			return exitError(err.Error(), ExitCode.RPC)
+			return clitools.ExitOnRPC(err.Error())
 		}
 
 		fmt.Printf("Cluster '%s' deleted.\n", clusterName)
@@ -474,7 +463,7 @@ var clusterStopCommand = cli.Command{
 
 		err = clusterInstance.Stop()
 		if err != nil {
-			return exitError(err.Error(), ExitCode.RPC)
+			return clitools.ExitOnRPC(err.Error())
 		}
 		fmt.Printf("Cluster '%s' stopped.\n", clusterName)
 		return nil
@@ -503,7 +492,7 @@ var clusterStartCommand = cli.Command{
 		}
 		err = clusterInstance.Start()
 		if err != nil {
-			return exitError(err.Error(), ExitCode.RPC)
+			return clitools.ExitOnRPC(err.Error())
 		}
 		fmt.Printf("Cluster '%s' started.\n", clusterName)
 		return nil
@@ -531,7 +520,7 @@ var clusterStateCommand = cli.Command{
 		state, err := clusterInstance.GetState()
 		if err != nil {
 			msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
-			return exitError(msg, ExitCode.RPC)
+			return clitools.ExitOnRPC(msg)
 		}
 		out, _ := json.Marshal(map[string]interface{}{
 			"Name":       clusterName,
@@ -633,7 +622,7 @@ var clusterExpandCommand = cli.Command{
 		}
 		hosts, err := clusterInstance.AddNodes(count, public, nodeRequest)
 		if err != nil {
-			return exitError(err.Error(), ExitCode.RPC)
+			return clitools.ExitOnRPC(err.Error())
 		}
 		jsoned, _ := json.Marshal(&hosts)
 		fmt.Println(string(jsoned))
@@ -693,7 +682,7 @@ var clusterShrinkCommand = cli.Command{
 		present := clusterInstance.CountNodes(public)
 		if count > present {
 			msg := fmt.Sprintf("can't delete %d %s node%s, the cluster contains only %d of them", count, nodeTypeString, countS, present)
-			return exitError(msg, ExitCode.InvalidOption)
+			return clitools.ExitOnInvalidOption(msg)
 		}
 
 		msg := fmt.Sprintf("Are you sure you want to delete %d %s node%s from Cluster %s", count, nodeTypeString, countS, clusterName)
@@ -711,7 +700,7 @@ var clusterShrinkCommand = cli.Command{
 			}
 		}
 		if len(msgs) > 0 {
-			return exitError(strings.Join(msgs, "\n"), ExitCode.RPC)
+			return clitools.ExitOnRPC(strings.Join(msgs, "\n"))
 		}
 		fmt.Printf("%d %s node%s successfully deleted from cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
 		return nil
@@ -856,7 +845,7 @@ var clusterDcosCommand = cli.Command{
 		config := clusterInstance.GetConfig()
 		if config.Flavor != Flavor.DCOS {
 			msg := fmt.Sprintf("Can't call dcos on this cluster, its flavor isn't DCOS (%s).\n", config.Flavor.String())
-			return exitError(msg, ExitCode.NotApplicable)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotApplicable, msg)
 		}
 		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i dcos " + strings.Join(args, " ")
@@ -909,7 +898,7 @@ var clusterRunCommand = cli.Command{
 		}
 
 		fmt.Println()
-		return exitError("clusterRunCmd not yet implemented", ExitCode.NotImplemented)
+		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "clusterRunCmd not yet implemented")
 	},
 }
 
@@ -917,7 +906,7 @@ func executeCommand(command string) error {
 	masters := clusterInstance.ListMasterIDs()
 	if len(masters) <= 0 {
 		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetName())
-		return exitError(msg, ExitCode.Run)
+		return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 	}
 	brokerssh := brokerclient.New().Ssh
 	for i, m := range masters {
@@ -935,13 +924,13 @@ func executeCommand(command string) error {
 			}
 			output += stderr
 			// fmt.Fprintf(os.Stderr, "Run on master #%d, retcode=%d\n%s\n", i+1, retcode, output)
-			return exitError(output, ExitCode.RPC)
+			return clitools.ExitOnRPC(output)
 		}
 		fmt.Println(stdout)
 		return nil
 	}
 
-	return exitError("failed to find an available master server to execute the command.", ExitCode.RPC)
+	return clitools.ExitOnRPC("failed to find an available master server to execute the command.")
 }
 
 // clusterAddFeatureCommand handles 'deploy cluster add-feature CLUSTERNAME FEATURENAME'
@@ -974,11 +963,11 @@ var clusterAddFeatureCommand = cli.Command{
 
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("Failed to find a feature named '%s'.\n", featureName)
-			return exitError(msg, ExitCode.NotFound)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
 		}
 
 		values := install.Variables{}
@@ -997,14 +986,14 @@ var clusterAddFeatureCommand = cli.Command{
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
-			return exitError(msg, ExitCode.RPC)
+			return clitools.ExitOnRPC(msg)
 		}
 		if !results.Successful() {
 			msg := fmt.Sprintf("Failed to install feature '%s' on cluster '%s'", featureName, clusterName)
 			if Debug || Verbose {
 				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 			}
-			return exitError(msg, ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 		}
 
 		fmt.Printf("Feature '%s' installed successfully on cluster '%s'\n", featureName, clusterName)
@@ -1036,11 +1025,11 @@ var clusterCheckFeatureCommand = cli.Command{
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("Failed to find a feature named '%s'.\n", featureName)
-			return exitError(msg, ExitCode.NotFound)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
 		}
 
 		values := install.Variables{}
@@ -1058,7 +1047,7 @@ var clusterCheckFeatureCommand = cli.Command{
 		results, err := feature.Check(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
-			return exitError(msg, ExitCode.RPC)
+			return clitools.ExitOnRPC(msg)
 		}
 		if !results.Successful() {
 			msg := fmt.Sprintf("Feature '%s' not found on cluster '%s'", featureName, clusterName)
@@ -1094,11 +1083,11 @@ var clusterDeleteFeatureCommand = cli.Command{
 		}
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("Failed to find a feature named '%s'.\n", featureName)
-			return exitError(msg, ExitCode.NotFound)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
 		}
 
 		values := install.Variables{}
@@ -1119,14 +1108,14 @@ var clusterDeleteFeatureCommand = cli.Command{
 		results, err := feature.Remove(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())
-			return exitError(msg, ExitCode.RPC)
+			return clitools.ExitOnRPC(msg)
 		}
 		if !results.Successful() {
 			msg := fmt.Sprintf("Failed to delete feature '%s' from cluster '%s'", featureName, clusterName)
 			if Verbose || Debug {
 				msg += fmt.Sprintf(":\n%s\n", results.AllErrorMessages())
 			}
-			return exitError(msg, ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 		}
 		fmt.Printf("Feature '%s' deleted successfully from cluster '%s'\n", featureName, clusterName)
 		return nil
@@ -1170,14 +1159,16 @@ var clusterNodeCommand = cli.Command{
 		if !c.Command.HasName("list") {
 			hostName = c.Args().Get(1)
 			if hostName == "" {
-				return exitError("Invalid argument HOSTNAME", ExitCode.InvalidArgument)
+				fmt.Fprintln(os.Stderr, "missing mandatory argument HOSTNAME")
+				_ = cli.ShowSubcommandHelp(c)
+				return clitools.ExitOnInvalidArgument()
 			}
 
 			var err error
 			hostInstance, err = brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
 			if err != nil {
 				msg := fmt.Sprintf("Failed to list nodes of cluster '%s'", clusterName)
-				return exitError(msg, ExitCode.RPC)
+				return clitools.ExitOnRPC(msg)
 			}
 		}
 
@@ -1254,7 +1245,7 @@ var clusterNodeListCommand = cli.Command{
 		jsoned, err := json.Marshal(formatted)
 		if err != nil {
 			log.Errorln(err.Error())
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		fmt.Println(string(jsoned))
 		return nil
@@ -1283,23 +1274,23 @@ var clusterNodeInspectCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		host, err := brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
-			return exitError("Failed to get node information", ExitCode.RPC)
+			return clitools.ExitOnRPC(err.Error())
 		}
 
 		jsoned, err := json.Marshal(host)
 		if err != nil {
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 
 		toFormat := map[string]interface{}{}
 		err = json.Unmarshal(jsoned, &toFormat)
 		if err != nil {
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 
 		jsoned, err = json.Marshal(toFormat)
 		if err != nil {
-			return exitError(err.Error(), ExitCode.Run)
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		fmt.Printf(string(jsoned))
 		return nil
@@ -1347,7 +1338,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 
 		err := clusterInstance.Delete()
 		if err != nil {
-			return exitError(err.Error(), ExitCode.RPC)
+			return clitools.ExitOnRPC(err.Error())
 		}
 
 		fmt.Printf("Node '%s' of cluster '%s' deleted successfully.\n", hostName, clusterName)
@@ -1369,7 +1360,7 @@ var clusterNodeStopCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
-		return exitError("Not yet implemented", ExitCode.NotImplemented)
+		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented")
 	},
 }
 
@@ -1390,7 +1381,7 @@ var clusterNodeStartCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
-		return exitError("Not yet implemented", ExitCode.NotImplemented)
+		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented")
 	},
 }
 
@@ -1407,6 +1398,6 @@ var clusterNodeStateCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
-		return exitError("Not yet implemented", ExitCode.NotImplemented)
+		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented")
 	},
 }

@@ -182,7 +182,7 @@ func (client *Client) DeleteVPC(id string) error {
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
-	log.Infof("providers.flexibleengine.CreateNetwork(%s) called\n", req.Name)
+	log.Debugf("providers.flexibleengine.CreateNetwork(%s) called\n", req.Name)
 	subnet, err := client.findSubnetByName(req.Name)
 	if subnet == nil && err != nil {
 		return nil, err
@@ -195,6 +195,18 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 		return nil, fmt.Errorf("network name '%s' invalid: %s", req.Name, err)
 	}
 
+	// Checks if CIDR is valid...
+	_, vpcnetDesc, _ := net.ParseCIDR(client.vpc.CIDR)
+	_, networkDesc, err := net.ParseCIDR(req.CIDR)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error())
+	}
+	// .. and if CIDR is inside VPC's one
+	if !cidrIntersects(vpcnetDesc, networkDesc) {
+		return nil, fmt.Errorf("can't create subnet with CIDR '%s': not inside network CIDR '%s'", req.CIDR, client.vpc.CIDR)
+	}
+
+	// Creates the subnet
 	subnet, err = client.createSubnet(req.Name, req.CIDR)
 	if err != nil {
 		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, openstack.ProviderErrorToString(err))
@@ -446,15 +458,7 @@ func cidrIntersects(n1, n2 *net.IPNet) bool {
 
 // createSubnet creates a subnet using native FlexibleEngine API
 func (client *Client) createSubnet(name string, cidr string) (*subnets.Subnet, error) {
-	// Checks if subnet is inside CIDR of VPC
-	_, vpcnetDesc, _ := net.ParseCIDR(client.vpc.CIDR)
-	network, networkDesc, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", name, cidr, openstack.ProviderErrorToString(err))
-	}
-	if !cidrIntersects(vpcnetDesc, networkDesc) {
-		return nil, fmt.Errorf("can't create subnet with CIDR '%s': not inside network CIDR '%s'", cidr, client.vpc.CIDR)
-	}
+	network, networkDesc, _ := net.ParseCIDR(cidr)
 
 	// Validates CIDR regarding the existing subnets
 	subnets, err := client.listSubnets()

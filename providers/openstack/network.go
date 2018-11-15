@@ -17,8 +17,8 @@
 package openstack
 
 import (
-	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -78,6 +78,12 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	}
 	if _net != nil {
 		return nil, fmt.Errorf("Error creating network '%s': a network already exists with that name", req.Name)
+	}
+
+	// Checks if CIDR is valid...
+	_, _, err = net.ParseCIDR(req.CIDR)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error())
 	}
 
 	// We specify a name and that it should forward packets
@@ -508,9 +514,9 @@ func (client *Client) createSubnet(name string, networkID string, cidr string, i
 	if err != nil {
 		switch r.Err.(type) {
 		case gc.ErrDefault400:
-			msg := extractMessageFromNeutronError(r.Err.Error())
-			if msg != "" {
-				msg = fmt.Sprintf("Error creating subnet: bad request: %s\n", msg)
+			neutronError := ParseNeutronError(r.Err.Error())
+			if neutronError != nil {
+				msg := fmt.Sprintf("Error creating subnet: bad request: %s\n", neutronError["message"])
 				log.Debugf(msg)
 				return nil, fmt.Errorf(msg)
 			}
@@ -563,18 +569,6 @@ func (client *Client) createSubnet(name string, networkID string, cidr string, i
 		Mask:      subnet.CIDR,
 		NetworkID: subnet.NetworkID,
 	}, nil
-}
-
-func extractMessageFromNeutronError(neutronError string) string {
-	startIdx := strings.Index(neutronError, "{\"NeutronError\":")
-	//startIdx += len("\"NeutronError\":")
-	jsonError := strings.Trim(neutronError[startIdx:], " ")
-	unjsoned := map[string]map[string]string{}
-	json.Unmarshal([]byte(jsonError), &unjsoned)
-	if msg, ok := unjsoned["NeutronError"]["message"]; ok {
-		return msg
-	}
-	return ""
 }
 
 // getSubnet returns the sub network identified by id

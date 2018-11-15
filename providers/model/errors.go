@@ -51,6 +51,24 @@ func (e ResourceNotFound) Error() string {
 	return fmt.Sprintf("Unable to find %s '%s'", e.ResourceType, e.Name)
 }
 
+// ResourceNotAvailable resource not available error
+type ResourceNotAvailable struct {
+	ResourceError
+}
+
+// ResourceNotAvailableError creates a ResourceNotAvailable error
+func ResourceNotAvailableError(resource, name string) ResourceNotAvailable {
+	return ResourceNotAvailable{
+		ResourceError{
+			Name:         name,
+			ResourceType: resource,
+		},
+	}
+}
+func (e ResourceNotAvailable) Error() string {
+	return fmt.Sprintf("%s resource '%s' is unavailable", e.ResourceType, e.Name)
+}
+
 // ResourceAlreadyExists resource already exists error
 type ResourceAlreadyExists struct {
 	ResourceError
