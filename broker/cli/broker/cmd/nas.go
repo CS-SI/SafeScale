@@ -19,10 +19,12 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/providers/model"
+	clitools "github.com/CS-SI/SafeScale/utils"
 
 	"github.com/urfave/cli"
 )
@@ -56,7 +58,7 @@ var nasCreate = cli.Command{
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Nas_name> and/or <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Nas and Host name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		def := pb.NasExportDefinition{
 			Name: &pb.NasExportName{Name: c.Args().Get(0)},
@@ -65,7 +67,7 @@ var nasCreate = cli.Command{
 		}
 		err := client.New().Nas.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return client.DecorateError(err, "creation of nas", true)
+			return clitools.ExitOnRPC(client.DecorateError(err, "creation of nas", true).Error())
 		}
 
 		return nil
@@ -74,20 +76,23 @@ var nasCreate = cli.Command{
 
 var nasDelete = cli.Command{
 	Name:      "delete",
-	Usage:     "Delete a nfs server on an host and expose a directory",
+	Usage:     "Delete a nfs server on an host",
 	ArgsUsage: "<Nas_name>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() < 1 {
 			fmt.Println("Missing mandatory argument <Nas_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Nas name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 
 		var nasList []string
 		nasList = append(nasList, c.Args().First())
 		nasList = append(nasList, c.Args().Tail()...)
 
-		_ = client.New().Nas.Delete(nasList, client.DefaultExecutionTimeout)
+		err := client.New().Nas.Delete(nasList, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.ExitOnRPC(client.DecorateError(err, "deletion of nas", false).Error())
+		}
 
 		return nil
 	},
@@ -99,7 +104,7 @@ var nasList = cli.Command{
 	Action: func(c *cli.Context) error {
 		nases, err := client.New().Nas.List(0)
 		if err != nil {
-			return client.DecorateError(err, "list of nas", false)
+			return clitools.ExitOnRPC(client.DecorateError(err, "list of nas", false).Error())
 		}
 		out, _ := json.Marshal(nases)
 		fmt.Println(string(out))
@@ -121,9 +126,9 @@ var nasMount = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Nas_name> and/or <Host_name>")
+			fmt.Fprintln(os.Stderr, "Missing mandatory argument <Nas_name> and/or <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Nas and Host name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		def := pb.NasMountDefinition{
 			Host: &pb.Reference{Name: c.Args().Get(1)},
@@ -133,7 +138,7 @@ var nasMount = cli.Command{
 		}
 		err := client.New().Nas.Mount(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return client.DecorateError(err, "mount of nas", true)
+			return clitools.ExitOnRPC(client.DecorateError(err, "mount of nas", true).Error())
 		}
 		return nil
 	},
@@ -147,7 +152,7 @@ var nasUnmount = cli.Command{
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Nas_name> and/or <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Nas and Host name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		def := pb.NasMountDefinition{
 			Host: &pb.Reference{Name: c.Args().Get(1)},
@@ -155,7 +160,7 @@ var nasUnmount = cli.Command{
 		}
 		err := client.New().Nas.Unmount(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return client.DecorateError(err, "unmount of nas", true)
+			return clitools.ExitOnRPC(client.DecorateError(err, "unmount of nas", true).Error())
 		}
 
 		return nil
@@ -170,11 +175,11 @@ var nasInspect = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Nas_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Nas name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		export, err := client.New().Nas.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return client.DecorateError(err, "inspection of nas", false)
+			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of nas", false).Error())
 		}
 		out, _ := json.Marshal(export)
 		fmt.Println(string(out))

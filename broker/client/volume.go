@@ -18,11 +18,13 @@ package client
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	utils "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/broker/utils"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // volume is the part of broker client handing volumes
@@ -69,7 +71,10 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 
 	timeout = timeout + (30 * time.Second * time.Duration(len(names)))
 
-	var wg sync.WaitGroup
+	var (
+		wg   sync.WaitGroup
+		errs int
+	)
 
 	volDeleter := func(aname string) {
 		defer wg.Done()
@@ -79,7 +84,8 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 		_, err := volumeService.Delete(ctx, &pb.Reference{Name: aname})
 
 		if err != nil {
-			fmt.Println(DecorateError(err, "deletion of volume", true).Error())
+			fmt.Fprintln(os.Stderr, DecorateError(err, "deletion of volume", true).Error())
+			errs++
 		} else {
 			fmt.Printf("Volume '%s' deleted\n", aname)
 		}
@@ -89,9 +95,11 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 	for _, target := range names {
 		go volDeleter(target)
 	}
-
 	wg.Wait()
 
+	if errs > 0 {
+		return clitools.ExitOnRPC("")
+	}
 	return nil
 }
 

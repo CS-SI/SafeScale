@@ -20,9 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/urfave/cli"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
-	"github.com/urfave/cli"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // NetworkCmd command
@@ -49,7 +51,7 @@ var networkList = cli.Command{
 	Action: func(c *cli.Context) error {
 		networks, err := client.New().Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return client.DecorateError(err, "list of networks", false)
+			return clitools.ExitOnRPC(client.DecorateError(err, "list of networks", false).Error())
 		}
 		out, _ := json.Marshal(networks.GetNetworks())
 		fmt.Println(string(out))
@@ -67,14 +69,17 @@ var networkDelete = cli.Command{
 		if c.NArg() < 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Network name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 
 		var networkList []string
 		networkList = append(networkList, c.Args().First())
 		networkList = append(networkList, c.Args().Tail()...)
 
-		_ = client.New().Network.Delete(networkList, client.DefaultExecutionTimeout)
+		err := client.New().Network.Delete(networkList, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.ExitOnRPC(client.DecorateError(err, "deletion of network", false).Error())
+		}
 
 		return nil
 	},
@@ -88,11 +93,11 @@ var networkInspect = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Network name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return client.DecorateError(err, "inspection of network", false)
+			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of network", false).Error())
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))
@@ -142,7 +147,7 @@ var networkCreate = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Network name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		netdef := pb.NetworkDefinition{
 			CIDR: c.String("cidr"),
@@ -158,7 +163,7 @@ var networkCreate = cli.Command{
 		}
 		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
 		if err != nil {
-			return client.DecorateError(err, "creation of network", true)
+			return clitools.ExitOnRPC(client.DecorateError(err, "creation of network", true).Error())
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))
