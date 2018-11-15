@@ -67,7 +67,7 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	// We 1st check if name is not aleready used
 	_net, err := metadata.LoadNetwork(providers.FromClient(client), req.Name)
 	if err != nil {
-		log.Debugf("Error creating network: loading metadata: %+v", err)
+		log.Errorf("Error creating network: loading metadata: %+v", err)
 		return nil, errors.Wrap(err, "Error creating network: loading metadata")
 	}
 	if _net != nil {
@@ -84,13 +84,13 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	// Execute the operation and get back a networks.Network struct
 	network, err := networks.Create(client.Network, opts).Extract()
 	if err != nil {
-		log.Debugf("Error creating network: network create: %+v", err)
+		log.Errorf("Error creating network: network create: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating network %s: %s", req.Name, ProviderErrorToString(err)))
 	}
 
 	sn, err := client.CreateSubnet(req.Name, network.ID, req.CIDR, req.IPVersion)
 	if err != nil {
-		log.Debugf("Error creating network: subnetwork create: %+v", err)
+		log.Errorf("Error creating network: subnetwork create: %+v", err)
 		nerr := client.DeleteNetwork(network.ID)
 		if nerr != nil {
 			log.Warnf("Error deleting network: %v", nerr)
@@ -106,7 +106,7 @@ func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error
 	}
 	err = metadata.SaveNetwork(providers.FromClient(client), net)
 	if err != nil {
-		log.Debugf("Error creating network: subnetwork save metadata: %+v", err)
+		log.Errorf("Error creating network: subnetwork save metadata: %+v", err)
 		nerr := client.DeleteNetwork(network.ID)
 		if nerr != nil {
 			log.Warnf("Error deleting network: %v", nerr)
@@ -121,7 +121,7 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 	// We first try looking for network from metadata
 	m, err := metadata.LoadNetwork(providers.FromClient(client), ref)
 	if err != nil {
-		log.Debugf("Error getting network: loading network metadata: %+v", err)
+		log.Errorf("Error getting network: loading network metadata: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting network: loading network metadata"))
 	}
 	if m != nil {
@@ -133,7 +133,7 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 	network, err := networks.Get(client.Network, ref).Extract()
 	if err != nil {
 		if _, ok := err.(gc.ErrDefault404); !ok {
-			log.Debugf("Error getting network: getting network: %+v", err)
+			log.Errorf("Error getting network: getting network: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error getting network: %s", ProviderErrorToString(err)))
 		}
 	}
@@ -164,7 +164,7 @@ func (client *Client) GetNetwork(ref string) (*api.Network, error) {
 	// Last chance, we look at all network
 	nets, err := client.listAllNetworks()
 	if err != nil {
-		log.Debugf("Error getting network: listing all networks: %+v", err)
+		log.Errorf("Error getting network: listing all networks: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting network: listing all networks"))
 	}
 	for _, n := range nets {
@@ -280,7 +280,7 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 func (client *Client) DeleteNetwork(networkRef string) error {
 	m, err := metadata.LoadNetwork(providers.FromClient(client), networkRef)
 	if err != nil {
-		log.Debugf("Error deleting network: loading network: %+v", err)
+		log.Errorf("Error deleting network: loading network: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting network: loading network"))
 	}
 	if m == nil {
@@ -298,7 +298,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 
 	hosts, err := m.ListHosts()
 	if err != nil {
-		log.Debugf("Error deleting network: listing hosts: %+v", err)
+		log.Errorf("Error deleting network: listing hosts: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting network: listing hosts"))
 	}
 	gwID := m.Get().GatewayID
@@ -334,24 +334,24 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 
 	sns, err := client.ListSubnets(networkID)
 	if err != nil {
-		log.Debugf("Error deleting network: listing subnets: %+v", err)
+		log.Errorf("Error deleting network: listing subnets: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting network, listing subnets: %s", ProviderErrorToString(err)))
 	}
 	for _, sn := range sns {
 		err := client.DeleteSubnet(sn.ID)
 		if err != nil {
-			log.Debugf("Error deleting network: deleting subnets: %+v", err)
+			log.Errorf("Error deleting network: deleting subnets: %+v", err)
 			return errors.Wrap(err, fmt.Sprintf("Error deleting network, deleting subnets: %s", ProviderErrorToString(err)))
 		}
 	}
 	err = networks.Delete(client.Network, networkID).ExtractErr()
 	if err != nil {
-		log.Debugf("Error deleting network: extracting errors: %+v", err)
+		log.Errorf("Error deleting network: extracting errors: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting network: %s", ProviderErrorToString(err)))
 	}
 	err = m.Delete()
 	if err != nil {
-		log.Debugf("Error deleting network: deletion: %+v", err)
+		log.Errorf("Error deleting network: deletion: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting network: %s", ProviderErrorToString(err)))
 	}
 
@@ -363,7 +363,7 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	// Ensure network exists
 	net, err := client.GetNetwork(req.NetworkID)
 	if err != nil {
-		log.Debugf("Error creating gateway: getting network: %+v", err)
+		log.Errorf("Error creating gateway: getting network: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway, getting network by id, Network '%s' not found '%s'", req.NetworkID, ProviderErrorToString(err)))
 	}
 	if net == nil {
@@ -383,7 +383,7 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	}
 	host, err := client.createHost(hostReq, true)
 	if err != nil {
-		log.Debugf("Error creating gateway: creating host: %+v", err)
+		log.Errorf("Error creating gateway: creating host: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
 	}
 	err = metadata.SaveGateway(providers.FromClient(client), host, req.NetworkID)
@@ -399,7 +399,7 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 	}(err)
 
 	if err != nil {
-		log.Debugf("Error creating gateway: saving network metadata: %+v", err)
+		log.Errorf("Error creating gateway: saving network metadata: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway: Error saving gateway metadata: %s", ProviderErrorToString(err)))
 	}
 
@@ -410,7 +410,7 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 func (client *Client) DeleteGateway(networkID string) error {
 	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
 	if err != nil {
-		log.Debugf("Error deleting gateway: loading gateway: %+v", err)
+		log.Errorf("Error deleting gateway: loading gateway: %+v", err)
 		return errors.Wrap(err, "Error deleting gateway: loading gateway")
 	}
 	if m == nil {
