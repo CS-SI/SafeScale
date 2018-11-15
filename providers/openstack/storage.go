@@ -96,8 +96,8 @@ func (client *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, erro
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume, loading volume metadata"))
 	}
 	if volume != nil {
-		log.Debugf("Error creating volume, volume not found: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Volume '%s' already exists", request.Name))
+		log.Debugf("Error creating volume, '%s' already exists", request.Name)
+		return nil, errors.New(fmt.Sprintf("Volume '%s' already exists", request.Name))
 	}
 
 	vol, err := volumes.Create(client.Volume, volumes.CreateOpts{
