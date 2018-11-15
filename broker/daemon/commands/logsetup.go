@@ -1,14 +1,17 @@
 package commands
 
 import (
+	"github.com/CS-SI/SafeScale/utils"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 )
 
 func init() {
+	log.SetFormatter(&utils.MyFormatter{ TextFormatter: log.TextFormatter{ForceColors:true, TimestampFormat : "2006-01-02 15:04:05", FullTimestamp:true, DisableLevelTruncation:true}})
+	log.SetLevel(log.DebugLevel)
+
 	// Log as JSON instead of the default ASCII formatter.
-	log.SetFormatter(&log.TextFormatter{ForceColors:true, TimestampFormat : "2006-01-02 15:04:05", FullTimestamp:true})
 	// log.SetFormatter(&log.JSONFormatter{})
 
 	// Output to stdout instead of the default stderr
