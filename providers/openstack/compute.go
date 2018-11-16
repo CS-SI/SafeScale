@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -33,7 +32,6 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	gc "github.com/gophercloud/gophercloud"
-	nics "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
@@ -50,6 +48,7 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
@@ -339,12 +338,52 @@ func (client *Client) UpdateHost(host *model.Host) error {
 	return nil
 }
 
+// interpretAddresses converts adresses returned by the OpenStack driver
+// Returns string slice containing the name of the networks, string map of IP addresses
+// (indexed on network name), public ipv4 and ipv6 (if they exists)
+func (client *Client) interpretAddresses(
+	addresses map[string]interface{},
+) ([]string, map[IPVersion.Enum]map[string]string, string, string) {
+
+	var (
+		networks    = []string{}
+		addrs       = map[IPVersion.Enum]map[string]string{}
+		AcccessIPv4 string
+		AcccessIPv6 string
+	)
+
+	addrs[IPVersion.IPv4] = map[string]string{}
+	addrs[IPVersion.IPv4] = map[string]string{}
+
+	for n, obj := range addresses {
+		networks = append(networks, n)
+		for _, networkAddresses := range obj.([]interface{}) {
+			address := networkAddresses.(map[string]interface{})
+			version := address["version"].(float64)
+			fixedIP := address["addr"].(string)
+			if n == client.Cfg.ProviderNetwork {
+				switch version {
+				case 4:
+					AcccessIPv4 = fixedIP
+				case 6:
+					AcccessIPv6 = fixedIP
+				}
+			} else {
+				switch version {
+				case 4:
+					addrs[IPVersion.IPv4][n] = fixedIP
+				case 6:
+					addrs[IPVersion.IPv6][n] = fixedIP
+				}
+			}
+		}
+	}
+	return networks, addrs, AcccessIPv4, AcccessIPv6
+}
+
 // complementHost complements Host data with content of server parameter
 func (client *Client) complementHost(host *model.Host, server *servers.Server) error {
-	networks, addresses, ipv4, ipv6, err := client.collectAddresses(host)
-	if err != nil {
-		return err
-	}
+	networks, addresses, ipv4, ipv6 := client.interpretAddresses(server.Addresses)
 
 	// Updates intrinsic data of host if needed
 	if host.ID == "" {
@@ -357,35 +396,35 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 	host.LastState = toHostState(server.Status)
 
 	// Updates Host Property propsv1.HostDescription
-	heDescriptionV1 := propsv1.HostDescription{}
-	err = host.Properties.Get(string(HostProperty.DescriptionV1), &heDescriptionV1)
+	hpDescriptionV1 := propsv1.BlankHostDescription
+	err := host.Properties.Get(HostProperty.DescriptionV1, &hpDescriptionV1)
 	if err != nil {
 		return err
 	}
-	heDescriptionV1.Created = server.Created
-	heDescriptionV1.Updated = server.Updated
-	err = host.Properties.Set(string(HostProperty.DescriptionV1), &heDescriptionV1)
+	hpDescriptionV1.Created = server.Created
+	hpDescriptionV1.Updated = server.Updated
+	err = host.Properties.Set(HostProperty.DescriptionV1, &hpDescriptionV1)
 	if err != nil {
 		return err
 	}
 
 	// Updates Host Property propsv1.HostSizing
-	heSizingV1 := propsv1.HostSizing{}
-	err = host.Properties.Get(HostProperty.SizingV1, &heSizingV1)
+	hpSizingV1 := propsv1.BlankHostSizing
+	err = host.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
 	if err != nil {
 		return err
 	}
-	heSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
-	err = host.Properties.Set(HostProperty.SizingV1, &heSizingV1)
+	hpSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
+	err = host.Properties.Set(HostProperty.SizingV1, &hpSizingV1)
 	if err != nil {
 		return err
 	}
 
-	// Updates Host Property HostNetwork
-	hpNetworkV1 := propsv1.HostNetwork{}
+	// Updates Host Property propsv1.HostNetwork
+	hpNetworkV1 := propsv1.BlankHostNetwork
 	err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
 	if err != nil {
-		return nil
+		return err
 	}
 	if hpNetworkV1.PublicIPv4 == "" {
 		hpNetworkV1.PublicIPv4 = ipv4
@@ -442,218 +481,9 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 		hpNetworkV1.IPv4Addresses = ipv4Addresses
 		hpNetworkV1.IPv6Addresses = ipv6Addresses
 	}
-	err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
 }
-
-// collectAddresses converts adresses returned by the OpenStack driver
-// Returns string slice containing the name of the networks, string map of IP addresses
-// (indexed on network name), public ipv4 and ipv6 (if they exists)
-func (client *Client) collectAddresses(host *model.Host) ([]string, map[IPVersion.Enum]map[string]string, string, string, error) {
-	var (
-		networks      = []string{}
-		addrs         = map[IPVersion.Enum]map[string]string{}
-		AcccessIPv4   string
-		AcccessIPv6   string
-		allInterfaces = []nics.Interface{}
-	)
-
-	pager := client.listInterfaces(host.ID)
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		list, err := nics.ExtractInterfaces(page)
-		if err != nil {
-			return false, err
-		}
-		allInterfaces = append(allInterfaces, list...)
-		return true, nil
-	})
-	if err != nil {
-		return networks, addrs, "", "", err
-	}
-
-	addrs[IPVersion.IPv4] = map[string]string{}
-	addrs[IPVersion.IPv6] = map[string]string{}
-
-	for _, item := range allInterfaces {
-		networks = append(networks, item.NetID)
-		for _, address := range item.FixedIPs {
-			fixedIP := address.IPAddress
-			ipv4 := net.ParseIP(fixedIP).To4() != nil
-			if item.NetID == client.Cfg.ProviderNetwork {
-				if ipv4 {
-					AcccessIPv4 = fixedIP
-				} else {
-					AcccessIPv6 = fixedIP
-				}
-			} else {
-				if ipv4 {
-					addrs[IPVersion.IPv4][item.NetID] = fixedIP
-				} else {
-					addrs[IPVersion.IPv6][item.NetID] = fixedIP
-				}
-			}
-		}
-	}
-	return networks, addrs, AcccessIPv4, AcccessIPv6, nil
-}
-
-// listInterfaces returns a pager of the interfaces attached to host identified by 'serverID'
-func (client *Client) listInterfaces(hostID string) pagination.Pager {
-	url := client.Compute.ServiceURL("servers", hostID, "os-interface")
-	return pagination.NewPager(client.Compute, url, func(r pagination.PageResult) pagination.Page {
-		return nics.InterfacePage{SinglePageBase: pagination.SinglePageBase(r)}
-	})
-}
-
-// // interpretAddresses converts adresses returned by the OpenStack driver
-// // Returns string slice containing the name of the networks, string map of IP addresses
-// // (indexed on network name), public ipv4 and ipv6 (if they exists)
-// func (client *Client) interpretAddresses(
-// 	addresses map[string]interface{},
-// ) ([]string, map[IPVersion.Enum]map[string]string, string, string) {
-
-// 	var (
-// 		networks    = []string{}
-// 		addrs       = map[IPVersion.Enum]map[string]string{}
-// 		AcccessIPv4 string
-// 		AcccessIPv6 string
-// 	)
-
-// 	addrs[IPVersion.IPv4] = map[string]string{}
-// 	addrs[IPVersion.IPv4] = map[string]string{}
-
-// 	for n, obj := range addresses {
-// 		networks = append(networks, n)
-// 		for _, networkAddresses := range obj.([]interface{}) {
-// 			address := networkAddresses.(map[string]interface{})
-// 			version := address["version"].(float64)
-// 			fixedIP := address["addr"].(string)
-// 			if n == client.Cfg.ProviderNetwork {
-// 				switch version {
-// 				case 4:
-// 					AcccessIPv4 = fixedIP
-// 				case 6:
-// 					AcccessIPv6 = fixedIP
-// 				}
-// 			} else {
-// 				switch version {
-// 				case 4:
-// 					addrs[IPVersion.IPv4][n] = fixedIP
-// 				case 6:
-// 					addrs[IPVersion.IPv6][n] = fixedIP
-// 				}
-// 			}
-// 		}
-// 	}
-// 	return networks, addrs, AcccessIPv4, AcccessIPv6
-// }
-
-// // complementHost complements Host data with content of server parameter
-// func (client *Client) complementHost(host *model.Host, server *servers.Server) error {
-// 	networks, addresses, ipv4, ipv6 := client.interpretAddresses(server.Addresses)
-
-// 	// Updates intrinsic data of host if needed
-// 	if host.ID == "" {
-// 		host.ID = server.ID
-// 	}
-// 	if host.Name == "" {
-// 		host.Name = server.Name
-// 	}
-
-// 	host.LastState = toHostState(server.Status)
-
-// 	// Updates Host Property propsv1.HostDescription
-// 	hpDescriptionV1 := propsv1.BlankHostDescription
-// 	err := host.Properties.Get(HostProperty.DescriptionV1, &hpDescriptionV1)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	hpDescriptionV1.Created = server.Created
-// 	hpDescriptionV1.Updated = server.Updated
-// 	err = host.Properties.Set(HostProperty.DescriptionV1, &hpDescriptionV1)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	// Updates Host Property propsv1.HostSizing
-// 	hpSizingV1 := propsv1.BlankHostSizing
-// 	err = host.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	hpSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
-// 	err = host.Properties.Set(HostProperty.SizingV1, &hpSizingV1)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	// Updates Host Property propsv1.HostNetwork
-// 	hpNetworkV1 := propsv1.BlankHostNetwork
-// 	err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if hpNetworkV1.PublicIPv4 == "" {
-// 		hpNetworkV1.PublicIPv4 = ipv4
-// 	}
-// 	if hpNetworkV1.PublicIPv6 == "" {
-// 		hpNetworkV1.PublicIPv6 = ipv6
-// 	}
-// 	// networks contains network names, by HostExtensionNetworkV1.IPxAddresses has to be
-// 	// indexed on network ID. Tries to convert if possible, if we already have correspondance
-// 	// between network ID and network Name in Host definition
-// 	if len(hpNetworkV1.NetworksByName) > 0 {
-// 		ipv4Addresses := map[string]string{}
-// 		ipv6Addresses := map[string]string{}
-// 		for netname, netid := range hpNetworkV1.NetworksByName {
-// 			if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
-// 				ipv4Addresses[netid] = ip
-// 			} else if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
-// 				ipv4Addresses[netid] = ip
-// 			} else {
-// 				ipv4Addresses[netid] = ""
-// 			}
-
-// 			if ip, ok := addresses[IPVersion.IPv6][netid]; ok {
-// 				ipv6Addresses[netid] = ip
-// 			} else if ip, ok := addresses[IPVersion.IPv6][netname]; ok {
-// 				ipv6Addresses[netid] = ip
-// 			} else {
-// 				ipv6Addresses[netid] = ""
-// 			}
-// 		}
-// 		hpNetworkV1.IPv4Addresses = ipv4Addresses
-// 		hpNetworkV1.IPv6Addresses = ipv6Addresses
-// 	} else {
-// 		networksByName := map[string]string{}
-// 		ipv4Addresses := map[string]string{}
-// 		ipv6Addresses := map[string]string{}
-// 		for _, netname := range networks {
-// 			networksByName[netname] = ""
-
-// 			if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
-// 				ipv4Addresses[netname] = ip
-// 			} else {
-// 				ipv4Addresses[netname] = ""
-// 			}
-
-// 			if ip, ok := addresses[IPVersion.IPv6][netname]; ok {
-// 				ipv6Addresses[netname] = ip
-// 			} else {
-// 				ipv6Addresses[netname] = ""
-// 			}
-// 		}
-// 		hpNetworkV1.NetworksByName = networksByName
-// 		// IPvxAddresses are here indexed by names... At least we have them...
-// 		hpNetworkV1.IPv4Addresses = ipv4Addresses
-// 		hpNetworkV1.IPv6Addresses = ipv6Addresses
-// 	}
-
-// 	return host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
-// }
 
 // userData is the structure to apply to userdata.sh template
 type userData struct {
@@ -702,19 +532,22 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	host, err := client.createHost(request, false)
 	if err != nil {
 		log.Debugf("Error creating host: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host"))
+		return nil, err
 	}
+
+	defer func() {
+		if err != nil {
+			derr := client.DeleteHost(host.ID)
+			if derr != nil {
+				log.Warnf("Error deleting host: %v", derr)
+			}
+		}
+	}()
 
 	// Saves host metadata
 	err = metadata.SaveHost(client, host)
 	if err != nil {
-		nerr := client.DeleteHost(host.ID)
-		if nerr != nil {
-			log.Warnf("Error deleting host: %v", nerr)
-		}
-
-		log.Debugf("Error creating host: save host: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("error creating host: %s", ProviderErrorToString(err)))
+		return nil, err
 	}
 
 	return host, nil
@@ -732,11 +565,11 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 	// First check if name is not already used
 	mh, err := metadata.LoadHost(client, request.ResourceName)
 	if err != nil {
-		log.Debugf("Error creating host: loading host: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: loading host"))
+		log.Debugf("%+v", err)
+		return nil, err
 	}
 	if mh != nil {
-		return nil, fmt.Errorf(msgFail, fmt.Sprintf("a host already exists with name '%s'", request.ResourceName))
+		return nil, fmt.Errorf("a host already exists with name '%s'", request.ResourceName)
 	}
 
 	// The Default Network is the first of the provided list, by convention
@@ -748,9 +581,9 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 	if !request.PublicIP {
 		mgw, err := metadata.LoadGateway(client, defaultNetworkID)
 		if err != nil {
-			log.Debugf("Error creating host: read gateway: %+v", err)
-			err := fmt.Errorf(msgFail, "no private host can be created on a network without gateway")
-			return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: read gateway"))
+			msg := fmt.Sprintf("private host requested without network")
+			log.Debugf(utils.TitleFirst(msg))
+			return nil, fmt.Errorf(msg)
 		}
 		if mgw != nil {
 			defaultGateway = mgw.Get()
@@ -767,7 +600,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 		return nil, err
 	}
 	if mn == nil {
-		return nil, fmt.Errorf(msgFail, fmt.Sprintf("failed to load metadata of network '%s'", defaultNetworkID))
+		return nil, fmt.Errorf("failed to load metadata of network '%s'", defaultNetworkID)
 	}
 	defaultNetwork = mn.Get()
 	if isGateway {
@@ -793,15 +626,17 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 	if request.KeyPair == nil {
 		id, err := uuid.NewV4()
 		if err != nil {
-			log.Debugf("Error creating host: error creating UID: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("error creating UID : %v", err))
+			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
+			log.Debugf(utils.TitleFirst(msg))
+			return nil, fmt.Errorf(msg)
 		}
 
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
 		request.KeyPair, err = client.CreateKeyPair(name)
 		if err != nil {
-			log.Debugf("Error creating host: creating key pair: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
+			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
+			log.Debugf(utils.TitleFirst(msg))
+			return nil, fmt.Errorf(msg)
 		}
 	}
 
@@ -810,8 +645,9 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 	// Constructs userdata content
 	userData, err := userdata.Prepare(client, request, isGateway, request.KeyPair, defaultGateway, cidr)
 	if err != nil {
-		log.Debugf("Error creating host: preparing user data: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: preparing user data"))
+		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
+		log.Debugf(utils.TitleFirst(msg))
+		return nil, fmt.Errorf(msg)
 	}
 
 	_, err = client.GetTemplate(request.TemplateID)
@@ -883,8 +719,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 				if server != nil {
 					servers.Delete(client.Compute, server.ID)
 				}
-				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
-
+				msg := ProviderErrorToString(err)
 				log.Warnf(msg)
 				return fmt.Errorf(msg)
 			}
@@ -894,8 +729,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 			host, err = client.WaitHostReady(host, 5*time.Minute)
 			if err != nil {
 				servers.Delete(client.Compute, server.ID)
-				msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
-
+				msg := ProviderErrorToString(err)
 				log.Warnf(msg)
 				return fmt.Errorf(msg)
 			}
@@ -921,7 +755,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 		}
 	}()
 
-	// if Floating IP are not used or no public address is requested
+	// if Floating IP are used and public address is requested
 	if client.Cfg.UseFloatingIP && request.PublicIP {
 		// Create the floating IP
 		ip, err := floatingips.Create(client.Compute, floatingips.CreateOpts{

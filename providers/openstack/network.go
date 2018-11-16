@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -36,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 //RouterRequest represents a router request
@@ -272,12 +274,9 @@ func (client *Client) listMonitoredNetworks() ([]*model.Network, error) {
 		return nil
 	})
 
-	if len(netList) == 0 || err != nil {
-		if err != nil {
-			log.Debugf("Error listing monitored networks: pagination error: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing monitored networks: %s", ProviderErrorToString(err)))
-		}
-		log.Debugf("Listing monitored networks: Empty network list !")
+	if err != nil {
+		log.Debugf("Error listing monitored networks: pagination error: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error listing monitored networks: %s", ProviderErrorToString(err)))
 	}
 
 	return netList, err
@@ -285,12 +284,12 @@ func (client *Client) listMonitoredNetworks() ([]*model.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (client *Client) DeleteNetwork(networkRef string) error {
-	log.Infof("providers.openstack.DeleteNetwork(%s) called", networkRef)
+	log.Debugf("providers.openstack.DeleteNetwork(%s) called", networkRef)
+	defer log.Debugf("providers.openstack.DeleteNetwork(%s) done", networkRef)
 
-	// TODO Add more detailed exceptions here
 	mn, err := metadata.LoadNetwork(client, networkRef)
 	if err != nil {
-		msg := fmt.Sprintf("Error deleting network '%s': %+v", networkRef, err)
+		msg := fmt.Sprintf("failed to delete network '%s': error reading metadata: %+v", networkRef, err)
 		log.Debugf(msg)
 		return fmt.Errorf(msg)
 	}
@@ -300,9 +299,10 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 	network := mn.Get()
 	networkID := network.ID
 
-	err = networks.Get(client.Network, networkID).Err
+	r := networks.Get(client.Network, networkID)
+	err = r.Err
 	if err != nil {
-		log.Errorf("Error deleting network: %+v", err)
+		log.Errorf("Failed to delete network: %+v", err)
 		if strings.Contains(err.Error(), "Resource not found") {
 			log.Errorf("Inconsistent network data !!")
 		}
@@ -326,14 +326,14 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 			if len(allhosts) > 1 {
 				lenS = "s"
 			}
-			return fmt.Errorf("network '%s' has %d host%s attached (%s)", networkRef, len(allhosts), lenS, strings.Join(allhosts, ","))
+			return fmt.Errorf("network '%s' has %d host%s attached (%s)", network.Name, len(allhosts), lenS, strings.Join(allhosts, ","))
 		}
 	}
 
 	if gwID != "" {
 		err = client.DeleteGateway(networkID)
 		if err != nil {
-			log.Warnf("Error deleting gateway: %s", ProviderErrorToString(err))
+			log.Warnf("Failed to delete gateway: %s", ProviderErrorToString(err))
 		}
 		err = networks.Get(client.Network, gwID).Err
 		if err != nil {
@@ -345,26 +345,29 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 
 	sns, err := client.listSubnets(networkID)
 	if err != nil {
-		msg := fmt.Sprintf("Error deleting network '%s': %s", networkID, ProviderErrorToString(err))
-		log.Debugf(msg)
+		msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
+		log.Debugf(utils.TitleFirst(msg))
 		return fmt.Errorf(msg)
 	}
 	for _, sn := range sns {
 		err := client.deleteSubnet(sn.ID)
 		if err != nil {
-			log.Debugf("Error deleting network: deleting subnets: %+v", err)
-			return errors.Wrap(err, fmt.Sprintf("Error deleting network, deleting subnets: %s", ProviderErrorToString(err)))
+			msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
+			log.Debugf(utils.TitleFirst(msg))
+			return fmt.Errorf(msg)
 		}
 	}
 	err = networks.Delete(client.Network, networkID).ExtractErr()
 	if err != nil {
-		log.Debugf("Error deleting network: extracting errors: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error deleting network: %s", ProviderErrorToString(err)))
+		msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
+		log.Debugf(utils.TitleFirst(msg))
+		return fmt.Errorf(msg)
 	}
 	err = mn.Delete()
 	if err != nil {
-		log.Debugf("Error deleting network: deletion: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error deleting network: %s", ProviderErrorToString(err)))
+		msg := fmt.Sprintf("failed to delete network: %+v", err)
+		log.Debugf(utils.TitleFirst(msg))
+		return fmt.Errorf(msg)
 	}
 
 	return nil
@@ -625,6 +628,9 @@ func (client *Client) listSubnets(netID string) ([]Subnet, error) {
 
 // deleteSubnet deletes the sub network identified by id
 func (client *Client) deleteSubnet(id string) error {
+	log.Debugf("providers.openstack.deleteSubnet(%s) called", id)
+	defer log.Debugf("providers.openstack.deleteSubnet(%s) done", id)
+
 	routerList, _ := client.ListRouters()
 	var router *Router
 	for _, r := range routerList {
@@ -635,27 +641,41 @@ func (client *Client) deleteSubnet(id string) error {
 	}
 	if router != nil {
 		if err := client.removeSubnetFromRouter(router.ID, id); err != nil {
-			msg := fmt.Sprintf("Error deleting subnet: %s", ProviderErrorToString(err))
-			log.Errorf(msg)
+			msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
+			log.Debug(utils.TitleFirst(msg))
 			return fmt.Errorf(msg)
 		}
 		if err := client.deleteRouter(router.ID); err != nil {
-			msg := fmt.Sprintf("Error deleting subnet: %s", ProviderErrorToString(err))
-			log.Errorf(msg)
+			msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
+			log.Debug(utils.TitleFirst(msg))
 			return fmt.Errorf(msg)
 		}
 	}
-	var err error
+
+	var (
+		r   subnets.DeleteResult
+		err error
+	)
 	for i := 0; i < 10; i++ {
-		if err = subnets.Delete(client.Network, id).ExtractErr(); err == nil {
+		r = subnets.Delete(client.Network, id)
+		err = r.ExtractErr()
+		if err == nil {
 			break
 		}
 		time.Sleep(1 * time.Second)
 	}
-
 	if err != nil {
-		msg := fmt.Sprintf("Error deleting subnet: %s", ProviderErrorToString(err))
-		log.Errorf(msg)
+		switch err.(type) {
+		case gc.ErrUnexpectedResponseCode:
+			neutronError := ParseNeutronError(err.Error())
+			if neutronError["type"] != "" {
+				msg := fmt.Sprintf("failed to delete subnet '%s': still in use", id)
+				log.Errorf(utils.TitleFirst(msg))
+				return fmt.Errorf(msg)
+			}
+		}
+		msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
+		log.Errorf(utils.TitleFirst(msg))
 		return fmt.Errorf(msg)
 	}
 
@@ -676,23 +696,22 @@ func (client *Client) createRouter(req RouterRequest) (*Router, error) {
 	}
 	router, err := routers.Create(client.Network, opts).Extract()
 	if err != nil {
-		log.Debugf("Error deleting subnet: deleting subnet: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating Router: %s", ProviderErrorToString(err)))
+		log.Debugf("failed to create router '%s': %+v", req.Name, err)
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to create router '%s': %s", req.Name, ProviderErrorToString(err)))
 	}
+	log.Debugf("Router '%s' (%s) successfully created", router.Name, router.ID)
 	return &Router{
 		ID:        router.ID,
 		Name:      router.Name,
 		NetworkID: router.GatewayInfo.NetworkID,
 	}, nil
-
 }
 
 // getRouter returns the router identified by id
 func (client *Client) getRouter(id string) (*Router, error) {
-
 	r, err := routers.Get(client.Network, id).Extract()
 	if err != nil {
-		log.Debugf("Error getting router: get router: %+v", err)
+		log.Debugf("Error getting router '%s': %+v", id, err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting Router: %s", ProviderErrorToString(err)))
 	}
 	return &Router{
@@ -700,7 +719,6 @@ func (client *Client) getRouter(id string) (*Router, error) {
 		Name:      r.Name,
 		NetworkID: r.GatewayInfo.NetworkID,
 	}, nil
-
 }
 
 // ListRouters lists available routers
@@ -721,11 +739,8 @@ func (client *Client) ListRouters() ([]Router, error) {
 		}
 		return true, nil
 	})
-	if (err != nil) || (len(ns) == 0) {
-		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
-		}
-		log.Warnf("Router list empty !")
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
 	}
 	return ns, nil
 }
@@ -754,12 +769,15 @@ func (client *Client) addSubnetToRouter(routerID string, subnetID string) error 
 
 // removeSubnetFromRouter detachesa subnet from router interface
 func (client *Client) removeSubnetFromRouter(routerID string, subnetID string) error {
-	_, err := routers.RemoveInterface(client.Network, routerID, routers.RemoveInterfaceOpts{
+	r := routers.RemoveInterface(client.Network, routerID, routers.RemoveInterfaceOpts{
 		SubnetID: subnetID,
-	}).Extract()
+	})
+	_, err := r.Extract()
 	if err != nil {
-		log.Debugf("Error removing subnet from router: removing interface: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error addinter subnet: %s", ProviderErrorToString(err)))
+		spew.Dump(r)
+		msg := fmt.Sprintf("failed to remove subnet '%s' from router '%s': %s", subnetID, routerID, ProviderErrorToString(err))
+		log.Debug(msg)
+		return errors.Wrap(err, msg)
 	}
 	return nil
 }

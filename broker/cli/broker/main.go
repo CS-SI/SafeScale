@@ -51,7 +51,7 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "verbose, v",
-			Usage: "Show debug information",
+			Usage: "Increase verbosity",
 		},
 		cli.BoolFlag{
 			Name:  "debug, d",
@@ -95,8 +95,8 @@ func main() {
 	app.Commands = append(app.Commands, cmd.ContainerCmd)
 	sort.Sort(cli.CommandsByName(cmd.ContainerCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.NasCmd)
-	sort.Sort(cli.CommandsByName(cmd.NasCmd.Subcommands))
+	app.Commands = append(app.Commands, cmd.ShareCmd)
+	sort.Sort(cli.CommandsByName(cmd.ShareCmd.Subcommands))
 
 	app.Commands = append(app.Commands, cmd.ImageCmd)
 	sort.Sort(cli.CommandsByName(cmd.ImageCmd.Subcommands))

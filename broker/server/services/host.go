@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"os"
 	"os/user"
-	"path"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -135,7 +133,7 @@ func (svc *HostService) Create(
 
 	host, err := svc.provider.CreateHost(hostRequest)
 	if err != nil {
-		tbr := errors.Wrapf(err, "Compute resource creation failed: '%s'.", hostRequest.ResourceName)
+		tbr := errors.Wrapf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
@@ -279,84 +277,54 @@ func (svc *HostService) Delete(ref string) error {
 		return err
 	}
 
-	// Don't remove a host acting as a NAS with exported folders
-	hpNasV1 := propsv1.BlankHostNas
-	err = host.Properties.Get(HostProperty.NasV1, &hpNasV1)
+	// Don't remove a host having shares
+	hostSharesV1 := propsv1.BlankHostShares
+	err = host.Properties.Get(HostProperty.SharesV1, &hostSharesV1)
 	if err != nil {
 		return err
 	}
-	if len(hpNasV1.ExportsByID) > 0 {
-		return fmt.Errorf("host is a NAS and export at least one folder")
+	nShares := len(hostSharesV1.ByID)
+	if nShares > 0 {
+		return fmt.Errorf("Can't delete host, exports %d share%s", nShares, utils.Plural(nShares))
 	}
 
 	// Don't remove a host with volumes attached
-	// TODO?: automatic detach ?
-	hpVolumesV1 := propsv1.BlankHostVolumes
-	err = host.Properties.Get(HostProperty.VolumesV1, &hpVolumesV1)
+	hostVolumesV1 := propsv1.BlankHostVolumes
+	err = host.Properties.Get(HostProperty.VolumesV1, &hostVolumesV1)
 	if err != nil {
 		return err
 	}
-	nbAttached := len(hpVolumesV1.VolumesByID)
-	if nbAttached > 0 {
-		return fmt.Errorf("host has %d volume%s attached", nbAttached, utils.Plural(nbAttached))
+	nAttached := len(hostVolumesV1.VolumesByID)
+	if nAttached > 0 {
+		return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
 	}
 
 	// Don't remove a host that is a gateway
-	hpNetworkV1 := propsv1.BlankHostNetwork
-	err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	hostNetworkV1 := propsv1.BlankHostNetwork
+	err = host.Properties.Get(HostProperty.NetworkV1, &hostNetworkV1)
 	if err != nil {
 		return err
 	}
-	if hpNetworkV1.IsGateway {
+	if hostNetworkV1.IsGateway {
 		return fmt.Errorf("can't delete host, it's a gateway that can't be deleted but with its network")
 	}
 
-	// If host mounted NAS exports, unmounts them before anything else
-	hpMountsV1 := propsv1.BlankHostMounts
-	err = host.Properties.Get(HostProperty.MountsV1, &hpMountsV1)
+	// If host mounted shares, unmounts them before anything else
+	hostMountsV1 := propsv1.BlankHostMounts
+	err = host.Properties.Get(HostProperty.MountsV1, &hostMountsV1)
 	if err != nil {
 		return err
 	}
-	nasSvc := NewNasService(svc.provider)
-	for _, i := range hpMountsV1.MountsByPath {
-		if i.Local {
-			continue
-		}
-
-		// Decompose device name to get NAS export name
-		parts := strings.Split(i.Device, ":")
-		exportName := path.Base(parts[1])
-		if exportName == "." || exportName == "/" {
-			return fmt.Errorf("inconsistent metadata content")
-		}
-
-		// Gets NAS export data
-		nas, export, err := nasSvc.Inspect(exportName)
+	shareSvc := NewShareService(svc.provider)
+	for _, i := range hostMountsV1.RemoteMountsByPath {
+		// Gets share data
+		_, share, err := shareSvc.Inspect(i.ShareID)
 		if err != nil {
 			return err
 		}
 
-		// Unmounts NAS export from host
-		err = nasSvc.Unmount(exportName, host.Name)
-		if err != nil {
-			return err
-		}
-
-		// Updates host property propsv1.HostNas
-		hpNasV1 := propsv1.HostNas{}
-		err = nas.Properties.Get(HostProperty.NasV1, &hpNasV1)
-		if err != nil {
-			return err
-		}
-		delete(hpNasV1.ExportsByID, export.ID)
-		delete(hpNasV1.ExportsByName, export.Name)
-		err = nas.Properties.Set(HostProperty.NasV1, &hpNasV1)
-		if err != nil {
-			return err
-		}
-
-		// Updates NAS host metadata
-		err = metadata.SaveHost(svc.provider, nas)
+		// Unmounts share from host
+		err = shareSvc.Unmount(share.Name, host.Name)
 		if err != nil {
 			return err
 		}

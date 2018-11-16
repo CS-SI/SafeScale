@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
-//ProviderNetwork name of ovh external network
+// ProviderNetwork name of ovh external network
 const ProviderNetwork string = "Ext-Net"
 
 type gpuCfg struct {
@@ -78,7 +78,7 @@ type AuthOptions struct {
 // 	tokens := strings.Split(openrc, "export")
 // }
 
-//AuthenticatedClient returns an authenticated client
+// AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	client := &Client{}
 	osclt, err := openstack.AuthenticatedClient(
@@ -123,7 +123,7 @@ type Client struct {
 	MetadataBucketName string
 }
 
-//Build build a new Client from configuration parameter
+// Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	ApplicationKey, _ := params["ApplicationKey"].(string)
 	OpenstackID, _ := params["OpenstackID"].(string)

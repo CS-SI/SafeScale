@@ -110,3 +110,10 @@ func Plural(value int) string {
 	}
 	return ""
 }
+
+// TitleFirst makes the first letter of the first word uppercased
+func TitleFirst(value string) string {
+	fields := strings.Fields(value)
+	fields[0] = strings.Title(fields[0])
+	return strings.Join(fields, " ")
+}

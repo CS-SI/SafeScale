@@ -20,105 +20,109 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
-
 	"github.com/CS-SI/SafeScale/utils/metadata"
 )
 
 const (
 	// nasFolderName is the technical name of the container used to store nas info
-	nasFolderName = "nas"
+	shareFolderName = "shares"
 )
 
-// Nas links Object Storage folder and Network
-type Nas struct {
+// Share contains information to maintain in Object Storage a list of shared folders
+type Share struct {
 	item *metadata.Item
 	name *string
 	id   *string
 }
 
-// NewNas creates an instance of metadata.Nas
-func NewNas(svc api.ClientAPI) *Nas {
-	return &Nas{
-		item: metadata.NewItem(svc, nasFolderName),
+// NewShare creates an instance of metadata.Nas
+func NewShare(svc api.ClientAPI) *Share {
+	return &Share{
+		item: metadata.NewItem(svc, shareFolderName),
 	}
 }
 
-type exportItem struct {
-	HostName   string `json:"name"`        // contains the Name of the host serving the export
-	ExportID   string `json:"export_id"`   // contains the ID of the export
-	ExportName string `json:"export_name"` // contains the name of the export
+type shareItem struct {
+	HostID    string `json:"host_id"`    // contains the ID of the host serving the share
+	HostName  string `json:"host_name"`  // contains the Name of the host serving the share
+	ShareID   string `json:"share_id"`   // contains the ID of the share
+	ShareName string `json:"share_name"` // contains the name of the share
 }
 
 // Serialize ...
-func (n *exportItem) Serialize() ([]byte, error) {
+func (n *shareItem) Serialize() ([]byte, error) {
 	return model.SerializeToJSON(n)
 }
 
 // Deserialize ...
-func (n *exportItem) Deserialize(buf []byte) error {
+func (n *shareItem) Deserialize(buf []byte) error {
 	return model.DeserializeFromJSON(buf, n)
 }
 
 // Carry links an export instance to the Metadata instance
-func (mn *Nas) Carry(hostName, exportID, exportName string) *Nas {
+func (ms *Share) Carry(hostID, hostName, shareID, shareName string) *Share {
+	if hostID == "" {
+		panic("hostID is empty!")
+	}
 	if hostName == "" {
 		panic("hostName is empty!")
 	}
-	if exportID == "" {
-		panic("exportID is empty!")
+	if shareID == "" {
+		panic("shareID is empty!")
 	}
-	if exportName == "" {
-		panic("exportName is empty!")
+	if shareName == "" {
+		panic("shareName is empty!")
 	}
-	if mn.item == nil {
-		panic("mn.item is nil!")
+	if ms.item == nil {
+		panic("ms.item is nil!")
 	}
-	ni := exportItem{
-		HostName:   hostName,
-		ExportID:   exportID,
-		ExportName: exportName,
+	ni := shareItem{
+		HostID:    hostID,
+		HostName:  hostName,
+		ShareID:   shareID,
+		ShareName: shareName,
 	}
-	mn.item.Carry(&ni)
-	mn.name = &ni.ExportName
-	mn.id = &ni.ExportID
-	return mn
+	ms.item.Carry(&ni)
+	ms.name = &ni.ShareName
+	ms.id = &ni.ShareID
+	return ms
 }
 
-// Get returns the ID of the host the exporting
-func (mn *Nas) Get() string {
-	if mn.item == nil {
-		panic("mn.item is nil!")
+// Get returns the ID of the host owning the share
+func (ms *Share) Get() string {
+	if ms.item == nil {
+		panic("ms.item is nil!")
 	}
-	if ei, ok := mn.item.Get().(*exportItem); ok {
+	if ei, ok := ms.item.Get().(*shareItem); ok {
 		return ei.HostName
 	}
 	panic("invalid content in metadata!")
 }
 
-// Write updates the metadata corresponding to the nas in the Object Storage
-func (mn *Nas) Write() error {
-	if mn.item == nil {
-		panic("mn.item is nil!")
+// Write updates the metadata corresponding to the share in the Object Storage
+func (ms *Share) Write() error {
+	if ms.item == nil {
+		panic("ms.item is nil!")
 	}
-	err := mn.item.WriteInto(ByIDFolderName, *mn.id)
+	err := ms.item.WriteInto(ByIDFolderName, *ms.id)
 	if err != nil {
 		return err
 	}
-	return mn.item.WriteInto(ByNameFolderName, *mn.name)
+	return ms.item.WriteInto(ByNameFolderName, *ms.name)
 }
 
 // ReadByID reads the metadata of an export identified by ID from Object Storage
-func (mn *Nas) ReadByID(id string) (bool, error) {
-	if mn.item == nil {
-		panic("mn.item is nil!")
+func (ms *Share) ReadByID(id string) (bool, error) {
+	if ms.item == nil {
+		panic("ms.item is nil!")
 	}
-	var ei exportItem
-	found, err := mn.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
-		err := (&ei).Deserialize(buf)
+	var si shareItem
+	found, err := ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
+		err := (&si).Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &ei, nil
+		return &si, nil
 	})
 	if err != nil {
 		return false, err
@@ -126,22 +130,22 @@ func (mn *Nas) ReadByID(id string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	mn.Carry(ei.HostName, ei.ExportID, ei.ExportName)
+	ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName)
 	return true, nil
 }
 
 // ReadByName reads the metadata of a nas identified by name
-func (mn *Nas) ReadByName(name string) (bool, error) {
-	if mn.item == nil {
-		panic("mn.name is nil!")
+func (ms *Share) ReadByName(name string) (bool, error) {
+	if ms.item == nil {
+		panic("ms.name is nil!")
 	}
-	var ei exportItem
-	found, err := mn.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
-		err := (&ei).Deserialize(buf)
+	var si shareItem
+	found, err := ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
+		err := (&si).Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &ei, nil
+		return &si, nil
 	})
 	if err != nil {
 		return false, err
@@ -149,28 +153,28 @@ func (mn *Nas) ReadByName(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	mn.Carry(ei.HostName, ei.ExportID, ei.ExportName)
+	ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName)
 	return true, nil
 }
 
-// Delete updates the metadata corresponding to the nas
-func (mn *Nas) Delete() error {
-	err := mn.item.DeleteFrom(ByIDFolderName, *mn.id)
+// Delete updates the metadata corresponding to the share
+func (ms *Share) Delete() error {
+	err := ms.item.DeleteFrom(ByIDFolderName, *ms.id)
 	if err != nil {
 		return err
 	}
-	return mn.item.DeleteFrom(ByNameFolderName, *mn.name)
+	return ms.item.DeleteFrom(ByNameFolderName, *ms.name)
 }
 
-// Browse walks through nas folder and executes a callback for each entries
-func (mn *Nas) Browse(callback func(string, string) error) error {
-	return mn.item.BrowseInto(ByNameFolderName, func(buf []byte) error {
-		ei := exportItem{}
-		err := (&ei).Deserialize(buf)
+// Browse walks through shares folder and executes a callback for each entry
+func (ms *Share) Browse(callback func(string, string) error) error {
+	return ms.item.BrowseInto(ByNameFolderName, func(buf []byte) error {
+		si := shareItem{}
+		err := (&si).Deserialize(buf)
 		if err != nil {
 			return err
 		}
-		return callback(ei.HostName, ei.ExportID)
+		return callback(si.HostName, si.ShareID)
 	})
 }
 
@@ -225,38 +229,38 @@ func (mn *Nas) Browse(callback func(string, string) error) error {
 // }
 
 // Acquire waits until the write lock is available, then locks the metadata
-func (mn *Nas) Acquire() {
-	mn.item.Acquire()
+func (ms *Share) Acquire() {
+	ms.item.Acquire()
 }
 
 // Release unlocks the metadata
-func (mn *Nas) Release() {
-	mn.item.Release()
+func (ms *Share) Release() {
+	ms.item.Release()
 }
 
-// SaveNas saves the Nas definition in Object Storage
-func SaveNas(svc *providers.Service, hostName, exportID, exportName string) error {
-	err := NewNas(svc).Carry(hostName, exportID, exportName).Write()
+// SaveShare saves the Nas definition in Object Storage
+func SaveShare(svc *providers.Service, hostID, hostName, shareID, shareName string) error {
+	err := NewShare(svc).Carry(hostID, hostName, shareID, shareName).Write()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// RemoveNas removes the Nas definition from Object Storage
-func RemoveNas(svc *providers.Service, hostName, exportID, exportName string) error {
-	return NewNas(svc).Carry(hostName, exportID, exportName).Delete()
+// RemoveShare removes the share definition from Object Storage
+func RemoveShare(svc *providers.Service, hostID, hostName, shareID, shareName string) error {
+	return NewShare(svc).Carry(hostID, hostName, shareID, shareName).Delete()
 }
 
-// LoadNas returns the host ID hosting export 'ref' read from Object Storage
-func LoadNas(svc *providers.Service, ref string) (string, error) {
-	mn := NewNas(svc)
-	found, err := mn.ReadByID(ref)
+// LoadShare returns the name of the host owing the share 'ref', read from Object Storage
+func LoadShare(svc *providers.Service, ref string) (string, error) {
+	ms := NewShare(svc)
+	found, err := ms.ReadByID(ref)
 	if err != nil {
 		return "", err
 	}
 	if !found {
-		found, err := mn.ReadByName(ref)
+		found, err := ms.ReadByName(ref)
 		if err != nil {
 			return "", err
 		}
@@ -264,7 +268,7 @@ func LoadNas(svc *providers.Service, ref string) (string, error) {
 			return "", nil
 		}
 	}
-	return mn.Get(), nil
+	return ms.Get(), nil
 }
 
 // // MountNas add the client nas to the Nas definition from Object Storage
