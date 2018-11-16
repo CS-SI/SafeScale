@@ -106,6 +106,30 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
 	}
 
+	// TODO Remove later
+	k, uperr := sshconfig.Command("which scp")
+	if uperr != nil {
+		_, uptext, _, kerr := k.Run()
+		if kerr == nil {
+			connected := strings.Contains(uptext, "/scp")
+			if !connected {
+				log.Warn("SSH problem ?")
+			}
+		}
+	}
+
+	// TODO Remove later
+	k, uperr = sshconfig.SudoCommand("which scp")
+	if uperr != nil {
+		_, uptext, _, kerr := k.Run()
+		if kerr == nil {
+			connected := strings.Contains(uptext, "/scp")
+			if !connected {
+				log.Warn("SUDO problem ?")
+			}
+		}
+	}
+
 	nerr := utils.LazyRemove(f.Name())
 	if nerr != nil {
 		log.Warnf("Error deleting file: %v", nerr)
@@ -159,6 +183,18 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			return 255, stdout, stderr, retryErr
 		}
 	}
+
+	/*
+	k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
+	if uperr != nil {
+		log.Warn("Network problem...")
+	} else {
+		_, uptext, _, kerr := k.Run()
+		if kerr == nil {
+			log.Warnf("Network working !!: %s", uptext)
+		}
+	}
+	*/
 
 	return retcode, stdout, stderr, err
 }
