@@ -16,7 +16,9 @@ func init() {
 
 	// Output to stdout instead of the default stderr
 	// Can be any io.Writer, see below for File example
-	file, err := os.OpenFile("brokerd-session.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+
+	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale"), 0777)
+	file, err := os.OpenFile(utils.AbsPathify("$HOME/.safescale/brokerd-session.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		panic(err)
 	}
