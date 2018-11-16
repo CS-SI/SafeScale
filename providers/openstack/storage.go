@@ -159,7 +159,7 @@ func (client *Client) ListVolumes(all bool) ([]api.Volume, error) {
 // ListVolumes list available volumes
 func (client *Client) listAllVolumes() ([]api.Volume, error) {
 	var vs []api.Volume
-	err := volumes.List(client.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+	pageErr := volumes.List(client.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumes.ExtractVolumes(page)
 		if err != nil {
 			log.Errorf("Error listing volumes: volume extraction: %+v", err)
@@ -178,10 +178,10 @@ func (client *Client) listAllVolumes() ([]api.Volume, error) {
 		}
 		return true, nil
 	})
-	if err != nil || len(vs) == 0{
-		if err != nil {
-			log.Debugf("Error listing volumes: list invocation: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
+	if pageErr != nil || len(vs) == 0{
+		if pageErr != nil {
+			log.Debugf("Error listing volumes: list invocation: %+v", pageErr)
+			return nil, errors.Wrap(pageErr, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(pageErr)))
 		} else {
 			// log.Debugf("Complete volume list empty")
 		}
