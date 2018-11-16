@@ -280,17 +280,17 @@ func (client *Client) listMonitoredNetworks() ([]api.Network, error) {
 func (client *Client) DeleteNetwork(networkRef string) error {
 	m, err := metadata.LoadNetwork(providers.FromClient(client), networkRef)
 	if err != nil {
-		log.Errorf("Error deleting network: loading network: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error deleting network: loading network"))
+		log.Errorf("Error deleting network '%s': failure loading network metadata: %+v", networkRef, err)
+		return errors.Wrap(err, fmt.Sprintf("Error deleting network '%s': failure loading network metadata", networkRef))
 	}
 	if m == nil {
-		return fmt.Errorf("Failed to find network '%s' in metadata", networkRef)
+		return fmt.Errorf("Error deleting network '%s': Failed to find network '%s' in metadata", networkRef, networkRef)
 	}
 	networkID := m.Get().ID
 
 	err = networks.Get(client.Network, networkID).Err
 	if err != nil {
-		log.Warnf("Error deleting network: getting network: %+v", err)
+		log.Warnf("Error deleting network: failure retrieving network: %+v", err)
 		if strings.Contains(err.Error(), "Resource not found") {
 			log.Warnf("Inconsistent network data !!")
 		}
@@ -320,7 +320,7 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 
 	err = client.DeleteGateway(networkID)
 	if err != nil {
-		log.Warnf("Error deleting gateway: %s", ProviderErrorToString(err))
+		log.Errorf("Error deleting network '%s': %+v", networkRef, err)
 	}
 
 	if gwID != "" {
@@ -410,8 +410,8 @@ func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
 func (client *Client) DeleteGateway(networkID string) error {
 	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
 	if err != nil {
-		log.Errorf("Error deleting gateway: loading gateway: %+v", err)
-		return errors.Wrap(err, "Error deleting gateway: loading gateway")
+		// log.Errorf("Error deleting gateway: failure loading gateway metadata: %+v", err)
+		return errors.Wrap(err, "Error deleting gateway: failure loading gateway metadata")
 	}
 	if m == nil {
 		return nil
@@ -420,11 +420,14 @@ func (client *Client) DeleteGateway(networkID string) error {
 	host := m.Get()
 	nerr := client.DeleteHost(host.ID)
 	if nerr != nil {
-		log.Warnf("Error deleting host: %v", nerr)
-	}
-	// Loop waiting for effective deletion of the host
-	for err = nil; err != nil; _, err = client.GetHost(host.ID) {
-		time.Sleep(100 * time.Millisecond)
+		return errors.Wrapf(nerr, "Error deleting gateway: error deleting host '%s'", host.ID)
+	} else {
+		// TODO Handle edge cases, and don't wait forever
+
+		// Loop waiting for effective deletion of the host
+		for err = nil; err != nil; _, err = client.GetHost(host.ID) {
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 
 	return m.Delete()
