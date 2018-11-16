@@ -21,14 +21,14 @@ const (
 	DefaultUser = "gpac"
 
 	// DefaultVolumeMountPoint Default mount point for volumes
-	DefaultVolumeMountPoint = "/shared/"
+	DefaultVolumeMountPoint = "/data/"
 
 	// DefaultContainerMountPoint Default mount point for containers
 	DefaultContainerMountPoint = "/containers/"
 
-	// DefaultNasExposedPath Default path to be exported by nfs server
-	DefaultNasExposedPath = "/shared/data"
+	// DefaultShareExportedPath Default path to be exported by nfs server
+	DefaultShareExportedPath = "/shared/data"
 
-	// DefaultNasMountPath Default path to be mounted to access a nfs directory
-	DefaultNasMountPath = "/data"
+	// DefaultShareMountPath Default path to be mounted to access a nfs directory
+	DefaultShareMountPath = "/shared"
 )

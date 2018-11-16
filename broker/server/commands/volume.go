@@ -76,13 +76,13 @@ func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 	}
 
 	service := VolumeServiceCreator(providers.FromClient(tenant.Client))
-	vol, err := service.Create(in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
+	volume, err := service.Create(in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("Volume '%s' created: %v", in.GetName(), vol)
-	return conv.ToPBVolume(vol), nil
+	log.Printf("Volume '%s' created: %v", in.GetName(), volume.Name)
+	return conv.ToPBVolume(volume), nil
 }
 
 // Attach a volume to an host and create a mount point

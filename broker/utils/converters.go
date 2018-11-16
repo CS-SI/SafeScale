@@ -75,7 +75,7 @@ func ToPBVolumeAttachment(in *model.VolumeAttachment) *pb.VolumeAttachment {
 }
 
 // ToPBVolumeInfo converts an api.Volume to a *VolumeInfo
-func ToPBVolumeInfo(volume *model.Volume, mounts map[string]propsv1.HostMount) *pb.VolumeInfo {
+func ToPBVolumeInfo(volume *model.Volume, mounts map[string]propsv1.HostLocalMount) *pb.VolumeInfo {
 	pbvi := &pb.VolumeInfo{
 		ID:    volume.ID,
 		Name:  volume.Name,
@@ -116,24 +116,24 @@ func ToPBContainerMountPoint(in *model.ContainerInfo) *pb.ContainerMountingPoint
 	}
 }
 
-// ToPBNasExport convert an export from api to protocolbuffer format
-func ToPBNasExport(hostName string, export propsv1.HostExport) *pb.NasExportDefinition {
-	return &pb.NasExportDefinition{
-		ID:   export.ID,
-		Name: &pb.NasExportName{Name: export.Name},
+// ToPBShare convert a share from model to protocolbuffer format
+func ToPBShare(hostName string, share propsv1.HostShare) *pb.ShareDefinition {
+	return &pb.ShareDefinition{
+		ID:   share.ID,
+		Name: share.Name,
 		Host: &pb.Reference{Name: hostName},
-		Path: export.Path,
+		Path: share.Path,
 		Type: "nfs",
 	}
 }
 
-// ToPBNasMount convert a host mount to protocolbuffer format
-func ToPBNasMount(exportName string, hostName string, mount *propsv1.HostMount) *pb.NasMountDefinition {
-	return &pb.NasMountDefinition{
-		Name: &pb.NasExportName{Name: exportName},
-		Host: &pb.Reference{Name: hostName},
-		Path: mount.Path,
-		Type: "nfs",
+// ToPBShareMount convert share mount on host to protocolbuffer format
+func ToPBShareMount(shareName string, hostName string, mount propsv1.HostRemoteMount) *pb.ShareMountDefinition {
+	return &pb.ShareMountDefinition{
+		Share: &pb.Reference{Name: shareName},
+		Host:  &pb.Reference{Name: hostName},
+		Path:  mount.Path,
+		Type:  mount.FileSystem,
 	}
 }
 

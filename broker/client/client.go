@@ -31,7 +31,7 @@ import (
 type Session struct {
 	Container *container
 	Host      *host
-	Nas       *nas
+	Share     *share
 	Network   *network
 	Ssh       *ssh
 	Tenant    *tenant
@@ -59,7 +59,7 @@ func New() Client {
 	s := &Session{}
 	s.Container = &container{session: s}
 	s.Host = &host{session: s}
-	s.Nas = &nas{session: s}
+	s.Share = &share{session: s}
 	s.Network = &network{session: s}
 	s.Ssh = &ssh{session: s}
 	s.Tenant = &tenant{session: s}
