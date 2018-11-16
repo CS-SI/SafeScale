@@ -29,28 +29,29 @@ import (
 	"github.com/urfave/cli"
 )
 
-//NasCmd ssh command
-var NasCmd = cli.Command{
-	Name:  "nas",
-	Usage: "nas COMMAND",
+// ShareCmd ssh command
+var ShareCmd = cli.Command{
+	Name:    "share",
+	Aliases: []string{"nas"},
+	Usage:   "share COMMAND",
 	Subcommands: []cli.Command{
-		nasCreate,
-		nasDelete,
-		nasMount,
-		nasUnmount,
-		nasList,
-		nasInspect,
+		shareCreate,
+		shareDelete,
+		shareMount,
+		shareUnmount,
+		shareList,
+		shareInspect,
 	},
 }
 
-var nasCreate = cli.Command{
+var shareCreate = cli.Command{
 	Name:      "create",
-	Usage:     "Create a nfs server on an host and expose a directory",
-	ArgsUsage: "<Nas_name> <Host_name|Host_ID>",
+	Usage:     "Create a nfs server on an host and exports a directory",
+	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: model.DefaultNasExposedPath,
+			Value: model.DefaultShareExportedPath,
 			Usage: "Path to be exported",
 		},
 	},
@@ -60,62 +61,62 @@ var nasCreate = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
-		def := pb.NasExportDefinition{
-			Name: &pb.NasExportName{Name: c.Args().Get(0)},
+		def := pb.ShareDefinition{
+			Name: c.Args().Get(0),
 			Host: &pb.Reference{Name: c.Args().Get(1)},
 			Path: c.String("path"),
 		}
-		err := client.New().Nas.Create(def, client.DefaultExecutionTimeout)
+		err := client.New().Share.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(client.DecorateError(err, "creation of nas", true).Error())
+			return clitools.ExitOnRPC(client.DecorateError(err, "creation of share", true).Error())
 		}
 
-		fmt.Println("Nas successfully created.")
+		fmt.Println("Share successfully created.")
 		return nil
 	},
 }
 
-var nasDelete = cli.Command{
+var shareDelete = cli.Command{
 	Name:      "delete",
-	Usage:     "Delete a nfs server on an host",
-	ArgsUsage: "<Nas_name>",
+	Usage:     "Delete a share from an host",
+	ArgsUsage: "<Share_name>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() < 1 {
-			fmt.Println("Missing mandatory argument <Nas_name>")
+			fmt.Println("Missing mandatory argument <Share_name>")
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
 
-		var nasList []string
-		nasList = append(nasList, c.Args().First())
-		nasList = append(nasList, c.Args().Tail()...)
+		var shareList []string
+		shareList = append(shareList, c.Args().First())
+		shareList = append(shareList, c.Args().Tail()...)
 
-		err := client.New().Nas.Delete(nasList, client.DefaultExecutionTimeout)
+		err := client.New().Share.Delete(shareList, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(client.DecorateError(err, "deletion of nas", false).Error())
+			return clitools.ExitOnRPC(client.DecorateError(err, "deletion of share", false).Error())
 		}
 
 		return nil
 	},
 }
 
-var nasList = cli.Command{
+var shareList = cli.Command{
 	Name:  "list",
-	Usage: "List all created nas",
+	Usage: "List all created shared",
 	Action: func(c *cli.Context) error {
-		list, err := client.New().Nas.List(0)
+		list, err := client.New().Share.List(0)
 		if err != nil {
-			return clitools.ExitOnRPC(client.DecorateError(err, "list of nas", false).Error())
+			return clitools.ExitOnRPC(client.DecorateError(err, "list of shares", false).Error())
 		}
 		var out []byte
-		if len(list.ExportList) == 0 {
+		if len(list.ShareList) == 0 {
 			out, _ = json.Marshal(nil)
 		} else {
 			var output []map[string]interface{}
-			for _, i := range list.ExportList {
+			for _, i := range list.ShareList {
 				output = append(output, map[string]interface{}{
 					"ID":   i.GetID(),
-					"Name": i.GetName().GetName(),
+					"Name": i.GetName(),
 					"Host": i.GetHost().GetName(),
 					"Path": i.GetPath(),
 					"Type": i.GetType(),
@@ -129,14 +130,14 @@ var nasList = cli.Command{
 	},
 }
 
-var nasMount = cli.Command{
+var shareMount = cli.Command{
 	Name:      "mount",
 	Usage:     "Mount an exported nfs directory on an host",
-	ArgsUsage: "<Nas_name> <Host_name|Host_ID>",
+	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: model.DefaultNasMountPath,
+			Value: model.DefaultShareMountPath,
 			Usage: "Path to be mounted",
 		},
 	},
@@ -146,13 +147,13 @@ var nasMount = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
-		def := pb.NasMountDefinition{
-			Host: &pb.Reference{Name: c.Args().Get(1)},
-			Name: &pb.NasExportName{Name: c.Args().Get(0)},
-			Path: c.String("path"),
-			Type: "nfs",
+		def := pb.ShareMountDefinition{
+			Host:  &pb.Reference{Name: c.Args().Get(1)},
+			Share: &pb.Reference{Name: c.Args().Get(0)},
+			Path:  c.String("path"),
+			Type:  "nfs",
 		}
-		err := client.New().Nas.Mount(def, client.DefaultExecutionTimeout)
+		err := client.New().Share.Mount(def, client.DefaultExecutionTimeout)
 		if err != nil {
 			return clitools.ExitOnRPC(client.DecorateError(err, "mount of nas", true).Error())
 		}
@@ -160,52 +161,53 @@ var nasMount = cli.Command{
 	},
 }
 
-var nasUnmount = cli.Command{
+var shareUnmount = cli.Command{
 	Name:      "umount",
-	Usage:     "Unmount an exported nfs directory on an host",
-	ArgsUsage: "<Nas_name> <Host_name|Host_ID>",
+	Aliases:   []string{"umount"},
+	Usage:     "Unmount a share from an host",
+	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Nas_name> and/or <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
-		def := pb.NasMountDefinition{
-			Host: &pb.Reference{Name: c.Args().Get(1)},
-			Name: &pb.NasExportName{Name: c.Args().Get(0)},
+		def := pb.ShareMountDefinition{
+			Host:  &pb.Reference{Name: c.Args().Get(1)},
+			Share: &pb.Reference{Name: c.Args().Get(0)},
 		}
-		err := client.New().Nas.Unmount(def, client.DefaultExecutionTimeout)
+		err := client.New().Share.Unmount(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(client.DecorateError(err, "unmount of nas", true).Error())
+			return clitools.ExitOnRPC(client.DecorateError(err, "unmount of share", true).Error())
 		}
 
 		return nil
 	},
 }
 
-var nasInspect = cli.Command{
+var shareInspect = cli.Command{
 	Name:      "inspect",
-	Usage:     "List the nfs server and all clients connected to it",
-	ArgsUsage: "<Nas_name>",
+	Usage:     "List the share information and clients connected to it",
+	ArgsUsage: "<Share_name>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Nas_name>")
+			fmt.Println("Missing mandatory argument <Share_name>")
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
-		list, err := client.New().Nas.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
+		list, err := client.New().Share.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of nas", false).Error())
+			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of share", false).Error())
 		}
 		var out []byte
-		if len(list.ExportList) == 0 {
+		if len(list.ShareList) == 0 {
 			out, _ = json.Marshal(nil)
 		} else {
 			var output []map[string]interface{}
-			for _, i := range list.ExportList {
+			for _, i := range list.ShareList {
 				output = append(output, map[string]interface{}{
 					"ID":   i.GetID(),
-					"Name": i.GetName().GetName(),
+					"Name": i.GetName(),
 					"Host": i.GetHost().GetName(),
 					"Path": i.GetPath(),
 					"Type": i.GetType(),

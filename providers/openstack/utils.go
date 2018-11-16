@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,11 +35,25 @@ func ParseBadRequest(badRequestError string) map[string]string {
 		return nil
 	}
 	if content, ok := unjsoned["badRequest"]; ok {
-		spew.Dump(content)
-		return map[string]string{
-			"message": content["message"].(string),
-			"code":    fmt.Sprintf("%d", int(content["code"].(float64))),
+		retval := map[string]string{
+			"message": "",
+			"type":    "",
+			"code":    "",
+			"detail":  "",
 		}
+		if field, ok := content["message"].(string); ok {
+			retval["message"] = field
+		}
+		if field, ok := content["type"].(string); ok {
+			retval["type"] = field
+		}
+		if field, ok := content["code"].(float64); ok {
+			retval["code"] = fmt.Sprintf("%d", int(field))
+		}
+		if field, ok := content["detail"].(string); ok {
+			retval["detail"] = field
+		}
+		return retval
 	}
 	return nil
 }
@@ -56,11 +69,26 @@ func ParseNeutronError(neutronError string) map[string]string {
 		return nil
 	}
 	if content, ok := unjsoned["NeutronError"]; ok {
-		spew.Dump(content)
-		return map[string]string{
-			"message": content["message"].(string),
-			"code":    content["code"].(string),
+		retval := map[string]string{
+			"message": "",
+			"type":    "",
+			"code":    "",
+			"detail":  "",
 		}
+		if field, ok := content["message"].(string); ok {
+			retval["message"] = field
+		}
+		if field, ok := content["type"].(string); ok {
+			retval["type"] = field
+		}
+		if field, ok := content["code"].(string); ok {
+			retval["code"] = field
+		}
+		if field, ok := content["detail"].(string); ok {
+			retval["detail"] = field
+		}
+
+		return retval
 	}
 	return nil
 }

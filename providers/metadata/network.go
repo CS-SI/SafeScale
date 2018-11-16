@@ -165,11 +165,11 @@ func (m *Network) Delete() error {
 		panic("m.item is nil!")
 	}
 
-	// First delete network/<id> folder if it exists
-	nerr := m.item.Delete(*m.id)
-	if nerr != nil {
-		log.Warnf("Error deleting network: %v", nerr)
-	}
+	// // First delete network/<id> folder if it exists
+	// nerr := m.item.Delete(*m.id)
+	// if nerr != nil {
+	// 	log.Warnf("Error deleting network: %v", nerr)
+	// }
 
 	// then delete the entry in 'ByIDFolderName' folder
 	err := m.item.DeleteFrom(ByIDFolderName, *m.id)

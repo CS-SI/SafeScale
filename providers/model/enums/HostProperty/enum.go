@@ -27,8 +27,8 @@ const (
 	FeaturesV1 = "4"
 	// VolumesV1 contains optional additional info about attached volumes on the host
 	VolumesV1 = "5"
-	// NasV1 contains optional additional info about Nas role of the host
-	NasV1 = "6"
+	// SharesV1 contains optional additional info about Nas role of the host
+	SharesV1 = "6"
 	// MountsV1 contains optional additional info about mounted devices (locally attached or remote filesystem)
 	MountsV1 = "7"
 )
