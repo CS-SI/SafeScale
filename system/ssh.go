@@ -535,7 +535,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 				if retcode == 255 {
 					return fmt.Errorf("ssh not ready")
 				}
-				log.Warnln(stderr)
+				log.Debugf(stderr)
 				return fmt.Errorf("%s", stderr)
 			}
 			return nil

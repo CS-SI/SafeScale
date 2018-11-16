@@ -35,7 +35,7 @@ type HostDescription struct {
 var BlankHostDescription = HostDescription{}
 
 // HostNetwork contains network information related to Host
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostNetwork struct {
@@ -60,7 +60,7 @@ var BlankHostNetwork = HostNetwork{
 }
 
 // HostSize represent sizing elements of an host
-// FROZEN
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostSize struct {
@@ -75,7 +75,7 @@ type HostSize struct {
 var BlankHostSize = HostSize{}
 
 // HostTemplate represents an host template
-// FROZEN
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostTemplate struct {
@@ -90,7 +90,7 @@ var BlankHostTemplate = HostTemplate{
 }
 
 // HostSizing contains sizing information about the host
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostSizing struct {
@@ -120,10 +120,12 @@ type HostSystem struct {
 var BlankHostSystem = HostSystem{}
 
 // HostVolume contains information about attached volume
+// not FROZEN yet
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with needed supplemental fields
 type HostVolume struct {
-	AttachID string `json:"id"`     // contains the ID of the volume attachment
-	Name     string `json:"name"`   // contains the name of the volume
-	Device   string `json:"device"` // contains the device on the host
+	AttachID string `json:"attach_id"` // contains the ID of the volume attachment
+	Device   string `json:"device"`    // contains the device on the host
 }
 
 // BlankHostVolume ...
@@ -148,12 +150,11 @@ var BlankHostVolumes = HostVolumes{
 	DevicesByID:     map[string]string{},
 }
 
-// HostMount stores information about a device mount (being local or remote)
+// HostLocalMount stores information about a device (as an attached volume) mount
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
-type HostMount struct {
-	Local      bool   `json:"local"`             // Local tells if the mount is local
+type HostLocalMount struct {
 	Device     string `json:"device"`            // Device is the name of the device (/dev/... for local mount, host:/path for remote mount)
 	Path       string `json:"mountpoint"`        // Path is the mount point of the device
 	FileSystem string `json:"file_system"`       // FileSystem tells the filesystem used
@@ -161,68 +162,80 @@ type HostMount struct {
 
 }
 
-// BlankHostMount ...
-var BlankHostMount = HostMount{}
+// BlankHostLocalMount ...
+var BlankHostLocalMount = HostLocalMount{}
+
+// HostRemoteMount stores information about a remote filesystem mount
+// not FROZEN yet
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with needed supplemental/overriding fields
+type HostRemoteMount struct {
+	ShareID    string `json:"share_id"`          // contains the ID of the share mounted
+	Export     string `json:"export"`            // contains the path of the export (ie: <host>:/data/shared)
+	Path       string `json:"mountpoint"`        // Path is the mount point of the device
+	FileSystem string `json:"file_system"`       // FileSystem tells the filesystem used
+	Options    string `json:"options,omitempty"` // Options contains the mount options
+}
+
+// BlankHostRemoteMount ...
+var BlankHostRemoteMount = HostRemoteMount{}
 
 // HostMounts contains information about mounts on the host
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostMounts struct {
-	MountsByDevice map[string]string    `json:"mounts_by_device"` // contains mount path, indexed by devices
-	MountsByPath   map[string]HostMount `json:"mounts_by_path"`   // contains HostMount indexed by path
+	LocalMountsByDevice   map[string]string          `json:"local_mounts_by_device"`  // contains local mount path, indexed by devices
+	LocalMountsByPath     map[string]HostLocalMount  `json:"local_mounts_by_path"`    // contains HostLocalMount structs, indexed by path
+	RemoteMountsByShareID map[string]string          `json:"remote_mounts_by_device"` // contains local mount path, indexed by Share ID
+	RemoteMountsByExport  map[string]string          `json:"remote_mounts_by_export"` // contains local mount path, indexed by export
+	RemoteMountsByPath    map[string]HostRemoteMount `json:"remote_mounts_by_path"`   // contains HostRemoteMount, indexed by path
 }
 
 // BlankHostMounts ...
 var BlankHostMounts = HostMounts{
-	MountsByDevice: map[string]string{},
-	MountsByPath:   map[string]HostMount{},
+	LocalMountsByDevice:   map[string]string{},
+	LocalMountsByPath:     map[string]HostLocalMount{},
+	RemoteMountsByShareID: map[string]string{},
+	RemoteMountsByExport:  map[string]string{},
+	RemoteMountsByPath:    map[string]HostRemoteMount{},
 }
 
-// HostExport describes an export by remote filesystem from the host
+// HostShare describes a filesystem exported from the host
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
-type HostExport struct {
-	// ID ...
-	ID string `json:"uid"`
-	// Name is the name of the export
-	Name string `json:"name"`
-	// Path is the path on the host filesystem exported
-	Path string `json:"path"`
-	// FsAcls are the filesystem acls to set on the exported folder
-	PathAcls string `json:"path_acls,omitempty"`
-	// Type is the export type (NFS, GlusterFS, ...)
-	Type string `json:"type,omitempty"`
-	// Acls are the acls to set on the export
-	ExportAcls string `json:"export_acls,omitempty"`
-	// ExportOptions are the options (other than acls) to set on the export
-	ExportOptions string `json:"export_options,omitempty"`
-	// ClientsByID contains the name of the hosts mounting the export, indexed by ID
-	ClientsByID map[string]string `json:"clients_by_id,omit_empty"`
-	// ClientsByName contains the ID of the hosts mounting the export, indexed by Name
-	ClientsByName map[string]string `json:"clients_by_name,omit_empty"`
+type HostShare struct {
+	ID            string            `json:"id"`                         // ID ...
+	Name          string            `json:"name"`                       // the name of the share
+	Path          string            `json:"path"`                       // the path on the host filesystem that is shared
+	PathAcls      string            `json:"path_acls,omitempty"`        // filesystem acls to set on the exported folder
+	Type          string            `json:"type,omitempty"`             // export type is lowercase (ie. nfs, glusterfs, ...)
+	ShareAcls     string            `json:"share_acls,omitempty"`       // the acls to set on the share
+	ShareOptions  string            `json:"share_options,omitempty"`    // the options (other than acls) to set on the share
+	ClientsByID   map[string]string `json:"clients_by_id,omit_empty"`   // contains the name of the hosts mounting the export, indexed by ID
+	ClientsByName map[string]string `json:"clients_by_name,omit_empty"` // contains the ID of the hosts mounting the export, indexed by Name
 }
 
-// BlankHostExport ...
-var BlankHostExport = HostExport{
+// BlankHostShare ...
+var BlankHostShare = HostShare{
 	ClientsByID:   map[string]string{},
 	ClientsByName: map[string]string{},
 }
 
-// HostNas contains information about the Nas role of the host
+// HostShares contains information about the shares of the host
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
-type HostNas struct {
-	ExportsByID   map[string]HostExport `json:"exports_by_id"`
-	ExportsByName map[string]string     `json:"exports_by_name"`
+type HostShares struct {
+	ByID   map[string]HostShare `json:"by_id"`
+	ByName map[string]string    `json:"by_name"`
 }
 
-// BlankHostNas ...
-var BlankHostNas = HostNas{
-	ExportsByID:   map[string]HostExport{},
-	ExportsByName: map[string]string{},
+// BlankHostShares ...
+var BlankHostShares = HostShares{
+	ByID:   map[string]HostShare{},
+	ByName: map[string]string{},
 }
 
 // HostInstalledFeature ...

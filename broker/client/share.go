@@ -27,15 +27,14 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
-// nas is the part of the broker client handing Nas
-// VPL: shouldn't it be called 'share' ?
-type nas struct {
+// share is the part of the broker client handing Shares
+type share struct {
 	// Session is not used currently
 	session *Session
 }
 
 // Create ...
-func (n *nas) Create(def pb.NasExportDefinition, timeout time.Duration) error {
+func (n *share) Create(def pb.ShareDefinition, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
@@ -43,14 +42,14 @@ func (n *nas) Create(def pb.NasExportDefinition, timeout time.Duration) error {
 	}
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
-	service := pb.NewNasServiceClient(conn)
+	service := pb.NewShareServiceClient(conn)
 
 	_, err := service.Create(ctx, &def)
 	return err
 }
 
 // Delete deletes several nas at the same time in goroutines
-func (n *nas) Delete(names []string, timeout time.Duration) error {
+func (n *share) Delete(names []string, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
@@ -61,23 +60,23 @@ func (n *nas) Delete(names []string, timeout time.Duration) error {
 
 	var wg sync.WaitGroup
 
-	nasDeleter := func(aname string) {
+	shareDeleter := func(aname string) {
 		defer wg.Done()
 		ctx, cancel := utils.GetContext(timeout)
 		defer cancel()
-		nasService := pb.NewNasServiceClient(conn)
-		_, err := nasService.Delete(ctx, &pb.NasExportName{Name: aname})
+		shareService := pb.NewShareServiceClient(conn)
+		_, err := shareService.Delete(ctx, &pb.Reference{Name: aname})
 
 		if err != nil {
-			fmt.Println(DecorateError(err, "deletion of Nas", true).Error())
+			fmt.Println(DecorateError(err, "deletion of share", true).Error())
 		} else {
-			fmt.Printf("Nas '%s' successfully deleted\n", aname)
+			fmt.Printf("Share '%s' successfully deleted\n", aname)
 		}
 	}
 
 	wg.Add(len(names))
 	for _, target := range names {
-		go nasDeleter(target)
+		go shareDeleter(target)
 	}
 	wg.Wait()
 
@@ -85,7 +84,7 @@ func (n *nas) Delete(names []string, timeout time.Duration) error {
 }
 
 // List ...
-func (n *nas) List(timeout time.Duration) (*pb.NasExportList, error) {
+func (n *share) List(timeout time.Duration) (*pb.ShareList, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
@@ -93,12 +92,12 @@ func (n *nas) List(timeout time.Duration) (*pb.NasExportList, error) {
 	}
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
-	service := pb.NewNasServiceClient(conn)
+	service := pb.NewShareServiceClient(conn)
 	return service.List(ctx, &google_protobuf.Empty{})
 }
 
 // Mount ...
-func (n *nas) Mount(def pb.NasMountDefinition, timeout time.Duration) error {
+func (n *share) Mount(def pb.ShareMountDefinition, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
@@ -106,13 +105,13 @@ func (n *nas) Mount(def pb.NasMountDefinition, timeout time.Duration) error {
 	}
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
-	service := pb.NewNasServiceClient(conn)
+	service := pb.NewShareServiceClient(conn)
 	_, err := service.Mount(ctx, &def)
 	return err
 }
 
 // Unmount ...
-func (n *nas) Unmount(def pb.NasMountDefinition, timeout time.Duration) error {
+func (n *share) Unmount(def pb.ShareMountDefinition, timeout time.Duration) error {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
@@ -120,13 +119,13 @@ func (n *nas) Unmount(def pb.NasMountDefinition, timeout time.Duration) error {
 	}
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
-	service := pb.NewNasServiceClient(conn)
+	service := pb.NewShareServiceClient(conn)
 	_, err := service.Unmount(ctx, &def)
 	return err
 }
 
 // Inspect ...
-func (n *nas) Inspect(name string, timeout time.Duration) (*pb.NasExportList, error) {
+func (n *share) Inspect(name string, timeout time.Duration) (*pb.ShareList, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
@@ -134,6 +133,6 @@ func (n *nas) Inspect(name string, timeout time.Duration) (*pb.NasExportList, er
 	}
 	ctx, cancel := utils.GetContext(timeout)
 	defer cancel()
-	service := pb.NewNasServiceClient(conn)
-	return service.Inspect(ctx, &pb.NasExportName{Name: name})
+	service := pb.NewShareServiceClient(conn)
+	return service.Inspect(ctx, &pb.Reference{Name: name})
 }

@@ -33,7 +33,7 @@ message TenantName{
 }
 
 message ImageList{
-    repeated  Image Images= 1;
+    repeated Image Images= 1;
 }
 
 message ImageListRequest{
@@ -307,42 +307,38 @@ service SshService{
     rpc Copy(SshCopyCommand) returns (SshResponse){}
 }
 
-// broker nas create nas1 host1 --path="/shared/data"
-//broker nas delete nas1
-//broker nas mount nas1 host2 --path="/data"
-//broker nas umount nas1 host2
-//broker nas list
-//broker nas inspect nas1
+// broker nas|share create share1 host1 --path="/shared/data"
+// broker nas|share delete share1
+// broker nas|share mount share1 host2 --path="/data"
+// broker nas|share umount share1 host2
+// broker nas|share list
+// broker nas|share inspect share1
 
-message NasExportName{
-    string Name = 1;
-}
-
-message NasExportDefinition{
+message ShareDefinition{
     string ID = 1;
-    NasExportName Name = 2;
+    string Name = 2;
     Reference Host = 3;
     string Path = 4;
     string Type = 5;
     string Acls = 6;
 }
 
-message NasExportList{
-    repeated NasExportDefinition ExportList = 1;
+message ShareList{
+    repeated ShareDefinition ShareList = 1;
 }
 
-message NasMountDefinition{
+message ShareMountDefinition{
     Reference Host = 1;
-    NasExportName Name = 2;
+    Reference Share = 2;
     string Path = 3;
     string Type = 4;
     string Options = 5;
 }
-service NasService{
-    rpc Create(NasExportDefinition) returns (NasExportDefinition){}
-    rpc Delete(NasExportName) returns (google.protobuf.Empty){}
-    rpc List(google.protobuf.Empty) returns (NasExportList){}
-    rpc Mount(NasMountDefinition) returns (NasMountDefinition){}
-    rpc Unmount(NasMountDefinition) returns (google.protobuf.Empty){}
-    rpc Inspect(NasExportName) returns (NasExportList){}
+service ShareService{
+    rpc Create(ShareDefinition) returns (ShareDefinition){}
+    rpc Delete(Reference) returns (google.protobuf.Empty){}
+    rpc List(google.protobuf.Empty) returns (ShareList){}
+    rpc Mount(ShareMountDefinition) returns (ShareMountDefinition){}
+    rpc Unmount(ShareMountDefinition) returns (google.protobuf.Empty){}
+    rpc Inspect(Reference) returns (ShareList){}
 }

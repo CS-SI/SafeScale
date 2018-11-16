@@ -117,7 +117,7 @@ func work() {
 	pb.RegisterVolumeServiceServer(s, &commands.VolumeServiceServer{})
 	pb.RegisterSshServiceServer(s, &commands.SSHServiceServer{})
 	pb.RegisterContainerServiceServer(s, &commands.ContainerServiceServer{})
-	pb.RegisterNasServiceServer(s, &commands.NasServiceServer{})
+	pb.RegisterShareServiceServer(s, &commands.ShareServiceServer{})
 	pb.RegisterImageServiceServer(s, &commands.ImageServiceServer{})
 	pb.RegisterTemplateServiceServer(s, &commands.TemplateServiceServer{})
 

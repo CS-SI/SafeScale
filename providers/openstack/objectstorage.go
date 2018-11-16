@@ -30,6 +30,7 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 // CreateContainer creates an object container
@@ -169,7 +170,7 @@ func (client *Client) GetObject(container string, name string, ranges []model.Ra
 	}
 
 	sRanges := strings.Join(rList, ",")
-	log.Debugf("Getting object from object conainer: downloading the range [%s]", sRanges)
+	//log.Debugf("Getting object from object container: downloading the range [%s]", sRanges)
 
 	// TODO Why we have a bad range ??
 	var res objects.DownloadResult
@@ -301,11 +302,13 @@ func (client *Client) CopyObject(containerSrc, objectSrc, objectDst string) erro
 // DeleteObject deletes an object from a container
 func (client *Client) DeleteObject(container, object string) error {
 	log.Debugf("providers.openstack.DeleteObject(%s:%s) called", container, object)
+	defer log.Debugf("providers.openstack.DeleteObject(%s:%s) done", container, object)
 
 	_, err := objects.Delete(client.Container, container, object, objects.DeleteOpts{}).Extract()
 	if err != nil {
-		log.Debugf("Error deleting object: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error deleting object '%s:%s': %s", container, object, ProviderErrorToString(err)))
+		msg := fmt.Sprintf("failed to delete object '%s:%s': %s", container, object, ProviderErrorToString(err))
+		log.Debugf(utils.TitleFirst(msg))
+		return fmt.Errorf(msg)
 	}
 	return nil
 }
