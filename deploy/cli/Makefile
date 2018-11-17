@@ -1,6 +1,12 @@
 GO?=go
-EXEC:=deploy
-EXEC-COVER:=deploy-cover
+
+ifeq ($(OS),Windows_NT)
+	EXEC:=deploy.exe
+	EXEC-COVER:=deploy-cover.exe
+else
+	EXEC:=deploy
+	EXEC-COVER:=deploy-cover
+endif
 
 BUILD_DATE := `date +%Y-%m-%d\ %H:%M`
 VERSIONFILE := version.go

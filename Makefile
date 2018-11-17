@@ -21,7 +21,11 @@ CP?=cp
 RM?=rm
 BROWSER?=firefox
 
-HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)
+ifeq ($(OS),Windows_NT)
+	HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)
+	RM = del /Q
+endif
+
 GOPATH?=$(HOME)/go
 GOBIN?=$(GOPATH)/bin
 
@@ -76,7 +80,7 @@ INFO_STRING  = "[INFO]"
 ERROR_STRING = "[ERROR]"
 WARN_STRING  = "[WARNING]"
 
-all: begin ground getdevdeps ensure generate providers broker system deploy perform utils vet-light
+all: begin ground getdevdeps ensure generate providers broker system deploy perform scanner utils vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps ensure generate

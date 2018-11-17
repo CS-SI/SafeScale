@@ -138,7 +138,7 @@ func (client *Client) DeleteVolume(id string) error {
 		return errors.Wrap(providers.ResourceNotFoundError("volume", id), "Cannot delete volume")
 	}
 
-	err = v2_vol.Delete(client.osclt.Volume, id).ExtractErr()
+	err = v2_vol.Delete(client.osclt.Volume, id, nil).ExtractErr()
 	if err != nil {
 		return fmt.Errorf("Error deleting volume: %s", openstack.ProviderErrorToString(err))
 	}

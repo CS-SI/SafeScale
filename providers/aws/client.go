@@ -165,6 +165,30 @@ type Client struct {
 	//ImageOwners []string
 }
 
+func (c *Client) ListNetworks(all bool) ([]api.Network, error) {
+	panic("implement me")
+}
+
+func (c *Client) ListHosts(all bool) ([]api.Host, error) {
+	panic("implement me")
+}
+
+func (c *Client) RebootHost(id string) error {
+	panic("implement me")
+}
+
+func (c *Client) ListVolumes(all bool) ([]api.Volume, error) {
+	panic("implement me")
+}
+
+func (c *Client) GetContainer(name string) (*api.ContainerInfo, error) {
+	panic("implement me")
+}
+
+func (c *Client) GetAuthOpts() (api.Config, error) {
+	panic("implement me")
+}
+
 func createFilters() []*ec2.Filter {
 	filters := []*ec2.Filter{
 		&ec2.Filter{
