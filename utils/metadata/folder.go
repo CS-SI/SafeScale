@@ -122,7 +122,15 @@ func (f *Folder) Search(path string, name string) (bool, error) {
 
 // Delete removes metadata passed as parameter
 func (f *Folder) Delete(path string, name string) error {
-	err := f.svc.DeleteObject(f.bucketName, f.absolutePath(path, name))
+	found, err := f.Search(path, name)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+
+	err = f.svc.DeleteObject(f.bucketName, f.absolutePath(path, name))
 	if err != nil {
 		return fmt.Errorf("failed to remove metadata in Object Storage: %s", err.Error())
 	}
