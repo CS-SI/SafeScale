@@ -1,5 +1,10 @@
 GO?=go
-EXEC:=scanner
+
+ifeq ($(OS),Windows_NT)
+	EXEC:=scanner.exe
+else
+	EXEC:=scanner
+endif
 
 BUILD_DATE := `date +%Y-%m-%d\ %H:%M`
 VERSIONFILE := version.go

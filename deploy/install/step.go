@@ -55,10 +55,10 @@ func (sr stepResult) ErrorMessage() string {
 	return ""
 }
 
-// stepResults contains the errors of the step for each host target
-type stepResults map[string]stepResult
+// StepResults contains the errors of the step for each host target
+type StepResults map[string]stepResult
 
-func (s stepResults) ErrorMessages() string {
+func (s StepResults) ErrorMessages() string {
 	output := ""
 	for h, k := range s {
 		val := k.ErrorMessage()
@@ -69,7 +69,7 @@ func (s stepResults) ErrorMessages() string {
 	return output
 }
 
-func (s stepResults) Successful() bool {
+func (s StepResults) Successful() bool {
 	if len(s) == 0 {
 		return false
 	}
@@ -223,13 +223,13 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(port int, hosts []*pb.Host, v Variables, s Settings) (stepResults, error) {
+func (is *step) Run(port int, hosts []*pb.Host, v Variables, s Settings) (StepResults, error) {
 	//if debug
 	if false {
 		log.Printf("running step '%s' on %d hosts...", is.Name, len(hosts))
 	}
 
-	results := stepResults{}
+	results := StepResults{}
 
 	if is.Serial || s.Serialize {
 		for _, h := range hosts {

@@ -42,13 +42,13 @@ import (
 type HostServiceServer struct{}
 
 type StoredCPUInfo struct {
-	Id      string `bow:"key"`
+	Id           string `bow:"key"`
 	TenantName   string `json:"tenant_name,omitempty"`
 	TemplateID   string `json:"template_id,omitempty"`
 	TemplateName string `json:"template_name,omitempty"`
-	ImageID   string `json:"image_id,omitempty"`
-	ImageName string `json:"image_name,omitempty"`
-	LastUpdated string `json:"last_updated,omitempty"`
+	ImageID      string `json:"image_id,omitempty"`
+	ImageName    string `json:"image_name,omitempty"`
+	LastUpdated  string `json:"last_updated,omitempty"`
 
 	NumberOfCPU    int     `json:"number_of_cpu,omitempty"`
 	NumberOfCore   int     `json:"number_of_core,omitempty"`
@@ -172,7 +172,7 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 			if err != nil {
 				if !in.Force {
 					fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
-					log.Warnf("Error reading Scanner database", err)
+					log.Warnf("Error reading Scanner database: %v", err)
 				} else {
 					noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem listing images from Scanner database: %v", in.GetGPUNumber(), in.GetFreq(), err)
 					log.Error(noHostError)
