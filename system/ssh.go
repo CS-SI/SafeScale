@@ -113,7 +113,7 @@ type SSHConfig struct {
 	Host          string
 	PrivateKey    string
 	Port          int
-	LocalPort	  int
+	LocalPort     int
 	GatewayConfig *SSHConfig
 	cmdTpl        string
 }
@@ -181,7 +181,7 @@ func getFreePort() (int, error) {
 
 // CreateTempFileFromString creates a tempory file containing 'content'
 func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, error) {
-	f, err := ioutil.TempFile("/tmp", "")
+	f, err := ioutil.TempFile("/tmp", "") // TODO Windows friendly
 	if err != nil {
 		return nil, err
 	}
@@ -532,7 +532,10 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			cmd, _ := ssh.Command("sudo cat /var/tmp/user_data.done")
+			cmd, err := ssh.Command("sudo cat /var/tmp/user_data.done")
+			if err != nil {
+				return err
+			}
 
 			retcode, _, stderr, err := cmd.Run()
 			if err != nil {
@@ -549,7 +552,10 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		timeout,
 	)
 	if err != nil {
-		logCmd, _ := ssh.Command("sudo cat /var/tmp/user_data.log")
+		logCmd, err := ssh.Command("sudo cat /var/tmp/user_data.log")
+		if err != nil {
+			return err
+		}
 
 		retcode, stdout, stderr, logErr := logCmd.Run()
 		if logErr == nil {
@@ -732,7 +738,6 @@ func (ssh *SSHConfig) Enter() error {
 	}
 	return err
 }
-
 
 // CommandContext is like Command but includes a context.
 //
