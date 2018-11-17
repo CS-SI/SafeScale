@@ -17,10 +17,13 @@ REMOTE := $(shell git rev-parse $(UPSTREAM))
 BASE := $(shell git merge-base HEAD $(UPSTREAM))
 
 GO?=go
+CP?=cp
+RM?=rm
+BROWSER?=firefox
+
+HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)
 GOPATH?=$(HOME)/go
 GOBIN?=$(GOPATH)/bin
-CP?=cp
-BROWSER?=firefox
 
 ifeq (, $(shell which git))
  $(error "No git in your PATH: $(PATH), you must have git installed and available through your PATH")
@@ -152,6 +155,9 @@ perform/perform: perform
 
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
+
+show:
+	@echo $(GOBIN)
 
 docs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
