@@ -70,7 +70,7 @@ func (svc *HostService) Stop(ref string) error {
 
 // Reboot reboots a host
 func (svc *HostService) Reboot(ref string) error {
-	log.Println("Rebooting host '%s'...", ref)
+	log.Printf("Rebooting host '%s'...", ref)
 	return svc.provider.RebootHost(ref)
 }
 
@@ -114,7 +114,7 @@ func (svc *HostService) Create(name string, net string, cpu int, ram float32, di
 		NetworkIDs: networks,
 	}
 
-	if exists, err := svc.provider.GetHostByName(name); exists != nil && err == nil{
+	if exists, err := svc.provider.GetHostByName(name); exists != nil && err == nil {
 		tbr := errors.Errorf("Failure creating host: host '%s' already exists.", name)
 		log.Errorf("%v", tbr)
 		return nil, tbr
