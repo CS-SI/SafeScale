@@ -1,6 +1,6 @@
 GO?=go
-EXEC:=perform
-EXEC-COVER:=perform-cover
+EXEC:=perform.exe
+EXEC-COVER:=perform-cover.exe
 
 BUILD_DATE := `date +%Y-%m-%d\ %H:%M`
 VERSIONFILE := version.go

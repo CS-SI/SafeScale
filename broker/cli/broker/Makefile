@@ -1,6 +1,6 @@
 GO?=go
-EXEC:=broker
-EXEC-COVER:=broker-cover
+EXEC:=broker.exe
+EXEC-COVER:=broker-cover.exe
 
 BUILD_DATE := `date +%Y-%m-%d\ %H:%M`
 VERSIONFILE := version.go

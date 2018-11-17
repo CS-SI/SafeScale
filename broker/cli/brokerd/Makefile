@@ -1,6 +1,6 @@
 GO?=go
-EXEC:=brokerd
-EXEC-COVER:=brokerd-cover
+EXEC:=brokerd.exe
+EXEC-COVER:=brokerd-cover.exe
 
 BUILD_DATE := `date +%Y-%m-%d\ %H:%M`
 VERSIONFILE := version.go

@@ -18,11 +18,10 @@ func TestMain(m *testing.M) {
 
 	// If the test binary name is "calc" we've are being asked to run the
 	// coverage-instrumented calc.
-	if path.Base(os.Args[0]) == "brokerd-cover" {
+	if path.Base(os.Args[0]) == "brokerd-cover.exe" {
 		main()
 		exit.Exit(0)
 	}
 
 	os.Exit(m.Run())
 }
-
