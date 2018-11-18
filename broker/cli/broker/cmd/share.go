@@ -46,6 +46,7 @@ var ShareCmd = cli.Command{
 
 var shareCreate = cli.Command{
 	Name:      "create",
+	Aliases:   []string{"new"},
 	Usage:     "Create a nfs server on an host and exports a directory",
 	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
@@ -78,6 +79,7 @@ var shareCreate = cli.Command{
 
 var shareDelete = cli.Command{
 	Name:      "delete",
+	Aliases:   []string{"rm", "remove"},
 	Usage:     "Delete a share from an host",
 	ArgsUsage: "<Share_name>",
 	Action: func(c *cli.Context) error {
@@ -101,8 +103,9 @@ var shareDelete = cli.Command{
 }
 
 var shareList = cli.Command{
-	Name:  "list",
-	Usage: "List all created shared",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List all created shared",
 	Action: func(c *cli.Context) error {
 		list, err := client.New().Share.List(0)
 		if err != nil {
@@ -163,7 +166,7 @@ var shareMount = cli.Command{
 
 var shareUnmount = cli.Command{
 	Name:      "umount",
-	Aliases:   []string{"umount"},
+	Aliases:   []string{"unmount"},
 	Usage:     "Unmount a share from an host",
 	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
@@ -187,6 +190,7 @@ var shareUnmount = cli.Command{
 
 var shareInspect = cli.Command{
 	Name:      "inspect",
+	Aliases:   []string{"show"},
 	Usage:     "List the share information and clients connected to it",
 	ArgsUsage: "<Share_name>",
 	Action: func(c *cli.Context) error {

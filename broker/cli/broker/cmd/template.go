@@ -36,8 +36,9 @@ var TemplateCmd = cli.Command{
 }
 
 var templateList = cli.Command{
-	Name:  "list",
-	Usage: "List available templates",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available templates",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all",
