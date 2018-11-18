@@ -133,6 +133,7 @@ var hostList = cli.Command{
 
 var hostInspect = cli.Command{
 	Name:      "inspect",
+	Aliases:   []string{"show"},
 	Usage:     "inspect Host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {

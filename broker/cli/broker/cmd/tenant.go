@@ -37,8 +37,9 @@ var TenantCmd = cli.Command{
 }
 
 var tenantList = cli.Command{
-	Name:  "list",
-	Usage: "List available tenants",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available tenants",
 	Action: func(c *cli.Context) error {
 		tenants, err := client.New().Tenant.List(client.DefaultExecutionTimeout)
 		if err != nil {

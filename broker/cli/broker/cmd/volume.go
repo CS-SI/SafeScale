@@ -70,6 +70,7 @@ var volumeList = cli.Command{
 
 var volumeInspect = cli.Command{
 	Name:      "inspect",
+	Aliases:   []string{"show"},
 	Usage:     "Inspect volume",
 	ArgsUsage: "<Volume_name|Volume_ID>",
 	Action: func(c *cli.Context) error {
@@ -115,6 +116,7 @@ var volumeDelete = cli.Command{
 
 var volumeCreate = cli.Command{
 	Name:      "create",
+	Aliases:   []string{"new"},
 	Usage:     "Create a volume",
 	ArgsUsage: "<Volume_name>",
 	Flags: []cli.Flag{
