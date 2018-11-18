@@ -240,8 +240,8 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	return retcode, stdout, stderr, err
 }
 
-// Connect ...
-func (s *ssh) Connect(name string, timeout time.Duration) error {
+// getSSHConfigFromName ...
+func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.SSHConfig, error) {
 	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxHost {
@@ -260,7 +260,7 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 
 // Connect ...
 func (s *ssh) Connect(name string, timeout time.Duration) error {
-	sshCfg, err := s.getSShConfigFromName(name, timeout)
+	sshCfg, err := s.getSSHConfigFromName(name, timeout)
 	if err != nil {
 		return err
 	}
@@ -279,25 +279,23 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 }
 
 func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) error {
-	sshCfg, err := s.getSShConfigFromName(name, timeout)
+	sshCfg, err := s.getSSHConfigFromName(name, timeout)
 	if err != nil {
 		return err
 	}
 
 	if sshCfg.GatewayConfig == nil {
 		sshCfg.GatewayConfig = &system.SSHConfig{
-			User:			sshCfg.User,
-			Host:			sshCfg.Host,
-			PrivateKey:    	sshCfg.PrivateKey,
-			Port:          	sshCfg.Port,
-			GatewayConfig: 	nil,
+			User:          sshCfg.User,
+			Host:          sshCfg.Host,
+			PrivateKey:    sshCfg.PrivateKey,
+			Port:          sshCfg.Port,
+			GatewayConfig: nil,
 		}
 	}
 	sshCfg.Host = "127.0.0.1"
 	sshCfg.Port = remotePort
 	sshCfg.LocalPort = localPort
-
-
 
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
@@ -325,18 +323,18 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 }
 
 func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, timeout time.Duration) error {
-	sshCfg, err := s.getSShConfigFromName(name, timeout)
+	sshCfg, err := s.getSSHConfigFromName(name, timeout)
 	if err != nil {
 		return err
 	}
 
 	if sshCfg.GatewayConfig == nil {
 		sshCfg.GatewayConfig = &system.SSHConfig{
-			User:			sshCfg.User,
-			Host:			sshCfg.Host,
-			PrivateKey:    	sshCfg.PrivateKey,
-			Port:          	sshCfg.Port,
-			GatewayConfig: 	nil,
+			User:          sshCfg.User,
+			Host:          sshCfg.Host,
+			PrivateKey:    sshCfg.PrivateKey,
+			Port:          sshCfg.Port,
+			GatewayConfig: nil,
 		}
 		sshCfg.Host = "127.0.0.1"
 	}
@@ -362,7 +360,6 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 
 	return nil
 }
-
 
 // WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
 func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {
