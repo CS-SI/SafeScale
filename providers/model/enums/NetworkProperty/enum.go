@@ -19,4 +19,6 @@ package NetworkProperty
 const (
 	// DescriptionV1 contains optional additional info describing host (purpose, ...)
 	DescriptionV1 = "1"
+	// HostsV1 contains list of hosts attached to the network
+	HostsV1 = "2"
 )
