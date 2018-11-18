@@ -33,3 +33,17 @@ type NetworkDescription struct {
 func NewNetworkDescription() *NetworkDescription {
 	return &NetworkDescription{}
 }
+
+// NetworkHosts contains information about hosts connected to the network
+type NetworkHosts struct {
+	ByID   map[string]string `json:"by_id"`   // list of host names, indexed by host id
+	ByName map[string]string `json:"by_name"` // list of host IDs, indexed by host name
+}
+
+// NewNetworkHosts ...
+func NewNetworkHosts() *NetworkHosts {
+	return &NetworkHosts{
+		ByID:   map[string]string{},
+		ByName: map[string]string{},
+	}
+}

@@ -56,7 +56,7 @@ func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 		return nil, err
 	}
 
-	log.Printf("Network '%s' created", in.Name)
+	log.Println("Network created")
 	return conv.ToPBNetwork(network), nil
 }
 

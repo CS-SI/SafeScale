@@ -98,13 +98,13 @@ func (svc *ShareService) Create(shareName, hostName, path string) (*propsv1.Host
 	sshSvc := NewSSHService(svc.provider)
 	sshConfig, err := sshSvc.GetConfig(server)
 	if err != nil {
-		tbr := errors.Wrap(err, "Error getting NAS ssh config")
+		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	nfsServer, err := nfs.NewServer(sshConfig)
 	if err != nil {
-		tbr := errors.Wrap(err, "Error creating NAS structure")
+		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
