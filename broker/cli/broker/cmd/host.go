@@ -258,7 +258,7 @@ var hostCreate = cli.Command{
 
 var hostDelete = cli.Command{
 	Name:      "delete",
-	Aliases:   []string{"rm, remove"},
+	Aliases:   []string{"rm", "remove"},
 	Usage:     "Delete host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {

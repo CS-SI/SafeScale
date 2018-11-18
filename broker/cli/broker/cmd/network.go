@@ -62,7 +62,7 @@ var networkList = cli.Command{
 
 var networkDelete = cli.Command{
 	Name:      "delete",
-	Aliases:   []string{"rm, remove"},
+	Aliases:   []string{"rm", "remove"},
 	Usage:     "delete NETWORK",
 	ArgsUsage: "<network_name>",
 	Action: func(c *cli.Context) error {
