@@ -453,7 +453,7 @@ func (client *Client) DeleteGateway(networkID string) error {
 		// TODO Handle edge cases, and don't wait forever
 
 		// Loop waiting for effective deletion of the host
-		for err = nil; err != nil; _, err = client.GetHost(host.ID) {
+		for err = nil; err != nil; err = client.UpdateHost(host) {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}

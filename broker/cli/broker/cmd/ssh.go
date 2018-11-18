@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 	"strconv"
+	"time"
 
 	"github.com/urfave/cli"
 
@@ -138,9 +138,9 @@ var sshConnect = cli.Command{
 }
 
 var sshTunnel = cli.Command{
-	Name:		"tunnel",
-	Usage:		"Create a ssh tunnel between admin host and a host in the cloud",
-	ArgsUsage:	"<Host_name|Host_ID --local local_port  --remote remote_port>",
+	Name:      "tunnel",
+	Usage:     "Create a ssh tunnel between admin host and a host in the cloud",
+	ArgsUsage: "<Host_name|Host_ID --local local_port  --remote remote_port>",
 	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "local",
@@ -158,7 +158,7 @@ var sshTunnel = cli.Command{
 			Usage: "timeout in minutes",
 		},
 	},
-	Action: func(c *cli.Context) error{
+	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument")
 			_ = cli.ShowSubcommandHelp(c)
@@ -181,9 +181,8 @@ var sshTunnel = cli.Command{
 
 		timeout := time.Duration(c.Float64("timeout")) * time.Minute
 
-
 		//c.GlobalInt("port") is the grpc port aka. 50051
-		err := client.New(c.GlobalInt("port")).Ssh.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
+		err := client.New().Ssh.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
 		if err != nil {
 			err = client.DecorateError(err, "ssh tunnel", false)
 		}
@@ -242,7 +241,7 @@ var sshClose = cli.Command{
 		timeout := time.Duration(c.Float64("timeout")) * time.Minute
 
 		//c.GlobalInt("port") is the grpc port aka. 50051
-		err := client.New(c.GlobalInt("port")).Ssh.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
+		err := client.New().Ssh.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
 		if err != nil {
 			err = client.DecorateError(err, "ssh close", false)
 		}

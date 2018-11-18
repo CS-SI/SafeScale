@@ -19,6 +19,7 @@ package cloudferro
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
@@ -46,13 +47,13 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	IdentityEndpoint := "https://cf2.cloudferro.com:5000/v3"
 	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
 		IdentityEndpoint: IdentityEndpoint,
-		Username:   opts.Username,
-		Password:   opts.Password,
-		DomainName: opts.DomainName,
-		TenantName: opts.ProjectName,
-		Region:     opts.Region,
-		FloatingIPPool: "external",
-		AllowReauth: true,
+		Username:         opts.Username,
+		Password:         opts.Password,
+		DomainName:       opts.DomainName,
+		TenantName:       opts.ProjectName,
+		Region:           opts.Region,
+		FloatingIPPool:   "external",
+		AllowReauth:      true,
 	},
 		openstack.CfgOptions{
 			ProviderNetwork:           "external",
@@ -60,11 +61,11 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 			UseLayer3Networking:       true,
 			AutoHostNetworkInterfaces: true,
 			VolumeSpeeds: map[string]VolumeSpeed.Enum{
-				"HDD":    VolumeSpeed.COLD,
+				"HDD": VolumeSpeed.COLD,
 				"SSD": VolumeSpeed.HDD,
 			},
-			MetadataBucketName: api.BuildMetadataBucketName(opts.ProjectID),
-			DNSList: []string{"1.1.1.1", "8.8.8.8"},
+			MetadataBucketName: metadata.BuildMetadataBucketName(opts.ProjectID),
+			DNSList:            []string{"1.1.1.1", "8.8.8.8"},
 		},
 	)
 
