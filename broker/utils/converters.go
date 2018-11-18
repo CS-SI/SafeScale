@@ -75,7 +75,7 @@ func ToPBVolumeAttachment(in *model.VolumeAttachment) *pb.VolumeAttachment {
 }
 
 // ToPBVolumeInfo converts an api.Volume to a *VolumeInfo
-func ToPBVolumeInfo(volume *model.Volume, mounts map[string]propsv1.HostLocalMount) *pb.VolumeInfo {
+func ToPBVolumeInfo(volume *model.Volume, mounts map[string]*propsv1.HostLocalMount) *pb.VolumeInfo {
 	pbvi := &pb.VolumeInfo{
 		ID:    volume.ID,
 		Name:  volume.Name,
@@ -117,7 +117,7 @@ func ToPBContainerMountPoint(in *model.ContainerInfo) *pb.ContainerMountingPoint
 }
 
 // ToPBShare convert a share from model to protocolbuffer format
-func ToPBShare(hostName string, share propsv1.HostShare) *pb.ShareDefinition {
+func ToPBShare(hostName string, share *propsv1.HostShare) *pb.ShareDefinition {
 	return &pb.ShareDefinition{
 		ID:   share.ID,
 		Name: share.Name,
@@ -128,7 +128,7 @@ func ToPBShare(hostName string, share propsv1.HostShare) *pb.ShareDefinition {
 }
 
 // ToPBShareMount convert share mount on host to protocolbuffer format
-func ToPBShareMount(shareName string, hostName string, mount propsv1.HostRemoteMount) *pb.ShareMountDefinition {
+func ToPBShareMount(shareName string, hostName string, mount *propsv1.HostRemoteMount) *pb.ShareMountDefinition {
 	return &pb.ShareMountDefinition{
 		Share: &pb.Reference{Name: shareName},
 		Host:  &pb.Reference{Name: hostName},
@@ -139,13 +139,13 @@ func ToPBShareMount(shareName string, hostName string, mount propsv1.HostRemoteM
 
 // ToPBHost convert an host from api to protocolbuffer format
 func ToPBHost(in *model.Host) *pb.Host {
-	hpNetworkV1 := propsv1.BlankHostNetwork
-	err := in.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	hpNetworkV1 := propsv1.NewHostNetwork()
+	err := in.Properties.Get(HostProperty.NetworkV1, hpNetworkV1)
 	if err != nil {
 		return nil
 	}
-	hpSizingV1 := propsv1.BlankHostSizing
-	err = in.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
+	hpSizingV1 := propsv1.NewHostSizing()
+	err = in.Properties.Get(HostProperty.SizingV1, hpSizingV1)
 	if err != nil {
 		return nil
 	}

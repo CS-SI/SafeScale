@@ -79,8 +79,8 @@ func getMockableClient(t *testing.T) (*tests.ClientTester, *mocks.MockClientAPI,
 // Helper function to test mock objects
 func GetHostTemplate(core int, ram int, disk int) model.HostTemplate {
 	return model.HostTemplate{
-		HostTemplate: propsv1.HostTemplate{
-			HostSize: propsv1.HostSize{
+		HostTemplate: &propsv1.HostTemplate{
+			HostSize: &propsv1.HostSize{
 				Cores:    core,
 				RAMSize:  float32(ram) / 1000.0,
 				DiskSize: disk,

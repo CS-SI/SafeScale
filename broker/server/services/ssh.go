@@ -82,17 +82,17 @@ func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 		Host:       host.GetAccessIP(),
 		User:       model.DefaultUser,
 	}
-	hpNetworkV1 := propsv1.BlankHostNetwork
-	err := host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	hostNetworkV1 := propsv1.NewHostNetwork()
+	err := host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
 		return nil, err
 	}
-	if hpNetworkV1.DefaultGatewayID != "" {
-		mgw, err := metadata.LoadHost(svc.provider, hpNetworkV1.DefaultGatewayID)
+	if hostNetworkV1.DefaultGatewayID != "" {
+		hostSvc := NewHostService(svc.provider)
+		gw, err := hostSvc.Get(hostNetworkV1.DefaultGatewayID)
 		if err != nil {
 			return nil, err
 		}
-		gw := mgw.Get()
 		GatewayConfig := system.SSHConfig{
 			PrivateKey: gw.PrivateKey,
 			Port:       22,

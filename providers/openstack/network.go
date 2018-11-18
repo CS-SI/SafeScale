@@ -413,13 +413,13 @@ func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
 	}()
 
 	// Updates Host Property propsv1.HostSizing
-	hpSizingV1 := propsv1.BlankHostSizing
-	err = host.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
+	hostSizingV1 := propsv1.NewHostSizing()
+	err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
 	}
-	hpSizingV1.Template = req.TemplateID
-	err = host.Properties.Set(HostProperty.SizingV1, &hpSizingV1)
+	hostSizingV1.Template = req.TemplateID
+	err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
 	}

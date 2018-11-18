@@ -28,3 +28,8 @@ type NetworkDescription struct {
 	Purpose string    `json:"purpose,omitempty"` // contains the purpose of this network
 	Created time.Time `json:"created,omitempty"` // Contains the date of creation if the network
 }
+
+// NewNetworkDescription ...
+func NewNetworkDescription() *NetworkDescription {
+	return &NetworkDescription{}
+}
