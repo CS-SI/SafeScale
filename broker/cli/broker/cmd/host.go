@@ -19,10 +19,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/deploy/install"
-	"github.com/CS-SI/SafeScale/deploy/cli/enums/ExitCode"
 	"log"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/deploy/cli/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/deploy/install"
 
 	"github.com/urfave/cli"
 
@@ -237,9 +238,9 @@ var hostCreate = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		mapFeatureNames := map[string]string{
-			"docker": "docker",
+			"docker":         "docker",
 			"docker-compose": "docker-compose",
-			"nvidiadocker": "nvidiadocker",
+			"nvidiadocker":   "nvidiadocker",
 		}
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
@@ -277,7 +278,7 @@ var hostCreate = cli.Command{
 				target := install.NewHostTarget(resp)
 				settings := install.Settings{}
 				settings.SkipProxy = c.Bool("skip-proxy")
-				results, err := feature.Add(c.GlobalInt("port"), target, install.Variables{}, install.Settings{})
+				results, err := feature.Add(target, install.Variables{}, install.Settings{})
 				if err != nil {
 					msg := fmt.Sprintf("Error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 					return cli.NewExitError(msg, int(ExitCode.RPC))
