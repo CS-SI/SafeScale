@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -112,8 +111,8 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 		return nil, errors.Wrap(err, fmt.Sprintf("error getting template: %s", ProviderErrorToString(err)))
 	}
 	return &model.HostTemplate{
-		HostTemplate: propsv1.HostTemplate{
-			HostSize: propsv1.HostSize{
+		HostTemplate: &propsv1.HostTemplate{
+			HostSize: &propsv1.HostSize{
 				Cores:    flv.VCPUs,
 				RAMSize:  float32(flv.RAM) / 1000.0,
 				DiskSize: flv.Disk,
@@ -144,8 +143,8 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 		for _, flv := range flavorList {
 
 			flvList = append(flvList, model.HostTemplate{
-				HostTemplate: propsv1.HostTemplate{
-					HostSize: propsv1.HostSize{
+				HostTemplate: &propsv1.HostTemplate{
+					HostSize: &propsv1.HostSize{
 						Cores:    flv.VCPUs,
 						RAMSize:  float32(flv.RAM) / 1000.0,
 						DiskSize: flv.Disk,
@@ -253,7 +252,7 @@ func (client *Client) DeleteKeyPair(id string) error {
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into mdel.Host
-func (client *Client) toHostSize(flavor map[string]interface{}) propsv1.HostSize {
+func (client *Client) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
 		tpl, err := client.GetTemplate(fid)
@@ -261,14 +260,13 @@ func (client *Client) toHostSize(flavor map[string]interface{}) propsv1.HostSize
 			return tpl.HostSize
 		}
 	}
+	hostSize := propsv1.NewHostSize()
 	if _, ok := flavor["vcpus"]; ok {
-		return propsv1.HostSize{
-			Cores:    flavor["vcpus"].(int),
-			DiskSize: flavor["disk"].(int),
-			RAMSize:  flavor["ram"].(float32) / 1000.0,
-		}
+		hostSize.Cores = flavor["vcpus"].(int)
+		hostSize.DiskSize = flavor["disk"].(int)
+		hostSize.RAMSize = flavor["ram"].(float32) / 1000.0
 	}
-	return propsv1.HostSize{}
+	return hostSize
 }
 
 // toHostState converts host status returned by OpenStack driver into HostState enum
@@ -396,33 +394,33 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 	host.LastState = toHostState(server.Status)
 
 	// Updates Host Property propsv1.HostDescription
-	hpDescriptionV1 := propsv1.BlankHostDescription
-	err := host.Properties.Get(HostProperty.DescriptionV1, &hpDescriptionV1)
+	hpDescriptionV1 := propsv1.NewHostDescription()
+	err := host.Properties.Get(HostProperty.DescriptionV1, hpDescriptionV1)
 	if err != nil {
 		return err
 	}
 	hpDescriptionV1.Created = server.Created
 	hpDescriptionV1.Updated = server.Updated
-	err = host.Properties.Set(HostProperty.DescriptionV1, &hpDescriptionV1)
+	err = host.Properties.Set(HostProperty.DescriptionV1, hpDescriptionV1)
 	if err != nil {
 		return err
 	}
 
 	// Updates Host Property propsv1.HostSizing
-	hpSizingV1 := propsv1.BlankHostSizing
-	err = host.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
+	hpSizingV1 := propsv1.NewHostSizing()
+	err = host.Properties.Get(HostProperty.SizingV1, hpSizingV1)
 	if err != nil {
 		return err
 	}
 	hpSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
-	err = host.Properties.Set(HostProperty.SizingV1, &hpSizingV1)
+	err = host.Properties.Set(HostProperty.SizingV1, hpSizingV1)
 	if err != nil {
 		return err
 	}
 
 	// Updates Host Property propsv1.HostNetwork
-	hpNetworkV1 := propsv1.BlankHostNetwork
-	err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	hpNetworkV1 := propsv1.NewHostNetwork()
+	err = host.Properties.Get(HostProperty.NetworkV1, hpNetworkV1)
 	if err != nil {
 		return err
 	}
@@ -482,7 +480,7 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 		hpNetworkV1.IPv6Addresses = ipv6Addresses
 	}
 
-	return host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
+	return host.Properties.Set(HostProperty.NetworkV1, hpNetworkV1)
 }
 
 // userData is the structure to apply to userdata.sh template
@@ -670,7 +668,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 	host := model.NewHost()
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 
-	hpNetworkV1 := propsv1.BlankHostNetwork
+	hpNetworkV1 := propsv1.NewHostNetwork()
 
 	// Tells if the host is a gateway
 	hpNetworkV1.IsGateway = isGateway
@@ -702,7 +700,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 	}
 
 	// Updates Host Property NetworkV1 in host instance
-	err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
+	err = host.Properties.Set(HostProperty.NetworkV1, hpNetworkV1)
 	if err != nil {
 		return nil, err
 	}
@@ -786,7 +784,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 			return nil, errors.Wrap(err, fmt.Sprintf(msg))
 		}
 
-		err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+		err = host.Properties.Get(HostProperty.NetworkV1, hpNetworkV1)
 		if err != nil {
 			return nil, err
 		}
@@ -797,7 +795,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 		}
 
 		// Updates Host Extension NetworkV1 in host instance
-		err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
+		err = host.Properties.Set(HostProperty.NetworkV1, hpNetworkV1)
 		if err != nil {
 			return nil, err
 		}
@@ -1168,21 +1166,19 @@ func (client *Client) StartHost(ref string) error {
 }
 
 func (client *Client) getSSHConfig(host *model.Host) (*system.SSHConfig, error) {
-	spew.Dump(host)
-
 	sshConfig := system.SSHConfig{
 		PrivateKey: host.PrivateKey,
 		Port:       22,
 		Host:       host.GetAccessIP(),
 		User:       model.DefaultUser,
 	}
-	hpNetworkV1 := propsv1.HostNetwork{}
-	err := host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	hostNetworkV1 := propsv1.NewHostNetwork()
+	err := host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
 		return nil, err
 	}
-	if hpNetworkV1.DefaultGatewayID != "" {
-		mgw, err := metadata.LoadHost(client, hpNetworkV1.DefaultGatewayID)
+	if hostNetworkV1.DefaultGatewayID != "" {
+		mgw, err := metadata.LoadHost(client, hostNetworkV1.DefaultGatewayID)
 		if err != nil {
 			log.Debugf("Error getting ssh config: getting host: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error getting ssh config: getting host"))

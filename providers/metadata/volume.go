@@ -185,33 +185,16 @@ func (mv *Volume) Attach(va *model.VolumeAttachment) error {
 
 	// First save attachment in volume property VolumeAttachments
 	volume := mv.Get()
-	vpAttachmentsV1 := propsv1.VolumeAttachments{}
-	err := volume.Properties.Get(VolumeProperty.AttachedV1, &vpAttachmentsV1)
+	volumeAttachmentsV1 := propsv1.NewVolumeAttachments()
+	err := volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachmentsV1)
 	if err != nil {
 		return err
 	}
-	vpAttachmentsV1.HostIDs = append(vpAttachmentsV1.HostIDs, va.ServerID)
-	err = volume.Properties.Set(VolumeProperty.AttachedV1, &vpAttachmentsV1)
+	volumeAttachmentsV1.HostIDs = append(volumeAttachmentsV1.HostIDs, va.ServerID)
+	err = volume.Properties.Set(VolumeProperty.AttachedV1, volumeAttachmentsV1)
 	if err != nil {
 		return err
 	}
-
-	// // Second save attachment in host metadata
-	// h := mh.Get()
-	// hpVolumesV1 := propsv1.HostVolumes{}
-	// err = h.Properties.Get(HostProperty.VolumesV1, &hpVolumesV1)
-	// if err != nil {
-	// 	return err
-	// }
-	// hpVolume := propsv1.HostVolume{
-	// 	ID:     va.VolumeID,
-	// 	Name:   va.Name,
-	// 	Device: va.Device,
-	// }
-	// hpVolumesV1.AttachedByID[va.VolumeID] = hpVolume
-	// hpVolumesV1.AttachedByDevice[va.Name] = va.VolumeID
-	// hpVolumesV1.AttachedByDevice[va.Device] = va.VolumeID
-	// err =  h.Properties.Set(HostProperty.VolumesV1, &hpVolumesV1)
 
 	return err
 }
@@ -223,15 +206,15 @@ func (mv *Volume) Detach(va *model.VolumeAttachment) error {
 	}
 	volume := mv.Get()
 
-	vpAttachedV1 := propsv1.VolumeAttachments{}
-	err := volume.Properties.Get(VolumeProperty.AttachedV1, &vpAttachedV1)
+	volumeAttachedV1 := propsv1.NewVolumeAttachments()
+	err := volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
 	if err != nil {
 		return err
 	}
 	present := false
 	k := 0
 	i := ""
-	for k, i = range vpAttachedV1.HostIDs {
+	for k, i = range volumeAttachedV1.HostIDs {
 		if i == va.ServerID {
 			present = true
 			break
@@ -241,8 +224,8 @@ func (mv *Volume) Detach(va *model.VolumeAttachment) error {
 		log.Warnf("Volume '%s' can't be detached from host '%s', it isn't attached to it.", va.ID, va.ServerID)
 		return nil
 	}
-	vpAttachedV1.HostIDs = append(vpAttachedV1.HostIDs[:k], vpAttachedV1.HostIDs[k+1:]...)
-	return volume.Properties.Set(VolumeProperty.AttachedV1, &vpAttachedV1)
+	volumeAttachedV1.HostIDs = append(volumeAttachedV1.HostIDs[:k], volumeAttachedV1.HostIDs[k+1:]...)
+	return volume.Properties.Set(VolumeProperty.AttachedV1, volumeAttachedV1)
 }
 
 // GetAttachments returns a list of ID of the hosts which are attached to the volume
@@ -256,12 +239,12 @@ func (mv *Volume) GetAttachments() ([]string, error) {
 		panic("No volume instance in metadata!")
 	}
 
-	vpAttachedV1 := propsv1.VolumeAttachments{}
-	err := v.Properties.Get(VolumeProperty.AttachedV1, &vpAttachedV1)
+	volumeAttachedV1 := propsv1.NewVolumeAttachments()
+	err := v.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
 	if err != nil {
 		return nil, err
 	}
-	return vpAttachedV1.HostIDs, nil
+	return volumeAttachedV1.HostIDs, nil
 }
 
 // SaveVolume saves the Volume definition in Object Storage
