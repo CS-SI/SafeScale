@@ -171,12 +171,12 @@ func (svc *NetworkService) Create(
 	}()
 
 	// Updates gw requested sizing
-	hpSizingV1 := propsv1.BlankHostSizing
-	err = gw.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
+	gwSizingV1 := propsv1.NewHostSizing()
+	err = gw.Properties.Get(HostProperty.SizingV1, gwSizingV1)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error creating network")
 	}
-	hpSizingV1.RequestedSize = propsv1.HostSize{
+	gwSizingV1.RequestedSize = &propsv1.HostSize{
 		Cores:    cpu,
 		RAMSize:  ram,
 		DiskSize: disk,

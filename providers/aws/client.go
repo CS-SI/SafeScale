@@ -904,8 +904,8 @@ func (c *Client) prepareUserData(request model.HostRequest, kp *model.KeyPair, g
 	// }
 	ip := ""
 	if gw != nil {
-		hpNetworkV1 := propsv1.BlankHostNetwork
-		err := gw.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+		hpNetworkV1 := propsv1.NewHostNetwork()
+		err := gw.Properties.Get(HostProperty.NetworkV1, hpNetworkV1)
 		if err != nil {
 			return "", err
 		}

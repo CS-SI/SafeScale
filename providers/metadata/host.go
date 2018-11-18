@@ -170,13 +170,13 @@ func SaveHost(svc api.ClientAPI, host *model.Host) error {
 	if err != nil {
 		return err
 	}
-	hpNetworkV1 := propsv1.BlankHostNetwork
-	err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	hostNetworkV1 := propsv1.NewHostNetwork()
+	err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
 		return err
 	}
 	mn := NewNetwork(svc)
-	for netID := range hpNetworkV1.NetworksByID {
+	for netID := range hostNetworkV1.NetworksByID {
 		found, err := mn.ReadByID(netID)
 		if err != nil {
 			return err

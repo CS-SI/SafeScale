@@ -63,12 +63,12 @@ type HostRequest struct {
 
 // HostSize ...
 type HostSize struct {
-	propsv1.HostSize
+	*propsv1.HostSize
 }
 
 // HostTemplate ...
 type HostTemplate struct {
-	propsv1.HostTemplate
+	*propsv1.HostTemplate
 }
 
 // Host contains the information about a host
@@ -98,30 +98,30 @@ func (h *Host) GetAccessIP() string {
 
 // GetPublicIP computes public IP of the host
 func (h *Host) GetPublicIP() string {
-	hpNetworkV1 := propsv1.HostNetwork{}
-	err := h.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	hostNetworkV1 := propsv1.NewHostNetwork()
+	err := h.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
 		return ""
 	}
-	ip := hpNetworkV1.PublicIPv4
+	ip := hostNetworkV1.PublicIPv4
 	if ip == "" {
-		ip = hpNetworkV1.PublicIPv6
+		ip = hostNetworkV1.PublicIPv6
 	}
 	return ip
 }
 
 // GetPrivateIP ...
 func (h *Host) GetPrivateIP() string {
-	hpNetworkV1 := propsv1.HostNetwork{}
-	err := h.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	hostNetworkV1 := propsv1.NewHostNetwork()
+	err := h.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
 		return ""
 	}
 	ip := ""
-	if len(hpNetworkV1.IPv4Addresses) > 0 {
-		ip = hpNetworkV1.IPv4Addresses[hpNetworkV1.DefaultNetworkID]
+	if len(hostNetworkV1.IPv4Addresses) > 0 {
+		ip = hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
 		if ip == "" {
-			ip = hpNetworkV1.IPv6Addresses[hpNetworkV1.DefaultNetworkID]
+			ip = hostNetworkV1.IPv6Addresses[hostNetworkV1.DefaultNetworkID]
 		}
 	}
 	return ip
