@@ -36,8 +36,9 @@ var ImageCmd = cli.Command{
 }
 
 var imageList = cli.Command{
-	Name:  "list",
-	Usage: "List available images",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available images",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all",
