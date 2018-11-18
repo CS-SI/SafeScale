@@ -277,7 +277,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		feature                       *install.Feature
 		target                        install.Target
 		results                       install.Results
-		hpNetworkV1                   propsv1.HostNetwork
+		hpNetworkV1                   = propsv1.NewHostNetwork()
 	)
 	broker := brokerclient.New()
 
@@ -359,7 +359,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
 		goto cleanNetwork
 	}
-	err = gw.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+	err = gw.Properties.Get(HostProperty.NetworkV1, hpNetworkV1)
 	if err != nil {
 		goto cleanNetwork
 	}
@@ -534,10 +534,10 @@ func Sanitize(data *metadata.Cluster) error {
 		masterIPs := []string{}
 		privateNodeIPs := []string{}
 		publicNodeIPs := []string{}
-		hpNetworkV1 := propsv1.HostNetwork{}
-		defaultNetworkIP := hpNetworkV1.IPv4Addresses[hpNetworkV1.DefaultNetworkID]
+		hostNetworkV1 := propsv1.NewHostNetwork()
+		defaultNetworkIP := hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
 		for _, h := range hosts {
-			err = h.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+			err = h.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 			if err != nil {
 				return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
 			}
@@ -550,7 +550,7 @@ func Sanitize(data *metadata.Cluster) error {
 				publicNodeIPs = append(privateNodeIPs, defaultNetworkIP)
 			}
 		}
-		err = gw.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+		err = gw.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 		if err != nil {
 			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
 		}

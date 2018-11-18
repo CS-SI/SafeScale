@@ -40,12 +40,12 @@ import (
 
 // ShareAPI defines API to manipulate Shares
 type ShareAPI interface {
-	Create(name, host, path string) (propsv1.HostShare, error)
+	Create(name, host, path string) (*propsv1.HostShare, error)
 	Delete(name string) error
-	List() (map[string]map[string]propsv1.HostShare, error)
-	Mount(name, host, path string) (propsv1.HostRemoteMount, error)
+	List() (map[string]map[string]*propsv1.HostShare, error)
+	Mount(name, host, path string) (*propsv1.HostRemoteMount, error)
 	Unmount(name, host string) error
-	Inspect(name string) (*model.Host, propsv1.HostShare, error)
+	Inspect(name string) (*model.Host, *propsv1.HostShare, error)
 }
 
 // ShareService nas service
@@ -69,21 +69,21 @@ func sanitize(in string) (string, error) {
 }
 
 // Create a share on host
-func (svc *ShareService) Create(shareName, hostName, path string) (propsv1.HostShare, error) {
+func (svc *ShareService) Create(shareName, hostName, path string) (*propsv1.HostShare, error) {
 	// Check if a share already exists with the same name
 	serverName, err := svc.findShare(shareName)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
-		return propsv1.BlankHostShare, tbr
+		return nil, tbr
 	}
 	if serverName != "" {
-		return propsv1.BlankHostShare, model.ResourceAlreadyExistsError("share", shareName)
+		return nil, model.ResourceAlreadyExistsError("share", shareName)
 	}
 	hostSvc := NewHostService(svc.provider)
 	server, err := hostSvc.Get(hostName)
 	if err != nil {
-		return propsv1.BlankHostShare, err
+		return nil, err
 	}
 
 	// Sanitize path
@@ -91,7 +91,7 @@ func (svc *ShareService) Create(shareName, hostName, path string) (propsv1.HostS
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
-		return propsv1.BlankHostShare, tbr
+		return nil, tbr
 	}
 
 	// Installs NFS Server software if needed
@@ -100,18 +100,18 @@ func (svc *ShareService) Create(shareName, hostName, path string) (propsv1.HostS
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
-		return propsv1.BlankHostShare, tbr
+		return nil, tbr
 	}
 	nfsServer, err := nfs.NewServer(sshConfig)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
-		return propsv1.BlankHostShare, tbr
+		return nil, tbr
 	}
-	serverSharesV1 := propsv1.BlankHostShares
-	err = server.Properties.Get(HostProperty.SharesV1, &serverSharesV1)
+	serverSharesV1 := propsv1.NewHostShares()
+	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
-		return propsv1.BlankHostShare, err
+		return nil, err
 	}
 	if len(serverSharesV1.ByID) == 0 {
 		// Host doesn't have shares yet, so install NFS
@@ -119,24 +119,24 @@ func (svc *ShareService) Create(shareName, hostName, path string) (propsv1.HostS
 		if err != nil {
 			tbr := errors.Wrap(err, "")
 			log.Errorf("%+v", tbr)
-			return propsv1.BlankHostShare, tbr
+			return nil, tbr
 		}
 	}
 	err = nfsServer.AddShare(sharePath, "")
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
-		return propsv1.BlankHostShare, tbr
+		return nil, tbr
 	}
 
 	// Create share struct
-	share := propsv1.BlankHostShare
+	share := propsv1.NewHostShare()
 	share.Name = shareName
 	shareID, err := uuid.NewV4()
 	if err != nil {
 		tbr := errors.Wrap(err, "Error creating UUID for share")
 		log.Errorf("%+v", tbr)
-		return propsv1.BlankHostShare, tbr
+		return nil, tbr
 	}
 	share.ID = shareID.String()
 	share.Path = sharePath
@@ -146,20 +146,20 @@ func (svc *ShareService) Create(shareName, hostName, path string) (propsv1.HostS
 	serverSharesV1.ByName[share.Name] = share.ID
 
 	// Updates Host Property propsv1.HostShares
-	err = server.Properties.Set(HostProperty.SharesV1, &serverSharesV1)
+	err = server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
-		return propsv1.BlankHostShare, err
+		return nil, err
 	}
 
 	err = metadata.SaveHost(svc.provider, server)
 	if err != nil {
 		tbr := errors.Wrap(err, "Error saving server metadata")
 		log.Errorf("%+v", tbr)
-		return propsv1.BlankHostShare, tbr
+		return nil, tbr
 	}
 	err = metadata.SaveShare(svc.provider, server.ID, server.Name, share.ID, share.Name)
 	if err != nil {
-		return propsv1.BlankHostShare, err
+		return nil, err
 	}
 
 	return share, nil
@@ -175,8 +175,8 @@ func (svc *ShareService) Delete(name string) error {
 		return tbr
 	}
 
-	hpSharesV1 := propsv1.BlankHostShares
-	err = server.Properties.Get(HostProperty.SharesV1, &hpSharesV1)
+	serverSharesV1 := propsv1.NewHostShares()
+	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
 		return err
 	}
@@ -210,9 +210,9 @@ func (svc *ShareService) Delete(name string) error {
 		return tbr
 	}
 
-	delete(hpSharesV1.ByID, share.ID)
-	delete(hpSharesV1.ByName, share.Name)
-	err = server.Properties.Set(HostProperty.SharesV1, &hpSharesV1)
+	delete(serverSharesV1.ByID, share.ID)
+	delete(serverSharesV1.ByName, share.Name)
+	err = server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
 		return err
 	}
@@ -229,8 +229,8 @@ func (svc *ShareService) Delete(name string) error {
 }
 
 // List return the list of all shares from all servers
-func (svc *ShareService) List() (map[string]map[string]propsv1.HostShare, error) {
-	shares := map[string]map[string]propsv1.HostShare{}
+func (svc *ShareService) List() (map[string]map[string]*propsv1.HostShare, error) {
+	shares := map[string]map[string]*propsv1.HostShare{}
 
 	servers := []string{}
 	ms := metadata.NewShare(svc.provider)
@@ -249,32 +249,31 @@ func (svc *ShareService) List() (map[string]map[string]propsv1.HostShare, error)
 		return nil, nil
 	}
 
-	for _, server := range servers {
-		mh, err := metadata.LoadHost(svc.provider.ClientAPI, server)
-		if err != nil {
-			return nil, err
-		}
-		host := mh.Get()
-
-		hpSharesV1 := propsv1.BlankHostShares
-		err = host.Properties.Get(HostProperty.SharesV1, &hpSharesV1)
+	hostSvc := NewHostService(svc.provider)
+	for _, serverID := range servers {
+		host, err := hostSvc.Get(serverID)
 		if err != nil {
 			return nil, err
 		}
 
-		shares[server] = hpSharesV1.ByID
+		hostSharesV1 := propsv1.NewHostShares()
+		err = host.Properties.Get(HostProperty.SharesV1, hostSharesV1)
+		if err != nil {
+			return nil, err
+		}
+
+		shares[serverID] = hostSharesV1.ByID
 	}
 	return shares, nil
 }
 
 // Mount a share on a local directory of an host
-func (svc *ShareService) Mount(shareName, hostName, path string) (propsv1.HostRemoteMount, error) {
-	mount := propsv1.BlankHostRemoteMount
+func (svc *ShareService) Mount(shareName, hostName, path string) (*propsv1.HostRemoteMount, error) {
 
 	// Sanitize path
 	mountPath, err := sanitize(path)
 	if err != nil {
-		return mount, fmt.Errorf("invalid mount path '%s': '%s'", path, err)
+		return nil, fmt.Errorf("invalid mount path '%s': '%s'", path, err)
 	}
 
 	// Retrieve info about the share
@@ -282,44 +281,44 @@ func (svc *ShareService) Mount(shareName, hostName, path string) (propsv1.HostRe
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
-		return mount, tbr
+		return nil, tbr
 	}
 
 	hostSvc := NewHostService(svc.provider)
 	target, err := hostSvc.Get(hostName)
 	if err != nil {
-		return mount, model.ResourceNotFoundError("host", hostName)
+		return nil, model.ResourceNotFoundError("host", hostName)
 	}
 
 	// Checks if there is no other device mounted in the path (or in subpath)
 	// Checks if there is already something mounted in the path
-	targetMountsV1 := propsv1.BlankHostMounts
-	err = target.Properties.Get(HostProperty.MountsV1, &targetMountsV1)
+	targetMountsV1 := propsv1.NewHostMounts()
+	err = target.Properties.Get(HostProperty.MountsV1, targetMountsV1)
 	if err != nil {
-		return mount, err
+		return nil, err
 	}
 	for _, i := range targetMountsV1.LocalMountsByPath {
 		if i.Path == path {
 			// Can't mount a share in place of a volume (by convention, nothing technically preventing it)
-			return mount, fmt.Errorf("Can't mount share '%s' to host '%s': there is already a volume in path '%s'", shareName, target.Name, path)
+			return nil, fmt.Errorf("Can't mount share '%s' to host '%s': there is already a volume in path '%s'", shareName, target.Name, path)
 		}
 	}
 	for _, i := range targetMountsV1.RemoteMountsByPath {
 		if strings.Index(i.Path, path) == 0 {
 			// Can't mount a share inside another share (at least by convention, if not technically)
-			return mount, fmt.Errorf("Can't mount share volume '%s' to host '%s': there is a share mounted in path '%s[/...]'", shareName, target.Name, path)
+			return nil, fmt.Errorf("Can't mount share volume '%s' to host '%s': there is a share mounted in path '%s[/...]'", shareName, target.Name, path)
 		}
 	}
 
 	// Mount the share on host
-	serverSharesV1 := propsv1.BlankHostShares
-	err = server.Properties.Get(HostProperty.SharesV1, &serverSharesV1)
+	serverSharesV1 := propsv1.NewHostShares()
+	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
-		return mount, err
+		return nil, err
 	}
 	_, found := serverSharesV1.ByID[serverSharesV1.ByName[shareName]]
 	if !found {
-		return mount, fmt.Errorf("failed to find metadata about share '%s'", shareName)
+		return nil, fmt.Errorf("failed to find metadata about share '%s'", shareName)
 	}
 	shareID := serverSharesV1.ByName[shareName]
 	share := serverSharesV1.ByID[shareID]
@@ -328,36 +327,37 @@ func (svc *ShareService) Mount(shareName, hostName, path string) (propsv1.HostRe
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
-		return mount, tbr
+		return nil, tbr
 	}
 
 	nfsClient, err := nfs.NewNFSClient(sshConfig)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
-		return mount, tbr
+		return nil, tbr
 	}
 	err = nfsClient.Install()
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
-		return mount, tbr
+		return nil, tbr
 	}
 
 	err = nfsClient.Mount(server.GetAccessIP(), share.Path, mountPath)
 	if err != nil {
 		tbr := errors.Wrap(err, "")
 		log.Errorf("%+v", tbr)
-		return mount, tbr
+		return nil, tbr
 	}
 
 	serverSharesV1.ByID[shareID].ClientsByName[target.Name] = target.ID
 	serverSharesV1.ByID[shareID].ClientsByID[target.ID] = target.Name
-	err = server.Properties.Set(HostProperty.SharesV1, &serverSharesV1)
+	err = server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
-		return mount, err
+		return nil, err
 	}
 
+	mount := propsv1.NewHostRemoteMount()
 	mount.ShareID = share.ID
 	mount.Export = server.GetAccessIP() + ":" + share.Path
 	mount.Path = mountPath
@@ -365,18 +365,18 @@ func (svc *ShareService) Mount(shareName, hostName, path string) (propsv1.HostRe
 	targetMountsV1.RemoteMountsByPath[mount.Path] = mount
 	targetMountsV1.RemoteMountsByShareID[mount.ShareID] = mount.Path
 	targetMountsV1.RemoteMountsByExport[mount.Export] = mount.Path
-	err = target.Properties.Set(HostProperty.MountsV1, &targetMountsV1)
+	err = target.Properties.Set(HostProperty.MountsV1, targetMountsV1)
 	if err != nil {
-		return mount, err
+		return nil, err
 	}
 
 	err = metadata.SaveHost(svc.provider.ClientAPI, target)
 	if err != nil {
-		return mount, err
+		return nil, err
 	}
 	err = metadata.SaveHost(svc.provider.ClientAPI, server)
 	if err != nil {
-		return mount, err
+		return nil, err
 	}
 	return mount, nil
 }
@@ -390,8 +390,8 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 		return tbr
 	}
 
-	serverSharesV1 := propsv1.BlankHostShares
-	err = server.Properties.Get(HostProperty.SharesV1, &serverSharesV1)
+	serverSharesV1 := propsv1.NewHostShares()
+	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
 		return err
 	}
@@ -410,8 +410,8 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 	if target == nil {
 		return model.ResourceNotFoundError("host", hostName)
 	}
-	targetMountsV1 := propsv1.BlankHostMounts
-	err = target.Properties.Get(HostProperty.MountsV1, &targetMountsV1)
+	targetMountsV1 := propsv1.NewHostMounts()
+	err = target.Properties.Get(HostProperty.MountsV1, targetMountsV1)
 	if err != nil {
 		return err
 	}
@@ -444,7 +444,7 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 	// Remove mount from mount list
 	delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
 	delete(targetMountsV1.RemoteMountsByPath, mount.Path)
-	err = target.Properties.Set(HostProperty.MountsV1, &targetMountsV1)
+	err = target.Properties.Set(HostProperty.MountsV1, targetMountsV1)
 	if err != nil {
 		return err
 	}
@@ -452,7 +452,7 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 	// Remove host from client lists of the share
 	delete(serverSharesV1.ByID[shareID].ClientsByName, target.Name)
 	delete(serverSharesV1.ByID[shareID].ClientsByID, target.ID)
-	err = server.Properties.Set(HostProperty.SharesV1, &serverSharesV1)
+	err = server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
 		return err
 	}
@@ -471,26 +471,27 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 }
 
 // Inspect returns the host and share corresponding to 'shareName'
-func (svc *ShareService) Inspect(shareName string) (*model.Host, propsv1.HostShare, error) {
+func (svc *ShareService) Inspect(shareName string) (*model.Host, *propsv1.HostShare, error) {
+
 	hostName, err := metadata.LoadShare(svc.provider, shareName)
 	if err != nil {
 		tbr := errors.Wrap(err, "error loading share metadata")
 		log.Errorf("%+v", tbr)
-		return nil, propsv1.BlankHostShare, tbr
+		return nil, nil, tbr
 	}
 	if hostName == "" {
-		return nil, propsv1.BlankHostShare, model.ResourceNotFoundError("share", "")
+		return nil, nil, model.ResourceNotFoundError("share", "")
 	}
 
 	hostSvc := NewHostService(svc.provider)
 	server, err := hostSvc.Get(hostName)
 	if err != nil {
-		return nil, propsv1.BlankHostShare, err
+		return nil, nil, err
 	}
-	serverSharesV1 := propsv1.BlankHostShares
-	err = server.Properties.Get(HostProperty.SharesV1, &serverSharesV1)
+	serverSharesV1 := propsv1.NewHostShares()
+	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
-		return nil, propsv1.BlankHostShare, err
+		return nil, nil, err
 	}
 	shareID, found := serverSharesV1.ByName[shareName]
 	if !found {
@@ -498,7 +499,7 @@ func (svc *ShareService) Inspect(shareName string) (*model.Host, propsv1.HostSha
 		_, found = serverSharesV1.ByID[shareID]
 	}
 	if !found {
-		return nil, propsv1.BlankHostShare, err
+		return nil, nil, err
 	}
 	return server, serverSharesV1.ByID[shareID], nil
 }

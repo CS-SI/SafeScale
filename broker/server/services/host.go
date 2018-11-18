@@ -139,18 +139,18 @@ func (svc *HostService) Create(
 	}
 
 	// Updates property propsv1.HostSizing
-	hpSizingV1 := propsv1.BlankHostSizing
-	err = host.Properties.Get(HostProperty.SizingV1, &hpSizingV1)
+	hostSizingV1 := propsv1.NewHostSizing()
+	err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
 	if err != nil {
 		return nil, err
 	}
-	hpSizingV1.Template = hostRequest.TemplateID
-	hpSizingV1.RequestedSize = propsv1.HostSize{
+	hostSizingV1.Template = hostRequest.TemplateID
+	hostSizingV1.RequestedSize = &propsv1.HostSize{
 		Cores:    cpu,
 		RAMSize:  ram,
 		DiskSize: disk,
 	}
-	err = host.Properties.Set(HostProperty.SizingV1, &hpSizingV1)
+	err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
 	if err != nil {
 		return nil, err
 	}
@@ -181,14 +181,14 @@ func (svc *HostService) Create(
 		if err == nil {
 			gatewayID = mgw.Get().ID
 		}
-		hpNetworkV1 := propsv1.BlankHostNetwork
-		err = host.Properties.Get(HostProperty.NetworkV1, &hpNetworkV1)
+		hostNetworkV1 := propsv1.NewHostNetwork()
+		err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 		if err != nil {
 			return nil, err
 		}
 		// hpNetworkV1.Networks = networks
-		hpNetworkV1.DefaultGatewayID = gatewayID
-		err = host.Properties.Set(HostProperty.NetworkV1, &hpNetworkV1)
+		hostNetworkV1.DefaultGatewayID = gatewayID
+		err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
 		if err != nil {
 			return nil, err
 		}
@@ -278,8 +278,8 @@ func (svc *HostService) Delete(ref string) error {
 	}
 
 	// Don't remove a host having shares
-	hostSharesV1 := propsv1.BlankHostShares
-	err = host.Properties.Get(HostProperty.SharesV1, &hostSharesV1)
+	hostSharesV1 := propsv1.NewHostShares()
+	err = host.Properties.Get(HostProperty.SharesV1, hostSharesV1)
 	if err != nil {
 		return err
 	}
@@ -289,8 +289,8 @@ func (svc *HostService) Delete(ref string) error {
 	}
 
 	// Don't remove a host with volumes attached
-	hostVolumesV1 := propsv1.BlankHostVolumes
-	err = host.Properties.Get(HostProperty.VolumesV1, &hostVolumesV1)
+	hostVolumesV1 := propsv1.NewHostVolumes()
+	err = host.Properties.Get(HostProperty.VolumesV1, hostVolumesV1)
 	if err != nil {
 		return err
 	}
@@ -300,8 +300,8 @@ func (svc *HostService) Delete(ref string) error {
 	}
 
 	// Don't remove a host that is a gateway
-	hostNetworkV1 := propsv1.BlankHostNetwork
-	err = host.Properties.Get(HostProperty.NetworkV1, &hostNetworkV1)
+	hostNetworkV1 := propsv1.NewHostNetwork()
+	err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
 		return err
 	}
@@ -310,8 +310,8 @@ func (svc *HostService) Delete(ref string) error {
 	}
 
 	// If host mounted shares, unmounts them before anything else
-	hostMountsV1 := propsv1.BlankHostMounts
-	err = host.Properties.Get(HostProperty.MountsV1, &hostMountsV1)
+	hostMountsV1 := propsv1.NewHostMounts()
+	err = host.Properties.Get(HostProperty.MountsV1, hostMountsV1)
 	if err != nil {
 		return err
 	}

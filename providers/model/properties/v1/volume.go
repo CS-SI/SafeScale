@@ -31,8 +31,10 @@ type VolumeDescription struct {
 	Created time.Time
 }
 
-// BlankVolumeDescription ...
-var BlankVolumeDescription = VolumeDescription{}
+// NewVolumeDescription ...
+func NewVolumeDescription() *VolumeDescription {
+	return &VolumeDescription{}
+}
 
 // VolumeAttachments contains host ids where the volume is attached
 type VolumeAttachments struct {
@@ -40,5 +42,9 @@ type VolumeAttachments struct {
 	HostIDs   []string `json:"host_ids,omitempty"`  // Contains the ID of the hosts mounting the volume (only one allowed if Shareable == false)
 }
 
-// BlankVolumeAttachments ...
-var BlankVolumeAttachments = VolumeAttachments{HostIDs: []string{}}
+// NewVolumeAttachments ...
+func NewVolumeAttachments() *VolumeAttachments {
+	return &VolumeAttachments{
+		HostIDs: []string{},
+	}
+}

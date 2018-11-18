@@ -241,12 +241,12 @@ func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentReque
 	}
 	volume := mv.Get()
 
-	vpAttachedV1 := propsv1.BlankVolumeAttachments
-	err = volume.Properties.Get(VolumeProperty.AttachedV1, &vpAttachedV1)
+	volumeAttachedV1 := propsv1.NewVolumeAttachments()
+	err = volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
 	if err != nil {
 		return "", err
 	}
-	if len(vpAttachedV1.HostIDs) == 1 {
+	if len(volumeAttachedV1.HostIDs) == 1 {
 		// For now, allows only one attachment...
 		return "", fmt.Errorf("Volume '%s' already attached to host(s)", request.VolumeID)
 	}

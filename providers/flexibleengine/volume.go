@@ -217,8 +217,8 @@ func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentReque
 	}
 	volume := mv.Get()
 
-	vpAttachedV1 := propsv1.BlankVolumeAttachments
-	err = volume.Properties.Get(VolumeProperty.AttachedV1, &vpAttachedV1)
+	vpAttachedV1 := propsv1.NewVolumeAttachments()
+	err = volume.Properties.Get(VolumeProperty.AttachedV1, vpAttachedV1)
 	if err != nil {
 		return "", err
 	}
