@@ -710,16 +710,16 @@ func (client *Client) GetGateway(networkID string) (*model.Host, error) {
 
 // DeleteGateway deletes the gateway associated with network identified by ID
 func (client *Client) DeleteGateway(networkID string) error {
-	m, err := metadata.LoadGateway(client, networkID)
+	mg, err := metadata.LoadGateway(client, networkID)
 	if err != nil {
 		return err
 	}
-	if m != nil {
-		err = client.DeleteHost(m.Get().ID)
+	if mg != nil {
+		err = client.DeleteHost(mg.Get().ID)
 		if err != nil {
 			return err
 		}
-		return m.Delete()
+		return mg.Delete()
 	}
 	return fmt.Errorf("failed to load gateway metadata")
 }

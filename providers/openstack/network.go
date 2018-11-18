@@ -436,16 +436,16 @@ func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
 
 // DeleteGateway delete the public gateway of a private network
 func (client *Client) DeleteGateway(networkID string) error {
-	m, err := metadata.LoadGateway(client, networkID)
+	mg, err := metadata.LoadGateway(client, networkID)
 	if err != nil {
 		// log.Errorf("Error deleting gateway: failure loading gateway metadata: %+v", err)
 		return errors.Wrap(err, "Error deleting gateway: failure loading gateway metadata")
 	}
-	if m == nil {
+	if mg == nil {
 		return nil
 	}
 
-	host := m.Get()
+	host := mg.Get()
 	nerr := client.DeleteHost(host.ID)
 	if nerr != nil {
 		return errors.Wrapf(nerr, "Error deleting gateway: error deleting host '%s'", host.ID)
@@ -462,7 +462,7 @@ func (client *Client) DeleteGateway(networkID string) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return m.Delete()
+	return mg.Delete()
 }
 
 // ToGopherIPversion ...

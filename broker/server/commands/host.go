@@ -23,12 +23,10 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/server/services"
 	"github.com/CS-SI/SafeScale/broker/utils"
-
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
-	"os"
 )
 
 // broker host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
@@ -156,57 +154,47 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 
 	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 
-	askedForSpecificScannerInfo := in.GetGPUNumber() > 0 || in.GetFreq() != 0
-	if askedForSpecificScannerInfo {
-		_ = os.MkdirAll(safeutils.AbsPathify("$HOME/.safescale/scanner"), 0777)
-		db, err := scribble.New(safeutils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
-		if err != nil {
-			if !in.Force {
-				fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
-				log.Warnf("Problem creating / accessing Scanner database, ignoring for now...: %v", err)
-			} else {
-				noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem accessing Scanner database: %v", in.GetGPUNumber(), in.GetFreq(), err)
-				log.Error(noHostError)
-				return nil, errors.New(noHostError)
-			}
-		} else {
-			image_list, err := db.ReadAll("images")
-			if err != nil {
-				if !in.Force {
-					fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
-					log.Warnf("Error reading Scanner database", err)
-				} else {
-					noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem listing images from Scanner database: %v", in.GetGPUNumber(), in.GetFreq(), err)
-					log.Error(noHostError)
-					return nil, errors.New(noHostError)
-				}
-			} else {
-				images := []StoredCPUInfo{}
-				for _, f := range image_list {
-					imageFound := StoredCPUInfo{}
-					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
-						fmt.Println("Error", err)
-					}
+	// db, err := scribble.New(safeutils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-					if imageFound.GPU < int(in.GetGPUNumber()) {
-						continue
-					}
+	// imageList, err := db.ReadAll("images")
+	// if err != nil {
+	// 	fmt.Println("Error", err)
+	// }
 
-					if imageFound.CPUFrequency < float64(in.GetFreq()) {
-						continue
-					}
+	// if in.GetGPUNumber() > 0 && in.GetFreq() != 0 {
+	// 	if !in.Force && (len(imageList) == 0) {
+	// 		noScannerDb := fmt.Sprintf("No scanner database available! Run scanner to create one.")
+	// 		log.Error(noScannerDb)
+	// 		return nil, errors.New(noScannerDb)
+	// 	}
+	// }
 
-					images = append(images, imageFound)
-				}
+	// images := []StoredCPUInfo{}
+	// for _, f := range imageList {
+	// 	imageFound := StoredCPUInfo{}
+	// 	if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
+	// 		fmt.Println("Error", err)
+	// 	}
 
-				if !in.Force && (len(images) == 0) {
-					noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, no such host found with those specs !!", in.GetGPUNumber(), in.GetFreq())
-					log.Error(noHostError)
-					return nil, errors.New(noHostError)
-				}
-			}
-		}
-	}
+	// 	if imageFound.GPU < int(in.GetGPUNumber()) {
+	// 		continue
+	// 	}
+
+	// 	if imageFound.CPUFrequency < float64(in.GetFreq()) {
+	// 		continue
+	// 	}
+
+	// 	images = append(images, imageFound)
+	// }
+
+	// if !in.Force && (len(images) == 0) {
+	// 	noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !", in.GetGPUNumber(), in.GetFreq())
+	// 	log.Error(noHostError)
+	// 	return nil, errors.New(noHostError)
+	// }
 
 	// TODO https://github.com/CS-SI/SafeScale/issues/30
 	// TODO GITHUB If we have to ask for GPU requirements and FREQ requirements, pb.HostDefinition has to change and the invocation of hostService.Create too...
