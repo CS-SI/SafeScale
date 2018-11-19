@@ -10,6 +10,7 @@ import (
 )
 
 func Test_Basic(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_OVH")
 	tearDown()
 	defer tearDown()
 
@@ -173,6 +174,7 @@ func Test_Basic(t *testing.T) {
 
 
 func Test_Stop_Start(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_OVH")
 	tearDown()
 	defer tearDown()
 
@@ -237,6 +239,7 @@ func Test_Stop_Start(t *testing.T) {
 
 
 func Test_Delete_Volume_Mounted(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_OVH")
 	tearDown()
 	defer tearDown()
 
@@ -367,6 +370,7 @@ func Test_Delete_Volume_Mounted(t *testing.T) {
 }
 
 func Test_Basic_Until_NAS(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_OVH")
 	tearDown()
 
 	brokerd_launched, err := isBrokerdLaunched()
@@ -440,6 +444,7 @@ func Test_Basic_Until_NAS(t *testing.T) {
 
 
 func Test_Basic_Until_Volume(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_OVH")
 	tearDown()
 
 	brokerd_launched, err := isBrokerdLaunched()
@@ -517,5 +522,6 @@ func Test_Basic_Until_Volume(t *testing.T) {
 }
 
 func Test_Cleanup(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_OVH")
 	tearDown()
 }

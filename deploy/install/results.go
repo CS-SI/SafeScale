@@ -21,7 +21,7 @@ import (
 )
 
 // Results ...
-type Results map[string]StepResults
+type Results map[string]stepResults
 
 // Successful ...
 func (r Results) Successful() bool {
@@ -72,11 +72,11 @@ func (r Results) ErrorMessagesOfHost(name string) string {
 }
 
 // ResultsOfStep ...
-func (r Results) ResultsOfStep(name string) StepResults {
+func (r Results) ResultsOfStep(name string) stepResults {
 	if step, ok := r[name]; ok {
 		return step
 	}
-	return StepResults{}
+	return stepResults{}
 }
 
 // Transpose reorganizes Results to be indexed by hosts (instead by steps normally)
@@ -84,7 +84,7 @@ func (r Results) Transpose() Results {
 	t := Results{}
 	for step, results := range r {
 		for h, sr := range results {
-			t[h] = StepResults{step: sr}
+			t[h] = stepResults{step: sr}
 		}
 	}
 	return t

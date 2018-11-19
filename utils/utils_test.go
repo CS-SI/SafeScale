@@ -45,7 +45,11 @@ func OriginalAbsPathify(inPath string) string {
 
 	return ""
 }
+
 func TestAbsPathify(t *testing.T) {
+	pwd, _ := os.Getwd()
+	user := os.Getenv("USER")
+
 	type args struct {
 		inPath string
 	}
@@ -54,11 +58,10 @@ func TestAbsPathify(t *testing.T) {
 		args args
 		want string
 	}{
-		{"first", args{inPath: "."}, "/home/oscar/GoLand/src/github.com/CS-SI/SafeScale/utils"},
-		{"second", args{inPath: "$HOME/.safescale"}, "/home/oscar/.safescale"},
-		{"third", args{inPath: "$HOME/.config/safescale"}, "/home/oscar/.config/safescale"},
+		{"first", args{inPath: "."}, pwd},
+		{"second", args{inPath: "$HOME/.safescale"}, "/home/" + user + "/.safescale"},
+		{"third", args{inPath: "$HOME/.config/safescale"}, "/home/" + user + "/.config/safescale"},
 		{"last", args{inPath: "/etc/safescale"}, "/etc/safescale"},
-		{"gopath", args{inPath: "$GOPATH"}, "/home/oscar/GoLand"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -77,6 +80,9 @@ func TestAbsPathify(t *testing.T) {
 }
 
 func TestOriginalAbsPathify(t *testing.T) {
+	pwd, _ := os.Getwd()
+	user := os.Getenv("USER")
+
 	type args struct {
 		inPath string
 	}
@@ -85,11 +91,10 @@ func TestOriginalAbsPathify(t *testing.T) {
 		args args
 		want string
 	}{
-		{"first", args{inPath: "."}, "/home/oscar/GoLand/src/github.com/CS-SI/SafeScale/utils"},
-		{"second", args{inPath: "$HOME/.safescale"}, "/home/oscar/.safescale"},
-		{"third", args{inPath: "$HOME/.config/safescale"}, "/home/oscar/.config/safescale"},
+		{"first", args{inPath: "."}, pwd},
+		{"second", args{inPath: "$HOME/.safescale"}, "/home/" + user + "/.safescale"},
+		{"third", args{inPath: "$HOME/.config/safescale"}, "/home/" + user + "/.config/safescale"},
 		{"last", args{inPath: "/etc/safescale"}, "/etc/safescale"},
-		{"gopath", args{inPath: "$GOPATH"}, "$GOPATH"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
