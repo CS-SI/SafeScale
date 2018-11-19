@@ -36,11 +36,6 @@ import (
 
 func main() {
 
-	cli.VersionFlag = cli.BoolFlag{
-		Name:  "version, V",
-		Usage: "print version",
-	}
-
 	app := cli.NewApp()
 	app.Name = "deploy"
 	app.Usage = "deploy COMMAND"
@@ -53,13 +48,14 @@ func main() {
 			Email: "safescale@c-s.fr",
 		},
 	}
-	app.EnableBashCompletion = true
+	//app.EnableBashCompletion = true
+
+	cli.VersionFlag = cli.BoolFlag{
+		Name:  "version, V",
+		Usage: "Print program version",
+	}
 
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "version, V",
-			Usage: "Prints program version",
-		},
 		cli.BoolFlag{
 			Name:  "verbose, v",
 			Usage: "Increase verbosity",
