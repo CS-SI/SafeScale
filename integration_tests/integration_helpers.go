@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -48,6 +49,12 @@ func getOutput(command string) (string, error) {
 	}
 
 	return string(out), nil
+}
+
+func runOnlyInIntegrationTest(key string) {
+	if tenant_override := os.Getenv(key); tenant_override == "" {
+		panic("This only runs as an integration test")
+	}
 }
 
 func tearDown() {

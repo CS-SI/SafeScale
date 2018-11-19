@@ -10,6 +10,7 @@ import (
 
 
 func Test_Flexible_Basic(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_FLEXIBLE")
 	defer tearDown()
 
 	brokerd_launched, err := isBrokerdLaunched()

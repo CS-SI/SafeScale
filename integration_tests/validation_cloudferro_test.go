@@ -9,6 +9,8 @@ import (
 
 
 func Test_Nas_Error(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_CLOUDFERRO")
+
 	ferroTearDown()
 	defer ferroTearDown()
 
@@ -59,6 +61,8 @@ func Test_Nas_Error(t *testing.T) {
 
 
 func Test_Ready_To_Ssh(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_CLOUDFERRO")
+
 	ferroTearDown()
 
 	brokerd_launched, err := isBrokerdLaunched()
@@ -107,10 +111,14 @@ func Test_Ready_To_Ssh(t *testing.T) {
 
 
 func Test_Nas_Cleanup(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_CLOUDFERRO")
+
 	ferroTearDown()
 }
 
 func ferroTearDown() {
+	runOnlyInIntegrationTest("TEST_CLOUDFERRO")
+
 	log.Printf("Starting cleanup...")
 	_, _ = getOutput("broker nas delete ferronas")
 	_, _ = getOutput("broker host delete ferrohost")
