@@ -323,7 +323,7 @@ func (client *Client) UpdateHost(host *model.Host) error {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return fmt.Errorf("failed to get host '%s' information after 10s: %s", host.ID, err.Error())
+			return fmt.Errorf("failed to get host '%s' information after 10s: %s", host.ID, retryErr.Error())
 		}
 	}
 	if err != nil {
@@ -707,6 +707,8 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 
 	// --- query provider for host creation ---
 
+	var host_tmp *model.Host
+
 	// Retry creation until success, for 10 minutes
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
@@ -724,7 +726,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 			host.ID = server.ID
 
 			// Wait that Host is ready, not just that the build is started
-			host, err = client.WaitHostReady(host, 5*time.Minute)
+			host_tmp, err = client.WaitHostReady(host, 5*time.Minute)
 			if err != nil {
 				servers.Delete(client.Compute, server.ID)
 				msg := ProviderErrorToString(err)
@@ -739,9 +741,11 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 		log.Debugf("Error creating host: timeout: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
-	if host == nil {
+	if host_tmp == nil {
 		return nil, errors.New("unexpected problem creating host")
 	}
+
+	host = host_tmp
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
