@@ -33,10 +33,9 @@ func (client *Client) GetVolume(id string) (*model.Volume, error) {
 	return client.osclt.GetVolume(id)
 }
 
-//ListVolumes return the list of all volume known on the current tenant (all=ture)
-//or 'only' thode monitored by safescale (all=false) ie those monitored by metadata
-func (client *Client) ListVolumes(all bool) ([]model.Volume, error) {
-	return client.osclt.ListVolumes(all)
+// ListVolumes lists volume IDs
+func (client *Client) ListVolumes() ([]model.Volume, error) {
+	return client.osclt.ListVolumes()
 }
 
 // DeleteVolume deletes the volume identified by id

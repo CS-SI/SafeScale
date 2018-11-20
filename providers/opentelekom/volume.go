@@ -57,21 +57,12 @@ func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, 
 	return client.feclt.CreateVolume(request)
 }
 
-// ExCreateVolume creates a block volume
-// - name is the name of the volume
-// - size is the size of the volume in GB
-// - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-// - imageID is the ID of the image to initialize the volume with
-func (client *Client) ExCreateVolume(request model.VolumeRequest, imageID string) (*model.Volume, error) {
-	return client.feclt.ExCreateVolume(request, imageID)
-}
-
 // GetVolume returns the volume identified by id
 func (client *Client) GetVolume(id string) (*model.Volume, error) {
 	return client.feclt.GetVolume(id)
 }
 
-// ListVolumes list available volumes
-func (client *Client) ListVolumes(all bool) ([]model.Volume, error) {
-	return client.feclt.ListVolumes(all)
+// ListVolumes list volumes
+func (client *Client) ListVolumes() ([]model.Volume, error) {
+	return client.feclt.ListVolumes()
 }

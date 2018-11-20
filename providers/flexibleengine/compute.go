@@ -30,7 +30,6 @@ import (
 	"github.com/pengux/check"
 
 	filters "github.com/CS-SI/SafeScale/providers/filters/images"
-	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
@@ -272,24 +271,11 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 
 // CreateHost creates a new host
 func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
-	host, err := client.createHost(request, false)
-	if err != nil {
-		return nil, err
-	}
-
-	err = metadata.SaveHost(client, host)
-	if err != nil {
-		nerr := client.DeleteHost(host.ID)
-		if nerr != nil {
-			log.Warnf("Error deleting host: %v", nerr)
-		}
-		return nil, fmt.Errorf("failed to create Host: %s", openstack.ProviderErrorToString(err))
-	}
-	return host, nil
+	return client.createHost(request, false, nil, "")
 }
 
 // CreateHost creates a new host and configure it as gateway for the network if isGateway is true
-func (client *Client) createHost(request model.HostRequest, isGateway bool) (*model.Host, error) {
+func (client *Client) createHost(request model.HostRequest, isGateway bool, gw *model.Host, cidr string) (*model.Host, error) {
 	//msgFail := "Failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
@@ -302,44 +288,8 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 		return nil, fmt.Errorf("name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, openstack.ProviderErrorToString(err))
 	}
 
-	// Check name availability
-	mh, err := metadata.LoadHost(client, request.ResourceName)
-	if err != nil {
-		return nil, err
-	}
-	if mh != nil {
-		return nil, model.ResourceAlreadyExistsError("Host", request.ResourceName)
-	}
-
 	// The Default Network is the first of the provided list, by convention
 	defaultNetworkID := request.NetworkIDs[0]
-
-	// Optional Network gateway
-	var defaultGateway *model.Host
-	// If the host is not public it has to be created on a network owning a Gateway
-	if !request.PublicIP {
-		mgw, err := metadata.LoadGateway(client, defaultNetworkID)
-		if err != nil {
-			return nil, err
-		}
-		if mgw != nil {
-			defaultGateway = mgw.Get()
-		}
-	}
-
-	// If a gateway is created, we need the CIDR for the userdata
-	mn, err := metadata.LoadNetwork(client, defaultNetworkID)
-	if err != nil {
-		return nil, err
-	}
-	if mn == nil {
-		return nil, fmt.Errorf("failed to load metadata of network '%s'", defaultNetworkID)
-	}
-	defaultNetwork := mn.Get()
-	var cidr string
-	if isGateway {
-		cidr = defaultNetwork.CIDR
-	}
 
 	var nets []servers.Network
 	// Add private networks
@@ -366,7 +316,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	userData, err := userdata.Prepare(client, request, isGateway, request.KeyPair, defaultGateway, cidr)
+	userData, err := userdata.Prepare(client, request, isGateway, request.KeyPair, gw, cidr)
 	if err != nil {
 		return nil, err
 	}
@@ -426,50 +376,50 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 	hostNetworkV1 := propsv1.NewHostNetwork()
 	hostNetworkV1.IsGateway = isGateway
 
-	// Add gateway information to Host definition
-	defaultGatewayPrivateIP := ""
-	if defaultGateway != nil {
-		hostNetworkV1.DefaultGatewayID = defaultGateway.ID
+	// // Add gateway information to Host definition
+	// defaultGatewayPrivateIP := ""
+	// if gw != nil {
+	// 	hostNetworkV1.DefaultGatewayID = gw.ID
 
-		hostGatewayNetworkV1 := propsv1.NewHostNetwork()
-		err = defaultGateway.Properties.Get(HostProperty.NetworkV1, hostGatewayNetworkV1)
-		if err != nil {
-			return nil, err
-		}
-		defaultGatewayPrivateIP = hostGatewayNetworkV1.IPv4Addresses[defaultNetworkID]
-		if defaultGatewayPrivateIP == "" {
-			defaultGatewayPrivateIP = hostGatewayNetworkV1.IPv6Addresses[defaultNetworkID]
-		}
-	}
+	// 	hostGatewayNetworkV1 := propsv1.NewHostNetwork()
+	// 	err = gw.Properties.Get(HostProperty.NetworkV1, hostGatewayNetworkV1)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	defaultGatewayPrivateIP = hostGatewayNetworkV1.IPv4Addresses[defaultNetworkID]
+	// 	if defaultGatewayPrivateIP == "" {
+	// 		defaultGatewayPrivateIP = hostGatewayNetworkV1.IPv6Addresses[defaultNetworkID]
+	// 	}
+	// }
 
 	// Adds default network information
 	hostNetworkV1.DefaultNetworkID = defaultNetworkID
-	hostNetworkV1.DefaultGatewayAccessIP = defaultGatewayPrivateIP
-	hostNetworkV1.NetworksByID = map[string]string{defaultNetwork.ID: defaultNetwork.Name}
-	hostNetworkV1.NetworksByName = map[string]string{defaultNetwork.Name: defaultNetwork.ID}
+	// hostNetworkV1.DefaultGatewayAccessIP = defaultGatewayPrivateIP
+	// hostNetworkV1.NetworksByID = map[string]string{defaultNetwork.ID: defaultNetwork.Name}
+	// hostNetworkV1.NetworksByName = map[string]string{defaultNetwork.Name: defaultNetwork.ID}
 
-	// Adds other network information to Host definition
-	for _, netID := range request.NetworkIDs {
-		if netID != defaultNetworkID {
-			mn, err := metadata.LoadNetwork(client, netID)
-			if err != nil {
-				return nil, err
-			}
-			if mn == nil {
-				return nil, fmt.Errorf("failed to load metadata of network '%s'", netID)
-			}
-			name := mn.Get().Name
-			hostNetworkV1.NetworksByID[netID] = name
-			hostNetworkV1.NetworksByName[name] = netID
-		}
-	}
+	// // Adds other network information to Host definition
+	// for _, netID := range request.NetworkIDs {
+	// 	if netID != defaultNetworkID {
+	// 		mn, err := metadata.LoadNetwork(client, netID)
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		if mn == nil {
+	// 			return nil, fmt.Errorf("failed to load metadata of network '%s'", netID)
+	// 		}
+	// 		name := mn.Get().Name
+	// 		hostNetworkV1.NetworksByID[netID] = name
+	// 		hostNetworkV1.NetworksByName[name] = netID
+	// 	}
+	// }
 	// Updates Host Extension NetworkV1 in host instance
 	err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
 		return nil, err
 	}
 
-	// Adds Host Extension SizingV1
+	// Adds Host property SizingV1
 	err = host.Properties.Set(HostProperty.SizingV1, &propsv1.HostSizing{
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		Template:      request.TemplateID,
@@ -522,15 +472,31 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 		return nil, errors.New("unexpected problem creating host")
 	}
 
+	// Starting from here, delete host if exiting with error
+	defer func() {
+		if err != nil {
+			err := client.DeleteHost(host.ID)
+			if err != nil {
+				log.Warnf("Error deleting host: %v", err)
+			}
+		}
+	}()
+
 	if request.PublicIP {
 		fip, err := client.attachFloatingIP(host)
 		if err != nil {
-			nerr := client.DeleteHost(host.ID)
-			if nerr != nil {
-				log.Warnf("Error deleting host: %v", nerr)
-			}
 			return nil, fmt.Errorf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 		}
+
+		// Starting from here, delete Floating IP if exiting with error
+		defer func() {
+			if err != nil {
+				derr := client.DeleteFloatingIP(fip.ID)
+				if derr != nil {
+					log.Errorf("Error deleting Floating IP: %v", derr)
+				}
+			}
+		}()
 
 		err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 		if err != nil {
@@ -545,14 +511,6 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool) (*mo
 		if isGateway {
 			err = client.enableHostRouterMode(host)
 			if err != nil {
-				nerr := client.DeleteHost(host.ID)
-				if nerr != nil {
-					log.Warnf("Error deleting host: %v", nerr)
-				}
-				nerr = client.DeleteFloatingIP(fip.ID)
-				if nerr != nil {
-					log.Warnf("Error deleting floating ip: %v", nerr)
-				}
 				return nil, fmt.Errorf("error enabling gateway mode of host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 			}
 		}
@@ -809,15 +767,7 @@ func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error
 }
 
 // ListHosts lists available hosts
-func (client *Client) ListHosts(all bool) ([]*model.Host, error) {
-	if all {
-		return client.listAllHosts()
-	}
-	return client.listMonitoredHosts()
-}
-
-// listAllHosts lists available hosts
-func (client *Client) listAllHosts() ([]*model.Host, error) {
+func (client *Client) ListHosts() ([]*model.Host, error) {
 	pager := servers.List(client.osclt.Compute, servers.ListOpts{})
 	var hosts []*model.Host
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -842,64 +792,8 @@ func (client *Client) listAllHosts() ([]*model.Host, error) {
 	return hosts, nil
 }
 
-// listMonitoredHosts lists available hosts created by SafeScale (ie registered in object storage)
-func (client *Client) listMonitoredHosts() ([]*model.Host, error) {
-	var hosts []*model.Host
-	m := metadata.NewHost(client)
-	err := m.Browse(func(host *model.Host) error {
-		hosts = append(hosts, host)
-		return nil
-	})
-	if err != nil {
-		return hosts, err
-	}
-	return hosts, nil
-}
-
 // DeleteHost deletes the host identified by id
-func (client *Client) DeleteHost(ref string) error {
-	m, err := metadata.LoadHost(client, ref)
-	if err != nil {
-		return err
-	}
-	if m == nil {
-		return errors.Wrap(model.ResourceNotFoundError("host", ref), "Can't delete host")
-	}
-
-	host := m.Get()
-	id := host.ID
-
-	// // Retrieve the list of attached volumes before deleting the host
-	// volumeAttachments, err := client.ListVolumeAttachments(id)
-	// if err != nil {
-	// 	return err
-	// }
-
-	err = client.oscltDeleteHost(id)
-	if err != nil {
-		return err
-	}
-	err = metadata.RemoveHost(client, host)
-	if err != nil {
-		return err
-	}
-
-	// // In FlexibleEngine, volumes may not be always automatically removed, so take care of them
-	// for _, va := range volumeAttachments {
-	// 	volume, err := client.GetVolume(va.VolumeID)
-	// 	if err != nil {
-	// 		continue
-	// 	}
-	// 	nerr := client.DeleteVolume(volume.ID)
-	// 	if nerr != nil {
-	// 		log.Warnf("Failed to delete volume '%s': %v", volume.Name, nerr)
-	// 	}
-	// }
-
-	return err
-}
-
-func (client *Client) oscltDeleteHost(id string) error {
+func (client *Client) DeleteHost(id string) error {
 	if client.osclt.Cfg.UseFloatingIP {
 		fip, err := client.getFloatingIPOfHost(id)
 		if err == nil {
