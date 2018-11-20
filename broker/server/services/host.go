@@ -67,19 +67,51 @@ func NewHostService(api *providers.Service) HostAPI {
 
 // Start starts a host
 func (svc *HostService) Start(ref string) error {
-	log.Printf("Starting host '%s'...", ref)
+	log.Debugf("server.services.HostService.Start(%s) called", ref)
+	defer log.Debugf("server.services.HostService.Start(%s) done", ref)
+
+	mh, err := metadata.LoadHost(svc, ref)
+	if err != nil {
+		log.Debugf("Error getting ssh config: loading host metadata: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error getting ssh config: loading host metadata"))
+	}
+	if mh == nil {
+		return fmt.Errorf("host '%s' not found", ref)
+	}
+	return svc.provider.StartHost(mh.Get().ID)
 	return srvLog(svc.provider.StartHost(ref))
 }
 
 // Stop stops a host
 func (svc *HostService) Stop(ref string) error {
-	log.Printf("Stopping host '%s'...", ref)
+	log.Debugf("server.services.HostService.Stop(%s) called", ref)
+	defer log.Debugf("server.services.HostService.Stop(%s) done", ref)
+
+	mh, err := metadata.LoadHost(svc, ref)
+	if err != nil {
+		log.Debugf("Error getting ssh config: loading host metadata: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error getting ssh config: loading host metadata"))
+	}
+	if mh == nil {
+		return fmt.Errorf("host '%s' not found", ref)
+	}
+	return svc.provider.StopHost(mh.Get().ID)
 	return srvLog(svc.provider.StopHost(ref))
 }
 
 // Reboot reboots a host
 func (svc *HostService) Reboot(ref string) error {
-	log.Printf("Rebooting host '%s'...", ref)
+	log.Debugf("server.services.HostService.Reboot(%s) called", ref)
+	defer log.Debugf("server.services.HostService.Reboot(%s) done", ref)
+
+	mh, err := metadata.LoadHost(svc, ref)
+	if err != nil {
+		return fmt.Errorf("failed to load metadata of host '%s': %v", ref, err)
+	}
+	if mh == nil {
+		return fmt.Errorf("host '%s' not found", ref)
+	}
+	return svc.provider.RebootHost(mh.Get().ID)
 	return srvLog(svc.provider.RebootHost(ref))
 }
 
@@ -171,24 +203,41 @@ func (svc *HostService) Create(
 		Creator: creator,
 	})
 
-	// Updates host extension NetworkV1
+	// Updates host property propsv1.HostNetwork
+	hostNetworkV1 := propsv1.NewHostNetwork()
+	err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+	if err != nil {
+		return nil, err
+	}
+	defaultNetworkID := hostNetworkV1.DefaultNetworkID // set earlier by svc.provider.CreateHost()
 	gatewayID := ""
-	if len(networks) > 0 {
-		mgw, err := metadata.LoadGateway(svc.provider, networks[0])
-		if err == nil {
-			gatewayID = mgw.Get().ID
+	if !request.PublicIP {
+		if len(networks) > 0 {
+			mgw, err := metadata.LoadGateway(svc.provider, defaultNetworkID)
+			if err == nil {
+				gatewayID = mgw.Get().ID
+			}
 		}
-		hostNetworkV1 := propsv1.NewHostNetwork()
-		err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+	}
+	hostNetworkV1.DefaultGatewayID = gatewayID
+	err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
+	if err != nil {
+		return nil, err
+	}
+	for _, netID := range request.NetworkIDs {
+		mn, err := metadata.LoadNetwork(svc.provider, netID)
 		if err != nil {
 			return nil, srvLog(err)
 		}
-		// hpNetworkV1.Networks = networks
-		hostNetworkV1.DefaultGatewayID = gatewayID
+		if mn == nil {
+			return nil, fmt.Errorf("failed to load metadata of network '%s'", netID)
 		err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
 		if err != nil {
 			return nil, srvLog(err)
 		}
+		name := mn.Get().Name
+		hostNetworkV1.NetworksByID[netID] = name
+		hostNetworkV1.NetworksByName[name] = netID
 	}
 
 	// Updates metadata
@@ -232,7 +281,20 @@ func (svc *HostService) Create(
 
 // List returns the host list
 func (svc *HostService) List(all bool) ([]*model.Host, error) {
-	return svc.provider.ListHosts(all)
+	if all {
+		return svc.provider.ListHosts()
+	}
+
+	var hosts []*model.Host
+	m := metadata.NewHost(svc)
+	err := m.Browse(func(host *model.Host) error {
+		hosts = append(hosts, host)
+		return nil
+	})
+	if err != nil {
+		return hosts, errors.Wrap(err, fmt.Sprintf("Error listing monitored hosts: browse"))
+	}
+	return hosts, nil
 }
 
 // Get returns the host identified by ref, ref can be the name or the id
@@ -320,7 +382,7 @@ func (svc *HostService) Delete(ref string) error {
 	if err != nil {
 		return srvLog(err)
 	}
-	return metadata.NewHost(svc.provider).Carry(host).Delete()
+	return metadata.RemoveHost(svc, host)
 }
 
 // SSH returns ssh parameters to access the host referenced by ref

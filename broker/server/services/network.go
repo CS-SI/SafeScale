@@ -18,6 +18,7 @@ package services
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services NetworkAPI
@@ -59,7 +61,7 @@ func NewNetworkService(api *providers.Service) NetworkAPI {
 
 // Create creates a network
 func (svc *NetworkService) Create(
-	net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string,
+	name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string,
 ) (*model.Network, error) {
 
 	// Verify that the network doesn't exist first
@@ -67,10 +69,15 @@ func (svc *NetworkService) Create(
 		err = srvLog(errors.Errorf("A network already exists with name '%s'", net))
 		return nil, err
 	}
+	for _, i := range nets {
+		if nets.Name == name {
+			return nil, fmt.Errorf("Error creating network '%s': a network already exists with that name", name)
+		}
+	}
 
 	// Create the network
 	network, err := svc.provider.CreateNetwork(model.NetworkRequest{
-		Name:      net,
+		Name:      networkName,
 		IPVersion: ipVersion,
 		CIDR:      cidr,
 	})
@@ -104,6 +111,11 @@ func (svc *NetworkService) Create(
 			}
 		}
 	}()
+
+	err = metadata.SaveNetwork(svc, network)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create a gateway
 	tpls, err := svc.provider.SelectTemplatesBySize(model.SizingRequirements{
@@ -141,6 +153,7 @@ func (svc *NetworkService) Create(
 		KeyPair:    keypair,
 		TemplateID: tpls[0].ID,
 		GWName:     gwname,
+		CIDR:       network.CIDR,
 	}
 
 	log.Infof("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwname)
@@ -163,7 +176,7 @@ func (svc *NetworkService) Create(
 		}
 	}()
 
-	// Updates gw requested sizing
+	// Updates requested sizing in gateway property propsv1.HostSizing
 	gwSizingV1 := propsv1.NewHostSizing()
 	err = gw.Properties.Get(HostProperty.SizingV1, gwSizingV1)
 	if err != nil {
@@ -174,8 +187,16 @@ func (svc *NetworkService) Create(
 		RAMSize:  ram,
 		DiskSize: disk,
 	}
+	err = gw.Properties.Set(HostProperty.SizingV1, gwSizingV1)
 	if err != nil {
 		return nil, srvLog(errors.Wrapf(err, "Error creating network"))
+	}
+
+	// Writes Gateway metadata
+	err = metadata.SaveGateway(svc, host, req.NetworkID)
+	if err != nil {
+		log.Debugf("Error creating gateway: saving network metadata: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway: Error saving gateway metadata: %s", ProviderErrorToString(err)))
 	}
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
@@ -197,16 +218,6 @@ func (svc *NetworkService) Create(
 	}
 	log.Infof("SSH service of gateway '%s' started.", gw.Name)
 
-	// Gateway is ready to work, update Network metadata
-	// rv, err := svc.Get(net)
-	// if err != nil {
-	// 	tbr := errors.Wrap(err, "Error getting network before metadata update")
-	// 	log.Errorf("%+v", tbr)
-	// 	return nil, tbr
-	// }
-	// if rv != nil {
-	// 	rv.GatewayID = gw.ID
-	// }
 	network.GatewayID = gw.ID
 
 	//	err = metadata.SaveNetwork(svc.provider, rv)
@@ -221,7 +232,24 @@ func (svc *NetworkService) Create(
 
 // List returns the network list
 func (svc *NetworkService) List(all bool) ([]*model.Network, error) {
-	return svc.provider.ListNetworks(all)
+	if all {
+		return svc.provider.ListNetworks()
+	}
+
+	var netList []*model.Network
+
+	mn := metadata.NewNetwork(client)
+	err := mn.Browse(func(network *model.Network) error {
+		netList = append(netList, network)
+		return nil
+	})
+
+	if err != nil {
+		log.Debugf("Error listing monitored networks: pagination error: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error listing monitored networks: %s", ProviderErrorToString(err)))
+	}
+
+	return netList, err
 }
 
 // Get returns the network identified by ref, ref can be the name or the id
@@ -231,5 +259,59 @@ func (svc *NetworkService) Get(ref string) (*model.Network, error) {
 
 // Delete deletes network referenced by ref
 func (svc *NetworkService) Delete(ref string) error {
-	return svc.provider.DeleteNetwork(ref)
+	mn, err := metadata.LoadNetwork(svc, networkRef)
+	if err != nil {
+		msg := fmt.Sprintf("failed to read metadata of network '%s': %+v", ref, err)
+		log.Debugf(msg)
+		return fmt.Errorf(msg)
+	}
+	if mn == nil {
+		return fmt.Errorf("Failed to find network '%s' in metadata", ref)
+	}
+	network := mn.Get()
+	gwID := network.GatewayID
+
+	// Check if hosts are still attached to network according to metadata
+	hosts, err := mn.ListHosts()
+	if err != nil {
+		return err
+	}
+	if len(hosts) > 0 {
+		var allhosts []string
+		for _, i := range hosts {
+			if gwID != i.ID {
+				allhosts = append(allhosts, i.Name)
+			}
+		}
+		if len(allhosts) > 0 {
+			var lenS string
+			if len(allhosts) > 1 {
+				lenS = "s"
+			}
+			return fmt.Errorf("network '%s' has %d host%s attached (%s)", network.Name, len(allhosts), lenS, strings.Join(allhosts, ","))
+		}
+	}
+
+	// 1st delete gateway
+	if gwID != "" {
+		mh, err := metadata.LoadHost(svc.provider, gwID)
+		if err != nil {
+			return err
+		}
+		err = client.DeleteHost(gwID)
+		if err != nil {
+			log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
+		}
+		err = mh.Delete()
+		if err != nil {
+			return err
+		}
+	}
+
+	// 2nd delete network
+	err = svc.provider.DeleteNetwork(network.ID)
+	if err != nil {
+		return err
+	}
+	return mn.Delete()
 }
