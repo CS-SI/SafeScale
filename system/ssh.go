@@ -113,7 +113,7 @@ type SSHConfig struct {
 	Host          string
 	PrivateKey    string
 	Port          int
-	LocalPort     int
+	LocalPort	  int
 	GatewayConfig *SSHConfig
 	cmdTpl        string
 }
@@ -545,6 +545,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 				if retcode == 255 {
 					return fmt.Errorf("ssh not ready")
 				}
+				log.Debugf(stderr)
 				return fmt.Errorf("%s", stderr)
 			}
 			return nil

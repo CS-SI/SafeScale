@@ -31,7 +31,7 @@ import (
 type Session struct {
 	Container *container
 	Host      *host
-	Nas       *nas
+	Share     *share
 	Network   *network
 	Ssh       *ssh
 	Tenant    *tenant
@@ -40,9 +40,9 @@ type Session struct {
 	Image     *image
 
 	// For future use...
-	brokerdAddress string
-	brokerdPort    uint16
-	tenantName     string
+	// brokerdAddress string
+	// brokerdPort    uint16
+	tenantName string
 }
 
 // Client is a instance of Session used temporarily until the session logic in brokerd is implemented
@@ -55,18 +55,18 @@ const (
 )
 
 // New returns an instance of broker Client
-func New(port int) Client {
+func New() Client {
 	s := &Session{}
 	s.Container = &container{session: s}
 	s.Host = &host{session: s}
-	s.Nas = &nas{session: s}
+	s.Share = &share{session: s}
 	s.Network = &network{session: s}
 	s.Ssh = &ssh{session: s}
 	s.Tenant = &tenant{session: s}
 	s.Volume = &volume{session: s}
 	s.Template = &template{session: s}
 	s.Image = &image{session: s}
-	s.brokerdPort = uint16(port)
+	//s.brokerdPort = uint16(port)
 	return s
 }
 
@@ -79,19 +79,16 @@ func DecorateError(err error, action string, maySucceed bool) error {
 			msg += " (may eventually succeed)"
 		}
 		return fmt.Errorf(msg, action, DefaultExecutionTimeout)
-	} else {
-		msg := err.Error()
-		if strings.Index(msg, "desc = ") != -1 {
-			pos := strings.Index(msg, "desc = ") + 7
-			msg = msg[pos:]
+	}
+	msg := err.Error()
+	if strings.Index(msg, "desc = ") != -1 {
+		pos := strings.Index(msg, "desc = ") + 7
+		msg = msg[pos:]
 
-			if strings.Index(msg, " :") == 0 {
-				msg = msg[2:]
-			}
-
-			return errors.New(msg)
-
+		if strings.Index(msg, " :") == 0 {
+			msg = msg[2:]
 		}
+		return errors.New(msg)
 	}
 	return err
 }

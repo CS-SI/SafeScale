@@ -19,10 +19,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math"
 	"os"
@@ -31,10 +27,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
+	server "github.com/CS-SI/SafeScale/broker/server/services"
 	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 const cmdNumberOfCPU string = "lscpu | grep 'CPU(s):' | grep -v 'NUMA' | tr -d '[:space:]' | cut -d: -f2"
@@ -68,9 +69,9 @@ type CPUInfo struct {
 	TenantName   string `json:"tenant_name,omitempty"`
 	TemplateID   string `json:"template_id,omitempty"`
 	TemplateName string `json:"template_name,omitempty"`
-	ImageID   string `json:"image_id,omitempty"`
-	ImageName string `json:"image_name,omitempty"`
-	LastUpdated string `json:"last_updated,omitempty"`
+	ImageID      string `json:"image_id,omitempty"`
+	ImageName    string `json:"image_name,omitempty"`
+	LastUpdated  string `json:"last_updated,omitempty"`
 
 	NumberOfCPU    int     `json:"number_of_cpu,omitempty"`
 	NumberOfCore   int     `json:"number_of_core,omitempty"`
@@ -136,21 +137,22 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	return &info, nil
 }
 
+// RunScanner ...
 func RunScanner() {
-	var targeted_providers []string
-	the_providers, _ := providers.Tenants()
+	var targetedProviders []string
+	theProviders, _ := providers.Tenants()
 
-	for tenantName := range the_providers {
+	for tenantName := range theProviders {
 		if strings.Contains(tenantName, "-scannable") {
-			targeted_providers = append(targeted_providers, tenantName)
+			targetedProviders = append(targetedProviders, tenantName)
 		}
 	}
 
 	var wtg sync.WaitGroup
 
-	wtg.Add(len(targeted_providers))
+	wtg.Add(len(targetedProviders))
 
-	for _, tenantName := range targeted_providers {
+	for _, tenantName := range targetedProviders {
 		fmt.Printf("Working with tenant %s\n", tenantName)
 		go analyzeTenant(&wtg, tenantName)
 	}
@@ -190,7 +192,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	// Prepare network
 
 	there := true
-	var net *api.Network = nil
+	var net *model.Network
 
 	netName := "scanner"
 	if net, err = service.GetNetwork(netName); net != nil && err == nil {
@@ -201,7 +203,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	}
 
 	if !there {
-		net, err = service.CreateNetwork(api.NetworkRequest{
+		net, err = service.CreateNetwork(model.NetworkRequest{
 			CIDR:      "192.168.0.0/24",
 			IPVersion: IPVersion.IPv4,
 			Name:      netName,
@@ -220,21 +222,21 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 
 	var wg sync.WaitGroup
 
-	concurrency := math.Min(4, float64(len(templates) / 2))
+	concurrency := math.Min(4, float64(len(templates)/2))
 	sem := make(chan bool, int(concurrency))
 
-	hostAnalysis := func(template api.HostTemplate) error {
+	hostAnalysis := func(template model.HostTemplate) error {
 		defer wg.Done()
 		if net != nil {
 			log.Printf("Checking template %s\n", template.Name)
 
 			hostName := "scanhost-" + template.Name
-			host, err := service.CreateHost(api.HostRequest{
-				Name:       hostName,
-				PublicIP:   true,
-				ImageID:    img.ID,
-				TemplateID: template.ID,
-				NetworkIDs: []string{net.ID},
+			host, err := service.CreateHost(model.HostRequest{
+				ResourceName: hostName,
+				PublicIP:     true,
+				ImageID:      img.ID,
+				TemplateID:   template.ID,
+				NetworkIDs:   []string{net.ID},
 			})
 
 			defer service.DeleteHost(hostName)
@@ -243,12 +245,13 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				return err
 			}
 
-			ssh, err := service.GetSSHConfig(host.ID)
+			sshSvc := server.NewSSHService(service)
+			ssh, err := sshSvc.GetConfig(host.ID)
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
-			nerr := ssh.WaitServerReady(time.Duration(concurrency - 1) * time.Minute)
+			nerr := ssh.WaitServerReady(time.Duration(concurrency-1) * time.Minute)
 			if nerr != nil {
 				log.Warnf("template [%s] : Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
@@ -264,26 +267,26 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				return err
 			}
 
-			daCpu, err := createCPUInfo(cout)
+			daCPU, err := createCPUInfo(cout)
 			if err != nil {
 				log.Warnf("template [%s] : Problem building cpu info: %v", template.Name, err)
 				return err
 			}
 
-			daCpu.TemplateName = template.Name
-			daCpu.TemplateID = template.ID
-			daCpu.ImageID = img.ID
-			daCpu.ImageName = img.Name
-			daCpu.TenantName = theTenant
-			daCpu.LastUpdated = time.Now().Format(time.RFC850)
+			daCPU.TemplateName = template.Name
+			daCPU.TemplateID = template.ID
+			daCPU.ImageID = img.ID
+			daCPU.ImageName = img.Name
+			daCPU.TenantName = theTenant
+			daCPU.LastUpdated = time.Now().Format(time.RFC850)
 
-			daOut, err := json.MarshalIndent(daCpu, "", "\t")
+			daOut, err := json.MarshalIndent(daCPU, "", "\t")
 			if err != nil {
 				log.Warnf("template [%s] : Problem marshaling json data: %v", template.Name, err)
 				return err
 			}
 
-			nerr = ioutil.WriteFile( utils.AbsPathify("$HOME/.safescale/scanner/" +theTenant+ "#" + template.Name + ".json"), daOut, 0666)
+			nerr = ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json"), daOut, 0666)
 			if nerr != nil {
 				log.Warnf("template [%s] : Error writing file: %v", template.Name, nerr)
 				return nerr
@@ -299,7 +302,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 
 	for _, target := range templates {
 		sem <- true
-		go func(inner api.HostTemplate) {
+		go func(inner model.HostTemplate) {
 			defer func() { <-sem }()
 			err = hostAnalysis(inner)
 			if err != nil {
@@ -317,12 +320,11 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	return nil
 }
 
-
 func dumpTemplates(service *providers.Service, tenant string) error {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	type TemplateList struct {
-		Templates []api.HostTemplate `json:"templates,omitempty"`
+		Templates []model.HostTemplate `json:"templates,omitempty"`
 	}
 
 	templates, err := service.ListTemplates(false)
@@ -345,12 +347,11 @@ func dumpTemplates(service *providers.Service, tenant string) error {
 	return nil
 }
 
-
 func dumpImages(service *providers.Service, tenant string) error {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	type ImageList struct {
-		Images []api.Image `json:"images,omitempty"`
+		Images []model.Image `json:"images,omitempty"`
 	}
 
 	images, err := service.ListImages(false)
@@ -375,7 +376,7 @@ func dumpImages(service *providers.Service, tenant string) error {
 
 func main() {
 	log.Printf("%s version %s\n", os.Args[0], VERSION)
-	log.Printf( "built %s\n", BUILD_DATE)
+	log.Printf("built %s\n", BUILD_DATE)
 
 	RunScanner()
 }

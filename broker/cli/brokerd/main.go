@@ -18,25 +18,22 @@ package main
 
 import (
 	"fmt"
-	"github.com/dlespiau/covertool/pkg/exit"
-	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/daemon/commands"
-
-	"github.com/CS-SI/SafeScale/providers"
-
+	"github.com/dlespiau/covertool/pkg/exit"
+	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	_ "github.com/urfave/cli"
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/server/commands"
+	"github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/providers"
 )
-
 
 /*
 broker provider list
@@ -90,7 +87,7 @@ func cleanup() {
 }
 
 // *** MAIN ***
-func work(port int) {
+func work() {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -99,27 +96,28 @@ func work(port int) {
 		exit.Exit(1)
 	}()
 
-	log.Println("Checking configuration")
+	log.Infoln("Checking configuration")
 	_, err := providers.Tenants()
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 
-	log.Println("Starting server")
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	log.Infoln("Starting server")
+	//lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
 
-	log.Println("Registering services")
+	log.Infoln("Registering services")
 	pb.RegisterTenantServiceServer(s, &commands.TenantServiceServer{})
 	pb.RegisterNetworkServiceServer(s, &commands.NetworkServiceServer{})
 	pb.RegisterHostServiceServer(s, &commands.HostServiceServer{})
 	pb.RegisterVolumeServiceServer(s, &commands.VolumeServiceServer{})
 	pb.RegisterSshServiceServer(s, &commands.SSHServiceServer{})
 	pb.RegisterContainerServiceServer(s, &commands.ContainerServiceServer{})
-	pb.RegisterNasServiceServer(s, &commands.NasServiceServer{})
+	pb.RegisterShareServiceServer(s, &commands.ShareServiceServer{})
 	pb.RegisterImageServiceServer(s, &commands.ImageServiceServer{})
 	pb.RegisterTemplateServiceServer(s, &commands.TemplateServiceServer{})
 
@@ -130,8 +128,7 @@ func work(port int) {
 	reflection.Register(s)
 
 	version := VERSION + ", build date: " + BUILD_DATE
-	log.Printf("Brokerd version: %s", version)
-	log.Println("Ready to serve :-)")
+	fmt.Printf("Brokerd version: %s\nReady to serve :-)\n", version)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
@@ -140,16 +137,42 @@ func work(port int) {
 func main() {
 	app := cli.NewApp()
 
+	cli.VersionFlag = cli.BoolFlag{
+		Name:  "version, V",
+		Usage: "Print program version",
+	}
+
 	app.Flags = []cli.Flag{
-		cli.IntFlag{
-			Name:  "port, p",
-			Usage: "Bind to specified port `PORT`",
-			Value: 50051,
+		cli.BoolFlag{
+			Name:  "verbose, v",
+			Usage: "Increase verbosity",
 		},
+		cli.BoolFlag{
+			Name:  "debug, d",
+			Usage: "Show debug information",
+		},
+		// cli.IntFlag{
+		// 	Name:  "port, p",
+		// 	Usage: "Bind to specified port `PORT`",
+		// 	Value: 50051,
+		// },
+	}
+
+	app.Before = func(c *cli.Context) error {
+		log.SetLevel(log.WarnLevel)
+		if c.GlobalBool("verbose") {
+			log.SetLevel(log.InfoLevel)
+			utils.Verbose = true
+		}
+		if c.GlobalBool("debug") {
+			log.SetLevel(log.DebugLevel)
+			utils.Debug = true
+		}
+		return nil
 	}
 
 	app.Action = func(c *cli.Context) error {
-		work(c.GlobalInt("port"))
+		work()
 		return nil
 	}
 

@@ -17,10 +17,9 @@ package metadata
  */
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
 
@@ -39,8 +38,8 @@ type Cluster struct {
 }
 
 // NewCluster creates a new Cluster metadata
-func NewCluster(port int) (*Cluster, error) {
-	svc, err := provideruse.GetProviderService(port)
+func NewCluster() (*Cluster, error) {
+	svc, err := provideruse.GetProviderService()
 	if err != nil {
 		return nil, err
 	}
@@ -85,8 +84,8 @@ func (m *Cluster) Read(name string) (bool, error) {
 			ptr = &target
 		}
 	}
-	found, err := m.item.Read(name, func(buf *bytes.Buffer) (interface{}, error) {
-		err := gob.NewDecoder(buf).Decode(ptr)
+	found, err := m.item.Read(name, func(buf []byte) (model.Serializable, error) {
+		err := ptr.Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
@@ -135,18 +134,18 @@ func (m *Cluster) Get() *api.ClusterCore {
 }
 
 // Browse walks through cluster folder and executes a callback for each entry
-func (m *Cluster) Browse(port int, callback func(*Cluster) error) error {
-	return m.item.Browse(func(buf *bytes.Buffer) error {
-		var data api.ClusterCore
-		err := gob.NewDecoder(buf).Decode(&data)
+func (m *Cluster) Browse(callback func(*Cluster) error) error {
+	return m.item.Browse(func(buf []byte) error {
+		cc := api.ClusterCore{}
+		err := (&cc).Deserialize(buf)
 		if err != nil {
 			return err
 		}
-		cm, err := NewCluster(port)
+		cm, err := NewCluster()
 		if err != nil {
-			return nil
+			return err
 		}
-		cm.Carry(&data)
+		cm.Carry(&cc)
 		return callback(cm)
 	})
 }

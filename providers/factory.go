@@ -18,9 +18,11 @@ package providers
 
 import (
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/spf13/viper"
 )
 
@@ -65,12 +67,12 @@ func GetService(tenantName string) (*Service, error) {
 				if provider, ok := tenant["client"].(string); ok {
 					clientProvider = provider
 					if client, ok := providers[provider]; ok {
-						service, err := client.Build(tenant)
+						clientAPI, err := client.Build(tenant)
 						if err != nil {
 							return nil, fmt.Errorf("Error creating tenant %s on provider %s: %s", tenantName, provider, err.Error())
 						}
 						return &Service{
-							ClientAPI: service,
+							ClientAPI: clientAPI,
 						}, nil
 					}
 				}
@@ -81,7 +83,7 @@ func GetService(tenantName string) (*Service, error) {
 	if !tenantInCfg {
 		return nil, fmt.Errorf("Tenant '%s' not found in configuration", tenantName)
 	}
-	return nil, ResourceNotFoundError("Client builder", clientProvider)
+	return nil, model.ResourceNotFoundError("Client builder", clientProvider)
 }
 
 func loadConfig() error {

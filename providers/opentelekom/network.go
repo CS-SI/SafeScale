@@ -17,21 +17,21 @@
 package opentelekom
 
 import (
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 )
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
-func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
+func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
 	return client.feclt.CreateNetwork(req)
 }
 
 // GetNetwork returns the network identified by id
-func (client *Client) GetNetwork(id string) (*api.Network, error) {
+func (client *Client) GetNetwork(id string) (*model.Network, error) {
 	return client.feclt.GetNetwork(id)
 }
 
 // ListNetworks lists available networks
-func (client *Client) ListNetworks(all bool) ([]api.Network, error) {
+func (client *Client) ListNetworks(all bool) ([]*model.Network, error) {
 	return client.feclt.ListNetworks(all)
 }
 
@@ -43,12 +43,12 @@ func (client *Client) DeleteNetwork(id string) error {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
+func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
 	return client.feclt.CreateGateway(req)
 }
 
 // GetGateway returns the name of the gateway of a network
-func (client *Client) GetGateway(networkID string) (*api.Host, error) {
+func (client *Client) GetGateway(networkID string) (*model.Host, error) {
 	return client.feclt.GetGateway(networkID)
 }
 

@@ -18,11 +18,13 @@ package client
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	utils "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/broker/utils"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // volume is the part of broker client handing volumes
@@ -33,7 +35,7 @@ type volume struct {
 
 // List ...
 func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
-	conn := utils.GetConnection(int(v.session.brokerdPort))
+	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -48,7 +50,7 @@ func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
 
 // Inspect ...
 func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, error) {
-	conn := utils.GetConnection(int(v.session.brokerdPort))
+	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -61,7 +63,7 @@ func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, er
 
 // Delete ...
 func (v *volume) Delete(names []string, timeout time.Duration) error {
-	conn := utils.GetConnection(int(v.session.brokerdPort))
+	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -69,9 +71,12 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 
 	timeout = timeout + (30 * time.Second * time.Duration(len(names)))
 
-	var wg sync.WaitGroup
+	var (
+		wg   sync.WaitGroup
+		errs int
+	)
 
-	volDeleter := func (aname string) {
+	volDeleter := func(aname string) {
 		defer wg.Done()
 		ctx, cancel := utils.GetContext(timeout)
 		defer cancel()
@@ -79,7 +84,8 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 		_, err := volumeService.Delete(ctx, &pb.Reference{Name: aname})
 
 		if err != nil {
-			fmt.Printf("Error response from daemon : %v", DecorateError(err, "deletion of volume", true))
+			fmt.Fprintln(os.Stderr, DecorateError(err, "deletion of volume", true).Error())
+			errs++
 		} else {
 			fmt.Printf("Volume '%s' deleted\n", aname)
 		}
@@ -89,15 +95,17 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 	for _, target := range names {
 		go volDeleter(target)
 	}
-
 	wg.Wait()
 
+	if errs > 0 {
+		return clitools.ExitOnRPC("")
+	}
 	return nil
 }
 
 // Create ...
 func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Volume, error) {
-	conn := utils.GetConnection(int(v.session.brokerdPort))
+	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -110,7 +118,7 @@ func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Vol
 
 // Attach ...
 func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
-	conn := utils.GetConnection(int(v.session.brokerdPort))
+	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault
@@ -124,7 +132,7 @@ func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
 
 // Detach ...
 func (v *volume) Detach(volumeName string, hostName string, timeout time.Duration) error {
-	conn := utils.GetConnection(int(v.session.brokerdPort))
+	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault

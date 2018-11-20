@@ -19,11 +19,13 @@ package ovh
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
-//ProviderNetwork name of ovh external network
+// ProviderNetwork name of ovh external network
 const ProviderNetwork string = "Ext-Net"
 
 type gpuCfg struct {
@@ -76,7 +78,7 @@ type AuthOptions struct {
 // 	tokens := strings.Split(openrc, "export")
 // }
 
-//AuthenticatedClient returns an authenticated client
+// AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	client := &Client{}
 	osclt, err := openstack.AuthenticatedClient(
@@ -100,7 +102,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"classic":    VolumeSpeed.COLD,
 				"high-speed": VolumeSpeed.HDD,
 			},
-			MetadataBucketName: api.BuildMetadataBucketName(opts.ApplicationKey),
+			MetadataBucketName: metadata.BuildMetadataBucketName(opts.ApplicationKey),
 		},
 	)
 
@@ -121,7 +123,7 @@ type Client struct {
 	MetadataBucketName string
 }
 
-//Build build a new Client from configuration parameter
+// Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	ApplicationKey, _ := params["ApplicationKey"].(string)
 	OpenstackID, _ := params["OpenstackID"].(string)
@@ -139,12 +141,12 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 }
 
 // GetCfgOpts return configuration parameters
-func (client *Client) GetCfgOpts() (api.Config, error) {
+func (client *Client) GetCfgOpts() (model.Config, error) {
 	return client.osclt.GetCfgOpts()
 }
 
 // GetAuthOpts returns the auth options
-func (client *Client) GetAuthOpts() (api.Config, error) {
+func (client *Client) GetAuthOpts() (model.Config, error) {
 	return client.osclt.GetAuthOpts()
 }
 

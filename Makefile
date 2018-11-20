@@ -44,7 +44,7 @@ EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
 # List of packages to test (nor deploy neither providers are ready for prime time :( )
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /deploy | grep -v /providers/aws )
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /deploy | grep -v /providers/aws | grep -v /iaas/)
 
 
 # DEPENDENCIES MANAGEMENT
@@ -148,7 +148,7 @@ clean:
 broker/client/broker: broker
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service broker (client) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
-broker/daemon/brokerd: broker
+broker/server/brokerd: broker
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service broker (daemon) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
 deploy/cli/deploy: deploy

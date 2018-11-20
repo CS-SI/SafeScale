@@ -19,11 +19,13 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
-	"github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers/api"
+	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/providers/model"
+	clitools "github.com/CS-SI/SafeScale/utils"
 	"github.com/urfave/cli"
 )
 
@@ -42,24 +44,25 @@ var VolumeCmd = cli.Command{
 }
 
 var volumeList = cli.Command{
-	Name:  "list",
-	Usage: "List available volumes",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available volumes",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all",
 			Usage: "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		resp, err := client.New(c.GlobalInt("port")).Volume.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		volumes, err := client.New().Volume.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of volumes", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "list of volumes", false).Error())
 		}
-
-		var volumes []*volumeDisplayable
-		for _, vol := range resp.GetVolumes() {
-			volumes = append(volumes, toDisplaybleVolume(vol))
+		var out []byte
+		if len(volumes.Volumes) == 0 {
+			out, _ = json.Marshal(nil)
+		} else {
+			out, _ = json.Marshal(volumes)
 		}
-		out, _ := json.Marshal(volumes)
 		fmt.Println(string(out))
 		return nil
 	},
@@ -67,49 +70,53 @@ var volumeList = cli.Command{
 
 var volumeInspect = cli.Command{
 	Name:      "inspect",
+	Aliases:   []string{"show"},
 	Usage:     "Inspect volume",
 	ArgsUsage: "<Volume_name|Volume_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Volume_name|Volume_ID>")
+			fmt.Fprintln(os.Stderr, "Missing mandatory argument <Volume_name|Volume_ID>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Volume name or ID required")
+			return clitools.ExitOnInvalidArgument()
 		}
-		volumeInfo, err := client.New(c.GlobalInt("port")).Volume.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
+		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of volume", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of volume", false).Error())
 		}
 
 		out, _ := json.Marshal(toDisplaybleVolumeInfo(volumeInfo))
 		fmt.Println(string(out))
-
 		return nil
 	},
 }
 
 var volumeDelete = cli.Command{
 	Name:      "delete",
+	Aliases:   []string{"rm", "remove"},
 	Usage:     "Delete volume",
 	ArgsUsage: "<Volume_name|Volume_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() < 1 {
-			fmt.Println("Missing mandatory argument <Volume_name|Volume_ID>")
+			fmt.Fprintln(os.Stderr, "Missing mandatory argument <Volume_name|Volume_ID>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Volume name or ID required")
+			return clitools.ExitOnInvalidArgument()
 		}
 
 		var volumeList []string
 		volumeList = append(volumeList, c.Args().First())
 		volumeList = append(volumeList, c.Args().Tail()...)
 
-		_ = client.New(c.GlobalInt("port")).Volume.Delete(volumeList, client.DefaultExecutionTimeout)
-
+		err := client.New().Volume.Delete(volumeList, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.ExitOnRPC(client.DecorateError(err, "deletion of volume", false).Error())
+		}
 		return nil
 	},
 }
 
 var volumeCreate = cli.Command{
 	Name:      "create",
+	Aliases:   []string{"new"},
 	Usage:     "Create a volume",
 	ArgsUsage: "<Volume_name>",
 	Flags: []cli.Flag{
@@ -126,15 +133,15 @@ var volumeCreate = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Volume_name>")
+			fmt.Fprintln(os.Stderr, "Missing mandatory argument <Volume_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Volume name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		speed := c.String("speed")
 
 		volSpeed, ok := pb.VolumeSpeed_value[speed]
 		if !ok {
-			return fmt.Errorf("Invalid speed '%s'", speed)
+			return clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid speed '%s'", speed))
 		}
 		def := pb.VolumeDefinition{
 			Name:  c.Args().First(),
@@ -142,13 +149,12 @@ var volumeCreate = cli.Command{
 			Speed: pb.VolumeSpeed(volSpeed),
 		}
 
-		volume, err := client.New(c.GlobalInt("port")).Volume.Create(def, client.DefaultExecutionTimeout)
+		volume, err := client.New().Volume.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "creation of volume", true))
+			return clitools.ExitOnRPC(client.DecorateError(err, "creation of volume", true).Error())
 		}
 		out, _ := json.Marshal(toDisplaybleVolume(volume))
 		fmt.Println(string(out))
-
 		return nil
 	},
 }
@@ -156,11 +162,11 @@ var volumeCreate = cli.Command{
 var volumeAttach = cli.Command{
 	Name:      "attach",
 	Usage:     "Attach a volume to an host",
-	ArgsUsage: "<Volume_name|Volume_ID>, <Host_name|Host_ID>",
+	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: api.DefaultVolumeMountPoint,
+			Value: model.DefaultVolumeMountPoint,
 			Usage: "Mount point of the volume",
 		},
 		cli.StringFlag{
@@ -173,7 +179,7 @@ var volumeAttach = cli.Command{
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Volume_name> and/or <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Volume and Host name required")
+			return clitools.ExitOnInvalidArgument()
 		}
 		def := pb.VolumeAttachment{
 			Format:    c.String("format"),
@@ -181,12 +187,11 @@ var volumeAttach = cli.Command{
 			Host:      &pb.Reference{Name: c.Args().Get(1)},
 			Volume:    &pb.Reference{Name: c.Args().Get(0)},
 		}
-		err := client.New(c.GlobalInt("port")).Volume.Attach(def, client.DefaultExecutionTimeout)
+		err := client.New().Volume.Attach(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "attach of volume", true))
+			return clitools.ExitOnRPC(client.DecorateError(err, "attach of volume", true).Error())
 		}
 		fmt.Printf("Volume '%s' attached to host '%s'\n", c.Args().Get(0), c.Args().Get(1))
-
 		return nil
 	},
 }
@@ -199,14 +204,14 @@ var volumeDetach = cli.Command{
 		if c.NArg() != 2 {
 			fmt.Println("Missing mandatory argument <Volume_name> and/or <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("volume and host names required")
+			return clitools.ExitOnInvalidArgument()
 		}
-		err := client.New(c.GlobalInt("port")).Volume.Detach(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
+		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "unattach of volume", true))
+			return clitools.ExitOnRPC(client.DecorateError(err, "unattach of volume", true).Error())
 		}
-		fmt.Printf("Volume '%s' detached from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 
+		fmt.Printf("Volume '%s' detached from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 		return nil
 	},
 }
@@ -235,7 +240,7 @@ func toDisplaybleVolumeInfo(volumeInfo *pb.VolumeInfo) *volumeInfoDisplayable {
 		volumeInfo.GetName(),
 		pb.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
-		utils.GetReference(volumeInfo.GetHost()),
+		brokerutils.GetReference(volumeInfo.GetHost()),
 		volumeInfo.GetMountPath(),
 		volumeInfo.GetFormat(),
 		volumeInfo.GetDevice(),

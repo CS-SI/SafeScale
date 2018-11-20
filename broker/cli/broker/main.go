@@ -18,11 +18,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
 	"os"
 	"sort"
 
-	"github.com/urfave/cli"
+	log "github.com/sirupsen/logrus"
+	cli "github.com/urfave/cli"
+
+	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
+	"github.com/CS-SI/SafeScale/broker/utils"
 )
 
 func main() {
@@ -40,12 +43,38 @@ func main() {
 
 	app.EnableBashCompletion = true
 
+	cli.VersionFlag = cli.BoolFlag{
+		Name:  "version, V",
+		Usage: "Print program version",
+	}
+
 	app.Flags = []cli.Flag{
-		cli.IntFlag{
-			Name:  "port, p",
-			Usage: "Bind to specified port `PORT`",
-			Value: 50051,
+		cli.BoolFlag{
+			Name:  "verbose, v",
+			Usage: "Increase verbosity",
 		},
+		cli.BoolFlag{
+			Name:  "debug, d",
+			Usage: "Show debug information",
+		},
+		// cli.IntFlag{
+		// 	Name:  "port, p",
+		// 	Usage: "Bind to specified port `PORT`",
+		// 	Value: 50051,
+		// },
+	}
+
+	app.Before = func(c *cli.Context) error {
+		log.SetLevel(log.WarnLevel)
+		if c.GlobalBool("verbose") {
+			log.SetLevel(log.InfoLevel)
+			utils.Verbose = true
+		}
+		if c.GlobalBool("debug") {
+			log.SetLevel(log.DebugLevel)
+			utils.Debug = true
+		}
+		return nil
 	}
 
 	app.Commands = append(app.Commands, cmd.NetworkCmd)
@@ -66,8 +95,8 @@ func main() {
 	app.Commands = append(app.Commands, cmd.ContainerCmd)
 	sort.Sort(cli.CommandsByName(cmd.ContainerCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.NasCmd)
-	sort.Sort(cli.CommandsByName(cmd.NasCmd.Subcommands))
+	app.Commands = append(app.Commands, cmd.ShareCmd)
+	sort.Sort(cli.CommandsByName(cmd.ShareCmd.Subcommands))
 
 	app.Commands = append(app.Commands, cmd.ImageCmd)
 	sort.Sort(cli.CommandsByName(cmd.ImageCmd.Subcommands))

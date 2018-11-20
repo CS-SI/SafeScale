@@ -20,7 +20,7 @@ type genericPackager struct {
 }
 
 // Check checks if the feature is installed
-func (g *genericPackager) Check(port int, f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (g *genericPackager) Check(f *Feature, t Target, v Variables, s Settings) (Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".check"
 	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
@@ -37,11 +37,11 @@ func (g *genericPackager) Check(port int, f *Feature, t Target, v Variables, s S
 		log.Println(err.Error())
 		return nil, err
 	}
-	return worker.Proceed(port, v, s)
+	return worker.Proceed(v, s)
 }
 
 // Add installs the feature using apt
-func (g *genericPackager) Add(port int, f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".add"
 	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
@@ -58,11 +58,11 @@ func (g *genericPackager) Add(port int, f *Feature, t Target, v Variables, s Set
 		return nil, err
 	}
 
-	return worker.Proceed(port, v, s)
+	return worker.Proceed(v, s)
 }
 
 // Remove uninstalls the feature using the RemoveScript script
-func (g *genericPackager) Remove(port int, f *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (g *genericPackager) Remove(f *Feature, t Target, v Variables, s Settings) (Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".remove"
 	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
@@ -79,7 +79,7 @@ func (g *genericPackager) Remove(port int, f *Feature, t Target, v Variables, s 
 		log.Println(err.Error())
 		return nil, err
 	}
-	return worker.Proceed(port, v, s)
+	return worker.Proceed(v, s)
 }
 
 // aptInstaller is an installer using script to add and remove a feature
