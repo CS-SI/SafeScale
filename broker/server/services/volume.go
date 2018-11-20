@@ -65,14 +65,28 @@ func NewVolumeService(api *providers.Service) VolumeAPI {
 
 // List returns the network list
 func (svc *VolumeService) List(all bool) ([]model.Volume, error) {
-	return svc.provider.ListVolumes(all)
+	if all {
+		return svc.provider.ListVolumes()
+	}
+
+	var volumes []model.Volume
+	mv := metadata.NewVolume(client)
+	err := mv.Browse(func(volume *model.Volume) error {
+		volumes = append(volumes, *volume)
+		return nil
+	})
+	if err != nil {
+		log.Debugf("Error listing volumes: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error listing volumes : %v", err))
+	}
+	return volumes, nil
 }
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // Delete deletes volume referenced by ref
 func (svc *VolumeService) Delete(ref string) error {
-	vol, err := svc.Get(ref)
+	mv, err := metadata.LoadVolume(svc, ref)
 	if err != nil {
 		return srvLog(err)
 	}
@@ -81,7 +95,7 @@ func (svc *VolumeService) Delete(ref string) error {
 	}
 
 	volumeAttachmentsV1 := propsv1.NewVolumeAttachments()
-	err = vol.Properties.Get(VolumeProperty.AttachedV1, volumeAttachmentsV1)
+	err = volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachmentsV1)
 	if err != nil {
 		err := srvLog(err)
 		return err
@@ -92,12 +106,12 @@ func (svc *VolumeService) Delete(ref string) error {
 		return srvLogNew(fmt.Errorf("still attached on %d host%s", nbAttach, utils.Plural(nbAttach)))
 	}
 
-	tbr := svc.provider.DeleteVolume(vol.ID)
-	if tbr != nil {
-		tbr := srvLog(tbr)
-		return tbr
+	err = svc.provider.DeleteVolume(vol.ID)
+	if err != nil {
+		return err
 	}
-	return  tbr
+
+	return mv.Delete()
 }
 
 // Get returns the volume identified by ref, ref can be the name or the id
@@ -161,11 +175,30 @@ func (svc *VolumeService) Inspect(ref string) (*model.Volume, map[string]*propsv
 
 // Create a volume
 func (svc *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error) {
-	return svc.provider.CreateVolume(model.VolumeRequest{
+	volume, err := svc.provider.CreateVolume(model.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			derr := svc.provider.DeleteVolume(volume.ID)
+			if derr != nil {
+				log.Debugf("failed to delete volume '%': %v", volume.Name, derr)
+			}
+		}
+	}()
+
+	err = metadata.SaveVolume(svc.provider, &volume)
+	if err != nil {
+		log.Debugf("Error creating volume: saving volume metadata: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume : %s", ProviderErrorToString(err)))
+	}
+	return volume, err
 }
 
 // Attach a volume to an host
@@ -340,7 +373,7 @@ func (svc *VolumeService) Attach(volumeName, hostName, path, format string) erro
 		return err
 	}
 
-	// Starting from here, unmount block device if exit with error
+	// Starting from here, unmount block device if exiting with error
 	defer func() {
 		if err != nil {
 			derr := server.UnmountBlockDevice(deviceName)
