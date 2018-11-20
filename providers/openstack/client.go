@@ -18,29 +18,6 @@ package openstack
 
 import (
 	"fmt"
-<<<<<<< develop
-||||||| ancestor
-	"log"
-
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
-
-	"github.com/CS-SI/SafeScale/metadata"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
-=======
-	"log"
-
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
-
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/api/VolumeSpeed"
-<<<<<<< develop
-	"github.com/CS-SI/SafeScale/providers/object"
->>>>>>> Update object storage management
-||||||| ancestor
-	"github.com/CS-SI/SafeScale/providers/object"
-=======
->>>>>>> object storage
 
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -48,7 +25,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	provmetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
@@ -113,28 +89,22 @@ type AuthOptions struct {
 type CfgOptions struct {
 	// Name of the provider (external) network
 	ProviderNetwork string
-
 	// DNSList list of DNS
 	DNSList []string
-
 	// UseFloatingIP indicates if floating IP are used (optional)
 	UseFloatingIP bool
-
 	// UseLayer3Networking indicates if layer 3 networking features (router) can be used
 	// if UseFloatingIP is true UseLayer3Networking must be true
 	UseLayer3Networking bool
-
 	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
 	AutoHostNetworkInterfaces bool
-
 	// VolumeSpeeds map volume types with volume speeds
 	VolumeSpeeds map[string]VolumeSpeed.Enum
-
-	// S3Protocol protocol used to mount object storage (ex: swiftks or s3)
-	S3Protocol string
-
+	// // ObjectStorageType type of Object Storage (ex: swift or s3)
+	// ObjectStorageType string
 	// MetadataBucketName contains the name of the bucket storing metadata
 	MetadataBucketName string
+	DefaultImage       string
 }
 
 // ProviderErrorToString creates an error string from openstack api error
@@ -250,27 +220,13 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
-
-	// Storage API
-	blocstorage, err := openstack.NewBlockStorageV1(pClient, gc.EndpointOpts{
+	// volume API
+	volume, err := openstack.NewBlockStorageV1(pClient, gc.EndpointOpts{
 		Region: opts.Region,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
-
-	// Object Storage
-	objectstorage, err := openstack.NewObjectStorageV1(pClient, gc.EndpointOpts{
-		Region: opts.Region,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
-	}
-
-	if len(cfg.S3Protocol) == 0 {
-		cfg.S3Protocol = "swiftks"
-	}
-	//log.Print("Object storage protocol: ", cfg.S3Protocol)
 
 	clt := Client{
 		Opts:              &opts,
@@ -278,8 +234,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Provider:          pClient,
 		Compute:           compute,
 		Network:           network,
-		Volume:            blocstorage,
-		Container:         objectstorage,
+		Volume:            volume,
 		ProviderNetworkID: nID,
 	}
 
@@ -287,111 +242,11 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-<<<<<<< develop
 
-	// Creates metadata Object Storage bucket/container
+	// Creates metadata Object Storage bucket
 	if clt.Cfg.MetadataBucketName == "" {
 		clt.Cfg.MetadataBucketName = provmetadata.BuildMetadataBucketName(opts.DomainName)
 	}
-	err = providers.InitializeBucket(&clt)
-	if err != nil {
-		return nil, err
-	}
-||||||| ancestor
-	// Creates metadata Object Storage container
-	err = metadata.InitializeContainer(&clt)
-	if err != nil {
-		return nil, err
-	}
-=======
-
-<<<<<<< develop
-	//*** modif PC
-	// connection STOW for containers management
-	/*
-		var Config object.Config
-		var ConfigObject object.Config
-		Config.Auth = clt.Opts.IdentityEndpoint
-		Config.Tenant = clt.Opts.TenantName
-		Config.Key = clt.Opts.Password
-		Config.User = clt.Opts.Username
-		Config.Region = clt.Opts.Region
-		Config.Types = "swift"
-
-		ConfigObject.Domain = "default"
-		ConfigObject.Auth = clt.Opts.OstAuth
-		ConfigObject.Endpoint = clt.Opts.OstAuth
-		ConfigObject.User = clt.Opts.OstUsername
-		ConfigObject.Tenant = clt.Opts.OstProjectID
-		ConfigObject.Region = clt.Opts.OstRegion
-		ConfigObject.Secretkey = clt.Opts.OstSecretKey
-		ConfigObject.Key = clt.Opts.OstPassword
-		ConfigObject.Types = clt.Opts.OstTypes
-		log.Println("config container set to : ", Config.Auth)
-		log.Println("object storage set to  : ", ConfigObject.Auth)
-		err = clt.LocforConfig.Connect(Config)
-		if err != nil {
-			log.Println("Erreur Connection  stow LocforConfig : ", err)
-			return nil, err
-		}
-		err = metadata.InitContainer(clt.LocforConfig)
-		if err != nil {
-			log.Println("Erreur InitContainer    : ", err)
-			return nil, err
-		}
-		err = clt.LocforStore.Connect(ConfigObject)
-		if err != nil {
-			log.Println("Erreur Connection  stow LocforStore : ", err)
-			return nil, err
-		}
-
-		//	clt.CreateContainer(api.NasContainerName)
-	*/
->>>>>>> Update object storage management
-||||||| ancestor
-	//*** modif PC
-	// connection STOW for containers management
-	/*
-		var Config object.Config
-		var ConfigObject object.Config
-		Config.Auth = clt.Opts.IdentityEndpoint
-		Config.Tenant = clt.Opts.TenantName
-		Config.Key = clt.Opts.Password
-		Config.User = clt.Opts.Username
-		Config.Region = clt.Opts.Region
-		Config.Types = "swift"
-
-		ConfigObject.Domain = "default"
-		ConfigObject.Auth = clt.Opts.OstAuth
-		ConfigObject.Endpoint = clt.Opts.OstAuth
-		ConfigObject.User = clt.Opts.OstUsername
-		ConfigObject.Tenant = clt.Opts.OstProjectID
-		ConfigObject.Region = clt.Opts.OstRegion
-		ConfigObject.Secretkey = clt.Opts.OstSecretKey
-		ConfigObject.Key = clt.Opts.OstPassword
-		ConfigObject.Types = clt.Opts.OstTypes
-		log.Println("config container set to : ", Config.Auth)
-		log.Println("object storage set to  : ", ConfigObject.Auth)
-		err = clt.LocforConfig.Connect(Config)
-		if err != nil {
-			log.Println("Erreur Connection  stow LocforConfig : ", err)
-			return nil, err
-		}
-		err = metadata.InitContainer(clt.LocforConfig)
-		if err != nil {
-			log.Println("Erreur InitContainer    : ", err)
-			return nil, err
-		}
-		err = clt.LocforStore.Connect(ConfigObject)
-		if err != nil {
-			log.Println("Erreur Connection  stow LocforStore : ", err)
-			return nil, err
-		}
-
-		//	clt.CreateContainer(api.NasContainerName)
-	*/
-=======
->>>>>>> object storage
 	return &clt, nil
 }
 
@@ -400,13 +255,13 @@ const defaultSecurityGroup string = "30ad3142-a5ec-44b5-9560-618bde3de1ef"
 
 // Client is the implementation of the openstack driver regarding to the api.ClientAPI
 type Client struct {
-	Opts      *AuthOptions
-	Cfg       *CfgOptions
-	Provider  *gc.ProviderClient
-	Compute   *gc.ServiceClient
-	Network   *gc.ServiceClient
-	Volume    *gc.ServiceClient
-	Container *gc.ServiceClient
+	Opts     *AuthOptions
+	Cfg      *CfgOptions
+	Provider *gc.ProviderClient
+	Compute  *gc.ServiceClient
+	Network  *gc.ServiceClient
+	Volume   *gc.ServiceClient
+	// Container *gc.ServiceClient
 
 	SecurityGroup     *secgroups.SecurityGroup
 	ProviderNetworkID string
@@ -440,7 +295,7 @@ func (client *Client) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error
 
 // createTCPRules creates TCP rules to configure the default security group
 func (client *Client) createTCPRules(groupID string) error {
-	//Open TCP Ports
+	// Open TCP Ports
 	ruleOpts := secgroups.CreateRuleOpts{
 		ParentGroupID: groupID,
 		FromPort:      1,
@@ -464,9 +319,9 @@ func (client *Client) createTCPRules(groupID string) error {
 	return err
 }
 
-//createTCPRules creates UDP rules to configure the default security group
+// createTCPRules creates UDP rules to configure the default security group
 func (client *Client) createUDPRules(groupID string) error {
-	//Open UDP Ports
+	// Open UDP Ports
 	ruleOpts := secgroups.CreateRuleOpts{
 		ParentGroupID: groupID,
 		FromPort:      1,
@@ -490,9 +345,9 @@ func (client *Client) createUDPRules(groupID string) error {
 	return err
 }
 
-//createICMPRules creates UDP rules to configure the default security group
+// createICMPRules creates UDP rules to configure the default security group
 func (client *Client) createICMPRules(groupID string) error {
-	//Open TCP Ports
+	// Open TCP Ports
 	ruleOpts := secgroups.CreateRuleOpts{
 		ParentGroupID: groupID,
 		FromPort:      -1,
@@ -516,9 +371,9 @@ func (client *Client) createICMPRules(groupID string) error {
 	return err
 }
 
-//initDefaultSecurityGroup create an open Security Group
-//The default security group opens all TCP, UDP, ICMP ports
-//Security is managed individually on each host using a linux firewall
+// initDefaultSecurityGroup create an open Security Group
+// The default security group opens all TCP, UDP, ICMP ports
+// Security is managed individually on each host using a linux firewall
 func (client *Client) initDefaultSecurityGroup() error {
 	sg, err := client.getDefaultSecurityGroup()
 	if err != nil {
@@ -557,23 +412,30 @@ func (client *Client) initDefaultSecurityGroup() error {
 	return nil
 }
 
-//Build build a new Client from configuration parameter
+// Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	IdentityEndpoint, _ := params["IdentityEndpoint"].(string)
-	Username, _ := params["Username"].(string)
-	Password, _ := params["Password"].(string)
-	TenantName, _ := params["TenantName"].(string)
-	Region, _ := params["Region"].(string)
-	FloatingIPPool, _ := params["FloatingIPPool"].(string)
+	tenantName, _ := params["name"].(string)
+
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
+	// network, _ := params["network"].(map[string]interface{})
+
+	identityEndpoint, _ := identity["Endpoint"].(string)
+	username, _ := identity["Username"].(string)
+	password, _ := identity["Password"].(string)
+
+	region, _ := compute["Region"].(string)
+	floatingIPPool, _ := compute["FloatingIPPool"].(string)
+	defaultImage, _ := compute["DefaultImage"]
 
 	return AuthenticatedClient(
 		AuthOptions{
-			IdentityEndpoint: IdentityEndpoint,
-			Username:         Username,
-			Password:         Password,
-			TenantName:       TenantName,
-			Region:           Region,
-			FloatingIPPool:   FloatingIPPool,
+			IdentityEndpoint: identityEndpoint,
+			Username:         username,
+			Password:         password,
+			TenantName:       tenantName,
+			Region:           region,
+			FloatingIPPool:   floatingIPPool,
 		},
 		CfgOptions{
 			ProviderNetwork:           "public",
@@ -584,8 +446,8 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 				"standard":   VolumeSpeed.COLD,
 				"performant": VolumeSpeed.HDD,
 			},
-			DNSList:    []string{"185.23.94.244", "185.23.94.244"},
-			S3Protocol: "swiftks",
+			DNSList:      []string{"185.23.94.244", "185.23.94.244"},
+			DefaultImage: defaultImage.(string),
 		},
 	)
 }
@@ -607,7 +469,7 @@ func (client *Client) GetCfgOpts() (model.Config, error) {
 	cfg := model.ConfigMap{}
 
 	cfg.Set("DNSList", client.Cfg.DNSList)
-	cfg.Set("S3Protocol", client.Cfg.S3Protocol)
+	// cfg.Set("ObjectStorageType", client.Cfg.ObjectStorageType)
 	cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
 	cfg.Set("MetadataBucket", client.Cfg.MetadataBucketName)
