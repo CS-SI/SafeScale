@@ -112,7 +112,13 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	Region, _ := params["Region"].(string)
 	DomainName, _ := params["UserDomainName"].(string)
 	ProjectName, _ := params["ProjectName"].(string)
-	ProjectID, _ := params["ProjectID"].(string)
+
+	// TODO Remove patch later
+	// ProjectID, _ := params["ProjectID"].(string)
+
+	metadataFix, _ := params["ProjectID"].(string)
+	ProjectID := metadataFix + ".v2"
+
 	return AuthenticatedClient(AuthOptions{
 		Username:    Username,
 		Password:    Password,
