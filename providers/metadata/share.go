@@ -18,7 +18,6 @@ package metadata
 
 import (
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 )
@@ -36,7 +35,7 @@ type Share struct {
 }
 
 // NewShare creates an instance of metadata.Nas
-func NewShare(svc api.ClientAPI) *Share {
+func NewShare(svc *providers.Service) *Share {
 	return &Share{
 		item: metadata.NewItem(svc, shareFolderName),
 	}

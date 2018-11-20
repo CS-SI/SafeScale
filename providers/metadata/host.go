@@ -21,7 +21,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
@@ -41,7 +41,7 @@ type Host struct {
 }
 
 // NewHost creates an instance of api.Host
-func NewHost(svc api.ClientAPI) *Host {
+func NewHost(svc *providers.Service) *Host {
 	return &Host{
 		item: metadata.NewItem(svc, hostsFolderName),
 	}
@@ -165,7 +165,7 @@ func (m *Host) Browse(callback func(*model.Host) error) error {
 }
 
 // SaveHost saves the Host definition in Object Storage
-func SaveHost(svc api.ClientAPI, host *model.Host) error {
+func SaveHost(svc *providers.Service, host *model.Host) error {
 	err := NewHost(svc).Carry(host).Write()
 	if err != nil {
 		return err
@@ -192,7 +192,7 @@ func SaveHost(svc api.ClientAPI, host *model.Host) error {
 }
 
 // RemoveHost removes the host definition from Object Storage
-func RemoveHost(svc api.ClientAPI, host *model.Host) error {
+func RemoveHost(svc *providers.Service, host *model.Host) error {
 	// First, browse networks to delete links on the deleted host
 	mn := NewNetwork(svc)
 	mnb := NewNetwork(svc)
@@ -217,7 +217,7 @@ func RemoveHost(svc api.ClientAPI, host *model.Host) error {
 }
 
 // LoadHostByID gets the host definition from Object Storage
-func LoadHostByID(svc api.ClientAPI, hostID string) (*Host, error) {
+func LoadHostByID(svc *providers.Service, hostID string) (*Host, error) {
 	m := NewHost(svc)
 	found, err := m.ReadByID(hostID)
 	if err != nil {
@@ -230,7 +230,7 @@ func LoadHostByID(svc api.ClientAPI, hostID string) (*Host, error) {
 }
 
 // LoadHostByName gets the Network definition from Object Storage
-func LoadHostByName(svc api.ClientAPI, hostName string) (*Host, error) {
+func LoadHostByName(svc *providers.Service, hostName string) (*Host, error) {
 	m := NewHost(svc)
 	found, err := m.ReadByName(hostName)
 	if err != nil {
@@ -243,7 +243,7 @@ func LoadHostByName(svc api.ClientAPI, hostName string) (*Host, error) {
 }
 
 // LoadHost gets the host definition from Object Storage
-func LoadHost(svc api.ClientAPI, ref string) (*Host, error) {
+func LoadHost(svc *providers.Service, ref string) (*Host, error) {
 	// We first try looking for host by ID from metadata
 	m, err := LoadHostByID(svc, ref)
 	if err != nil {

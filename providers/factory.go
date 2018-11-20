@@ -20,15 +20,11 @@ import (
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-<<<<<<< develop
 	"github.com/CS-SI/SafeScale/providers/model"
-||||||| ancestor
-=======
-	"github.com/CS-SI/SafeScale/providers/object"
->>>>>>> Update object storage management
-	"github.com/spf13/viper"
+	"github.com/CS-SI/SafeScale/providers/objectstorage"
 )
 
 var (
@@ -62,51 +58,91 @@ func GetService(tenantName string) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	tenantInCfg := false
-	clientProvider := "__not_found__"
+	var (
+		tenantInCfg    = false
+		found          = false
+		name           string
+		client         api.ClientAPI
+		clientProvider = "__not_found__"
+	)
+
 	for _, t := range tenants {
 		tenant, _ := t.(map[string]interface{})
-		tenantconfig, _ := tenant["config"].(map[string]interface{})
-		tenantobject, _ := tenant["object"].(map[string]interface{})
-		if name, ok := tenantconfig["name"].(string); ok {
-			if name == tenantName {
-				tenantInCfg = true
-				if provider, ok := tenantconfig["client"].(string); ok {
-					clientProvider = provider
-					if client, ok := providers[provider]; ok {
-<<<<<<< develop
-						clientAPI, err := client.Build(tenant)
-||||||| ancestor
-						service, err := client.Build(tenant)
-=======
-						location := new(object.Location)
-						Config := setConfig(tenantobject)
-						err = location.Connect(Config)
-<<<<<<< develop
-						service, err := client.Build(tenantmerged)
->>>>>>> Update object storage management
-||||||| ancestor
-						service, err := client.Build(tenantmerged)
-=======
-						service, err := client.Build(tenantconfig)
->>>>>>> object storage
-						if err != nil {
-							return nil, fmt.Errorf("Error creating tenant %s on provider %s: %s", tenantName, provider, err.Error())
-						}
-						return &Service{
-<<<<<<< develop
-							ClientAPI: clientAPI,
-||||||| ancestor
-							ClientAPI: service,
-=======
-							ClientAPI: service,
-							Location:  location,
->>>>>>> Update object storage management
-						}, nil
-					}
-				}
-			}
+		name, found = tenant["name"].(string)
+		if !found {
+			log.Errorf("tenant found without 'name'")
+			continue
 		}
+		if name != tenantName {
+			continue
+		}
+
+		tenantInCfg = true
+		provider, found := tenant["client"].(string)
+		if !found {
+			log.Errorf("Missing field 'client' in tenant '%s'")
+			continue
+		}
+
+		clientProvider = provider
+		client, found = providers[provider]
+		if !found {
+			log.Errorf("Failed to find client '%s' for tenant '%s'", clientProvider, name)
+			continue
+		}
+
+		tenantIdentity, found := tenant["identity"].(map[string]interface{})
+		tenantCompute, found := tenant["compute"].(map[string]interface{})
+		tenantNetwork, found := tenant["network"].(map[string]interface{})
+		// Merge identity compute and network in single map
+		tenantClient := map[string]interface{}{
+			"identity": tenantIdentity,
+			"compute":  tenantCompute,
+			"network":  tenantNetwork,
+		}
+		tenantObjectStorage, found := tenant["objectstorage"].(map[string]interface{})
+		tenantMetadata, found := tenant["metadata"].(map[string]interface{})
+		if !found {
+			tenantMetadata = tenantObjectStorage
+		}
+
+		clientAPI, err := client.Build(tenantClient)
+		if err != nil {
+			return nil, fmt.Errorf("Error creating tenant %s on provider %s: %s", tenantName, provider, err.Error())
+		}
+		clientCfg, err := clientAPI.GetCfgOpts()
+		if err != nil {
+			return nil, err
+		}
+		objectStorageConfig := fillObjectStorageConfig(tenantObjectStorage)
+		objectStorageLocation := objectstorage.NewLocation(objectStorageConfig)
+		err = objectStorageLocation.Connect()
+		if err != nil {
+			return nil, fmt.Errorf("Error connecting to Object Storage Location: %s", err.Error())
+		}
+		metadataLocationConfig := fillObjectStorageConfig(tenantMetadata)
+		metadataLocation := objectstorage.NewLocation(metadataLocationConfig)
+		err = metadataLocation.Connect()
+		if err != nil {
+			return nil, fmt.Errorf("Error connecting to Object Storage Location to store metadata: %s", err.Error())
+		}
+		anon, found := clientCfg.Get("MetadataBucketName")
+		if !found {
+			return nil, fmt.Errorf("missing configuration option 'MetadataBucketName'")
+		}
+		bucketName := anon.(string)
+		var bucket objectstorage.Bucket
+		found, err = metadataLocation.FindBucket(bucketName)
+		if found {
+			bucket, err = metadataLocation.GetBucket(bucketName)
+		} else {
+			bucket, err = metadataLocation.CreateBucket(bucketName)
+		}
+		return &Service{
+			Client:         clientAPI,
+			ObjectStorage:  objectStorageLocation,
+			MetadataBucket: bucket,
+		}, nil
 	}
 
 	if !tenantInCfg {
@@ -115,21 +151,21 @@ func GetService(tenantName string) (*Service, error) {
 	return nil, model.ResourceNotFoundError("Client builder", clientProvider)
 }
 
-func setConfig(tenant map[string]interface{}) object.Config {
-
-	var Config object.Config
-	Config.Domain = "default"
-	Config.Auth = tenant["Auth"].(string)
-	Config.Endpoint = tenant["Auth"].(string)
-	Config.User = tenant["Username"].(string)
-	Config.Tenant = tenant["ProjectID"].(string)
-	Config.Region = tenant["Region"].(string)
+// fillObjectStorageConfig initializes objectstorage.Config struct with map
+func fillObjectStorageConfig(tenant map[string]interface{}) objectstorage.Config {
+	var config objectstorage.Config
+	config.Domain = "default"
+	config.Auth = tenant["Auth"].(string)
+	config.Endpoint = tenant["Auth"].(string)
+	config.User = tenant["Username"].(string)
+	config.Tenant = tenant["ProjectID"].(string)
+	config.Region = tenant["Region"].(string)
 	if tenant["SecretKey"] != nil {
-		Config.Secretkey = tenant["SecretKey"].(string)
+		config.Secretkey = tenant["SecretKey"].(string)
 	}
-	Config.Key = tenant["Password"].(string)
-	Config.Types = tenant["Types"].(string)
-	return Config
+	config.Key = tenant["Password"].(string)
+	config.Types = tenant["Types"].(string)
+	return config
 }
 
 func loadConfig() error {

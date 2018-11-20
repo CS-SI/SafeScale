@@ -19,7 +19,7 @@ package metadata
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
@@ -40,7 +40,7 @@ type Volume struct {
 }
 
 // NewVolume creates an instance of metadata.Volume
-func NewVolume(svc api.ClientAPI) *Volume {
+func NewVolume(svc *providers.Service) *Volume {
 	return &Volume{
 		item: metadata.NewItem(svc, volumesFolderName),
 		name: nil,
@@ -248,12 +248,12 @@ func (mv *Volume) GetAttachments() ([]string, error) {
 }
 
 // SaveVolume saves the Volume definition in Object Storage
-func SaveVolume(svc api.ClientAPI, volume *model.Volume) error {
+func SaveVolume(svc *providers.Service, volume *model.Volume) error {
 	return NewVolume(svc).Carry(volume).Write()
 }
 
 // RemoveVolume removes the Volume definition from Object Storage
-func RemoveVolume(svc api.ClientAPI, volumeID string) error {
+func RemoveVolume(svc *providers.Service, volumeID string) error {
 	m, err := LoadVolume(svc, volumeID)
 	if err != nil {
 		return err
@@ -262,7 +262,7 @@ func RemoveVolume(svc api.ClientAPI, volumeID string) error {
 }
 
 // LoadVolume gets the Volume definition from Object Storage
-func LoadVolume(svc api.ClientAPI, ref string) (*Volume, error) {
+func LoadVolume(svc *providers.Service, ref string) (*Volume, error) {
 	m := NewVolume(svc)
 	found, err := m.ReadByID(ref)
 	if err != nil {

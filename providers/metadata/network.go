@@ -21,7 +21,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
@@ -44,7 +44,7 @@ type Network struct {
 }
 
 // NewNetwork creates an instance of network.Metadata
-func NewNetwork(svc api.ClientAPI) *Network {
+func NewNetwork(svc *providers.Service) *Network {
 	return &Network{
 		item: metadata.NewItem(svc, networksFolderName),
 	}
@@ -297,17 +297,17 @@ func (m *Network) Release() {
 }
 
 // SaveNetwork saves the Network definition in Object Storage
-func SaveNetwork(svc api.ClientAPI, net *model.Network) error {
+func SaveNetwork(svc *providers.Service, net *model.Network) error {
 	return NewNetwork(svc).Carry(net).Write()
 }
 
 // RemoveNetwork removes the Network definition from Object Storage
-func RemoveNetwork(svc api.ClientAPI, net *model.Network) error {
+func RemoveNetwork(svc *providers.Service, net *model.Network) error {
 	return NewNetwork(svc).Carry(net).Delete()
 }
 
 // LoadNetworkByID gets the Network definition from Object Storage
-func LoadNetworkByID(svc api.ClientAPI, networkID string) (*Network, error) {
+func LoadNetworkByID(svc *providers.Service, networkID string) (*Network, error) {
 	m := NewNetwork(svc)
 	found, err := m.ReadByID(networkID)
 	if err != nil {
@@ -320,7 +320,7 @@ func LoadNetworkByID(svc api.ClientAPI, networkID string) (*Network, error) {
 }
 
 // LoadNetworkByName gets the Network definition from Object Storage
-func LoadNetworkByName(svc api.ClientAPI, networkname string) (*Network, error) {
+func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, error) {
 	m := NewNetwork(svc)
 	found, err := m.ReadByName(networkname)
 	if err != nil {
@@ -333,7 +333,7 @@ func LoadNetworkByName(svc api.ClientAPI, networkname string) (*Network, error) 
 }
 
 // LoadNetwork gets the Network definition from Object Storage
-func LoadNetwork(svc api.ClientAPI, ref string) (*Network, error) {
+func LoadNetwork(svc *providers.Service, ref string) (*Network, error) {
 	m, err := LoadNetworkByID(svc, ref)
 	if err != nil {
 		return nil, err
@@ -360,7 +360,7 @@ type Gateway struct {
 }
 
 // NewGateway creates an instance of metadata.Gateway
-func NewGateway(svc api.ClientAPI, networkID string) (*Gateway, error) {
+func NewGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 	network := NewNetwork(svc)
 	found, err := network.ReadByID(networkID)
 	if err != nil {
@@ -462,7 +462,7 @@ func (mg *Gateway) Release() {
 }
 
 // LoadGateway returns the metadata of the Gateway of a network
-func LoadGateway(svc api.ClientAPI, networkID string) (*Gateway, error) {
+func LoadGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 	mg, err := NewGateway(svc, networkID)
 	if err != nil {
 		return nil, err
@@ -478,7 +478,7 @@ func LoadGateway(svc api.ClientAPI, networkID string) (*Gateway, error) {
 }
 
 // SaveGateway saves the metadata of a gateway
-func SaveGateway(svc api.ClientAPI, host *model.Host, networkID string) error {
+func SaveGateway(svc *providers.Service, host *model.Host, networkID string) error {
 	mg, err := NewGateway(svc, networkID)
 	if err != nil {
 		return err
