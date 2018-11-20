@@ -26,6 +26,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/pagination"
+	"net/http"
 )
 
 /*AuthOptions fields are the union of those recognized by each identity implementation and
@@ -135,6 +136,52 @@ func ProviderErrorToString(err error) string {
 	}
 }
 
+func verifyServiceEndpoint(service string) (bool, error) {
+	var serviceGone error = nil
+
+	resp, err := http.Get(service)
+	if (err == nil) && (resp.StatusCode != 200) && (resp.StatusCode != 401) && (resp.StatusCode != 403) {
+		serviceGone = fmt.Errorf("%d Http Error: [%s]", resp.StatusCode, service)
+		return false, serviceGone
+	}
+
+	return true, nil
+}
+
+func VerifyEndpoints(service *Client) (bool, error) {
+	if service == nil {
+		panic("Nil service !!")
+	}
+
+	ok := true
+
+	pok, err := verifyServiceEndpoint(service.Compute.Endpoint)
+	if err != nil {
+		return false, err
+	}
+	ok = ok && pok
+
+	pok, err = verifyServiceEndpoint(service.Network.Endpoint)
+	if err != nil {
+		return false, err
+	}
+	ok = ok && pok
+
+	pok, err = verifyServiceEndpoint(service.Volume.Endpoint)
+	if err != nil {
+		return false, err
+	}
+	ok = ok && pok
+
+	pok, err = verifyServiceEndpoint(service.Container.Endpoint)
+	if err != nil {
+		return false, err
+	}
+	ok = ok && pok
+
+	return ok, nil
+}
+
 // AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	gcOpts := gc.AuthOptions{
@@ -160,7 +207,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	compute, err := openstack.NewComputeV2(pClient, gc.EndpointOpts{
 		Region: opts.Region,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
@@ -172,15 +218,22 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
+
+	// Get Identity from network service
 	nID, err := networks.IDFromName(network, cfg.ProviderNetwork)
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
+
 	// Storage API
 	blocstorage, err := openstack.NewBlockStorageV1(pClient, gc.EndpointOpts{
 		Region: opts.Region,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+	}
 
+	// Object Storage
 	objectstorage, err := openstack.NewObjectStorageV1(pClient, gc.EndpointOpts{
 		Region: opts.Region,
 	})
