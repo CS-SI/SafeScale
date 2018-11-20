@@ -21,7 +21,7 @@ func (i *dcosInstaller) GetName() string {
 }
 
 // Check checks if the feature is installed
-func (i *dcosInstaller) Check(port int, c *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (i *dcosInstaller) Check(c *Feature, t Target, v Variables, s Settings) (Results, error) {
 	worker, err := newWorker(c, t, Method.DCOS, Action.Check, nil)
 	if err != nil {
 		return nil, err
@@ -38,11 +38,11 @@ func (i *dcosInstaller) Check(port int, c *Feature, t Target, v Variables, s Set
 	//	v["kubectl"] = kubectlCli
 	v["options"] = ""
 
-	return worker.Proceed(port, v, s)
+	return worker.Proceed(v, s)
 }
 
 // Add installs the feature in a DCOS cluster
-func (i *dcosInstaller) Add(port int, c *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (i *dcosInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Results, error) {
 	worker, err := newWorker(c, t, Method.DCOS, Action.Add, nil)
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func (i *dcosInstaller) Add(port int, c *Feature, t Target, v Variables, s Setti
 	//v["kubectl"] = kubectlCli
 	v["options"] = ""
 
-	return worker.Proceed(port, v, s)
+	return worker.Proceed(v, s)
 }
 
 // Remove uninstalls the feature using the RemoveScript script
@@ -68,7 +68,7 @@ func (i *dcosInstaller) Add(port int, c *Feature, t Target, v Variables, s Setti
 // - if err == nil and ok ==true, removal wa submitted and succeeded
 // - if err == nil and ok == false, removal was submitted successfully but failed, results contain reasons
 //   of failures on what parts
-func (i *dcosInstaller) Remove(port int, c *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (i *dcosInstaller) Remove(c *Feature, t Target, v Variables, s Settings) (Results, error) {
 
 	worker, err := newWorker(c, t, Method.DCOS, Action.Remove, nil)
 	if err != nil {
@@ -86,7 +86,7 @@ func (i *dcosInstaller) Remove(port int, c *Feature, t Target, v Variables, s Se
 	//	v["kubectl"] = kubectlCli
 	v["options"] = ""
 
-	return worker.Proceed(port, v, s)
+	return worker.Proceed(v, s)
 }
 
 // NewDcosInstaller creates a new instance of Installer using DCOS

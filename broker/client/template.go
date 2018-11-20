@@ -31,7 +31,7 @@ type template struct {
 
 // List return the list of availble templates on the current tenant
 func (t *template) List(all bool, timeout time.Duration) (*pb.TemplateList, error) {
-	conn := utils.GetConnection(int(t.session.brokerdPort))
+	conn := utils.GetConnection()
 	defer conn.Close()
 	if timeout < utils.TimeoutCtxDefault {
 		timeout = utils.TimeoutCtxDefault

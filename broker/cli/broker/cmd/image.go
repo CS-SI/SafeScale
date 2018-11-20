@@ -20,8 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/urfave/cli"
+
+	"github.com/CS-SI/SafeScale/broker/client"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // ImageCmd command
@@ -34,17 +36,18 @@ var ImageCmd = cli.Command{
 }
 
 var imageList = cli.Command{
-	Name:  "list",
-	Usage: "List available images",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available images",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all",
 			Usage: "List all available images in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
-		images, err := client.New(c.GlobalInt("port")).Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
+		images, err := client.New().Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of images", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "list of images", false).Error())
 		}
 		out, _ := json.Marshal(images.GetImages())
 		fmt.Println(string(out))

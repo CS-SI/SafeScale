@@ -18,20 +18,23 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/utils/metadata"
+
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/pagination"
+
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	provmetadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"net/http"
 )
 
-/*AuthOptions fields are the union of those recognized by each identity implementation and
-provider.
-*/
+// AuthOptions fields are the union of those recognized by each identity implementation and
+// provider.
 type AuthOptions struct {
 	// IdentityEndpoint specifies the HTTP endpoint that is required to work with
 	// the Identity API of the appropriate version. While it's ultimately needed by
@@ -63,7 +66,7 @@ type AuthOptions struct {
 	// cache your credentials in memory, and to allow Gophercloud to attempt to
 	// re-authenticate automatically if/when your token expires.  If you set it to
 	// false, it will not cache these settings, but re-authentication will not be
-	// possible.  This setting defaults to false.
+	// possible. This setting defaults to false.
 	//
 	// NOTE: The reauth function will try to re-authenticate endlessly if left unchecked.
 	// The way to limit the number of attempts is to provide a custom HTTP client to the provider client
@@ -264,9 +267,9 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 
 	// Creates metadata Object Storage bucket/container
 	if clt.Cfg.MetadataBucketName == "" {
-		clt.Cfg.MetadataBucketName = api.BuildMetadataBucketName(opts.DomainName)
+		clt.Cfg.MetadataBucketName = provmetadata.BuildMetadataBucketName(opts.DomainName)
 	}
-	err = metadata.InitializeBucket(&clt)
+	err = providers.InitializeBucket(&clt)
 	if err != nil {
 		return nil, err
 	}
@@ -468,8 +471,8 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 }
 
 // GetAuthOpts returns the auth options
-func (client *Client) GetAuthOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
+func (client *Client) GetAuthOpts() (model.Config, error) {
+	cfg := model.ConfigMap{}
 
 	cfg.Set("TenantName", client.Opts.TenantName)
 	cfg.Set("Login", client.Opts.Username)
@@ -480,8 +483,8 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 }
 
 // GetCfgOpts return configuration parameters
-func (client *Client) GetCfgOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
+func (client *Client) GetCfgOpts() (model.Config, error) {
+	cfg := model.ConfigMap{}
 
 	cfg.Set("DNSList", client.Cfg.DNSList)
 	cfg.Set("S3Protocol", client.Cfg.S3Protocol)

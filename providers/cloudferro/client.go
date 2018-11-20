@@ -19,7 +19,9 @@ package cloudferro
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	gc "github.com/gophercloud/gophercloud"
 	ops "github.com/gophercloud/gophercloud/openstack"
@@ -64,7 +66,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"HDD": VolumeSpeed.COLD,
 				"SSD": VolumeSpeed.HDD,
 			},
-			MetadataBucketName: api.BuildMetadataBucketName(opts.ProjectID),
+			MetadataBucketName: metadata.BuildMetadataBucketName(opts.ProjectID),
 			DNSList:            []string{"1.1.1.1", "8.8.8.8"},
 		},
 	)
@@ -122,8 +124,8 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 }
 
 // GetCfgOpts return configuration parameters
-func (c *Client) GetCfgOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
+func (c *Client) GetCfgOpts() (model.Config, error) {
+	cfg := model.ConfigMap{}
 
 	cfg.Set("DNSList", c.Cfg.DNSList)
 	cfg.Set("S3Protocol", c.Cfg.S3Protocol)

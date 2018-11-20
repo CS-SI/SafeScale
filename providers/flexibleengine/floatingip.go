@@ -19,7 +19,7 @@ package flexibleengine
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	"github.com/gophercloud/gophercloud"
@@ -236,7 +236,7 @@ func (client *Client) DeleteFloatingIP(id string) error {
 }
 
 // AssociateFloatingIP to host
-func (client *Client) AssociateFloatingIP(host *api.Host, id string) error {
+func (client *Client) AssociateFloatingIP(host *model.Host, id string) error {
 	fip, err := client.GetFloatingIP(id)
 	if err != nil {
 		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
@@ -258,7 +258,7 @@ func (client *Client) AssociateFloatingIP(host *api.Host, id string) error {
 }
 
 // DissociateFloatingIP from host
-func (client *Client) DissociateFloatingIP(host *api.Host, id string) error {
+func (client *Client) DissociateFloatingIP(host *model.Host, id string) error {
 	fip, err := client.GetFloatingIP(id)
 	if err != nil {
 		return fmt.Errorf("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/broker/client"
+	clitools "github.com/CS-SI/SafeScale/utils"
 	"github.com/urfave/cli"
 )
 
@@ -36,12 +37,13 @@ var TenantCmd = cli.Command{
 }
 
 var tenantList = cli.Command{
-	Name:  "list",
-	Usage: "List available tenants",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available tenants",
 	Action: func(c *cli.Context) error {
-		tenants, err := client.New(c.GlobalInt("port")).Tenant.List(client.DefaultExecutionTimeout)
+		tenants, err := client.New().Tenant.List(client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of tenants", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "list of tenants", false).Error())
 		}
 		out, _ := json.Marshal(tenants.GetTenants())
 		fmt.Println(string(out))
@@ -54,9 +56,9 @@ var tenantGet = cli.Command{
 	Name:  "get",
 	Usage: "Get current tenant",
 	Action: func(c *cli.Context) error {
-		tenant, err := client.New(c.GlobalInt("port")).Tenant.Get(client.DefaultExecutionTimeout)
+		tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "get tenant", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "get tenant", false).Error())
 		}
 		out, _ := json.Marshal(tenant)
 		fmt.Println(string(out))
@@ -72,11 +74,11 @@ var tenantSet = cli.Command{
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <tenant_name>")
 			_ = cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Tenant name required")
+			return clitools.ExitOnInvalidArgument()
 		}
-		err := client.New(c.GlobalInt("port")).Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
+		err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "set tenant", false))
+			return clitools.ExitOnRPC(client.DecorateError(err, "set tenant", false).Error())
 		}
 		fmt.Printf("Tenant '%s' set\n", c.Args().First())
 		return nil

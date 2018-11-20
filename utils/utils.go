@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package utils
 
 import (
@@ -29,7 +30,6 @@ import (
 
 // AbsPathify ...
 func AbsPathify(inPath string) string {
-
 	r, _ := regexp.Compile("(\\$[\\{]{1}[A-Z]+[\\}]{1})|(\\$[A-Z]+)")
 	found := r.FindAllString(inPath, -1)
 
@@ -101,4 +101,19 @@ func ExtractRetCode(err error) (string, int, error) {
 		return msg, retCode, nil
 	}
 	return msg, retCode, fmt.Errorf("Error is not an 'ExitError'")
+}
+
+// Plural returns 's' if value > 0, "" otherwise
+func Plural(value int) string {
+	if value > 0 {
+		return "s"
+	}
+	return ""
+}
+
+// TitleFirst makes the first letter of the first word uppercased
+func TitleFirst(value string) string {
+	fields := strings.Fields(value)
+	fields[0] = strings.Title(fields[0])
+	return strings.Join(fields, " ")
 }

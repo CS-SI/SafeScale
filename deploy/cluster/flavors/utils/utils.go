@@ -22,15 +22,12 @@ import (
 	txttmpl "text/template"
 	"time"
 
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-
-	"github.com/CS-SI/SafeScale/deploy/install"
-
-	"github.com/CS-SI/SafeScale/utils/template"
-
-	"github.com/CS-SI/SafeScale/system"
-
 	rice "github.com/GeertJohan/go.rice"
+
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/deploy/install"
+	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils/template"
 )
 
 const (
@@ -45,7 +42,7 @@ var (
 )
 
 // ExecuteScript executes the script template with the parameters on tarGetHost
-func ExecuteScript(port int,
+func ExecuteScript(
 	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	hostID string,
 ) (int, string, string, error) {
@@ -56,7 +53,7 @@ func ExecuteScript(port int,
 	}
 	data["reserved_BashLibrary"] = bashLibrary
 
-	path, err := UploadTemplateToFile(port, box, funcMap, tmplName, data, hostID, tmplName)
+	path, err := UploadTemplateToFile(box, funcMap, tmplName, data, hostID, tmplName)
 	if err != nil {
 		return 0, "", "", err
 	}
@@ -67,11 +64,11 @@ func ExecuteScript(port int,
 	} else {
 		cmd = fmt.Sprintf("sudo bash %s; rc=$?; rm %s; exit $rc", path, path)
 	}
-	return brokerclient.New(port).Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(20)*time.Minute)
+	return brokerclient.New().Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(20)*time.Minute)
 }
 
 // UploadTemplateToFile uploads a template named 'tmplName' coming from rice 'box' in a file to a remote host
-func UploadTemplateToFile(port int,
+func UploadTemplateToFile(
 	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	hostID string, fileName string,
 ) (string, error) {
@@ -79,7 +76,7 @@ func UploadTemplateToFile(port int,
 	if box == nil {
 		panic("box is nil!")
 	}
-	broker := brokerclient.New(port)
+	broker := brokerclient.New()
 	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 	if err != err {
 		return "", fmt.Errorf("failed to get host information: %s", err)
@@ -101,7 +98,7 @@ func UploadTemplateToFile(port int,
 	cmd := dataBuffer.String()
 	remotePath := tempFolder + fileName
 
-	err = install.UploadStringToRemoteFile(port, cmd, host, remotePath, "", "", "")
+	err = install.UploadStringToRemoteFile(cmd, host, remotePath, "", "", "")
 	if err != nil {
 		return "", err
 	}

@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/CS-SI/SafeScale/utils/metadata"
-
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
+	provmetadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	// Gophercloud OpenStack API
@@ -236,7 +236,7 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 			UseLayer3Networking: cfg.UseLayer3Networking,
 			VolumeSpeeds:        cfg.VolumeSpeeds,
 			S3Protocol:          "s3",
-			MetadataBucketName:  api.BuildMetadataBucketName(opts.DomainName),
+			MetadataBucketName:  provmetadata.BuildMetadataBucketName(opts.DomainName),
 		},
 		Provider: provider,
 		Compute:  compute,
@@ -265,7 +265,7 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 	}
 
 	// Creates metadata Object Storage container
-	err = metadata.InitializeBucket(&clt)
+	err = providers.InitializeBucket(&clt)
 	if err != nil {
 		return nil, err
 	}
@@ -615,8 +615,8 @@ func (client *Client) findVPCID() (*string, error) {
 }
 
 // GetAuthOpts returns the auth options
-func (client *Client) GetAuthOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
+func (client *Client) GetAuthOpts() (model.Config, error) {
+	cfg := model.ConfigMap{}
 
 	cfg.Set("DomainName", client.Opts.DomainName)
 	cfg.Set("Login", client.Opts.Username)
@@ -629,7 +629,7 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 }
 
 // GetCfgOpts return configuration parameters
-func (client *Client) GetCfgOpts() (api.Config, error) {
+func (client *Client) GetCfgOpts() (model.Config, error) {
 	return client.osclt.GetCfgOpts()
 }
 
