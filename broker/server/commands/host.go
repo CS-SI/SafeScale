@@ -23,6 +23,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/server/services"
 	"github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/providers"
 
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	safeutils "github.com/CS-SI/SafeScale/utils"
@@ -155,7 +156,7 @@ func (s *HostServiceServer) Create(ctx context.Context, in *pb.HostDefinition) (
 		return nil, fmt.Errorf("Cannot create host : No tenant set")
 	}
 
-	hostService := services.NewHostService(currentTenant.Client)
+	hostService := services.NewHostService(providers.FromClient(currentTenant.Client))
 
 	askedForSpecificScannerInfo := in.GetGPUNumber() > 0 || in.GetFreq() != 0
 	if askedForSpecificScannerInfo {
