@@ -19,8 +19,10 @@ package metadata
 import (
 	"sync"
 
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/objectstorage"
 )
 
 // Item is an entry in the ObjectStorage
@@ -34,16 +36,26 @@ type Item struct {
 type ItemDecoderCallback func([]byte) (model.Serializable, error)
 
 // NewItem creates a new item with 'name' and in 'path'
-func NewItem(client api.ClientAPI, path string) *Item {
+func NewItem(svc *providers.Service, path string) *Item {
 	return &Item{
-		folder:  NewFolder(client, path),
+		folder:  NewFolder(svc, path),
 		payload: nil,
 	}
 }
 
-// GetService returns the service providers used by Item
-func (i *Item) GetService() api.ClientAPI {
+// GetService returns the service used by Item
+func (i *Item) GetService() *providers.Service {
 	return i.folder.GetService()
+}
+
+// GetBucket returns the bucket used by Item
+func (i *Item) GetBucket() objectstorage.Bucket {
+	return i.folder.GetBucket()
+}
+
+// GetClient returns the bucket used by Item
+func (i *Item) GetClient() api.ClientAPI {
+	return i.folder.GetClient()
 }
 
 // GetPath returns the path in the Object Storage where the Item is stored
