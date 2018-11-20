@@ -61,8 +61,8 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 			UseLayer3Networking:       true,
 			AutoHostNetworkInterfaces: true,
 			VolumeSpeeds: map[string]VolumeSpeed.Enum{
-				"HDD": VolumeSpeed.COLD,
-				"SSD": VolumeSpeed.HDD,
+				"HDD": VolumeSpeed.HDD,
+				"SSD": VolumeSpeed.SSD,
 			},
 			MetadataBucketName: api.BuildMetadataBucketName(opts.ProjectID),
 			DNSList:            []string{"1.1.1.1", "8.8.8.8"},
