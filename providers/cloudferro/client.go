@@ -21,6 +21,8 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
+	gc "github.com/gophercloud/gophercloud"
+	ops "github.com/gophercloud/gophercloud/openstack"
 )
 
 /*AuthOptions fields are the union of those recognized by each identity implementation and
@@ -45,13 +47,13 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	IdentityEndpoint := "https://cf2.cloudferro.com:5000/v3"
 	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
 		IdentityEndpoint: IdentityEndpoint,
-		Username:   opts.Username,
-		Password:   opts.Password,
-		DomainName: opts.DomainName,
-		TenantName: opts.ProjectName,
-		Region:     opts.Region,
-		FloatingIPPool: "external",
-		AllowReauth: true,
+		Username:         opts.Username,
+		Password:         opts.Password,
+		DomainName:       opts.DomainName,
+		TenantName:       opts.ProjectName,
+		Region:           opts.Region,
+		FloatingIPPool:   "external",
+		AllowReauth:      true,
 	},
 		openstack.CfgOptions{
 			ProviderNetwork:           "external",
@@ -59,17 +61,33 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 			UseLayer3Networking:       true,
 			AutoHostNetworkInterfaces: true,
 			VolumeSpeeds: map[string]VolumeSpeed.Enum{
-				"HDD":    VolumeSpeed.COLD,
+				"HDD": VolumeSpeed.COLD,
 				"SSD": VolumeSpeed.HDD,
 			},
 			MetadataBucketName: api.BuildMetadataBucketName(opts.ProjectID),
-			DNSList: []string{"1.1.1.1", "8.8.8.8"},
+			DNSList:            []string{"1.1.1.1", "8.8.8.8"},
 		},
 	)
 
 	if err != nil {
 		return nil, err
 	}
+
+	// Storage API V2
+	blocstorage, err := ops.NewBlockStorageV2(os.Provider, gc.EndpointOpts{
+		Region: opts.Region,
+	})
+	os.Volume = blocstorage
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = openstack.VerifyEndpoints(os)
+	if err != nil {
+		return nil, err
+	}
+
 	client := &Client{
 		Client: os,
 		opts:   opts,
