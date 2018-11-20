@@ -51,14 +51,13 @@ type ClientAPI interface {
 	CreateNetwork(req model.NetworkRequest) (*model.Network, error)
 	// GetNetwork returns the network identified by ref (id or name)
 	GetNetwork(ref string) (*model.Network, error)
-	// ListNetworks lists available networks
-	ListNetworks(all bool) ([]*model.Network, error)
+	// ListNetworks lists all networks
+	ListNetworks() ([]*model.Network, error)
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
 	// CreateGateway creates a public Gateway for a private network
 	CreateGateway(req model.GWRequest) (*model.Host, error)
-	// DeleteGateway delete the public gateway of a private network
-	DeleteGateway(networkID string) error
+	// Note: no DeleteGateway(); DeleteHost() does this very well
 
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request model.HostRequest) (*model.Host, error)
@@ -66,8 +65,8 @@ type ClientAPI interface {
 	UpdateHost(host *model.Host) error
 	// GetHostState returns the current state of the host identified by id
 	GetHostState(hostParam interface{}) (HostState.Enum, error)
-	// ListHosts lists available hosts
-	ListHosts(all bool) ([]*model.Host, error)
+	// ListHosts lists all hosts
+	ListHosts() ([]*model.Host, error)
 	// DeleteHost deletes the host identified by id
 	DeleteHost(id string) error
 	// StopHost stops the host identified by id
@@ -87,7 +86,7 @@ type ClientAPI interface {
 	// GetVolume returns the volume identified by id
 	GetVolume(id string) (*model.Volume, error)
 	// ListVolumes list available volumes
-	ListVolumes(all bool) ([]model.Volume, error)
+	ListVolumes() ([]model.Volume, error)
 	// DeleteVolume deletes the volume identified by id
 	DeleteVolume(id string) error
 
@@ -102,31 +101,29 @@ type ClientAPI interface {
 	ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error)
 	// DeleteVolumeAttachment deletes the volume attachment identifed by id
 	DeleteVolumeAttachment(serverID, id string) error
-	/*
-		// CreateContainer creates an object container
-		CreateContainer(name string) error
-		// DeleteContainer deletes an object container
-		DeleteContainer(name string) error
-		// ListContainers list object containers
-		ListContainers() ([]string, error)
-	*/
-	// Getcontainer returns info of the container
-	GetContainer(name string) (*model.ContainerInfo, error)
 
-	// PutObject put an object into an object container
-	PutObject(container string, obj model.Object) error
-	// UpdateObjectMetadata update an object into  object container
-	UpdateObjectMetadata(container string, obj model.Object) error
-	// GetObject get  object content from an object container
-	GetObject(container string, name string, ranges []model.Range) (*model.Object, error)
-	// GetObjectMetadata get  object metadata from an object container
-	GetObjectMetadata(container string, name string) (*model.Object, error)
-	// ListObjects list objects of a container
-	ListObjects(container string, filter model.ObjectFilter) ([]string, error)
-	// CopyObject copies an object
-	CopyObject(containerSrc, objectSrc, objectDst string) error
-	// DeleteObject delete an object from a container
-	DeleteObject(container, object string) error
+	// // CreateBucket creates an object container
+	// CreateBucket(bucketName string) error
+	// // DeleteBucket deletes an object container
+	// DeleteBucket(bucketName string) error
+	// // ListBuckets list object containers
+	// ListBuckets() ([]string, error)
+	// // GetBucket returns info about the Bucket
+	// GetBucket(name string) (*model.Bucket, error)
+	// // PutObject put an object into a Bucket
+	// PutObject(bucketName string, obj model.Object) error
+	// // UpdateObjectMetadata update an object into  object container
+	// UpdateObjectMetadata(bucketName string, obj model.Object) error
+	// // GetObject get object content from a Bucket
+	// GetObject(bucketName string, objectName string, ranges []model.Range) (*model.Object, error)
+	// // GetObjectMetadata get object metadata from a Bucket
+	// GetObjectMetadata(bucketName string, objectName string) (*model.Object, error)
+	// // ListObjects list objects of a container
+	// ListObjects(buckeName string, filter model.ObjectFilter) ([]string, error)
+	// // CopyObject copies an object
+	// CopyObject(bucketNameSrc, objectSrc, objectDst string) error
+	// // DeleteObject delete an object from a container
+	// DeleteObject(bucketName, objectName string) error
 
 	// GetAuthOpts returns authentification options as a Config
 	GetAuthOpts() (model.Config, error)
