@@ -53,7 +53,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 [[override]]
   name = "github.com/gophercloud/gophercloud"
   branch = "master"
-  source = "github.com/oscarpicas/gophercloud.git"
+#  source = "github.com/oscarpicas/gophercloud.git"
 
 [[constraint]]
   name = "github.com/gorilla/websocket"
