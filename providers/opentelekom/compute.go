@@ -36,9 +36,9 @@ func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error
 	return client.feclt.GetHostState(hostParam)
 }
 
-// ListHosts lists available hosts
-func (client *Client) ListHosts(all bool) ([]*model.Host, error) {
-	return client.feclt.ListHosts(all)
+// ListHosts lists all hosts
+func (client *Client) ListHosts() ([]*model.Host, error) {
+	return client.feclt.ListHosts()
 }
 
 // DeleteHost deletes the host identified by id

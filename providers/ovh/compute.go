@@ -114,14 +114,14 @@ func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error
 	return client.osclt.GetHostState(hostParam)
 }
 
-// ListHosts lists available hosts
-func (client *Client) ListHosts(all bool) ([]*model.Host, error) {
-	return client.osclt.ListHosts(all)
+// ListHosts lists all hosts
+func (client *Client) ListHosts() ([]*model.Host, error) {
+	return client.osclt.ListHosts()
 }
 
 // DeleteHost deletes the host identified by id
-func (client *Client) DeleteHost(ref string) error {
-	return client.osclt.DeleteHost(ref)
+func (client *Client) DeleteHost(id string) error {
+	return client.osclt.DeleteHost(id)
 }
 
 // StopHost stops the host identified by id

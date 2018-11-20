@@ -30,9 +30,9 @@ func (client *Client) GetNetwork(id string) (*model.Network, error) {
 	return client.feclt.GetNetwork(id)
 }
 
-// ListNetworks lists available networks
-func (client *Client) ListNetworks(all bool) ([]*model.Network, error) {
-	return client.feclt.ListNetworks(all)
+// ListNetworks lists networks
+func (client *Client) ListNetworks() ([]*model.Network, error) {
+	return client.feclt.ListNetworks()
 }
 
 // DeleteNetwork consists to delete subnet in FlexibleEngine VPC
@@ -47,12 +47,12 @@ func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
 	return client.feclt.CreateGateway(req)
 }
 
-// GetGateway returns the name of the gateway of a network
-func (client *Client) GetGateway(networkID string) (*model.Host, error) {
-	return client.feclt.GetGateway(networkID)
-}
+// // GetGateway returns the name of the gateway of a network
+// func (client *Client) GetGateway(networkID string) (*model.Host, error) {
+// 	return client.feclt.GetGateway(networkID)
+// }
 
-// DeleteGateway deletes the gateway associated with network identified by ID
-func (client *Client) DeleteGateway(networkID string) error {
-	return client.feclt.DeleteGateway(networkID)
-}
+// // DeleteGateway deletes the gateway associated with network identified by ID
+// func (client *Client) DeleteGateway(networkID string) error {
+// 	return client.feclt.DeleteGateway(networkID)
+// }

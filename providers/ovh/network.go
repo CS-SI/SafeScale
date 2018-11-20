@@ -35,9 +35,9 @@ func (client *Client) GetNetwork(ref string) (*model.Network, error) {
 	return client.osclt.GetNetwork(ref)
 }
 
-// ListNetworks lists available networks
-func (client *Client) ListNetworks(all bool) ([]*model.Network, error) {
-	return client.osclt.ListNetworks(all)
+// ListNetworks lists networks
+func (client *Client) ListNetworks() ([]*model.Network, error) {
+	return client.osclt.ListNetworks()
 }
 
 // DeleteNetwork deletes the network identified by id
@@ -50,7 +50,7 @@ func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
 	return client.osclt.CreateGateway(req)
 }
 
-// DeleteGateway delete the public gateway of a private network
-func (client *Client) DeleteGateway(networkID string) error {
-	return client.osclt.DeleteGateway(networkID)
-}
+// // DeleteGateway delete the public gateway of a private network
+// func (client *Client) DeleteGateway(networkID string) error {
+// 	return client.osclt.DeleteGateway(networkID)
+// }
