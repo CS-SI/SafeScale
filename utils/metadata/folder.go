@@ -21,96 +21,56 @@ import (
 	"fmt"
 	"strings"
 
-<<<<<<< develop:utils/metadata/folder.go
 	log "github.com/sirupsen/logrus"
-||||||| ancestor
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-=======
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/object"
->>>>>>> Update object storage management:metadata/metadata.go
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/objectstorage"
 )
 
-<<<<<<< develop:utils/metadata/folder.go
-// Folder describes a metadata folder
-||||||| ancestor
-var containerName string
+var bucketName string
 
-// InitializeContainer creates the Object Storage Container/Bucket that will store the metadata
-func InitializeContainer(client api.ClientAPI) error {
-	svc := providers.FromClient(client)
-	err := svc.CreateContainer(containerName)
+// InitializeBucket creates the Object Storage Bucket that will store the metadata
+func InitializeBucket(location objectstorage.Location) error {
+	_, err := location.CreateBucket(bucketName)
 	if err != nil {
-		fmt.Printf("failed to create Object Container %s: %s\n", containerName, err.Error())
+		return fmt.Errorf("failed to create Object Storage Bucket '%s': %s", bucketName, err.Error())
 	}
-	return err
-}
-
-// Folder describes a metadata folder
-=======
-var containerName string
-
-/*
-// InitializeContainer creates the Object Storage Container/Bucket that will store the metadata
-func InitializeContainer(client *object.Location) error {
-	svc := providers.FromClientObject(client)
-	err := svc.CreateContainer(containerName)
-	if err != nil {
-		fmt.Printf("failed to create Object Container %s: %s\n", containerName, err.Error())
-	}
-	return err
-}
-*/
-
-//InitContainer InitContainer creates the Object Storage Container/Bucket that will store the metadata
-func InitContainer(Location object.Location) error {
-	err := Location.Create(containerName)
-	if err != nil {
-		fmt.Printf("failed to create Object Container %s: %s\n", containerName, err.Error())
-	}
-	return err
+	return nil
 }
 
 //Folder describes a metadata folder
->>>>>>> Update object storage management:metadata/metadata.go
 type Folder struct {
 	//path contains the base path where to read/write record in Object Storage
-	path       string
-	svc        api.ClientAPI
-	bucketName string
-	crypt      bool
-	cryptKey   []byte
+	path     string
+	service  *providers.Service
+	crypt    bool
+	cryptKey []byte
 }
 
 // FolderDecoderCallback is the prototype of the function that will decode data read from Metadata
 type FolderDecoderCallback func([]byte) error
 
 // NewFolder creates a new Metadata Folder object, ready to help access the metadata inside it
-func NewFolder(svc api.ClientAPI, path string) *Folder {
+func NewFolder(svc *providers.Service, path string) *Folder {
 	if svc == nil {
 		panic("svc is nil!")
 	}
-	cfg, err := svc.GetCfgOpts()
+	cfg, err := svc.Client.GetCfgOpts()
 	if err != nil {
 		panic(fmt.Sprintf("config options are not available! %s", err.Error()))
 	}
-	name, found := cfg.Get("MetadataBucket")
-	if !found {
-		panic("config option 'MetadataBucket' is not set!")
-	}
+	// name, found := cfg.Get("MetadataBucket")
+	// if !found {
+	// 	panic("config option 'MetadataBucket' is not set!")
+	// }
 	cryptKey, crypt := cfg.Get("MetadataKey")
 	f := &Folder{
-		path:       strings.Trim(path, "/"),
-		svc:        svc,
-		bucketName: name.(string),
-		crypt:      crypt,
+		path:    strings.Trim(path, "/"),
+		service: svc,
+		// bucketName: name.(string),
+		crypt: crypt,
 	}
 	if crypt {
 		f.cryptKey = []byte(cryptKey.(string))
@@ -119,8 +79,18 @@ func NewFolder(svc api.ClientAPI, path string) *Folder {
 }
 
 // GetService returns the service used by the folder
-func (f *Folder) GetService() api.ClientAPI {
-	return f.svc
+func (f *Folder) GetService() *providers.Service {
+	return f.service
+}
+
+// GetClient returns the api.ClientAPI used by the folder
+func (f *Folder) GetClient() api.ClientAPI {
+	return f.service.Client
+}
+
+// GetBucket returns the bucket used by the folder to store Object Storage
+func (f *Folder) GetBucket() objectstorage.Bucket {
+	return f.service.MetadataBucket
 }
 
 // GetPath returns the base path of the folder
@@ -145,8 +115,8 @@ func (f *Folder) absolutePath(path ...string) string {
 // Search tells if the object named 'name' is inside the ObjectStorage folder
 func (f *Folder) Search(path string, name string) (bool, error) {
 	absPath := strings.Trim(f.absolutePath(path), "/")
-	list, err := f.svc.ListObjects(f.bucketName, model.ObjectFilter{
-		Path: absPath,
+	list, err := f.service.MetadataBucket.List(model.ObjectFilter{
+		Prefix: absPath,
 	})
 	if err != nil {
 		return false, err
@@ -169,14 +139,14 @@ func (f *Folder) Delete(path string, name string) error {
 	log.Debugf("utils.metadata.Folder.Delete(%s:%s) called", path, name)
 	defer log.Debugf("utils.metadata.Folder.Delete(%s:%s) called", path, name)
 
-	err := f.svc.DeleteObject(f.bucketName, f.absolutePath(path, name))
+	err := f.service.MetadataBucket.DeleteObject(f.absolutePath(path, name))
 	if err != nil {
 		return fmt.Errorf("failed to remove metadata in Object Storage: %s", err.Error())
 	}
 	return nil
 }
 
-// Read loads the content of the object stored in metadata container
+// Read loads the content of the object stored in metadata bucket
 // returns false, nil if the object is not found
 // returns false, err if an error occured
 // returns true, nil if the object has been found
@@ -187,13 +157,8 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 		return false, err
 	}
 	if found {
-		o, err := f.svc.GetObject(f.bucketName, f.absolutePath(path, name), nil)
-		if err != nil {
-			log.Errorf("Error reading metadata: getting object: %+v", err)
-			return false, err
-		}
 		var buffer bytes.Buffer
-		_, err = buffer.ReadFrom(o.Content)
+		_, err := f.service.MetadataBucket.ReadObject(f.absolutePath(path, name), &buffer, nil)
 		if err != nil {
 			return false, err
 		}
@@ -225,37 +190,24 @@ func (f *Folder) Write(path string, name string, content []byte) error {
 		data = content
 	}
 
-	return f.svc.PutObject(f.bucketName, model.Object{
-		Name:    f.absolutePath(path, name),
-		Content: bytes.NewReader(data),
-	})
+	source := bytes.NewBuffer(data)
+	_, err = f.service.MetadataBucket.WriteObject(f.absolutePath(path, name), source, int64(source.Len()), nil)
+	return err
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
 func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
-	list, err := f.svc.ListObjects(f.bucketName, model.ObjectFilter{
-		Path: strings.Trim(f.absolutePath(path), "/"),
+	list, err := f.service.MetadataBucket.List(model.ObjectFilter{
+		Prefix: strings.Trim(f.absolutePath(path), "/"),
 	})
 	if err != nil {
-		//TODO: AWS adherance, to be changed !!!
-		// If bucket not found, return nil; no item will be processed, meaning empty path
-		if awsError, ok := err.(awserr.RequestFailure); ok {
-			if awsError.StatusCode() == 404 {
-				return nil
-			}
-		}
 		log.Errorf("Error browsing metadata: listing objects: %+v", err)
 		return err
 	}
 
 	for _, i := range list {
-		o, err := f.svc.GetObject(f.bucketName, i, nil)
-		if err != nil {
-			log.Errorf("Error browsing metadata: getting object: %+v", err)
-			return err
-		}
 		var buffer bytes.Buffer
-		_, err = buffer.ReadFrom(o.Content)
+		_, err = f.service.MetadataBucket.ReadObject(i, &buffer, nil)
 		if err != nil {
 			log.Errorf("Error browsing metadata: reading from buffer: %+v", err)
 			return err
