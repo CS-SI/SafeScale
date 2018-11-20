@@ -44,17 +44,18 @@ type AuthOptions struct {
 // }
 
 //AuthenticatedClient returns an authenticated client
-func AuthenticatedClient(opts AuthOptions) (*Client, error) {
+func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, error) {
 	IdentityEndpoint := fmt.Sprintf("https://identity.%s.cloudwatt.com/v2.0", opts.Region)
-	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
-		IdentityEndpoint: IdentityEndpoint,
-		//UserID:           opts.OpenstackID,
-		Username:       opts.Username,
-		Password:       opts.Password,
-		TenantName:     opts.TenantName,
-		Region:         opts.Region,
-		FloatingIPPool: "public",
-	},
+	os, err := openstack.AuthenticatedClient(
+		openstack.AuthOptions{
+			IdentityEndpoint: IdentityEndpoint,
+			//UserID:           opts.OpenstackID,
+			Username:       opts.Username,
+			Password:       opts.Password,
+			TenantName:     opts.TenantName,
+			Region:         opts.Region,
+			FloatingIPPool: "public",
+		},
 		openstack.CfgOptions{
 			ProviderNetwork:           "public",
 			UseFloatingIP:             true,
@@ -64,7 +65,8 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"standard":   VolumeSpeed.COLD,
 				"performant": VolumeSpeed.HDD,
 			},
-			DNSList: []string{"185.23.94.244", "185.23.94.245"},
+			DNSList:      []string{"185.23.94.244", "185.23.94.245"},
+			DefaultImage: cfg.DefaultImage,
 		},
 	)
 
@@ -88,16 +90,29 @@ type Client struct {
 
 //Build build a new Client from configuration parameter
 func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	Username, _ := params["Username"].(string)
-	Password, _ := params["Password"].(string)
-	TenantName, _ := params["TenantName"].(string)
-	Region, _ := params["Region"].(string)
-	return AuthenticatedClient(AuthOptions{
-		Username:   Username,
-		Password:   Password,
-		TenantName: TenantName,
-		Region:     Region,
-	})
+	tenantName, _ := params["name"].(string)
+
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
+	// network, _ := params["network"].(map[string]interface{})
+
+	username, _ := identity["Username"].(string)
+	password, _ := identity["Password"].(string)
+
+	region, _ := compute["Region"].(string)
+	defaultImage, _ := compute["DefaultImage"].(string)
+
+	return AuthenticatedClient(
+		AuthOptions{
+			Username:   username,
+			Password:   password,
+			TenantName: tenantName,
+			Region:     region,
+		},
+		openstack.CfgOptions{
+			DefaultImage: defaultImage,
+		},
+	)
 }
 
 // GetCfgOpts return configuration parameters
@@ -105,7 +120,7 @@ func (c *Client) GetCfgOpts() (model.Config, error) {
 	cfg := model.ConfigMap{}
 
 	cfg.Set("DNSList", c.Cfg.DNSList)
-	cfg.Set("S3Protocol", c.Cfg.S3Protocol)
+	// cfg.Set("S3Protocol", c.Cfg.S3Protocol)
 	cfg.Set("AutoHostNetworkInterfaces", c.Cfg.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", c.Cfg.UseLayer3Networking)
 

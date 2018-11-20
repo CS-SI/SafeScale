@@ -19,7 +19,6 @@ package ovh
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
@@ -80,9 +79,8 @@ type AuthOptions struct {
 // }
 
 // AuthenticatedClient returns an authenticated client
-func AuthenticatedClient(opts AuthOptions) (*Client, error) {
+func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, error) {
 	client := &Client{}
-<<<<<<< develop
 	osclt, err := openstack.AuthenticatedClient(
 		openstack.AuthOptions{
 			IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
@@ -94,37 +92,6 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 			Region:      opts.Region,
 			AllowReauth: true,
 		},
-||||||| ancestor
-	//	c, err := ovh.NewClient(opts.Endpoint, opts.ApplicationName, opts.ApplicationKey, opts.ConsumerKey)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//client.ovh = c
-	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
-		IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
-		//UserID:           opts.OpenstackID,
-		Username:   opts.OpenstackID,
-		Password:   opts.OpenstackPassword,
-		TenantID:   opts.ApplicationKey,
-		TenantName: opts.ProjectName,
-		Region:     opts.Region,
-	},
-=======
-	//	c, err := ovh.NewClient(opts.Endpoint, opts.ApplicationName, opts.ApplicationKey, opts.ConsumerKey)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//client.ovh = c
-	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
-		IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
-		//UserID:           opts.OpenstackID,
-		Username:   opts.OpenstackID,
-		Password:   opts.OpenstackPassword,
-		TenantID:   opts.ApplicationKey,
-		TenantName: opts.ProjectName,
-		Region:     opts.Region,
-	},
->>>>>>> Update object storage management
 		openstack.CfgOptions{
 			ProviderNetwork:           ProviderNetwork,
 			UseFloatingIP:             false,
@@ -135,7 +102,8 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"classic":    VolumeSpeed.COLD,
 				"high-speed": VolumeSpeed.HDD,
 			},
-			MetadataBucketName: metadata.BuildMetadataBucketName(opts.ApplicationKey + opts.Context),
+			// MetadataBucketName: metadata.BuildMetadataBucketName(opts.ApplicationKey),
+			DefaultImage: cfg.DefaultImage,
 		},
 	)
 
@@ -158,27 +126,33 @@ type Client struct {
 
 // Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	ApplicationKey, _ := params["ApplicationKey"].(string)
-	OpenstackID, _ := params["OpenstackID"].(string)
-	OpenstackPassword, _ := params["OpenstackPassword"].(string)
-	Region, _ := params["Region"].(string)
-	ProjectName, _ := params["ProjectName"].(string)
-<<<<<<< develop
-<<<<<<< develop
+	// tenantName, _ := params["name"].(string)
 
-	Context, ok := params["Context"].(string)
-	if !ok {
-		Context = ""
-	}
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
+	// network, _ := params["network"].(map[string]interface{})
 
-	return AuthenticatedClient(AuthOptions{
-		ApplicationKey:    ApplicationKey,
-		OpenstackID:       OpenstackID,
-		OpenstackPassword: OpenstackPassword,
-		Region:            Region,
-		ProjectName:       ProjectName,
+	applicationKey, _ := identity["ApplicationKey"].(string)
+	openstackID, _ := identity["OpenstackID"].(string)
+	openstackPassword, _ := identity["OpenstackPassword"].(string)
+
+	region, _ := compute["Region"].(string)
+	projectName, _ := compute["ProjectName"].(string)
+	defaultImage, _ := compute["DefaultImage"].(string)
+
+	return AuthenticatedClient(
+		AuthOptions{
+			ApplicationKey:    applicationKey,
+			OpenstackID:       openstackID,
+			OpenstackPassword: openstackPassword,
+			Region:            region,
+			ProjectName:       projectName,
+		},
+		openstack.CfgOptions{
+			DefaultImage: defaultImage,
+		},
+	)
 		Context:		   Context,
-	})
 }
 
 // GetCfgOpts return configuration parameters

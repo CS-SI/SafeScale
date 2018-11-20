@@ -27,9 +27,7 @@ import (
 	ops "github.com/gophercloud/gophercloud/openstack"
 )
 
-/*AuthOptions fields are the union of those recognized by each identity implementation and
-provider.
-*/
+// AuthOptions fields are the union of those recognized by each identity implementation and provider.
 type AuthOptions struct {
 	Username    string
 	Password    string
@@ -44,19 +42,21 @@ type AuthOptions struct {
 // 	tokens := strings.Split(openrc, "export")
 // }
 
-//AuthenticatedClient returns an authenticated client
-func AuthenticatedClient(opts AuthOptions) (*Client, error) {
-	IdentityEndpoint := "https://cf2.cloudferro.com:5000/v3"
-	os, err := openstack.AuthenticatedClient(openstack.AuthOptions{
-		IdentityEndpoint: IdentityEndpoint,
-		Username:         opts.Username,
-		Password:         opts.Password,
-		DomainName:       opts.DomainName,
-		TenantName:       opts.ProjectName,
-		Region:           opts.Region,
-		FloatingIPPool:   "external",
-		AllowReauth:      true,
-	},
+// AuthenticatedClient returns an authenticated client
+func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, error) {
+	const identityEndpoint = "https://cf2.cloudferro.com:5000/v3"
+
+	os, err := openstack.AuthenticatedClient(
+		openstack.AuthOptions{
+			IdentityEndpoint: identityEndpoint,
+			Username:         opts.Username,
+			Password:         opts.Password,
+			DomainName:       opts.DomainName,
+			TenantName:       opts.ProjectName,
+			Region:           opts.Region,
+			FloatingIPPool:   "external",
+			AllowReauth:      true,
+		},
 		openstack.CfgOptions{
 			ProviderNetwork:           "external",
 			UseFloatingIP:             true,
@@ -68,6 +68,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 			},
 			MetadataBucketName: metadata.BuildMetadataBucketName(opts.ProjectID),
 			DNSList:            []string{"1.1.1.1", "8.8.8.8"},
+			DefaultImage:       cfg.DefaultImage,
 		},
 	)
 
@@ -98,35 +99,43 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 	return client, nil
 }
 
-//Client is the implementation of the ovh driver regarding to the api.ClientAPI
-//This client used ovh api and opensatck ovh api to maximize code reuse
+// Client is the implementation of the ovh driver regarding to the api.ClientAPI
+// This client used ovh api and opensatck ovh api to maximize code reuse
 type Client struct {
 	*openstack.Client
 	opts AuthOptions
 }
 
-//Build build a new Client from configuration parameter
+// Build build a new Client from configuration parameter
 func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	Username, _ := params["Username"].(string)
-	Password, _ := params["Password"].(string)
-	Region, _ := params["Region"].(string)
-	DomainName, _ := params["UserDomainName"].(string)
-	ProjectName, _ := params["ProjectName"].(string)
+	// tenantName, _ := params["name"].(string)
 
-	ProjectID, _ := params["ProjectID"].(string)
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
+	// network, _ := params["network"].(map[string]interface{})
 
-	// TODO Remove patch later
-	// metadataFix, _ := params["ProjectID"].(string)
-	// ProjectID := metadataFix + ".v2"
+	username, _ := identity["Username"].(string)
+	password, _ := identity["Password"].(string)
+	domainName, _ := identity["UserDomainName"].(string)
 
-	return AuthenticatedClient(AuthOptions{
-		Username:    Username,
-		Password:    Password,
-		Region:      Region,
-		DomainName:  DomainName,
-		ProjectName: ProjectName,
-		ProjectID:   ProjectID,
-	})
+	region, _ := compute["Region"].(string)
+	projectName, _ := compute["ProjectName"].(string)
+	projectID, _ := compute["ProjectID"].(string)
+	defaultImage, _ := compute["DefaultImage"].(string)
+
+	return AuthenticatedClient(
+		AuthOptions{
+			Username:    username,
+			Password:    password,
+			Region:      region,
+			DomainName:  domainName,
+			ProjectName: projectName,
+			ProjectID:   projectID,
+		},
+		openstack.CfgOptions{
+			DefaultImage: defaultImage,
+		},
+	)
 }
 
 // GetCfgOpts return configuration parameters
@@ -134,7 +143,7 @@ func (c *Client) GetCfgOpts() (model.Config, error) {
 	cfg := model.ConfigMap{}
 
 	cfg.Set("DNSList", c.Cfg.DNSList)
-	cfg.Set("S3Protocol", c.Cfg.S3Protocol)
+	// cfg.Set("ObjectStorageType", c.Cfg.ObjectStorageType)
 	cfg.Set("AutoHostNetworkInterfaces", c.Cfg.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", c.Cfg.UseLayer3Networking)
 	cfg.Set("MetadataBucket", c.Cfg.MetadataBucketName)
