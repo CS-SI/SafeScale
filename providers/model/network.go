@@ -23,6 +23,7 @@ import (
 // GWRequest to create a Gateway into a network
 type GWRequest struct {
 	NetworkID string `json:"network_id,omitempty"`
+	CIDR      string `json:"cidr,omitempty"`
 	// TemplateID the UUID of the template used to size the host (see SelectTemplates)
 	TemplateID string `json:"template_id,omitempty"`
 	// ImageID is the UUID of the image that contains the server's OS and initial state.

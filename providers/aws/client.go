@@ -41,7 +41,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/aws/s3"
 	"github.com/CS-SI/SafeScale/providers/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
@@ -127,7 +126,7 @@ func AuthenticatedClient(opts AuthOpts) (*Client, error) {
 		AuthOpts:    opts,
 		UserDataTpl: tpl,
 	}
-	providers.InitializeBucket(&c)
+	//providers.InitializeBucket(&c)
 	//c.CreateContainer("gpac.aws.networks")
 	//c.CreateContainer("gpac.aws.wms")
 	//c.CreateContainer("gpac.aws.volumes")
@@ -147,14 +146,28 @@ func wrapError(msg string, err error) error {
 
 // Build build a new Client from configuration parameter
 func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	AccessKeyID, _ := params["AccessKeyID"].(string)
-	SecretAccessKey, _ := params["SecretAccessKey"].(string)
-	Region, _ := params["Region"].(string)
-	return AuthenticatedClient(AuthOpts{
-		AccessKeyID:     AccessKeyID,
-		SecretAccessKey: SecretAccessKey,
-		Region:          Region,
-	})
+	tenantName, _ := params["name"].(string)
+
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
+	network, _ := params["network"].(map[string]interface{})
+
+	accessKeyID, _ := identity["AccessKeyID"].(string)
+	secretAccessKey, _ := identity["SecretAccessKey"].(string)
+	identityEndpoint, _ := identity["EndPoint"].(string)
+
+	region, _ := compute["Region"].(string)
+	defaultImage, _ := compute["DefaultImage"]
+
+	return AuthenticatedClient(
+		AuthOpts{
+			AccessKeyID:     accessKeyID,
+			SecretAccessKey: secretAccessKey,
+			Region:          region,
+		}, CfgOpts{
+			DefaultImage: defaultImage,
+		},
+	)
 
 }
 
@@ -424,10 +437,10 @@ func (c *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 			}
 
 			tpl := model.HostTemplate{
-				HostTemplate: propsv1.HostTemplate{
+				HostTemplate: &propsv1.HostTemplate{
 					ID:   price.Product.Attributes.InstanceType,
 					Name: price.Product.Attributes.InstanceType,
-					HostSize: propsv1.HostSize{
+					HostSize: &propsv1.HostSize{
 						Cores:    cores,
 						DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
 						RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
@@ -535,10 +548,10 @@ func (c *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 					}
 
 					tpl := model.HostTemplate{
-						HostTemplate: propsv1.HostTemplate{
+						HostTemplate: &propsv1.HostTemplate{
 							ID:   price.Product.Attributes.InstanceType,
 							Name: price.Product.Attributes.InstanceType,
-							HostSize: propsv1.HostSize{
+							HostSize: &propsv1.HostSize{
 								Cores:    cores,
 								DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
 								RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
@@ -664,13 +677,14 @@ func (c *Client) removeNetwork(netID string) error {
 
 // CreateNetwork creates a network
 func (c *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
-	m, err := metadata.LoadNetwork(c, req.Name)
-	if err != nil {
-		return nil, err
-	}
-	if m != nil {
-		return nil, fmt.Errorf("A network already exists with name '%s'", req.Name)
-	}
+	// m, err := metadata.LoadNetwork(c, req.Name)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if m != nil {
+	// 	return nil, fmt.Errorf("A network already exists with name '%s'", req.Name)
+	// }
+
 	vpcOut, err := c.EC2.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: aws.String(req.CIDR),
 	})
