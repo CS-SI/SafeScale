@@ -41,7 +41,7 @@ import (
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
-	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool) (*model.Host, error)
+	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool, gpuNumber int, freq float32, force bool) (*model.Host, error)
 	List(all bool) ([]*model.Host, error)
 	Get(ref string) (*model.Host, error)
 	Delete(ref string) error
@@ -83,7 +83,7 @@ func (svc *HostService) Reboot(ref string) error {
 
 // Create creates a host
 func (svc *HostService) Create(
-	name string, net string, cpu int, ram float32, disk int, los string, public bool,
+	name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32, force bool,
 ) (*model.Host, error) {
 
 	log.Infof("Creating compute resource '%s' ...", name)
@@ -102,14 +102,13 @@ func (svc *HostService) Create(
 		networks = append(networks, n.ID)
 	}
 
-	// TODO GITHUB https://github.com/CS-SI/SafeScale/issues/30
-	// TODO Add GPU and Freq requirements here
-
-	tpls, err := svc.provider.SelectTemplatesBySize(model.SizingRequirements{
+	templates, err := svc.provider.SelectTemplatesBySize(model.SizingRequirements{
 		MinCores:    cpu,
 		MinRAMSize:  ram,
 		MinDiskSize: disk,
-	})
+		MinGPU:      gpuNumber,
+		MinFreq:	 freq,
+	}, force)
 	img, err := svc.provider.SearchImage(los)
 	if err != nil {
 		tbr := errors.Wrap(err, "Failed to find image to use on compute resource.")
@@ -119,7 +118,7 @@ func (svc *HostService) Create(
 	hostRequest := model.HostRequest{
 		ImageID:      img.ID,
 		ResourceName: name,
-		TemplateID:   tpls[0].ID,
+		TemplateID:   templates[0].ID,
 		// IsGateway:  false,
 		PublicIP:   public,
 		NetworkIDs: networks,

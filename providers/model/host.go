@@ -35,6 +35,30 @@ type SizingRequirements struct {
 	MinCores    int     `json:"min_cores,omitempty"`
 	MinRAMSize  float32 `json:"min_ram_size,omitempty"`
 	MinDiskSize int     `json:"min_disk_size,omitempty"`
+	MinGPU 		int     `json:"min_gpu,omitempty"`
+	MinFreq 	float32 `json:"min_freq,omitempty"`
+}
+
+type StoredCPUInfo struct {
+	Id      string `bow:"key"`
+	TenantName   string `json:"tenant_name,omitempty"`
+	TemplateID   string `json:"template_id,omitempty"`
+	TemplateName string `json:"template_name,omitempty"`
+	ImageID      string `json:"image_id,omitempty"`
+	ImageName    string `json:"image_name,omitempty"`
+	LastUpdated  string `json:"last_updated,omitempty"`
+
+	NumberOfCPU    int     `json:"number_of_cpu,omitempty"`
+	NumberOfCore   int     `json:"number_of_core,omitempty"`
+	NumberOfSocket int     `json:"number_of_socket,omitempty"`
+	CPUFrequency   float64 `json:"cpu_frequency,omitempty"`
+	CPUArch        string  `json:"cpu_arch,omitempty"`
+	Hypervisor     string  `json:"hypervisor,omitempty"`
+	CPUModel       string  `json:"cpu_model,omitempty"`
+	RAMSize        float64 `json:"ram_size,omitempty"`
+	RAMFreq        float64 `json:"ram_freq,omitempty"`
+	GPU            int     `json:"gpu,omitempty"`
+	GPUModel       string  `json:"gpu_model,omitempty"`
 }
 
 // Image representes an OS image
