@@ -126,7 +126,6 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	if err != nil {
 		info.RAMFreq = 0
 	}
-	fmt.Println(tokens[9])
 	gpuTokens := strings.Split(tokens[9], "%")
 	nb := len(gpuTokens)
 	if nb > 1 {
@@ -148,6 +147,8 @@ func RunScanner() {
 		}
 	}
 
+	// TODO Enable when several brokerd instances can run in parallel
+	/*
 	var wtg sync.WaitGroup
 
 	wtg.Add(len(targetedProviders))
@@ -158,12 +159,20 @@ func RunScanner() {
 	}
 
 	wtg.Wait()
+	*/
+
+	for _, tenantName := range targetedProviders {
+		fmt.Printf("Working with tenant %s\n", tenantName)
+		analyzeTenant(nil, tenantName)
+	}
 
 	collect()
 }
 
 func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
-	defer group.Done()
+	if group != nil {
+		defer group.Done()
+	}
 
 	service, err := providers.GetService(theTenant)
 	if err != nil {
