@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 	"testing"
+	"time"
 )
 
 func Test_Nas_Error(t *testing.T) {
@@ -71,15 +72,23 @@ func Test_Nas_Error(t *testing.T) {
 	out, err = getOutput("broker volume  attach volumetest ferrohost")
 	require.Nil(t, err)
 
+	time.Sleep(5 * time.Second)
+
 	out, err = getOutput("broker volume delete volumetest")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(err.Error(), "still attached"))
 
+	time.Sleep(5 * time.Second)
+
 	out, err = getOutput("broker volume  detach volumetest ferrohost")
 	require.Nil(t, err)
 
+	time.Sleep(5 * time.Second)
+
 	out, err = getOutput("broker volume delete volumetest")
 	require.Nil(t, err)
+
+	time.Sleep(5 * time.Second)
 
 	out, err = getOutput("broker volume list")
 	require.Nil(t, err)
@@ -153,6 +162,30 @@ func Test_Until_Volume_Error(t *testing.T) {
 
 	out, err = getOutput("broker volume create volumetest")
 	require.Nil(t, err)
+
+	time.Sleep(5 * time.Second)
+
+	out, err = getOutput("broker volume  attach volumetest ferrohost")
+	require.Nil(t, err)
+
+	time.Sleep(5 * time.Second)
+
+	out, err = getOutput("broker volume delete volumetest")
+	if err != nil {
+		captured := err.Error()
+		log.Println(captured)
+	}
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(err.Error(), "still attached"))
+}
+
+func Test_Minimal(t *testing.T) {
+	out, err := getOutput("broker volume delete volumetest")
+	if err != nil {
+		captured := err.Error()
+		log.Println(out)
+		log.Println(captured)
+	}
 }
 
 func Test_Ready_To_Ssh(t *testing.T) {
@@ -214,8 +247,14 @@ func ferroTearDown() {
 
 	log.Printf("Starting cleanup...")
 	_, _ = getOutput("broker nas delete ferronas")
+	time.Sleep(5 * time.Second)
+	_, _ = getOutput("broker volume detach volumetest ferrohost")
+	time.Sleep(5 * time.Second)
 	_, _ = getOutput("broker volume delete volumetest")
+	time.Sleep(5 * time.Second)
 	_, _ = getOutput("broker host delete ferrohost")
+	time.Sleep(5 * time.Second)
 	_, _ = getOutput("broker network delete ferronet")
+	time.Sleep(5 * time.Second)
 	log.Printf("Finishing cleanup...")
 }
