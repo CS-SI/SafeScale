@@ -61,7 +61,7 @@ func Test_Nas_Error(t *testing.T) {
 
 	fmt.Println("Creating Volume volumetest...")
 
-	out, err = getOutput("broker volume create volumetest")
+	out, err = getOutput("broker volume create --speed SSD volumetest")
 	require.Nil(t, err)
 
 	out, err = getOutput("broker volume list")
@@ -80,6 +80,22 @@ func Test_Nas_Error(t *testing.T) {
 
 	out, err = getOutput("broker volume delete volumetest")
 	require.Nil(t, err)
+
+	out, err = getOutput("broker volume list")
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "null"))
+
+	out, err = getOutput("broker ssh run ferrohost -c \"uptime\"")
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "0 users"))
+
+	out, err = getOutput("broker host delete ferrohost")
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "deleted"))
+
+	out, err = getOutput("broker network delete ferronet")
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "deleted"))
 }
 
 func Test_Until_Volume_Error(t *testing.T) {
