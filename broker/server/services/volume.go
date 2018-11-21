@@ -102,6 +102,7 @@ func (svc *VolumeService) Get(ref string) (*model.Volume, error) {
 		return nil, tbr
 	}
 	if mv == nil {
+		log.Warnf("Volume not found: '%s'", ref)
 		return nil, nil
 	}
 	return mv.Get(), nil
@@ -112,6 +113,10 @@ func (svc *VolumeService) Inspect(ref string) (*model.Volume, map[string]*propsv
 	volume, err := svc.Get(ref)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if volume == nil {
+		return nil, nil, errors.Errorf("Volume '%s' not found !", ref)
 	}
 
 	mounts := map[string]*propsv1.HostLocalMount{}
@@ -398,6 +403,10 @@ func (svc *VolumeService) Detach(volumeName, hostName string) error {
 	volume, err := svc.Get(volumeName)
 	if err != nil {
 		return errors.Wrap(model.ResourceNotFoundError("volume", volumeName), "Can't detach volume")
+	}
+
+	if volume == nil {
+		return errors.Errorf("Volume '%s' not found !", volumeName)
 	}
 
 	// Load host data
