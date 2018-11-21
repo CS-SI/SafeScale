@@ -167,7 +167,7 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 0,
-	})
+	}, false)
 	require.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 16.04")
 	require.Nil(t, err)
@@ -195,7 +195,7 @@ func (tester *ClientTester) CreateHost(t *testing.T, name string, networkID stri
 		MinCores:    1,
 		MinRAMSize:  4,
 		MinDiskSize: 10,
-	})
+	}, false)
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 16.04")
 	assert.Nil(t, err)
@@ -215,7 +215,7 @@ func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
 		MinCores:    1,
 		MinRAMSize:  4,
 		MinDiskSize: 10,
-	})
+	}, false)
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 16.04")
 	assert.Nil(t, err)

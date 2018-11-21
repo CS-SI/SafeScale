@@ -112,7 +112,7 @@ func (svc *NetworkService) Create(
 		MinCores:    cpu,
 		MinRAMSize:  ram,
 		MinDiskSize: disk,
-	})
+	}, false)
 	if err != nil {
 		tbr := errors.Wrap(err, "Error creating network: Error selecting template")
 		log.Errorf("%+v", tbr)

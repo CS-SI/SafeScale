@@ -408,6 +408,57 @@ configure_gateway_redhat() {
     echo done
 }
 
+install_drivers_nvidia() {
+    case $LINUX_KIND in
+        ubuntu)
+            add-apt-repository -y ppa:graphics-drivers &>/dev/null
+            apt update &>/dev/null
+            apt -y install nvidia-410 &>/dev/null || apt -y install nvidia-driver-410 &>/dev/null
+            ;;
+        debian)
+            if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
+                echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
+                rmmod nouveau
+            fi
+            apt update &>/dev/null && apt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null
+            dpkg --add-architecture i386 &>/dev/null
+            apt update &>/dev/null && apt install -y lib32z1 lib32ncurses5 &>/dev/null
+            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null
+            bash NVIDIA-Linux-x86_64-410.78.run -s
+            ;;
+        centos)
+            if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
+                echo -e "blacklist nouveau\noptions nouveau modeset=0" >>/etc/modprobe.d/blacklist-nouveau.conf
+                dracut --force
+                rmmod nouveau
+            fi
+            yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null
+            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run
+            bash NVIDIA-Linux-x86_64-410.78.run -s
+            rm NVIDIA-Linux-x86_64-410.78.run
+            ;;
+        *)
+            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            exit 1
+            ;;
+    esac
+}
+
+install_packages() {
+     case $LINUX_KIND in
+        ubuntu|debian)
+            apt install -y -qq pciutils &>/dev/null
+            ;;
+        redhat|centos)
+            yum install -y -q pciutils wget &>/dev/null
+            ;;
+        *)
+            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            exit 1
+            ;;
+     esac
+}
+
 case $LINUX_KIND in
     debian|ubuntu)
         export DEBIAN_FRONTEND=noninteractive
@@ -442,6 +493,9 @@ case $LINUX_KIND in
         exit 1
         ;;
 esac
+
+install_packages
+lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
 echo "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
 systemctl reboot
