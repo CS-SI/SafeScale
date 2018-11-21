@@ -19,13 +19,18 @@ package providers
 import (
 	"fmt"
 	"math"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"time"
+	"encoding/json"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
+	safeutils "github.com/CS-SI/SafeScale/utils"
+	"github.com/nanobox-io/golang-scribble"
+	"github.com/pkg/errors"
 
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
@@ -258,22 +263,82 @@ func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, c
 
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements) ([]model.HostTemplate, error) {
-	tpls, err := svc.ListTemplates(false)
+func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force bool) ([]model.HostTemplate, error) {
+	templates, err := svc.ListTemplates(false)
 	var selectedTpls []model.HostTemplate
+	scannerTemplates := map[string]bool{}
 	if err != nil {
 		return nil, err
 	}
 
-	log.Debugf("Looking for machine with: %d cores, %f RAM, and %d Disk", sizing.MinCores, sizing.MinRAMSize, sizing.MinDiskSize)
-
-	for _, tpl := range tpls {
-		if tpl.Cores >= sizing.MinCores && (tpl.DiskSize == 0 || tpl.DiskSize >= sizing.MinDiskSize) && tpl.RAMSize >= sizing.MinRAMSize {
-			selectedTpls = append(selectedTpls, tpl)
+	askedForSpecificScannerInfo := sizing.MinGPU > 0 || sizing.MinFreq != 0
+	if askedForSpecificScannerInfo {
+		_ = os.MkdirAll(safeutils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+		db, err := scribble.New(safeutils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
+		if err != nil {
+			if !force {
+				fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
+				log.Warnf("Problem creating / accessing Scanner database, ignoring for now...: %v", err)
+			} else {
+				noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+				log.Error(noHostError)
+				return nil, errors.New(noHostError)
+			}
 		} else {
-			log.Debugf("Discard machine template '%s' with : %d cores, %f RAM, and %d Disk", tpl.Name, tpl.Cores, tpl.RAMSize, tpl.DiskSize)
+			image_list, err := db.ReadAll("images")
+			if err != nil {
+				if !force {
+					fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
+					log.Warnf("Error reading Scanner database: %v", err)
+				} else {
+					noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem listing images from Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+					log.Error(noHostError)
+					return nil, errors.New(noHostError)
+				}
+			} else {
+				images := []model.StoredCPUInfo{}
+				for _, f := range image_list {
+					imageFound := model.StoredCPUInfo{}
+					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
+						fmt.Println("Error", err)
+					}
+
+					if imageFound.GPU < int(sizing.MinGPU) {
+						continue
+					}
+
+					if imageFound.CPUFrequency < float64(sizing.MinFreq) {
+						continue
+					}
+
+					images = append(images, imageFound)
+				}
+
+				if !force && (len(images) == 0) {
+					noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, no such host found with those specs !!", sizing.MinGPU, sizing.MinFreq)
+					log.Error(noHostError)
+					return nil, errors.New(noHostError)
+				}
+
+				for _, image := range images {
+					scannerTemplates[image.TemplateID] = true
+				}
+			}
 		}
 	}
+
+	log.Debugf("Looking for machine with: %d cores, %f RAM, and %d Disk", sizing.MinCores, sizing.MinRAMSize, sizing.MinDiskSize)
+
+	for _, template := range templates {
+		if template.Cores >= sizing.MinCores && (template.DiskSize == 0 || template.DiskSize >= sizing.MinDiskSize) && template.RAMSize >= sizing.MinRAMSize {
+			if _, ok := scannerTemplates[template.ID]; ok || !askedForSpecificScannerInfo{
+				selectedTpls = append(selectedTpls, template)
+			}
+		} else {
+			log.Debugf("Discard machine template '%s' with : %d cores, %f RAM, and %d Disk", template.Name, template.Cores, template.RAMSize, template.DiskSize)
+		}
+	}
+
 	sort.Sort(ByRankDRF(selectedTpls))
 	return selectedTpls, nil
 }
