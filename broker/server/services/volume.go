@@ -68,6 +68,8 @@ func (svc *VolumeService) List(all bool) ([]model.Volume, error) {
 	return svc.provider.ListVolumes(all)
 }
 
+// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+
 // Delete deletes volume referenced by ref
 func (svc *VolumeService) Delete(ref string) error {
 	vol, err := svc.Get(ref)
@@ -77,12 +79,14 @@ func (svc *VolumeService) Delete(ref string) error {
 		return tbr
 	}
 	if vol == nil {
-		return fmt.Errorf("volume doesn't exist")
+		return fmt.Errorf("volume '%s' doesn't exist", ref)
 	}
 
 	volumeAttachmentsV1 := propsv1.NewVolumeAttachments()
 	err = vol.Properties.Get(VolumeProperty.AttachedV1, volumeAttachmentsV1)
 	if err != nil {
+		tbr := errors.Wrap(err, "")
+		log.Errorf("%+v", tbr)
 		return err
 	}
 
@@ -90,7 +94,14 @@ func (svc *VolumeService) Delete(ref string) error {
 	if nbAttach > 0 {
 		return fmt.Errorf("still attached on %d host%s", nbAttach, utils.Plural(nbAttach))
 	}
-	return svc.provider.DeleteVolume(vol.ID)
+
+	tbr := svc.provider.DeleteVolume(vol.ID)
+	if tbr != nil {
+		tbr := errors.Wrap(err, "")
+		log.Errorf("%+v", tbr)
+		return tbr
+	}
+	return  tbr
 }
 
 // Get returns the volume identified by ref, ref can be the name or the id
@@ -102,7 +113,7 @@ func (svc *VolumeService) Get(ref string) (*model.Volume, error) {
 		return nil, tbr
 	}
 	if mv == nil {
-		log.Warnf("Volume not found: '%s'", ref)
+		log.Warnf("Volume metadata not found: '%s'", ref)
 		return nil, nil
 	}
 	return mv.Get(), nil
