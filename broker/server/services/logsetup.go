@@ -30,9 +30,17 @@ func srvLog(err error) error {
 	if err == nil {
 		return nil
 	}
-	tbr := errors.Wrap(err, "")
-	log.Errorf("%+v", tbr)
+	tbr := errors.WithStack(err)
+	log.Errorf("%+v", err)
 	return tbr
+}
+
+func srvLogNew(err error) error {
+	if err == nil {
+		return nil
+	}
+	log.Errorf("%+v", err)
+	return err
 }
 
 func srvLogMessage(err error, message string) error {

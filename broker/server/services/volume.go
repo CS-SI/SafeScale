@@ -77,7 +77,7 @@ func (svc *VolumeService) Delete(ref string) error {
 		return srvLog(err)
 	}
 	if vol == nil {
-		return srvLog(fmt.Errorf("volume '%s' doesn't exist", ref))
+		return srvLogNew(fmt.Errorf("volume '%s' doesn't exist", ref))
 	}
 
 	volumeAttachmentsV1 := propsv1.NewVolumeAttachments()
@@ -89,7 +89,7 @@ func (svc *VolumeService) Delete(ref string) error {
 
 	nbAttach := len(volumeAttachmentsV1.HostIDs)
 	if nbAttach > 0 {
-		return srvLog(fmt.Errorf("still attached on %d host%s", nbAttach, utils.Plural(nbAttach)))
+		return srvLogNew(fmt.Errorf("still attached on %d host%s", nbAttach, utils.Plural(nbAttach)))
 	}
 
 	tbr := svc.provider.DeleteVolume(vol.ID)
@@ -228,7 +228,7 @@ func (svc *VolumeService) Attach(volumeName, hostName, path, format string) erro
 	if device, found := hostVolumesV1.DevicesByID[volume.ID]; found {
 		path := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]].Path
 		if path != mountPoint {
-			return srvLog(fmt.Errorf("Can't attach volume '%s' to '%s:%s': volume already attached in '%s:%s'", volume.Name, host.Name, mountPoint, host.Name, path))
+			return srvLogNew(fmt.Errorf("Can't attach volume '%s' to '%s:%s': volume already attached in '%s:%s'", volume.Name, host.Name, mountPoint, host.Name, path))
 		}
 		return nil
 	}
@@ -236,12 +236,12 @@ func (svc *VolumeService) Attach(volumeName, hostName, path, format string) erro
 	// Check if there is no other device mounted in the path (or in subpath)
 	for _, i := range hostMountsV1.LocalMountsByPath {
 		if strings.Index(i.Path, mountPoint) == 0 {
-			return srvLog(fmt.Errorf("Can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volume.Name, host.Name, mountPoint, host.Name, i.Path))
+			return srvLogNew(fmt.Errorf("Can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volume.Name, host.Name, mountPoint, host.Name, i.Path))
 		}
 	}
 	for _, i := range hostMountsV1.RemoteMountsByPath {
 		if strings.Index(i.Path, mountPoint) == 0 {
-			return srvLog(fmt.Errorf("Can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volume.Name, host.Name, mountPoint, host.Name, i.Path))
+			return srvLogNew(fmt.Errorf("Can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volume.Name, host.Name, mountPoint, host.Name, i.Path))
 		}
 	}
 
@@ -301,7 +301,7 @@ func (svc *VolumeService) Attach(volumeName, hostName, path, format string) erro
 		2*time.Minute,
 	)
 	if retryErr != nil {
-		return srvLog(fmt.Errorf("failed to acknowledge the disk attachment after %s", 2*time.Minute))
+		return srvLogNew(fmt.Errorf("failed to acknowledge the disk attachment after %s", 2*time.Minute))
 	}
 
 	// Recovers real device name from the system
@@ -404,7 +404,7 @@ func (svc *VolumeService) listAttachedDevices(host *model.Host) (mapset.Set, err
 		2*time.Minute,
 	)
 	if retryErr != nil {
-		return nil, srvLog(fmt.Errorf("failed to get list of connected disks after %s: %s", 2*time.Minute, retryErr.Error()))
+		return nil, srvLogMessage(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", 2*time.Minute))
 	}
 	disks := strings.Split(stdout, "\n")
 	set := mapset.NewThreadUnsafeSet()
@@ -459,13 +459,13 @@ func (svc *VolumeService) Detach(volumeName, hostName string) error {
 	// Check the volume is effectively attached
 	attachment, found := hostVolumesV1.VolumesByID[volume.ID]
 	if !found {
-		return srvLog(fmt.Errorf("Can't detach volume '%s': not attached to host '%s'", volumeName, host.Name))
+		return srvLogNew(fmt.Errorf("Can't detach volume '%s': not attached to host '%s'", volumeName, host.Name))
 	}
 	device := attachment.Device
 	path := hostMountsV1.LocalMountsByDevice[device]
 	mount := hostMountsV1.LocalMountsByPath[path]
 	if mount == nil {
-		return srvLog(fmt.Errorf("no mount metadata corresponding to volume attachment metadata"))
+		return srvLogNew(fmt.Errorf("no mount metadata corresponding to volume attachment metadata"))
 	}
 	// Check if volume has other mounts inside it
 	for p, i := range hostMountsV1.LocalMountsByPath {
@@ -473,13 +473,13 @@ func (svc *VolumeService) Detach(volumeName, hostName string) error {
 			continue
 		}
 		if strings.Index(p, mount.Path) == 0 {
-			return srvLog(fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
+			return srvLogNew(fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
 				volume.Name, host.Name, mount.Path, host.Name, p))
 		}
 	}
 	for p := range hostMountsV1.RemoteMountsByPath {
 		if strings.Index(p, mount.Path) == 0 {
-			return srvLog(fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
+			return srvLogNew(fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
 				volume.Name, host.Name, mount.Path, host.Name, p))
 		}
 	}

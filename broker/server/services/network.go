@@ -193,7 +193,7 @@ func (svc *NetworkService) Create(
 	err = ssh.WaitServerReady(utils.TimeoutCtxHost)
 	// err = ssh.WaitServerReady(time.Second * 3)
 	if err != nil {
-		return nil, srvLog(fmt.Errorf("Error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name))
+		return nil, srvLogNew(fmt.Errorf("Error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name))
 	}
 	log.Infof("SSH service of gateway '%s' started.", gw.Name)
 

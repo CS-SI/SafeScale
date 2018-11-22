@@ -86,7 +86,7 @@ func (svc *ContainerService) Mount(containerName, hostName, path string) error {
 	hostService := NewHostService(svc.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return srvLog(fmt.Errorf("no host found with name or id '%s'", hostName))
+		return srvLogMessage(err, fmt.Sprintf("no host found with name or id '%s'", hostName))
 	}
 
 	// Create mount point

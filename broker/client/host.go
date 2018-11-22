@@ -18,6 +18,8 @@ package client
 
 import (
 	"fmt"
+	"google.golang.org/grpc/status"
+	"strings"
 	"sync"
 	"time"
 
@@ -140,6 +142,8 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 	timeout = timeout + (30 * time.Second * time.Duration(len(names)))
 
 	var wg sync.WaitGroup
+	problems := false
+	deleteErrors := make(chan error, len(names))
 
 	hostDeleter := func(aname string) {
 		defer wg.Done()
@@ -150,6 +154,8 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 
 		if err != nil {
 			fmt.Printf("%v\n", DecorateError(err, "deletion of host", true))
+			deleteErrors <- err
+			problems = true
 		} else {
 			fmt.Printf("Host '%s' deleted\n", aname)
 		}
@@ -161,6 +167,18 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 	}
 
 	wg.Wait()
+	close(deleteErrors)
+
+	var errorList []string
+	for err := range deleteErrors {
+		errorList = append(errorList, status.Convert(err).Message())
+	}
+
+
+	if problems {
+		formatted := fmt.Errorf("One or more errors detected deleting hosts: [%s]", strings.Join(errorList, ";"))
+		return formatted
+	}
 
 	return nil
 }
