@@ -110,6 +110,7 @@ var volumeDelete = cli.Command{
 		if err != nil {
 			return clitools.ExitOnRPC(client.DecorateError(err, "deletion of volume", false).Error())
 		}
+
 		return nil
 	},
 }

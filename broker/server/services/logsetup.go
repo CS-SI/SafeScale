@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/CS-SI/SafeScale/utils"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
@@ -23,4 +24,22 @@ func init() {
 	}
 
 	log.SetOutput(io.MultiWriter(os.Stdout, file))
+}
+
+func srvLog(err error) error {
+	if err == nil {
+		return nil
+	}
+	tbr := errors.Wrap(err, "")
+	log.Errorf("%+v", tbr)
+	return tbr
+}
+
+func srvLogMessage(err error, message string) error {
+	if err == nil {
+		return nil
+	}
+	tbr := errors.Wrap(err, message)
+	log.Errorf("%+v", tbr)
+	return tbr
 }

@@ -39,6 +39,8 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services HostAPI
 
+// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
 	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool, gpuNumber int, freq float32, force bool) (*model.Host, error)
@@ -66,19 +68,19 @@ func NewHostService(api *providers.Service) HostAPI {
 // Start starts a host
 func (svc *HostService) Start(ref string) error {
 	log.Printf("Starting host '%s'...", ref)
-	return svc.provider.StartHost(ref)
+	return srvLog(svc.provider.StartHost(ref))
 }
 
 // Stop stops a host
 func (svc *HostService) Stop(ref string) error {
 	log.Printf("Stopping host '%s'...", ref)
-	return svc.provider.StopHost(ref)
+	return srvLog(svc.provider.StopHost(ref))
 }
 
 // Reboot reboots a host
 func (svc *HostService) Reboot(ref string) error {
-	log.Println("Rebooting host '%s'...", ref)
-	return svc.provider.RebootHost(ref)
+	log.Printf("Rebooting host '%s'...", ref)
+	return srvLog(svc.provider.RebootHost(ref))
 }
 
 // Create creates a host
@@ -92,12 +94,11 @@ func (svc *HostService) Create(
 		networkSvc := NewNetworkService(svc.provider)
 		n, err := networkSvc.Get(net)
 		if err != nil {
-			tbr := errors.Wrapf(err, "Failed to get network resource data: '%s'.", net)
-			log.Errorf("%+v", tbr)
+			tbr := srvLog(errors.Wrapf(err, "Failed to get network resource data: '%s'.", net))
 			return nil, tbr
 		}
 		if n == nil {
-			return nil, fmt.Errorf("Failed to find network '%s'", net)
+			return nil, srvLog(fmt.Errorf("Failed to find network '%s'", net))
 		}
 		networks = append(networks, n.ID)
 	}
@@ -111,8 +112,7 @@ func (svc *HostService) Create(
 	}, force)
 	img, err := svc.provider.SearchImage(los)
 	if err != nil {
-		tbr := errors.Wrap(err, "Failed to find image to use on compute resource.")
-		log.Errorf("%+v", tbr)
+		tbr := srvLog(errors.Wrap(err, "Failed to find image to use on compute resource."))
 		return nil, tbr
 	}
 	hostRequest := model.HostRequest{
@@ -125,15 +125,13 @@ func (svc *HostService) Create(
 	}
 
 	if exists, err := svc.provider.GetHostByName(name); exists != nil && err == nil {
-		tbr := errors.Errorf("Failure creating host: host '%s' already exists.", name)
-		log.Errorf("%v", tbr)
+		tbr := srvLog(errors.Errorf("Failure creating host: host '%s' already exists.", name))
 		return nil, tbr
 	}
 
 	host, err := svc.provider.CreateHost(hostRequest)
 	if err != nil {
-		tbr := errors.Wrapf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
-		log.Errorf("%+v", tbr)
+		tbr := srvLog(errors.Wrapf(err, "failed to create compute resource '%s'", hostRequest.ResourceName))
 		return nil, tbr
 	}
 
@@ -141,7 +139,7 @@ func (svc *HostService) Create(
 	hostSizingV1 := propsv1.NewHostSizing()
 	err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
 	if err != nil {
-		return nil, err
+		return nil, srvLog(err)
 	}
 	hostSizingV1.Template = hostRequest.TemplateID
 	hostSizingV1.RequestedSize = &propsv1.HostSize{
@@ -151,7 +149,7 @@ func (svc *HostService) Create(
 	}
 	err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
 	if err != nil {
-		return nil, err
+		return nil, srvLog(err)
 	}
 
 	// Sets host extension DescriptionV1
@@ -183,23 +181,21 @@ func (svc *HostService) Create(
 		hostNetworkV1 := propsv1.NewHostNetwork()
 		err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 		if err != nil {
-			return nil, err
+			return nil, srvLog(err)
 		}
 		// hpNetworkV1.Networks = networks
 		hostNetworkV1.DefaultGatewayID = gatewayID
 		err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
 		if err != nil {
-			return nil, err
+			return nil, srvLog(err)
 		}
 	}
 
 	// Updates metadata
 	err = metadata.NewHost(svc.provider).Carry(host).Write()
 	if err != nil {
-		tbr := errors.Wrapf(err, "Metadata creation failed")
 		svc.provider.DeleteHost(host.ID)
-		log.Errorf("%+v", tbr)
-		return nil, tbr
+		return nil, srvLogMessage(err, "Metadata creation failed")
 	}
 	log.Infof("Compute resource created: '%s'", host.Name)
 
@@ -213,31 +209,21 @@ func (svc *HostService) Create(
 		derr := svc.provider.DeleteHost(host.ID)
 		if derr != nil {
 			log.Warnf("Error deleting host after failing to get its ssh config: %v", derr)
-			tbr := errors.Wrap(err, "Error getting ssh configuration")
-			log.Errorf("%+v", tbr)
-			return nil, tbr
+			return nil, srvLogMessage(derr, "Error getting ssh configuration")
 		}
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return nil, tbr
+		return nil, srvLog(err)
 	}
 	err = sshCfg.WaitServerReady(brokerutils.TimeoutCtxHost)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return nil, tbr
+		return nil, srvLog(err)
 	}
 	if client.IsTimeout(err) {
 		derr := svc.provider.DeleteHost(host.ID)
 		if derr != nil {
 			log.Warnf("Error deleting host after a timeout: %v", derr)
-			tbr := errors.Wrap(err, "Timeout creating a host")
-			log.Errorf("%+v", tbr)
-			return nil, tbr
+			return nil, srvLogMessage(derr, "Timeout creating a host")
 		}
-		tbr := errors.Wrap(err, "Timeout creating a host")
-		log.Errorf("%+v", tbr)
-		return nil, tbr
+		return nil, srvLogMessage(err, "Timeout creating a host")
 	}
 	log.Infof("SSH service started on host '%s'.", host.Name)
 
@@ -255,16 +241,16 @@ func (svc *HostService) Get(ref string) (*model.Host, error) {
 	mh := metadata.NewHost(svc.provider)
 	found, err := mh.ReadByID(ref)
 	if err != nil {
-		return nil, err
+		return nil, srvLog(err)
 	}
 	if !found {
 		found, err = mh.ReadByName(ref)
 		if err != nil {
-			return nil, err
+			return nil, srvLog(err)
 		}
 	}
 	if !found {
-		return nil, fmt.Errorf("host '%s' not found", ref)
+		return nil, srvLog(fmt.Errorf("host '%s' not found", ref))
 	}
 	return mh.Get(), nil
 }
@@ -273,66 +259,66 @@ func (svc *HostService) Get(ref string) (*model.Host, error) {
 func (svc *HostService) Delete(ref string) error {
 	host, err := svc.Get(ref)
 	if err != nil {
-		return err
+		return srvLog(err)
 	}
 
 	// Don't remove a host having shares
 	hostSharesV1 := propsv1.NewHostShares()
 	err = host.Properties.Get(HostProperty.SharesV1, hostSharesV1)
 	if err != nil {
-		return err
+		return srvLog(err)
 	}
 	nShares := len(hostSharesV1.ByID)
 	if nShares > 0 {
-		return fmt.Errorf("Can't delete host, exports %d share%s", nShares, utils.Plural(nShares))
+		return srvLog(fmt.Errorf("Can't delete host, exports %d share%s", nShares, utils.Plural(nShares)))
 	}
 
 	// Don't remove a host with volumes attached
 	hostVolumesV1 := propsv1.NewHostVolumes()
 	err = host.Properties.Get(HostProperty.VolumesV1, hostVolumesV1)
 	if err != nil {
-		return err
+		return srvLog(err)
 	}
 	nAttached := len(hostVolumesV1.VolumesByID)
 	if nAttached > 0 {
-		return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
+		return srvLog(fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached)))
 	}
 
 	// Don't remove a host that is a gateway
 	hostNetworkV1 := propsv1.NewHostNetwork()
 	err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
-		return err
+		return srvLog(err)
 	}
 	if hostNetworkV1.IsGateway {
-		return fmt.Errorf("can't delete host, it's a gateway that can't be deleted but with its network")
+		return srvLog(fmt.Errorf("can't delete host, it's a gateway that can't be deleted but with its network"))
 	}
 
 	// If host mounted shares, unmounts them before anything else
 	hostMountsV1 := propsv1.NewHostMounts()
 	err = host.Properties.Get(HostProperty.MountsV1, hostMountsV1)
 	if err != nil {
-		return err
+		return srvLog(err)
 	}
 	shareSvc := NewShareService(svc.provider)
 	for _, i := range hostMountsV1.RemoteMountsByPath {
 		// Gets share data
 		_, share, err := shareSvc.Inspect(i.ShareID)
 		if err != nil {
-			return err
+			return srvLog(err)
 		}
 
 		// Unmounts share from host
 		err = shareSvc.Unmount(share.Name, host.Name)
 		if err != nil {
-			return err
+			return srvLog(err)
 		}
 	}
 
 	// Conditions are met, delete host
 	err = svc.provider.DeleteHost(ref)
 	if err != nil {
-		return err
+		return srvLog(err)
 	}
 	return metadata.NewHost(svc.provider).Carry(host).Delete()
 }
@@ -341,10 +327,10 @@ func (svc *HostService) Delete(ref string) error {
 func (svc *HostService) SSH(ref string) (*system.SSHConfig, error) {
 	host, err := svc.Get(ref)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query host '%s'", ref)
+		return nil, srvLog(fmt.Errorf("failed to query host '%s'", ref))
 	}
 	if host == nil {
-		return nil, fmt.Errorf("host '%s' not found", ref)
+		return nil, srvLog(fmt.Errorf("host '%s' not found", ref))
 	}
 	sshSvc := NewSSHService(svc.provider)
 	return sshSvc.GetConfig(host.ID)

@@ -30,6 +30,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -181,7 +182,12 @@ func getFreePort() (int, error) {
 
 // CreateTempFileFromString creates a tempory file containing 'content'
 func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, error) {
-	f, err := ioutil.TempFile("/tmp", "") // TODO Windows friendly
+	defaultTmpDir := "/tmp"
+	if runtime.GOOS == "windows" {
+		defaultTmpDir = ""
+	}
+
+	f, err := ioutil.TempFile(defaultTmpDir, "") // TODO Windows friendly
 	if err != nil {
 		return nil, err
 	}
