@@ -50,8 +50,9 @@ const cmdTotalRAM string = "cat /proc/meminfo | grep MemTotal | cut -d: -f2 | se
 const cmdRAMFreq string = "sudo dmidecode -t memory | grep Speed | head -1 | cut -d' ' -f2"
 
 const cmdGPU string = "lspci | egrep -i 'VGA|3D' | grep -i nvidia | cut -d: -f3 | sed 's/.*controller://g' | tr '\n' '%'"
+const cmdDiskSize string = "lsblk -b --output SIZE -n -d /dev/sda"
 
-var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)",
+var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)",
 	cmdNumberOfCPU,
 	cmdNumberOfCorePerSocket,
 	cmdNumberOfSocket,
@@ -62,6 +63,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 	cmdTotalRAM,
 	cmdRAMFreq,
 	cmdGPU,
+	cmdDiskSize,
 )
 
 //CPUInfo stores CPU properties
@@ -84,6 +86,7 @@ type CPUInfo struct {
 	RAMFreq        float64 `json:"ram_freq,omitempty"`
 	GPU            int     `json:"gpu,omitempty"`
 	GPUModel       string  `json:"gpu_model,omitempty"`
+	DiskSize       int64   `json:"disk_size,omitempty"`
 }
 
 func createCPUInfo(output string) (*CPUInfo, error) {
@@ -133,6 +136,11 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 		info.GPU = nb - 1
 	}
 
+	info.DiskSize, err = strconv.ParseInt(tokens[10], 10, 64)
+	if err != nil {
+		info.DiskSize = 0
+	}
+
 	return &info, nil
 }
 
@@ -142,7 +150,7 @@ func RunScanner() {
 	theProviders, _ := providers.Tenants()
 
 	for tenantName := range theProviders {
-		if strings.Contains(tenantName, "-scannable") {
+		if strings.Contains(tenantName, "-scannable-gpu-test") {
 			targetedProviders = append(targetedProviders, tenantName)
 		}
 	}
@@ -237,6 +245,14 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	hostAnalysis := func(template model.HostTemplate) error {
 		defer wg.Done()
 		if net != nil {
+
+			// TODO Remove this later
+			/*
+			if template.Name != "s1-2" {
+				return nil
+			}
+			*/
+
 			log.Printf("Checking template %s\n", template.Name)
 
 			hostName := "scanhost-" + template.Name
