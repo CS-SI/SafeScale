@@ -39,6 +39,9 @@ const protocolSeparator = ":"
 
 //go:generate mockgen -destination=../mocks/mock_sshapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services SSHAPI
 
+// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+
+
 // SSHAPI defines ssh management API
 type SSHAPI interface {
 	// Connect(name string) error
@@ -67,6 +70,7 @@ func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 	case string:
 		mh, err := metadata.LoadHost(svc.provider, hostParam.(string))
 		if err != nil {
+			err = srvLog(err)
 			return nil, err
 		}
 		host = mh.Get()
@@ -85,12 +89,14 @@ func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 	hostNetworkV1 := propsv1.NewHostNetwork()
 	err := host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
+		err = srvLog(err)
 		return nil, err
 	}
 	if hostNetworkV1.DefaultGatewayID != "" {
 		hostSvc := NewHostService(svc.provider)
 		gw, err := hostSvc.Get(hostNetworkV1.DefaultGatewayID)
 		if err != nil {
+			err = srvLog(err)
 			return nil, err
 		}
 		GatewayConfig := system.SSHConfig{
@@ -110,7 +116,7 @@ func (svc *SSHService) WaitServerReady(hostParam interface{}, timeout time.Durat
 	sshSvc := NewSSHService(svc.provider)
 	ssh, err := sshSvc.GetConfig(hostParam)
 	if err != nil {
-		return fmt.Errorf("failed to read SSH config: %s", err.Error())
+		return srvLogMessage(err, "Failed to read SSH config")
 	}
 	return ssh.WaitServerReady(timeout)
 }
@@ -124,6 +130,7 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 	hostSvc := NewHostService(svc.provider)
 	host, err := hostSvc.Get(hostName)
 	if err != nil {
+		_ = srvLog(err)
 		return 0, "", "", fmt.Errorf("no host found with name or id '%s'", hostName)
 	}
 
@@ -131,6 +138,7 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 	ssh, err := svc.GetConfig(host)
 
 	if err != nil {
+		err = srvLog(err)
 		return 0, "", "", err
 	}
 
@@ -146,6 +154,9 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 			}
 		},
 	)
+	if err != nil {
+		err = srvLog(err)
+	}
 
 	return retCode, stdOut, stdErr, err
 }
@@ -155,6 +166,7 @@ func (svc *SSHService) run(ssh *system.SSHConfig, cmd string) (int, string, stri
 	// Create the command
 	sshCmd, err := ssh.Command(cmd)
 	if err != nil {
+		err = srvLog(err)
 		return 0, "", "", err
 	}
 	return sshCmd.Run()
@@ -188,6 +200,7 @@ func extractPath(in string) (string, error) {
 	}
 	_, err := extracthostName(in)
 	if err != nil {
+		err = srvLog(err)
 		return "", err
 	}
 
@@ -202,10 +215,12 @@ func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
 	// Try extract host
 	hostFrom, err := extracthostName(from)
 	if err != nil {
+		err = srvLog(err)
 		return 0, "", "", err
 	}
 	hostTo, err := extracthostName(to)
 	if err != nil {
+		err = srvLog(err)
 		return 0, "", "", err
 	}
 
@@ -219,10 +234,12 @@ func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
 
 	fromPath, err := extractPath(from)
 	if err != nil {
+		err = srvLog(err)
 		return 0, "", "", err
 	}
 	toPath, err := extractPath(to)
 	if err != nil {
+		err = srvLog(err)
 		return 0, "", "", err
 	}
 
@@ -247,6 +264,7 @@ func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
 	// retrieve ssh config to perform some commands
 	ssh, err := svc.GetConfig(host.ID)
 	if err != nil {
+		err = srvLog(err)
 		return 0, "", "", err
 	}
 

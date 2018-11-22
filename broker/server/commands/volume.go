@@ -19,8 +19,6 @@ package commands
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-
 	log "github.com/sirupsen/logrus"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
@@ -131,22 +129,16 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		tbr := fmt.Errorf("Can't delete volume: neither name nor id given as reference")
-		log.Error(tbr)
-		return nil, tbr
+		return nil, fmt.Errorf("Can't delete volume: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		tbr := fmt.Errorf("can't delete volume '%s': no tenant set", ref)
-		log.Error(tbr)
-		return nil, tbr
+		return nil, fmt.Errorf("can't delete volume '%s': no tenant set", ref)
 	}
 	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
 	err := service.Delete(ref)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
 		return &google_protobuf.Empty{}, fmt.Errorf("Can't delete volume '%s': %s", ref, err.Error())
 	}
 	log.Printf("Volume '%s' deleted", ref)

@@ -24,6 +24,8 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services TemplateAPI
 
+// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+
 //TemplateAPI defines API to manipulate hosts
 type TemplateAPI interface {
 	List(all bool) ([]model.HostTemplate, error)

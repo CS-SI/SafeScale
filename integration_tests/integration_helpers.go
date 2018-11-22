@@ -39,9 +39,9 @@ func canBeRun(command string) (bool, error) {
 }
 
 func getOutput(command string) (string, error) {
-	out, err := exec.Command("bash", "-c", command).Output()
+	out, err := exec.Command("bash", "-c", command).CombinedOutput()
 	if err != nil {
-		return "", err
+		return string(out), err
 	}
 
 	if strings.Contains(strings.ToUpper(string(out)), strings.ToUpper("Error")) {

@@ -20,14 +20,13 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 )
 
 //go:generate mockgen -destination=../mocks/mock_containerapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services ContainerAPI
+
+// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 //ContainerAPI defines API to manipulate containers
 type ContainerAPI interface {
@@ -80,16 +79,14 @@ func (svc *ContainerService) Mount(containerName, hostName, path string) error {
 	// Check container existence
 	_, err := svc.Inspect(containerName)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return tbr
+		return srvLog(err)
 	}
 
 	// Get Host ID
 	hostService := NewHostService(svc.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("no host found with name or id '%s'", hostName)
+		return srvLog(fmt.Errorf("no host found with name or id '%s'", hostName))
 	}
 
 	// Create mount point
@@ -143,9 +140,7 @@ func (svc *ContainerService) UMount(containerName, hostName string) error {
 	// Check container existence
 	_, err := svc.Inspect(containerName)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return tbr
+		return srvLog(err)
 	}
 
 	// Get Host ID
