@@ -94,11 +94,11 @@ func (svc *HostService) Create(
 		networkSvc := NewNetworkService(svc.provider)
 		n, err := networkSvc.Get(net)
 		if err != nil {
-			tbr := srvLog(errors.Wrapf(err, "Failed to get network resource data: '%s'.", net))
+			tbr := srvLogMessage(err, fmt.Sprintf( "Failed to get network resource data: '%s'.", net))
 			return nil, tbr
 		}
 		if n == nil {
-			return nil, srvLog(fmt.Errorf("Failed to find network '%s'", net))
+			return nil, srvLogNew(fmt.Errorf("Failed to find network '%s'", net))
 		}
 		networks = append(networks, n.ID)
 	}
@@ -250,7 +250,7 @@ func (svc *HostService) Get(ref string) (*model.Host, error) {
 		}
 	}
 	if !found {
-		return nil, srvLog(fmt.Errorf("host '%s' not found", ref))
+		return nil, srvLogNew(fmt.Errorf("Cannot find host metadata : host '%s' not found", ref))
 	}
 	return mh.Get(), nil
 }
@@ -270,7 +270,7 @@ func (svc *HostService) Delete(ref string) error {
 	}
 	nShares := len(hostSharesV1.ByID)
 	if nShares > 0 {
-		return srvLog(fmt.Errorf("Can't delete host, exports %d share%s", nShares, utils.Plural(nShares)))
+		return srvLogNew(fmt.Errorf("Can't delete host, exports %d share%s", nShares, utils.Plural(nShares)))
 	}
 
 	// Don't remove a host with volumes attached
@@ -281,7 +281,7 @@ func (svc *HostService) Delete(ref string) error {
 	}
 	nAttached := len(hostVolumesV1.VolumesByID)
 	if nAttached > 0 {
-		return srvLog(fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached)))
+		return srvLogNew(fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached)))
 	}
 
 	// Don't remove a host that is a gateway
@@ -291,7 +291,7 @@ func (svc *HostService) Delete(ref string) error {
 		return srvLog(err)
 	}
 	if hostNetworkV1.IsGateway {
-		return srvLog(fmt.Errorf("can't delete host, it's a gateway that can't be deleted but with its network"))
+		return srvLogNew(fmt.Errorf("can't delete host, it's a gateway that can't be deleted but with its network"))
 	}
 
 	// If host mounted shares, unmounts them before anything else
@@ -327,10 +327,10 @@ func (svc *HostService) Delete(ref string) error {
 func (svc *HostService) SSH(ref string) (*system.SSHConfig, error) {
 	host, err := svc.Get(ref)
 	if err != nil {
-		return nil, srvLog(fmt.Errorf("failed to query host '%s'", ref))
+		return nil, srvLogMessage(err, fmt.Sprintf("Cannot access ssh parameters of host '%s': failed to query host '%s'", ref, ref))
 	}
 	if host == nil {
-		return nil, srvLog(fmt.Errorf("host '%s' not found", ref))
+		return nil, srvLogNew(fmt.Errorf("Cannot access ssh parameters of host '%s': host '%s' not found", ref, ref))
 	}
 	sshSvc := NewSSHService(svc.provider)
 	return sshSvc.GetConfig(host.ID)
