@@ -131,7 +131,7 @@ func Test_Basic(t *testing.T) {
 
 	out, err = getOutput("broker volume delete volumetest")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(err.Error(), "still attached"))
+	require.True(t, strings.Contains(out, "still attached"))
 
 	out, err = getOutput("broker volume inspect volumetest")
 	require.Nil(t, err)
@@ -360,7 +360,7 @@ func Test_Delete_Volume_Mounted(t *testing.T) {
 
 	out, err = getOutput("broker volume delete volumetest")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(err.Error(), "still attached"))
+	require.True(t, strings.Contains(out, "still attached"))
 
 	// TODO Parse message received
 	message_received := "Could not delete volume 'volumetest': rpc error: code = Unknown desc = Error deleting volume: Bad request with: [DELETE https://volume.compute.sbg3.cloud.ovh.net/v1/7bf42a51e07a4be98e62b0435bfc1765/volumes/906e8b9c-b6ac-461b-9916-a8bc7afa8449], error message: {'badRequest': {'message': 'Volume 906e8b9c-b6ac-461b-9916-a8bc7afa8449 is still attached, detach volume first.', 'code': 400}}"

@@ -76,8 +76,7 @@ func Test_Nas_Error(t *testing.T) {
 
 	out, err = getOutput("broker volume delete volumetest")
 	require.NotNil(t, err)
-	fmt.Println(out)
-	require.True(t, strings.Contains(err.Error(), "still attached"))
+	require.True(t, strings.Contains(out, "still attached"))
 
 	time.Sleep(5 * time.Second)
 
@@ -176,16 +175,6 @@ func Test_Until_Volume_Error(t *testing.T) {
 	require.True(t, strings.Contains(out, "still attached"))
 }
 
-func Test_Minimal(t *testing.T) {
-	out, err := getOutput("broker volume delete volumetest")
-	if err != nil {
-		captured := err.Error()
-		log.Println(captured)
-		log.Println(out)
-	}
-	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "still attached"))
-}
 
 func Test_Ready_To_Ssh(t *testing.T) {
 	runOnlyInIntegrationTest("TEST_CLOUDFERRO")

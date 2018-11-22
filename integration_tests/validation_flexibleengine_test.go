@@ -130,7 +130,7 @@ func Test_Flexible_Basic(t *testing.T) {
 
 	out, err = getOutput("broker volume delete volumetest")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(err.Error(), "still attached"))
+	require.True(t, strings.Contains(out, "still attached"))
 
 	out, err = getOutput("broker volume inspect volumetest")
 	require.Nil(t, err)
