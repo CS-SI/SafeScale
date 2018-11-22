@@ -98,7 +98,14 @@ func Test_Nas_Error(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 
+	out, err = getOutput("broker nas delete ferronas ")
+	require.Nil(t, err)
+
 	out, err = getOutput("broker host delete ferrohost")
+	if err != nil {
+		fmt.Println(err.Error())
+		fmt.Println(out)
+	}
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
