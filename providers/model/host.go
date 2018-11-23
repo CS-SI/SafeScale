@@ -51,14 +51,20 @@ type StoredCPUInfo struct {
 	NumberOfCPU    int     `json:"number_of_cpu,omitempty"`
 	NumberOfCore   int     `json:"number_of_core,omitempty"`
 	NumberOfSocket int     `json:"number_of_socket,omitempty"`
-	CPUFrequency   float64 `json:"cpu_frequency,omitempty"`
+	CPUFrequency   float64 `json:"cpu_frequency_Ghz,omitempty"`
 	CPUArch        string  `json:"cpu_arch,omitempty"`
 	Hypervisor     string  `json:"hypervisor,omitempty"`
 	CPUModel       string  `json:"cpu_model,omitempty"`
-	RAMSize        float64 `json:"ram_size,omitempty"`
+	RAMSize        float64 `json:"ram_size_Gb,omitempty"`
 	RAMFreq        float64 `json:"ram_freq,omitempty"`
 	GPU            int     `json:"gpu,omitempty"`
 	GPUModel       string  `json:"gpu_model,omitempty"`
+	DiskSize       int64   `json:"disk_size_Gb,omitempty"`
+	MainDiskType   string  `json:"main_disk_type"`
+	MainDiskSpeed  float64 `json:"main_disk_speed_MBps"`
+	SampleNetSpeed float64 `json:"sample_net_speed_KBps"`
+	EphDiskSize    int64   `json:"eph_disk_size_Gb"`
+	PricePerHour   float64 `json:"price_in_dollars_hour"`
 }
 
 // Image representes an OS image
