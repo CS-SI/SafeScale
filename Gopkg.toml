@@ -50,10 +50,9 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/golang/protobuf"
   version = "=v1.2.0"
 
-# TODO Fork & tag
 [[override]]
   name = "github.com/gophercloud/gophercloud"
-  branch = "master"
+  revision = "39db44929bf62867520de8607bd519217a78f802"
 
 [[constraint]]
   name = "github.com/gorilla/websocket"
