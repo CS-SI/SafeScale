@@ -51,8 +51,12 @@ const cmdRAMFreq string = "sudo dmidecode -t memory | grep Speed | head -1 | cut
 
 const cmdGPU string = "lspci | egrep -i 'VGA|3D' | grep -i nvidia | cut -d: -f3 | sed 's/.*controller://g' | tr '\n' '%'"
 const cmdDiskSize string = "lsblk -b --output SIZE -n -d /dev/sda"
+const cmdEphemeralDiskSize string = "lsblk -o name,type,mountpoint | grep disk | awk {'print $1'} | grep -v sda | xargs -i'{}' lsblk -b --output SIZE -n -d /dev/'{}'"
+const cmdRotational string = "cat /sys/block/sda/queue/rotational"
+const cmdDiskSpeed string = "sudo hdparm -t --direct /dev/sda | grep MB | awk '{print $11}'"
+const cmdNetSpeed string = "URL=\"http://www.google.com\";curl -L --w \"$URL\nDNS %{time_namelookup}s conn %{time_connect}s time %{time_total}s\nSpeed %{speed_download}bps Size %{size_download}bytes\n\" -o/dev/null -s $URL | grep bps | awk '{ print $2}' | cut -d '.' -f 1"
 
-var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)",
+var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)",
 	cmdNumberOfCPU,
 	cmdNumberOfCorePerSocket,
 	cmdNumberOfSocket,
@@ -64,6 +68,10 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 	cmdRAMFreq,
 	cmdGPU,
 	cmdDiskSize,
+	cmdEphemeralDiskSize,
+	cmdDiskSpeed,
+	cmdRotational,
+	cmdNetSpeed,
 )
 
 //CPUInfo stores CPU properties
@@ -78,15 +86,20 @@ type CPUInfo struct {
 	NumberOfCPU    int     `json:"number_of_cpu,omitempty"`
 	NumberOfCore   int     `json:"number_of_core,omitempty"`
 	NumberOfSocket int     `json:"number_of_socket,omitempty"`
-	CPUFrequency   float64 `json:"cpu_frequency,omitempty"`
+	CPUFrequency   float64 `json:"cpu_frequency_Ghz,omitempty"`
 	CPUArch        string  `json:"cpu_arch,omitempty"`
 	Hypervisor     string  `json:"hypervisor,omitempty"`
 	CPUModel       string  `json:"cpu_model,omitempty"`
-	RAMSize        float64 `json:"ram_size,omitempty"`
+	RAMSize        float64 `json:"ram_size_Gb,omitempty"`
 	RAMFreq        float64 `json:"ram_freq,omitempty"`
 	GPU            int     `json:"gpu,omitempty"`
 	GPUModel       string  `json:"gpu_model,omitempty"`
-	DiskSize       int64   `json:"disk_size,omitempty"`
+	DiskSize       int64   `json:"disk_size_Gb,omitempty"`
+	MainDiskType   string  `json:"main_disk_type"`
+	MainDiskSpeed  float64 `json:"main_disk_speed_MBps"`
+	SampleNetSpeed float64 `json:"sample_net_speed_KBps"`
+	EphDiskSize    int64   `json:"eph_disk_size_Gb"`
+	PricePerHour   float64 `json:"price_in_dollars_hour"`
 }
 
 func createCPUInfo(output string) (*CPUInfo, error) {
@@ -115,7 +128,7 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
 	}
-	info.CPUFrequency = math.Ceil(info.CPUFrequency/100) / 10
+	info.CPUFrequency = math.Floor(info.CPUFrequency*100) / 100000
 
 	info.CPUArch = tokens[4]
 	info.Hypervisor = tokens[5]
@@ -124,7 +137,9 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Parsing error: RAMSize='%s' (from '%s')", tokens[7], str)
 	}
-	info.RAMSize = math.Ceil(info.RAMSize / 1024 / 1024)
+
+	memInGb := info.RAMSize / 1024 / 1024
+	info.RAMSize = math.Floor(memInGb*100) / 100
 	info.RAMFreq, err = strconv.ParseFloat(tokens[8], 64)
 	if err != nil {
 		info.RAMFreq = 0
@@ -140,6 +155,38 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 	if err != nil {
 		info.DiskSize = 0
 	}
+	info.DiskSize = info.DiskSize / 1024 / 1024 / 1024
+
+	info.EphDiskSize, err = strconv.ParseInt(tokens[11], 10, 64)
+	if err != nil {
+		info.EphDiskSize = 0
+	}
+	info.EphDiskSize = info.EphDiskSize / 1024 / 1024 / 1024
+
+	info.MainDiskSpeed, err = strconv.ParseFloat(tokens[12], 64)
+	if err != nil {
+		info.MainDiskSpeed = 0
+	}
+
+	rotational, err := strconv.ParseInt(tokens[13], 10, 64)
+	if err != nil {
+		info.MainDiskType = ""
+	} else {
+		if rotational == 1 {
+			info.MainDiskType = "HDD"
+		} else {
+			info.MainDiskType = "SSD"
+		}
+	}
+
+	nsp, err := strconv.ParseFloat(tokens[14], 64)
+	if err != nil {
+		info.SampleNetSpeed = 0
+	} else {
+		info.SampleNetSpeed = nsp / 1000 / 8
+	}
+
+	info.PricePerHour = 0
 
 	return &info, nil
 }
@@ -157,16 +204,16 @@ func RunScanner() {
 
 	// TODO Enable when several brokerd instances can run in parallel
 	/*
-	var wtg sync.WaitGroup
+		var wtg sync.WaitGroup
 
-	wtg.Add(len(targetedProviders))
+		wtg.Add(len(targetedProviders))
 
-	for _, tenantName := range targetedProviders {
-		fmt.Printf("Working with tenant %s\n", tenantName)
-		go analyzeTenant(&wtg, tenantName)
-	}
+		for _, tenantName := range targetedProviders {
+			fmt.Printf("Working with tenant %s\n", tenantName)
+			go analyzeTenant(&wtg, tenantName)
+		}
 
-	wtg.Wait()
+		wtg.Wait()
 	*/
 
 	for _, tenantName := range targetedProviders {
@@ -247,10 +294,11 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		if net != nil {
 
 			// TODO Remove this later
+
 			/*
-			if template.Name != "s1-2" {
-				return nil
-			}
+				if template.Name != "s1-2" {
+					return nil
+				}
 			*/
 
 			log.Printf("Checking template %s\n", template.Name)
