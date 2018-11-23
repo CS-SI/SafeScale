@@ -205,7 +205,7 @@ var hostCreate = cli.Command{
 		cli.IntFlag{
 			Name:  "disk",
 			Value: 16,
-			Usage: "Disk space for the host (MB)",
+			Usage: "Disk space for the host (GB)",
 		},
 		cli.StringFlag{
 			Name:  "os",
@@ -224,7 +224,7 @@ var hostCreate = cli.Command{
 		cli.Float64Flag{
 			Name:  "cpu-freq",
 			Value: 0,
-			Usage: "Minimum cpu frequency required for the host",
+			Usage: "Minimum cpu frequency required for the host (GHz)",
 		},
 		cli.BoolFlag{
 			Name:  "force",
