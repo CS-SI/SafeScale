@@ -50,6 +50,6 @@ func Test_Setup(t *testing.T) {
 		require.Nil(t, err)
 	}
 	require.True(t, len(out) > 0)
-	require.True(t, strings.Contains(out, "ovh"))
+	require.True(t, strings.Contains(out, "safescale"))
 }
 
