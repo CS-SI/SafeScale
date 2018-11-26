@@ -257,34 +257,34 @@ service VolumeService{
     rpc Inspect(Reference) returns (VolumeInfo){}
 }
 
-// broker container create c1
-// broker container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
-// broker container umount c1 host1
-// broker container delete c1
-// broker container list
-// broker container inspect C1
+// broker bucket|container create c1
+// broker bucket|container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
+// broker bucket|container umount c1 host1
+// broker bucket|container delete c1
+// broker bucket|container list
+// broker bucket|container inspect C1
 
-message Container{
+message Bucket{
     string Name = 1;
 }
 
-message ContainerList{
-    repeated Container Containers = 1;
+message BucketList{
+    repeated Bucket Buckets = 1;
 }
 
-message ContainerMountingPoint{
-    string Container = 1;
+message BucketMountingPoint{
+    string Bucket = 1;
     Reference Host = 2;
     string Path = 3;
 }
 
-service ContainerService{
-    rpc Create(Container) returns (google.protobuf.Empty){}
-    rpc Mount(ContainerMountingPoint) returns (google.protobuf.Empty){}
-    rpc UMount(ContainerMountingPoint) returns (google.protobuf.Empty){}
-    rpc Delete(Container) returns (google.protobuf.Empty){}
-    rpc List(google.protobuf.Empty) returns (ContainerList){}
-    rpc Inspect(Container) returns (ContainerMountingPoint){}
+service BucketService{
+    rpc Create(Bucket) returns (google.protobuf.Empty){}
+    rpc Mount(BucketMountingPoint) returns (google.protobuf.Empty){}
+    rpc Unmount(BucketMountingPoint) returns (google.protobuf.Empty){}
+    rpc Delete(Bucket) returns (google.protobuf.Empty){}
+    rpc List(google.protobuf.Empty) returns (BucketList){}
+    rpc Inspect(Bucket) returns (BucketMountingPoint){}
 }
 
 message SshCommand{

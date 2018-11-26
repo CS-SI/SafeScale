@@ -38,9 +38,9 @@ func TestNetworkService_List_with_brokerd_running(t *testing.T) {
 		},
 	}
 
-	mockClientAPI.EXPECT().ListNetworks(false).Return(nil, nil).Times(1)
+	mockClientAPI.EXPECT().ListNetworks().Return(nil, nil).Times(1)
 
-	result, daerr := ness.provider.ListNetworks(false)
+	result, daerr := ness.provider.ListNetworks()
 
 	assert.Nil(t, daerr)
 
@@ -60,9 +60,9 @@ func TestNetworkService_List_with_NO_brokerd_running(t *testing.T) {
 		},
 	}
 
-	mockClientAPI.EXPECT().ListNetworks(false).Return(nil, theError).Times(1)
+	mockClientAPI.EXPECT().ListNetworks().Return(nil, theError).Times(1)
 
-	result, daerr := ness.provider.ListNetworks(false)
+	result, daerr := ness.provider.ListNetworks()
 
 	assert.EqualError(t, daerr, "Failure")
 

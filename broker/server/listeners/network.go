@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package commands
+package listeners
 
 import (
 	"context"
@@ -28,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/broker/server/services"
 	"github.com/CS-SI/SafeScale/broker/utils"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 )
 
@@ -37,18 +36,18 @@ import (
 // broker network delete net1
 // broker network inspect net1
 
-// NetworkServiceServer network service server grpc
-type NetworkServiceServer struct{}
+// NetworkServiceListener network service server grpc
+type NetworkServiceListener struct{}
 
 // Create a new network
-func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
+func (s *NetworkServiceListener) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
 	log.Printf("Create Network called '%s'", in.Name)
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot create network : No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(providers.FromClient(currentTenant.Client))
+	networkAPI := services.NewNetworkService(currentTenant.Service)
 	network, err := networkAPI.Create(in.GetName(), in.GetCIDR(), IPVersion.IPv4,
 		int(in.Gateway.GetCPU()), in.GetGateway().GetRAM(), int(in.GetGateway().GetDisk()), in.GetGateway().GetImageID(), in.GetGateway().GetName())
 
@@ -61,14 +60,14 @@ func (s *NetworkServiceServer) Create(ctx context.Context, in *pb.NetworkDefinit
 }
 
 // List existing networks
-func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (*pb.NetworkList, error) {
+func (s *NetworkServiceListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.NetworkList, error) {
 	log.Printf("List Network called")
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot list networks : No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(providers.FromClient(currentTenant.Client))
+	networkAPI := services.NewNetworkService(currentTenant.Service)
 
 	networks, err := networkAPI.List(in.GetAll())
 	if err != nil {
@@ -86,32 +85,33 @@ func (s *NetworkServiceServer) List(ctx context.Context, in *pb.NWListRequest) (
 }
 
 // Inspect returns infos on a network
-func (s *NetworkServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
-	log.Printf("Inspect Network called '%s'", in.Name)
+func (s *NetworkServiceListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
+	log.Debugf("broker.server.listeners.NetworkServiceListener.Inspect(%s) called'", in.Name)
+	defer log.Debugf("broker.server.listeners.NetworkServiceListener.Inspect(%s) done'", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Cannot inspect network : Neither name nor id given as reference")
+		return nil, fmt.Errorf("Can't inspect network : Neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot inspect network : No tenant set")
+		return nil, fmt.Errorf("Can't inspect network : No tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(providers.FromClient(currentTenant.Client))
+	networkAPI := services.NewNetworkService(currentTenant.Service)
 	network, err := networkAPI.Get(ref)
 	if err != nil {
 		return nil, err
 	}
 	if network == nil {
-		return nil, fmt.Errorf("Cannot inspect network : No network '%s' found", ref)
+		return nil, fmt.Errorf("Can't inspect network: no network '%s' found", ref)
 	}
 
 	return conv.ToPBNetwork(network), nil
 }
 
 // Delete a network
-func (s *NetworkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
+func (s *NetworkServiceListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Delete Network called for network '%s'", in.GetName())
 
 	ref := utils.GetReference(in)
@@ -123,7 +123,7 @@ func (s *NetworkServiceServer) Delete(ctx context.Context, in *pb.Reference) (*g
 		return nil, fmt.Errorf("Can't delete network: no tenant set")
 	}
 
-	networkAPI := services.NewNetworkService(providers.FromClient(currentTenant.Client))
+	networkAPI := services.NewNetworkService(currentTenant.Service)
 	err := networkAPI.Delete(ref)
 	if err != nil {
 		return nil, err

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package commands
+package listeners
 
 import (
 	"context"
@@ -23,17 +23,14 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/object"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant
 type Tenant struct {
-	name     string
-	Client   api.ClientAPI
-	Location *object.Location
+	name    string
+	Service *providers.Service
 }
 
 var (
@@ -49,11 +46,11 @@ var (
 
 // }
 
-// TenantServiceServer server is used to implement SafeScale.broker.
-type TenantServiceServer struct{}
+// TenantServiceListener server is used to implement SafeScale.broker.
+type TenantServiceListener struct{}
 
 // List registerd tenants
-func (s *TenantServiceServer) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
+func (s *TenantServiceListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
 	log.Println("List tenant called")
 
 	tenants, err := providers.Tenants()
@@ -73,7 +70,7 @@ func (s *TenantServiceServer) List(ctx context.Context, in *google_protobuf.Empt
 }
 
 // Get returns the name of the current tenant used
-func (s *TenantServiceServer) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
+func (s *TenantServiceListener) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
 	log.Println("Tenant Get called")
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -99,14 +96,14 @@ func getCurrentTenant() *Tenant {
 			if err != nil {
 				return nil
 			}
-			currentTenant = &Tenant{name: name, Client: service.ClientAPI, Location: service.Location}
+			currentTenant = &Tenant{name: name, Service: service}
 		}
 	}
 	return currentTenant
 }
 
 // Set the the tenant tu use for each command
-func (s *TenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
+func (s *TenantServiceListener) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
 	log.Printf("Tenant Set called '%s'", in.Name)
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
@@ -114,11 +111,11 @@ func (s *TenantServiceServer) Set(ctx context.Context, in *pb.TenantName) (*goog
 		return &google_protobuf.Empty{}, nil
 	}
 
-	clientAPI, err := providers.GetService(in.GetName())
+	service, err := providers.GetService(in.GetName())
 	if err != nil {
 		return &google_protobuf.Empty{}, fmt.Errorf("Unable to set tenant '%s': %s", in.GetName(), err.Error())
 	}
-	currentTenant = &Tenant{name: in.GetName(), Client: clientAPI.ClientAPI, Location: clientAPI.Location}
+	currentTenant = &Tenant{name: in.GetName(), Service: service}
 	log.Printf("Current tenant is now '%s'", in.GetName())
 	return &google_protobuf.Empty{}, nil
 }

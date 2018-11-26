@@ -73,25 +73,54 @@ func sanitize(in string) (string, error) {
 // Create a share on host
 func (svc *ShareService) Create(shareName, hostName, path string) (*propsv1.HostShare, error) {
 	// Check if a share already exists with the same name
-	serverName, err := svc.findShare(shareName)
+	server, _, err := svc.Inspect(shareName)
 	if err != nil {
-		err = srvLog(err)
-		return nil, err
+		switch err.(type) {
+		case model.ErrResourceNotFound:
+		default:
+			tbr := errors.Wrap(err, "")
+			log.Errorf("%+v", tbr)
+			return nil, tbr
+		}
 	}
-	if serverName != "" {
-		return nil, srvLog(model.ResourceAlreadyExistsError("share", shareName))
-	}
-	hostSvc := NewHostService(svc.provider)
-	server, err := hostSvc.Get(hostName)
-	if err != nil {
-		err = srvLog(err)
-		return nil, err
+	if server != nil {
+		return nil, model.ResourceAlreadyExistsError("share", shareName)
 	}
 
 	// Sanitize path
 	sharePath, err := sanitize(path)
 	if err != nil {
+		tbr := errors.Wrap(err, "")
+		log.Errorf("%+v", tbr)
+		return nil, tbr
+	}
+
+	hostSvc := NewHostService(svc.provider)
+	server, err = hostSvc.Get(hostName)
+	if err != nil {
+		switch err.(type) {
+		case model.ErrResourceNotFound:
+			return nil, err
+		default:
+			tbr := errors.Wrap(err, "")
+			log.Errorf("%+v", tbr)
+			return nil, tbr
+		}
+	}
+
+	// Check if the path to share isn't a remote mount or contains a remote mount
+	serverMountsV1 := propsv1.NewHostMounts()
+	err = server.Properties.Get(HostProperty.MountsV1, serverMountsV1)
+	if err != nil {
 		return nil, srvLog(err)
+	}
+	if _, found := serverMountsV1.RemoteMountsByPath[path]; found {
+		return nil, fmt.Errorf("path to export '%s' is a mounted share", sharePath)
+	}
+	for k := range serverMountsV1.RemoteMountsByPath {
+		if strings.Index(sharePath, k) == 0 {
+			return nil, fmt.Errorf("export path '%s' contains a share mounted in '%s'", sharePath, k)
+		}
 	}
 
 	// Installs NFS Server software if needed
@@ -161,7 +190,9 @@ func (svc *ShareService) Delete(name string) error {
 	if err != nil {
 		return srvLog(err)
 	}
-
+	if server == nil {
+		return model.ResourceNotFoundError(name, "share")
+	}
 	serverSharesV1 := propsv1.NewHostShares()
 	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
@@ -252,43 +283,53 @@ func (svc *ShareService) List() (map[string]map[string]*propsv1.HostShare, error
 
 // Mount a share on a local directory of an host
 func (svc *ShareService) Mount(shareName, hostName, path string) (*propsv1.HostRemoteMount, error) {
-
-	// Sanitize path
-	mountPath, err := sanitize(path)
-	if err != nil {
-		return nil, srvLogMessage(err, fmt.Sprintf("invalid mount path '%s'", path))
-	}
-
 	// Retrieve info about the share
-	server, _, err := svc.Inspect(shareName)
+	server, share, err := svc.Inspect(shareName)
 	if err != nil {
 		err = srvLog(err)
 		return nil, err
+	}
+	if server == nil {
+		return nil, model.ResourceNotFoundError("share", shareName)
+	}
+	// Sanitize path
+	mountPath, err := sanitize(path)
+	if err != nil {
+		return nil, fmt.Errorf("invalid mount path '%s': '%s'", path, err)
 	}
 
 	hostSvc := NewHostService(svc.provider)
 	target, err := hostSvc.Get(hostName)
 	if err != nil {
-		return nil, srvLog(model.ResourceNotFoundError("host", hostName))
+		switch err.(type) {
+		case model.ErrResourceNotFound:
+			return nil, err
+		default:
+			return nil, errors.Wrap(err, "")
+		}
 	}
 
-	// Checks if there is no other device mounted in the path (or in subpath)
-	// Checks if there is already something mounted in the path
+	// Check if share is already mounted
+	// Check if there is already volume mounted in the path (or in subpath)
+	// Check
 	targetMountsV1 := propsv1.NewHostMounts()
 	err = target.Properties.Get(HostProperty.MountsV1, targetMountsV1)
 	if err != nil {
 		return nil, srvLog(err)
 	}
+	if s, ok := targetMountsV1.RemoteMountsByShareID[share.ID]; ok {
+		return nil, fmt.Errorf("already mounted in '%s:%s'", target.Name, targetMountsV1.RemoteMountsByPath[s].Path)
+	}
 	for _, i := range targetMountsV1.LocalMountsByPath {
 		if i.Path == path {
 			// Can't mount a share in place of a volume (by convention, nothing technically preventing it)
-			return nil, srvLogNew(fmt.Errorf("Can't mount share '%s' to host '%s': there is already a volume in path '%s'", shareName, target.Name, path))
+			return nil, fmt.Errorf("there is already a volume in path '%s:%s'", target.Name, path)
 		}
 	}
 	for _, i := range targetMountsV1.RemoteMountsByPath {
-		if strings.Index(i.Path, path) == 0 {
+		if strings.Index(path, i.Path) == 0 {
 			// Can't mount a share inside another share (at least by convention, if not technically)
-			return nil, srvLogNew(fmt.Errorf("Can't mount share volume '%s' to host '%s': there is a share mounted in path '%s[/...]'", shareName, target.Name, path))
+			return nil, fmt.Errorf("there is already a share mounted in '%s:%s'", target.Name, i.Path)
 		}
 	}
 
@@ -303,7 +344,6 @@ func (svc *ShareService) Mount(shareName, hostName, path string) (*propsv1.HostR
 		return nil, srvLogNew(fmt.Errorf("failed to find metadata about share '%s'", shareName))
 	}
 	shareID := serverSharesV1.ByName[shareName]
-	share := serverSharesV1.ByID[shareID]
 	sshSvc := NewSSHService(svc.provider)
 	sshConfig, err := sshSvc.GetConfig(target)
 	if err != nil {
@@ -348,11 +388,11 @@ func (svc *ShareService) Mount(shareName, hostName, path string) (*propsv1.HostR
 		return nil, srvLog(err)
 	}
 
-	err = metadata.SaveHost(svc.provider.ClientAPI, target)
+	err = metadata.SaveHost(svc.provider, target)
 	if err != nil {
 		return nil, srvLog(err)
 	}
-	err = metadata.SaveHost(svc.provider.ClientAPI, server)
+	err = metadata.SaveHost(svc.provider, server)
 	if err != nil {
 		return nil, srvLog(err)
 	}
@@ -378,8 +418,8 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 	if !found {
 		return srvLogNew(fmt.Errorf("failed to find data about share '%s'", shareName))
 	}
-	share := serverSharesV1.ByID[shareID]
-	remotePath := server.GetAccessIP() + ":" + share.Path
+	// share := serverSharesV1.ByID[shareID]
+	// remotePath := server.GetAccessIP() + ":" + share.Path
 
 	hostSvc := NewHostService(svc.provider)
 	target, err := hostSvc.Get(hostName)
@@ -398,7 +438,7 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 	}
 	mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
 	if !found {
-		return srvLogNew(fmt.Errorf("share '%s' not mounted on host '%s'", remotePath, target.Name))
+		return fmt.Errorf("not mounted on host '%s'", target.Name)
 	}
 
 	// Unmount share from client
@@ -438,12 +478,12 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 	}
 
 	// Saves metadata
-	err = metadata.SaveHost(svc.provider.ClientAPI, server)
+	err = metadata.SaveHost(svc.provider, server)
 	if err != nil {
 		err = srvLog(err)
 		return err
 	}
-	err = metadata.SaveHost(svc.provider.ClientAPI, target)
+	err = metadata.SaveHost(svc.provider, target)
 	if err != nil {
 		err = srvLog(err)
 		return err
@@ -454,14 +494,13 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 
 // Inspect returns the host and share corresponding to 'shareName'
 func (svc *ShareService) Inspect(shareName string) (*model.Host, *propsv1.HostShare, error) {
-
 	hostName, err := metadata.LoadShare(svc.provider, shareName)
 	if err != nil {
 		err = srvLog(errors.Wrap(err, "error loading share metadata"))
 		return nil, nil, err
 	}
 	if hostName == "" {
-		return nil, nil, model.ResourceNotFoundError("share", "")
+		return nil, nil, model.ResourceNotFoundError("share", shareName)
 	}
 
 	hostSvc := NewHostService(svc.provider)

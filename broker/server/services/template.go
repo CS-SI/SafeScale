@@ -18,7 +18,6 @@ package services
 
 import (
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
 )
 
@@ -32,9 +31,9 @@ type TemplateAPI interface {
 }
 
 //NewTemplateService creates a template service
-func NewTemplateService(api api.ClientAPI) TemplateAPI {
+func NewTemplateService(api *providers.Service) TemplateAPI {
 	return &TemplateService{
-		provider: providers.FromClient(api),
+		provider: api,
 	}
 }
 

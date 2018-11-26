@@ -18,20 +18,22 @@ package services
 
 import (
 	"fmt"
-	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/broker/utils"
+	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/openstack"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services NetworkAPI
@@ -70,14 +72,14 @@ func (svc *NetworkService) Create(
 		return nil, err
 	}
 	for _, i := range nets {
-		if nets.Name == name {
+		if i.Name == name {
 			return nil, fmt.Errorf("Error creating network '%s': a network already exists with that name", name)
 		}
 	}
 
 	// Create the network
 	network, err := svc.provider.CreateNetwork(model.NetworkRequest{
-		Name:      networkName,
+		Name:      name,
 		IPVersion: ipVersion,
 		CIDR:      cidr,
 	})
@@ -107,15 +109,22 @@ func (svc *NetworkService) Create(
 		if err != nil {
 			derr := svc.provider.DeleteNetwork(network.ID)
 			if derr != nil {
+				spew.Dump(derr)
 				log.Errorf("Failed to delete network: %+v", derr)
 			}
 		}
 	}()
 
-	err = metadata.SaveNetwork(svc, network)
+	err = metadata.SaveNetwork(svc.provider, network)
 	if err != nil {
 		return nil, err
 	}
+
+	if gwname == "" {
+		gwname = "gw-" + network.Name
+	}
+
+	log.Debugf("Creating compute resource '%s' ...", gwname)
 
 	// Create a gateway
 	tpls, err := svc.provider.SelectTemplatesBySize(model.SizingRequirements{
@@ -144,19 +153,14 @@ func (svc *NetworkService) Create(
 		return nil, err
 	}
 
-	if gwname == "" {
-		gwname = "gw-" + network.Name
-	}
-	gwRequest := model.GWRequest{
+	gwRequest := model.GatewayRequest{
 		ImageID:    img.ID,
-		NetworkID:  network.ID,
+		Network:    network,
 		KeyPair:    keypair,
 		TemplateID: tpls[0].ID,
-		GWName:     gwname,
+		Name:       gwname,
 		CIDR:       network.CIDR,
 	}
-
-	log.Infof("Waiting until gateway '%s' is finished provisioning and is available through SSH ...", gwname)
 
 	log.Infof("Requesting the creation of a gateway '%s' with image '%s'", gwname, img.ID)
 	gw, err := svc.provider.CreateGateway(gwRequest)
@@ -169,12 +173,19 @@ func (svc *NetworkService) Create(
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
 		if err != nil {
-			err := svc.provider.DeleteGateway(network.ID)
-			if err != nil {
-				log.Errorf("failed to delete gateway '%s': %v", gw.Name, err)
+			derr := svc.provider.DeleteHost(gw.ID)
+			if derr != nil {
+				spew.Dump(derr)
+				log.Errorf("failed to delete gateway '%s': %v", gw.Name, derr)
 			}
 		}
 	}()
+
+	// Reloads the host to be sure all the properties are updated
+	gw, err = svc.provider.GetHost(gw)
+	if err != nil {
+		return nil, err
+	}
 
 	// Updates requested sizing in gateway property propsv1.HostSizing
 	gwSizingV1 := propsv1.NewHostSizing()
@@ -193,11 +204,14 @@ func (svc *NetworkService) Create(
 	}
 
 	// Writes Gateway metadata
-	err = metadata.SaveGateway(svc, host, req.NetworkID)
+	err = metadata.SaveGateway(svc.provider, gw, network.ID)
 	if err != nil {
-		log.Debugf("Error creating gateway: saving network metadata: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway: Error saving gateway metadata: %s", ProviderErrorToString(err)))
+		msg := fmt.Sprintf("failed to create gateway: failed to save metadata: %s", err.Error())
+		log.Debugf(utils.TitleFirst(msg))
+		return nil, errors.Wrap(err, msg)
 	}
+
+	log.Debugf("Waiting until gateway '%s' is available through SSH ...", gwname)
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
@@ -211,7 +225,7 @@ func (svc *NetworkService) Create(
 	}
 
 	// TODO Test for failure with 15s !!!
-	err = ssh.WaitServerReady(utils.TimeoutCtxHost)
+	err = ssh.WaitServerReady(brokerutils.TimeoutCtxHost)
 	// err = ssh.WaitServerReady(time.Second * 3)
 	if err != nil {
 		return nil, srvLogNew(fmt.Errorf("Error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name))
@@ -238,7 +252,7 @@ func (svc *NetworkService) List(all bool) ([]*model.Network, error) {
 
 	var netList []*model.Network
 
-	mn := metadata.NewNetwork(client)
+	mn := metadata.NewNetwork(svc.provider)
 	err := mn.Browse(func(network *model.Network) error {
 		netList = append(netList, network)
 		return nil
@@ -246,7 +260,7 @@ func (svc *NetworkService) List(all bool) ([]*model.Network, error) {
 
 	if err != nil {
 		log.Debugf("Error listing monitored networks: pagination error: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error listing monitored networks: %s", ProviderErrorToString(err)))
+		return nil, errors.Wrap(err, fmt.Sprintf("Error listing monitored networks: %s", err.Error()))
 	}
 
 	return netList, err
@@ -254,61 +268,66 @@ func (svc *NetworkService) List(all bool) ([]*model.Network, error) {
 
 // Get returns the network identified by ref, ref can be the name or the id
 func (svc *NetworkService) Get(ref string) (*model.Network, error) {
-	return svc.provider.GetNetwork(ref)
+	mn, err := metadata.LoadNetwork(svc.provider, ref)
+	if err != nil {
+		msg := fmt.Sprintf("failed to load metadata of network '%s'", ref)
+		log.Debugf(utils.TitleFirst(msg))
+		return nil, fmt.Errorf(msg)
+	}
+	if mn == nil {
+		return nil, model.ResourceNotFoundError("network(service)", ref)
+	}
+	return mn.Get(), err
 }
 
 // Delete deletes network referenced by ref
 func (svc *NetworkService) Delete(ref string) error {
-	mn, err := metadata.LoadNetwork(svc, networkRef)
+	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
-		msg := fmt.Sprintf("failed to read metadata of network '%s': %+v", ref, err)
-		log.Debugf(msg)
+		msg := fmt.Sprintf("failed to load metadata of network '%s'", ref)
+		log.Debugf(utils.TitleFirst(msg))
 		return fmt.Errorf(msg)
 	}
 	if mn == nil {
-		return fmt.Errorf("Failed to find network '%s' in metadata", ref)
+		return fmt.Errorf("network '%s' not found", ref)
 	}
 	network := mn.Get()
 	gwID := network.GatewayID
 
 	// Check if hosts are still attached to network according to metadata
-	hosts, err := mn.ListHosts()
+	networkHostsV1 := propsv1.NewNetworkHosts()
+	err = network.Properties.Get(NetworkProperty.HostsV1, networkHostsV1)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "")
 	}
-	if len(hosts) > 0 {
-		var allhosts []string
-		for _, i := range hosts {
-			if gwID != i.ID {
-				allhosts = append(allhosts, i.Name)
-			}
-		}
-		if len(allhosts) > 0 {
-			var lenS string
-			if len(allhosts) > 1 {
-				lenS = "s"
-			}
-			return fmt.Errorf("network '%s' has %d host%s attached (%s)", network.Name, len(allhosts), lenS, strings.Join(allhosts, ","))
-		}
+	if len(networkHostsV1.ByID) > 0 {
+		return fmt.Errorf("can't delete network '%s': at least one host is still attached to it", ref)
 	}
 
 	// 1st delete gateway
 	if gwID != "" {
 		mh, err := metadata.LoadHost(svc.provider, gwID)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "")
 		}
-		err = client.DeleteHost(gwID)
-		if err != nil {
-			log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
-		}
-		err = mh.Delete()
-		if err != nil {
-			return err
+		// allow no metadata, but log it
+		if mh == nil {
+			log.Warnf("Failed to find metadata of gateway; continuing assuming gateway is gone")
+		} else {
+			err = svc.provider.DeleteGateway(gwID)
+			// allow no gateway, but log it
+			if err != nil {
+				spew.Dump(err)
+				log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
+			}
+			err = mh.Delete()
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	// 2nd delete network
+	// 2nd delete network, with no tolerance
 	err = svc.provider.DeleteNetwork(network.ID)
 	if err != nil {
 		return err

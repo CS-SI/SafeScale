@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package commands
+package listeners
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/system"
 	log "github.com/sirupsen/logrus"
 
@@ -33,17 +32,17 @@ import (
 // broker ssh copy /file/test.txt host1://tmp
 // broker ssh copy host1:/file/test.txt /tmp
 
-// SSHServiceServer SSH service server grpc
-type SSHServiceServer struct{}
+// SSHServiceListener SSH service server grpc
+type SSHServiceListener struct{}
 
 // Run executes an ssh command an an host
-func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
+func (s *SSHServiceListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
 	log.Printf("Ssh run called '%s', '%s'", in.Host, in.Command)
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot execute ssh command : No tenant set")
 	}
 
-	service := services.NewSSHService(providers.FromClient(currentTenant.Client))
+	service := services.NewSSHService(currentTenant.Service)
 	retcode, stdout, stderr, err := service.Run(in.GetHost().GetName(), in.GetCommand())
 
 	return &pb.SshResponse{
@@ -54,13 +53,13 @@ func (s *SSHServiceServer) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshR
 }
 
 // Copy copy file from/to an host
-func (s *SSHServiceServer) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshResponse, error) {
+func (s *SSHServiceListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshResponse, error) {
 	log.Printf("Ssh copy called '%s', '%s'", in.Source, in.Destination)
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot copy ssh : No tenant set")
 	}
 
-	service := services.NewSSHService(providers.FromClient(currentTenant.Client))
+	service := services.NewSSHService(currentTenant.Service)
 	retcode, stdout, stderr, err := service.Copy(in.GetSource(), in.GetDestination())
 	if err != nil {
 		return nil, err

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package commands_test
+package listeners_test
 
 import (
 	"errors"
@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/server/commands"
+	"github.com/CS-SI/SafeScale/broker/server/listeners"
 	"github.com/CS-SI/SafeScale/broker/server/services"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
@@ -63,23 +63,23 @@ func TestCreate(t *testing.T) {
 	myMockedVolService := &MyMockedVolService{}
 	myMockedVolService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return()
 	//Mock VolumeServiceCreator
-	old := commands.VolumeServiceCreator
-	defer func() { commands.VolumeServiceCreator = old }()
+	old := listeners.NewVolumeService
+	defer func() { listeners.NewVolumeService = old }()
 
-	commands.VolumeServiceCreator = func(api *providers.Service) services.VolumeAPI {
+	listeners.NewVolumeService = func(api *providers.Service) services.VolumeAPI {
 		return nil
 		// TODO Fix this
 		// return myMockedVolService
 	}
 
 	// Mock GetCurrentTenant
-	oldGetCurrentTeant := commands.GetCurrentTenant
-	defer func() { commands.GetCurrentTenant = oldGetCurrentTeant }()
-	commands.GetCurrentTenant = func() *commands.Tenant {
-		return &commands.Tenant{Client: &providers.Service{}}
+	oldGetCurrentTeant := listeners.GetCurrentTenant
+	defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
+	listeners.GetCurrentTenant = func() *listeners.Tenant {
+		return &listeners.Tenant{Service: &providers.Service{}}
 	}
 
-	underTest := &commands.VolumeServiceServer{}
+	underTest := &listeners.VolumeServiceListener{}
 
 	// ACT
 	underTest.Create(nil, &pb.VolumeDefinition{
@@ -103,23 +103,23 @@ func TestCreate_Err(t *testing.T) {
 	myMockedVolService := &MyMockedVolService{err: errors.New("plop")}
 	myMockedVolService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("Fake Error"))
 	//Mock VolumeServiceCreator
-	old := commands.VolumeServiceCreator
-	defer func() { commands.VolumeServiceCreator = old }()
+	old := listeners.NewVolumeService
+	defer func() { listeners.NewVolumeService = old }()
 
-	commands.VolumeServiceCreator = func(api *providers.Service) services.VolumeAPI {
+	listeners.NewVolumeService = func(api *providers.Service) services.VolumeAPI {
 		// TODO Fix this
 		return nil
 		// return myMockedVolService
 	}
 
 	// Mock GetCurrentTenant
-	oldGetCurrentTeant := commands.GetCurrentTenant
-	defer func() { commands.GetCurrentTenant = oldGetCurrentTeant }()
-	commands.GetCurrentTenant = func() *commands.Tenant {
-		return &commands.Tenant{Client: &providers.Service{}}
+	oldGetCurrentTeant := listeners.GetCurrentTenant
+	defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
+	listeners.GetCurrentTenant = func() *listeners.Tenant {
+		return &listeners.Tenant{Service: &providers.Service{}}
 	}
 
-	underTest := &commands.VolumeServiceServer{}
+	underTest := &listeners.VolumeServiceListener{}
 
 	// ACT
 	_, err := underTest.Create(nil, &pb.VolumeDefinition{
@@ -133,13 +133,13 @@ func TestCreate_Err(t *testing.T) {
 func TestCreate_Err_NoTenantSet(t *testing.T) {
 	// ARRANGE
 	// Mock GetCurrentTenant
-	oldGetCurrentTeant := commands.GetCurrentTenant
-	defer func() { commands.GetCurrentTenant = oldGetCurrentTeant }()
-	commands.GetCurrentTenant = func() *commands.Tenant {
+	oldGetCurrentTeant := listeners.GetCurrentTenant
+	defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
+	listeners.GetCurrentTenant = func() *listeners.Tenant {
 		return nil
 	}
 	myMockedVolService := &MyMockedVolService{err: errors.New("plop")}
-	underTest := &commands.VolumeServiceServer{}
+	underTest := &listeners.VolumeServiceListener{}
 
 	// ACT
 	_, err := underTest.Create(nil, &pb.VolumeDefinition{

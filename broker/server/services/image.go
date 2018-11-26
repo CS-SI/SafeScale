@@ -18,7 +18,6 @@ package services
 
 import (
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
 )
 
@@ -34,9 +33,9 @@ type ImageAPI interface {
 }
 
 //NewImageService creates an host service
-func NewImageService(api api.ClientAPI) ImageAPI {
+func NewImageService(api *providers.Service) ImageAPI {
 	return &ImageService{
-		provider: providers.FromClient(api),
+		provider: api,
 	}
 }
 
@@ -50,12 +49,12 @@ func (srv *ImageService) List(all bool) ([]model.Image, error) {
 	return srv.provider.ListImages(all)
 }
 
-//Select selects the image that best fits osname
+// Select selects the image that best fits osname
 func (srv *ImageService) Select(osname string) (*model.Image, error) {
 	return nil, nil
 }
 
-//Filter filters the images that do not fit osname
+// Filter filters the images that do not fit osname
 func (srv *ImageService) Filter(osname string) ([]model.Image, error) {
 	return nil, nil
 }
