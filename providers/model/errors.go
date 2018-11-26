@@ -27,28 +27,28 @@ func (e *ErrTimeout) Error() string {
 	return e.Message
 }
 
-// ResourceError resource error
-type ResourceError struct {
+// ErrResource resource error
+type ErrResource struct {
 	Name         string
 	ResourceType string
 }
 
-// ResourceNotFound resource not found error
-type ResourceNotFound struct {
-	ResourceError
+// ErrResourceNotFound resource not found error
+type ErrResourceNotFound struct {
+	ErrResource
 }
 
 // ResourceNotFoundError creates a ResourceNotFound error
-func ResourceNotFoundError(resource string, name string) ResourceNotFound {
-	return ResourceNotFound{
-		ResourceError{
+func ResourceNotFoundError(resource string, name string) ErrResourceNotFound {
+	return ErrResourceNotFound{
+		ErrResource{
 			Name:         name,
 			ResourceType: resource,
 		},
 	}
 }
-func (e ResourceNotFound) Error() string {
-	tmpl := "Unable to find %s"
+func (e ErrResourceNotFound) Error() string {
+	tmpl := "failed to find %s"
 	if e.Name != "" {
 		tmpl += " '%s'"
 		return fmt.Sprintf(tmpl, e.ResourceType, e.Name)
@@ -56,39 +56,58 @@ func (e ResourceNotFound) Error() string {
 	return fmt.Sprintf(tmpl, e.ResourceType)
 }
 
-// ResourceNotAvailable resource not available error
-type ResourceNotAvailable struct {
-	ResourceError
+// ErrResourceNotAvailable resource not available error
+type ErrResourceNotAvailable struct {
+	ErrResource
 }
 
 // ResourceNotAvailableError creates a ResourceNotAvailable error
-func ResourceNotAvailableError(resource, name string) ResourceNotAvailable {
-	return ResourceNotAvailable{
-		ResourceError{
+func ResourceNotAvailableError(resource, name string) ErrResourceNotAvailable {
+	return ErrResourceNotAvailable{
+		ErrResource{
 			Name:         name,
 			ResourceType: resource,
 		},
 	}
 }
-func (e ResourceNotAvailable) Error() string {
-	return fmt.Sprintf("%s resource '%s' is unavailable", e.ResourceType, e.Name)
+func (e ErrResourceNotAvailable) Error() string {
+	return fmt.Sprintf("%s '%s' is unavailable", e.ResourceType, e.Name)
 }
 
-// ResourceAlreadyExists resource already exists error
-type ResourceAlreadyExists struct {
-	ResourceError
+// ErrResourceAlreadyExists resource already exists error
+type ErrResourceAlreadyExists struct {
+	ErrResource
 }
 
 // ResourceAlreadyExistsError creates a ResourceAlreadyExists error
-func ResourceAlreadyExistsError(resource string, name string) ResourceAlreadyExists {
-	return ResourceAlreadyExists{
-		ResourceError{
+func ResourceAlreadyExistsError(resource string, name string) ErrResourceAlreadyExists {
+	return ErrResourceAlreadyExists{
+		ErrResource{
 			Name:         name,
 			ResourceType: resource,
 		},
 	}
 }
 
-func (e ResourceAlreadyExists) Error() string {
+func (e ErrResourceAlreadyExists) Error() string {
 	return fmt.Sprintf("%s '%s' already exists", e.ResourceType, e.Name)
+}
+
+// ErrResourceInvalidRequest resource requested with invalid parameters
+type ErrResourceInvalidRequest struct {
+	ErrResource
+}
+
+// ResourceInvalidRequestError creates a ErrResourceInvalidRequest error
+func ResourceInvalidRequestError(resource string, reason string) ErrResourceInvalidRequest {
+	return ErrResourceInvalidRequest{
+		ErrResource{
+			Name:         reason,
+			ResourceType: resource,
+		},
+	}
+}
+
+func (e ErrResourceInvalidRequest) Error() string {
+	return fmt.Sprintf("%s request is invalid: %s", e.ResourceType, e.Name)
 }

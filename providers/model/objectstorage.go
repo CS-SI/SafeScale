@@ -20,32 +20,38 @@ import (
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/CS-SI/SafeScale/providers/objectstorage"
 )
 
-// ContainerInfo represents a container description
-type ContainerInfo struct {
+// Bucket describes a Bucket
+type Bucket struct {
+	ID         string `json:"id,omitempty"`
 	Name       string `json:"name,omitempty"`
 	Host       string `json:"host,omitempty"`
 	MountPoint string `json:"mountPoint,omitempty"`
-	NbItems    int    `json:"nbitems,omitempty"`
+	// NbItems    int    `json:"nbitems,omitempty"`
 }
 
 // Object object to put in a container
 type Object struct {
-	Name          string            `json:"name,omitempty"`
-	Content       io.ReadSeeker     `json:"content,omitempty"`
-	DeleteAt      time.Time         `json:"delete_at,omitempty"`
-	Metadata      map[string]string `json:"metadata,omitempty"`
-	Date          time.Time         `json:"date,omitempty"`
-	LastModified  time.Time         `json:"last_modified,omitempty"`
-	ContentType   string            `json:"content_type,omitempty"`
-	ContentLength int64             `json:"content_length,omitempty"`
+	ID            string                       `json:"id,omitempty"`
+	Name          string                       `json:"name,omitempty"`
+	DeleteAt      time.Time                    `json:"delete_at,omitempty"`
+	Date          time.Time                    `json:"date,omitempty"`
+	ContentType   string                       `json:"content_type,omitempty"`
+	ContentLength int64                        `json:"content_length,omitempty"`
+	Content       io.ReadSeeker                `json:"content,omitempty"`
+	Size          int64                        `json:"size,omitempty"`
+	Metadata      objectstorage.ObjectMetadata `json:"metadata,omitempty"`
+	LastModified  time.Time                    `json:"last_modified,omitempty"`
+	ETag          string                       `json:"etag,omitempty"`
 }
 
 // ObjectFilter filter object
 type ObjectFilter struct {
-	Prefix string `json:"prefix,omitempty"`
 	Path   string `json:"path,omitempty"`
+	Prefix string `json:"prefix,omitempty"`
 }
 
 // Range Defines a range of bytes

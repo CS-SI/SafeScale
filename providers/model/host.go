@@ -76,19 +76,21 @@ type Image struct {
 // HostRequest represents requirements to create host
 type HostRequest struct {
 	// ResourceName contains the name of the compute resource
-	ResourceName string `json:"resource_name,omitempty"`
+	ResourceName string
 	// HostName contains the hostname on the system (if empty, will use ResourceName)
-	HostName string `json:"host_name,omitempty"`
-	// NetworksIDs lists the network IDs the host must be connected to
-	NetworkIDs []string `json:"network_ids,omitempty"`
+	HostName string
+	// Networks lists the networks the host must be connected to
+	Networks []*Network
+	// DefaultGateway is the host used as default gateway
+	DefaultGateway *Host
 	// PublicIP a flag telling if the host must have a public IP
-	PublicIP bool `json:"public_ip,omitempty"`
+	PublicIP bool
 	// TemplateID is the UUID of the template used to size the host (see SelectTemplates)
-	TemplateID string `json:"template_id,omitempty"`
+	TemplateID string
 	// ImageID is the UUID of the image that contains the server's OS and initial state.
-	ImageID string `json:"image_id,omitempty"`
+	ImageID string
 	// KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
-	KeyPair *KeyPair `json:"key_pair,omitempty"`
+	KeyPair *KeyPair
 }
 
 // HostSize ...
