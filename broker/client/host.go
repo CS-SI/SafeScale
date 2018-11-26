@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"google.golang.org/grpc/status"
 	"strings"
@@ -24,10 +25,10 @@ import (
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/utils"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/system"
 	cache "github.com/CS-SI/SafeScale/utils"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 var sshCfgCache = cache.NewMapCache()
@@ -40,122 +41,95 @@ type host struct {
 
 // List ...
 func (h *host) List(all bool, timeout time.Duration) (*pb.HostList, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxHost {
-		timeout = utils.TimeoutCtxHost
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewHostServiceClient(conn)
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+	ctx := context.Background()
+
 	return service.List(ctx, &pb.HostListRequest{All: all})
 }
 
 // Inspect ...
 func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewHostServiceClient(conn)
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+	ctx := context.Background()
+
 	return service.Inspect(ctx, &pb.Reference{Name: name})
+
 }
 
 // Get host status
 func (h *host) Status(name string, timeout time.Duration) (*pb.HostStatus, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewHostServiceClient(conn)
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+	ctx := context.Background()
 
-	theHost, theErr := service.Status(ctx, &pb.Reference{Name: name})
-
-	return theHost, theErr
+	return service.Status(ctx, &pb.Reference{Name: name})
 }
 
 // Reboots host
-func (h *host) Reboot(name string, timeout time.Duration) (interface{}, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewHostServiceClient(conn)
-	return service.Reboot(ctx, &pb.Reference{Name: name})
+func (h *host) Reboot(name string, timeout time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+	ctx := context.Background()
+
+	_, err := service.Reboot(ctx, &pb.Reference{Name: name})
+	return err
 }
 
 // Start host
-func (h *host) Start(name string, timeout time.Duration) (interface{}, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewHostServiceClient(conn)
-	return service.Start(ctx, &pb.Reference{Name: name})
+func (h *host) Start(name string, timeout time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+	ctx := context.Background()
+
+	_, err := service.Start(ctx, &pb.Reference{Name: name})
+	return err
 }
 
-func (h *host) Stop(name string, timeout time.Duration) (interface{}, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewHostServiceClient(conn)
-	return service.Stop(ctx, &pb.Reference{Name: name})
+func (h *host) Stop(name string, timeout time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+	ctx := context.Background()
+
+	_, err := service.Stop(ctx, &pb.Reference{Name: name})
+	return err
 }
 
 // Create ...
 func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxHost {
-		timeout = utils.TimeoutCtxHost
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewHostServiceClient(conn)
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+	ctx := context.Background()
+
 	return service.Create(ctx, &def)
 }
 
 // Delete deletes several hosts at the same time in goroutines
 func (h *host) Delete(names []string, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxHost {
-		timeout = utils.TimeoutCtxHost
-	}
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+	ctx := context.Background()
 
-	timeout = timeout + (30 * time.Second * time.Duration(len(names)))
-
-	var wg sync.WaitGroup
-	problems := false
-	deleteErrors := make(chan error, len(names))
+	var (
+		wg   sync.WaitGroup
+		errs int
+	)
 
 	hostDeleter := func(aname string) {
 		defer wg.Done()
-		ctx, cancel := utils.GetContext(timeout)
-		defer cancel()
-		service := pb.NewHostServiceClient(conn)
 		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
-
 		if err != nil {
 			fmt.Printf("%v\n", DecorateError(err, "deletion of host", true))
-			deleteErrors <- err
-			problems = true
+			errs++
 		} else {
 			fmt.Printf("Host '%s' deleted\n", aname)
 		}
@@ -165,21 +139,12 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 	for _, target := range names {
 		go hostDeleter(target)
 	}
-
 	wg.Wait()
 	close(deleteErrors)
 
-	var errorList []string
-	for err := range deleteErrors {
-		errorList = append(errorList, status.Convert(err).Message())
+	if errs > 0 {
+		return clitools.ExitOnRPC("")
 	}
-
-
-	if problems {
-		formatted := fmt.Errorf("One or more errors detected deleting hosts: [%s]", strings.Join(errorList, ";"))
-		return formatted
-	}
-
 	return nil
 }
 
@@ -188,11 +153,12 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 	if anon, ok := sshCfgCache.Get(name); ok {
 		return anon.(*system.SSHConfig), nil
 	}
-	conn := utils.GetConnection()
-	defer conn.Close()
-	ctx, cancel := utils.GetContext(utils.TimeoutCtxDefault)
-	defer cancel()
-	service := pb.NewHostServiceClient(conn)
+
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+	ctx := context.Background()
+
 	pbSSHCfg, err := service.SSH(ctx, &pb.Reference{Name: name})
 	sshCfg := conv.ToSystemSshConfig(pbSSHCfg)
 	if err == nil {

@@ -17,10 +17,10 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	utils "github.com/CS-SI/SafeScale/broker/utils"
 )
 
 // host is the broker client part handling hosts
@@ -31,13 +31,10 @@ type template struct {
 
 // List return the list of availble templates on the current tenant
 func (t *template) List(all bool, timeout time.Duration) (*pb.TemplateList, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewTemplateServiceClient(conn)
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTemplateServiceClient(t.session.connection)
+	ctx := context.Background()
 	return service.List(ctx, &pb.TemplateListRequest{All: all})
+
 }

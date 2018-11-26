@@ -17,122 +17,99 @@
 package client
 
 import (
-	"fmt"
-	"sync"
+	"context"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	utils "github.com/CS-SI/SafeScale/broker/utils"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
-// share is the part of the broker client handing Shares
+// share is the part of the broker client handilng Shares
 type share struct {
-	// Session is not used currently
 	session *Session
 }
 
 // Create ...
 func (n *share) Create(def pb.ShareDefinition, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewShareServiceClient(conn)
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx := context.Background()
 
 	_, err := service.Create(ctx, &def)
-	return err
+	if err != nil {
+		return DecorateError(err, "creation of share", true)
+	}
+	return nil
 }
 
-// Delete deletes several nas at the same time in goroutines
-func (n *share) Delete(names []string, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxHost {
-		timeout = utils.TimeoutCtxHost
+// Delete deletes a share
+func (n *share) Delete(name string, timeout time.Duration) error {
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx := context.Background()
+
+	_, err := service.Delete(ctx, &pb.Reference{Name: name})
+	if err != nil {
+		return DecorateError(err, "deletion of share", true)
 	}
-
-	timeout = timeout + (30 * time.Second * time.Duration(len(names)))
-
-	var wg sync.WaitGroup
-
-	shareDeleter := func(aname string) {
-		defer wg.Done()
-		ctx, cancel := utils.GetContext(timeout)
-		defer cancel()
-		shareService := pb.NewShareServiceClient(conn)
-		_, err := shareService.Delete(ctx, &pb.Reference{Name: aname})
-
-		if err != nil {
-			fmt.Println(DecorateError(err, "deletion of share", true).Error())
-		} else {
-			fmt.Printf("Share '%s' successfully deleted\n", aname)
-		}
-	}
-
-	wg.Add(len(names))
-	for _, target := range names {
-		go shareDeleter(target)
-	}
-	wg.Wait()
-
 	return nil
 }
 
 // List ...
 func (n *share) List(timeout time.Duration) (*pb.ShareList, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx := context.Background()
+
+	list, err := service.List(ctx, &google_protobuf.Empty{})
+	if err != nil {
+		return nil, DecorateError(err, "list of shares", true)
 	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewShareServiceClient(conn)
-	return service.List(ctx, &google_protobuf.Empty{})
+	return list, nil
 }
 
 // Mount ...
 func (n *share) Mount(def pb.ShareMountDefinition, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewShareServiceClient(conn)
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx := context.Background()
+
 	_, err := service.Mount(ctx, &def)
-	return err
+	if err != nil {
+		return DecorateError(err, "mount of share", true)
+	}
+	return nil
 }
 
 // Unmount ...
 func (n *share) Unmount(def pb.ShareMountDefinition, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewShareServiceClient(conn)
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx := context.Background()
+
 	_, err := service.Unmount(ctx, &def)
-	return err
+	if err != nil {
+		return DecorateError(err, "unmount of share", true)
+	}
+	return nil
 }
 
 // Inspect ...
 func (n *share) Inspect(name string, timeout time.Duration) (*pb.ShareList, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx := context.Background()
+
+	list, err := service.Inspect(ctx, &pb.Reference{Name: name})
+	if err != nil {
+		return nil, DecorateError(err, "inspection of share", true)
 	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewShareServiceClient(conn)
-	return service.Inspect(ctx, &pb.Reference{Name: name})
+	return list, nil
 }
