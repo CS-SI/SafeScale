@@ -100,12 +100,10 @@ func GetService(tenantName string) (*Service, error) {
 			"compute":  tenantCompute,
 			"network":  tenantNetwork,
 		}
-		tenantObjectStorage, found := tenant["objectstorage"].(map[string]interface{})
-		tenantMetadata, found := tenant["metadata"].(map[string]interface{})
-		if !found {
-			tenantMetadata = tenantObjectStorage
-		}
+		_, tenantObjectStorageFound := tenant["objectstorage"]
+		_, tenantMetadataFound := tenant["metadata"]
 
+		// Initializes Provider
 		clientAPI, err := client.Build(tenantClient)
 		if err != nil {
 			return nil, fmt.Errorf("Error creating tenant %s on provider %s: %s", tenantName, provider, err.Error())
@@ -114,34 +112,59 @@ func GetService(tenantName string) (*Service, error) {
 		if err != nil {
 			return nil, err
 		}
-		objectStorageConfig := fillObjectStorageConfig(tenantObjectStorage)
-		objectStorageLocation := objectstorage.NewLocation(objectStorageConfig)
-		err = objectStorageLocation.Connect()
-		if err != nil {
-			return nil, fmt.Errorf("Error connecting to Object Storage Location: %s", err.Error())
-		}
-		metadataLocationConfig := fillObjectStorageConfig(tenantMetadata)
-		metadataLocation := objectstorage.NewLocation(metadataLocationConfig)
-		err = metadataLocation.Connect()
-		if err != nil {
-			return nil, fmt.Errorf("Error connecting to Object Storage Location to store metadata: %s", err.Error())
-		}
-		anon, found := clientCfg.Get("MetadataBucketName")
-		if !found {
-			return nil, fmt.Errorf("missing configuration option 'MetadataBucketName'")
-		}
-		bucketName := anon.(string)
-		var bucket objectstorage.Bucket
-		found, err = metadataLocation.FindBucket(bucketName)
-		if found {
-			bucket, err = metadataLocation.GetBucket(bucketName)
+
+		// Initializes Object Storage
+		var objectStorageLocation objectstorage.Location
+		if tenantObjectStorageFound {
+			objectStorageConfig, err := fillObjectStorageConfig(tenant)
+			if err != nil {
+				return nil, err
+			}
+			objectStorageLocation, err = objectstorage.NewLocation(objectStorageConfig)
+			if err != nil {
+				return nil, fmt.Errorf("Error connecting to Object Storage Location: %s", err.Error())
+			}
 		} else {
-			bucket, err = metadataLocation.CreateBucket(bucketName)
+			log.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
 		}
+
+		// Initializes Metadata Object Storage (may be different than the Object Storage)
+		var metadataBucket objectstorage.Bucket
+		if tenantMetadataFound || tenantObjectStorageFound {
+			metadataLocationConfig, err := fillMetadataObjectStorageConfig(tenant)
+			if err != nil {
+				return nil, err
+			}
+			metadataLocation, err := objectstorage.NewLocation(metadataLocationConfig)
+			if err != nil {
+				return nil, fmt.Errorf("Error connecting to Object Storage Location to store metadata: %s", err.Error())
+			}
+			anon, found := clientCfg.Get("MetadataBucket")
+			if !found {
+				panic("missing configuration option 'MetadataBucket'!")
+			}
+			bucketName := anon.(string)
+			found, err = metadataLocation.FindBucket(bucketName)
+			if found {
+				metadataBucket, err = metadataLocation.GetBucket(bucketName)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				metadataBucket, err = metadataLocation.CreateBucket(bucketName)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			return nil, fmt.Errorf("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+		}
+
+		// Service is ready
 		return &Service{
-			Client:         clientAPI,
+			ClientAPI:      clientAPI,
 			ObjectStorage:  objectStorageLocation,
-			MetadataBucket: bucket,
+			MetadataBucket: metadataBucket,
 		}, nil
 	}
 
@@ -152,20 +175,164 @@ func GetService(tenantName string) (*Service, error) {
 }
 
 // fillObjectStorageConfig initializes objectstorage.Config struct with map
-func fillObjectStorageConfig(tenant map[string]interface{}) objectstorage.Config {
-	var config objectstorage.Config
-	config.Domain = "default"
-	config.Auth = tenant["Auth"].(string)
-	config.Endpoint = tenant["Auth"].(string)
-	config.User = tenant["Username"].(string)
-	config.Tenant = tenant["ProjectID"].(string)
-	config.Region = tenant["Region"].(string)
-	if tenant["SecretKey"] != nil {
-		config.Secretkey = tenant["SecretKey"].(string)
+func fillObjectStorageConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
+	var (
+		config objectstorage.Config
+		ok     bool
+	)
+
+	identity, _ := tenant["identity"].(map[string]interface{})
+	compute, _ := tenant["compute"].(map[string]interface{})
+	objectstorage, _ := tenant["objectstorage"].(map[string]interface{})
+
+	if config.Type, ok = objectstorage["Type"].(string); !ok {
+		return config, fmt.Errorf("missing setting 'Type' in 'metadata' section")
 	}
-	config.Key = tenant["Password"].(string)
-	config.Types = tenant["Types"].(string)
-	return config
+
+	if config.Domain, ok = objectstorage["Domain"].(string); !ok {
+		if config.Domain, ok = objectstorage["DomainName"].(string); !ok {
+			if config.Domain, ok = compute["Domain"].(string); !ok {
+				config.Domain, _ = compute["DomainName"].(string)
+			}
+		}
+	}
+
+	if config.Tenant, ok = objectstorage["Tenant"].(string); !ok {
+		if config.Tenant, ok = objectstorage["ProjectName"].(string); !ok {
+			if config.Tenant, ok = objectstorage["ProjectID"].(string); !ok {
+				if config.Tenant, ok = compute["ProjectName"].(string); !ok {
+					config.Tenant, _ = compute["ProjectID"].(string)
+				}
+			}
+		}
+	}
+
+	config.AuthURL, _ = objectstorage["AuthURL"].(string)
+	config.Endpoint, _ = objectstorage["Endpoint"].(string)
+	config.User, _ = objectstorage["Username"].(string)
+
+	if config.Key, ok = objectstorage["AccessKey"].(string); !ok {
+		if config.Key, ok = objectstorage["OpenStackID"].(string); !ok {
+			if config.Key, ok = objectstorage["Username"].(string); !ok {
+				if config.Key, ok = identity["OpenstackID"].(string); !ok {
+					config.Key, _ = identity["Username"].(string)
+				}
+			}
+		}
+	}
+	config.User = config.Key
+	if config.SecretKey, ok = objectstorage["SecretKey"].(string); !ok {
+		if config.SecretKey, ok = objectstorage["OpenstackPassword"].(string); !ok {
+			if config.SecretKey, ok = objectstorage["Password"].(string); !ok {
+				config.SecretKey, _ = identity["OpenstackPassword"].(string)
+			}
+		}
+	}
+
+	if config.Region, ok = objectstorage["Region"].(string); !ok {
+		config.Region, _ = compute["Region"].(string)
+	}
+
+	return config, nil
+}
+
+// fillMetadataObjectStorageConfig initializes objectstorage.Config struct with map
+func fillMetadataObjectStorageConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
+	var (
+		config objectstorage.Config
+		ok     bool
+	)
+
+	identity, _ := tenant["identity"].(map[string]interface{})
+	compute, _ := tenant["compute"].(map[string]interface{})
+	objectstorage, _ := tenant["objectstorage"].(map[string]interface{})
+	metadata, _ := tenant["metadata"].(map[string]interface{})
+
+	if config.Type, ok = metadata["Type"].(string); !ok {
+		if config.Type, ok = objectstorage["Type"].(string); !ok {
+			return config, fmt.Errorf("missing setting 'Type' in 'metadata' section")
+		}
+	}
+
+	if config.Domain, ok = metadata["Domain"].(string); !ok {
+		if config.Domain, ok = metadata["DomainName"].(string); !ok {
+			if config.Domain, ok = objectstorage["Domain"].(string); !ok {
+				if config.Domain, ok = objectstorage["DomainName"].(string); !ok {
+					if config.Domain, ok = compute["Domain"].(string); !ok {
+						config.Domain, _ = compute["DomainName"].(string)
+					}
+				}
+			}
+		}
+	}
+
+	if config.Tenant, ok = metadata["Tenant"].(string); !ok {
+		if config.Tenant, ok = metadata["ProjectName"].(string); !ok {
+			if config.Tenant, ok = metadata["ProjectID"].(string); !ok {
+				if config.Tenant, ok = objectstorage["Tenant"].(string); !ok {
+					if config.Tenant, ok = objectstorage["ProjectName"].(string); !ok {
+						if config.Tenant, ok = objectstorage["ProjectID"].(string); !ok {
+							if config.Tenant, ok = compute["ProjectName"].(string); !ok {
+								config.Tenant, _ = compute["ProjectID"].(string)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if config.AuthURL, ok = metadata["AuthURL"].(string); !ok {
+		config.AuthURL, _ = objectstorage["AuthURL"].(string)
+	}
+
+	if config.Endpoint, ok = metadata["Endpoint"].(string); !ok {
+		config.Endpoint, _ = objectstorage["Endpoint"].(string)
+	}
+
+	if config.Key, ok = metadata["AccessKey"].(string); !ok {
+		if config.Key, ok = metadata["OpenstackID"].(string); !ok {
+			if config.Key, ok = metadata["Username"].(string); !ok {
+				if config.Key, ok = objectstorage["AccessKey"].(string); !ok {
+					if config.Key, ok = objectstorage["OpenStackID"].(string); !ok {
+						if config.Key, ok = objectstorage["Username"].(string); !ok {
+							if config.Key, ok = identity["Username"].(string); !ok {
+								config.Key, _ = identity["OpenstackID"].(string)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	config.User = config.Key
+	if config.SecretKey, ok = metadata["SecretKey"].(string); !ok {
+		if config.SecretKey, ok = metadata["AccessPassword"].(string); !ok {
+			if config.SecretKey, ok = metadata["OpenstackPassword"].(string); !ok {
+				if config.SecretKey, ok = metadata["Password"].(string); !ok {
+					if config.SecretKey, ok = objectstorage["SecretKey"].(string); !ok {
+						if config.SecretKey, ok = objectstorage["AccessPassword"].(string); !ok {
+							if config.SecretKey, ok = objectstorage["OpenstackPassword"].(string); !ok {
+								if config.SecretKey, ok = objectstorage["Password"].(string); !ok {
+									if config.SecretKey, ok = identity["Password"].(string); !ok {
+										config.SecretKey, _ = identity["OpenstackPassword"].(string)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if config.Region, ok = metadata["Region"].(string); !ok {
+		if config.Region, ok = objectstorage["Region"].(string); !ok {
+			config.Region, _ = compute["Region"].(string)
+		}
+	}
+
+	return config, nil
 }
 
 func loadConfig() error {
@@ -175,9 +342,8 @@ func loadConfig() error {
 	}
 	for _, t := range tenantsCfg {
 		tenant, _ := t.(map[string]interface{})
-		tenantconfig, _ := tenant["config"].(map[string]interface{})
-		if name, ok := tenantconfig["name"].(string); ok {
-			if provider, ok := tenantconfig["client"].(string); ok {
+		if name, ok := tenant["name"].(string); ok {
+			if provider, ok := tenant["client"].(string); ok {
 				tenants[name] = provider
 			} else {
 				return fmt.Errorf("Invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)

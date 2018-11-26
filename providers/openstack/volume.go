@@ -18,11 +18,13 @@ package openstack
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -30,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
@@ -114,8 +117,11 @@ func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, 
 func (client *Client) GetVolume(id string) (*model.Volume, error) {
 	r := volumes.Get(client.Volume, id)
 	volume, err := r.Extract()
-	spew.Dump(r)
 	if err != nil {
+		switch err.(type) {
+		case gc.ErrDefault404:
+			return nil, nil
+		}
 		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", ProviderErrorToString(err)))
 	}
@@ -163,14 +169,37 @@ func (client *Client) ListVolumes() ([]model.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(id string) error {
-	r := volumes.Delete(client.Volume, id)
-	err := r.ExtractErr()
-	if err != nil {
-		spew.Dump(r.Err)
-		log.Debugf("Error deleting volume: actual delete call: %+v", err)
-		return errors.Wrap(err, fmt.Sprintf("Error deleting volume: %s", ProviderErrorToString(err)))
-	}
+	var (
+		err     error
+		timeout = 30 * time.Second
+	)
 
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			r := volumes.Delete(client.Volume, id)
+			err := r.ExtractErr()
+			if err != nil {
+				switch err.(type) {
+				case gc.ErrDefault400:
+					return fmt.Errorf("volume not in state 'available'")
+				default:
+					return err
+				}
+			}
+			return nil
+		},
+		timeout,
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case retry.ErrTimeout:
+			if err != nil {
+				return fmt.Errorf("timeout after %v to delete volume: %v", timeout, err)
+			}
+		}
+		log.Debugf("Error deleting volume: %+v", retryErr)
+		return errors.Wrap(retryErr, fmt.Sprintf("Error deleting volume: %v", retryErr))
+	}
 	return nil
 }
 

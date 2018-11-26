@@ -26,7 +26,7 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-	provmetadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"net/http"
@@ -102,9 +102,9 @@ type CfgOptions struct {
 	VolumeSpeeds map[string]VolumeSpeed.Enum
 	// // ObjectStorageType type of Object Storage (ex: swift or s3)
 	// ObjectStorageType string
-	// MetadataBucketName contains the name of the bucket storing metadata
-	MetadataBucketName string
-	DefaultImage       string
+	// MetadataBucket contains the name of the bucket storing metadata
+	MetadataBucket string
+	DefaultImage   string
 }
 
 // ProviderErrorToString creates an error string from openstack api error
@@ -192,6 +192,9 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		AllowReauth:      opts.AllowReauth,
 		TokenID:          opts.TokenID,
 	}
+	if cfg.MetadataBucket == "" {
+		cfg.MetadataBucket = metadata.BuildMetadataBucketName(opts.Username)
+	}
 
 	// Openstack client
 	pClient, err := openstack.AuthenticatedClient(gcOpts)
@@ -243,10 +246,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, err
 	}
 
-	// Creates metadata Object Storage bucket
-	if clt.Cfg.MetadataBucketName == "" {
-		clt.Cfg.MetadataBucketName = provmetadata.BuildMetadataBucketName(opts.DomainName)
-	}
 	return &clt, nil
 }
 
@@ -472,7 +471,8 @@ func (client *Client) GetCfgOpts() (model.Config, error) {
 	// cfg.Set("ObjectStorageType", client.Cfg.ObjectStorageType)
 	cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
-	cfg.Set("MetadataBucket", client.Cfg.MetadataBucketName)
+	cfg.Set("ProviderNetwork", client.Cfg.ProviderNetwork)
+	cfg.Set("MetadataBucket", client.Cfg.MetadataBucket)
 
 	return cfg, nil
 }

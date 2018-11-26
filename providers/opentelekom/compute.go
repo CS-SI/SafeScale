@@ -26,9 +26,14 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	return client.feclt.CreateHost(request)
 }
 
-// UpdateHost returns the host identified by id or updates an already existing *model.Host instance
-func (client *Client) UpdateHost(host *model.Host) error {
-	return client.feclt.UpdateHost(host)
+// GetHost returns the host identified by id or updates an already existing *model.Host instance
+func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
+	return client.feclt.GetHost(hostParam)
+}
+
+// GetHostByName returns the host identified by name
+func (client *Client) GetHostByName(name string) (*model.Host, error) {
+	return client.feclt.GetHostByName(name)
 }
 
 // GetHostState ...
@@ -45,12 +50,6 @@ func (client *Client) ListHosts() ([]*model.Host, error) {
 func (client *Client) DeleteHost(id string) error {
 	return client.feclt.DeleteHost(id)
 }
-
-// // GetSSHConfig creates SSHConfig to connect an host by its ID
-// // Param can be type string or *model.Host; any other type will panic
-// func (client *Client) GetSSHConfig(hostParam interface{}) (*system.SSHConfig, error) {
-// 	return client.feclt.GetSSHConfig(hostParam)
-// }
 
 // CreateKeyPair creates and import a key pair
 func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {

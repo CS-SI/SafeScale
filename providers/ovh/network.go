@@ -30,6 +30,11 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	return client.osclt.CreateNetwork(req)
 }
 
+// GetNetworkByName returns the network identified name
+func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
+	return client.osclt.GetNetworkByName(name)
+}
+
 // GetNetwork returns the network identified by ref (id or name)
 func (client *Client) GetNetwork(ref string) (*model.Network, error) {
 	return client.osclt.GetNetwork(ref)
@@ -46,11 +51,11 @@ func (client *Client) DeleteNetwork(networkRef string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
+func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
 	return client.osclt.CreateGateway(req)
 }
 
-// // DeleteGateway delete the public gateway of a private network
-// func (client *Client) DeleteGateway(networkID string) error {
-// 	return client.osclt.DeleteGateway(networkID)
-// }
+// DeleteGateway delete the public gateway of a private network
+func (client *Client) DeleteGateway(networkID string) error {
+	return client.osclt.DeleteGateway(networkID)
+}

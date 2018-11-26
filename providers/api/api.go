@@ -49,22 +49,27 @@ type ClientAPI interface {
 
 	// CreateNetwork creates a network named name
 	CreateNetwork(req model.NetworkRequest) (*model.Network, error)
-	// GetNetwork returns the network identified by ref (id or name)
-	GetNetwork(ref string) (*model.Network, error)
+	// GetNetwork returns the network identified by id
+	GetNetwork(id string) (*model.Network, error)
+	// GetNetworkByName returns the network identified by name)
+	GetNetworkByName(name string) (*model.Network, error)
 	// ListNetworks lists all networks
 	ListNetworks() ([]*model.Network, error)
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
 	// CreateGateway creates a public Gateway for a private network
-	CreateGateway(req model.GWRequest) (*model.Host, error)
-	// Note: no DeleteGateway(); DeleteHost() does this very well
+	CreateGateway(req model.GatewayRequest) (*model.Host, error)
+	// DeleteGateway ...
+	DeleteGateway(string) error
 
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request model.HostRequest) (*model.Host, error)
-	// GetHost returns the host identified by id
-	UpdateHost(host *model.Host) error
+	// GetHost returns the host identified by id or updates content of a *model.Host
+	GetHost(interface{}) (*model.Host, error)
+	// GetHostByName returns the host identified by name
+	GetHostByName(string) (*model.Host, error)
 	// GetHostState returns the current state of the host identified by id
-	GetHostState(hostParam interface{}) (HostState.Enum, error)
+	GetHostState(interface{}) (HostState.Enum, error)
 	// ListHosts lists all hosts
 	ListHosts() ([]*model.Host, error)
 	// DeleteHost deletes the host identified by id

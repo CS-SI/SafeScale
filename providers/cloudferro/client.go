@@ -20,7 +20,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/metadata"
-	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	gc "github.com/gophercloud/gophercloud"
@@ -66,9 +65,9 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 				"HDD": VolumeSpeed.HDD,
 				"SSD": VolumeSpeed.SSD,
 			},
-			MetadataBucketName: metadata.BuildMetadataBucketName(opts.ProjectID),
-			DNSList:            []string{"1.1.1.1", "8.8.8.8"},
-			DefaultImage:       cfg.DefaultImage,
+			MetadataBucket: metadata.BuildMetadataBucketName(opts.ProjectID),
+			DNSList:        []string{"1.1.1.1", "8.8.8.8"},
+			DefaultImage:   cfg.DefaultImage,
 		},
 	)
 
@@ -138,18 +137,18 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	)
 }
 
-// GetCfgOpts return configuration parameters
-func (c *Client) GetCfgOpts() (model.Config, error) {
-	cfg := model.ConfigMap{}
+// // GetCfgOpts return configuration parameters
+// func (c *Client) GetCfgOpts() (model.Config, error) {
+// 	cfg := model.ConfigMap{}
 
-	cfg.Set("DNSList", c.Cfg.DNSList)
-	// cfg.Set("ObjectStorageType", c.Cfg.ObjectStorageType)
-	cfg.Set("AutoHostNetworkInterfaces", c.Cfg.AutoHostNetworkInterfaces)
-	cfg.Set("UseLayer3Networking", c.Cfg.UseLayer3Networking)
-	cfg.Set("MetadataBucket", c.Cfg.MetadataBucketName)
+// 	cfg.Set("DNSList", c.Cfg.DNSList)
+// 	// cfg.Set("ObjectStorageType", c.Cfg.ObjectStorageType)
+// 	cfg.Set("AutoHostNetworkInterfaces", c.Cfg.AutoHostNetworkInterfaces)
+// 	cfg.Set("UseLayer3Networking", c.Cfg.UseLayer3Networking)
+// 	cfg.Set("MetadataBucket", c.Cfg.MetadataBucketName)
 
-	return cfg, nil
-}
+// 	return cfg, nil
+// }
 
 func init() {
 	providers.Register("cloudferro", &Client{})

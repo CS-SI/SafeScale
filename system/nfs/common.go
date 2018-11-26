@@ -19,12 +19,13 @@ package nfs
 import (
 	"bytes"
 	"fmt"
-	"github.com/pkg/errors"
 	"os/exec"
 	"strings"
 	"syscall"
 	"text/template"
 	"time"
+
+	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
 
@@ -206,13 +207,12 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 
 		// TODO Simplification of error message
 		collected := ""
-		errLines := strings.Split(stderr,"\n")
+		errLines := strings.Split(stderr, "\n")
 		for _, errline := range errLines {
 			if strings.Contains(errline, "An error occurred in line") {
 				collected += errline + ";"
 			}
 		}
-
 		return errors.Wrapf(err, "%s: std error [%s]", msg, collected)
 	}
 	if retcode != 0 {

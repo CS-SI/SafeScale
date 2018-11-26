@@ -19,7 +19,7 @@ package flexibleengine
 import (
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
+	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	v2_vol "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -113,11 +113,15 @@ func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, 
 }
 
 // GetVolume returns the volume identified by id
+// If volume not found, returns (nil, nil)
 func (client *Client) GetVolume(id string) (*model.Volume, error) {
 	r := volumes.Get(client.osclt.Volume, id)
 	volume, err := r.Extract()
-	spew.Dump(r)
 	if err != nil {
+		switch err.(type) {
+		case gc.ErrDefault404:
+			return nil, nil
+		}
 		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", openstack.ProviderErrorToString(err)))
 	}

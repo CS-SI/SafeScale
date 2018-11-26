@@ -41,11 +41,11 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/metadata"
@@ -1193,7 +1193,20 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 }
 
 // GetHost returns the host identified by id
-func (c *Client) GetHost(id string) (*model.Host, error) {
+func (c *Client) GetHost(hostParam interface{}) (*model.Host, error) {
+	var (
+		host *model.Host
+	)
+
+	switch hostParam.(type) {
+	case string:
+		host := model.NewHost()
+		host.ID = hostParam.(string)
+	case *model.Host:
+		host = hostParam.(*model.Host)
+	default:
+		panic("hostParam must be a string or a *model.Host!")
+	}
 
 	out, err := c.EC2.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{aws.String(id)},

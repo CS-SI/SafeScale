@@ -309,7 +309,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				PublicIP:     true,
 				ImageID:      img.ID,
 				TemplateID:   template.ID,
-				NetworkIDs:   []string{net.ID},
+				Networks:     []*model.Network{net},
 			})
 
 			defer service.DeleteHost(hostName)

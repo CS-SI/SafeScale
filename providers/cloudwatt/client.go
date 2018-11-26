@@ -21,6 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
@@ -57,6 +58,7 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 			FloatingIPPool: "public",
 		},
 		openstack.CfgOptions{
+			MetadataBucket:            metadata.BuildMetadataBucketName(opts.TenantName),
 			ProviderNetwork:           "public",
 			UseFloatingIP:             true,
 			UseLayer3Networking:       true,

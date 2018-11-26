@@ -104,9 +104,14 @@ func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*mode
 	return client.osclt.WaitHostReady(hostID, timeout)
 }
 
-// UpdateHost returns the host identified by id
-func (client *Client) UpdateHost(host *model.Host) error {
-	return client.osclt.UpdateHost(host)
+// GetHost returns the host identified by id
+func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
+	return client.osclt.GetHost(hostParam)
+}
+
+// GetHostByName ...
+func (client *Client) GetHostByName(name string) (*model.Host, error) {
+	return client.osclt.GetHostByName(name)
 }
 
 // GetHostState returns the host identified by id

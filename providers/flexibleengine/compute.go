@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -37,6 +38,7 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	uuid "github.com/satori/go.uuid"
@@ -271,16 +273,11 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 
 // CreateHost creates a new host
 func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
-	return client.createHost(request, false, nil, "")
-}
-
-// CreateHost creates a new host and configure it as gateway for the network if isGateway is true
-func (client *Client) createHost(request model.HostRequest, isGateway bool, gw *model.Host, cidr string) (*model.Host, error) {
 	//msgFail := "Failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
-	if isGateway && !request.PublicIP {
-		return nil, fmt.Errorf("can't create a gateway without public IP")
+	if request.DefaultGateway == nil && !request.PublicIP {
+		return nil, model.ResourceInvalidRequestError("host creation", "can't create a gateway without public IP")
 	}
 
 	// Validating name of the host
@@ -289,13 +286,27 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool, gw *
 	}
 
 	// The Default Network is the first of the provided list, by convention
-	defaultNetworkID := request.NetworkIDs[0]
+	defaultNetwork := request.Networks[0]
+	defaultNetworkID := defaultNetwork.ID
+	defaultGateway := request.DefaultGateway
+	isGateway := defaultGateway == nil && defaultNetwork.Name != model.SingleHostNetworkName
+	defaultGatewayID := ""
+	defaultGatewayPrivateIP := ""
+	if defaultGateway != nil {
+		hostNetworkV1 := propsv1.NewHostNetwork()
+		err := defaultGateway.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+		if err != nil {
+			return nil, err
+		}
+		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
+		defaultGatewayID = defaultGateway.ID
+	}
 
 	var nets []servers.Network
 	// Add private networks
-	for _, n := range request.NetworkIDs {
+	for _, n := range request.Networks {
 		nets = append(nets, servers.Network{
-			UUID: n,
+			UUID: n.ID,
 		})
 	}
 
@@ -309,16 +320,19 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool, gw *
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
 		request.KeyPair, err = client.CreateKeyPair(name)
 		if err != nil {
-			return nil, fmt.Errorf("error creating key pair for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
+			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
+			log.Debugf(utils.TitleFirst(msg))
 		}
 	}
 
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	userData, err := userdata.Prepare(client, request, isGateway, request.KeyPair, gw, cidr)
+	userData, err := userdata.Prepare(client, request, request.KeyPair, defaultNetwork.CIDR)
 	if err != nil {
-		return nil, err
+		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
+		log.Debugf(utils.TitleFirst(msg))
+		return nil, fmt.Errorf(msg)
 	}
 
 	// Determine system disk size based on vcpus count
@@ -375,45 +389,11 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool, gw *
 
 	hostNetworkV1 := propsv1.NewHostNetwork()
 	hostNetworkV1.IsGateway = isGateway
-
-	// // Add gateway information to Host definition
-	// defaultGatewayPrivateIP := ""
-	// if gw != nil {
-	// 	hostNetworkV1.DefaultGatewayID = gw.ID
-
-	// 	hostGatewayNetworkV1 := propsv1.NewHostNetwork()
-	// 	err = gw.Properties.Get(HostProperty.NetworkV1, hostGatewayNetworkV1)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	defaultGatewayPrivateIP = hostGatewayNetworkV1.IPv4Addresses[defaultNetworkID]
-	// 	if defaultGatewayPrivateIP == "" {
-	// 		defaultGatewayPrivateIP = hostGatewayNetworkV1.IPv6Addresses[defaultNetworkID]
-	// 	}
-	// }
-
-	// Adds default network information
 	hostNetworkV1.DefaultNetworkID = defaultNetworkID
-	// hostNetworkV1.DefaultGatewayAccessIP = defaultGatewayPrivateIP
-	// hostNetworkV1.NetworksByID = map[string]string{defaultNetwork.ID: defaultNetwork.Name}
-	// hostNetworkV1.NetworksByName = map[string]string{defaultNetwork.Name: defaultNetwork.ID}
+	hostNetworkV1.DefaultGatewayID = defaultGatewayID
+	hostNetworkV1.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
 
-	// // Adds other network information to Host definition
-	// for _, netID := range request.NetworkIDs {
-	// 	if netID != defaultNetworkID {
-	// 		mn, err := metadata.LoadNetwork(client, netID)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		if mn == nil {
-	// 			return nil, fmt.Errorf("failed to load metadata of network '%s'", netID)
-	// 		}
-	// 		name := mn.Get().Name
-	// 		hostNetworkV1.NetworksByID[netID] = name
-	// 		hostNetworkV1.NetworksByName[name] = netID
-	// 	}
-	// }
-	// Updates Host Extension NetworkV1 in host instance
+	// Updates Host property NetworkV1
 	err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
 		return nil, err
@@ -475,9 +455,9 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool, gw *
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
-			err := client.DeleteHost(host.ID)
-			if err != nil {
-				log.Warnf("Error deleting host: %v", err)
+			derr := client.DeleteHost(host.ID)
+			if derr != nil {
+				log.Warnf("Error deleting host: %v", derr)
 			}
 		}
 	}()
@@ -485,6 +465,7 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool, gw *
 	if request.PublicIP {
 		fip, err := client.attachFloatingIP(host)
 		if err != nil {
+			spew.Dump(err)
 			return nil, fmt.Errorf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 		}
 
@@ -508,17 +489,17 @@ func (client *Client) createHost(request model.HostRequest, isGateway bool, gw *
 			hostNetworkV1.PublicIPv6 = fip.PublicIPAddress
 		}
 
-		if isGateway {
+		// Updates Host property NetworkV1 in host instance
+		err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
+		if err != nil {
+			return nil, err
+		}
+
+		if defaultGateway == nil && defaultNetwork.Name != model.SingleHostNetworkName {
 			err = client.enableHostRouterMode(host)
 			if err != nil {
 				return nil, fmt.Errorf("error enabling gateway mode of host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 			}
-		}
-
-		// Updates Host Extension NetworkV1 in host instance
-		err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
-		if err != nil {
-			return nil, err
 		}
 	}
 
@@ -548,13 +529,24 @@ func validatehostName(req model.HostRequest) (bool, error) {
 	return true, nil
 }
 
-// UpdateHost updates the data inside host with the data from provider
-// TODO: move this method on the model.Host struct
-func (client *Client) UpdateHost(host *model.Host) error {
+// GetHost updates the data inside host with the data from provider
+func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 	var (
-		server *servers.Server
-		err    error
+		host     *model.Host
+		server   *servers.Server
+		err      error
+		notFound bool
 	)
+
+	switch hostParam.(type) {
+	case *model.Host:
+		host = hostParam.(*model.Host)
+	case string:
+		host = model.NewHost()
+		host.ID = hostParam.(string)
+	default:
+		panic("hostParam must be a string or a *model.Host!")
+	}
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -564,17 +556,17 @@ func (client *Client) UpdateHost(host *model.Host) error {
 				case gc.ErrDefault404:
 					// If error is "resource not found", we want to return GopherCloud error as-is to be able
 					// to behave differently in this special case. To do so, stop the retry
+					notFound = true
 					return nil
 				case gc.ErrDefault500:
 					// When the response is "Internal Server Error", retries
-					log.Println("received 'Internal Server Error', retrying servers.Get...")
+					log.Println("received 'Internal Server Error', retrying...")
 					return err
 				}
 				// Any other error stops the retry
 				err = fmt.Errorf("Error getting host '%s': %s", host.ID, openstack.ProviderErrorToString(err))
 				return nil
 			}
-			//spew.Dump(server)
 			if server.Status != "ERROR" && server.Status != "CREATING" {
 				host.LastState = toHostState(server.Status)
 				return nil
@@ -587,17 +579,17 @@ func (client *Client) UpdateHost(host *model.Host) error {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return fmt.Errorf("failed to get host '%s' information after 10s: %s", host.ID, err.Error())
+			return nil, fmt.Errorf("failed to get host '%s' information after 10s: %v", host.ID, err)
 		}
 	}
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if notFound {
+		return nil, model.ResourceNotFoundError("host", host.ID)
 	}
 	err = client.complementHost(host, server)
-	if err != nil {
-		return err
-	}
-	return nil
+	return host, err
 }
 
 // complementHost complements Host data with content of server parameter
@@ -619,13 +611,13 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 
 	// Updates Host Property propsv1.HostDescription
 	hostDescriptionV1 := propsv1.NewHostDescription()
-	err = host.Properties.Get(string(HostProperty.DescriptionV1), hostDescriptionV1)
+	err = host.Properties.Get(HostProperty.DescriptionV1, hostDescriptionV1)
 	if err != nil {
 		return err
 	}
 	hostDescriptionV1.Created = server.Created
 	hostDescriptionV1.Updated = server.Updated
-	err = host.Properties.Set(string(HostProperty.DescriptionV1), hostDescriptionV1)
+	err = host.Properties.Set(HostProperty.DescriptionV1, hostDescriptionV1)
 	if err != nil {
 		return err
 	}
@@ -654,13 +646,11 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 	if hostNetworkV1.PublicIPv6 == "" {
 		hostNetworkV1.PublicIPv6 = ipv6
 	}
-	// networks contains network names, by HostExtensionNetworkV1.IPxAddresses has to be
-	// indexed on network ID. Tries to convert if possible, if we already have correspondance
-	// between network ID and network Name in Host definition
-	if len(hostNetworkV1.NetworksByName) > 0 {
+
+	if len(hostNetworkV1.NetworksByID) > 0 {
 		ipv4Addresses := map[string]string{}
 		ipv6Addresses := map[string]string{}
-		for netname, netid := range hostNetworkV1.NetworksByName {
+		for netid, netname := range hostNetworkV1.NetworksByID {
 			if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
 				ipv4Addresses[netid] = ip
 			} else if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
@@ -680,34 +670,44 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 		hostNetworkV1.IPv4Addresses = ipv4Addresses
 		hostNetworkV1.IPv6Addresses = ipv6Addresses
 	} else {
-		networksByName := map[string]string{}
+		networksByID := map[string]string{}
 		ipv4Addresses := map[string]string{}
 		ipv6Addresses := map[string]string{}
-		for _, netname := range networks {
-			networksByName[netname] = ""
+		for _, netid := range networks {
+			networksByID[netid] = ""
 
-			if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
-				ipv4Addresses[netname] = ip
+			if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
+				ipv4Addresses[netid] = ip
 			} else {
-				ipv4Addresses[netname] = ""
+				ipv4Addresses[netid] = ""
 			}
 
-			if ip, ok := addresses[IPVersion.IPv6][netname]; ok {
-				ipv6Addresses[netname] = ip
+			if ip, ok := addresses[IPVersion.IPv6][netid]; ok {
+				ipv6Addresses[netid] = ip
 			} else {
-				ipv6Addresses[netname] = ""
+				ipv6Addresses[netid] = ""
 			}
 		}
-		hostNetworkV1.NetworksByName = networksByName
+		hostNetworkV1.NetworksByID = networksByID
 		// IPvxAddresses are here indexed by names... At least we have them...
 		hostNetworkV1.IPv4Addresses = ipv4Addresses
 		hostNetworkV1.IPv6Addresses = ipv6Addresses
 	}
-	err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
-	if err != nil {
-		return err
+
+	// Updates network name and relationships if needed
+	for netid, netname := range hostNetworkV1.NetworksByID {
+		if netname == "" {
+			net, err := client.GetNetwork(netid)
+			if err != nil {
+				log.Errorf("failed to get network '%s'", netid)
+				continue
+			}
+			hostNetworkV1.NetworksByID[netid] = net.Name
+			hostNetworkV1.NetworksByName[net.Name] = netid
+		}
 	}
-	return nil
+
+	return host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
 }
 
 // collectAddresses converts adresses returned by the OpenStack driver
@@ -761,6 +761,11 @@ func (client *Client) collectAddresses(host *model.Host) ([]string, map[IPVersio
 	return networks, addrs, AcccessIPv4, AcccessIPv6, nil
 }
 
+// GetHostByName ...
+func (client *Client) GetHostByName(name string) (*model.Host, error) {
+	return client.osclt.GetHostByName(name)
+}
+
 // GetHostState ...
 func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 	return client.osclt.GetHostState(hostParam)
@@ -778,6 +783,7 @@ func (client *Client) ListHosts() ([]*model.Host, error) {
 
 		for _, srv := range list {
 			h := model.NewHost()
+			h.ID = srv.ID
 			err := client.complementHost(h, &srv)
 			if err != nil {
 				return false, err
@@ -787,13 +793,18 @@ func (client *Client) ListHosts() ([]*model.Host, error) {
 		return true, nil
 	})
 	if len(hosts) == 0 && err != nil {
-		return nil, fmt.Errorf("error listing hosts : %s", openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("error listing hosts: %s", openstack.ProviderErrorToString(err))
 	}
 	return hosts, nil
 }
 
 // DeleteHost deletes the host identified by id
 func (client *Client) DeleteHost(id string) error {
+	_, err := client.GetHost(id)
+	if err != nil {
+		return err
+	}
+
 	if client.osclt.Cfg.UseFloatingIP {
 		fip, err := client.getFloatingIPOfHost(id)
 		if err == nil {
@@ -812,7 +823,6 @@ func (client *Client) DeleteHost(id string) error {
 		}
 	}
 
-	var err error
 	// Try to remove host for 3 minutes
 	outerRetryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -875,56 +885,6 @@ func (client *Client) DeleteHost(id string) error {
 	return nil
 }
 
-// func (client *Client) getSSHConfig(host *model.Host) (*system.SSHConfig, error) {
-// 	sshConfig := system.SSHConfig{
-// 		PrivateKey: host.PrivateKey,
-// 		Port:       22,
-// 		Host:       host.GetAccessIP(),
-// 		User:       model.DefaultUser,
-// 	}
-// 	hostNetworkV1 := propsv1.NewHostNetwork()
-// 	err := host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if hpNetworkV1.DefaultGatewayID != "" {
-// 		mgw, err := metadata.LoadHost(client, hpNetworkV1.DefaultGatewayID)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		gw := mgw.Get()
-// 		GatewayConfig := system.SSHConfig{
-// 			PrivateKey: gw.PrivateKey,
-// 			Port:       22,
-// 			User:       model.DefaultUser,
-// 			Host:       gw.GetAccessIP(),
-// 		}
-// 		sshConfig.GatewayConfig = &GatewayConfig
-// 	}
-// 	return &sshConfig, nil
-// }
-
-// // GetSSHConfig creates SSHConfig to connect an host
-// func (client *Client) GetSSHConfig(param interface{}) (*system.SSHConfig, error) {
-// 	var (
-// 		host *model.Host
-// 	)
-
-// 	switch param.(type) {
-// 	case string:
-// 		mh, err := metadata.LoadHost(client, param.(string))
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		host = mh.Get()
-// 	case *model.Host:
-// 		host = param.(*model.Host)
-// 	default:
-// 		panic("param must be a string or a *model.Host!")
-// 	}
-// 	return client.getSSHConfig(host)
-// }
-
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
 func (client *Client) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, error) {
@@ -981,7 +941,7 @@ func (client *Client) enableHostRouterMode(host *model.Host) error {
 		return fmt.Errorf("failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 	if portID == nil {
-		return fmt.Errorf("failed to enable Router Mode on host '%s': failed to find IpenStack port", host.Name)
+		return fmt.Errorf("failed to enable Router Mode on host '%s': failed to find OpenStack port", host.Name)
 	}
 
 	pairs := []ports.AddressPair{
@@ -1256,7 +1216,7 @@ func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			err = client.UpdateHost(host)
+			host, err = client.GetHost(host)
 			if err != nil {
 				return err
 			}

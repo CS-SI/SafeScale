@@ -193,32 +193,6 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 	if err != nil {
 		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
-
-	// // Need to get Endpoint URL for ObjectStorage, that will be used with AWS S3 protocol
-	// objectStorage, err := gcos.NewObjectStorageV1(provider, gc.EndpointOpts{
-	// 	Type:   "object",
-	// 	Region: opts.Region,
-	// })
-	// if err != nil {
-	// 	return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
-	// }
-	// // Fix URL of ObjectStorage for FlexibleEngine...
-	// u, _ := url.Parse(objectStorage.Endpoint)
-	// endpoint := u.Scheme + "://" + u.Hostname() + "/"
-	// // FlexibleEngine uses a protocol compatible with S3, so we need to get aws.Session instance
-	// authOpts := awsAuthOpts{
-	// 	AccessKeyID:     opts.S3AccessKeyID,
-	// 	SecretAccessKey: opts.S3AccessKeyPassword,
-	// 	Region:          opts.Region,
-	// }
-	// awsSession, err := awssession.NewSession(&aws.Config{
-	// 	Region:      aws.String(opts.Region),
-	// 	Credentials: awscreds.NewCredentials(authOpts),
-	// 	Endpoint:    &endpoint,
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
 	openstackClient := openstack.Client{
 		Opts: &openstack.AuthOptions{
 			IdentityEndpoint: opts.IdentityEndpoint,
@@ -233,21 +207,18 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 			UseFloatingIP:       true,
 			UseLayer3Networking: cfg.UseLayer3Networking,
 			VolumeSpeeds:        cfg.VolumeSpeeds,
-			// S3Protocol:          "s3",
-			MetadataBucketName: provmetadata.BuildMetadataBucketName(opts.DomainName),
+			MetadataBucket:      provmetadata.BuildMetadataBucketName(opts.DomainName),
 		},
 		Provider: provider,
 		Compute:  compute,
 		Network:  network,
 		Volume:   volume,
-		//Container:   objectStorage,
 	}
 
 	clt := Client{
 		Opts:     &opts,
 		osclt:    &openstackClient,
 		Identity: identity,
-		// S3Session: awsSession,
 	}
 
 	// Initializes the VPC
