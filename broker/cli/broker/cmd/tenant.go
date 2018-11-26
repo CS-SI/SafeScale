@@ -20,9 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/broker/client"
-	clitools "github.com/CS-SI/SafeScale/utils"
 	"github.com/urfave/cli"
+
+	"github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/utils"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // TenantCmd command
@@ -43,7 +45,7 @@ var tenantList = cli.Command{
 	Action: func(c *cli.Context) error {
 		tenants, err := client.New().Tenant.List(client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(client.DecorateError(err, "list of tenants", false).Error())
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "list of tenants", false).Error()))
 		}
 		out, _ := json.Marshal(tenants.GetTenants())
 		fmt.Println(string(out))
@@ -58,7 +60,7 @@ var tenantGet = cli.Command{
 	Action: func(c *cli.Context) error {
 		tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(client.DecorateError(err, "get tenant", false).Error())
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "get tenant", false).Error()))
 		}
 		out, _ := json.Marshal(tenant)
 		fmt.Println(string(out))
@@ -78,7 +80,7 @@ var tenantSet = cli.Command{
 		}
 		err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(client.DecorateError(err, "set tenant", false).Error())
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "set tenant", false).Error()))
 		}
 		fmt.Printf("Tenant '%s' set\n", c.Args().First())
 		return nil

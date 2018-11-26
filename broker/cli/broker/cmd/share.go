@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
@@ -62,8 +63,9 @@ var shareCreate = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
+		shareName := c.Args().Get(0)
 		def := pb.ShareDefinition{
-			Name: c.Args().Get(0),
+			Name: shareName,
 			Host: &pb.Reference{Name: c.Args().Get(1)},
 			Path: c.String("path"),
 		}
@@ -72,7 +74,7 @@ var shareCreate = cli.Command{
 			return clitools.ExitOnRPC(client.DecorateError(err, "creation of share", true).Error())
 		}
 
-		fmt.Println("Share successfully created.")
+		fmt.Printf("Share '%s' successfully created.\n", shareName)
 		return nil
 	},
 }
@@ -80,8 +82,8 @@ var shareCreate = cli.Command{
 var shareDelete = cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
-	Usage:     "Delete a share from an host",
-	ArgsUsage: "<Share_name>",
+	Usage:     "Delete a share",
+	ArgsUsage: "<Share_name> [<Share_name>...]",
 	Action: func(c *cli.Context) error {
 		if c.NArg() < 1 {
 			fmt.Println("Missing mandatory argument <Share_name>")
@@ -89,15 +91,34 @@ var shareDelete = cli.Command{
 			return clitools.ExitOnInvalidArgument()
 		}
 
-		var shareList []string
+		var (
+			wg        sync.WaitGroup
+			errs      int
+			shareList []string
+		)
 		shareList = append(shareList, c.Args().First())
 		shareList = append(shareList, c.Args().Tail()...)
 
-		err := client.New().Share.Delete(shareList, client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(client.DecorateError(err, "deletion of share", false).Error())
+		shareDeleter := func(aname string) {
+			defer wg.Done()
+			err := client.New().Share.Delete(aname, client.DefaultExecutionTimeout)
+			if err != nil {
+				fmt.Println(clitools.TitleFirst(err.Error()))
+				errs++
+			} else {
+				fmt.Printf("Share '%s' successfully deleted.\n", aname)
+			}
 		}
 
+		wg.Add(len(shareList))
+		for _, target := range shareList {
+			go shareDeleter(target)
+		}
+		wg.Wait()
+
+		if errs > 0 {
+			return clitools.ExitOnRPC("")
+		}
 		return nil
 	},
 }
@@ -150,16 +171,21 @@ var shareMount = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
+		shareName := c.Args().Get(0)
+		hostName := c.Args().Get(1)
+		path := c.String("path")
 		def := pb.ShareMountDefinition{
-			Host:  &pb.Reference{Name: c.Args().Get(1)},
-			Share: &pb.Reference{Name: c.Args().Get(0)},
-			Path:  c.String("path"),
+			Host:  &pb.Reference{Name: hostName},
+			Share: &pb.Reference{Name: shareName},
+			Path:  path,
 			Type:  "nfs",
 		}
 		err := client.New().Share.Mount(def, client.DefaultExecutionTimeout)
 		if err != nil {
 			return clitools.ExitOnRPC(client.DecorateError(err, "mount of nas", true).Error())
 		}
+
+		fmt.Printf("Share '%s' successfully mounted on '%s:%s'.\n", shareName, hostName, path)
 		return nil
 	},
 }
@@ -175,15 +201,18 @@ var shareUnmount = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
+		shareName := c.Args().Get(0)
+		hostName := c.Args().Get(1)
 		def := pb.ShareMountDefinition{
-			Host:  &pb.Reference{Name: c.Args().Get(1)},
-			Share: &pb.Reference{Name: c.Args().Get(0)},
+			Host:  &pb.Reference{Name: hostName},
+			Share: &pb.Reference{Name: shareName},
 		}
 		err := client.New().Share.Unmount(def, client.DefaultExecutionTimeout)
 		if err != nil {
 			return clitools.ExitOnRPC(client.DecorateError(err, "unmount of share", true).Error())
 		}
 
+		fmt.Printf("Share '%s' successfully unmounted from host '%s'\n", shareName, hostName)
 		return nil
 	},
 }
