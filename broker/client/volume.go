@@ -17,13 +17,13 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
@@ -35,53 +35,41 @@ type volume struct {
 
 // List ...
 func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewVolumeServiceClient(conn)
-	return service.List(ctx, &pb.VolumeListRequest{
-		All: all,
-	})
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx := context.Background()
+
+	return service.List(ctx, &pb.VolumeListRequest{All: all})
+
 }
 
 // Inspect ...
 func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewVolumeServiceClient(conn)
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx := context.Background()
+
 	return service.Inspect(ctx, &pb.Reference{Name: name})
+
 }
 
 // Delete ...
 func (v *volume) Delete(names []string, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-
-	timeout = timeout + (30 * time.Second * time.Duration(len(names)))
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx := context.Background()
 
 	var (
 		wg   sync.WaitGroup
 		errs int
 	)
 
-	volDeleter := func(aname string) {
+	volumeDeleter := func(aname string) {
 		defer wg.Done()
-		ctx, cancel := utils.GetContext(timeout)
-		defer cancel()
-		volumeService := pb.NewVolumeServiceClient(conn)
-		_, err := volumeService.Delete(ctx, &pb.Reference{Name: aname})
+		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
 
 		if err != nil {
 			fmt.Fprintln(os.Stderr, DecorateError(err, "deletion of volume", true).Error())
@@ -93,7 +81,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 
 	wg.Add(len(names))
 	for _, target := range names {
-		go volDeleter(target)
+		go volumeDeleter(target)
 	}
 	wg.Wait()
 
@@ -101,45 +89,39 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 		return clitools.ExitOnRPC("")
 	}
 	return nil
+
 }
 
 // Create ...
 func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Volume, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewVolumeServiceClient(conn)
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx := context.Background()
+
 	return service.Create(ctx, &def)
+
 }
 
 // Attach ...
 func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewVolumeServiceClient(conn)
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx := context.Background()
+
 	_, err := service.Attach(ctx, &def)
 	return err
+
 }
 
 // Detach ...
 func (v *volume) Detach(volumeName string, hostName string, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewVolumeServiceClient(conn)
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx := context.Background()
+
 	_, err := service.Detach(ctx, &pb.VolumeDetachment{
 		Volume: &pb.Reference{Name: volumeName},
 		Host:   &pb.Reference{Name: hostName},

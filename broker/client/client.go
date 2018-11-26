@@ -23,25 +23,29 @@ import (
 
 	"github.com/pkg/errors"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/CS-SI/SafeScale/broker/utils"
 )
 
 // Session units the different resources proposed by brokerd as broker client
 type Session struct {
-	Container *container
-	Host      *host
-	Share     *share
-	Network   *network
-	Ssh       *ssh
-	Tenant    *tenant
-	Volume    *volume
-	Template  *template
-	Image     *image
+	Bucket   *bucket
+	Host     *host
+	Share    *share
+	Network  *network
+	Ssh      *ssh
+	Tenant   *tenant
+	Volume   *volume
+	Template *template
+	Image    *image
 
-	// For future use...
-	// brokerdAddress string
-	// brokerdPort    uint16
+	brokerdHost string
+	brokerdPort int
+	connection  *grpc.ClientConn
+
 	tenantName string
 }
 
@@ -56,8 +60,12 @@ const (
 
 // New returns an instance of broker Client
 func New() Client {
-	s := &Session{}
-	s.Container = &container{session: s}
+	s := &Session{
+		brokerdHost: "localhost",
+		brokerdPort: 50051,
+	}
+
+	s.Bucket = &bucket{session: s}
 	s.Host = &host{session: s}
 	s.Share = &share{session: s}
 	s.Network = &network{session: s}
@@ -66,8 +74,22 @@ func New() Client {
 	s.Volume = &volume{session: s}
 	s.Template = &template{session: s}
 	s.Image = &image{session: s}
-	//s.brokerdPort = uint16(port)
 	return s
+}
+
+// Connect establishes connection with brokerd
+func (s *Session) Connect() {
+	if s.connection == nil {
+		s.connection = utils.GetConnection(s.brokerdHost, s.brokerdPort)
+	}
+}
+
+// Disconnect cuts the connection with brokerd
+func (s *Session) Disconnect() {
+	if s.connection != nil {
+		s.connection.Close()
+		s.connection = nil
+	}
 }
 
 // DecorateError changes the error to something more comprehensible when
