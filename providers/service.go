@@ -17,6 +17,7 @@
 package providers
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"os"
@@ -35,24 +36,24 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 // Service Client High level service
 type Service struct {
-	Client         api.ClientAPI
+	api.ClientAPI
 	ObjectStorage  objectstorage.Location
 	MetadataBucket objectstorage.Bucket
 }
 
-// FromClient contructs a Service instance from a ClientAPI
-func FromClient(clt api.ClientAPI) *Service {
-	return &Service{
-		Client: clt,
-	}
-}
+// // FromClient contructs a Service instance from a ClientAPI
+// func FromClient(clt api.ClientAPI) *Service {
+// 	return &Service{
+// 		ClientAPI: clt,
+// 	}
+// }
 
 const (
 	//CoreDRFWeight is the Dominant Resource Fairness weight of a core
@@ -116,7 +117,7 @@ func (svc *Service) WaitHostState(hostID string, state HostState.Enum, timeout t
 	host := model.NewHost()
 	host.ID = hostID
 	for next {
-		err = svc.Client.UpdateHost(host)
+		host, err = svc.GetHost(host)
 		if err != nil {
 			return err
 		}
@@ -223,7 +224,7 @@ func (svc *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 	next := make(chan bool)
 	vc := make(chan *model.Volume)
 
-	go pollVolume(svc.Client, volumeID, state, cout, next, vc)
+	go pollVolume(svc, volumeID, state, cout, next, vc)
 	for {
 		select {
 		case res := <-cout:
@@ -350,7 +351,7 @@ func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force
 
 // FilterImages search an images corresponding to OS Name
 func (svc *Service) FilterImages(filter string) ([]model.Image, error) {
-	imgs, err := svc.Client.ListImages(false)
+	imgs, err := svc.ListImages(false)
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +376,7 @@ func (svc *Service) FilterImages(filter string) ([]model.Image, error) {
 
 // SearchImage search an image corresponding to OS Name
 func (svc *Service) SearchImage(osname string) (*model.Image, error) {
-	imgs, err := svc.Client.ListImages(false)
+	imgs, err := svc.ListImages(false)
 	if err != nil {
 		return nil, err
 	}
@@ -396,10 +397,10 @@ func (svc *Service) SearchImage(osname string) (*model.Image, error) {
 	//fmt.Println(fields, len(fields))
 	//fmt.Println(len(fields))
 	if maxscore < 0.5 || maxi < 0 || len(imgs) == 0 {
-		return nil, fmt.Errorf("Unable to find an image matching %s", osname)
+		return nil, fmt.Errorf("unable to find an image matching %s", osname)
 	}
 
-	log.Printf("Selected image '%s' with ID '%s'", imgs[maxi].Name, imgs[maxi].ID)
+	log.Printf("Selected image: '%s' (ID='%s')", imgs[maxi].Name, imgs[maxi].ID)
 	return &imgs[maxi], nil
 }
 
@@ -417,7 +418,7 @@ func (svc *Service) CreateHostWithKeyPair(request model.HostRequest) (*model.Hos
 	}
 
 	kpName := kpNameuuid.String()
-	kp, err := svc.Client.CreateKeyPair(kpName)
+	kp, err := svc.CreateKeyPair(kpName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -425,13 +426,14 @@ func (svc *Service) CreateHostWithKeyPair(request model.HostRequest) (*model.Hos
 
 	// Create host
 	hostReq := model.HostRequest{
-		ResourceName: request.ResourceName,
-		HostName:     request.HostName,
-		ImageID:      request.ImageID,
-		KeyPair:      kp,
-		PublicIP:     request.PublicIP,
-		NetworkIDs:   request.NetworkIDs,
-		TemplateID:   request.TemplateID,
+		ResourceName:   request.ResourceName,
+		HostName:       request.HostName,
+		ImageID:        request.ImageID,
+		KeyPair:        kp,
+		PublicIP:       request.PublicIP,
+		Networks:       request.Networks,
+		DefaultGateway: request.DefaultGateway,
+		TemplateID:     request.TemplateID,
 	}
 	host, err := svc.CreateHost(hostReq)
 	if err != nil {
@@ -442,7 +444,7 @@ func (svc *Service) CreateHostWithKeyPair(request model.HostRequest) (*model.Hos
 
 // ListHostsByName list hosts by name
 func (svc *Service) ListHostsByName() (map[string]*model.Host, error) {
-	hosts, err := svc.Client.ListHosts()
+	hosts, err := svc.ListHosts()
 	if err != nil {
 		return nil, err
 	}
@@ -451,61 +453,6 @@ func (svc *Service) ListHostsByName() (map[string]*model.Host, error) {
 		hostMap[host.Name] = host
 	}
 	return hostMap, nil
-}
-
-// GetHostByName returns host corresponding to name
-func (svc *Service) GetHostByName(name string) (*model.Host, error) {
-	hosts, err := svc.ListHostsByName()
-	if err != nil {
-		return nil, err
-	}
-	host, ok := hosts[name]
-	if !ok {
-		return nil, model.ResourceNotFoundError("host", name)
-	}
-	return host, nil
-}
-
-// TODO: missing metadata for net-safescale, and it's not intended to handle it there...
-func (svc *Service) getOrCreateDefaultNetwork() (*model.Network, error) {
-	nets, err := svc.Client.ListNetworks()
-	if err != nil {
-		return nil, err
-	}
-	var defaultNet *model.Network
-	for _, n := range nets {
-		if n.Name == "net-safescale" {
-			defaultNet = n
-		}
-	}
-	if defaultNet == nil {
-		defaultNet, err = svc.Client.CreateNetwork(model.NetworkRequest{
-			CIDR:      "10.0.0.0/8",
-			Name:      "net-safescale",
-			IPVersion: IPVersion.IPv4,
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-	return defaultNet, nil
-}
-
-// CreateHost creates an host that fulfils the request
-func (svc *Service) CreateHost(request model.HostRequest) (*model.Host, error) {
-	log.Debugf("providers.service.Service.CreateHost(%s) called", request.ResourceName)
-	defer log.Debugf("providers.service.Service.CreateHost(%s) done", request.ResourceName)
-
-	log.Debugf("service.CreateHost(): type(svc)=%s, type(svc.ClientAPI)=%s\n", reflect.TypeOf(svc).String(), reflect.TypeOf(svc.Client).String())
-
-	if len(request.NetworkIDs) == 0 {
-		net, err := svc.getOrCreateDefaultNetwork()
-		if err != nil {
-			return nil, err
-		}
-		request.NetworkIDs = append(request.NetworkIDs, net.ID)
-	}
-	return svc.Client.CreateHost(request)
 }
 
 // CreateBucket creates an object container
@@ -533,7 +480,7 @@ func (svc *Service) ListBuckets() ([]string, error) {
 	if svc.ObjectStorage == nil {
 		panic("svc.ObjectStorage is nil!")
 	}
-	return svc.ObjectStorage.ListBuckets()
+	return svc.ObjectStorage.ListBuckets(objectstorage.NoPrefix)
 }
 
 // GetBucket returns info about the Bucket
@@ -553,7 +500,7 @@ func (svc *Service) PutObject(bucketName string, obj model.Object) error {
 	if err != nil {
 		return err
 	}
-	_, err = b.WriteObject(obj.Name, obj.Content, obj.Size, obj.Metadata)
+	_, err = b.WriteObject(obj.Name, obj.Content, obj.Size, nil)
 	return err
 }
 
@@ -564,17 +511,64 @@ func (svc *Service) UpdateObjectMetadata(bucketName string, obj model.Object) er
 }
 
 // GetObject get object content from a Bucket
-func (svc *Service) GetObject(bucketName string, objectName string, ranges []model.Range) (objectstorage.Object, error) {
+func (svc *Service) GetObject(bucketName string, objectName string, ranges []model.Range) (*model.Object, error) {
 	if svc.ObjectStorage == nil {
 		panic("svc.Location is nil!")
 	}
-	return svc.ObjectStorage.GetObject(bucketName, objectName)
+	o, err := svc.ObjectStorage.GetObject(bucketName, objectName)
+	if err != nil {
+		return nil, err
+	}
+	mo := model.Object{
+		ID:       o.GetID(),
+		Name:     o.GetName(),
+		Metadata: o.GetMetadata(),
+		Size:     o.GetSize(),
+		ETag:     o.GetETag(),
+	}
+	mo.LastModified, err = o.GetLastUpdate()
+	if err != nil {
+		return nil, err
+	}
+	if ranges == nil || len(ranges) == 0 {
+		r := model.NewRange(0, 0)
+		ranges = []model.Range{r}
+	}
+	buf := bytes.NewBuffer(nil)
+	for _, r := range ranges {
+		err = o.Read(buf, int64(*r.From), int64(*r.To))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if mo.Size != int64(buf.Len()) {
+		return nil, fmt.Errorf("object size doesn't match with size of read data")
+	}
+	mo.Content = bytes.NewReader(buf.Bytes())
+	return &mo, nil
 }
 
 // GetObjectMetadata get object metadata from a Bucket
-func (svc *Service) GetObjectMetadata(bucketName string, objectName string) (objectstorage.Object, error) {
-	// Stow doesn't allow Object Metadata only read for now
-	return nil, fmt.Errorf("Not implemented")
+func (svc *Service) GetObjectMetadata(bucketName string, objectName string) (*model.Object, error) {
+	if svc.ObjectStorage == nil {
+		panic("svc.ObjectStorage is nil!")
+	}
+	o, err := svc.ObjectStorage.GetObject(bucketName, objectName)
+	if err != nil {
+		return nil, err
+	}
+	mo := model.Object{
+		ID:       o.GetID(),
+		Name:     o.GetName(),
+		Metadata: o.GetMetadata(),
+		Size:     o.GetSize(),
+		ETag:     o.GetETag(),
+	}
+	mo.LastModified, err = o.GetLastUpdate()
+	if err != nil {
+		return nil, err
+	}
+	return &mo, nil
 }
 
 // ListObjects list objects of a container
@@ -582,7 +576,7 @@ func (svc *Service) ListObjects(bucketName string, filter model.ObjectFilter) ([
 	if svc.ObjectStorage == nil {
 		panic("svc.Location is nil!")
 	}
-	return svc.ObjectStorage.ListObjects(bucketName, filter)
+	return svc.ObjectStorage.ListObjects(bucketName, filter.Path, filter.Prefix)
 }
 
 // CopyObject copies an object

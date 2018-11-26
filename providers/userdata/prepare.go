@@ -61,7 +61,7 @@ var userdataTemplate *template.Template
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func Prepare(
-	client api.ClientAPI, request model.HostRequest, isGateway bool, kp *model.KeyPair, gw *model.Host, cidr string,
+	client api.ClientAPI, request model.HostRequest, kp *model.KeyPair, cidr string,
 ) ([]byte, error) {
 
 	// Generate password for user gpac
@@ -86,8 +86,8 @@ func Prepare(
 
 	// Determine Gateway IP
 	ip := ""
-	if gw != nil {
-		ip = gw.GetPrivateIP()
+	if request.DefaultGateway != nil {
+		ip = request.DefaultGateway.GetPrivateIP()
 	}
 
 	config, err := client.GetCfgOpts()
@@ -129,12 +129,13 @@ func Prepare(
 		PublicKey:  strings.Trim(kp.PublicKey, "\n"),
 		PrivateKey: strings.Trim(kp.PrivateKey, "\n"),
 		ConfIF:     !autoHostNetworkInterfaces,
-		IsGateway:  isGateway && !useLayer3Networking,
+		IsGateway:  request.DefaultGateway == nil && request.Networks[0].Name != model.SingleHostNetworkName && !useLayer3Networking,
 		AddGateway: !request.PublicIP && !useLayer3Networking,
 		DNSServers: dnsList,
 		CIDR:       cidr,
 		GatewayIP:  ip,
 		Password:   gpacPassword,
+
 		//HostName:   request.Name,
 	}
 

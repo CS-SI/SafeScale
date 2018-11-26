@@ -17,7 +17,6 @@
 package flexibleengine
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -202,7 +201,7 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	}
 	// .. and if CIDR is inside VPC's one
 	if !cidrIntersects(vpcnetDesc, networkDesc) {
-		return nil, fmt.Errorf("can't create subnet with CIDR '%s': not inside network CIDR '%s'", req.CIDR, client.vpc.CIDR)
+		return nil, fmt.Errorf("can't create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, client.vpc.CIDR)
 	}
 
 	// Creates the subnet
@@ -249,6 +248,29 @@ func validateNetworkName(req model.NetworkRequest) (bool, error) {
 		return false, fmt.Errorf(strings.Join(errs, "; "))
 	}
 	return true, nil
+}
+
+// GetNetworkByName ...
+func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
+	if name == "" {
+		panic("name is empty!")
+	}
+
+	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
+	r := networks.GetResult{}
+	_, r.Err = client.osclt.Compute.Get(client.osclt.Network.ServiceURL("subnets?name="+name), &r.Body, &gc.RequestOpts{
+		OkCodes: []int{200, 203},
+	})
+	if r.Err != nil {
+		return nil, fmt.Errorf("query for network '%s' failed: %v", name, r.Err)
+	}
+	subnets, found := r.Body.(map[string]interface{})["subnets"].([]interface{})
+	if found && len(subnets) > 0 {
+		entry := subnets[0].(map[string]interface{})
+		id := entry["id"].(string)
+		return client.GetNetwork(id)
+	}
+	return nil, model.ResourceNotFoundError("network", name)
 }
 
 // GetNetwork returns the network identified by id
@@ -512,22 +534,24 @@ func (client *Client) deleteSubnet(id string) error {
 	// So we retry subnet deletion until all hosts are really deleted and subnet can be deleted
 	err := retry.Action(
 		func() error {
-			_, err := client.osclt.Provider.Request("DELETE", url, &opts)
-			return err
+			r, _ := client.osclt.Provider.Request("DELETE", url, &opts)
+			if r.StatusCode == 204 || r.StatusCode == 404 {
+				return nil
+			}
+			return fmt.Errorf("%d", r.StatusCode)
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(time.Minute*5)),
 		retry.Constant(time.Second*3),
 		nil, nil,
 		func(t retry.Try, verdict Verdict.Enum) {
-			if r, ok := t.Err.(gc.ErrDefault500); ok {
-				var v map[string]string
-				jsonErr := json.Unmarshal(r.Body, &v)
-				if jsonErr == nil {
-					log.Printf("network still owns host(s), retrying in 3s...")
-					return
+			if t.Err != nil {
+				switch t.Err.Error() {
+				case "409":
+					log.Debugln("network still owns host(s), retrying in 3s...")
+				default:
+					log.Debugf("error submitting network deletion (status=%s), retrying in 3s...", t.Err.Error())
 				}
 			}
-			log.Printf("error submitting network deletion, retrying in 3s...")
 		},
 	)
 	if err != nil {
@@ -575,54 +599,35 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
-	network, err := client.GetNetwork(req.NetworkID)
-	if err != nil {
-		return nil, fmt.Errorf("Network %s not found: %s", req.NetworkID, openstack.ProviderErrorToString(err))
+func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
+	if req.Network == nil {
+		panic("req.Network is nil!")
 	}
-	gwname := req.GWName
+	gwname := req.Name
 	if gwname == "" {
-		gwname = "gw-" + network.Name
+		gwname = "gw-" + req.Network.Name
 	}
 	hostReq := model.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
-		NetworkIDs:   []string{req.NetworkID},
+		Networks:     []*model.Network{req.Network},
 		PublicIP:     true,
 	}
-	host, err := client.createHost(hostReq, true, nil, req.CIDR)
+	host, err := client.CreateHost(hostReq)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
+		switch err.(type) {
+		case model.ErrResourceInvalidRequest:
+			return nil, err
+		default:
+			return nil, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
+		}
 	}
 	return host, err
 }
 
-// // GetGateway returns the name of the gateway of a network
-// func (client *Client) GetGateway(networkID string) (*model.Host, error) {
-// 	m, err := metadata.LoadGateway(client, networkID)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if m != nil {
-// 		return m.Get(), nil
-// 	}
-// 	return nil, fmt.Errorf("Failed to load gateway metadata")
-// }
-
-// // DeleteGateway deletes the gateway associated with network identified by ID
-// func (client *Client) DeleteGateway(networkID string) error {
-// 	mg, err := metadata.LoadGateway(client, networkID)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if mg != nil {
-// 		err = client.DeleteHost(mg.Get().ID)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return mg.Delete()
-// 	}
-// 	return fmt.Errorf("failed to load gateway metadata")
-// }
+// DeleteGateway deletes the gateway associated with network identified by ID
+func (client *Client) DeleteGateway(id string) error {
+	return client.DeleteHost(id)
+}

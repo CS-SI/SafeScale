@@ -19,13 +19,14 @@ package ovh
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
-// ProviderNetwork name of ovh external network
-const ProviderNetwork string = "Ext-Net"
+// providerNetwork name of ovh external network
+const providerNetwork string = "Ext-Net"
 
 type gpuCfg struct {
 	GPUNumber int
@@ -93,7 +94,7 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 			AllowReauth: true,
 		},
 		openstack.CfgOptions{
-			ProviderNetwork:           ProviderNetwork,
+			ProviderNetwork:           providerNetwork,
 			UseFloatingIP:             false,
 			UseLayer3Networking:       false,
 			AutoHostNetworkInterfaces: false,
@@ -102,8 +103,8 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 				"classic":    VolumeSpeed.COLD,
 				"high-speed": VolumeSpeed.HDD,
 			},
-			// MetadataBucketName: metadata.BuildMetadataBucketName(opts.ApplicationKey),
-			DefaultImage: cfg.DefaultImage,
+			MetadataBucket: metadata.BuildMetadataBucketName(opts.ApplicationKey),
+			DefaultImage:   cfg.DefaultImage,
 		},
 	)
 
@@ -119,9 +120,8 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 // Client is the implementation of the ovh driver regarding to the api.ClientAPI
 // This client used ovh api and opensatck ovh api to maximize code reuse
 type Client struct {
-	osclt              *openstack.Client
-	opts               AuthOptions
-	MetadataBucketName string
+	osclt *openstack.Client
+	opts  AuthOptions
 }
 
 // Build build a new Client from configuration parameter

@@ -25,6 +25,11 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	return client.feclt.CreateNetwork(req)
 }
 
+// GetNetworkByName returns the network identified by name
+func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
+	return client.feclt.GetNetworkByName(name)
+}
+
 // GetNetwork returns the network identified by id
 func (client *Client) GetNetwork(id string) (*model.Network, error) {
 	return client.feclt.GetNetwork(id)
@@ -43,7 +48,7 @@ func (client *Client) DeleteNetwork(id string) error {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
+func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
 	return client.feclt.CreateGateway(req)
 }
 
@@ -52,7 +57,7 @@ func (client *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
 // 	return client.feclt.GetGateway(networkID)
 // }
 
-// // DeleteGateway deletes the gateway associated with network identified by ID
-// func (client *Client) DeleteGateway(networkID string) error {
-// 	return client.feclt.DeleteGateway(networkID)
-// }
+// DeleteGateway deletes the gateway associated with network identified by ID
+func (client *Client) DeleteGateway(networkID string) error {
+	return client.feclt.DeleteGateway(networkID)
+}

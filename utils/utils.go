@@ -103,9 +103,9 @@ func ExtractRetCode(err error) (string, int, error) {
 	return msg, retCode, fmt.Errorf("Error is not an 'ExitError'")
 }
 
-// Plural returns 's' if value > 0, "" otherwise
+// Plural returns 's' if value > 1, "" otherwise
 func Plural(value int) string {
-	if value > 0 {
+	if value > 1 {
 		return "s"
 	}
 	return ""
@@ -114,6 +114,15 @@ func Plural(value int) string {
 // TitleFirst makes the first letter of the first word uppercased
 func TitleFirst(value string) string {
 	fields := strings.Fields(value)
-	fields[0] = strings.Title(fields[0])
+	if len(fields) > 0 {
+		// WORKAROUND: strings.Title consider ' as the beginning of a new word, so "can't" becomes "Can'T"...
+		quoted := strings.Split(fields[0], "'")
+		if len(quoted) > 1 {
+			quoted[0] = strings.Title(quoted[0])
+			fields[0] = strings.Join(quoted, "'")
+		} else {
+			fields[0] = strings.Title(fields[0])
+		}
+	}
 	return strings.Join(fields, " ")
 }

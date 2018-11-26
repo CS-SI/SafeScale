@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/objectstorage"
 
 	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialize tenant cloudwatt
@@ -174,9 +175,9 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool
 	keypair, err := tester.Service.CreateKeyPair("kp_" + network.Name)
 	require.Nil(t, err)
 
-	gwRequest := model.GWRequest{
+	gwRequest := model.GatewayRequest{
 		ImageID:    img.ID,
-		NetworkID:  network.ID,
+		Network:    network,
 		KeyPair:    keypair,
 		TemplateID: tpls[0].ID,
 	}
@@ -203,8 +204,9 @@ func (tester *ClientTester) CreateHost(t *testing.T, name string, networkID stri
 		ImageID:      img.ID,
 		ResourceName: name,
 		TemplateID:   tpls[0].ID,
-		NetworkIDs:   []string{networkID},
-		PublicIP:     public,
+		// VPL: field 'NetworkIDs []string' becomes 'Network []*model.Network'
+		// NetworkIDs:   []string{networkID},
+		PublicIP: public,
 	}
 	return tester.Service.CreateHost(hostRequest)
 }
@@ -219,10 +221,11 @@ func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 16.04")
 	assert.Nil(t, err)
-	gwRequest := model.GWRequest{
+	gwRequest := model.GatewayRequest{
 		ImageID:    img.ID,
 		TemplateID: tpls[0].ID,
-		NetworkID:  networkID,
+		//VPL: field 'NetworkID string' becomes 'Network *model.Network'
+		// NetworkID:  networkID,
 	}
 	_, err = tester.Service.CreateGateway(gwRequest)
 	return err
@@ -231,7 +234,7 @@ func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
 // CreateNetworkTest test
 func (tester *ClientTester) CreateNetworkTest(t *testing.T) {
 	// Get inital number of networks
-	nets, err := tester.Service.ListNetworks(true)
+	nets, err := tester.Service.ListNetworks()
 	require.Nil(t, err)
 	nbAllNetworks := len(nets)
 	require.True(t, nbAllNetworks > 0)
@@ -244,7 +247,7 @@ func (tester *ClientTester) CreateNetworkTest(t *testing.T) {
 
 	networkFound := false
 
-	nets, err = tester.Service.ListNetworks(true)
+	nets, err = tester.Service.ListNetworks()
 	require.Nil(t, err)
 	for _, net := range nets {
 		if net.Name == "unit_test_network_1" {
@@ -265,7 +268,7 @@ func (tester *ClientTester) CreateNetworkTest(t *testing.T) {
 //Networks test
 func (tester *ClientTester) Networks(t *testing.T) {
 	// Get inital number of networks
-	nets, err := tester.Service.ListNetworks(true)
+	nets, err := tester.Service.ListNetworks()
 	assert.Nil(t, err)
 	nbAllNetworks := len(nets)
 	// nets, err = tester.Service.ListNetworks(false)
@@ -304,7 +307,7 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	defer tester.Service.DeleteKeyPair(kp2.ID)
 	defer tester.Service.DeleteNetwork(network2.ID)
 
-	nets, err = tester.Service.ListNetworks(true)
+	nets, err = tester.Service.ListNetworks()
 	assert.Nil(t, err)
 	assert.Equal(t, nbAllNetworks+2, len(nets))
 	found := 0
@@ -331,7 +334,7 @@ func (tester *ClientTester) Networks(t *testing.T) {
 // Hosts test
 func (tester *ClientTester) Hosts(t *testing.T) {
 	// Get initial number of hosts
-	hosts, err := tester.Service.ListHosts(false)
+	hosts, err := tester.Service.ListHosts()
 	assert.NoError(t, err)
 	nbHosts := len(hosts)
 
@@ -389,7 +392,7 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 
 	network, err = tester.Service.GetNetwork(network.ID)
 	assert.NoError(t, err)
-	hosts, err = tester.Service.ListHosts(false)
+	hosts, err = tester.Service.ListHosts()
 	assert.Equal(t, nbHosts+3, len(hosts))
 	found := 0
 	for _, v := range hosts {
@@ -409,11 +412,12 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 
 	host2, err = tester.CreateHost(t, "host1", network.ID, true)
 
-	err = tester.Service.UpdateHost(host)
+	host, err = tester.Service.GetHost(host)
 	assert.NoError(t, err)
+	// //VPL: PublicIPv? moved in Host Property NetworkV1.PublicIPv?...
 	// assert.Equal(t, host2.PublicIPv4, host.PublicIPv4)
 	// assert.Equal(t, host2.PublicIPv6, host.PublicIPv6)
-	// //VPL: GatewayID moved in Host Extension NetworkV1.DefaultGatewayID...
+	// //VPL: GatewayID moved in Host Property NetworkV1.DefaultGatewayID...
 	//assert.Equal(t, host2.GatewayID, host.GatewayID)
 	assert.Equal(t, host2.ID, host.ID)
 	assert.Equal(t, host2.Name, host.Name)
@@ -466,7 +470,7 @@ func (tester *ClientTester) StartStopHost(t *testing.T) {
 //Volume test
 func (tester *ClientTester) Volume(t *testing.T) {
 	// Get initial number of volumes
-	lst, err := tester.Service.ListVolumes(true)
+	lst, err := tester.Service.ListVolumes()
 	nbVolumes := len(lst)
 
 	v, err := tester.Service.CreateVolume(model.VolumeRequest{
@@ -489,7 +493,7 @@ func (tester *ClientTester) Volume(t *testing.T) {
 	defer tester.Service.DeleteVolume(v2.ID)
 	assert.Nil(t, err)
 	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
-	lst, err = tester.Service.ListVolumes(true)
+	lst, err = tester.Service.ListVolumes()
 	assert.Nil(t, err)
 	assert.Equal(t, nbVolumes+2, len(lst))
 	for _, vl := range lst {
@@ -586,29 +590,29 @@ func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 
 //Containers test
 func (tester *ClientTester) Containers(t *testing.T) {
-	err := tester.Service.CreateContainer("testC")
+	err := tester.Service.CreateBucket("testC")
 	assert.Nil(t, err)
-	err = tester.Service.CreateContainer("testC2")
+	err = tester.Service.CreateBucket("testC2")
 	assert.Nil(t, err)
 
-	cl, err := tester.Service.ListContainers()
+	cl, err := tester.Service.ListBuckets()
 	assert.Contains(t, cl, "testC", "testC2")
-	err = tester.Service.DeleteContainer("testC")
+	err = tester.Service.DeleteBucket("testC")
 	assert.Nil(t, err)
-	err = tester.Service.DeleteContainer("testC2")
+	err = tester.Service.DeleteBucket("testC2")
 	assert.Nil(t, err)
-	cl, err = tester.Service.ListContainers()
+	cl, err = tester.Service.ListBuckets()
 	assert.NotContains(t, cl, "testC", "testC2")
 }
 
 //Objects test
 func (tester *ClientTester) Objects(t *testing.T) {
-	err := tester.Service.CreateContainer("testC")
+	err := tester.Service.CreateBucket("testC")
 	assert.Nil(t, err)
 	err = tester.Service.PutObject("testC", model.Object{
 		Content:  strings.NewReader("123456789"),
 		DeleteAt: time.Now().Add(5 * time.Second),
-		Metadata: map[string]string{"A": "B"},
+		Metadata: objectstorage.ObjectMetadata{"A": "B"},
 		Name:     "object1",
 	})
 	assert.Nil(t, err)
@@ -646,7 +650,7 @@ func (tester *ClientTester) Objects(t *testing.T) {
 
 	err = tester.Service.DeleteObject("testC", "object1")
 	assert.NotNil(t, err)
-	err = tester.Service.DeleteContainer("testC")
+	err = tester.Service.DeleteBucket("testC")
 	assert.Nil(t, err)
 }
 
