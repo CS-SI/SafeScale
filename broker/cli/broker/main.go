@@ -92,8 +92,8 @@ func main() {
 	app.Commands = append(app.Commands, cmd.SSHCmd)
 	sort.Sort(cli.CommandsByName(cmd.SSHCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.ContainerCmd)
-	sort.Sort(cli.CommandsByName(cmd.ContainerCmd.Subcommands))
+	app.Commands = append(app.Commands, cmd.BucketCmd)
+	sort.Sort(cli.CommandsByName(cmd.BucketCmd.Subcommands))
 
 	app.Commands = append(app.Commands, cmd.ShareCmd)
 	sort.Sort(cli.CommandsByName(cmd.ShareCmd.Subcommands))
