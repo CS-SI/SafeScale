@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package commands
+package listeners
 
 import (
 	"context"
@@ -28,18 +28,18 @@ import (
 
 // broker image list --all=false
 
-//ImageServiceServer image service server grpc
-type ImageServiceServer struct{}
+//ImageServiceListener image service server grpc
+type ImageServiceListener struct{}
 
 // List available images
-func (s *ImageServiceServer) List(ctx context.Context, in *pb.ImageListRequest) (*pb.ImageList, error) {
+func (s *ImageServiceListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.ImageList, error) {
 	log.Printf("List images called")
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot list images : No tenant set")
 	}
 
-	service := services.NewImageService(currentTenant.Client)
+	service := services.NewImageService(currentTenant.Service)
 
 	images, err := service.List(in.GetAll())
 	if err != nil {

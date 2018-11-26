@@ -35,14 +35,13 @@ const (
 )
 
 // GetConnection returns a connection to GRPC server
-func GetConnection() *grpc.ClientConn {
-	//realAddress := fmt.Sprintf("localhost:%d", port)
-	realAddress := fmt.Sprintf("localhost:50051")
+func GetConnection(host string, port int) *grpc.ClientConn {
+	address := fmt.Sprintf("%s:%d", host, port)
 
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(realAddress, grpc.WithInsecure())
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatalf("Failed to connect to brokerd (%s:%d): %v", host, port, err)
 	}
 	return conn
 }

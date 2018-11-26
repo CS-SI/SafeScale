@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package commands
+package listeners
 
 import (
 	"context"
 	"fmt"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/server/services"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
@@ -27,19 +28,18 @@ import (
 
 // broker template list --all=false
 
-//TemplateServiceServer host service server grpc
-type TemplateServiceServer struct{}
+//TemplateServiceListener host service server grpc
+type TemplateServiceListener struct{}
 
 // List available templates
-func (s *TemplateServiceServer) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
+func (s *TemplateServiceListener) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
 	log.Printf("Template List called")
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Cannot list templates : No tenant set")
 	}
 
-	service := services.NewTemplateService(currentTenant.Client)
-
+	service := services.NewTemplateService(currentTenant.Service)
 	templates, err := service.List(in.GetAll())
 	if err != nil {
 		return nil, err

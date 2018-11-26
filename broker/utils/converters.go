@@ -95,24 +95,23 @@ func ToPBVolumeInfo(volume *model.Volume, mounts map[string]*propsv1.HostLocalMo
 	return pbvi
 }
 
-// ToPBContainerList convert a list of string into a *ContainerLsit
-func ToPBContainerList(in []string) *pb.ContainerList {
-
-	var containers []*pb.Container
+// ToPBBucketList convert a list of string into a *ContainerLsit
+func ToPBBucketList(in []string) *pb.BucketList {
+	var buckets []*pb.Bucket
 	for _, name := range in {
-		containers = append(containers, &pb.Container{Name: name})
+		buckets = append(buckets, &pb.Bucket{Name: name})
 	}
-	return &pb.ContainerList{
-		Containers: containers,
+	return &pb.BucketList{
+		Buckets: buckets,
 	}
 }
 
-// ToPBContainerMountPoint convert a ContainerInfo into a ContainerMountingPoint
-func ToPBContainerMountPoint(in *model.ContainerInfo) *pb.ContainerMountingPoint {
-	return &pb.ContainerMountingPoint{
-		Container: in.Name,
-		Path:      in.MountPoint,
-		Host:      &pb.Reference{Name: in.Host},
+// ToPBBucketMountPoint convert a Bucket into a BucketMountingPoint
+func ToPBBucketMountPoint(in *model.Bucket) *pb.BucketMountingPoint {
+	return &pb.BucketMountingPoint{
+		Bucket: in.Name,
+		Path:   in.MountPoint,
+		Host:   &pb.Reference{Name: in.Host},
 	}
 }
 

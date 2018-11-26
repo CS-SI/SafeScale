@@ -32,7 +32,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/server/commands"
+	"github.com/CS-SI/SafeScale/broker/server/listeners"
 	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 )
@@ -68,19 +68,19 @@ broker volume delete v1
 broker volume inspect v1
 broker volume update v1 --speed="HDD" --size=1000
 
-broker container create c1
-broker container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
-broker container umount c1 host1
-broker container delete c1
-broker container list
-broker container inspect C1
+broker bucket|container create c1
+broker bucket|container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
+broker bucket|container umount c1 host1
+broker bucket|container delete c1
+broker bucket|container list
+broker bucket|container inspect C1
 
-broker nas create nas1 host1 --path="/shared/data"
-broker nas delete nas1
-broker nas mount nas1 host2 --path="/data"
-broker nas umount nas1 host2
-broker nas list
-broker nas inspect nas1
+broker share|nas create nas1 host1 --path="/shared/data"
+broker share|nas delete nas1
+broker share|nas mount nas1 host2 --path="/data"
+broker share|nas umount nas1 host2
+broker share|nas list
+broker share|nas inspect nas1
 
 */
 
@@ -113,15 +113,15 @@ func work() {
 	s := grpc.NewServer()
 
 	log.Infoln("Registering services")
-	pb.RegisterTenantServiceServer(s, &commands.TenantServiceServer{})
-	pb.RegisterNetworkServiceServer(s, &commands.NetworkServiceServer{})
-	pb.RegisterHostServiceServer(s, &commands.HostServiceServer{})
-	pb.RegisterVolumeServiceServer(s, &commands.VolumeServiceServer{})
-	pb.RegisterSshServiceServer(s, &commands.SSHServiceServer{})
-	pb.RegisterContainerServiceServer(s, &commands.ContainerServiceServer{})
-	pb.RegisterShareServiceServer(s, &commands.ShareServiceServer{})
-	pb.RegisterImageServiceServer(s, &commands.ImageServiceServer{})
-	pb.RegisterTemplateServiceServer(s, &commands.TemplateServiceServer{})
+	pb.RegisterTenantServiceServer(s, &listeners.TenantServiceListener{})
+	pb.RegisterNetworkServiceServer(s, &listeners.NetworkServiceListener{})
+	pb.RegisterHostServiceServer(s, &listeners.HostServiceListener{})
+	pb.RegisterVolumeServiceServer(s, &listeners.VolumeServiceListener{})
+	pb.RegisterSshServiceServer(s, &listeners.SSHServiceListener{})
+	pb.RegisterBucketServiceServer(s, &listeners.BucketServiceListener{})
+	pb.RegisterShareServiceServer(s, &listeners.ShareServiceListener{})
+	pb.RegisterImageServiceServer(s, &listeners.ImageServiceListener{})
+	pb.RegisterTemplateServiceServer(s, &listeners.TemplateServiceListener{})
 
 	// log.Println("Initializing service factory")
 	// commands.InitServiceFactory()

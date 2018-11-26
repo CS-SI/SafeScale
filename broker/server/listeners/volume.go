@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package commands
+package listeners
 
 import (
 	"context"
@@ -27,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/broker/server/services"
 	"github.com/CS-SI/SafeScale/broker/utils"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 )
 
@@ -38,20 +37,20 @@ import (
 // broker volume inspect v1
 // broker volume update v1 --speed="HDD" --size=1000
 
-// VolumeServiceServer is the volume service grps server
-type VolumeServiceServer struct{}
+// NewVolumeService ...
+var NewVolumeService = services.NewVolumeService
 
-// VolumeServiceCreator is the function tu use to create a VolumeService instance
-var VolumeServiceCreator = services.NewVolumeService
+// VolumeServiceListener is the volume service grps server
+type VolumeServiceListener struct{}
 
 // List the available volumes
-func (s *VolumeServiceServer) List(ctx context.Context, in *pb.VolumeListRequest) (*pb.VolumeList, error) {
+func (s *VolumeServiceListener) List(ctx context.Context, in *pb.VolumeListRequest) (*pb.VolumeList, error) {
 	log.Printf("Volume List called")
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		return nil, fmt.Errorf("Cannot list volumes : No tenant set")
 	}
-	service := VolumeServiceCreator(providers.FromClient(tenant.Client))
+	service := NewVolumeService(tenant.Service)
 	volumes, err := service.List(in.GetAll())
 	if err != nil {
 		return nil, err
@@ -67,14 +66,16 @@ func (s *VolumeServiceServer) List(ctx context.Context, in *pb.VolumeListRequest
 }
 
 // Create a new volume
-func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
-	log.Printf("Create Volume called '%s'", in.Name)
+func (s *VolumeServiceListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
+	log.Debugf("broker.server.listeners.VolumeServiceListener.Create(%v) called", in)
+	defer log.Debugf("broker.server.listeners.VolumeServiceListener.Create(%v) done", in)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		return nil, fmt.Errorf("Cannot create volume : No tenant set")
+		return nil, fmt.Errorf("Can't create volume: no tenant set")
 	}
 
-	service := VolumeServiceCreator(providers.FromClient(tenant.Client))
+	service := NewVolumeService(tenant.Service)
 	volume, err := service.Create(in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
 	if err != nil {
 		return nil, err
@@ -85,7 +86,7 @@ func (s *VolumeServiceServer) Create(ctx context.Context, in *pb.VolumeDefinitio
 }
 
 // Attach a volume to an host and create a mount point
-func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachment) (*google_protobuf.Empty, error) {
+func (s *VolumeServiceListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*google_protobuf.Empty, error) {
 	log.Printf("Attach volume called '%s', '%s'", in.Host.Name, in.MountPath)
 
 	tenant := GetCurrentTenant()
@@ -93,7 +94,7 @@ func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachmen
 		return nil, fmt.Errorf("Cannot attach volume : No tenant set")
 	}
 
-	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
+	service := NewVolumeService(tenant.Service)
 	err := service.Attach(in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat())
 
 	if err != nil {
@@ -104,39 +105,41 @@ func (s *VolumeServiceServer) Attach(ctx context.Context, in *pb.VolumeAttachmen
 }
 
 // Detach a volume from an host. It umount associated mountpoint
-func (s *VolumeServiceServer) Detach(ctx context.Context, in *pb.VolumeDetachment) (*google_protobuf.Empty, error) {
-	log.Printf("Detach volume called '%s', '%s'", in.Host.Name, in.Volume.Name)
+func (s *VolumeServiceListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*google_protobuf.Empty, error) {
+	log.Debugf("broker.server.listeners.VolumeServiceListener.Detach(%v) called", in)
+	defer log.Debugf("broker.server.listeners.VolumeServiceListener.Detach(%v) done", in)
 
+	volumeName := in.GetVolume().GetName()
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		return nil, fmt.Errorf("Cannot detach volume : No tenant set")
+		return nil, fmt.Errorf("Can't detach volume '%s': no tenant set", volumeName)
 	}
 
-	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
-	err := service.Detach(in.GetVolume().GetName(), in.GetHost().GetName())
-
+	hostName := in.GetHost().GetName()
+	service := NewVolumeService(tenant.Service)
+	err := service.Detach(volumeName, hostName)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println(fmt.Sprintf("Volume '%s' detached from '%s'", in.GetVolume().GetName(), in.GetHost().GetName()))
+	log.Println(fmt.Sprintf("Volume '%s' detached from '%s'", volumeName, hostName))
 	return &google_protobuf.Empty{}, nil
 }
 
 // Delete a volume
-func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
+func (s *VolumeServiceListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Volume delete called '%s'", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Can't delete volume: neither name nor id given as reference")
+		return nil, fmt.Errorf("Can't delete volume: invalid name or id")
 	}
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		return nil, fmt.Errorf("can't delete volume '%s': no tenant set", ref)
 	}
-	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
+	service := NewVolumeService(currentTenant.Service)
 	err := service.Delete(ref)
 	if err != nil {
 		return &google_protobuf.Empty{}, fmt.Errorf("Can't delete volume '%s': %s", ref, err.Error())
@@ -146,7 +149,7 @@ func (s *VolumeServiceServer) Delete(ctx context.Context, in *pb.Reference) (*go
 }
 
 // Inspect a volume
-func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*pb.VolumeInfo, error) {
+func (s *VolumeServiceListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.VolumeInfo, error) {
 	log.Printf("Inspect Volume called '%s'", in.Name)
 
 	ref := utils.GetReference(in)
@@ -159,7 +162,7 @@ func (s *VolumeServiceServer) Inspect(ctx context.Context, in *pb.Reference) (*p
 		return nil, fmt.Errorf("cannot inspect volume: No tenant set")
 	}
 
-	service := services.NewVolumeService(providers.FromClient(currentTenant.Client))
+	service := NewVolumeService(tenant.Service)
 	volume, mounts, err := service.Inspect(ref)
 	if err != nil {
 		return nil, err

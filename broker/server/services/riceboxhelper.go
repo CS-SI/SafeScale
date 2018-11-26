@@ -59,7 +59,7 @@ func getBoxContent(script string, data interface{}) (string, error) {
 	}
 
 	tplcmd := buffer.String()
-	//fmt.Fprintln(tplcmd)
+	// fmt.Println(tplcmd)
 	return tplcmd, nil
 }
 
