@@ -19,8 +19,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/status"
-	"strings"
 	"sync"
 	"time"
 
@@ -140,7 +138,6 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 		go hostDeleter(target)
 	}
 	wg.Wait()
-	close(deleteErrors)
 
 	if errs > 0 {
 		return clitools.ExitOnRPC("")

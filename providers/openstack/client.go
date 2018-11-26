@@ -25,11 +25,12 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"net/http"
+
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
-	"net/http"
 )
 
 // AuthOptions fields are the union of those recognized by each identity implementation and
@@ -133,7 +134,7 @@ func ProviderErrorToString(err error) string {
 }
 
 func verifyServiceEndpoint(service string) (bool, error) {
-	var serviceGone error = nil
+	var serviceGone error
 
 	resp, err := http.Get(service)
 	if (err == nil) && (resp.StatusCode != 200) && (resp.StatusCode != 401) && (resp.StatusCode != 403) {
@@ -144,6 +145,7 @@ func verifyServiceEndpoint(service string) (bool, error) {
 	return true, nil
 }
 
+// VerifyEndpoints ...
 func VerifyEndpoints(service *Client) (bool, error) {
 	if service == nil {
 		panic("Nil service !!")
@@ -169,11 +171,11 @@ func VerifyEndpoints(service *Client) (bool, error) {
 	}
 	ok = ok && pok
 
-	pok, err = verifyServiceEndpoint(service.Container.Endpoint)
-	if err != nil {
-		return false, err
-	}
-	ok = ok && pok
+	// pok, err = verifyServiceEndpoint(service.Container.Endpoint)
+	// if err != nil {
+	// 	return false, err
+	// }
+	// ok = ok && pok
 
 	return ok, nil
 }
