@@ -138,26 +138,26 @@ func ToPBShareMount(shareName string, hostName string, mount *propsv1.HostRemote
 
 // ToPBHost convert an host from api to protocolbuffer format
 func ToPBHost(in *model.Host) *pb.Host {
-	hpNetworkV1 := propsv1.NewHostNetwork()
-	err := in.Properties.Get(HostProperty.NetworkV1, hpNetworkV1)
+	hostNetworkV1 := propsv1.NewHostNetwork()
+	err := in.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
 		return nil
 	}
-	hpSizingV1 := propsv1.NewHostSizing()
-	err = in.Properties.Get(HostProperty.SizingV1, hpSizingV1)
+	hostSizingV1 := propsv1.NewHostSizing()
+	err = in.Properties.Get(HostProperty.SizingV1, hostSizingV1)
 	if err != nil {
 		return nil
 	}
 	return &pb.Host{
-		CPU:        int32(hpSizingV1.AllocatedSize.Cores),
-		Disk:       int32(hpSizingV1.AllocatedSize.DiskSize),
-		GatewayID:  hpNetworkV1.DefaultGatewayID,
+		CPU:        int32(hostSizingV1.AllocatedSize.Cores),
+		Disk:       int32(hostSizingV1.AllocatedSize.DiskSize),
+		GatewayID:  hostNetworkV1.DefaultGatewayID,
 		ID:         in.ID,
 		PublicIP:   in.GetPublicIP(),
 		PrivateIP:  in.GetPrivateIP(),
 		Name:       in.Name,
 		PrivateKey: in.PrivateKey,
-		RAM:        hpSizingV1.AllocatedSize.RAMSize,
+		RAM:        hostSizingV1.AllocatedSize.RAMSize,
 		State:      pb.HostState(in.LastState),
 	}
 }

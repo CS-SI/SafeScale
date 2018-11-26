@@ -18,27 +18,25 @@ package providers
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
-	"reflect"
 	"sort"
 	"strings"
 	"time"
-	"encoding/json"
 
-	uuid "github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
 	safeutils "github.com/CS-SI/SafeScale/utils"
 	"github.com/nanobox-io/golang-scribble"
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
-	"github.com/CS-SI/SafeScale/utils"
 )
 
 // Service Client High level service
@@ -337,7 +335,7 @@ func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force
 
 	for _, template := range templates {
 		if template.Cores >= sizing.MinCores && (template.DiskSize == 0 || template.DiskSize >= sizing.MinDiskSize) && template.RAMSize >= sizing.MinRAMSize {
-			if _, ok := scannerTemplates[template.ID]; ok || !askedForSpecificScannerInfo{
+			if _, ok := scannerTemplates[template.ID]; ok || !askedForSpecificScannerInfo {
 				selectedTpls = append(selectedTpls, template)
 			}
 		} else {

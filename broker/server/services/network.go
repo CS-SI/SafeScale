@@ -67,13 +67,13 @@ func (svc *NetworkService) Create(
 ) (*model.Network, error) {
 
 	// Verify that the network doesn't exist first
-	if exists, err := svc.provider.GetNetwork(net); exists != nil && err == nil {
-		err = srvLog(errors.Errorf("A network already exists with name '%s'", net))
-		return nil, err
-	}
-	for _, i := range nets {
-		if i.Name == name {
-			return nil, fmt.Errorf("Error creating network '%s': a network already exists with that name", name)
+	_, err := svc.provider.GetNetworkByName(name)
+	if err != nil {
+		switch err.(type) {
+		case model.ErrResourceNotFound:
+		default:
+			err = srvLog(errors.Errorf("failed to check if a network already exists with name '%s'", name))
+			return nil, err
 		}
 	}
 
@@ -237,8 +237,7 @@ func (svc *NetworkService) Create(
 	//	err = metadata.SaveNetwork(svc.provider, rv)
 	err = metadata.SaveNetwork(svc.provider, network)
 	if err != nil {
-		tbr := srvLog(errors.Wrap(err, "Error creating network: Error saving network metadata"))
-		return nil, tbr
+		return nil, srvLog(errors.Wrap(err, "Error creating network: Error saving network metadata"))
 	}
 
 	return network, nil

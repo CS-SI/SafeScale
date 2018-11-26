@@ -72,7 +72,6 @@ type AuthOptions struct {
 	Region string
 	// Project Name
 	ProjectName string
-	Context string
 }
 
 // func parseOpenRC(openrc string) (*openstack.AuthOptions, error) {
@@ -152,7 +151,6 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 			DefaultImage: defaultImage,
 		},
 	)
-		Context:		   Context,
 }
 
 // GetCfgOpts return configuration parameters
