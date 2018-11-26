@@ -72,6 +72,7 @@ type AuthOptions struct {
 	Region string
 	// Project Name
 	ProjectName string
+	Context string
 }
 
 // func parseOpenRC(openrc string) (*openstack.AuthOptions, error) {
@@ -102,7 +103,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"classic":    VolumeSpeed.COLD,
 				"high-speed": VolumeSpeed.HDD,
 			},
-			MetadataBucketName: metadata.BuildMetadataBucketName(opts.ApplicationKey),
+			MetadataBucketName: metadata.BuildMetadataBucketName(opts.ApplicationKey + opts.Context),
 		},
 	)
 
@@ -131,12 +132,18 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	Region, _ := params["Region"].(string)
 	ProjectName, _ := params["ProjectName"].(string)
 
+	Context, ok := params["Context"].(string)
+	if !ok {
+		Context = ""
+	}
+
 	return AuthenticatedClient(AuthOptions{
 		ApplicationKey:    ApplicationKey,
 		OpenstackID:       OpenstackID,
 		OpenstackPassword: OpenstackPassword,
 		Region:            Region,
 		ProjectName:       ProjectName,
+		Context:		   Context,
 	})
 }
 
