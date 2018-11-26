@@ -45,7 +45,7 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services HostAPI
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO At service level, we need to log before returning, because it's the last chance to track the real issue in server side
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
@@ -200,26 +200,28 @@ func (svc *HostService) Create(
 		networks = append(networks, net)
 	}
 
-	templates, err := svc.provider.SelectTemplatesBySize(model.SizingRequirements{
-		MinCores:    cpu,
-		MinRAMSize:  ram,
-		MinDiskSize: disk,
-	})
+	templates, err := svc.provider.SelectTemplatesBySize(
+		model.SizingRequirements{
+			MinCores:    cpu,
+			MinRAMSize:  ram,
+			MinDiskSize: disk,
+			MinGPU:      gpuNumber,
+			MinFreq:     freq,
+		}, force)
 	if err != nil {
 		tbr := errors.Wrap(err, "failed to find template corresponding to requested resources")
 		log.Errorf("%+v", tbr)
 		return nil, tbr
 	}
 	var template model.HostTemplate
-	if len(tpls) > 0 {
-		template = tpls[0]
+	if len(templates) > 0 {
+		template = templates[0]
 		log.Debugf("Selected template: '%s' (%d core%s, %.01f GB RAM, %d GB disk)", template.Name, template.Cores, utils.Plural(template.Cores), template.RAMSize, template.DiskSize)
 	}
 
 	img, err := svc.provider.SearchImage(los)
 	if err != nil {
-		tbr := srvLog(errors.Wrap(err, "Failed to find image to use on compute resource."))
-		return nil, tbr
+		return nil, srvLog(errors.Wrap(err, "Failed to find image to use on compute resource."))
 	}
 	hostRequest := model.HostRequest{
 		ImageID:        img.ID,
@@ -259,9 +261,11 @@ func (svc *HostService) Create(
 	}
 	hostSizingV1.Template = hostRequest.TemplateID
 	hostSizingV1.RequestedSize = &propsv1.HostSize{
-		Cores:    cpu,
-		RAMSize:  ram,
-		DiskSize: disk,
+		Cores:     cpu,
+		RAMSize:   ram,
+		DiskSize:  disk,
+		GPUNumber: gpuNumber,
+		CPUFreq:   freq,
 	}
 	err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
 	if err != nil {

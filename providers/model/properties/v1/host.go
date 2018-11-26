@@ -73,6 +73,7 @@ type HostSize struct {
 	DiskSize  int     `json:"disk_size,omitempty"`
 	GPUNumber int     `json:"gpu_number,omitempty"`
 	GPUType   string  `json:"gpu_type,omitempty"`
+	CPUFreq   float32 `json:"cpu_freq,omitempty"`
 }
 
 // NewHostSize ...

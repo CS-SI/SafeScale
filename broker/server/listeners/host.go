@@ -153,57 +153,14 @@ func (s *HostServiceListener) Create(ctx context.Context, in *pb.HostDefinition)
 
 	hostService := services.NewHostService(currentTenant.Service)
 
-	// db, err := scribble.New(safeutils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// imageList, err := db.ReadAll("images")
-	// if err != nil {
-	// 	fmt.Println("Error", err)
-	// }
-
-	// if in.GetGPUNumber() > 0 && in.GetFreq() != 0 {
-	// 	if !in.Force && (len(imageList) == 0) {
-	// 		noScannerDb := fmt.Sprintf("No scanner database available! Run scanner to create one.")
-	// 		log.Error(noScannerDb)
-	// 		return nil, errors.New(noScannerDb)
-	// 	}
-	// }
-
-	// images := []StoredCPUInfo{}
-	// for _, f := range imageList {
-	// 	imageFound := StoredCPUInfo{}
-	// 	if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
-	// 		fmt.Println("Error", err)
-	// 	}
-
-	// 	if imageFound.GPU < int(in.GetGPUNumber()) {
-	// 		continue
-	// 	}
-
-	// 	if imageFound.CPUFrequency < float64(in.GetFreq()) {
-	// 		continue
-	// 	}
-
-	// 	images = append(images, imageFound)
-	// }
-
-	// if !in.Force && (len(images) == 0) {
-	// 	noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !", in.GetGPUNumber(), in.GetFreq())
-	// 	log.Error(noHostError)
-	// 	return nil, errors.New(noHostError)
-	// }
-
 	// TODO https://github.com/CS-SI/SafeScale/issues/30
 	// TODO GITHUB If we have to ask for GPU requirements and FREQ requirements, pb.HostDefinition has to change and the invocation of hostService.Create too...
 
 	host, err := hostService.Create(in.GetName(), in.GetNetwork(),
-		int(in.GetCPUNumber()), in.GetRAM(), int(in.GetDisk()), in.GetImageID(), in.GetPublic())
+		int(in.GetCPUNumber()), in.GetRAM(), int(in.GetDisk()), in.GetImageID(), in.GetPublic(), int(in.GetGPUNumber()), float32(in.GetFreq()), in.Force)
 	if err != nil {
 		return nil, err
 	}
-
 	log.Infof("Host '%s' created", in.GetName())
 	return conv.ToPBHost(host), nil
 }
