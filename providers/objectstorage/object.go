@@ -1,3 +1,19 @@
+/*
+ * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package objectstorage
 
 import (
@@ -7,7 +23,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/graymeta/stow"
 	log "github.com/sirupsen/logrus"
 	// necessary for connect
@@ -90,8 +105,11 @@ func (o *object) reloadFromItem(item stow.Item) error {
 	return nil
 }
 
-// Read reads the content of the object from Object Storage and write it in 'target'
-func (o *object) Read(target io.Writer, ranges []model.Range) error {
+// Read reads the content of the object from Object Storage and writes it in 'target'
+func (o *object) Read(target io.Writer, from, to int64) error {
+	if from > to {
+		panic("from is greater than to!")
+	}
 	var seekTo int64
 	var length int64
 
@@ -107,16 +125,12 @@ func (o *object) Read(target io.Writer, ranges []model.Range) error {
 	}
 
 	length = size
-	if ranges != nil {
-		// TODO: support multiple ranges
-		if ranges[0].From != nil {
-			seekTo = int64(*ranges[0].From)
-		}
-		if ranges[0].To != nil {
-			length = int64(*ranges[0].To) - seekTo
-		}
+	if from > 0 {
+		seekTo = from
 	}
-	// log.Printf("ExtractItem   %s.%s extracted until %d bytes to %d bytes to %s ", bucketName, objectName, seekTo, length, f.Name())
+	if to > 0 && to > from {
+		length = to - from
+	}
 
 	source, err := o.item.Open()
 	if err != nil {
@@ -129,7 +143,6 @@ func (o *object) Read(target io.Writer, ranges []model.Range) error {
 		if err != nil {
 			return err
 		}
-		//log.Println("Extract Item By BytesRange => ", bucketName, item.Name(), " wrote ", nbytes, " to ", f.Name())
 	} else {
 		buf := make([]byte, seekTo)
 		if _, err := io.ReadAtLeast(source, buf, int(seekTo)); err != nil {
@@ -153,8 +166,8 @@ func (o *object) Read(target io.Writer, ranges []model.Range) error {
 
 // Write the source to the object in Object Storage
 func (o *object) Write(source io.Reader, sourceSize int64) error {
-	log.Debugf("objectstorage.object<%s,%s>.Write() called", o.bucket.Name, o.Name)
-	defer log.Debugf("objectstorage.object<%s,%s>.Write() done", o.bucket.Name, o.Name)
+	// log.Debugf("objectstorage.object<%s:%s>.Write() called", o.bucket.Name, o.Name)
+	// defer log.Debugf("objectstorage.object<%s:%s>.Write() done", o.bucket.Name, o.Name)
 
 	if o.bucket == nil {
 		panic("o.bucket == nil!")
@@ -167,9 +180,10 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 }
 
 // WriteMultiPart writes big data to Object, by parts (also called chunks)
+// Note: nothing to do with multi-chunk abilities of various object storage technologies
 func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) error {
-	log.Debugf("objectstorage.object<%s,%s>.WriteMultiPart() called", o.bucket.Name, o.Name)
-	defer log.Debugf("objectstorage.object<%s,%s>.WriteMultiPart() done", o.bucket.Name, o.Name)
+	// log.Debugf("objectstorage.object<%s,%s>.WriteMultiPart() called", o.bucket.Name, o.Name)
+	// defer log.Debugf("objectstorage.object<%s,%s>.WriteMultiPart() done", o.bucket.Name, o.Name)
 
 	metadataCopy := o.GetMetadata().Clone()
 

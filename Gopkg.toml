@@ -126,6 +126,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 [[constraint]]
   name = "github.com/graymeta/stow"
   branch = "master"
+  source = "github.com/appscode/stow.git"
 
 [prune]
   go-tests = true

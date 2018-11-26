@@ -48,48 +48,48 @@ func NewHost(svc *providers.Service) *Host {
 }
 
 // Carry links an host instance to the Metadata instance
-func (m *Host) Carry(host *model.Host) *Host {
+func (mh *Host) Carry(host *model.Host) *Host {
 	if host == nil {
 		panic("host is nil!")
 	}
 	if host.Properties == nil {
 		host.Properties = model.NewExtensions()
 	}
-	m.item.Carry(host)
-	m.name = &host.Name
-	m.id = &host.ID
-	return m
+	mh.item.Carry(host)
+	mh.name = &host.Name
+	mh.id = &host.ID
+	return mh
 }
 
 // Get returns the Network instance linked to metadata
-func (m *Host) Get() *model.Host {
-	if m.item == nil {
+func (mh *Host) Get() *model.Host {
+	if mh.item == nil {
 		panic("m.item is nil!")
 	}
-	return m.item.Get().(*model.Host)
+	return mh.item.Get().(*model.Host)
 }
 
 // Write updates the metadata corresponding to the host in the Object Storage
-func (m *Host) Write() error {
-	if m.item == nil {
+func (mh *Host) Write() error {
+	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
-	err := m.item.WriteInto(ByNameFolderName, *m.name)
+	err := mh.item.WriteInto(ByNameFolderName, *mh.name)
 	if err != nil {
 		return err
 	}
-	return m.item.WriteInto(ByIDFolderName, *m.id)
+	return mh.item.WriteInto(ByIDFolderName, *mh.id)
 }
 
 // ReadByID reads the metadata of a network identified by ID from Object Storage
-func (m *Host) ReadByID(id string) (bool, error) {
-	if m.item == nil {
+func (mh *Host) ReadByID(id string) (bool, error) {
+	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
 	var host model.Host
-	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
+	found, err := mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
 		phost := &host
 		err := phost.Deserialize(buf)
 		if err != nil {
@@ -103,19 +103,19 @@ func (m *Host) ReadByID(id string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.id = &host.ID
-	m.name = &host.Name
+	mh.id = &host.ID
+	mh.name = &host.Name
 	return true, nil
 }
 
 // ReadByName reads the metadata of a network identified by name
-func (m *Host) ReadByName(name string) (bool, error) {
-	if m.item == nil {
+func (mh *Host) ReadByName(name string) (bool, error) {
+	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
 	var host model.Host
-	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
+	found, err := mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
 		phost := &host
 		err := phost.Deserialize(buf)
 		if err != nil {
@@ -129,22 +129,22 @@ func (m *Host) ReadByName(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.name = &host.Name
-	m.id = &host.ID
+	mh.name = &host.Name
+	mh.id = &host.ID
 	return true, nil
 }
 
 // Delete updates the metadata corresponding to the network
-func (m *Host) Delete() error {
-	if m.item == nil {
-		panic("m.item is nil!")
+func (mh *Host) Delete() error {
+	if mh.item == nil {
+		panic("mh.item is nil!")
 	}
 
-	err := m.item.DeleteFrom(ByIDFolderName, *m.id)
+	err := mh.item.DeleteFrom(ByIDFolderName, *mh.id)
 	if err != nil {
 		return err
 	}
-	err = m.item.DeleteFrom(ByNameFolderName, *m.name)
+	err = mh.item.DeleteFrom(ByNameFolderName, *mh.name)
 	if err != nil {
 		return err
 	}
@@ -152,15 +152,14 @@ func (m *Host) Delete() error {
 }
 
 // Browse walks through host folder and executes a callback for each entries
-func (m *Host) Browse(callback func(*model.Host) error) error {
-	return m.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
-		host := model.Host{}
-		phost := &host
-		err := phost.Deserialize(buf)
+func (mh *Host) Browse(callback func(*model.Host) error) error {
+	return mh.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
+		host := model.NewHost()
+		err := host.Deserialize(buf)
 		if err != nil {
 			return err
 		}
-		return callback(phost)
+		return callback(host)
 	})
 }
 
@@ -218,59 +217,59 @@ func RemoveHost(svc *providers.Service, host *model.Host) error {
 
 // LoadHostByID gets the host definition from Object Storage
 func LoadHostByID(svc *providers.Service, hostID string) (*Host, error) {
-	m := NewHost(svc)
-	found, err := m.ReadByID(hostID)
+	mh := NewHost(svc)
+	found, err := mh.ReadByID(hostID)
 	if err != nil {
 		return nil, err
 	}
 	if !found {
 		return nil, nil
 	}
-	return m, nil
+	return mh, nil
 }
 
 // LoadHostByName gets the Network definition from Object Storage
 func LoadHostByName(svc *providers.Service, hostName string) (*Host, error) {
-	m := NewHost(svc)
-	found, err := m.ReadByName(hostName)
+	mh := NewHost(svc)
+	found, err := mh.ReadByName(hostName)
 	if err != nil {
 		return nil, err
 	}
 	if !found {
 		return nil, nil
 	}
-	return m, nil
+	return mh, nil
 }
 
 // LoadHost gets the host definition from Object Storage
 func LoadHost(svc *providers.Service, ref string) (*Host, error) {
 	// We first try looking for host by ID from metadata
-	m, err := LoadHostByID(svc, ref)
+	mh, err := LoadHostByID(svc, ref)
 	if err != nil {
 		return nil, err
 	}
-	if m != nil {
-		return m, nil
+	if mh != nil {
+		return mh, nil
 	}
 
 	// If not found, we try looking for host by name from metadata
-	m, err = LoadHostByName(svc, ref)
+	mh, err = LoadHostByName(svc, ref)
 	if err != nil {
 		return nil, err
 	}
-	if m != nil {
-		return m, nil
+	if mh != nil {
+		return mh, nil
 	}
 
 	return nil, nil
 }
 
 // Acquire waits until the write lock is available, then locks the metadata
-func (m *Host) Acquire() {
-	m.item.Acquire()
+func (mh *Host) Acquire() {
+	mh.item.Acquire()
 }
 
 // Release unlocks the metadata
-func (m *Host) Release() {
-	m.item.Release()
+func (mh *Host) Release() {
+	mh.item.Release()
 }

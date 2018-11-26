@@ -66,7 +66,7 @@ func (m *Network) Carry(network *model.Network) *Network {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	if network.Properties != nil {
+	if network.Properties == nil {
 		network.Properties = model.NewExtensions()
 	}
 	m.item.Carry(network)
@@ -276,7 +276,7 @@ func (m *Network) ListHosts() ([]*model.Host, error) {
 	for id := range networkHostsV1.ByID {
 		mh, err := LoadHost(m.item.GetService(), id)
 		if err != nil {
-			return nil, err
+			break
 		}
 		list = append(list, mh.Get())
 	}

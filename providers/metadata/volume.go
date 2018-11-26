@@ -21,10 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeProperty"
-	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/utils/metadata"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -171,81 +168,81 @@ func (mv *Volume) Browse(callback func(*model.Volume) error) error {
 	})
 }
 
-// Attach add a volume attachment to the volume definition in Object Storage
-func (mv *Volume) Attach(va *model.VolumeAttachment) error {
-	if mv.item == nil {
-		panic("m.item is nil!")
-	}
+// // Attach add a volume attachment to the volume definition in Object Storage
+// func (mv *Volume) Attach(va *model.VolumeAttachment) error {
+// 	if mv.item == nil {
+// 		panic("m.item is nil!")
+// 	}
 
-	// // We will need to update host attaching the volume...
-	// mh, err := LoadHostByID(mv.item.GetService(), va.ServerID)
-	// if err != nil {
-	// 	return err
-	// }
+// 	// // We will need to update host attaching the volume...
+// 	// mh, err := LoadHostByID(mv.item.GetService(), va.ServerID)
+// 	// if err != nil {
+// 	// 	return err
+// 	// }
 
-	// First save attachment in volume property VolumeAttachments
-	volume := mv.Get()
-	volumeAttachmentsV1 := propsv1.NewVolumeAttachments()
-	err := volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachmentsV1)
-	if err != nil {
-		return err
-	}
-	volumeAttachmentsV1.HostIDs = append(volumeAttachmentsV1.HostIDs, va.ServerID)
-	err = volume.Properties.Set(VolumeProperty.AttachedV1, volumeAttachmentsV1)
-	if err != nil {
-		return err
-	}
+// 	// First save attachment in volume property VolumeAttachments
+// 	volume := mv.Get()
+// 	volumeAttachmentsV1 := propsv1.NewVolumeAttachments()
+// 	err := volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachmentsV1)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	volumeAttachmentsV1.Hosts[va.ServerID] = ""
+// 	err = volume.Properties.Set(VolumeProperty.AttachedV1, volumeAttachmentsV1)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	return err
-}
+// 	return err
+// }
 
-// Detach remove a volume attachment from the volume definition in Object Storage
-func (mv *Volume) Detach(va *model.VolumeAttachment) error {
-	if mv.item == nil {
-		panic("mv.item is nil!")
-	}
-	volume := mv.Get()
+// // Detach remove a volume attachment from the volume definition in Object Storage
+// func (mv *Volume) Detach(va *model.VolumeAttachment) error {
+// 	if mv.item == nil {
+// 		panic("mv.item is nil!")
+// 	}
+// 	volume := mv.Get()
 
-	volumeAttachedV1 := propsv1.NewVolumeAttachments()
-	err := volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
-	if err != nil {
-		return err
-	}
-	present := false
-	k := 0
-	i := ""
-	for k, i = range volumeAttachedV1.HostIDs {
-		if i == va.ServerID {
-			present = true
-			break
-		}
-	}
-	if !present {
-		log.Warnf("Volume '%s' can't be detached from host '%s', it isn't attached to it.", va.ID, va.ServerID)
-		return nil
-	}
-	volumeAttachedV1.HostIDs = append(volumeAttachedV1.HostIDs[:k], volumeAttachedV1.HostIDs[k+1:]...)
-	return volume.Properties.Set(VolumeProperty.AttachedV1, volumeAttachedV1)
-}
+// 	volumeAttachedV1 := propsv1.NewVolumeAttachments()
+// 	err := volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	present := false
+// 	k := 0
+// 	i := ""
+// 	for k, i = range volumeAttachedV1.HostIDs {
+// 		if i == va.ServerID {
+// 			present = true
+// 			break
+// 		}
+// 	}
+// 	if !present {
+// 		log.Warnf("Volume '%s' can't be detached from host '%s', it isn't attached to it.", va.ID, va.ServerID)
+// 		return nil
+// 	}
+// 	volumeAttachedV1.HostIDs = append(volumeAttachedV1.HostIDs[:k], volumeAttachedV1.HostIDs[k+1:]...)
+// 	return volume.Properties.Set(VolumeProperty.AttachedV1, volumeAttachedV1)
+// }
 
-// GetAttachments returns a list of ID of the hosts which are attached to the volume
-func (mv *Volume) GetAttachments() ([]string, error) {
-	if mv.item == nil {
-		panic("m.item is nil!")
-	}
+// // GetAttachments returns a list of ID of the hosts which are attached to the volume
+// func (mv *Volume) GetAttachments() ([]string, error) {
+// 	if mv.item == nil {
+// 		panic("m.item is nil!")
+// 	}
 
-	v := mv.Get()
-	if v == nil {
-		panic("No volume instance in metadata!")
-	}
+// 	v := mv.Get()
+// 	if v == nil {
+// 		panic("No volume instance in metadata!")
+// 	}
 
-	volumeAttachedV1 := propsv1.NewVolumeAttachments()
-	err := v.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
-	if err != nil {
-		return nil, err
-	}
-	return volumeAttachedV1.HostIDs, nil
-}
+// 	volumeAttachedV1 := propsv1.NewVolumeAttachments()
+// 	err := v.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return volumeAttachedV1.HostIDs, nil
+// }
 
 // SaveVolume saves the Volume definition in Object Storage
 func SaveVolume(svc *providers.Service, volume *model.Volume) error {
@@ -275,7 +272,7 @@ func LoadVolume(svc *providers.Service, ref string) (*Volume, error) {
 		}
 	}
 	if !found {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("volume", ref)
 	}
 	return m, nil
 }
