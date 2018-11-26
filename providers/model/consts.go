@@ -23,12 +23,15 @@ const (
 	// DefaultVolumeMountPoint Default mount point for volumes
 	DefaultVolumeMountPoint = "/data/"
 
-	// DefaultContainerMountPoint Default mount point for containers
-	DefaultContainerMountPoint = "/containers/"
+	// DefaultBucketMountPoint Default mount point for containers
+	DefaultBucketMountPoint = "/buckets/"
 
 	// DefaultShareExportedPath Default path to be exported by nfs server
 	DefaultShareExportedPath = "/shared/data"
 
 	// DefaultShareMountPath Default path to be mounted to access a nfs directory
 	DefaultShareMountPath = "/shared"
+
+	// SingleHostNetworkName is the name to use to create the network owning single hosts (not attached to a named network)
+	SingleHostNetworkName = "net-safescale"
 )

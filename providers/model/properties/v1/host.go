@@ -41,16 +41,16 @@ func NewHostDescription() *HostDescription {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostNetwork struct {
-	IsGateway              bool              `json:"is_gateway,omitempty"`                // Tells if host is a gateway of a network
-	DefaultGatewayID       string            `json:"default_gateway_id,omitempty"`        // contains the ID of the Default Gateway
-	DefaultGatewayAccessIP string            `json:"default_gateway_access_ip,omitempty"` // contains the access IP of the default gateway
-	DefaultNetworkID       string            `json:"default_network_id,omitempty"`        // contains the ID of the default Network
-	NetworksByID           map[string]string `json:"networks_by_id,omitempty"`            // contains the name of each network binded to the host (indexed by ID)
-	NetworksByName         map[string]string `json:"networks_by_name,omitempty"`          // contains the ID of each network binded to the host (indexed by Name)
-	PublicIPv4             string            `json:"public_ip_v4,omitempty"`
-	PublicIPv6             string            `json:"public_ip_v6,omitempty"`
-	IPv4Addresses          map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
-	IPv6Addresses          map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network ID) allocated to the host
+	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
+	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // contains the ID of the Default Gateway
+	DefaultGatewayPrivateIP string            `json:"default_gateway_private_ip,omitempty"` // contains the private IP of the default gateway
+	DefaultNetworkID        string            `json:"default_network_id,omitempty"`         // contains the ID of the default Network
+	NetworksByID            map[string]string `json:"networks_by_id,omitempty"`             // contains the name of each network binded to the host (indexed by ID)
+	NetworksByName          map[string]string `json:"networks_by_name,omitempty"`           // contains the ID of each network binded to the host (indexed by Name)
+	PublicIPv4              string            `json:"public_ip_v4,omitempty"`
+	PublicIPv6              string            `json:"public_ip_v6,omitempty"`
+	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
+	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network ID) allocated to the host
 }
 
 // NewHostNetwork retuns a blank HostNetwork

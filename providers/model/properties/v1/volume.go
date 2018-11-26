@@ -21,7 +21,7 @@ import (
 )
 
 // VolumeDescription contains additional information describing the volume, in V1
-// not FROZEN yet
+// !!!FROZEN!!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type VolumeDescription struct {
@@ -37,14 +37,17 @@ func NewVolumeDescription() *VolumeDescription {
 }
 
 // VolumeAttachments contains host ids where the volume is attached
+// !!!FROZEN!!!
+// Note: if tagged as FROZEN, must not be changed ever.
+//       Create a new version instead with needed supplemental fields
 type VolumeAttachments struct {
-	Shareable bool     `json:"shareable,omitempty"` // Tells if the volume can be shared with multiple host
-	HostIDs   []string `json:"host_ids,omitempty"`  // Contains the ID of the hosts mounting the volume (only one allowed if Shareable == false)
+	Shareable bool              `json:"shareable,omitempty"` // Tells if the volume can be shared with multiple host
+	Hosts     map[string]string `json:"hosts,omitempty"`     // Contains the name of the hosts mounting the volume, indexed by ID
 }
 
 // NewVolumeAttachments ...
 func NewVolumeAttachments() *VolumeAttachments {
 	return &VolumeAttachments{
-		HostIDs: []string{},
+		Hosts: map[string]string{},
 	}
 }
