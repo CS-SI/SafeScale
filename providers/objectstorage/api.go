@@ -1,16 +1,37 @@
+/*
+ * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package objectstorage
 
 import (
 	"io"
 	"time"
+)
 
-	"github.com/CS-SI/SafeScale/providers/model"
+const (
+	// RootPath defines the path corresponding of the root of a Bucket
+	RootPath = ""
+	// NoPrefix corresponds to ... no prefix...
+	NoPrefix = ""
 )
 
 // Location ...
 type Location interface {
 	// ReadTenant(projectName string, provider string) (Config, error)
-	Connect() error
+	GetType() string
 	//Inspect() (map[string][]string, error)
 	// SumSize() string
 	// Count(key string, pattern string) (int, error)
@@ -18,7 +39,7 @@ type Location interface {
 	// FilterByMetadata(key string, valuePattern string) (map[string][]string, error)
 
 	// ListBuckets ...
-	ListBuckets() ([]string, error)
+	ListBuckets(string) ([]string, error)
 	// FindBucket returns true of bucket exists in location
 	FindBucket(string) (bool, error)
 	// GetBucket returns info of the Bucket
@@ -28,14 +49,14 @@ type Location interface {
 	// DeleteBucket removes a bucket (need to be cleared before)
 	DeleteBucket(string) error
 	// ClearBucket empties a Bucket
-	ClearBucket(string) error
+	ClearBucket(string, string, string) error
 
 	// ListObjects lists the objects in a Bucket
-	ListObjects(string, model.ObjectFilter) ([]string, error)
+	ListObjects(string, string, string) ([]string, error)
 	// GetObject ...
 	GetObject(string, string) (Object, error)
 	// ReadObject ...
-	ReadObject(string, string, io.Writer, []model.Range) error
+	ReadObject(string, string, io.Writer, int64, int64) error
 	// WriteMultiChunkObject ...
 	WriteMultiPartObject(string, string, io.Reader, int64, int, ObjectMetadata) (Object, error)
 	// WriteObject ...
@@ -61,9 +82,9 @@ type Location interface {
 // Bucket interface
 type Bucket interface {
 	// List list object names in a Bucket
-	List(model.ObjectFilter) ([]string, error)
+	List(string, string) ([]string, error)
 	// BrowseObjects browses inside the Bucket and execute a callback on each Object found
-	Browse(model.ObjectFilter, func(Object) error) error
+	Browse(string, string, func(Object) error) error
 
 	// CreateObject creates a new object in the bucket
 	CreateObject(string) (Object, error)
@@ -72,7 +93,7 @@ type Bucket interface {
 	// DeleteObject delete an object from a container
 	DeleteObject(string) error
 	// ReadObject reads the content of an object
-	ReadObject(string, io.Writer, []model.Range) (Object, error)
+	ReadObject(string, io.Writer, int64, int64) (Object, error)
 	// WriteObject writes into an object
 	WriteObject(string, io.Reader, int64, ObjectMetadata) (Object, error)
 	// WriteMultiPartObject writes a lot of data into an object, cut in pieces
@@ -83,9 +104,9 @@ type Bucket interface {
 	// GetName returns the name of the bucket
 	GetName() string
 	// GetCount returns the number of objects in the Bucket
-	GetCount(model.ObjectFilter) (int64, error)
+	GetCount(string, string) (int64, error)
 	// GetSize returns the total size of all objects in the bucket
-	GetSize(model.ObjectFilter) (int64, string, error)
+	GetSize(string, string) (int64, string, error)
 }
 
 // ObjectMetadata ...
@@ -104,7 +125,7 @@ func (om ObjectMetadata) Clone() ObjectMetadata {
 type Object interface {
 	Stored() bool
 
-	Read(io.Writer, []model.Range) error
+	Read(io.Writer, int64, int64) error
 	Write(io.Reader, int64) error
 	WriteMultiPart(io.Reader, int64, int) error
 	Reload() error
@@ -123,17 +144,17 @@ type Object interface {
 
 // Config ...
 type Config struct {
-	Types        string
-	Envauth      bool
-	Authversion  int
-	Auth         string
-	Endpointtype string
-	Tenantdomain string
+	Type         string
+	EnvAuth      bool
+	AuthVersion  int
+	AuthURL      string
+	EndpointType string
+	Endpoint     string
+	TenantDomain string
 	Tenant       string
 	Domain       string
 	User         string
 	Key          string
+	SecretKey    string
 	Region       string
-	Secretkey    string
-	Endpoint     string
 }

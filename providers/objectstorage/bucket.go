@@ -1,12 +1,25 @@
+/*
+ * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package objectstorage
 
 import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/CS-SI/SafeScale/providers/model"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/graymeta/stow"
 )
@@ -28,14 +41,9 @@ func newBucket(location stow.Location, bucketName string) (*bucket, error) {
 	if location == nil {
 		panic("location is nil!")
 	}
-	container, err := location.Container(bucketName)
-	if err == nil {
-		return nil, fmt.Errorf("bucket named '%s' already exists", bucketName)
-	}
 	return &bucket{
-		location:  location,
-		container: container,
-		Name:      bucketName,
+		location: location,
+		Name:     bucketName,
 	}, nil
 }
 
@@ -57,16 +65,24 @@ func (b *bucket) GetObject(objectName string) (Object, error) {
 }
 
 // ListObjects list objects of a Bucket
-func (b *bucket) List(filter model.ObjectFilter) ([]string, error) {
+func (b *bucket) List(path, prefix string) ([]string, error) {
 	list := []string{}
 
+	fullPath := path
+	if fullPath != "" {
+		fullPath += "/"
+	}
+	fullPath += prefix
+
 	//log.Println("Location.Container => : ", c.Name())
-	err := stow.Walk(b.container, filter.Prefix, 100,
+	err := stow.Walk(b.container, path, 100,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
 			}
-			list = append(list, item.Name())
+			if strings.Index(item.Name(), fullPath) == 0 {
+				list = append(list, item.Name())
+			}
 			return nil
 		},
 	)
@@ -77,33 +93,49 @@ func (b *bucket) List(filter model.ObjectFilter) ([]string, error) {
 }
 
 // Browse walks through the objects in the Bucket and executes callback on each Object found
-func (b *bucket) Browse(filter model.ObjectFilter, callback func(Object) error) error {
-	err := stow.Walk(b.container, filter.Prefix, 100,
+func (b *bucket) Browse(path, prefix string, callback func(Object) error) error {
+	fullPath := path
+	if fullPath != "" {
+		fullPath += "/"
+	}
+	fullPath += prefix
+
+	err := stow.Walk(b.container, path, 100,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
 			}
-			o := newObjectFromStow(b, item)
-			return callback(o)
+			if strings.Index(item.Name(), fullPath) == 0 {
+				return callback(newObjectFromStow(b, item))
+			}
+			return nil
 		},
 	)
 	return err
 }
 
 // Clear empties a bucket
-func (b *bucket) Clear() error {
-	return stow.Walk(b.container, stow.NoPrefix, 100,
+func (b *bucket) Clear(path, prefix string) error {
+	fullPath := path
+	if fullPath != "" {
+		fullPath += "/"
+	}
+	fullPath += prefix
+
+	return stow.Walk(b.container, path, 100,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
 			}
-			err = b.container.RemoveItem(item.Name())
-			if err != nil {
-				log.Println("erreur RemoveItem => : ", err)
-				return err
+			if strings.Index(item.Name(), fullPath) == 0 {
+				err = b.container.RemoveItem(item.Name())
+				if err != nil {
+					// log.Println("erreur RemoveItem => : ", err)
+					return err
+				}
+				// l.NbItem = 0
 			}
-			// l.NbItem = 0
-			return err
+			return nil
 		},
 	)
 }
@@ -118,12 +150,12 @@ func (b *bucket) DeleteObject(objectName string) error {
 }
 
 // ReadObject ...
-func (b *bucket) ReadObject(objectName string, target io.Writer, ranges []model.Range) (Object, error) {
+func (b *bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (Object, error) {
 	o, err := newObject(b, objectName)
 	if err != nil {
 		return nil, err
 	}
-	err = o.Read(target, ranges)
+	err = o.Read(target, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -170,17 +202,26 @@ func (b *bucket) GetName() string {
 }
 
 // GetCount returns the count of objects in the Bucket
-func (b *bucket) GetCount(filter model.ObjectFilter) (int64, error) {
-	log.Debugf("objectstorage.bucket.GetCount(%v) called", filter)
-	defer log.Debugf("objectstorage.Location.Count(%v) done", filter)
+// 'path' corresponds to stow prefix, and 'prefix' allows to filter what to count
+func (b *bucket) GetCount(path, prefix string) (int64, error) {
+	// log.Debugf("objectstorage.bucket.GetCount(%s,%s) called", path, prefix)
+	// defer log.Debugf("objectstorage.Location.Count(%s,%s) done", path, prefix)
 
 	var count int64
-	err := stow.Walk(b.container, filter.Prefix, 100,
+	fullPath := path
+	if fullPath != "" {
+		fullPath += "/"
+	}
+	fullPath += prefix
+
+	err := stow.Walk(b.container, path, 100,
 		func(c stow.Item, err error) error {
 			if err != nil {
 				return err
 			}
-			count++
+			if strings.Index(c.Name(), fullPath) == 0 {
+				count++
+			}
 			return nil
 		},
 	)
@@ -191,27 +232,37 @@ func (b *bucket) GetCount(filter model.ObjectFilter) (int64, error) {
 }
 
 // GetSize returns the total size of the Objects inside the Bucket
-func (b *bucket) GetSize(filter model.ObjectFilter) (int64, string, error) {
+func (b *bucket) GetSize(path, prefix string) (int64, string, error) {
 	var err error
-	var vSize int64
-	err = stow.Walk(b.container, filter.Prefix, 100,
+	var totalSize int64
+
+	fullPath := path
+	if fullPath != "" {
+		fullPath += "/"
+	}
+	fullPath += prefix
+
+	err = stow.Walk(b.container, path, 100,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
+			}
+			if strings.Index(item.Name(), fullPath) != 0 {
+				return nil
 			}
 
 			sizeItem, err := item.Size()
 			if err != nil {
 				return err
 			}
-			vSize += sizeItem
+			totalSize += sizeItem
 			return nil
 		},
 	)
 	if err != nil {
 		return -1, "", err
 	}
-	return vSize, humanReadableSize(vSize), nil
+	return totalSize, humanReadableSize(totalSize), nil
 }
 
 func humanReadableSize(bytes int64) string {

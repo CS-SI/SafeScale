@@ -1,10 +1,27 @@
+/*
+ * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package objectstorage
 
 import (
 	"fmt"
 	"io"
+	"strings"
 
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/graymeta/stow"
@@ -29,10 +46,15 @@ type location struct {
 }
 
 // NewLocation creates an Object Storage Location based on config
-func NewLocation(conf Config) Location {
-	return &location{
+func NewLocation(conf Config) (Location, error) {
+	location := &location{
 		config: conf,
 	}
+	err := location.connect()
+	if err != nil {
+		return nil, err
+	}
+	return location, nil
 }
 
 func (l *location) getStowLocation() stow.Location {
@@ -40,23 +62,23 @@ func (l *location) getStowLocation() stow.Location {
 }
 
 // Connect connects to an Object Storage Location
-func (l *location) Connect() error {
-	log.Debugln("objectstorage.Location.Connect() called")
-	defer log.Debugln("objectstorage.Location.Connect() done")
+func (l *location) connect() error {
+	// log.Debugln("objectstorage.Location.Connect() called")
+	// defer log.Debugln("objectstorage.Location.Connect() done")
 
 	config := stow.ConfigMap{
 		"access_key_id":   l.config.Key,
-		"secret_key":      l.config.Secretkey,
+		"secret_key":      l.config.SecretKey,
 		"username":        l.config.User,
-		"key":             l.config.Key,
+		"key":             l.config.SecretKey,
 		"endpoint":        l.config.Endpoint,
 		"tenant_name":     l.config.Tenant,
-		"tenant_auth_url": l.config.Auth,
+		"tenant_auth_url": l.config.AuthURL,
 		"region":          l.config.Region,
-		"domain":          l.config.Domain,
-		"kind":            l.config.Types,
+		"domain":          l.config.TenantDomain,
+		"kind":            l.config.Type,
 	}
-	kind := l.config.Types
+	kind := l.config.Type
 
 	// Check config location
 	err := stow.Validate(kind, config)
@@ -71,39 +93,44 @@ func (l *location) Connect() error {
 	return err
 }
 
-// ListBuckets ...
-func (l *location) ListBuckets() ([]string, error) {
-	log.Debugf("objectstorage.Location.ListBuckets() called")
-	defer log.Debugf("objectstorage.Location.ListBuckets() done")
+// GetType returns the type of ObjectStorage
+func (l location) GetType() string {
+	return l.config.Type
+}
 
-	// log.Println("Stow ListContainers Region ", client.Region)
-	// log.Println("Stow ListContainers TenantName ", client.TenantName)
-	vsf := []string{}
+// ListBuckets ...
+func (l *location) ListBuckets(prefix string) ([]string, error) {
+	// log.Debugf("objectstorage.Location.ListBuckets() called")
+	// defer log.Debugf("objectstorage.Location.ListBuckets() done")
+
+	list := []string{}
 	err := stow.WalkContainers(l.stowLocation, stow.NoPrefix, 100,
 		func(c stow.Container, err error) error {
 			if err != nil {
 				return err
 			}
-
-			vsf = append(vsf, c.Name())
+			if strings.Index(c.Name(), prefix) == 0 {
+				list = append(list, c.Name())
+			}
 			return nil
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
-	return vsf, nil
+	return list, nil
 }
 
 // findBucket returns true if a bucket with the name exists in location
 func (l *location) FindBucket(bucketName string) (bool, error) {
-	log.Debugf("objectstorage.Location.FindBucket(%s) called", bucketName)
-	defer log.Debugf("objectstorage.Location.ListBuckets(%s) done", bucketName)
+	// log.Debugf("objectstorage.Location.FindBucket(%s) called", bucketName)
+	// defer log.Debugf("objectstorage.Location.FindBuckets(%s) done", bucketName)
 
 	found := false
 	err := stow.WalkContainers(l.stowLocation, stow.NoPrefix, 100,
 		func(c stow.Container, err error) error {
 			if err != nil {
+				log.Debugf("%v", err)
 				return err
 			}
 			if c.Name() == bucketName {
@@ -121,34 +148,44 @@ func (l *location) FindBucket(bucketName string) (bool, error) {
 
 // GetBucket ...
 func (l *location) GetBucket(bucketName string) (Bucket, error) {
-	log.Debugf("objectstorage.Location.GetBucket(%s) called", bucketName)
-	defer log.Debugf("objectstorage.Location.ListBuckets(%s) done", bucketName)
+	// log.Debugf("objectstorage.Location.GetBucket(%s) called", bucketName)
+	// defer log.Debugf("objectstorage.Location.GetBucket(%s) done", bucketName)
 
-	return newBucket(l.stowLocation, bucketName)
+	b, err := newBucket(l.stowLocation, bucketName)
+	if err != nil {
+		return nil, err
+	}
+	b.container, err = l.stowLocation.Container(bucketName)
+	if err != nil {
+		//Note: No errors.Wrap here; error needs to be transmitted as-is
+		return nil, err
+	}
+	return b, nil
 }
 
 // CreateBucket ...
 func (l *location) CreateBucket(bucketName string) (Bucket, error) {
-	log.Debugf("objectstorage.Location.CreateBucket(%s) called", bucketName)
-	defer log.Debugf("objectstorage.Location.CreateBucket(%s) done", bucketName)
-
 	c, err := l.stowLocation.CreateContainer(bucketName)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to create bucket '%s'", bucketName))
 	}
 	return &bucket{
-		location: l.stowLocation,
-		ID:       c.ID(),
-		Name:     c.Name(),
+		location:  l.stowLocation,
+		container: c,
+		Name:      c.Name(),
 	}, nil
 }
 
 // DeleteBucket removes a bucket from Object Storage
 func (l *location) DeleteBucket(bucketName string) error {
-	log.Debugf("objectstorage.Location.Delete(%s) called", bucketName)
-	defer log.Debugf("objectstorage.Location.Delete(%s) done", bucketName)
+	// log.Debugf("objectstorage.Location.Delete(%s) called", bucketName)
+	// defer log.Debugf("objectstorage.Location.Delete(%s) done", bucketName)
 
-	return l.stowLocation.RemoveContainer(bucketName)
+	err := l.stowLocation.RemoveContainer(bucketName)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to delete bucket '%s'", bucketName))
+	}
+	return nil
 }
 
 // GetObject ...
@@ -170,37 +207,37 @@ func (l *location) DeleteObject(bucketName, objectName string) error {
 }
 
 // ListObjects lists the objects in a Bucket
-func (l *location) ListObjects(bucketName string, filter model.ObjectFilter) ([]string, error) {
+func (l *location) ListObjects(bucketName string, path, prefix string) ([]string, error) {
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
 		return nil, err
 	}
-	return b.List(filter)
+	return b.List(path, prefix)
 }
 
 // Browse walks through the objects in a Bucket and apply callback to each object
-func (l *location) BrowseBucket(bucketName string, filter model.ObjectFilter, callback func(o Object) error) error {
+func (l *location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) error) error {
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
 		return err
 	}
-	return b.Browse(filter, callback)
+	return b.Browse(path, prefix, callback)
 }
 
 // ClearBucket ...
-func (l *location) ClearBucket(bucketName string) error {
-	log.Debugf("objectstorage.Location.ClearBucket(%s) called", bucketName)
-	defer log.Debugf("objectstorage.Location.ClearBucket(%s) done", bucketName)
+func (l *location) ClearBucket(bucketName string, path, prefix string) error {
+	// log.Debugf("objectstorage.Location.ClearBucket(%s,%s,%s) called", bucketName, path, prefix)
+	// defer log.Debugf("objectstorage.Location.ClearBucket(%s,%s,%s) done", bucketName, path, prefix)
 
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
 		return err
 	}
-	return b.Clear()
+	return b.Clear(path, prefix)
 }
 
 // ReadObject reads the content of an object and put it in an io.Writer
-func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, ranges []model.Range) error {
+func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) error {
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
 		return err
@@ -209,7 +246,7 @@ func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, r
 	if err != nil {
 		return err
 	}
-	err = o.Read(writer, ranges)
+	err = o.Read(writer, from, to)
 	if err != nil {
 		return err
 	}
@@ -223,8 +260,8 @@ func (l *location) WriteObject(
 	metadata ObjectMetadata,
 ) (Object, error) {
 
-	log.Debugf("objectstorage.Location.WriteObject(%s, %s) called", bucketName, objectName)
-	defer log.Debugf("objectstorage.Location.WriteObject(%s, %s) done", bucketName, objectName)
+	// log.Debugf("objectstorage.Location.WriteObject(%s, %s) called", bucketName, objectName)
+	// defer log.Debugf("objectstorage.Location.WriteObject(%s, %s) done", bucketName, objectName)
 
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
@@ -234,6 +271,7 @@ func (l *location) WriteObject(
 }
 
 // WriteMultiPartObject writes data from 'source' to an object in Object Storage, splitting data in parts of 'chunkSize' bytes
+// Note: nothing to do with multi-chunk abilities of various object storage technologies
 func (l *location) WriteMultiPartObject(
 	bucketName string, objectName string,
 	source io.Reader, sourceSize int64,
@@ -241,8 +279,8 @@ func (l *location) WriteMultiPartObject(
 	metadata ObjectMetadata,
 ) (Object, error) {
 
-	log.Debugf("objectstorage.Location.WriteMultiChunkObject(%s, %s) called", bucketName, objectName)
-	defer log.Debugf("objectstorage.Location.WriteMultiChunkObject(%s, %s) called", bucketName, objectName)
+	// log.Debugf("objectstorage.Location.WriteMultiChunkObject(%s, %s) called", bucketName, objectName)
+	// defer log.Debugf("objectstorage.Location.WriteMultiChunkObject(%s, %s) called", bucketName, objectName)
 
 	bucket, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
