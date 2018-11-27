@@ -1,56 +1,49 @@
 # SafeScale: metadata in Object Storage
 
-SafeScale stores metadata of the objects it uses in Object Storage. This document describes how this storage is organizes.
+SafeScale stores metadata of the objects it uses in Object Storage. This document describes how this storage is organized.
 
-## SafeScale metadata Container/Bucket
+## SafeScale metadata Bucket
 
-The container/bucket name is ``0.safescale``. Everything is stored in there.
+The bucket name format is ``0.safescale-<unique provider-dependent data>[.<$SAFESCALE_METADATA_SUFFIX>]``; every metadata is stored in there.
 
-Each object in this container/bucket is stored as a gob representation of Go structs.
+SAFESCALE_METADATA_SUFFIX is an optional environment variable that can specialized even further the name of the bucket.
+For example, with SAFESCALE_METADATA_SUFFIX=dev, the bucket name will be ``0.safescale-<unique provider-dependent data>.dev``.
+The variable needs to be defined before starting brokerd, and for every SafeScale cli use (broker, deploy, perform, ...).
 
-Note: by defining the environment variable SAFESCALE_METADATA_SUFFIX, it's possible to contextualize
-the bucket name to ``0.safescale.$SAFESCALE_METADATA_SUFFIX``.
-For example, with SAFESCALE_METADATA_SUFFIX=dev, the bucket name will be ``0.safescale.dev``.
-The variable needs to be defined before starting brokerd, and for every SafeScale cli (broker, deploy, perform, ...).
+Each object in this bucket is stored as a JSON representation of Go structs, optionally encrypted (cf. MetadataKey in TENANTS.md).
 
+In the following, each reference to this bucket name will be simplified to ``<SAFESCALE>``.
 ### SafeScale Hosts
 
-The host informations are stored in folder ``0.safescale/hosts``.
+The hosts informations are stored in folder ``<SAFESCALE>/hosts``.
 
 Inside this folder, the metadata of an host is stored in object named with its ID in subfolder ``byID``,
 and in object named with its name in subfolder ``byName``.
 
 ### SafeScale Networks
 
-The metadata for network informations are stored in ``0.safescale/networks``.
+The metadata for network informations are stored in ``<SAFESCALE>/networks``.
 
 Inside this folder, the metadata of a network are stored in an object named with its ID in subfolder ``byID``,
 and in an object named with its name in subfolder ``byName``.
 
-metadata of objects linked to a network are stored in a subfolder named with the ID of the network, and in this subfolder will be find :
+### SafeScale Shares
 
-* an object named ``gw`` which contains the ID of the host acting as a default gateway for the network if it exists.
-* a subfolder named ``host`` containing for each host attached to the network its metadata named with itd ID
+The metadata for Shares informations are stored in ``<SAFESCALE>/shares``.
 
-### SafeScale NAS
-
-The metadata for NAS informations are stored in ``0.safescale/nas``.
-
-Inside this folder, the metadata of a volume are stored in an object named with its ID in subfolder ``byID``,
+Inside this folder, the metadata of a share are stored in an object named with its ID in subfolder ``byID``,
 and in an object named with its name in subfolder ``byName``.
 
 ### SafeScale Volumes
 
-The metadata for volume informations are stored in ``0.safescale/volumes`.
+The metadata for volume informations are stored in ``<SAFESCALE>/volumes`.
 
 Inside this folder, the metadata of a volume are stored in an object named with its ID in subfolder ``byID``,
 and in an object named with its name in subfolder ``byName``.
 
-Besides the folders ``byID`` and ``byName`` will be find folders named with the uuid of the volumes, containing an object named with the uuids of the hosts that are currently attached to the volume.
-
 ### SafeScale Clusters
 
-The metadata for Cluster informations are stored in ``0.safescale/clusters``.
+The metadata for Cluster informations are stored in ``<SAFESCALE>/clusters``.
 
 Inside this folder, the metadata of a cluster is stored in a folder named as the Cluster Name submitted at its creation.
 
@@ -65,7 +58,7 @@ Inside this subfolder is stored :
 ## Example
 
 ```shell
-0.safescale (dir)
+0.safescale-xxxxxxxxxxx (dir)
 |
 +- hosts (dir)
 |  |
@@ -90,24 +83,12 @@ Inside this subfolder is stored :
 |  |  +- ...
 |  |
 |  +- byName (dir)
-|  |  |
-|  |  +- net-dev (obj)
-|  |  |
-|  |  +- ...
-|  |
-|  +- 4d17de45-e019-445f-b746-9ab0805008a7 (dir)
-|  |  |
-|  |  +- gw (obj)
-|  |  |
-|  |  +- hosts (dir)
-|  |     |
-|  |     +- 4856512f-fca1-4129-b1d5-3c2a19a7b747 (obj)
-|  |     |
-|  |     +- ...
-|  |
-|  +- ...
+|     |
+|     +- net-dev (obj)
+|     |
+|     +- ...
 |
-+- nas (dir)
++- shares (dir)
 |  |
 |  +- byID (dir)
 |  |  |
@@ -117,7 +98,7 @@ Inside this subfolder is stored :
 |  |
 |  +- byName (dir)
 |     |
-|     +- mynas (obj)
+|     +- myshare (obj)
 |     |
 |     +- ...
 |
@@ -130,18 +111,10 @@ Inside this subfolder is stored :
 |  |  +- ...
 |  |
 |  +- byName (dir)
-|  |  |
-|  |  +- myvolume (obj)
-|  |  |
-|  |  +- ...
-|  |
-|  +- 4d17de45-e019-445f-b746-9ab0805008a7 (dir)
-|  |  |
-|  |  +- 4856512f-fca1-4129-b1d5-3c2a19a7b747 (obj)
-|  |  |
-|  |  +- ...
-|  |
-|  +- ...
+|     |
+|     +- myvolume (obj)
+|     |
+|     +- ...
 |
 +- clusters
    |
