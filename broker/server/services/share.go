@@ -298,20 +298,24 @@ func (svc *ShareService) Mount(shareName, hostName, path string) (*propsv1.HostR
 		return nil, fmt.Errorf("invalid mount path '%s': '%s'", path, err)
 	}
 
-	hostSvc := NewHostService(svc.provider)
-	target, err := hostSvc.Get(hostName)
-	if err != nil {
-		switch err.(type) {
-		case model.ErrResourceNotFound:
-			return nil, err
-		default:
-			return nil, errors.Wrap(err, "")
+	var target *model.Host
+	if server.Name == hostName || server.ID == hostName {
+		target = server
+	} else {
+		hostSvc := NewHostService(svc.provider)
+		target, err = hostSvc.Get(hostName)
+		if err != nil {
+			switch err.(type) {
+			case model.ErrResourceNotFound:
+				return nil, err
+			default:
+				return nil, errors.Wrap(err, "")
+			}
 		}
 	}
 
 	// Check if share is already mounted
 	// Check if there is already volume mounted in the path (or in subpath)
-	// Check
 	targetMountsV1 := propsv1.NewHostMounts()
 	err = target.Properties.Get(HostProperty.MountsV1, targetMountsV1)
 	if err != nil {
@@ -388,13 +392,15 @@ func (svc *ShareService) Mount(shareName, hostName, path string) (*propsv1.HostR
 		return nil, srvLog(err)
 	}
 
-	err = metadata.SaveHost(svc.provider, target)
-	if err != nil {
-		return nil, srvLog(err)
-	}
 	err = metadata.SaveHost(svc.provider, server)
 	if err != nil {
 		return nil, srvLog(err)
+	}
+	if target != server {
+		err = metadata.SaveHost(svc.provider, target)
+		if err != nil {
+			return nil, srvLog(err)
+		}
 	}
 	return mount, nil
 }
@@ -421,15 +427,22 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 	// share := serverSharesV1.ByID[shareID]
 	// remotePath := server.GetAccessIP() + ":" + share.Path
 
-	hostSvc := NewHostService(svc.provider)
-	target, err := hostSvc.Get(hostName)
-	if err != nil {
-		err = srvLog(err)
-		return err
+	var target *model.Host
+	if server.Name == hostName || server.ID == hostName {
+		target = server
+	} else {
+		hostSvc := NewHostService(svc.provider)
+		target, err = hostSvc.Get(hostName)
+		if err != nil {
+			switch err.(type) {
+			case model.ErrResourceNotFound:
+				return err
+			default:
+				return srvLog(err)
+			}
+		}
 	}
-	if target == nil {
-		return srvLog(model.ResourceNotFoundError("host", hostName))
-	}
+
 	targetMountsV1 := propsv1.NewHostMounts()
 	err = target.Properties.Get(HostProperty.MountsV1, targetMountsV1)
 	if err != nil {
@@ -483,10 +496,11 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 		err = srvLog(err)
 		return err
 	}
-	err = metadata.SaveHost(svc.provider, target)
-	if err != nil {
-		err = srvLog(err)
-		return err
+	if server != target {
+		err = metadata.SaveHost(svc.provider, target)
+		if err != nil {
+			return srvLog(err)
+		}
 	}
 
 	return nil
