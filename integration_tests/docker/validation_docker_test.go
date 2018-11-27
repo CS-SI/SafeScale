@@ -96,7 +96,7 @@ func launchClient(tenant string) {
 
 	if tenant == "TestFlexibleEngine" {
 		out := launchDockerExec(intera, delay, "broker network  create networktest --cpu 2 --ram 4 --os \"OBS_U_Ubuntu_16.04\" --cidr \"192.168.1.0/24\" ")
-		if CaseInsensitiveContains(string(out), "already exists") {
+		if CaseInsensitiveContains(string(out), "already exist") {
 			launchDockerExec(intera, delay, "broker host delete gw-networktest")
 			launchDockerExec(intera, delay, "broker network  delete  networktest")
 			launchDockerExec(intera, delay, "broker network  create networktest --cpu 2 --ram 4 --os \"OBS_U_Ubuntu_16.04\" --cidr \"192.168.1.0/24\" ")
@@ -105,7 +105,7 @@ func launchClient(tenant string) {
 
 	if tenant == "TestOvh" {
 		out := launchDockerExec(intera, delay, "broker network  create networktest  ")
-		if CaseInsensitiveContains(string(out), "already exists") {
+		if CaseInsensitiveContains(string(out), "already exist") {
 			launchDockerExec(intera, delay, "broker host delete gw-networktest")
 			launchDockerExec(intera, delay, "broker network  delete  networktest")
 			launchDockerExec(intera, delay, "broker network  create networktest   ")
