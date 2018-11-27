@@ -75,6 +75,8 @@ func (svc *NetworkService) Create(
 			err = srvLog(errors.Errorf("failed to check if a network already exists with name '%s'", name))
 			return nil, err
 		}
+	} else {
+		return nil, fmt.Errorf("network '%s' already exists", name)
 	}
 
 	// Create the network
