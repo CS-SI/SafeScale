@@ -71,6 +71,8 @@ Gopkg.lock
 cover.out
 cover.html
 *.cov
+covergen.py
+covernum.py
 
 # unit test xunit format
 xunit_tests.xml

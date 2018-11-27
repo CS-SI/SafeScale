@@ -21,8 +21,9 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/flexibleengine"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
@@ -52,29 +53,38 @@ func AuthenticatedClient(opts flexibleengine.AuthOptions, cfg openstack.CfgOptio
 
 // Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	Username, _ := params["Username"].(string)
-	Password, _ := params["Password"].(string)
-	DomainName, _ := params["DomainName"].(string)
-	ProjectID, _ := params["ProjectID"].(string)
-	VPCName, _ := params["VPCName"].(string)
-	VPCCIDR, _ := params["VPCCIDR"].(string)
-	Region, _ := params["Region"].(string)
-	IdentityEndpoint, _ := params["IdentityEndpoint"].(string)
+	// tenantName, _ := params["name"].(string)
 
-	S3AccessKeyID, _ := params["S3AccessKeyID"].(string)
-	S3AccessKeyPassword, _ := params["S3AccessKeyPassword"].(string)
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
+	network, _ := params["network"].(map[string]interface{})
+
+	identityEndpoint, _ := identity["Endpoint"].(string)
+	username, _ := identity["Username"].(string)
+	password, _ := identity["Password"].(string)
+	domainName, _ := identity["DomainName"].(string)
+
+	projectID, _ := compute["ProjectID"].(string)
+	region, _ := compute["Region"].(string)
+	defaultImage, _ := compute["DefaultImage"].(string)
+
+	vpcName, _ := network["VPCName"].(string)
+	vpcCIDR, _ := network["VPCCIDR"].(string)
+
+	// S3AccessKeyID, _ := params["S3AccessKeyID"].(string)
+	// S3AccessKeyPassword, _ := params["S3AccessKeyPassword"].(string)
 	authOptions := flexibleengine.AuthOptions{
-		Username:            Username,
-		Password:            Password,
-		DomainName:          DomainName,
-		ProjectID:           ProjectID,
-		Region:              Region,
-		AllowReauth:         true,
-		VPCName:             VPCName,
-		VPCCIDR:             VPCCIDR,
-		IdentityEndpoint:    IdentityEndpoint,
-		S3AccessKeyID:       S3AccessKeyID,
-		S3AccessKeyPassword: S3AccessKeyPassword,
+		Username:         username,
+		Password:         password,
+		DomainName:       domainName,
+		ProjectID:        projectID,
+		Region:           region,
+		AllowReauth:      true,
+		VPCName:          vpcName,
+		VPCCIDR:          vpcCIDR,
+		IdentityEndpoint: identityEndpoint,
+		// S3AccessKeyID:       S3AccessKeyID,
+		// S3AccessKeyPassword: S3AccessKeyPassword,
 	}
 	cfgOptions := openstack.CfgOptions{
 		DNSList:             []string{"1.1.1.1"},
@@ -85,17 +95,18 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 			"SAS":  VolumeSpeed.HDD,
 			"SSD":  VolumeSpeed.SSD,
 		},
+		DefaultImage: defaultImage,
 	}
 	return AuthenticatedClient(authOptions, cfgOptions)
 }
 
 //GetAuthOpts returns the auth options
-func (client *Client) GetAuthOpts() (api.Config, error) {
+func (client *Client) GetAuthOpts() (model.Config, error) {
 	return client.feclt.GetAuthOpts()
 }
 
 // GetCfgOpts return configuration parameters
-func (client *Client) GetCfgOpts() (api.Config, error) {
+func (client *Client) GetCfgOpts() (model.Config, error) {
 	return client.feclt.GetCfgOpts()
 }
 

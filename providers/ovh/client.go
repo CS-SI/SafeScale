@@ -19,12 +19,14 @@ package ovh
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
-//ProviderNetwork name of ovh external network
-const ProviderNetwork string = "Ext-Net"
+// providerNetwork name of ovh external network
+const providerNetwork string = "Ext-Net"
 
 type gpuCfg struct {
 	GPUNumber int
@@ -76,8 +78,8 @@ type AuthOptions struct {
 // 	tokens := strings.Split(openrc, "export")
 // }
 
-//AuthenticatedClient returns an authenticated client
-func AuthenticatedClient(opts AuthOptions) (*Client, error) {
+// AuthenticatedClient returns an authenticated client
+func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, error) {
 	client := &Client{}
 	osclt, err := openstack.AuthenticatedClient(
 		openstack.AuthOptions{
@@ -91,7 +93,7 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 			AllowReauth: true,
 		},
 		openstack.CfgOptions{
-			ProviderNetwork:           ProviderNetwork,
+			ProviderNetwork:           providerNetwork,
 			UseFloatingIP:             false,
 			UseLayer3Networking:       false,
 			AutoHostNetworkInterfaces: false,
@@ -100,7 +102,8 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 				"classic":    VolumeSpeed.COLD,
 				"high-speed": VolumeSpeed.HDD,
 			},
-			MetadataBucketName: api.BuildMetadataBucketName(opts.ApplicationKey),
+			MetadataBucket: metadata.BuildMetadataBucketName(opts.ApplicationKey),
+			DefaultImage:   cfg.DefaultImage,
 		},
 	)
 
@@ -116,35 +119,47 @@ func AuthenticatedClient(opts AuthOptions) (*Client, error) {
 // Client is the implementation of the ovh driver regarding to the api.ClientAPI
 // This client used ovh api and opensatck ovh api to maximize code reuse
 type Client struct {
-	osclt              *openstack.Client
-	opts               AuthOptions
-	MetadataBucketName string
+	osclt *openstack.Client
+	opts  AuthOptions
 }
 
-//Build build a new Client from configuration parameter
+// Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	ApplicationKey, _ := params["ApplicationKey"].(string)
-	OpenstackID, _ := params["OpenstackID"].(string)
-	OpenstackPassword, _ := params["OpenstackPassword"].(string)
-	Region, _ := params["Region"].(string)
-	ProjectName, _ := params["ProjectName"].(string)
+	// tenantName, _ := params["name"].(string)
 
-	return AuthenticatedClient(AuthOptions{
-		ApplicationKey:    ApplicationKey,
-		OpenstackID:       OpenstackID,
-		OpenstackPassword: OpenstackPassword,
-		Region:            Region,
-		ProjectName:       ProjectName,
-	})
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
+	// network, _ := params["network"].(map[string]interface{})
+
+	applicationKey, _ := identity["ApplicationKey"].(string)
+	openstackID, _ := identity["OpenstackID"].(string)
+	openstackPassword, _ := identity["OpenstackPassword"].(string)
+
+	region, _ := compute["Region"].(string)
+	projectName, _ := compute["ProjectName"].(string)
+	defaultImage, _ := compute["DefaultImage"].(string)
+
+	return AuthenticatedClient(
+		AuthOptions{
+			ApplicationKey:    applicationKey,
+			OpenstackID:       openstackID,
+			OpenstackPassword: openstackPassword,
+			Region:            region,
+			ProjectName:       projectName,
+		},
+		openstack.CfgOptions{
+			DefaultImage: defaultImage,
+		},
+	)
 }
 
 // GetCfgOpts return configuration parameters
-func (client *Client) GetCfgOpts() (api.Config, error) {
+func (client *Client) GetCfgOpts() (model.Config, error) {
 	return client.osclt.GetCfgOpts()
 }
 
 // GetAuthOpts returns the auth options
-func (client *Client) GetAuthOpts() (api.Config, error) {
+func (client *Client) GetAuthOpts() (model.Config, error) {
 	return client.osclt.GetAuthOpts()
 }
 

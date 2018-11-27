@@ -18,14 +18,6 @@ package flexibleengine
 
 import (
 	"fmt"
-	"net/url"
-
-	"github.com/CS-SI/SafeScale/utils/metadata"
-
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	// Gophercloud OpenStack API
 	gc "github.com/gophercloud/gophercloud"
@@ -37,9 +29,15 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	// official AWS API
-	"github.com/aws/aws-sdk-go/aws"
+
 	awscreds "github.com/aws/aws-sdk-go/aws/credentials"
-	awssession "github.com/aws/aws-sdk-go/aws/session"
+
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	provmetadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
 // AuthOptions fields are the union of those recognized by each identity implementation and
@@ -188,38 +186,12 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 	}
 
 	// Storage API
-	blockStorage, err := gcos.NewBlockStorageV2(provider, gc.EndpointOpts{
+	volume, err := gcos.NewBlockStorageV2(provider, gc.EndpointOpts{
 		Type:   "volumev2",
 		Region: opts.Region,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
-	}
-
-	// Need to get Endpoint URL for ObjectStorage, that will be used with AWS S3 protocol
-	objectStorage, err := gcos.NewObjectStorageV1(provider, gc.EndpointOpts{
-		Type:   "object",
-		Region: opts.Region,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
-	}
-	// Fix URL of ObjectStorage for FlexibleEngine...
-	u, _ := url.Parse(objectStorage.Endpoint)
-	endpoint := u.Scheme + "://" + u.Hostname() + "/"
-	// FlexibleEngine uses a protocol compatible with S3, so we need to get aws.Session instance
-	authOpts := awsAuthOpts{
-		AccessKeyID:     opts.S3AccessKeyID,
-		SecretAccessKey: opts.S3AccessKeyPassword,
-		Region:          opts.Region,
-	}
-	awsSession, err := awssession.NewSession(&aws.Config{
-		Region:      aws.String(opts.Region),
-		Credentials: awscreds.NewCredentials(authOpts),
-		Endpoint:    &endpoint,
-	})
-	if err != nil {
-		return nil, err
 	}
 	openstackClient := openstack.Client{
 		Opts: &openstack.AuthOptions{
@@ -235,21 +207,18 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 			UseFloatingIP:       true,
 			UseLayer3Networking: cfg.UseLayer3Networking,
 			VolumeSpeeds:        cfg.VolumeSpeeds,
-			S3Protocol:          "s3",
-			MetadataBucketName:  api.BuildMetadataBucketName(opts.DomainName),
+			MetadataBucket:      provmetadata.BuildMetadataBucketName(opts.DomainName),
 		},
 		Provider: provider,
 		Compute:  compute,
 		Network:  network,
-		Volume:   blockStorage,
-		//Container:   objectStorage,
+		Volume:   volume,
 	}
 
 	clt := Client{
-		Opts:      &opts,
-		osclt:     &openstackClient,
-		Identity:  identity,
-		S3Session: awsSession,
+		Opts:     &opts,
+		osclt:    &openstackClient,
+		Identity: identity,
 	}
 
 	// Initializes the VPC
@@ -264,11 +233,44 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 		return nil, err
 	}
 
-	// Creates metadata Object Storage container
-	err = metadata.InitializeBucket(&clt)
-	if err != nil {
-		return nil, err
-	}
+	// //*** modif PC
+	// var Config objectstorage.Config
+	// var ConfigObject objectstorage.Config
+
+	// Config.Types = "s3"
+	// Config.Domain = clt.Opts.DomainName
+	// Config.Tenant = clt.Opts.ProjectID
+	// Config.Region = clt.Opts.Region
+	// Config.Key = clt.Opts.S3AccessKeyID
+	// Config.Secretkey = clt.Opts.S3AccessKeyPassword
+	// Config.Endpoint = endpoint
+
+	// ConfigObject.Domain = "default"
+	// ConfigObject.Auth = clt.Opts.OstAuth
+	// ConfigObject.Endpoint = clt.Opts.OstAuth
+	// ConfigObject.User = clt.Opts.OstUsername
+	// ConfigObject.Tenant = clt.Opts.OstProjectID
+	// ConfigObject.Region = clt.Opts.OstRegion
+	// ConfigObject.Secretkey = clt.Opts.OstSecretKey
+	// ConfigObject.Key = clt.Opts.OstPassword
+	// ConfigObject.Types = clt.Opts.OstTypes
+	// log.Println("config container set to : ", Config.Endpoint)
+	// log.Println("object storage set to  : ", ConfigObject.Auth)
+	// err = clt.LocforConfig.Connect(Config)
+	// if err != nil {
+	// 	log.Println("Erreur Connection  stow  : ", err)
+	// 	return nil, err
+	// }
+	// //err = metadata.InitializeContainer(&clt)
+	// err = metadata.InitContainer(clt.LocforConfig)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// err = clt.LocforStore.Connect(ConfigObject)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
 	return &clt, nil
 }
 
@@ -278,8 +280,8 @@ type Client struct {
 	Opts *AuthOptions
 	// Identity contains service client of Identity openstack service
 	Identity *gc.ServiceClient
-	// S3Session is the "AWS Session" for object storage use (compatible S3)
-	S3Session *awssession.Session
+	// // S3Session is the "AWS Session" for object storage use (compatible S3)
+	// S3Session *awssession.Session
 	// osclt is the openstack.Client instance to use when fully openstack compliant
 	osclt *openstack.Client
 	// Instance of the VPC
@@ -292,36 +294,44 @@ type Client struct {
 
 // Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	Username, _ := params["Username"].(string)
-	Password, _ := params["Password"].(string)
-	DomainName, _ := params["DomainName"].(string)
-	ProjectID, _ := params["ProjectID"].(string)
-	VPCName, _ := params["VPCName"].(string)
-	VPCCIDR, _ := params["VPCCIDR"].(string)
-	Region, _ := params["Region"].(string)
-	S3AccessKeyID, _ := params["S3AccessKeyID"].(string)
-	S3AccessKeyPassword, _ := params["S3AccessKeyPassword"].(string)
+	// tenantName, _ := params["name"].(string)
 
-	return AuthenticatedClient(AuthOptions{
-		Username:            Username,
-		Password:            Password,
-		DomainName:          DomainName,
-		ProjectID:           ProjectID,
-		Region:              Region,
-		AllowReauth:         true,
-		VPCName:             VPCName,
-		VPCCIDR:             VPCCIDR,
-		S3AccessKeyID:       S3AccessKeyID,
-		S3AccessKeyPassword: S3AccessKeyPassword,
-	}, openstack.CfgOptions{
-		DNSList:             []string{"100.125.0.41", "100.126.0.41"},
-		UseFloatingIP:       true,
-		UseLayer3Networking: false,
-		VolumeSpeeds: map[string]VolumeSpeed.Enum{
-			"SATA": VolumeSpeed.COLD,
-			"SSD":  VolumeSpeed.SSD,
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
+	network, _ := params["network"].(map[string]interface{})
+
+	username, _ := identity["Username"].(string)
+	password, _ := identity["Password"].(string)
+	domainName, _ := identity["DomainName"].(string)
+
+	projectID, _ := compute["ProjectID"].(string)
+	region, _ := compute["Region"].(string)
+	defaultImage, _ := compute["DefaultImage"].(string)
+
+	vpcName, _ := network["VPCName"].(string)
+	vpcCIDR, _ := network["VPCCIDR"].(string)
+
+	return AuthenticatedClient(
+		AuthOptions{
+			Username:    username,
+			Password:    password,
+			DomainName:  domainName,
+			ProjectID:   projectID,
+			Region:      region,
+			AllowReauth: true,
+			VPCName:     vpcName,
+			VPCCIDR:     vpcCIDR,
 		},
-	})
+		openstack.CfgOptions{
+			DNSList:             []string{"100.125.0.41", "100.126.0.41"},
+			UseFloatingIP:       true,
+			UseLayer3Networking: false,
+			VolumeSpeeds: map[string]VolumeSpeed.Enum{
+				"SATA": VolumeSpeed.COLD,
+				"SSD":  VolumeSpeed.SSD,
+			},
+			DefaultImage: defaultImage,
+		})
 }
 
 /*
@@ -615,8 +625,8 @@ func (client *Client) findVPCID() (*string, error) {
 }
 
 // GetAuthOpts returns the auth options
-func (client *Client) GetAuthOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
+func (client *Client) GetAuthOpts() (model.Config, error) {
+	cfg := model.ConfigMap{}
 
 	cfg.Set("DomainName", client.Opts.DomainName)
 	cfg.Set("Login", client.Opts.Username)
@@ -629,7 +639,7 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 }
 
 // GetCfgOpts return configuration parameters
-func (client *Client) GetCfgOpts() (api.Config, error) {
+func (client *Client) GetCfgOpts() (model.Config, error) {
 	return client.osclt.GetCfgOpts()
 }
 

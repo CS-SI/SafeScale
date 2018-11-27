@@ -16,6 +16,23 @@
 #
 # Installs and configures
 
+set -u -o pipefail
+
+function print_error {
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+}
+trap print_error ERR
+
+function dns_fallback {
+    grep nameserver /etc/resolv.conf && return 0
+    echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
+    sudo cp /tmp/resolv.conf /etc/resolv.conf
+    return 0
+}
+
+dns_fallback
+
 {{.reserved_BashLibrary}}
 
 echo "Install NFS client"

@@ -92,6 +92,19 @@ func dockerFeature() *Feature {
 	}
 }
 
+// dockerComposeFeature ...
+func dockerComposeFeature() *Feature {
+	specs, err := loadSpecFile("docker-compose")
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
+		fileName:    "docker-compose",
+		specs:       specs,
+	}
+}
+
 // nVidiaDockerFeature ...
 func nVidiaDockerFeature() *Feature {
 	specs, err := loadSpecFile("nvidiadocker")

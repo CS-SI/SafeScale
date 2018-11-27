@@ -10,6 +10,7 @@ import (
 
 
 func Test_Flexible_Basic(t *testing.T) {
+	runOnlyInIntegrationTest("TEST_FLEXIBLE")
 	defer tearDown()
 
 	brokerd_launched, err := isBrokerdLaunched()
@@ -55,7 +56,7 @@ func Test_Flexible_Basic(t *testing.T) {
 
 	out, err = getOutput("broker host create easyvm --public --net crazy --cpu 4 --ram 50 ")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "A host already exists"))
+	require.True(t, strings.Contains(out, "already exists"))
 
 	out, err = getOutput("broker host inspect easyvm")
 	require.Nil(t, err)
@@ -70,7 +71,7 @@ func Test_Flexible_Basic(t *testing.T) {
 
 	out, err = getOutput("broker host create complexvm --public --net crazy")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "A host already exists"))
+	require.True(t, strings.Contains(out, "already exists"))
 
 	out, err = getOutput("broker nas list")
 	require.Nil(t, err)
@@ -129,7 +130,7 @@ func Test_Flexible_Basic(t *testing.T) {
 
 	out, err = getOutput("broker volume delete volumetest")
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(err.Error(), "still attached"))
+	require.True(t, strings.Contains(out, "still attached"))
 
 	out, err = getOutput("broker volume inspect volumetest")
 	require.Nil(t, err)

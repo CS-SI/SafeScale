@@ -1,8 +1,8 @@
 GO?=go
 
-.PHONY: dcos boh ohpc tests clean
+.PHONY: boh dcos k8s ohpc swarm tests clean
 
-all: dcos boh ohpc
+all: boh dcos k8s ohpc swarm
 
 vet:
 	@$(GO) vet ./...
@@ -16,11 +16,18 @@ boh:
 ohpc:
 	@(cd ohpc && $(MAKE))
 
-tests: dcos boh ohpc
+k8s:
+	@(cd k8s && $(MAKE))
+
+swarm:
+	@(cd swarm && $(MAKE))
+
+tests: boh dcos k8s ohpc swarm
 	@(cd tests && $(MAKE))
 
 clean:
-	@(cd dcos && $(MAKE) $@)
 	@(cd boh && $(MAKE) $@)
+	@(cd dcos && $(MAKE) $@)
+	@(cd k8s && $(MAKE) $@)
 	@(cd ohpc && $(MAKE) $@)
-
+	@(cd swarm && $(MAKE) $@)

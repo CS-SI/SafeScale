@@ -19,14 +19,12 @@ package api
 import (
 	"encoding/gob"
 
-	providerapi "github.com/CS-SI/SafeScale/providers/api"
-
+	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
-
-	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/providers/model"
 )
 
 // Request defines what kind of Cluster is wanted
@@ -48,7 +46,7 @@ type Request struct {
 	// NodesDef count
 	NodesDef *pb.HostDefinition
 	// DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
-	DisabledDefaultFeatures []string
+	DisabledDefaultFeatures map[string]struct{}
 }
 
 //go:generate mockgen -destination=../mocks/mock_cluster.go -package=mocks github.com/CS-SI/SafeScale/deploy/cluster/api Cluster
@@ -122,7 +120,7 @@ type ClusterCore struct {
 	// Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
 	Complexity Complexity.Enum `json:"complexity"`
 	// Keypair contains the key-pair used inside the Cluster
-	Keypair *providerapi.KeyPair `json:"keypair,omitempty"`
+	Keypair *model.KeyPair `json:"keypair,omitempty"`
 	// State of the cluster
 	State ClusterState.Enum `json:"state,omitempty"`
 	// Tenant is the name of the tenant
@@ -142,8 +140,21 @@ type ClusterCore struct {
 	PublicIP string `json:"public_ip"`
 	// NodesDef keeps the default node definition
 	NodesDef pb.HostDefinition `json:"nodes_def"`
-	// Infos contains additional info about the cluster
-	Infos ExtensionMap `json:"infos,omitempty"`
+	// DisabledFeatures keeps track of features normally automatically added with cluster creation,
+	// but explicitely disabled; if a disabled feature is added, must be removed from this property
+	DisabledFeatures map[string]struct{} `json:"disabled_features"`
+	// Extensions contains additional info about the cluster
+	Extensions ExtensionMap `json:"infos,omitempty"`
+}
+
+// Serialize ...
+func (c *ClusterCore) Serialize() ([]byte, error) {
+	return model.SerializeToJSON(c)
+}
+
+// Deserialize ...
+func (c *ClusterCore) Deserialize(buf []byte) error {
+	return model.DeserializeFromJSON(buf, c)
 }
 
 // GetName returns the name of the cluster
@@ -163,8 +174,8 @@ func (c *ClusterCore) GetGatewayIP() string {
 
 // GetExtension returns the additional info requested
 func (c *ClusterCore) GetExtension(ctx Extension.Enum) interface{} {
-	if c.Infos != nil {
-		if info, ok := c.Infos[ctx]; ok {
+	if c.Extensions != nil {
+		if info, ok := c.Extensions[ctx]; ok {
 			return info
 		}
 	}
@@ -173,10 +184,10 @@ func (c *ClusterCore) GetExtension(ctx Extension.Enum) interface{} {
 
 // SetExtension ...
 func (c *ClusterCore) SetExtension(ctx Extension.Enum, info interface{}) {
-	if c.Infos == nil {
-		c.Infos = map[Extension.Enum]interface{}{}
+	if c.Extensions == nil {
+		c.Extensions = map[Extension.Enum]interface{}{}
 	}
-	c.Infos[ctx] = info
+	c.Extensions[ctx] = info
 }
 
 // CountNodes returns the number of public or private nodes in the cluster

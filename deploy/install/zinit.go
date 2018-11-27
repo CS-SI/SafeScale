@@ -26,6 +26,7 @@ func init() {
 
 	allEmbedded = []*Feature{
 		dockerFeature(),
+		dockerComposeFeature(),
 		nVidiaDockerFeature(),
 		mpichOsPkgFeature(),
 		mpichBuildFeature(),
@@ -45,7 +46,7 @@ func init() {
 	for _, item := range allEmbedded {
 		allEmbeddedMap[item.BaseFilename()] = item
 		allEmbeddedMap[item.DisplayName()] = item
-		installers := item.Specs().GetStringMap("feature.install")
+		installers := item.specs.GetStringMap("feature.install")
 		for k := range installers {
 			method, err := Method.Parse(k)
 			if err != nil {

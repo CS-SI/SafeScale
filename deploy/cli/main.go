@@ -16,110 +16,83 @@
 
 package main
 
+// TODO NOTICE Side-effects imports here
 import (
+	"os"
+	"sort"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/deploy/cli/cmds"
 
-	"github.com/CS-SI/SafeScale/utils/cli"
-
+	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialise provider cloudferro
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise provider cloudwatt
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise provider flexibleengine
 	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise provider opentelekom
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise provider ovh
 )
 
-const (
-	address           = "localhost:50051"
-	timeoutCtxDefault = 10 * time.Second
-	timeoutCtxHost    = 2 * time.Minute
-
-	globalOptions string = `
-Global options:
-  -v,--verbose  Enable verbosity
-  -d,--debug    Enable debug suplemental information
-`
-
-	completeUsage string = `
-Usage: deploy version
-       deploy [-vd] help (cluster|host)
-       deploy [-vd] (cluster|datacenter|dc|host) help <command>
-       deploy [-vd] (cluster|datacenter|dc|host) (list|ls)
-       deploy [-vd] (cluster|datacenter|dc) help <command>
-       deploy [-vd] (cluster|datacenter|dc) <clustername> create [-N <cidr>][-F <flavor>][-C <complexity][--os <operating system>][--cpu <number of cpu>][--ram <ram size>][--disk <disk size>][-k][(--disable-feature <feature>)...]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> (delete|destroy|remove|rm) [-y]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> (start|stop|state|inspect)
-       deploy [-vd] (cluster|datacenter|dc) <clustername> expand [-n <count>][--os <os>][--cpu <number of cpu>][--ram <ram size>][--disk <disk size>]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> shrink [-n <count>]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> (add|install) [-f][--skip-proxy][--no-master][--no-node][(--param <param>)...]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> check [(--param <param>)...]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> feature <pkgname> (delete|destroy|remove|rm|uninstall) [-f][(--param <param>)...]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
-       deploy [-vd] (cluster|datacenter|dc) <clustername> (dcos|marathon|kubectl) [-- <arg>...]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> create [-u <storage unit size>][-n <count>][--host <nas host>]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> (expand|shrink) [-n <count>]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> (delete|destroy|remove|rm) [-y]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> create [(--acl <acl>)...]
-       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> (delete|destroy|remove|rm)
-       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> mount <mountpoint>
-       deploy [-vd] (cluster|datacenter|dc) <clustername> nas <nasname> share <sharename> (umount|unmount)
-       deploy [-vd] host help <command>
-       deploy [-vd] host <host name or id> feature <pkgname> (add|install) [(--param <param>)...]
-       deploy [-vd] host <host name or id> feature <pkgname> check
-       deploy [-vd] host <host name or id> feature <pkgname> (delete|destroy|remove|rm|uninstall)
-       deploy [-vd] host <host name or id> (service|svc) <pkgname> (check|start|state|stop|pause|resume)
-
-Options:
-  -C <complexity>,--complexity <complexity>               Defines complexity
-  -d,--debug                                              Enable debug suplemental information
-  -F <flavor>,--flavor <flavor>                           Defines flavor
-  -f,--force                                              Force action even when an error occured
-  -h,--help                                               Print help message
-  -k,--keep-on-failure                                    Don't delete the resources on failure
-  -N <cidr>,--cidr <cidr>                                 Defines CIDR
-  -n <count>,--count <count>                              Defines the number
-  -u <storage unit size>,--unit-size <storage unit size>  Defines the size in GB of a storage unit size for the nas
-  -v,--verbose                                            Enable verbosity
-  -y,--assume-yes                                         Automatically responds y to confirmation
-  -p,--param <param>                                      Used to set parameter of feature
-  --host <nas host>                                       By default, nas create creates a new host; with this option, add nas functionality on existing host
-  --cpu <cpu>                                             Defines number of CPU of host
-  --disk <disk>                                           Defines system disk size
-  --os <os>                                               Defines Linux Operating System
-  --ram <ram>                                             Defines ram size
-  --skip-proxy                                            Disables reverse proxy configuration
-  --no-check                                              Disables feature check before add or remove
-  --no-master                                             Disables feature installation on master(s)
-  --no-node                                               Disables feature installation on node(s)
-  --disable-feature <feature>                             Disables a default feature (remotedesktop)`
-)
-
 func main() {
-	app := cli.NewApp(completeUsage, &cli.Command{
-		Keyword: "deploy",
 
-		Commands: []*cli.Command{
-			cmds.ClusterCommand,
-			cmds.HostCommand,
+	app := cli.NewApp()
+	app.Name = "deploy"
+	app.Usage = "deploy COMMAND"
+	app.Version = "0.0.1"
+	app.Copyright = "(c) 2018 CS-SI"
+	app.Compiled = time.Now()
+	app.Authors = []cli.Author{
+		cli.Author{
+			Name:  "CS-SI",
+			Email: "safescale@c-s.fr",
 		},
+	}
+	//app.EnableBashCompletion = true
 
-		Before: func(c *cli.Command) {
-			cmds.Verbose = c.Flag("-v,--verbose", false)
-			cmds.Debug = c.Flag("-d,--debug", false)
-		},
+	cli.VersionFlag = cli.BoolFlag{
+		Name:  "version, V",
+		Usage: "Print program version",
+	}
 
-		Help: &cli.HelpContent{
-			Usage: `
-Usage: {{.ProgName}} [options] <command>
-       {{.ProgName}} [options] <command>
-            `,
-			Commands: `
-  host     Deploy on host
-  cluster  Deploy on cluster`,
-			Options: []string{
-				globalOptions,
-			},
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "verbose, v",
+			Usage: "Increase verbosity",
 		},
-	})
-	app.Run(nil)
+		cli.BoolFlag{
+			Name:  "debug, d",
+			Usage: "Displays debug log",
+		},
+		// cli.IntFlag{
+		// 	Name:  "port, p",
+		// 	Usage: "Bind to specified port `PORT`",
+		// 	Value: 50051,
+		// },
+	}
+
+	app.Before = func(c *cli.Context) error {
+		log.SetLevel(log.WarnLevel)
+		if c.GlobalBool("verbose") {
+			log.SetLevel(log.InfoLevel)
+			cmds.Verbose = true
+		}
+		if c.GlobalBool("debug") {
+			log.SetLevel(log.DebugLevel)
+			cmds.Debug = true
+		}
+		return nil
+	}
+
+	app.Commands = append(app.Commands, cmds.ClusterCommand)
+	sort.Sort(cli.CommandsByName(cmds.ClusterCommand.Subcommands))
+
+	app.Commands = append(app.Commands, cmds.HostCommand)
+	sort.Sort(cli.CommandsByName(cmds.HostCommand.Subcommands))
+
+	sort.Sort(cli.CommandsByName(app.Commands))
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

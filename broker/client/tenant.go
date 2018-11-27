@@ -17,10 +17,10 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	utils "github.com/CS-SI/SafeScale/broker/utils"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -33,40 +33,32 @@ type tenant struct {
 
 // List ...
 func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	tenantService := pb.NewTenantServiceClient(conn)
-	return tenantService.List(ctx, &google_protobuf.Empty{})
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTenantServiceClient(t.session.connection)
+	ctx := context.Background()
+
+	return service.List(ctx, &google_protobuf.Empty{})
+
 }
 
 // Get ...
 func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	tenantService := pb.NewTenantServiceClient(conn)
-	return tenantService.Get(ctx, &google_protobuf.Empty{})
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTenantServiceClient(t.session.connection)
+	ctx := context.Background()
+
+	return service.Get(ctx, &google_protobuf.Empty{})
 }
 
 // Set ...
 func (t *tenant) Set(name string, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	tenantService := pb.NewTenantServiceClient(conn)
-	_, err := tenantService.Set(ctx, &pb.TenantName{Name: name})
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTenantServiceClient(t.session.connection)
+	ctx := context.Background()
+
+	_, err := service.Set(ctx, &pb.TenantName{Name: name})
 	return err
 }

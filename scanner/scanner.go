@@ -19,19 +19,23 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
 	"io/ioutil"
 	"math"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
+	server "github.com/CS-SI/SafeScale/broker/server/services"
 	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 const cmdNumberOfCPU string = "lscpu | grep 'CPU(s):' | grep -v 'NUMA' | tr -d '[:space:]' | cut -d: -f2"
@@ -46,8 +50,13 @@ const cmdTotalRAM string = "cat /proc/meminfo | grep MemTotal | cut -d: -f2 | se
 const cmdRAMFreq string = "sudo dmidecode -t memory | grep Speed | head -1 | cut -d' ' -f2"
 
 const cmdGPU string = "lspci | egrep -i 'VGA|3D' | grep -i nvidia | cut -d: -f3 | sed 's/.*controller://g' | tr '\n' '%'"
+const cmdDiskSize string = "lsblk -b --output SIZE -n -d /dev/sda"
+const cmdEphemeralDiskSize string = "lsblk -o name,type,mountpoint | grep disk | awk {'print $1'} | grep -v sda | xargs -i'{}' lsblk -b --output SIZE -n -d /dev/'{}'"
+const cmdRotational string = "cat /sys/block/sda/queue/rotational"
+const cmdDiskSpeed string = "sudo hdparm -t --direct /dev/sda | grep MB | awk '{print $11}'"
+const cmdNetSpeed string = "URL=\"http://www.google.com\";curl -L --w \"$URL\nDNS %{time_namelookup}s conn %{time_connect}s time %{time_total}s\nSpeed %{speed_download}bps Size %{size_download}bytes\n\" -o/dev/null -s $URL | grep bps | awk '{ print $2}' | cut -d '.' -f 1"
 
-var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)",
+var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%s)",
 	cmdNumberOfCPU,
 	cmdNumberOfCorePerSocket,
 	cmdNumberOfSocket,
@@ -58,30 +67,44 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 	cmdTotalRAM,
 	cmdRAMFreq,
 	cmdGPU,
+	cmdDiskSize,
+	cmdEphemeralDiskSize,
+	cmdDiskSpeed,
+	cmdRotational,
+	cmdNetSpeed,
 )
 
 //CPUInfo stores CPU properties
 type CPUInfo struct {
+	TenantName   string `json:"tenant_name,omitempty"`
 	TemplateID   string `json:"template_id,omitempty"`
 	TemplateName string `json:"template_name,omitempty"`
+	ImageID      string `json:"image_id,omitempty"`
+	ImageName    string `json:"image_name,omitempty"`
+	LastUpdated  string `json:"last_updated,omitempty"`
 
 	NumberOfCPU    int     `json:"number_of_cpu,omitempty"`
 	NumberOfCore   int     `json:"number_of_core,omitempty"`
 	NumberOfSocket int     `json:"number_of_socket,omitempty"`
-	CPUFrequency   float64 `json:"cpu_frequency,omitempty"`
+	CPUFrequency   float64 `json:"cpu_frequency_Ghz,omitempty"`
 	CPUArch        string  `json:"cpu_arch,omitempty"`
 	Hypervisor     string  `json:"hypervisor,omitempty"`
 	CPUModel       string  `json:"cpu_model,omitempty"`
-	RAMSize        float64 `json:"ram_size,omitempty"`
+	RAMSize        float64 `json:"ram_size_Gb,omitempty"`
 	RAMFreq        float64 `json:"ram_freq,omitempty"`
 	GPU            int     `json:"gpu,omitempty"`
 	GPUModel       string  `json:"gpu_model,omitempty"`
+	DiskSize       int64   `json:"disk_size_Gb,omitempty"`
+	MainDiskType   string  `json:"main_disk_type"`
+	MainDiskSpeed  float64 `json:"main_disk_speed_MBps"`
+	SampleNetSpeed float64 `json:"sample_net_speed_KBps"`
+	EphDiskSize    int64   `json:"eph_disk_size_Gb"`
+	PricePerHour   float64 `json:"price_in_dollars_hour"`
 }
 
-func parseOutput(output []byte) (*CPUInfo, error) {
-	str := strings.TrimSpace(string(output))
+func createCPUInfo(output string) (*CPUInfo, error) {
+	str := strings.TrimSpace(output)
 
-	//	tokens := strings.Split(str, "\n")
 	tokens := strings.Split(str, "î")
 	if len(tokens) < 9 {
 		return nil, fmt.Errorf("parsing error: '%s'", str)
@@ -105,7 +128,7 @@ func parseOutput(output []byte) (*CPUInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Parsing error: CpuFrequency='%s' (from '%s')", tokens[3], str)
 	}
-	info.CPUFrequency = math.Ceil(info.CPUFrequency/100) / 10
+	info.CPUFrequency = math.Floor(info.CPUFrequency*100) / 100000
 
 	info.CPUArch = tokens[4]
 	info.Hypervisor = tokens[5]
@@ -114,12 +137,13 @@ func parseOutput(output []byte) (*CPUInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Parsing error: RAMSize='%s' (from '%s')", tokens[7], str)
 	}
-	info.RAMSize = math.Ceil(info.RAMSize / 1024 / 1024)
+
+	memInGb := info.RAMSize / 1024 / 1024
+	info.RAMSize = math.Floor(memInGb*100) / 100
 	info.RAMFreq, err = strconv.ParseFloat(tokens[8], 64)
 	if err != nil {
 		info.RAMFreq = 0
 	}
-	fmt.Println(tokens[9])
 	gpuTokens := strings.Split(tokens[9], "%")
 	nb := len(gpuTokens)
 	if nb > 1 {
@@ -127,195 +151,305 @@ func parseOutput(output []byte) (*CPUInfo, error) {
 		info.GPU = nb - 1
 	}
 
+	info.DiskSize, err = strconv.ParseInt(tokens[10], 10, 64)
+	if err != nil {
+		info.DiskSize = 0
+	}
+	info.DiskSize = info.DiskSize / 1024 / 1024 / 1024
+
+	info.EphDiskSize, err = strconv.ParseInt(tokens[11], 10, 64)
+	if err != nil {
+		info.EphDiskSize = 0
+	}
+	info.EphDiskSize = info.EphDiskSize / 1024 / 1024 / 1024
+
+	info.MainDiskSpeed, err = strconv.ParseFloat(tokens[12], 64)
+	if err != nil {
+		info.MainDiskSpeed = 0
+	}
+
+	rotational, err := strconv.ParseInt(tokens[13], 10, 64)
+	if err != nil {
+		info.MainDiskType = ""
+	} else {
+		if rotational == 1 {
+			info.MainDiskType = "HDD"
+		} else {
+			info.MainDiskType = "SSD"
+		}
+	}
+
+	nsp, err := strconv.ParseFloat(tokens[14], 64)
+	if err != nil {
+		info.SampleNetSpeed = 0
+	} else {
+		info.SampleNetSpeed = nsp / 1000 / 8
+	}
+
+	info.PricePerHour = 0
+
 	return &info, nil
 }
 
-func scanImages(tenant string, service *providers.Service, c chan error) {
-	images, err := service.ListImages(false)
-	fmt.Println(tenant, "images:", len(images))
-	if err != nil {
-		c <- err
-		return
+// RunScanner ...
+func RunScanner() {
+	var targetedProviders []string
+	theProviders, _ := providers.Tenants()
+
+	for tenantName := range theProviders {
+		if strings.Contains(tenantName, "-scannable-gpu-test") {
+			targetedProviders = append(targetedProviders, tenantName)
+		}
 	}
-	type ImageList struct {
-		Images []api.Image `json:"images,omitempty"`
+
+	// TODO Enable when several brokerd instances can run in parallel
+	/*
+		var wtg sync.WaitGroup
+
+		wtg.Add(len(targetedProviders))
+
+		for _, tenantName := range targetedProviders {
+			fmt.Printf("Working with tenant %s\n", tenantName)
+			go analyzeTenant(&wtg, tenantName)
+		}
+
+		wtg.Wait()
+	*/
+
+	for _, tenantName := range targetedProviders {
+		fmt.Printf("Working with tenant %s\n", tenantName)
+		analyzeTenant(nil, tenantName)
 	}
-	content, err := json.Marshal(ImageList{
-		Images: images,
-	})
-	if err != nil {
-		c <- err
-		return
-	}
-	f := fmt.Sprintf("%s/images.json", tenant)
-	ioutil.WriteFile(f, content, 0666)
-	c <- nil
+
+	collect()
 }
 
-type getCPUInfoResult struct {
-	Err     error
-	CPUInfo *CPUInfo
-}
-
-func getCPUInfo(tenant string, service *providers.Service, tpl api.HostTemplate, img *api.Image, key *api.KeyPair, networkID string) (*CPUInfo, error) {
-	//fmt.Printf("[%s] host %s: creating\n", tenant, tpl.Name)
-	host, err := service.CreateHost(api.HostRequest{
-		Name:       "scanhost",
-		PublicIP:   true,
-		ImageID:    img.ID,
-		TemplateID: tpl.ID,
-		KeyPair:    key,
-		NetworkIDs: []string{networkID},
-	})
-	if err != nil {
-		//fmt.Printf("[%s] host %s: error creation: %s\n", tenant, tpl.Name, err.Error())
-		return nil, err
-	}
-	defer service.DeleteHost(host.ID)
-
-	ssh, err := service.GetSSHConfig(host.ID)
-	//fmt.Println("Reading SSH Config")
-	if err != nil {
-		fmt.Printf("[%s] host %s: error reading SSHConfig: %s\n", tenant, tpl.Name, err.Error())
-		return nil, err
-	}
-	ssh.WaitServerReady(1 * time.Minute)
-	c, err := ssh.Command(cmd)
-
-	//cmd, err := ssh.Command(cmd)
-	//fmt.Println(">>> CMD", cmd)
-	_, err = ssh.Command(cmd)
-	if err != nil {
-		fmt.Printf("[%s] host %s: error scanning: %s\n", tenant, tpl.Name, err.Error())
-		return nil, err
-	}
-	out, err := c.CombinedOutput()
-	//fmt.Println("parse: ", string(out), err)
-	if err != nil {
-		return nil, err
-	}
-	return parseOutput(out)
-}
-
-func scanTemplates(tenant string, service *providers.Service, c chan error) {
-	tpls, err := service.ListTemplates(false)
-	total := len(tpls)
-	fmt.Println(tenant, "Templates:", total)
-	if err != nil {
-		c <- err
-		return
+func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
+	if group != nil {
+		defer group.Done()
 	}
 
-	info := []*CPUInfo{}
-	service.DeleteKeyPair("key-scan")
-	kp, err := service.CreateKeyPair("key-scan")
+	service, err := providers.GetService(theTenant)
 	if err != nil {
-		c <- err
-		return
+		log.Warnf("Unable to get service for tenant '%s': %s", theTenant, err.Error())
+		return err
 	}
 
-	net, err := service.CreateNetwork(api.NetworkRequest{
-		CIDR:      "192.168.0.0/24",
-		IPVersion: IPVersion.IPv4,
-		Name:      "net-scan",
-	})
+	err = dumpImages(service, theTenant)
 	if err != nil {
-		c <- err
-		service.DeleteKeyPair("key-scan")
-		return
+		return err
 	}
+
+	err = dumpTemplates(service, theTenant)
+	if err != nil {
+		return err
+	}
+
+	templates, err := service.ListTemplates(true)
 
 	img, err := service.SearchImage("Ubuntu 16.04")
 	if err != nil {
-		c <- err
-		service.DeleteKeyPair("key-scan")
-		return
+		log.Warnf("No image here...")
+		return err
 	}
 
-	ignored := 0
-	succeeded := 0
-	for _, tpl := range tpls {
-		fmt.Printf("[%s] scanning template %s\n", tenant, tpl.Name)
-		ci, err := getCPUInfo(tenant, service, tpl, img, kp, net.ID)
+	// Prepare network
+
+	there := true
+	var net *model.Network
+
+	netName := "scanner"
+	if net, err = service.GetNetwork(netName); net != nil && err == nil {
+		there = true
+		log.Warnf("Network '%s' already there", netName)
+	} else {
+		there = false
+	}
+
+	if !there {
+		net, err = service.CreateNetwork(model.NetworkRequest{
+			CIDR:      "192.168.0.0/24",
+			IPVersion: IPVersion.IPv4,
+			Name:      netName,
+		})
 		if err == nil {
-			ci.TemplateName = tpl.Name
-			ci.TemplateID = tpl.ID
-			info = append(info, ci)
-			succeeded++
-			fmt.Printf("[%s] scanning template %s: success: %v\n", tenant, tpl.Name, ci)
+			defer service.DeleteNetwork(net.ID)
 		} else {
-			errStr := err.Error()
-			if errStr == "exit status 255" {
-				errStr = "SSH failed"
-			}
-			fmt.Printf("[%s] scanning template %s failure: %s\n", tenant, tpl.Name, errStr)
+			return errors.Wrapf(err, "Error waiting for server ready: %v", err)
+		}
+		if net == nil {
+			return errors.Errorf("Failure creating network")
 		}
 	}
 
-	fmt.Printf("[%s] ALL RESULTS: %v\n", tenant, info)
-	fmt.Printf("[%s] total %d templaces scanned, %d succeeded, %d ignored, %d failed\n",
-		tenant, total, succeeded, ignored, total-succeeded-ignored)
-	type TplList struct {
-		Templates []*CPUInfo `json:"templates,omitempty"`
+	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+
+	var wg sync.WaitGroup
+
+	concurrency := math.Min(4, float64(len(templates)/2))
+	sem := make(chan bool, int(concurrency))
+
+	hostAnalysis := func(template model.HostTemplate) error {
+		defer wg.Done()
+		if net != nil {
+
+			// TODO Remove this later
+
+			/*
+				if template.Name != "s1-2" {
+					return nil
+				}
+			*/
+
+			log.Printf("Checking template %s\n", template.Name)
+
+			hostName := "scanhost-" + template.Name
+			host, err := service.CreateHost(model.HostRequest{
+				ResourceName: hostName,
+				PublicIP:     true,
+				ImageID:      img.ID,
+				TemplateID:   template.ID,
+				Networks:     []*model.Network{net},
+			})
+
+			defer service.DeleteHost(hostName)
+			if err != nil {
+				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
+				return err
+			}
+
+			sshSvc := server.NewSSHService(service)
+			ssh, err := sshSvc.GetConfig(host.ID)
+			if err != nil {
+				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
+				return err
+			}
+			nerr := ssh.WaitServerReady(time.Duration(concurrency-1) * time.Minute)
+			if nerr != nil {
+				log.Warnf("template [%s] : Error waiting for server ready: %v", template.Name, nerr)
+				return nerr
+			}
+			c, err := ssh.Command(cmd)
+			if err != nil {
+				log.Warnf("template [%s] : Problem creating ssh command: %v", template.Name, err)
+				return err
+			}
+			_, cout, _, err := c.Run()
+			if err != nil {
+				log.Warnf("template [%s] : Problem running ssh command: %v", template.Name, err)
+				return err
+			}
+
+			daCPU, err := createCPUInfo(cout)
+			if err != nil {
+				log.Warnf("template [%s] : Problem building cpu info: %v", template.Name, err)
+				return err
+			}
+
+			daCPU.TemplateName = template.Name
+			daCPU.TemplateID = template.ID
+			daCPU.ImageID = img.ID
+			daCPU.ImageName = img.Name
+			daCPU.TenantName = theTenant
+			daCPU.LastUpdated = time.Now().Format(time.RFC850)
+
+			daOut, err := json.MarshalIndent(daCPU, "", "\t")
+			if err != nil {
+				log.Warnf("template [%s] : Problem marshaling json data: %v", template.Name, err)
+				return err
+			}
+
+			nerr = ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json"), daOut, 0666)
+			if nerr != nil {
+				log.Warnf("template [%s] : Error writing file: %v", template.Name, nerr)
+				return nerr
+			}
+		} else {
+			return errors.New("No gateway network !")
+		}
+
+		return nil
 	}
-	content, err := json.Marshal(TplList{
-		Templates: info,
+
+	wg.Add(len(templates))
+
+	for _, target := range templates {
+		sem <- true
+		go func(inner model.HostTemplate) {
+			defer func() { <-sem }()
+			err = hostAnalysis(inner)
+			if err != nil {
+				log.Warnf("Error running scanner: %+v", err)
+			}
+		}(target)
+	}
+
+	for i := 0; i < cap(sem); i++ {
+		sem <- true
+	}
+
+	wg.Wait()
+
+	return nil
+}
+
+func dumpTemplates(service *providers.Service, tenant string) error {
+	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+
+	type TemplateList struct {
+		Templates []model.HostTemplate `json:"templates,omitempty"`
+	}
+
+	templates, err := service.ListTemplates(false)
+	if err != nil {
+		return err
+	}
+
+	content, err := json.Marshal(TemplateList{
+		Templates: templates,
 	})
 
-	f := fmt.Sprintf("%s/templates.json", tenant)
-	ioutil.WriteFile(f, content, 0666)
+	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", tenant)
+	f = utils.AbsPathify(f)
 
-	service.DeleteNetwork(net.ID)
-	service.DeleteKeyPair("key-scan")
-
+	err = ioutil.WriteFile(f, content, 0666)
 	if err != nil {
-		c <- err
-		return
+		return err
 	}
 
-	c <- nil
+	return nil
 }
 
-func scanService(tenant string, service *providers.Service, c chan error) {
-	os.Remove(tenant)
-	os.Mkdir(tenant, 0777)
-	cImage := make(chan error)
-	go scanImages(tenant, service, cImage)
-	cTpl := make(chan error)
-	go scanTemplates(tenant, service, cTpl)
-	errI := <-cImage
-	errT := <-cTpl
-	if errI != nil || errT != nil {
-		c <- fmt.Errorf("[%s] Errors during scan: %v, %v", tenant, errI, errT)
-	} else {
-		c <- nil
-	}
-}
+func dumpImages(service *providers.Service, tenant string) error {
+	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
-//Run runs the scan
-func Run() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	channels := []chan error{}
-	// TODO Fix check error
-	the_providers, _ := providers.Tenants()
-	for tenantname := range the_providers {
-		service, err := providers.GetService(tenantname)
-		if err != nil {
-			fmt.Printf("Unable to get service for tenant '%s': %s", tenantname, err.Error())
-		}
-		c := make(chan error)
-		go scanService(tenantname, service, c)
-		channels = append(channels, c)
+	type ImageList struct {
+		Images []model.Image `json:"images,omitempty"`
 	}
-	for _, c := range channels {
-		err := <-c
-		if err != nil {
-			fmt.Printf("Error during scan: %s ", err.Error())
-		}
+
+	images, err := service.ListImages(false)
+	if err != nil {
+		return err
 	}
-	fmt.Println("\nScanning done.")
+
+	content, err := json.Marshal(ImageList{
+		Images: images,
+	})
+
+	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", tenant)
+	f = utils.AbsPathify(f)
+
+	err = ioutil.WriteFile(f, content, 0666)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func main() {
-	Run()
+	log.Printf("%s version %s\n", os.Args[0], VERSION)
+	log.Printf("built %s\n", BUILD_DATE)
+
+	RunScanner()
 }

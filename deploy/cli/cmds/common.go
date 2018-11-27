@@ -16,9 +16,38 @@
 
 package cmds
 
+import (
+	"fmt"
+	"os"
+
+	clitools "github.com/CS-SI/SafeScale/utils"
+
+	pb "github.com/CS-SI/SafeScale/broker"
+
+	"github.com/urfave/cli"
+)
+
 var (
 	// Verbose tells if user asks more verbosity
 	Verbose bool
 	// Debug tells if user asks debug information
 	Debug bool
+
+	hostName     string
+	hostInstance *pb.Host
+	featureName  string
 )
+
+func extractFeatureArgument(c *cli.Context) error {
+	if c.NArg() < 2 {
+		fmt.Fprintln(os.Stderr, "Missing mandatory argument FEATURENAME")
+		_ = cli.ShowSubcommandHelp(c)
+		return clitools.ExitOnInvalidArgument()
+	}
+	featureName = c.Args().Get(1)
+	if featureName == "" {
+		fmt.Fprintln(os.Stderr, "Invalid argument FEATURENAME")
+		return clitools.ExitOnInvalidArgument()
+	}
+	return nil
+}

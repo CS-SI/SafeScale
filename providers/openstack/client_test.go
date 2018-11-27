@@ -67,36 +67,6 @@ func getClient() (*openstack.Client, error) {
 	return client, nil
 }
 
-/* TODO
-   review the code to test with userdata.Prepare, or move the test to userdata ?
-
-func Test_Template(t *testing.T) {
-	client := getClient()
-	//Data structure to apply to userdata.sh template
-	type userData struct {
-		User       string
-		Key        string
-		ConfIF     bool
-		IsGateway  bool
-		AddGateway bool
-		ResolvConf string
-		GatewayIP  string
-	}
-	dataBuffer := bytes.NewBufferString("")
-	data := userData{
-		User:       api.DefaultUser,
-		Key:        "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
-		ConfIF:     true,
-		IsGateway:  true,
-		AddGateway: true,
-		ResolvConf: "dskjfdshjjkdhsksdhhkjs\nsfdsfsdq\ndfsqdfqsdfq",
-		GatewayIP:  "172.1.2.1",
-	}
-	output, err := userdata.Prepare(client, dataBuffer, data)
-	assert.Nil(t, err)
-	fmt.Println(output.String())
-}*/
-
 func Test_ListImages(t *testing.T) {
 	tt, err := getTester()
 	require.Nil(t, err)

@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"log"
 	"runtime"
 	"strconv"
 	"strings"
@@ -29,6 +28,7 @@ import (
 	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/utils/template"
 
@@ -45,8 +45,10 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/install"
 
 	"github.com/CS-SI/SafeScale/providers"
-	providerapi "github.com/CS-SI/SafeScale/providers/api"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
@@ -54,6 +56,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 )
 
 //go:generate rice embed-go
@@ -186,12 +189,12 @@ func (c *Cluster) resetExtensions(Core *clusterapi.ClusterCore) {
 	if Core == nil {
 		return
 	}
-	anon := Core.GetExtension(Extension.Flavor)
+	anon := Core.GetExtension(Extension.FlavorV1)
 	if anon != nil {
 		manager := anon.(managerData)
 		c.manager = &manager
 		// Note: On Load(), need to replace Extensions that are struct to pointers to struct
-		Core.SetExtension(Extension.Flavor, &manager)
+		Core.SetExtension(Extension.FlavorV1, &manager)
 	}
 }
 
@@ -260,9 +263,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	var (
 		instance                      Cluster
 		masterCount, privateNodeCount int
-		kp                            *providerapi.KeyPair
+		kp                            *model.KeyPair
 		kpName                        string
-		gw                            *providerapi.Host
+		gw                            *model.Host
 		m                             *providermetadata.Gateway
 		ok                            bool
 		bootstrapChannel              chan error
@@ -271,9 +274,10 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		mastersStatus                 error
 		nodesChannel                  chan error
 		nodesStatus                   error
-		// feature                     *install.Feature
-		// target                        install.Target
-		// results                       install.AddResults
+		feature                       *install.Feature
+		target                        install.Target
+		results                       install.Results
+		hpNetworkV1                   = propsv1.NewHostNetwork()
 	)
 	broker := brokerclient.New()
 
@@ -299,64 +303,71 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 	err = brokerclient.New().Ssh.WaitReady(gw.ID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
-		err = brokerclient.DecorateError(err, "wait for remote ssh service to be ready", false)
+		err = brokerclient.DecorateError(err, "wait for gateway ssh service to be ready", false)
 		goto cleanNetwork
 	}
-	// feature, err = install.NewFeature("proxycache-server")
-	// if err != nil {
-	// 	goto cleanNetwork
-	// }
-	// target = install.NewHostTarget(pbutils.ToPBHost(gw))
-	// ok, results, err = feature.Add(target, install.Variables{})
-	// if err != nil {
-	// 	goto cleanNetwork
-	// }
-	// if !ok {
-	// 	err = fmt.Errorf(results.Errors())
-	// 	goto cleanNetwork
-	// }
+
+	// VPL: for now, disable proxycache unconditionnaly
+	req.DisabledDefaultFeatures["proxycache"] = struct{}{}
+	if _, ok = req.DisabledDefaultFeatures["proxycache"]; !ok {
+		feature, err = install.NewFeature("proxycache-server")
+		if err != nil {
+			goto cleanNetwork
+		}
+		target = install.NewHostTarget(pbutils.ToPBHost(gw))
+		results, err = feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			goto cleanNetwork
+		}
+		if !results.Successful() {
+			err = fmt.Errorf(results.AllErrorMessages())
+			goto cleanNetwork
+		}
+	}
 
 	// Create a KeyPair for the user cladm
 	kpName = "cluster_" + req.Name + "_cladm_key"
-	//svc.DeleteKeyPair(kpName)
 	kp, err = svc.CreateKeyPair(kpName)
 	if err != nil {
 		err = fmt.Errorf("failed to create Key Pair: %s", err.Error())
 		goto cleanNetwork
 	}
-	//defer svc.DeleteKeyPair(kpName)
 
 	// Saving cluster metadata, with status 'Creating'
 	instance = Cluster{
 		Core: &clusterapi.ClusterCore{
-			Name:          req.Name,
-			CIDR:          req.CIDR,
-			Flavor:        Flavor.DCOS,
-			State:         ClusterState.Creating,
-			Complexity:    req.Complexity,
-			Tenant:        req.Tenant,
-			NetworkID:     req.NetworkID,
-			GatewayIP:     gw.GetPrivateIP(),
-			PublicIP:      gw.GetAccessIP(),
-			Keypair:       kp,
-			AdminPassword: cladmPassword,
-			NodesDef:      nodesDef,
+			Name:             req.Name,
+			CIDR:             req.CIDR,
+			Flavor:           Flavor.DCOS,
+			State:            ClusterState.Creating,
+			Complexity:       req.Complexity,
+			Tenant:           req.Tenant,
+			NetworkID:        req.NetworkID,
+			GatewayIP:        gw.GetPrivateIP(),
+			PublicIP:         gw.GetAccessIP(),
+			Keypair:          kp,
+			AdminPassword:    cladmPassword,
+			NodesDef:         nodesDef,
+			DisabledFeatures: req.DisabledDefaultFeatures,
 		},
 		provider: svc,
 		manager:  &managerData{},
 	}
-	instance.SetExtension(Extension.Flavor, instance.manager)
+	instance.SetExtension(Extension.FlavorV1, instance.manager)
 	err = instance.updateMetadata(nil)
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
 		goto cleanNetwork
 	}
-
+	err = gw.Properties.Get(HostProperty.NetworkV1, hpNetworkV1)
+	if err != nil {
+		goto cleanNetwork
+	}
 	err = instance.updateMetadata(func() error {
 		// Saves gateway information in cluster metadata
 		instance.Core.PublicIP = gw.GetAccessIP()
 		instance.manager.BootstrapID = gw.ID
-		instance.manager.BootstrapIP = gw.PrivateIPsV4[0]
+		instance.manager.BootstrapIP = hpNetworkV1.IPv4Addresses[hpNetworkV1.DefaultNetworkID]
 		return nil
 	})
 	if err != nil {
@@ -463,28 +474,108 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 cleanNodes:
 	if !req.KeepOnFailure {
-		for _, id := range instance.Core.PublicNodeIDs {
-			broker.Host.Delete(id, brokerclient.DefaultExecutionTimeout)
-		}
-		for _, id := range instance.Core.PrivateNodeIDs {
-			broker.Host.Delete(id, brokerclient.DefaultExecutionTimeout)
-		}
+		broker.Host.Delete(instance.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
+		broker.Host.Delete(instance.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
 	}
 cleanMasters:
 	if !req.KeepOnFailure {
-		for _, id := range instance.manager.MasterIDs {
-			broker.Host.Delete(id, brokerclient.DefaultExecutionTimeout)
-		}
+		broker.Host.Delete(instance.manager.MasterIDs, brokerclient.DefaultExecutionTimeout)
 	}
 cleanNetwork:
 	if !req.KeepOnFailure {
-		broker.Network.Delete(instance.Core.NetworkID, brokerclient.DefaultExecutionTimeout)
+		broker.Network.Delete([]string{instance.Core.NetworkID}, brokerclient.DefaultExecutionTimeout)
 		instance.metadata.Delete()
 	}
 	if err == nil {
 		return nil, fmt.Errorf("cluster creation failed but no error bubbled up")
 	}
 	return nil, err
+}
+
+// Sanitize tries to rebuild manager struct based on what is available on ObjectStorage
+func Sanitize(data *metadata.Cluster) error {
+	svc, err := provideruse.GetProviderService()
+	if err != nil {
+		return err
+	}
+
+	core := data.Get()
+	instance := &Cluster{
+		Core:     core,
+		metadata: data,
+		provider: svc,
+	}
+	instance.resetExtensions(core)
+
+	if instance.manager == nil {
+		var mgw *providermetadata.Gateway
+		mgw, err := providermetadata.LoadGateway(svc, instance.Core.NetworkID)
+		if err != nil {
+			return err
+		}
+		gw := mgw.Get()
+		hm := providermetadata.NewHost(svc)
+		hosts := []*model.Host{}
+		err = hm.Browse(func(h *model.Host) error {
+			if strings.HasPrefix(h.Name, instance.Core.Name+"-") {
+				hosts = append(hosts, h)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if len(hosts) == 0 {
+			return fmt.Errorf("failed to find hosts belonging to cluster")
+		}
+
+		// We have hosts, fill the manager
+		masterIDs := []string{}
+		masterIPs := []string{}
+		privateNodeIPs := []string{}
+		publicNodeIPs := []string{}
+		hostNetworkV1 := propsv1.NewHostNetwork()
+		defaultNetworkIP := hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
+		for _, h := range hosts {
+			err = h.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+			if err != nil {
+				return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
+			}
+			if strings.HasPrefix(h.Name, instance.Core.Name+"-master-") {
+				masterIDs = append(masterIDs, h.ID)
+				masterIPs = append(masterIPs, defaultNetworkIP)
+			} else if strings.HasPrefix(h.Name, instance.Core.Name+"-node-") {
+				privateNodeIPs = append(privateNodeIPs, defaultNetworkIP)
+			} else if strings.HasPrefix(h.Name, instance.Core.Name+"-pubnode-") {
+				publicNodeIPs = append(privateNodeIPs, defaultNetworkIP)
+			}
+		}
+		err = gw.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+		if err != nil {
+			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
+		}
+		newManager := &managerData{
+			BootstrapID:      gw.ID,
+			BootstrapIP:      defaultNetworkIP,
+			MasterIDs:        masterIDs,
+			MasterIPs:        masterIPs,
+			PrivateNodeIPs:   privateNodeIPs,
+			PublicNodeIPs:    publicNodeIPs,
+			MasterLastIndex:  len(masterIDs),
+			PrivateLastIndex: len(privateNodeIPs),
+			PublicLastIndex:  len(publicNodeIPs),
+		}
+		log.Printf("updating metadata...\n")
+		err = instance.updateMetadata(func() error {
+			instance.manager = newManager
+			instance.Core.SetExtension(Extension.FlavorV1, newManager)
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
+		}
+	}
+	return nil
 }
 
 func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.HostDefinition, done chan error) {
@@ -511,13 +602,7 @@ func (c *Cluster) asyncCreateNodes(count int, public bool, def *pb.HostDefinitio
 		dones = append(dones, d)
 		r := make(chan string)
 		results = append(results, r)
-		go c.asyncCreateNode(
-			i,
-			nodeType,
-			*def,
-			timeout,
-			r,
-			d)
+		go c.asyncCreateNode(i, nodeType, *def, timeout, r, d)
 	}
 
 	var state error
@@ -700,14 +785,14 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 	// Update cluster definition in Object Storage
 	err = c.updateMetadata(func() error {
 		c.manager.MasterIDs = append(c.manager.MasterIDs, host.ID)
-		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PRIVATE_IP)
+		c.manager.MasterIPs = append(c.manager.MasterIPs, host.PrivateIP)
 		return nil
 	})
 	if err != nil {
 		// Object Storage failed, removes the ID we just added to the cluster struct
 		c.manager.MasterIDs = c.manager.MasterIDs[:len(c.manager.MasterIDs)-1]
 		c.manager.MasterIPs = c.manager.MasterIPs[:len(c.manager.MasterIPs)-1]
-		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultExecutionTimeout)
+		brokerclient.New().Host.Delete([]string{host.ID}, brokerclient.DefaultExecutionTimeout)
 
 		log.Printf("[master #%d (%s)] creation failed: %s\n", index, host.Name, err.Error())
 		done <- fmt.Errorf("failed to update Cluster metadata: %s", err.Error())
@@ -748,52 +833,56 @@ func (c *Cluster) asyncCreateMaster(index int, timeout time.Duration, done chan 
 	}
 	log.Printf("[master #%d (%s)] DCOS requirements successfully installed", index, host.Name)
 
-	values := install.Variables{
-		"Password": c.Core.AdminPassword,
-	}
+	// values := install.Variables{
+	// 	"Password": c.Core.AdminPassword,
+	// }
 
-	// // install proxycache-client feature
-	// feature, err := install.NewFeature("proxycache-client")
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
-	// 	done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
-	// }
-	// target := install.NewHostTarget(host)
-	// ok, results, err := feature.Add(target, values)
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
-	// 	done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
-	// 	return
-	// }
-	// if !ok {
-	// 	msg := results.Errors()
-	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
-	// 	done <- fmt.Errorf(msg)
-	// 	return
-	// }
+	// VPL: for now, disables unconditionally proxycache
+	c.Core.DisabledFeatures["proxycache"] = struct{}{}
+	if _, ok := c.Core.DisabledFeatures["proxycache"]; !ok {
+		// install proxycache-client feature
+		feature, err := install.NewFeature("proxycache-client")
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to prepare feature 'proxycache-client': %s", 1, host.ID, err.Error())
+			done <- fmt.Errorf("failed to add feature 'proxycache-client': %s", err.Error())
+		}
+		target := install.NewHostTarget(host)
+		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to add feature '%s': %s\n", 1, host.Name, feature.DisplayName(), err.Error())
+			done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+			return
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[master #%d (%s)] failed to add feature '%s': %s", 1, host.Name, feature.DisplayName(), msg)
+			done <- fmt.Errorf(msg)
+			return
+		}
+	}
 
 	// install docker feature
 	log.Printf("[master #%d (%s)] installing feature 'docker'", index, host.Name)
 	feature, err := install.NewFeature("docker")
 	if err != nil {
 		log.Printf("[master #%d (%s)] failed to prepare feature 'docker': %s", index, host.ID, err.Error())
-		done <- fmt.Errorf("failed to install feature 'docker': %s", err.Error())
+		done <- fmt.Errorf("failed to add feature 'docker': %s", err.Error())
 		return
 	}
 	target := install.NewHostTarget(host)
-	results, err := feature.Add(target, values, install.Settings{})
+	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s\n", index, host.Name, feature.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+		log.Printf("[master #%d (%s)] failed to add feature '%s': %s\n", index, host.Name, feature.DisplayName(), err.Error())
+		done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 		return
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		log.Printf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), msg)
+		log.Printf("[master #%d (%s)] failed to add feature '%s': %s", index, host.Name, feature.DisplayName(), msg)
 		done <- fmt.Errorf(msg)
 		return
 	}
-	log.Printf("[master #%d (%s)] feature 'docker' installed successfully\n", index, host.Name)
+	log.Printf("[master #%d (%s)] feature 'docker' added successfully\n", index, host.Name)
 
 	log.Printf("[master #%d (%s)] creation successful\n", index, host.Name)
 	done <- nil
@@ -829,32 +918,32 @@ func (c *Cluster) asyncConfigureMaster(index int, host *pb.Host, done chan error
 		return
 	}
 
-	// remotedekstop is a feature, can be added after master creation; should be automatically install
-	// in perform, not deploy
-	// // Installs remotedesktop feature on each master
-	// log.Printf("[master #%d (%s)] installing feature 'remotedesktop'\n", index, host.Name)
-	// feature, err := install.NewFeature("remotedesktop")
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to instanciate feature 'remotedesktop': %s\n", index, host.Name, err.Error())
-	// 	done <- err
-	// 	return
-	// }
-	// target := install.NewHostTarget(host)
-	// results, err := feature.Add(target, install.Variables{
-	// 	"Username": "cladm",
-	// 	"Password": c.Core.AdminPassword,
-	// }, install.Settings{})
-	// if err != nil {
-	// 	log.Printf("[master #%d (%s)] failed to install feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
-	// 	done <- err
-	// 	return
-	// }
-	// if !results.Successful() {
-	// 	msg := results.AllErrorMessages()
-	// 	log.Printf("[master #%d (%s)] installation script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
-	// 	done <- fmt.Errorf(msg)
-	// }
-	// log.Printf("[master #%d (%s)] feature '%s' installed successfully\n", index, host.Name, feature.DisplayName())
+	if _, ok := c.Core.DisabledFeatures["remotedesktop"]; !ok {
+		// Adds remotedesktop feature on each master
+		log.Printf("[master #%d (%s)] adding feature 'remotedesktop'\n", index, host.Name)
+		feature, err := install.NewFeature("remotedesktop")
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to instanciate feature 'remotedesktop': %s\n", index, host.Name, err.Error())
+			done <- err
+			return
+		}
+		target := install.NewHostTarget(host)
+		results, err := feature.Add(target, install.Variables{
+			"Username": "cladm",
+			"Password": c.Core.AdminPassword,
+		}, install.Settings{})
+		if err != nil {
+			log.Printf("[master #%d (%s)] failed to add feature '%s': %s", index, host.Name, feature.DisplayName(), err.Error())
+			done <- err
+			return
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[master #%d (%s)] addition script of feature '%s' failed: %s\n", index, host.Name, feature.DisplayName(), msg)
+			done <- fmt.Errorf(msg)
+		}
+		log.Printf("[master #%d (%s)] feature '%s' added successfully\n", index, host.Name, feature.DisplayName())
+	}
 
 	log.Printf("[master #%d (%s)] configuration successful\n", index, host.Name)
 	done <- nil
@@ -879,7 +968,7 @@ func (c *Cluster) asyncCreateNode(
 	log.Printf("[%s node #%d] starting creation...\n", nodeTypeStr, index)
 
 	// Create the host
-	log.Printf("[%s node #%d] starting host creation...\n", nodeTypeStr, index)
+	log.Printf("[%s node #%d] starting host resource creation...\n", nodeTypeStr, index)
 	var err error
 	req.Name, err = c.buildHostname("node", nodeType)
 	if err != nil {
@@ -905,10 +994,10 @@ func (c *Cluster) asyncCreateNode(
 		// Registers the new Agent in the cluster struct
 		if nodeType == NodeType.PublicNode {
 			c.Core.PublicNodeIDs = append(c.Core.PublicNodeIDs, host.ID)
-			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PRIVATE_IP)
+			c.manager.PublicNodeIPs = append(c.manager.PublicNodeIPs, host.PrivateIP)
 		} else {
 			c.Core.PrivateNodeIDs = append(c.Core.PrivateNodeIDs, host.ID)
-			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PRIVATE_IP)
+			c.manager.PrivateNodeIPs = append(c.manager.PrivateNodeIPs, host.PrivateIP)
 		}
 		return nil
 	})
@@ -921,17 +1010,17 @@ func (c *Cluster) asyncCreateNode(
 			c.Core.PrivateNodeIDs = c.Core.PrivateNodeIDs[:len(c.Core.PrivateNodeIDs)-1]
 			c.manager.PrivateNodeIPs = c.manager.PrivateNodeIPs[:len(c.manager.PrivateNodeIPs)-1]
 		}
-		brokerclient.New().Host.Delete(host.ID, brokerclient.DefaultExecutionTimeout)
+		brokerclient.New().Host.Delete([]string{host.ID}, brokerclient.DefaultExecutionTimeout)
 
 		log.Printf("[%s node #%d] creation failed: %s", nodeTypeStr, index, err.Error())
 		result <- ""
 		done <- fmt.Errorf("failed to update Cluster configuration: %s", err.Error())
 		return
 	}
-	log.Printf("[%s node #%d (%s)] host created successfully.\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] host resource created successfully.\n", nodeTypeStr, index, host.Name)
 
 	// Installs DCOS requirements
-	log.Printf("[%s node #%d (%s)] installing DCOS requirements...\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] installing requirements...\n", nodeTypeStr, index, host.Name)
 	installCommonRequirements, err := c.getInstallCommonRequirements()
 	if err != nil {
 		done <- err
@@ -966,50 +1055,55 @@ func (c *Cluster) asyncCreateNode(
 		}
 		return
 	}
-	log.Printf("[%s node #%d (%s)] DCOS requirements installed successfully.\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] requirements installed successfully.\n", nodeTypeStr, index, host.Name)
 
-	// // install proxycache-client feature
-	// feature, err := install.NewFeature("proxycache-client")
-	// if err != nil {
-	// 	log.Printf("[%s node #%d (%s)] failed to prepare feature 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
-	// 	done <- fmt.Errorf("failed to install feature 'proxycache-client': %s", err.Error())
-	// 	return
-	// }
 	target := install.NewHostTarget(host)
-	// ok, results, err := feature.Add(target, install.Variables{})
-	// if err != nil {
-	// 	log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
-	// 	done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
-	// 	return
-	// }
-	// if !ok {
-	// 	msg := results.Errors()
-	// 	log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
-	// 	done <- fmt.Errorf(msg)
-	// 	return
-	// }
+
+	//VPL: proxycache is disabled unconditionnaly for now
+	c.Core.DisabledFeatures["proxycache"] = struct{}{}
+	if _, ok := c.Core.DisabledFeatures["proxycache"]; !ok {
+		// install proxycache-client feature
+		feature, err := install.NewFeature("proxycache-client")
+		if err != nil {
+			log.Printf("[%s node #%d (%s)] failed to prepare feature 'proxycache-client': %s", nodeTypeStr, index, host.ID, err.Error())
+			done <- fmt.Errorf("failed to add feature 'proxycache-client': %s", err.Error())
+			return
+		}
+		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		if err != nil {
+			log.Printf("[%s node #%d (%s)] failed to add feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
+			done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+			return
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Printf("[%s node #%d (%s)] failed to add feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
+			done <- fmt.Errorf(msg)
+			return
+		}
+	}
 
 	// install docker feature
-	log.Printf("[%s node #%d (%s)] installing feature 'docker'...\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] adding feature 'docker'...\n", nodeTypeStr, index, host.Name)
 	feature, err := install.NewFeature("docker")
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to prepare feature 'docker': %s", nodeTypeStr, index, host.Name, err.Error())
-		done <- fmt.Errorf("failed to install feature 'docker': %s", err.Error())
+		done <- fmt.Errorf("failed to add feature 'docker': %s", err.Error())
 		return
 	}
 	results, err := feature.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s\n", nodeTypeStr, index, host.Name, feature.DisplayName(), err.Error())
-		done <- fmt.Errorf("failed to install feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
+		done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, err.Error())
 		return
 	}
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
 		log.Printf("[%s node #%d (%s)] failed to install feature '%s': %s", nodeTypeStr, index, host.Name, feature.DisplayName(), msg)
-		done <- fmt.Errorf("failed to intall feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, msg)
+		done <- fmt.Errorf("failed to add feature '%s' on host '%s': %s", feature.DisplayName(), host.Name, msg)
 		return
 	}
-	log.Printf("[%s node #%d (%s)] feature 'docker' installed successfully.\n", nodeTypeStr, index, host.Name)
+	log.Printf("[%s node #%d (%s)] feature 'docker' added successfully.\n", nodeTypeStr, index, host.Name)
 
 	log.Printf("[%s node #%d (%s)] creation successful.\n", nodeTypeStr, index, host.Name)
 	result <- host.ID
@@ -1065,12 +1159,18 @@ func (c *Cluster) asyncConfigureNode(index int, host *pb.Host, nodeType NodeType
 func (c *Cluster) asyncPrepareGateway(done chan error) {
 	log.Printf("[bootstrap] starting preparation...")
 
-	err := provideruse.WaitSSHServerReady(c.provider, c.manager.BootstrapID, 5*time.Minute)
+	brokerCltHost := brokerclient.New().Host
+	sshCfg, err := brokerCltHost.SSHConfig(c.manager.BootstrapID)
 	if err != nil {
 		done <- err
 		return
 	}
-	host, err := brokerclient.New().Host.Inspect(c.manager.BootstrapID, brokerclient.DefaultExecutionTimeout)
+	err = sshCfg.WaitServerReady(5 * time.Minute)
+	if err != nil {
+		done <- err
+		return
+	}
+	host, err := brokerCltHost.Inspect(c.manager.BootstrapID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		done <- err
 		return
@@ -1284,11 +1384,6 @@ func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 	return installCommonRequirementsContent, nil
 }
 
-// GetMasters returns a list of masters
-func (c *Cluster) GetMasters() ([]string, error) {
-	return c.manager.MasterIDs, nil
-}
-
 // Start starts the cluster named 'name'
 // In BOH, cluster state is logical, there is no way to stop a BOH cluster (except by stopping the hosts)
 func (c *Cluster) Start() error {
@@ -1341,14 +1436,20 @@ func (c *Cluster) ForceGetState() (ClusterState.Enum, error) {
 	)
 
 	cmd := "/opt/mesosphere/bin/dcos-diagnostics --diag"
-	ssh := brokerclient.New().Ssh
+	brokerClt := brokerclient.New()
+	brokerCltHost := brokerClt.Host
 	for _, id := range c.manager.MasterIDs {
-		err := provideruse.WaitSSHServerReady(c.provider, id, 2*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(id)
+		if err != nil {
+			log.Errorf("failed to get ssh config to connect to master '%s': %s", id, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err == nil {
 			if err != nil {
 				continue
 			}
-			retcode, _, stderr, err = ssh.Run(id, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+			retcode, _, stderr, err = brokerClt.Ssh.Run(id, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 			if err != nil {
 				continue
 			}
@@ -1436,9 +1537,7 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 	if len(errors) > 0 {
 		if len(hosts) > 0 {
 			broker := brokerclient.New().Host
-			for _, hostID := range hosts {
-				broker.Delete(hostID, brokerclient.DefaultExecutionTimeout)
-			}
+			broker.Delete(hosts, brokerclient.DefaultExecutionTimeout)
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
 	}
@@ -1448,18 +1547,26 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 
 // FindAvailableMaster returns the ID of a master available
 func (c *Cluster) FindAvailableMaster() (string, error) {
-	var masterID string
+	masterID := ""
+	found := false
+	brokerCltHost := brokerclient.New().Host
 	for _, masterID = range c.manager.MasterIDs {
-		err := provideruse.WaitSSHServerReady(c.provider, masterID, 2*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(masterID)
+		if err != nil {
+			log.Errorf("failed to get ssh config of master '%s': %s", masterID, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 			return "", err
 		}
+		found = true
 		break
 	}
-	if masterID == "" {
+	if !found {
 		return "", fmt.Errorf("failed to find available master")
 	}
 	return masterID, nil
@@ -1467,17 +1574,25 @@ func (c *Cluster) FindAvailableMaster() (string, error) {
 
 // FindAvailableNode returns the ID of a node available
 func (c *Cluster) FindAvailableNode(public bool) (string, error) {
-	var hostID string
+	hostID := ""
+	found := false
+	brokerCltHost := brokerclient.New().Host
 	for _, hostID = range c.ListNodeIDs(public) {
-		err := provideruse.WaitSSHServerReady(c.provider, hostID, 2*time.Minute)
+		sshCfg, err := brokerCltHost.SSHConfig(hostID)
+		if err != nil {
+			log.Errorf("failed to get ssh config for host '%s': %s", hostID, err.Error())
+			continue
+		}
+		err = sshCfg.WaitServerReady(2 * time.Minute)
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
 			}
 		}
+		found = true
 		break
 	}
-	if hostID == "" {
+	if !found {
 		return "", fmt.Errorf("failed to find available node")
 	}
 	return hostID, nil
@@ -1492,7 +1607,7 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 	} else {
 		hostID = c.Core.PrivateNodeIDs[len(c.Core.PrivateNodeIDs)-1]
 	}
-	err := brokerclient.New().Host.Delete(hostID, brokerclient.DefaultExecutionTimeout)
+	err := brokerclient.New().Host.Delete([]string{hostID}, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil
 	}
@@ -1518,7 +1633,7 @@ func (c *Cluster) DeleteSpecificNode(ID string) error {
 		return fmt.Errorf("host ID '%s' isn't a registered Node of the Cluster '%s'", ID, c.Core.Name)
 	}
 
-	err := brokerclient.New().Host.Delete(ID, brokerclient.DefaultExecutionTimeout)
+	err := brokerclient.New().Host.Delete([]string{ID}, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -1533,12 +1648,18 @@ func (c *Cluster) DeleteSpecificNode(ID string) error {
 
 // ListMasterIDs lists the IDs of the masters in the cluster
 func (c *Cluster) ListMasterIDs() []string {
-	return c.manager.MasterIDs
+	if c.manager != nil {
+		return c.manager.MasterIDs
+	}
+	return []string{}
 }
 
 // ListMasterIPs lists the IPs of the masters in the cluster
 func (c *Cluster) ListMasterIPs() []string {
-	return c.manager.MasterIPs
+	if c.manager != nil {
+		return c.manager.MasterIPs
+	}
+	return []string{}
 }
 
 // ListNodeIDs lists the IDs of the nodes in the cluster; if public is set, list IDs of public nodes
@@ -1553,10 +1674,13 @@ func (c *Cluster) ListNodeIDs(public bool) []string {
 // ListNodeIPs lists the IPs of the nodes in the cluster; if public is set, list IDs of public nodes
 // otherwise list IDs of private nodes
 func (c *Cluster) ListNodeIPs(public bool) []string {
-	if public {
-		return c.manager.PublicNodeIPs
+	if c.manager != nil {
+		if public {
+			return c.manager.PublicNodeIPs
+		}
+		return c.manager.PrivateNodeIPs
 	}
-	return c.manager.PrivateNodeIPs
+	return []string{}
 }
 
 // GetNode returns a node based on its ID
@@ -1644,22 +1768,18 @@ func (c *Cluster) Delete() error {
 		broker := brokerclient.New()
 
 		// Deletes the public nodes
-		for _, n := range c.Core.PublicNodeIDs {
-			broker.Host.Delete(n, brokerclient.DefaultExecutionTimeout)
-		}
+		broker.Host.Delete(c.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
 
 		// Deletes the private nodes
-		for _, n := range c.Core.PrivateNodeIDs {
-			broker.Host.Delete(n, brokerclient.DefaultExecutionTimeout)
-		}
+		broker.Host.Delete(c.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
 
 		// Deletes the masters
-		for _, n := range c.manager.MasterIDs {
-			broker.Host.Delete(n, brokerclient.DefaultExecutionTimeout)
+		if c.manager != nil {
+			broker.Host.Delete(c.manager.MasterIDs, brokerclient.DefaultExecutionTimeout)
 		}
 
 		// Deletes the network and gateway
-		return broker.Network.Delete(c.Core.NetworkID, brokerclient.DefaultExecutionTimeout)
+		return broker.Network.Delete([]string{c.Core.NetworkID}, brokerclient.DefaultExecutionTimeout)
 	})
 	if err != nil {
 		return err

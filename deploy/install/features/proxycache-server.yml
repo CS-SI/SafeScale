@@ -23,6 +23,7 @@ feature:
     requirements:
         features:
             - docker
+            - docker-compose
     install:
         bash:
             check:
@@ -161,8 +162,7 @@ feature:
                             EOF
 
                             sfRetry 5m 5 docker build --rm --no-cache -t proxycache:latest . && \
-                            cd /var/tmp && rm -rf proxycache.image && \
-                            docker image prune -f || exit 513
+                            cd /var/tmp && rm -rf proxycache.image || exit 192
 
                             docker-compose -f /opt/safescale/run/proxycache.compose.yml -p proxycache up -d || exit 514
 

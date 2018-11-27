@@ -18,7 +18,7 @@ SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters 
 * SafeScale Perform to manage Cloud computing platforms
 * SafeScale Security to secure user environments
 
-![SafeScale](img/SafeScale.png "SafeScale")
+![SafeScale](doc/img/SafeScale.png "SafeScale")
 
 ### SafeScale Broker
 
@@ -31,14 +31,14 @@ It allows to:
 * Mount object storage on file system,
 * Create NAS, Connect/disconnect host to NAS,
 
-![SafeScale Broker](img/SafeScale_Broker.png "SafeScale Broker")
+![SafeScale Broker](doc/img/SafeScale_Broker.png "SafeScale Broker")
 
 SafeScale Broker provides a complete abstraction overlay over underlying IaaS APIs to mask their heterogeneity.
 
 ### SafeScale Perform
 
 The concept of SafeScale Perform revolves around the offer of an API to create on-demand computing platforms. These platforms are built to by highly versatile providing all necessary building blocks to create a cutting-edge, production grade, scalable and highly available services: Micro service orchestration, Big Data and HPC computing frameworks, large scale data management, AI training and inference frameworks.
-![SafeScale Perform](img/SafeScale_Perform.png "SafeScale Perform")
+![SafeScale Perform](doc/img/SafeScale_Perform.png "SafeScale Perform")
 
 The innovative aspect of SafeScale Perform platforms lies in their capacity to offer a combined usage of a large variety of frameworks and technologies without having to manage resources allocation (Node, RAM, CPU, and GPU).
 SafeScale Perform platforms resource management is centralized by Apache Mesos which guarantees a fair and efficient distribution of resources for all components hosted by the platform. This particularity enables SafeScale users to run concurrently services and compute loads of data without worrying about their partitioning over the nodes of the cluster and thus significantly accelerate the implementation of complex distributed services.
@@ -53,7 +53,7 @@ SafeScale Security relies on Kong, an open source generic proxy to be put in bet
 * Open ID plugin to connect the Identity and Access Management server, KeyCloak
 * UDP Log plugin to connect the Log management system, Logstash
 The design of a SafeScale Security gateway can be depicted as bellow:
-![SafeScale Security](img/SafeScale_Security.png "SafeScale Security")
+![SafeScale Security](doc/img/SafeScale_Security.png "SafeScale Security")
 
 ## Currently available features
 SafeScale is currently under active development and does not yet offer all the features planned. However, we are already publishing it with the following features:
@@ -62,7 +62,7 @@ SafeScale is currently under active development and does not yet offer all the f
   * Create/Destroy Virtual Machine (host),
   * Create / Destroy block and object storage,
   * Mount object storage on file system,
-  * Create NAS, Connect/disconnect host to NAS,
+  * Create Shares, Connect/disconnect host to share,
 
 * Providers addressed:
   * Generic OpenStack
@@ -70,6 +70,7 @@ SafeScale is currently under active development and does not yet offer all the f
   * FlexibleEngine
   * OpenTelekom
   * CloudWatt
+  * CloudFerro
   * AWS: under development
 
 ## Contributing
@@ -81,10 +82,10 @@ If you wish to contribute you can [fork the project](https://help.github.com/for
 For bugs and feature requests, [please create an issue](../../issues/new).
 
 ## Build
-  [See Build file](./BUILDING.md)
+  [See Build file](doc/BUILDING.md)
 
 ## Usage
-  [See Usage file](./USAGE.md)
+  [See Usage file](doc/USAGE.md)
 
 ## License
 

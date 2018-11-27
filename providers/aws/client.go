@@ -29,16 +29,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
-	metadata "github.com/CS-SI/SafeScale/providers/metadata"
 	rice "github.com/GeertJohan/go.rice"
-
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/aws/s3"
-	"github.com/CS-SI/SafeScale/system"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -47,6 +38,17 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
+
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils/metadata"
 )
 
 // //Config AWS configurations
@@ -89,7 +91,7 @@ func (o AuthOpts) IsExpired() bool {
 	return false
 }
 
-//AuthenticatedClient returns an authenticated client
+// AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOpts) (*Client, error) {
 	s, err := session.NewSession(&aws.Config{
 		Region:      aws.String(opts.Region),
@@ -124,7 +126,7 @@ func AuthenticatedClient(opts AuthOpts) (*Client, error) {
 		AuthOpts:    opts,
 		UserDataTpl: tpl,
 	}
-	metadata.InitializeContainer(&c)
+	//providers.InitializeBucket(&c)
 	//c.CreateContainer("gpac.aws.networks")
 	//c.CreateContainer("gpac.aws.wms")
 	//c.CreateContainer("gpac.aws.volumes")
@@ -142,20 +144,34 @@ func wrapError(msg string, err error) error {
 	return err
 }
 
-//Build build a new Client from configuration parameter
+// Build build a new Client from configuration parameter
 func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	AccessKeyID, _ := params["AccessKeyID"].(string)
-	SecretAccessKey, _ := params["SecretAccessKey"].(string)
-	Region, _ := params["Region"].(string)
-	return AuthenticatedClient(AuthOpts{
-		AccessKeyID:     AccessKeyID,
-		SecretAccessKey: SecretAccessKey,
-		Region:          Region,
-	})
+	tenantName, _ := params["name"].(string)
+
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
+	network, _ := params["network"].(map[string]interface{})
+
+	accessKeyID, _ := identity["AccessKeyID"].(string)
+	secretAccessKey, _ := identity["SecretAccessKey"].(string)
+	identityEndpoint, _ := identity["EndPoint"].(string)
+
+	region, _ := compute["Region"].(string)
+	defaultImage, _ := compute["DefaultImage"]
+
+	return AuthenticatedClient(
+		AuthOpts{
+			AccessKeyID:     accessKeyID,
+			SecretAccessKey: secretAccessKey,
+			Region:          region,
+		}, CfgOpts{
+			DefaultImage: defaultImage,
+		},
+	)
 
 }
 
-//Client a AWS provider client
+// Client a AWS provider client
 type Client struct {
 	Session     *session.Session
 	EC2         *ec2.EC2
@@ -163,6 +179,30 @@ type Client struct {
 	AuthOpts    AuthOpts
 	UserDataTpl *template.Template
 	//ImageOwners []string
+}
+
+func (c *Client) ListNetworks(all bool) ([]api.Network, error) {
+	panic("implement me")
+}
+
+func (c *Client) ListHosts(all bool) ([]api.Host, error) {
+	panic("implement me")
+}
+
+func (c *Client) RebootHost(id string) error {
+	panic("implement me")
+}
+
+func (c *Client) ListVolumes(all bool) ([]api.Volume, error) {
+	panic("implement me")
+}
+
+func (c *Client) GetContainer(name string) (*api.ContainerInfo, error) {
+	panic("implement me")
+}
+
+func (c *Client) GetAuthOpts() (api.Config, error) {
+	panic("implement me")
 }
 
 func createFilters() []*ec2.Filter {
@@ -205,8 +245,8 @@ func createFilters() []*ec2.Filter {
 	return filters
 }
 
-//ListImages lists available OS images
-func (c *Client) ListImages(all bool) ([]api.Image, error) {
+// ListImages lists available OS images
+func (c *Client) ListImages(all bool) ([]model.Image, error) {
 
 	images, err := c.EC2.DescribeImages(&ec2.DescribeImagesInput{
 		//Owners: []*string{aws.String("aws-marketplace"), aws.String("self")},
@@ -215,12 +255,12 @@ func (c *Client) ListImages(all bool) ([]api.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	var list []api.Image
+	var list []model.Image
 	for _, img := range images.Images {
 		if img.Description == nil || strings.Contains(strings.ToUpper(*img.Name), "TEST") {
 			continue
 		}
-		list = append(list, api.Image{
+		list = append(list, model.Image{
 			ID:   *img.ImageId,
 			Name: *img.Name,
 		})
@@ -229,7 +269,7 @@ func (c *Client) ListImages(all bool) ([]api.Image, error) {
 	return list, nil
 }
 
-//Attributes attributes of a compute instance
+// Attributes attributes of a compute instance
 type Attributes struct {
 	ClockSpeed                  string `json:"clockSpeed,omitempty"`
 	CurrentGeneration           string `json:"currentGeneration,omitempty"`
@@ -258,14 +298,14 @@ type Attributes struct {
 	Vcpu                        string `json:"vcpu,omitempty"`
 }
 
-//Product compute instance product
+// Product compute instance product
 type Product struct {
 	Attributes    Attributes `json:"attributes,omitempty"`
 	ProductFamily string     `json:"productFamily,omitempty"`
 	Sku           string     `json:"sku,omitempty"`
 }
 
-//PriceDimension compute instance price related to term condition
+// PriceDimension compute instance price related to term condition
 type PriceDimension struct {
 	AppliesTo    []string           `json:"appliesTo,omitempty"`
 	BeginRange   string             `json:"beginRange,omitempty"`
@@ -276,19 +316,19 @@ type PriceDimension struct {
 	Unit         string             `json:"Unit,omitempty"`
 }
 
-//PriceDimensions compute instance price dimensions
+// PriceDimensions compute instance price dimensions
 type PriceDimensions struct {
 	PriceDimensionMap map[string]PriceDimension `json:"price_dimension_map,omitempty"`
 }
 
-//TermAttributes compute instance terms
+// TermAttributes compute instance terms
 type TermAttributes struct {
 	LeaseContractLength string `json:"leaseContractLength,omitempty"`
 	OfferingClass       string `json:"offeringClass,omitempty"`
 	PurchaseOption      string `json:"purchaseOption,omitempty"`
 }
 
-//Card compute instance price card
+// Card compute instance price card
 type Card struct {
 	EffectiveDate   string          `json:"effectiveDate,omitempty"`
 	OfferTermCode   string          `json:"offerTermCode,omitempty"`
@@ -297,23 +337,23 @@ type Card struct {
 	TermAttributes  TermAttributes  `json:"termAttributes,omitempty"`
 }
 
-//OnDemand on demand compute instance cards
+// OnDemand on demand compute instance cards
 type OnDemand struct {
 	Cards map[string]Card
 }
 
-//Reserved reserved compute instance cards
+// Reserved reserved compute instance cards
 type Reserved struct {
 	Cards map[string]Card `json:"cards,omitempty"`
 }
 
-//Terms compute instance prices terms
+// Terms compute instance prices terms
 type Terms struct {
 	OnDemand OnDemand `json:"onDemand,omitempty"`
 	Reserved Reserved `json:"reserved,omitempty"`
 }
 
-//Price Compute instance price information
+// Price Compute instance price information
 type Price struct {
 	Product         Product `json:"product,omitempty"`
 	PublicationDate string  `json:"publicationDate,omitempty"`
@@ -321,8 +361,8 @@ type Price struct {
 	Terms           Terms   `json:"terms,omitempty"`
 }
 
-//GetImage returns the Image referenced by id
-func (c *Client) GetImage(id string) (*api.Image, error) {
+// GetImage returns the Image referenced by id
+func (c *Client) GetImage(id string) (*model.Image, error) {
 	images, err := c.EC2.DescribeImages(&ec2.DescribeImagesInput{
 		ImageIds: []*string{aws.String(id)},
 	})
@@ -333,14 +373,14 @@ func (c *Client) GetImage(id string) (*api.Image, error) {
 		return nil, fmt.Errorf("Image %s does not exist", id)
 	}
 	img := images.Images[0]
-	return &api.Image{
+	return &model.Image{
 		ID:   *img.ImageId,
 		Name: *img.Name,
 	}, nil
 }
 
-//GetTemplate returns the Template referenced by id
-func (c *Client) GetTemplate(id string) (*api.HostTemplate, error) {
+// GetTemplate returns the Template referenced by id
+func (c *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 	input := pricing.GetProductsInput{
 		Filters: []*pricing.Filter{
 			{
@@ -396,13 +436,15 @@ func (c *Client) GetTemplate(id string) (*api.HostTemplate, error) {
 				continue
 			}
 
-			tpl := api.HostTemplate{
-				ID:   price.Product.Attributes.InstanceType,
-				Name: price.Product.Attributes.InstanceType,
-				HostSize: api.HostSize{
-					Cores:    cores,
-					DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
-					RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
+			tpl := model.HostTemplate{
+				HostTemplate: &propsv1.HostTemplate{
+					ID:   price.Product.Attributes.InstanceType,
+					Name: price.Product.Attributes.InstanceType,
+					HostSize: &propsv1.HostSize{
+						Cores:    cores,
+						DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
+						RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
+					},
 				},
 			}
 			return &tpl, nil
@@ -435,6 +477,7 @@ func parseStorage(str string) float64 {
 	//	fmt.Println((factor * size))
 	return factor * size
 }
+
 func parseMemory(str string) float64 {
 	r, err := regexp.Compile("([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?")
 	if err != nil {
@@ -453,9 +496,9 @@ func parseMemory(str string) float64 {
 	return size
 }
 
-//ListTemplates lists available host templates
-//Host templates are sorted using Dominant Resource Fairness Algorithm
-func (c *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
+// ListTemplates lists available host templates
+// Host templates are sorted using Dominant Resource Fairness Algorithm
+func (c *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 	input := pricing.GetProductsInput{
 		Filters: []*pricing.Filter{
 			{
@@ -483,7 +526,7 @@ func (c *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 		MaxResults:    aws.Int64(100),
 		ServiceCode:   aws.String("AmazonEC2"),
 	}
-	tpls := []api.HostTemplate{}
+	tpls := []model.HostTemplate{}
 	//prices := map[string]interface{}{}
 	err := c.Pricing.GetProductsPages(&input,
 		func(p *pricing.GetProductsOutput, lastPage bool) bool {
@@ -504,13 +547,15 @@ func (c *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 						continue
 					}
 
-					tpl := api.HostTemplate{
-						ID:   price.Product.Attributes.InstanceType,
-						Name: price.Product.Attributes.InstanceType,
-						HostSize: api.HostSize{
-							Cores:    cores,
-							DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
-							RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
+					tpl := model.HostTemplate{
+						HostTemplate: &propsv1.HostTemplate{
+							ID:   price.Product.Attributes.InstanceType,
+							Name: price.Product.Attributes.InstanceType,
+							HostSize: &propsv1.HostSize{
+								Cores:    cores,
+								DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
+								RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
+							},
 						},
 					}
 					tpls = append(tpls, tpl)
@@ -524,8 +569,8 @@ func (c *Client) ListTemplates(all bool) ([]api.HostTemplate, error) {
 	return tpls, nil
 }
 
-//CreateKeyPair creates and import a key pair
-func (c *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
+// CreateKeyPair creates and import a key pair
+func (c *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
 	publicKey, privateKey, err := system.CreateKeyPair()
 	if err != nil {
 		return nil, err
@@ -540,7 +585,7 @@ func (c *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &api.KeyPair{
+	return &model.KeyPair{
 		ID:         name,
 		Name:       name,
 		PrivateKey: string(privateKey),
@@ -556,8 +601,8 @@ func pStr(s *string) string {
 	return *s
 }
 
-//GetKeyPair returns the key pair identified by id
-func (c *Client) GetKeyPair(id string) (*api.KeyPair, error) {
+// GetKeyPair returns the key pair identified by id
+func (c *Client) GetKeyPair(id string) (*model.KeyPair, error) {
 	out, err := c.EC2.DescribeKeyPairs(&ec2.DescribeKeyPairsInput{
 		KeyNames: []*string{aws.String(id)},
 	})
@@ -565,7 +610,7 @@ func (c *Client) GetKeyPair(id string) (*api.KeyPair, error) {
 		return nil, err
 	}
 	kp := out.KeyPairs[0]
-	return &api.KeyPair{
+	return &model.KeyPair{
 		ID:         pStr(kp.KeyName),
 		Name:       pStr(kp.KeyName),
 		PrivateKey: "",
@@ -573,15 +618,15 @@ func (c *Client) GetKeyPair(id string) (*api.KeyPair, error) {
 	}, nil
 }
 
-//ListKeyPairs lists available key pairs
-func (c *Client) ListKeyPairs() ([]api.KeyPair, error) {
+// ListKeyPairs lists available key pairs
+func (c *Client) ListKeyPairs() ([]model.KeyPair, error) {
 	out, err := c.EC2.DescribeKeyPairs(&ec2.DescribeKeyPairsInput{})
 	if err != nil {
 		return nil, err
 	}
-	keys := []api.KeyPair{}
+	keys := []model.KeyPair{}
 	for _, kp := range out.KeyPairs {
-		keys = append(keys, api.KeyPair{
+		keys = append(keys, model.KeyPair{
 			ID:         pStr(kp.KeyName),
 			Name:       pStr(kp.KeyName),
 			PrivateKey: "",
@@ -592,7 +637,7 @@ func (c *Client) ListKeyPairs() ([]api.KeyPair, error) {
 	return keys, nil
 }
 
-//DeleteKeyPair deletes the key pair identified by id
+// DeleteKeyPair deletes the key pair identified by id
 func (c *Client) DeleteKeyPair(id string) error {
 	_, err := c.EC2.DeleteKeyPair(&ec2.DeleteKeyPairInput{
 		KeyName: aws.String(id),
@@ -600,26 +645,26 @@ func (c *Client) DeleteKeyPair(id string) error {
 	return err
 }
 
-func (c *Client) saveNetwork(n api.Network) error {
+func (c *Client) saveNetwork(n model.Network) error {
 	b, err := json.Marshal(n)
 	if err != nil {
 		return err
 	}
 	buffer := bytes.NewReader(b)
-	return c.PutObject("gpac.aws.networks", api.Object{
+	return c.PutObject("gpac.aws.networks", model.Object{
 		Name:    n.ID,
 		Content: buffer,
 	})
 }
 
-func (c *Client) getNetwork(netID string) (*api.Network, error) {
+func (c *Client) getNetwork(netID string) (*model.Network, error) {
 	o, err := c.GetObject("gpac.aws.networks", netID, nil)
 	if err != nil {
 		return nil, err
 	}
 	var buffer bytes.Buffer
 	buffer.ReadFrom(o.Content)
-	net := api.Network{}
+	net := model.Network{}
 	err = json.Unmarshal(buffer.Bytes(), &net)
 	if err != nil {
 		return nil, err
@@ -630,15 +675,16 @@ func (c *Client) removeNetwork(netID string) error {
 	return c.DeleteObject("gpac.aws.networks", netID)
 }
 
-//CreateNetwork creates a network
-func (c *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
-	m, err := metadata.LoadNetwork(providers.FromClient(c), req.Name)
-	if err != nil {
-		return nil, err
-	}
-	if m != nil {
-		return nil, fmt.Errorf("A network already exist with name '%s'", req.Name)
-	}
+// CreateNetwork creates a network
+func (c *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
+	// m, err := metadata.LoadNetwork(c, req.Name)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if m != nil {
+	// 	return nil, fmt.Errorf("A network already exists with name '%s'", req.Name)
+	// }
+
 	vpcOut, err := c.EC2.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: aws.String(req.CIDR),
 	})
@@ -710,7 +756,7 @@ func (c *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
 		c.DeleteNetwork(*vpcOut.Vpc.VpcId)
 		return nil, wrapError("Error creating network", err)
 	}
-	net := api.Network{
+	net := model.Network{
 		CIDR:      pStr(vpcOut.Vpc.CidrBlock),
 		ID:        pStr(vpcOut.Vpc.VpcId),
 		Name:      req.Name,
@@ -725,8 +771,8 @@ func (c *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
 	return &net, nil
 }
 
-//GetNetwork returns the network identified by id
-func (c *Client) GetNetwork(id string) (*api.Network, error) {
+// GetNetwork returns the network identified by id
+func (c *Client) GetNetwork(id string) (*model.Network, error) {
 	net, err := c.getNetwork(id)
 	if err != nil {
 		return nil, err
@@ -742,13 +788,13 @@ func (c *Client) GetNetwork(id string) (*api.Network, error) {
 	return net, nil
 }
 
-//ListNetworks lists available networks
-func (c *Client) ListNetworks() ([]api.Network, error) {
+// ListNetworks lists available networks
+func (c *Client) ListNetworks() ([]model.Network, error) {
 	out, err := c.EC2.DescribeVpcs(&ec2.DescribeVpcsInput{})
 	if err != nil {
 		return nil, err
 	}
-	nets := []api.Network{}
+	nets := []model.Network{}
 	for _, vpc := range out.Vpcs {
 		net, err := c.getNetwork(*vpc.VpcId)
 		if err != nil {
@@ -762,7 +808,7 @@ func (c *Client) ListNetworks() ([]api.Network, error) {
 
 }
 
-//DeleteNetwork deletes the network identified by id
+// DeleteNetwork deletes the network identified by id
 func (c *Client) DeleteNetwork(id string) error {
 	net, err := c.getNetwork(id)
 	if err == nil {
@@ -799,12 +845,12 @@ func (c *Client) DeleteNetwork(id string) error {
 	return err
 }
 
-//CreateGateway exists only to comply with api.ClientAPI interface
-func (c *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
+// CreateGateway exists only to comply with api.ClientAPI interface
+func (c *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
 	return nil, fmt.Errorf("aws.CreateGateway() isn't available by design")
 }
 
-//DeleteGateway exists only to comply with api.ClientAPI interface
+// DeleteGateway exists only to comply with api.ClientAPI interface
 func (c *Client) DeleteGateway(networkID string) error {
 	return fmt.Errorf("aws.DeleteGateway() isn't available by design")
 }
@@ -866,7 +912,7 @@ func getState(state *ec2.InstanceState) (HostState.Enum, error) {
 	return HostState.ERROR, fmt.Errorf("unexpected host state")
 }
 
-//Data structure to apply to userdata.sh template
+// Data structure to apply to userdata.sh template
 type userData struct {
 	//Name of the default user (api.DefaultUser)
 	User string
@@ -883,7 +929,7 @@ type userData struct {
 	GatewayIP string
 }
 
-func (c *Client) prepareUserData(request api.HostRequest, kp *api.KeyPair, gw *api.Host) (string, error) {
+func (c *Client) prepareUserData(request model.HostRequest, kp *model.KeyPair, gw *model.Host) (string, error) {
 	dataBuffer := bytes.NewBufferString("")
 	var ResolvConf string
 	var err error
@@ -896,14 +942,18 @@ func (c *Client) prepareUserData(request api.HostRequest, kp *api.KeyPair, gw *a
 	// }
 	ip := ""
 	if gw != nil {
-		if len(gw.PrivateIPsV4) > 0 {
-			ip = gw.PrivateIPsV4[0]
-		} else if len(gw.PrivateIPsV6) > 0 {
-			ip = gw.PrivateIPsV6[0]
+		hpNetworkV1 := propsv1.NewHostNetwork()
+		err := gw.Properties.Get(HostProperty.NetworkV1, hpNetworkV1)
+		if err != nil {
+			return "", err
+		}
+		ip = hpNetworkV1.IPv4Addresses[hpNetworkV1.DefaultNetworkID]
+		if ip == "" {
+			ip = hpNetworkV1.IPv6Addresses[hpNetworkV1.DefaultNetworkID]
 		}
 	}
 	data := userData{
-		User:       api.DefaultUser,
+		User:       model.DefaultUser,
 		Key:        strings.Trim(kp.PublicKey, "\n"),
 		IsGateway:  request.IsGateway,
 		AddGateway: !request.PublicIP,
@@ -920,14 +970,14 @@ func (c *Client) prepareUserData(request api.HostRequest, kp *api.KeyPair, gw *a
 	return encBuffer.String(), nil
 }
 
-func (c *Client) saveHost(host api.Host) error {
+func (c *Client) saveHost(host model.Host) error {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(host)
 	if err != nil {
 		return err
 	}
-	return c.PutObject("gpac.aws.wms", api.Object{
+	return c.PutObject("gpac.aws.wms", model.Object{
 		Name:    host.ID,
 		Content: bytes.NewReader(buffer.Bytes()),
 	})
@@ -935,7 +985,7 @@ func (c *Client) saveHost(host api.Host) error {
 func (c *Client) removeHost(hostID string) error {
 	return c.DeleteObject("gpac.aws.wms", hostID)
 }
-func (c *Client) readHost(hostID string) (*api.Host, error) {
+func (c *Client) readHost(hostID string) (*model.Host, error) {
 	o, err := c.GetObject("gpac.aws.wms", hostID, nil)
 	if err != nil {
 		return nil, err
@@ -943,7 +993,7 @@ func (c *Client) readHost(hostID string) (*api.Host, error) {
 	var buffer bytes.Buffer
 	buffer.ReadFrom(o.Content)
 	enc := gob.NewDecoder(&buffer)
-	var host api.Host
+	var host model.Host
 	err = enc.Decode(&host)
 	if err != nil {
 		return nil, err
@@ -983,13 +1033,12 @@ func (c *Client) createSecurityGroup(vpcID string, name string) (string, error) 
 	return *out.GroupId, nil
 }
 
-//CreateHost creates an host that fulfils the request
-func (c *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
-
+// CreateHost creates an host that fulfils the request
+func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	// If no KeyPair is supplied a temporay one is created
 	kp := request.KeyPair
 	if kp == nil {
-		kpTmp, err := c.CreateKeyPair(request.Name)
+		kpTmp, err := c.CreateKeyPair(request.ResourceName)
 		if err != nil {
 			return nil, err
 		}
@@ -997,8 +1046,8 @@ func (c *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 	}
 	// If the host is not a Gateway, get gateway of the first network
 	gwID := ""
-	var gw *api.Host
-	if !request.IsGateway {
+	var gw *model.Host
+	if !request.isGateway {
 		net, err := c.getNetwork(request.NetworkIDs[0])
 		if err != nil {
 			return nil, err
@@ -1096,7 +1145,7 @@ func (c *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 	service := providers.Service{
 		ClientAPI: c,
 	}
-	_, err = service.WaitHostState(*instance.InstanceId, HostState.STARTED, 120*time.Second)
+	err = service.WaitHostState(*instance.InstanceId, HostState.STARTED, 120*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -1143,8 +1192,21 @@ func (c *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
 	return &host, nil
 }
 
-//GetHost returns the host identified by id
-func (c *Client) GetHost(id string) (*api.Host, error) {
+// GetHost returns the host identified by id
+func (c *Client) GetHost(hostParam interface{}) (*model.Host, error) {
+	var (
+		host *model.Host
+	)
+
+	switch hostParam.(type) {
+	case string:
+		host := model.NewHost()
+		host.ID = hostParam.(string)
+	case *model.Host:
+		host = hostParam.(*model.Host)
+	default:
+		panic("hostParam must be a string or a *model.Host!")
+	}
 
 	out, err := c.EC2.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{aws.String(id)},
@@ -1184,7 +1246,7 @@ func (c *Client) GetHost(id string) (*api.Host, error) {
 }
 
 // ListHosts lists available hosts
-func (c *Client) ListHosts() ([]api.Host, error) {
+func (c *Client) ListHosts() ([]model.Host, error) {
 	panic("Not Implemented")
 }
 
@@ -1213,7 +1275,7 @@ func (c *Client) DeleteHost(id string) error {
 
 }
 
-//StopHost stops the host identified by id
+// StopHost stops the host identified by id
 func (c *Client) StopHost(id string) error {
 	_, err := c.EC2.StopInstances(&ec2.StopInstancesInput{
 		Force:       aws.Bool(true),
@@ -1222,7 +1284,7 @@ func (c *Client) StopHost(id string) error {
 	return err
 }
 
-//StartHost starts the host identified by id
+// StartHost starts the host identified by id
 func (c *Client) StartHost(id string) error {
 	_, err := c.EC2.StartInstances(&ec2.StartInstancesInput{
 		InstanceIds: []*string{aws.String(id)},
@@ -1230,36 +1292,44 @@ func (c *Client) StartHost(id string) error {
 	return err
 }
 
-//GetSSHConfig creates SSHConfig from host
-func (c *Client) GetSSHConfig(hostID string) (*system.SSHConfig, error) {
-	host, err := c.GetHost(hostID)
-	if err != nil {
-		return nil, err
-	}
-	ip := host.GetAccessIP()
-	sshConfig := system.SSHConfig{
-		PrivateKey: host.PrivateKey,
-		Port:       22,
-		Host:       ip,
-		User:       api.DefaultUser,
-	}
-	if host.GatewayID != "" {
-		gw, err := c.GetHost(host.GatewayID)
-		if err != nil {
-			return nil, err
-		}
-		ip := gw.GetAccessIP()
-		GatewayConfig := system.SSHConfig{
-			PrivateKey: gw.PrivateKey,
-			Port:       22,
-			User:       api.DefaultUser,
-			Host:       ip,
-		}
-		sshConfig.GatewayConfig = &GatewayConfig
-	}
+// //GetSSHConfig creates SSHConfig from host
+// func (c *Client) GetSSHConfig(param interface{}) (*system.SSHConfig, error) {
+// 	var host *model.Host
+// 	switch param.(type) {
+// 	case string:
+// 		mh, err := metadata.LoadHost(c, param.(string))
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		host := mh.Get()
+// 	case *model.Host:
+// 		host := param.(*model.Host)
+// 	}
 
-	return &sshConfig, nil
-}
+// 	ip := host.GetAccessIP()
+// 	sshConfig := system.SSHConfig{
+// 		PrivateKey: host.PrivateKey,
+// 		Port:       22,
+// 		Host:       ip,
+// 		User:       api.DefaultUser,
+// 	}
+// 	if host.GatewayID != "" {
+// 		gw, err := c.GetHost(host.GatewayID)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		ip := gw.GetAccessIP()
+// 		GatewayConfig := system.SSHConfig{
+// 			PrivateKey: gw.PrivateKey,
+// 			Port:       22,
+// 			User:       api.DefaultUser,
+// 			Host:       ip,
+// 		}
+// 		sshConfig.GatewayConfig = &GatewayConfig
+// 	}
+
+// 	return &sshConfig, nil
+// }
 
 func toVolumeType(speed VolumeSpeed.Enum) string {
 	switch speed {
@@ -1341,13 +1411,13 @@ func (c *Client) removeVolumeName(id string) error {
 	return c.DeleteObject("gpac.aws.volumes", id)
 }
 
-//CreateVolume creates a block volume
+// CreateVolume creates a block volume
 //- name is the name of the volume
 //- size is the size of the volume in GB
 //- volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (c *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
-	// Check if a volume already exist with the same name
-	_volume, err := metadata.LoadVolume(providers.FromClient(client), request.Name)
+func (c *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
+	// Check if a volume already exists with the same name
+	_volume, err := metadata.LoadVolume(client, request.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -1376,8 +1446,8 @@ func (c *Client) CreateVolume(request api.VolumeRequest) (*api.Volume, error) {
 	return &volume, nil
 }
 
-//GetVolume returns the volume identified by id
-func (c *Client) GetVolume(id string) (*api.Volume, error) {
+// GetVolume returns the volume identified by id
+func (c *Client) GetVolume(id string) (*model.Volume, error) {
 	out, err := c.EC2.DescribeVolumes(&ec2.DescribeVolumesInput{
 		VolumeIds: []*string{aws.String(id)},
 	})
@@ -1399,8 +1469,8 @@ func (c *Client) GetVolume(id string) (*api.Volume, error) {
 	return &volume, nil
 }
 
-//ListVolumes list available volumes
-func (c *Client) ListVolumes() ([]api.Volume, error) {
+// ListVolumes list available volumes
+func (c *Client) ListVolumes() ([]model.Volume, error) {
 	out, err := c.EC2.DescribeVolumes(&ec2.DescribeVolumesInput{})
 	if err != nil {
 		return nil, err
@@ -1424,7 +1494,7 @@ func (c *Client) ListVolumes() ([]api.Volume, error) {
 	return volumes, nil
 }
 
-//DeleteVolume deletes the volume identified by id
+// DeleteVolume deletes the volume identified by id
 func (c *Client) DeleteVolume(id string) error {
 	_, err := c.EC2.DeleteVolume(&ec2.DeleteVolumeInput{
 		VolumeId: aws.String(id),
@@ -1457,11 +1527,11 @@ func (c *Client) DeleteVolume(id string) error {
 // 	return fmt.Sprintf("%s###%s", hostID, volumeID)
 // }
 
-//CreateVolumeAttachment attaches a volume to an host
+// CreateVolumeAttachment attaches a volume to an host
 //- name the name of the volume attachment
 //- volume the volume to attach
 //- host on which the volume is attached
-func (c *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*api.VolumeAttachment, error) {
+func (c *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (*model.VolumeAttachment, error) {
 	va, err := c.EC2.AttachVolume(&ec2.AttachVolumeInput{
 		InstanceId: aws.String(request.ServerID),
 		VolumeId:   aws.String(request.VolumeID),
@@ -1478,8 +1548,8 @@ func (c *Client) CreateVolumeAttachment(request api.VolumeAttachmentRequest) (*a
 	}, nil
 }
 
-//GetVolumeAttachment returns the volume attachment identified by id
-func (c *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment, error) {
+// GetVolumeAttachment returns the volume attachment identified by id
+func (c *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachment, error) {
 	out, err := c.EC2.DescribeVolumes(&ec2.DescribeVolumesInput{
 		VolumeIds: []*string{aws.String(id)},
 	})
@@ -1499,8 +1569,8 @@ func (c *Client) GetVolumeAttachment(serverID, id string) (*api.VolumeAttachment
 	return nil, fmt.Errorf("Volume attachment of volume %s on server %s does not exist", serverID, id)
 }
 
-//ListVolumeAttachments lists available volume attachment
-func (c *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttachment, error) {
+// ListVolumeAttachments lists available volume attachment
+func (c *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error) {
 	out, err := c.EC2.DescribeVolumes(&ec2.DescribeVolumesInput{
 		Filters: []*ec2.Filter{
 			&ec2.Filter{
@@ -1526,7 +1596,7 @@ func (c *Client) ListVolumeAttachments(serverID string) ([]api.VolumeAttachment,
 
 }
 
-//DeleteVolumeAttachment deletes the volume attachment identifed by id
+// DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (c *Client) DeleteVolumeAttachment(serverID, id string) error {
 	_, err := c.EC2.DetachVolume(&ec2.DetachVolumeInput{
 		InstanceId: aws.String(serverID),
@@ -1535,63 +1605,65 @@ func (c *Client) DeleteVolumeAttachment(serverID, id string) error {
 	return err
 }
 
-//CreateContainer creates an object container
+// CreateContainer creates an object container
 func (c *Client) CreateContainer(name string) error {
 	return s3.CreateContainer(awss3.New(c.Session), name)
 }
 
-//DeleteContainer deletes an object container
+// DeleteContainer deletes an object container
 func (c *Client) DeleteContainer(name string) error {
 	return s3.DeleteContainer(awss3.New(c.Session), name)
 }
 
-//ListContainers list object containers
+// ListContainers list object containers
 func (c *Client) ListContainers() ([]string, error) {
 	return s3.ListContainers(awss3.New(c.Session))
 }
 
-//PutObject put an object into an object container
-func (c *Client) PutObject(container string, obj api.Object) error {
+// PutObject put an object into an object container
+func (c *Client) PutObject(container string, obj model.Object) error {
 	return s3.PutObject(awss3.New(c.Session), container, obj)
 }
 
-//UpdateObjectMetadata update an object into  object container
-func (c *Client) UpdateObjectMetadata(container string, obj api.Object) error {
+// UpdateObjectMetadata update an object into  object container
+func (c *Client) UpdateObjectMetadata(container string, obj model.Object) error {
 	return s3.UpdateObjectMetadata(awss3.New(c.Session), container, obj)
 }
 
-//GetObject get  object content from an object container
-func (c *Client) GetObject(container string, name string, ranges []api.Range) (*api.Object, error) {
+// GetObject get  object content from an object container
+func (c *Client) GetObject(container string, name string, ranges []model.Range) (*model.Object, error) {
 	return s3.GetObject(awss3.New(c.Session), container, name, ranges)
 }
 
-//GetObjectMetadata get  object metadata from an object container
-func (c *Client) GetObjectMetadata(container string, name string) (*api.Object, error) {
+// GetObjectMetadata get  object metadata from an object container
+func (c *Client) GetObjectMetadata(container string, name string) (*model.Object, error) {
 	return s3.GetObjectMetadata(awss3.New(c.Session), container, name)
 }
 
-//ListObjects list objects of a container
-func (c *Client) ListObjects(container string, filter api.ObjectFilter) ([]string, error) {
+// ListObjects list objects of a container
+func (c *Client) ListObjects(container string, filter model.ObjectFilter) ([]string, error) {
 	return s3.ListObjects(awss3.New(c.Session), container, filter)
 }
 
-//CopyObject copies an object
+// CopyObject copies an object
 func (c *Client) CopyObject(containerSrc, objectSrc, objectDst string) error {
 	return s3.CopyObject(awss3.New(c.Session), containerSrc, objectSrc, objectDst)
 }
 
-//DeleteObject deleta an object from a container
+// DeleteObject deleta an object from a container
 func (c *Client) DeleteObject(container, object string) error {
 	return s3.DeleteObject(awss3.New(c.Session), container, object)
 }
 
-//GetAuthOpts
-func (c *Client) GetAuthOpts() {
+// GetAuthOpts
+func (c *Client) GetAuthOpts() (model.Config, error) {
+	cfg := model.ConfigMap{}
+	return cfg, nil
 }
 
-//GetCfgOpts return configuration parameters
-func (c *Client) GetCfgOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
+// GetCfgOpts return configuration parameters
+func (c *Client) GetCfgOpts() (model.Config, error) {
+	cfg := model.ConfigMap{}
 
 	cfg.Set("DNSList", c.Cfg.DNSList)
 	cfg.Set("S3Protocol", c.Cfg.S3Protocol)

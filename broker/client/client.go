@@ -23,26 +23,30 @@ import (
 
 	"github.com/pkg/errors"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/CS-SI/SafeScale/broker/utils"
 )
 
 // Session units the different resources proposed by brokerd as broker client
 type Session struct {
-	Container *container
-	Host      *host
-	Nas       *nas
-	Network   *network
-	Ssh       *ssh
-	Tenant    *tenant
-	Volume    *volume
-	Template  *template
-	Image     *image
+	Bucket   *bucket
+	Host     *host
+	Share    *share
+	Network  *network
+	Ssh      *ssh
+	Tenant   *tenant
+	Volume   *volume
+	Template *template
+	Image    *image
 
-	// For future use...
-	brokerdAddress string
-	brokerdPort    uint16
-	tenantName     string
+	brokerdHost string
+	brokerdPort int
+	connection  *grpc.ClientConn
+
+	tenantName string
 }
 
 // Client is a instance of Session used temporarily until the session logic in brokerd is implemented
@@ -56,10 +60,14 @@ const (
 
 // New returns an instance of broker Client
 func New() Client {
-	s := &Session{}
-	s.Container = &container{session: s}
+	s := &Session{
+		brokerdHost: "localhost",
+		brokerdPort: 50051,
+	}
+
+	s.Bucket = &bucket{session: s}
 	s.Host = &host{session: s}
-	s.Nas = &nas{session: s}
+	s.Share = &share{session: s}
 	s.Network = &network{session: s}
 	s.Ssh = &ssh{session: s}
 	s.Tenant = &tenant{session: s}
@@ -67,6 +75,21 @@ func New() Client {
 	s.Template = &template{session: s}
 	s.Image = &image{session: s}
 	return s
+}
+
+// Connect establishes connection with brokerd
+func (s *Session) Connect() {
+	if s.connection == nil {
+		s.connection = utils.GetConnection(s.brokerdHost, s.brokerdPort)
+	}
+}
+
+// Disconnect cuts the connection with brokerd
+func (s *Session) Disconnect() {
+	if s.connection != nil {
+		s.connection.Close()
+		s.connection = nil
+	}
 }
 
 // DecorateError changes the error to something more comprehensible when
@@ -78,19 +101,16 @@ func DecorateError(err error, action string, maySucceed bool) error {
 			msg += " (may eventually succeed)"
 		}
 		return fmt.Errorf(msg, action, DefaultExecutionTimeout)
-	} else {
-		msg := err.Error()
-		if strings.Index(msg, "desc = ") != -1 {
-			pos := strings.Index(msg, "desc = ") + 7
-			msg = msg[pos:]
+	}
+	msg := err.Error()
+	if strings.Index(msg, "desc = ") != -1 {
+		pos := strings.Index(msg, "desc = ") + 7
+		msg = msg[pos:]
 
-			if strings.Index(msg, " :") == 0 {
-				msg = msg[2:]
-			}
-
-			return errors.New(msg)
-
+		if strings.Index(msg, " :") == 0 {
+			msg = msg[2:]
 		}
+		return errors.New(msg)
 	}
 	return err
 }

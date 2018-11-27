@@ -19,10 +19,11 @@ package ovh_test
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 
@@ -63,6 +64,24 @@ func Test_GetTemplates(t *testing.T) {
 		fmt.Println(tpl.Cores)
 		assert.True(t, tpl.Cores > 0)
 	}
+}
+
+// Test that we have templates with GPUs
+func Test_GetGpuTemplates(t *testing.T) {
+	cli, err := getClient()
+	require.Nil(t, err)
+	tpls, err := cli.Service.ListTemplates(true)
+	assert.NoError(t, err)
+	assert.True(t, len(tpls) > 0)
+
+	withGPU := false
+	for _, tpl := range tpls {
+		if tpl.GPUNumber > 0 {
+			withGPU = true
+		}
+	}
+
+	assert.True(t, withGPU)
 }
 
 func TemplateExists(name string) bool {
@@ -289,11 +308,11 @@ func Test_StartHost(t *testing.T) {
 
 }
 
-// GetSSHConfig creates SSHConfig from host
-func Test_GetSSHConfig(t *testing.T) {
-	// TODO Implement Test
+// // GetSSHConfig creates SSHConfig from host
+// func Test_GetSSHConfig(t *testing.T) {
+// 	// TODO Implement Test
 
-}
+// }
 
 // CreateVolume creates a block volume
 // - name is the name of the volume

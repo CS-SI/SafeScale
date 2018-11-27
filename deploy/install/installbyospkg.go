@@ -21,9 +21,8 @@ type genericPackager struct {
 
 // Check checks if the feature is installed
 func (g *genericPackager) Check(f *Feature, t Target, v Variables, s Settings) (Results, error) {
-	specs := f.Specs()
 	yamlKey := "feature.install." + g.keyword + ".check"
-	if !specs.IsSet(yamlKey) {
+	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
 		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
@@ -44,7 +43,7 @@ func (g *genericPackager) Check(f *Feature, t Target, v Variables, s Settings) (
 // Add installs the feature using apt
 func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".add"
-	if !f.Specs().IsSet(yamlKey) {
+	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
 		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
@@ -65,7 +64,7 @@ func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Re
 // Remove uninstalls the feature using the RemoveScript script
 func (g *genericPackager) Remove(f *Feature, t Target, v Variables, s Settings) (Results, error) {
 	yamlKey := "feature.install." + g.keyword + ".remove"
-	if !f.Specs().IsSet(yamlKey) {
+	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
 		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)

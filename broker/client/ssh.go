@@ -17,14 +17,20 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os/exec"
+	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
+	logr "github.com/sirupsen/logrus"
+
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
-	utils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
@@ -36,26 +42,18 @@ type ssh struct {
 	session *Session
 }
 
-// func systemSSH(bsc *broker.SshConfig, err error) (*system.SSHConfig, error) {
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if bsc == nil {
-// 		return nil, nil
-// 	}
-
-// 	g, _ := systemSSH(bsc.Gateway, nil)
-// 	return &system.SSHConfig{
-// 		GatewayConfig: g,
-// 		Host:          bsc.Host,
-// 		Port:          int(bsc.Port),
-// 		PrivateKey:    bsc.PrivateKey,
-// 		User:          bsc.User,
-// 	}, nil
-// }
-
 // Run ...
 func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+	var (
+		retcode        int
+		stdout, stderr string
+	)
+
+	sshCfg, err := s.getHostSSHConfig(hostName)
+	if err != nil {
+		return 0, "", "", err
+	}
+
 	if executionTimeout < utils.TimeoutCtxHost {
 		executionTimeout = utils.TimeoutCtxHost
 	}
@@ -66,26 +64,14 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		connectionTimeout = executionTimeout + 1*time.Minute
 	}
 
-	host := &host{session: s.session}
-	cfg, err := host.SSHConfig(hostName)
-	if err != nil {
-		return 0, "", "", err
-	}
-	ssh := conv.ToSystemSshConfig(cfg)
-
 	_, cancel := utils.GetContext(executionTimeout)
 	defer cancel()
-
-	var (
-		retcode        int
-		stdout, stderr string
-	)
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			// Create the command
 			var sshCmd *system.SSHCommand
-			sshCmd, err = ssh.Command(command)
+			sshCmd, err := sshCfg.Command(command)
 			if err != nil {
 				return err
 			}
@@ -115,6 +101,15 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		}
 	}
 	return retcode, stdout, stderr, err
+}
+
+func (s *ssh) getHostSSHConfig(hostname string) (*system.SSHConfig, error) {
+	host := &host{session: s.session}
+	cfg, err := host.SSHConfig(hostname)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
 
 const protocolSeparator = ":"
@@ -155,17 +150,6 @@ func extractPath(in string) (string, error) {
 
 // Copy ...
 func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
-	if executionTimeout < utils.TimeoutCtxHost {
-		executionTimeout = utils.TimeoutCtxHost
-	}
-	if connectionTimeout < DefaultConnectionTimeout {
-		connectionTimeout = DefaultConnectionTimeout
-	}
-	if connectionTimeout > executionTimeout {
-		connectionTimeout = executionTimeout
-	}
-
-	host := &host{session: s.session}
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -208,11 +192,20 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 		upload = true
 	}
 
-	cfg, err := host.SSHConfig(hostName)
+	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {
-		return -1, "", "", err
+		return 0, "", "", err
 	}
-	ssh := conv.ToSystemSshConfig(cfg)
+
+	if executionTimeout < utils.TimeoutCtxHost {
+		executionTimeout = utils.TimeoutCtxHost
+	}
+	if connectionTimeout < DefaultConnectionTimeout {
+		connectionTimeout = DefaultConnectionTimeout
+	}
+	if connectionTimeout > executionTimeout {
+		connectionTimeout = executionTimeout
+	}
 
 	_, cancel := utils.GetContext(executionTimeout)
 	defer cancel()
@@ -223,7 +216,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, err = ssh.Copy(remotePath, localPath, upload)
+			retcode, stdout, stderr, err = sshCfg.Copy(remotePath, localPath, upload)
 			// If an error occured, stop the loop and propagates this error
 			if err != nil {
 				retcode = -1
@@ -242,29 +235,36 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return -1, "", "", fmt.Errorf("failed to connect after %v", err.Error())
+			return -1, "", "", fmt.Errorf("failed to connect after %v", retryErr.Error())
 		}
 	}
 	return retcode, stdout, stderr, err
 }
 
+// getSSHConfigFromName ...
+func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.SSHConfig, error) {
+	// conn := utils.GetConnection()
+	// defer conn.Close()
+	s.session.Connect()
+	defer s.session.Disconnect()
+	ctx := context.Background()
+	service := pb.NewHostServiceClient(s.session.connection)
+
+	sshConfig, err := service.SSH(ctx, &pb.Reference{Name: name})
+	if err != nil {
+		return nil, err
+	}
+	return conv.ToSystemSshConfig(sshConfig), nil
+}
+
 // Connect ...
 func (s *ssh) Connect(name string, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxHost {
-		timeout = utils.TimeoutCtxHost
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	service := pb.NewHostServiceClient(conn)
-	sshConfig, err := service.SSH(ctx, &pb.Reference{Name: name})
+	sshCfg, err := s.getSSHConfigFromName(name, timeout)
 	if err != nil {
 		return err
 	}
-	sshCfg := conv.ToSystemSshConfig(sshConfig)
 
-	return retry.WhileUnsuccessful255Delay5SecondsWithNotify(
+	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
 			return sshCfg.Enter()
 		},
@@ -277,15 +277,98 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 	)
 }
 
+func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) error {
+	sshCfg, err := s.getSSHConfigFromName(name, timeout)
+	if err != nil {
+		return err
+	}
+
+	if sshCfg.GatewayConfig == nil {
+		sshCfg.GatewayConfig = &system.SSHConfig{
+			User:          sshCfg.User,
+			Host:          sshCfg.Host,
+			PrivateKey:    sshCfg.PrivateKey,
+			Port:          sshCfg.Port,
+			GatewayConfig: nil,
+		}
+	}
+	sshCfg.Host = "127.0.0.1"
+	sshCfg.Port = remotePort
+	sshCfg.LocalPort = localPort
+
+	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
+		func() error {
+
+			tunnels, _, err := sshCfg.CreateTunnels()
+			if err != nil {
+				for _, t := range tunnels {
+					nerr := t.Close()
+					if nerr != nil {
+						logr.Warnf("Error closing ssh tunnel: %v", nerr)
+					}
+				}
+				return fmt.Errorf("Unable to create command : %s", err.Error())
+			}
+
+			return nil
+		},
+		2*time.Minute,
+		func(t retry.Try, v Verdict.Enum) {
+			if v == Verdict.Retry {
+				log.Printf("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
+			}
+		},
+	)
+}
+
+func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, timeout time.Duration) error {
+	sshCfg, err := s.getSSHConfigFromName(name, timeout)
+	if err != nil {
+		return err
+	}
+
+	if sshCfg.GatewayConfig == nil {
+		sshCfg.GatewayConfig = &system.SSHConfig{
+			User:          sshCfg.User,
+			Host:          sshCfg.Host,
+			PrivateKey:    sshCfg.PrivateKey,
+			Port:          sshCfg.Port,
+			GatewayConfig: nil,
+		}
+		sshCfg.Host = "127.0.0.1"
+	}
+
+	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.Host, remotePort, sshCfg.GatewayConfig.User, sshCfg.GatewayConfig.Host)
+
+	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
+	if err == nil {
+		portStrs := strings.Split(strings.Trim(string(bytes), "\n"), "\n")
+		for _, portStr := range portStrs {
+			_, err = strconv.Atoi(portStr)
+			if err != nil {
+				log.Printf("Atoi failed on pid: %s\n", reflect.TypeOf(err).String())
+				return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+			}
+			err = exec.Command("kill", "-9", portStr).Run()
+			if err != nil {
+				log.Printf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
+				return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+			}
+		}
+	}
+
+	return nil
+}
+
 // WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
 func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {
 	if timeout < utils.TimeoutCtxHost {
 		timeout = utils.TimeoutCtxHost
 	}
-	host := &host{session: s.session}
-	cfg, err := host.SSHConfig(hostName)
+	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {
 		return err
 	}
-	return conv.ToSystemSshConfig(cfg).WaitServerReady(timeout)
+
+	return sshCfg.WaitServerReady(timeout)
 }

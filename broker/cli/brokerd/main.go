@@ -1,4 +1,3 @@
-//line main.go:1
 /*
  * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
  *
@@ -19,24 +18,23 @@ package main
 
 import (
 	"fmt"
-	"github.com/dlespiau/covertool/pkg/exit"
-	"log"
 	"net"
 	"os"
 	"os/signal"
+	"path"
+	"strings"
 	"syscall"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/daemon/commands"
-
-	"github.com/CS-SI/SafeScale/providers"
-
+	"github.com/dlespiau/covertool/pkg/exit"
+	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-)
 
-const (
-	port = ":50051"
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/server/listeners"
+	"github.com/CS-SI/SafeScale/broker/utils"
+	"github.com/CS-SI/SafeScale/providers"
 )
 
 /*
@@ -70,19 +68,19 @@ broker volume delete v1
 broker volume inspect v1
 broker volume update v1 --speed="HDD" --size=1000
 
-broker container create c1
-broker container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
-broker container umount c1 host1
-broker container delete c1
-broker container list
-broker container inspect C1
+broker bucket|container create c1
+broker bucket|container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
+broker bucket|container umount c1 host1
+broker bucket|container delete c1
+broker bucket|container list
+broker bucket|container inspect C1
 
-broker nas create nas1 host1 --path="/shared/data"
-broker nas delete nas1
-broker nas mount nas1 host2 --path="/data"
-broker nas umount nas1 host2
-broker nas list
-broker nas inspect nas1
+broker share|nas create nas1 host1 --path="/shared/data"
+broker share|nas delete nas1
+broker share|nas mount nas1 host2 --path="/data"
+broker share|nas umount nas1 host2
+broker share|nas list
+broker share|nas inspect nas1
 
 */
 
@@ -91,7 +89,7 @@ func cleanup() {
 }
 
 // *** MAIN ***
-func main() {
+func work() {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -100,37 +98,94 @@ func main() {
 		exit.Exit(1)
 	}()
 
-	log.Println("Checking configuration")
+	log.Infoln("Checking configuration")
 	_, err := providers.Tenants()
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 
-	log.Println("Starting server")
-	lis, err := net.Listen("tcp", port)
+	log.Infoln("Starting server")
+	//lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
 
-	log.Println("Registering services")
-	pb.RegisterTenantServiceServer(s, &commands.TenantServiceServer{})
-	pb.RegisterNetworkServiceServer(s, &commands.NetworkServiceServer{})
-	pb.RegisterHostServiceServer(s, &commands.HostServiceServer{})
-	pb.RegisterVolumeServiceServer(s, &commands.VolumeServiceServer{})
-	pb.RegisterSshServiceServer(s, &commands.SSHServiceServer{})
-	pb.RegisterContainerServiceServer(s, &commands.ContainerServiceServer{})
-	pb.RegisterNasServiceServer(s, &commands.NasServiceServer{})
-	pb.RegisterImageServiceServer(s, &commands.ImageServiceServer{})
-	pb.RegisterTemplateServiceServer(s, &commands.TemplateServiceServer{})
+	log.Infoln("Registering services")
+	pb.RegisterTenantServiceServer(s, &listeners.TenantServiceListener{})
+	pb.RegisterNetworkServiceServer(s, &listeners.NetworkServiceListener{})
+	pb.RegisterHostServiceServer(s, &listeners.HostServiceListener{})
+	pb.RegisterVolumeServiceServer(s, &listeners.VolumeServiceListener{})
+	pb.RegisterSshServiceServer(s, &listeners.SSHServiceListener{})
+	pb.RegisterBucketServiceServer(s, &listeners.BucketServiceListener{})
+	pb.RegisterShareServiceServer(s, &listeners.ShareServiceListener{})
+	pb.RegisterImageServiceServer(s, &listeners.ImageServiceListener{})
+	pb.RegisterTemplateServiceServer(s, &listeners.TemplateServiceListener{})
 
 	// log.Println("Initializing service factory")
 	// commands.InitServiceFactory()
 
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
-	log.Println("Ready to serve :-)")
+
+	version := VERSION + ", build date: " + BUILD_DATE
+	fmt.Printf("Brokerd version: %s\nReady to serve :-)\n", version)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
+	}
+}
+
+func main() {
+	app := cli.NewApp()
+
+	cli.VersionFlag = cli.BoolFlag{
+		Name:  "version, V",
+		Usage: "Print program version",
+	}
+
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "verbose, v",
+			Usage: "Increase verbosity",
+		},
+		cli.BoolFlag{
+			Name:  "debug, d",
+			Usage: "Show debug information",
+		},
+		// cli.IntFlag{
+		// 	Name:  "port, p",
+		// 	Usage: "Bind to specified port `PORT`",
+		// 	Value: 50051,
+		// },
+	}
+
+	app.Before = func(c *cli.Context) error {
+		if strings.Contains(path.Base(os.Args[0]), "-cover") {
+			log.SetLevel(log.InfoLevel)
+			utils.Verbose = true
+		} else {
+			log.SetLevel(log.WarnLevel)
+		}
+
+		if c.GlobalBool("verbose") {
+			log.SetLevel(log.InfoLevel)
+			utils.Verbose = true
+		}
+		if c.GlobalBool("debug") {
+			log.SetLevel(log.DebugLevel)
+			utils.Debug = true
+		}
+		return nil
+	}
+
+	app.Action = func(c *cli.Context) error {
+		work()
+		return nil
+	}
+
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
 	}
 }

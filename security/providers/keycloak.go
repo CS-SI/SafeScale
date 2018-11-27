@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	log "github.com/sirupsen/logrus"
 )
 
 //KeyCloak class to manage KeyCloak admin API
@@ -107,7 +108,10 @@ func (kc *KeyCloak) CreateClientApplication(clientID, clientSecret, clientName s
 
 	httpClt := &http.Client{}
 	b := new(bytes.Buffer)
-	json.NewEncoder(b).Encode(client)
+	nerr := json.NewEncoder(b).Encode(client)
+	if nerr != nil {
+		log.Warnf("Problem encoding: %v", nerr)
+	}
 	r, _ := http.NewRequest("POST", urlStr, b)
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Accept", "application/json")
@@ -171,7 +175,10 @@ func (kc *KeyCloak) CreateUser(name, email string, attrs map[string]interface{})
 
 	httpClt := &http.Client{}
 	b := new(bytes.Buffer)
-	json.NewEncoder(b).Encode(newKeyCloackUser(name, email, attrs))
+	nerr := json.NewEncoder(b).Encode(newKeyCloackUser(name, email, attrs))
+	if nerr != nil {
+		log.Warnf("Problem encoding: %v", nerr)
+	}
 	r, _ := http.NewRequest("POST", urlStr, b)
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Accept", "application/json")
