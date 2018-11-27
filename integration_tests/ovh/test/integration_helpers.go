@@ -59,11 +59,10 @@ func runOnlyInIntegrationTest(key string) {
 
 func tearDown() {
 	log.Printf("Starting cleanup...")
-	_, _ = getOutput("broker nas delete bnastest")
 	_, _ = getOutput("broker volume delete volumetest")
+	_, _ = getOutput("broker nas delete bnastest")
 	_, _ = getOutput("broker host delete easyvm")
 	_, _ = getOutput("broker host delete complexvm")
-	_, _ = getOutput("broker host delete gw-crazy")
 	_, _ = getOutput("broker network delete crazy")
 	log.Printf("Finishing cleanup...")
 }
