@@ -44,5 +44,6 @@ type TemplateService struct {
 
 // List returns the template list
 func (srv *TemplateService) List(all bool) ([]model.HostTemplate, error) {
-	return srv.provider.ListTemplates(all)
+	tlist, err := srv.provider.ListTemplates(all)
+	return tlist, infraErr(err)
 }

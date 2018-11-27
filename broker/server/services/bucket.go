@@ -20,9 +20,6 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
@@ -52,7 +49,8 @@ func NewBucketService(api *providers.Service) BucketAPI {
 
 // List retrieves all available buckets
 func (svc *BucketService) List() ([]string, error) {
-	return svc.provider.ObjectStorage.ListBuckets(objectstorage.RootPath)
+	rv, err := svc.provider.ObjectStorage.ListBuckets(objectstorage.RootPath)
+	return rv, infraErr(err)
 }
 
 // Create a bucket
@@ -60,15 +58,15 @@ func (svc *BucketService) Create(name string) error {
 	bucket, err := svc.provider.ObjectStorage.GetBucket(name)
 	if err != nil {
 		if err.Error() != "not found" {
-			return errors.Wrap(err, "failed to search of bucket '%s' already exists")
+			return infraErrf(err, "failed to search of bucket '%s' already exists", name)
 		}
 	}
 	if bucket != nil {
-		return model.ResourceAlreadyExistsError("bucket", name)
+		return logicErr(model.ResourceAlreadyExistsError("bucket", name))
 	}
 	_, err = svc.provider.ObjectStorage.CreateBucket(name)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to create bucket '%s'", name))
+		return infraErrf(err, "failed to create bucket '%s'", name)
 	}
 	return nil
 }
@@ -77,7 +75,7 @@ func (svc *BucketService) Create(name string) error {
 func (svc *BucketService) Delete(name string) error {
 	err := svc.provider.ObjectStorage.DeleteBucket(name)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to delete bucket '%s'", name))
+		return infraErrf(err, "failed to delete bucket '%s'", name)
 	}
 	return nil
 }
@@ -87,9 +85,9 @@ func (svc *BucketService) Inspect(name string) (*model.Bucket, error) {
 	b, err := svc.provider.ObjectStorage.GetBucket(name)
 	if err != nil {
 		if err.Error() == "not found" {
-			return nil, model.ResourceNotFoundError("bucket", name)
+			return nil, logicErr(model.ResourceNotFoundError("bucket", name))
 		}
-		return nil, errors.Wrap(err, fmt.Sprintf("failed to inspect bucket '%s'", name))
+		return nil, infraErrf(err, "failed to inspect bucket '%s'", name)
 	}
 	mb := model.Bucket{
 		Name: b.GetName(),
@@ -102,16 +100,14 @@ func (svc *BucketService) Mount(bucketName, hostName, path string) error {
 	// Check bucket existence
 	_, err := svc.provider.ObjectStorage.GetBucket(bucketName)
 	if err != nil {
-		tbr := errors.Wrap(err, "")
-		log.Errorf("%+v", tbr)
-		return tbr
+		return infraErr(err)
 	}
 
 	// Get Host ID
 	hostService := NewHostService(svc.provider)
 	host, err := hostService.Get(hostName)
 	if err != nil {
-		return fmt.Errorf("no host found with name or id '%s'", hostName)
+		return logicErr(fmt.Errorf("no host found with name or id '%s'", hostName))
 	}
 
 	// Create mount point
@@ -158,7 +154,8 @@ func (svc *BucketService) Mount(bucketName, hostName, path string) error {
 		Protocol:   objStorageProtocol,
 	}
 
-	return exec("mount_object_storage.sh", data, host.ID, svc.provider)
+	rerr := exec("mount_object_storage.sh", data, host.ID, svc.provider)
+	return logicErr(rerr)
 }
 
 // Unmount a bucket
@@ -168,11 +165,9 @@ func (svc *BucketService) Unmount(bucketName, hostName string) error {
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
-			return err
+			return infraErr(err)
 		default:
-			tbr := errors.Wrap(err, "")
-			log.Errorf("%+v", tbr)
-			return tbr
+			return infraErr(err)
 		}
 	}
 
@@ -182,9 +177,9 @@ func (svc *BucketService) Unmount(bucketName, hostName string) error {
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
-			return err
+			return infraErr(err)
 		default:
-			return errors.Wrap(err, fmt.Sprintf("failed to get host '%s':", hostName))
+			return infraErrf(err, "failed to get host '%s':", hostName)
 		}
 	}
 
@@ -194,5 +189,6 @@ func (svc *BucketService) Unmount(bucketName, hostName string) error {
 		Bucket: bucketName,
 	}
 
-	return exec("umount_object_storage.sh", data, host.ID, svc.provider)
+	rerr := exec("umount_object_storage.sh", data, host.ID, svc.provider)
+	return infraErr(rerr)
 }

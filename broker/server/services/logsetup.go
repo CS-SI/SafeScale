@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -26,7 +27,7 @@ func init() {
 	log.SetOutput(io.MultiWriter(os.Stdout, file))
 }
 
-func srvLog(err error) error {
+func infraErr(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -35,7 +36,19 @@ func srvLog(err error) error {
 	return tbr
 }
 
-func srvLogNew(err error) error {
+func infraErrf(err error, message string, a ...interface{}) error {
+	if err == nil {
+		return nil
+	}
+
+	tbr := errors.WithStack(err)
+	tbr = errors.WithMessage(tbr, fmt.Sprintf(message, a))
+
+	log.Errorf("%+v", err)
+	return tbr
+}
+
+func logicErr(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -43,11 +56,11 @@ func srvLogNew(err error) error {
 	return err
 }
 
-func srvLogMessage(err error, message string) error {
+func logicErrf(err error, message string, a ...interface{}) error {
 	if err == nil {
 		return nil
 	}
-	tbr := errors.Wrap(err, message)
+	tbr := errors.Wrap(err, fmt.Sprintf(message, a))
 	log.Errorf("%+v", tbr)
 	return tbr
 }

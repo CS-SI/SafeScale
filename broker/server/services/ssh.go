@@ -70,7 +70,7 @@ func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 	case string:
 		mh, err := metadata.LoadHost(svc.provider, hostParam.(string))
 		if err != nil {
-			err = srvLog(err)
+			err = infraErr(err)
 			return nil, err
 		}
 		host = mh.Get()
@@ -89,14 +89,14 @@ func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 	hostNetworkV1 := propsv1.NewHostNetwork()
 	err := host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
-		err = srvLog(err)
+		err = infraErr(err)
 		return nil, err
 	}
 	if hostNetworkV1.DefaultGatewayID != "" {
 		hostSvc := NewHostService(svc.provider)
 		gw, err := hostSvc.Get(hostNetworkV1.DefaultGatewayID)
 		if err != nil {
-			err = srvLog(err)
+			err = infraErr(err)
 			return nil, err
 		}
 		GatewayConfig := system.SSHConfig{
@@ -116,9 +116,10 @@ func (svc *SSHService) WaitServerReady(hostParam interface{}, timeout time.Durat
 	sshSvc := NewSSHService(svc.provider)
 	ssh, err := sshSvc.GetConfig(hostParam)
 	if err != nil {
-		return srvLogMessage(err, "Failed to read SSH config")
+		return logicErrf(err, "Failed to read SSH config")
 	}
-	return ssh.WaitServerReady(timeout)
+	waitErr := ssh.WaitServerReady(timeout)
+	return infraErr(waitErr)
 }
 
 // Run tries to execute command 'cmd' on the host
@@ -130,16 +131,14 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 	hostSvc := NewHostService(svc.provider)
 	host, err := hostSvc.Get(hostName)
 	if err != nil {
-		_ = srvLog(err)
-		return 0, "", "", fmt.Errorf("no host found with name or id '%s'", hostName)
+		return 0, "", "", logicErrf(err, "no host found with name or id '%s'", hostName)
 	}
 
 	// retrieve ssh config to perform some commands
 	ssh, err := svc.GetConfig(host)
 
 	if err != nil {
-		err = srvLog(err)
-		return 0, "", "", err
+		return 0, "", "", infraErr(err)
 	}
 
 	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
@@ -155,7 +154,7 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 		},
 	)
 	if err != nil {
-		err = srvLog(err)
+		err = infraErr(err)
 	}
 
 	return retCode, stdOut, stdErr, err
@@ -166,7 +165,6 @@ func (svc *SSHService) run(ssh *system.SSHConfig, cmd string) (int, string, stri
 	// Create the command
 	sshCmd, err := ssh.Command(cmd)
 	if err != nil {
-		err = srvLog(err)
 		return 0, "", "", err
 	}
 	return sshCmd.Run()
@@ -200,7 +198,7 @@ func extractPath(in string) (string, error) {
 	}
 	_, err := extracthostName(in)
 	if err != nil {
-		err = srvLog(err)
+		err = infraErr(err)
 		return "", err
 	}
 
@@ -215,31 +213,31 @@ func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
 	// Try extract host
 	hostFrom, err := extracthostName(from)
 	if err != nil {
-		err = srvLog(err)
+		err = infraErr(err)
 		return 0, "", "", err
 	}
 	hostTo, err := extracthostName(to)
 	if err != nil {
-		err = srvLog(err)
+		err = infraErr(err)
 		return 0, "", "", err
 	}
 
 	// Host checks
 	if hostFrom != "" && hostTo != "" {
-		return 0, "", "", fmt.Errorf("copy between 2 hosts is not supported yet")
+		return 0, "", "", logicErr(fmt.Errorf("copy between 2 hosts is not supported yet"))
 	}
 	if hostFrom == "" && hostTo == "" {
-		return 0, "", "", fmt.Errorf("no host name specified neither in from nor to")
+		return 0, "", "", logicErr(fmt.Errorf("no host name specified neither in from nor to"))
 	}
 
 	fromPath, err := extractPath(from)
 	if err != nil {
-		err = srvLog(err)
+		err = infraErr(err)
 		return 0, "", "", err
 	}
 	toPath, err := extractPath(to)
 	if err != nil {
-		err = srvLog(err)
+		err = infraErr(err)
 		return 0, "", "", err
 	}
 
@@ -258,15 +256,16 @@ func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
 	hostSvc := NewHostService(svc.provider)
 	host, err := hostSvc.Get(hostName)
 	if err != nil {
-		return 0, "", "", fmt.Errorf("no host found with name or id '%s'", hostName)
+		return 0, "", "", logicErr(fmt.Errorf("no host found with name or id '%s'", hostName))
 	}
 
 	// retrieve ssh config to perform some commands
 	ssh, err := svc.GetConfig(host.ID)
 	if err != nil {
-		err = srvLog(err)
+		err = infraErr(err)
 		return 0, "", "", err
 	}
 
-	return ssh.Copy(remotePath, localPath, upload)
+	cRc, cStcOut, cStdErr, cErr := ssh.Copy(remotePath, localPath, upload)
+	return cRc, cStcOut, cStdErr, infraErr(cErr)
 }
