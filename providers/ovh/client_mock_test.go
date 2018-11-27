@@ -18,18 +18,19 @@ package ovh_test
 import (
 	"errors"
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/mocks"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/providers"
-
+	"github.com/CS-SI/SafeScale/providers/mocks"
+	"github.com/CS-SI/SafeScale/providers/model"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/tests"
 )
 
@@ -76,15 +77,17 @@ func getMockableClient(t *testing.T) (*tests.ClientTester, *mocks.MockClientAPI,
 }
 
 // Helper function to test mock objects
-func GetHostTemplate(core int, ram int, disk int) api.HostTemplate {
-	return api.HostTemplate{
-		HostSize: api.HostSize{
-			Cores:    core,
-			RAMSize:  float32(ram) / 1000.0,
-			DiskSize: disk,
+func GetHostTemplate(core int, ram int, disk int) model.HostTemplate {
+	return model.HostTemplate{
+		HostTemplate: &propsv1.HostTemplate{
+			HostSize: &propsv1.HostSize{
+				Cores:    core,
+				RAMSize:  float32(ram) / 1000.0,
+				DiskSize: disk,
+			},
+			ID:   "",
+			Name: "",
 		},
-		ID:   "",
-		Name: "",
 	}
 }
 
@@ -94,7 +97,7 @@ func TestMock_GetTemplates_Mock(t *testing.T) {
 
 	// It runs with the Mock object
 	if amok != nil {
-		amok.EXPECT().ListTemplates(false).Times(1).Return([]api.HostTemplate{GetHostTemplate(3, 3, 1), GetHostTemplate(4, 4, 2)}, nil)
+		amok.EXPECT().ListTemplates(false).Times(1).Return([]model.HostTemplate{GetHostTemplate(3, 3, 1), GetHostTemplate(4, 4, 2)}, nil)
 	}
 
 	require.Nil(t, err)

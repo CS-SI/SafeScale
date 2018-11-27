@@ -20,9 +20,12 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/urfave/cli"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
-	"github.com/urfave/cli"
+	"github.com/CS-SI/SafeScale/utils"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // NetworkCmd command
@@ -38,8 +41,9 @@ var NetworkCmd = cli.Command{
 }
 
 var networkList = cli.Command{
-	Name:  "list",
-	Usage: "List existing Networks (created by SafeScale)",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List existing Networks (created by SafeScale)",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all",
@@ -48,7 +52,7 @@ var networkList = cli.Command{
 	Action: func(c *cli.Context) error {
 		networks, err := client.New().Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of networks", false))
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "list of networks", false).Error()))
 		}
 		out, _ := json.Marshal(networks.GetNetworks())
 		fmt.Println(string(out))
@@ -59,19 +63,24 @@ var networkList = cli.Command{
 
 var networkDelete = cli.Command{
 	Name:      "delete",
-	Usage:     "delete NETWORK",
-	ArgsUsage: "<network_name>",
+	Aliases:   []string{"rm", "remove"},
+	Usage:     "delete Network",
+	ArgsUsage: "<Network_name> [<Network_name>...]",
 	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <network_name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Network name required")
+		if c.NArg() < 1 {
+			fmt.Println("Missing mandatory argument <Network_name>")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
 		}
-		err := client.New().Network.Delete(c.Args().First(), client.DefaultExecutionTimeout)
+
+		var networkList []string
+		networkList = append(networkList, c.Args().First())
+		networkList = append(networkList, c.Args().Tail()...)
+
+		err := client.New().Network.Delete(networkList, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "deletion of network", true))
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "deletion of network", false).Error()))
 		}
-		fmt.Println(fmt.Sprintf("Network '%s' deleted", c.Args().First()))
 
 		return nil
 	},
@@ -79,17 +88,18 @@ var networkDelete = cli.Command{
 
 var networkInspect = cli.Command{
 	Name:      "inspect",
+	Aliases:   []string{"show"},
 	Usage:     "inspect NETWORK",
 	ArgsUsage: "<network_name>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Network name required")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
 		}
 		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "inspection of network", false))
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "inspection of network", false).Error()))
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))
@@ -100,6 +110,7 @@ var networkInspect = cli.Command{
 
 var networkCreate = cli.Command{
 	Name:      "create",
+	Aliases:   []string{"new"},
 	Usage:     "create a network",
 	ArgsUsage: "<network_name>",
 	Flags: []cli.Flag{
@@ -120,7 +131,7 @@ var networkCreate = cli.Command{
 		},
 		cli.IntFlag{
 			Name:  "disk",
-			Value: 100,
+			Value: 16,
 			Usage: "Disk space for the gateway",
 		},
 		cli.StringFlag{
@@ -137,8 +148,8 @@ var networkCreate = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <network_name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Network name required")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
 		}
 		netdef := pb.NetworkDefinition{
 			CIDR: c.String("cidr"),
@@ -154,7 +165,7 @@ var networkCreate = cli.Command{
 		}
 		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "creation of network", true))
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "creation of network", true).Error()))
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))

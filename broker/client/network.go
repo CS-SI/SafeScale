@@ -17,10 +17,13 @@
 package client
 
 import (
+	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/utils"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // network is the part of broker client handling Network
@@ -31,55 +34,71 @@ type network struct {
 
 // List ...
 func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	networkService := pb.NewNetworkServiceClient(conn)
-	return networkService.List(ctx, &pb.NWListRequest{
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewNetworkServiceClient(n.session.connection)
+	ctx := context.Background()
+
+	return service.List(ctx, &pb.NWListRequest{
 		All: all,
 	})
 }
 
-// Delete ...
-func (n *network) Delete(name string, timeout time.Duration) error {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxHost {
-		timeout = utils.TimeoutCtxHost
+// Delete deletes several networks at the same time in goroutines
+func (n *network) Delete(names []string, timeout time.Duration) error {
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewNetworkServiceClient(n.session.connection)
+	ctx := context.Background()
+
+	var (
+		wg   sync.WaitGroup
+		errs int
+	)
+
+	networkDeleter := func(aname string) {
+		defer wg.Done()
+		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
+
+		if err != nil {
+			fmt.Println(DecorateError(err, "deletion of network", true).Error())
+			errs++
+		} else {
+			fmt.Printf("Network '%s' deleted\n", aname)
+		}
 	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	networkService := pb.NewNetworkServiceClient(conn)
-	_, err := networkService.Delete(ctx, &pb.Reference{Name: name})
-	return err
+
+	wg.Add(len(names))
+	for _, target := range names {
+		go networkDeleter(target)
+	}
+	wg.Wait()
+
+	if errs > 0 {
+		return clitools.ExitOnRPC("")
+	}
+	return nil
+
 }
 
 // Inspect ...
 func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxDefault {
-		timeout = utils.TimeoutCtxDefault
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	networkService := pb.NewNetworkServiceClient(conn)
-	return networkService.Inspect(ctx, &pb.Reference{Name: name})
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewNetworkServiceClient(n.session.connection)
+	ctx := context.Background()
+
+	return service.Inspect(ctx, &pb.Reference{Name: name})
+
 }
 
 // Create ...
 func (n *network) Create(def pb.NetworkDefinition, timeout time.Duration) (*pb.Network, error) {
-	conn := utils.GetConnection()
-	defer conn.Close()
-	if timeout < utils.TimeoutCtxHost {
-		timeout = utils.TimeoutCtxHost
-	}
-	ctx, cancel := utils.GetContext(timeout)
-	defer cancel()
-	networkService := pb.NewNetworkServiceClient(conn)
-	return networkService.Create(ctx, &def)
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewNetworkServiceClient(n.session.connection)
+	ctx := context.Background()
+
+	return service.Create(ctx, &def)
+
 }

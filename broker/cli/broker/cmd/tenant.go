@@ -20,8 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/urfave/cli"
+
+	"github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/utils"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // TenantCmd command
@@ -36,17 +39,18 @@ var TenantCmd = cli.Command{
 }
 
 var tenantList = cli.Command{
-	Name:  "list",
-	Usage: "List available tenants",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available tenants",
 	Action: func(c *cli.Context) error {
 		tenants, err := client.New().Tenant.List(client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of tenants", false))
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "list of tenants", false).Error()))
 		}
 		out, _ := json.Marshal(tenants.GetTenants())
 		fmt.Println(string(out))
-		return nil
 
+		return nil
 	},
 }
 
@@ -56,7 +60,7 @@ var tenantGet = cli.Command{
 	Action: func(c *cli.Context) error {
 		tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "get tenant", false))
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "get tenant", false).Error()))
 		}
 		out, _ := json.Marshal(tenant)
 		fmt.Println(string(out))
@@ -71,12 +75,12 @@ var tenantSet = cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <tenant_name>")
-			cli.ShowSubcommandHelp(c)
-			return fmt.Errorf("Tenant name required")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
 		}
 		err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "set tenant", false))
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "set tenant", false).Error()))
 		}
 		fmt.Printf("Tenant '%s' set\n", c.Args().First())
 		return nil

@@ -17,75 +17,41 @@
 package providers
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
+	safeutils "github.com/CS-SI/SafeScale/utils"
+	"github.com/nanobox-io/golang-scribble"
+	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
-
-	uuid "github.com/satori/go.uuid"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/providers/objectstorage"
 )
-
-// ResourceError resource error
-type ResourceError struct {
-	Name         string
-	ResourceType string
-}
-
-// ResourceNotFound resource not found error
-type ResourceNotFound struct {
-	ResourceError
-}
-
-// ResourceNotFoundError creates a ResourceNotFound error
-func ResourceNotFoundError(resource string, name string) ResourceNotFound {
-	return ResourceNotFound{
-		ResourceError{
-			Name:         name,
-			ResourceType: resource,
-		},
-	}
-}
-func (e ResourceNotFound) Error() string {
-	return fmt.Sprintf("Unable to find %s '%s'", e.ResourceType, e.Name)
-}
-
-// ResourceAlreadyExists resource already exists error
-type ResourceAlreadyExists struct {
-	ResourceError
-}
-
-// ResourceAlreadyExistsError creates a ResourceAlreadyExists error
-func ResourceAlreadyExistsError(resource string, name string) ResourceAlreadyExists {
-	return ResourceAlreadyExists{
-		ResourceError{
-			Name:         name,
-			ResourceType: resource,
-		},
-	}
-}
-
-func (e ResourceAlreadyExists) Error() string {
-	return fmt.Sprintf("%s '%s' already exists", e.ResourceType, e.Name)
-}
 
 // Service Client High level service
 type Service struct {
 	api.ClientAPI
+	ObjectStorage  objectstorage.Location
+	MetadataBucket objectstorage.Bucket
 }
 
-// FromClient contructs a Service instance from a ClientAPI
-func FromClient(clt api.ClientAPI) *Service {
-	return &Service{
-		ClientAPI: clt,
-	}
-}
+// // FromClient contructs a Service instance from a ClientAPI
+// func FromClient(clt api.ClientAPI) *Service {
+// 	return &Service{
+// 		ClientAPI: clt,
+// 	}
+// }
 
 const (
 	//CoreDRFWeight is the Dominant Resource Fairness weight of a core
@@ -97,7 +63,7 @@ const (
 )
 
 // RankDRF computes the Dominant Resource Fairness Rank of an host template
-func RankDRF(t *api.HostTemplate) float32 {
+func RankDRF(t *model.HostTemplate) float32 {
 	fc := float32(t.Cores)
 	fr := t.RAMSize
 	fd := float32(t.DiskSize)
@@ -106,7 +72,7 @@ func RankDRF(t *api.HostTemplate) float32 {
 
 // ByRankDRF implements sort.Interface for []HostTemplate based on
 // the Dominant Resource Fairness
-type ByRankDRF []api.HostTemplate
+type ByRankDRF []model.HostTemplate
 
 func (a ByRankDRF) Len() int           { return len(a) }
 func (a ByRankDRF) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
@@ -114,63 +80,63 @@ func (a ByRankDRF) Less(i, j int) bool { return RankDRF(&a[i]) < RankDRF(&a[j]) 
 
 // HostAccess an host and the SSH Key Pair
 type HostAccess struct {
-	Host    *api.Host
-	Key     *api.KeyPair
+	Host    *model.Host
+	Key     *model.KeyPair
 	User    string
 	Gateway *HostAccess
 }
 
 // GetAccessIP returns the access IP
 func (access *HostAccess) GetAccessIP() string {
-	ip := access.Host.AccessIPv4
-	if len(ip) == 0 {
-		ip = access.Host.AccessIPv6
-	}
-	return ip
+	return access.Host.GetAccessIP()
 }
 
-// ServerRequest used to create a server
-type ServerRequest struct {
-	Name string `json:"name,omitempty"`
-	// NetworksIDs list of the network IDs the host must be connected
-	Networks []api.Network `json:"networks,omitempty"`
-	// PublicIP a flg telling if the host must have a public IP is
-	PublicIP bool `json:"public_ip,omitempty"`
-	// TemplateID the UUID of the template used to size the host (see SelectTemplates)
-	Template api.HostTemplate `json:"sizing,omitempty"`
-	// ImageID  is the UUID of the image that contains the server's OS and initial state.
-	OSName string `json:"os_name,omitempty"`
-	// Gateway through which the server can be connected
-	Gateway *HostAccess `json:"gateway,omitempty"`
-}
+// // ServerRequest used to create a server
+// type ServerRequest struct {
+// 	Name string `json:"name,omitempty"`
+// 	// NetworksIDs list of the network IDs the host must be connected
+// 	Networks []model.Network `json:"networks,omitempty"`
+// 	// PublicIP a flg telling if the host must have a public IP is
+// 	PublicIP bool `json:"public_ip,omitempty"`
+// 	// TemplateID the UUID of the template used to size the host (see SelectTemplates)
+// 	Template mode.HostTemplate `json:"sizing,omitempty"`
+// 	// ImageID  is the UUID of the image that contains the server's OS and initial state.
+// 	OSName string `json:"os_name,omitempty"`
+// 	// Gateway through which the server can be connected
+// 	Gateway *HostAccess `json:"gateway,omitempty"`
+// }
 
-//WaitHostState waits an host achieve state
-func (srv *Service) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) (*api.Host, error) {
-	var host *api.Host
+// WaitHostState waits an host achieve state
+func (svc *Service) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) error {
 	var err error
+
 	timer := time.After(timeout)
 	next := true
+	host := model.NewHost()
+	host.ID = hostID
 	for next {
-		host, err = srv.GetHost(hostID)
-		if host == nil {
-			return nil, err
-		} else if host.State == state {
-			return host, err
-		} else if host.State == HostState.ERROR {
-			return host, fmt.Errorf("host in error state")
+		host, err = svc.GetHost(host)
+		if err != nil {
+			return err
+		}
+		if host.LastState == state {
+			return nil
+		}
+		if host.LastState == HostState.ERROR {
+			return fmt.Errorf("host in error state")
 		}
 		select {
 		case <-timer:
-			return host, fmt.Errorf("timeout waiting host '%s' to reach state '%s'", host.Name, state.String())
+			return fmt.Errorf("timeout waiting host '%s' to reach state '%s'", host.Name, state.String())
 		default:
 			time.Sleep(1)
 		}
 	}
-	return host, err
+	return err
 }
 
-//WaitHostState waits an host achieve state
-// func (srv *Service) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) (*api.host, error) {
+// WaitHostState waits an host achieve state
+// func (svc *Service) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) (*api.host, error) {
 // 	cout := make(chan int)
 // 	stop := make(chan bool)
 // 	hostc := make(chan *api.Host)
@@ -250,13 +216,13 @@ func (srv *Service) WaitHostState(hostID string, state HostState.Enum, timeout t
 // 	}
 // }
 
-//WaitVolumeState waits an host achieve state
-func (srv *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*api.Volume, error) {
+// WaitVolumeState waits an host achieve state
+func (svc *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*model.Volume, error) {
 	cout := make(chan int)
 	next := make(chan bool)
-	vc := make(chan *api.Volume)
+	vc := make(chan *model.Volume)
 
-	go pollVolume(srv, volumeID, state, cout, next, vc)
+	go pollVolume(svc, volumeID, state, cout, next, vc)
 	for {
 		select {
 		case res := <-cout:
@@ -273,12 +239,12 @@ func (srv *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 			}
 		case <-time.After(timeout):
 			next <- false
-			return nil, &api.ErrTimeout{Message: "Wait host state timeout"}
+			return nil, &model.ErrTimeout{Message: "Wait host state timeout"}
 		}
 	}
 }
 
-func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, cout chan int, next chan bool, hostc chan *api.Volume) {
+func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, cout chan int, next chan bool, hostc chan *model.Volume) {
 	for {
 
 		v, err := client.GetVolume(volumeID)
@@ -299,34 +265,98 @@ func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, c
 	}
 }
 
-//SelectTemplatesBySize select templates satisfying sizing requirements
-//returned list is ordered by size fitting
-func (srv *Service) SelectTemplatesBySize(sizing api.SizingRequirements) ([]api.HostTemplate, error) {
-	tpls, err := srv.ListTemplates(false)
-	var selectedTpls []api.HostTemplate
+// SelectTemplatesBySize select templates satisfying sizing requirements
+// returned list is ordered by size fitting
+func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force bool) ([]model.HostTemplate, error) {
+	templates, err := svc.ListTemplates(false)
+	var selectedTpls []model.HostTemplate
+	scannerTemplates := map[string]bool{}
 	if err != nil {
 		return nil, err
 	}
-	for _, tpl := range tpls {
-		if tpl.Cores >= sizing.MinCores && (tpl.DiskSize == 0 || tpl.DiskSize >= sizing.MinDiskSize) && tpl.RAMSize >= sizing.MinRAMSize {
-			selectedTpls = append(selectedTpls, tpl)
+
+	askedForSpecificScannerInfo := sizing.MinGPU > 0 || sizing.MinFreq != 0
+	if askedForSpecificScannerInfo {
+		_ = os.MkdirAll(safeutils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+		db, err := scribble.New(safeutils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
+		if err != nil {
+			if !force {
+				fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
+				log.Warnf("Problem creating / accessing Scanner database, ignoring for now...: %v", err)
+			} else {
+				noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+				log.Error(noHostError)
+				return nil, errors.New(noHostError)
+			}
+		} else {
+			image_list, err := db.ReadAll("images")
+			if err != nil {
+				if !force {
+					fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
+					log.Warnf("Error reading Scanner database: %v", err)
+				} else {
+					noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem listing images from Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+					log.Error(noHostError)
+					return nil, errors.New(noHostError)
+				}
+			} else {
+				images := []model.StoredCPUInfo{}
+				for _, f := range image_list {
+					imageFound := model.StoredCPUInfo{}
+					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
+						fmt.Println("Error", err)
+					}
+
+					if imageFound.GPU < int(sizing.MinGPU) {
+						continue
+					}
+
+					if imageFound.CPUFrequency < float64(sizing.MinFreq) {
+						continue
+					}
+
+					images = append(images, imageFound)
+				}
+
+				if !force && (len(images) == 0) {
+					noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, no such host found with those specs !!", sizing.MinGPU, sizing.MinFreq)
+					log.Error(noHostError)
+					return nil, errors.New(noHostError)
+				}
+
+				for _, image := range images {
+					scannerTemplates[image.TemplateID] = true
+				}
+			}
 		}
 	}
+
+	log.Debugf("Looking for machine with: %d cores, %f RAM, and %d Disk", sizing.MinCores, sizing.MinRAMSize, sizing.MinDiskSize)
+
+	for _, template := range templates {
+		if template.Cores >= sizing.MinCores && (template.DiskSize == 0 || template.DiskSize >= sizing.MinDiskSize) && template.RAMSize >= sizing.MinRAMSize {
+			if _, ok := scannerTemplates[template.ID]; ok || !askedForSpecificScannerInfo {
+				selectedTpls = append(selectedTpls, template)
+			}
+		} else {
+			log.Debugf("Discard machine template '%s' with : %d cores, %f RAM, and %d Disk", template.Name, template.Cores, template.RAMSize, template.DiskSize)
+		}
+	}
+
 	sort.Sort(ByRankDRF(selectedTpls))
 	return selectedTpls, nil
 }
 
-//FilterImages search an images corresponding to OS Name
-func (srv *Service) FilterImages(filter string) ([]api.Image, error) {
-
-	imgs, err := srv.ListImages(false)
+// FilterImages search an images corresponding to OS Name
+func (svc *Service) FilterImages(filter string) ([]model.Image, error) {
+	imgs, err := svc.ListImages(false)
 	if err != nil {
 		return nil, err
 	}
 	if len(filter) == 0 {
 		return imgs, nil
 	}
-	fimgs := []api.Image{}
+	fimgs := []model.Image{}
 	//fields := strings.Split(strings.ToUpper(osname), " ")
 	for _, img := range imgs {
 		//score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
@@ -342,10 +372,9 @@ func (srv *Service) FilterImages(filter string) ([]api.Image, error) {
 
 }
 
-//SearchImage search an image corresponding to OS Name
-func (srv *Service) SearchImage(osname string) (*api.Image, error) {
-
-	imgs, err := srv.ListImages(false)
+// SearchImage search an image corresponding to OS Name
+func (svc *Service) SearchImage(osname string) (*model.Image, error) {
+	imgs, err := svc.ListImages(false)
 	if err != nil {
 		return nil, err
 	}
@@ -366,105 +395,200 @@ func (srv *Service) SearchImage(osname string) (*api.Image, error) {
 	//fmt.Println(fields, len(fields))
 	//fmt.Println(len(fields))
 	if maxscore < 0.5 || maxi < 0 || len(imgs) == 0 {
-		return nil, fmt.Errorf("Unable to find an image matching %s", osname)
+		return nil, fmt.Errorf("unable to find an image matching %s", osname)
 	}
+
+	log.Printf("Selected image: '%s' (ID='%s')", imgs[maxi].Name, imgs[maxi].ID)
 	return &imgs[maxi], nil
 }
 
-//CreateHostWithKeyPair creates an host
-func (srv *Service) CreateHostWithKeyPair(request api.HostRequest) (*api.Host, *api.KeyPair, error) {
-	_, err := srv.GetHostByName(request.Name)
+// CreateHostWithKeyPair creates an host
+func (svc *Service) CreateHostWithKeyPair(request model.HostRequest) (*model.Host, *model.KeyPair, error) {
+	_, err := svc.GetHostByName(request.ResourceName)
 	if err == nil {
-		return nil, nil, ResourceAlreadyExistsError("Host", request.Name)
+		return nil, nil, model.ResourceAlreadyExistsError("Host", request.ResourceName)
 	}
 
 	//Create temporary key pair
-	kpNameuuid, _ := uuid.NewV4()
-	kpName := kpNameuuid.String()
-	kp, err := srv.CreateKeyPair(kpName)
+	kpNameuuid, err := uuid.NewV4()
 	if err != nil {
 		return nil, nil, err
 	}
-	//defer srv.DeleteKeyPair(kpName)
 
-	//Create host
-	hostReq := api.HostRequest{
-		Name:       request.Name,
-		ImageID:    request.ImageID,
-		KeyPair:    kp,
-		PublicIP:   request.PublicIP,
-		NetworkIDs: request.NetworkIDs,
-		TemplateID: request.TemplateID,
+	kpName := kpNameuuid.String()
+	kp, err := svc.CreateKeyPair(kpName)
+	if err != nil {
+		return nil, nil, err
 	}
-	host, err := srv.CreateHost(hostReq)
+	//defer svc.DeleteKeyPair(kpName)
+
+	// Create host
+	hostReq := model.HostRequest{
+		ResourceName:   request.ResourceName,
+		HostName:       request.HostName,
+		ImageID:        request.ImageID,
+		KeyPair:        kp,
+		PublicIP:       request.PublicIP,
+		Networks:       request.Networks,
+		DefaultGateway: request.DefaultGateway,
+		TemplateID:     request.TemplateID,
+	}
+	host, err := svc.CreateHost(hostReq)
 	if err != nil {
 		return nil, nil, err
 	}
 	return host, kp, nil
 }
 
-//ListHostsByName list hosts by name
-func (srv *Service) ListHostsByName() (map[string]api.Host, error) {
-	hosts, err := srv.ListHosts(false)
+// ListHostsByName list hosts by name
+func (svc *Service) ListHostsByName() (map[string]*model.Host, error) {
+	hosts, err := svc.ListHosts()
 	if err != nil {
 		return nil, err
 	}
-	hostMap := make(map[string]api.Host)
+	hostMap := make(map[string]*model.Host)
 	for _, host := range hosts {
 		hostMap[host.Name] = host
 	}
 	return hostMap, nil
 }
 
-// GetHostByName returns host corresponding to name
-func (srv *Service) GetHostByName(name string) (*api.Host, error) {
-	hosts, err := srv.ListHostsByName()
+// CreateBucket creates an object container
+func (svc *Service) CreateBucket(bucketName string) error {
+	if svc.ObjectStorage == nil {
+		panic("svc.Location is nil!")
+	}
+	_, err := svc.ObjectStorage.CreateBucket(bucketName)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	host, ok := hosts[name]
-	if !ok {
-		return nil, ResourceNotFoundError("host", name)
-	}
-	return &host, nil
+	return nil
 }
 
-func (srv *Service) getOrCreateDefaultNetwork() (*api.Network, error) {
-	nets, err := srv.ClientAPI.ListNetworks(false)
+// DeleteBucket deletes an object container
+func (svc *Service) DeleteBucket(bucketName string) error {
+	if svc.ObjectStorage == nil {
+		panic("svc.Location is nil!")
+	}
+	return svc.ObjectStorage.DeleteBucket(bucketName)
+}
+
+// ListBuckets list object containers
+func (svc *Service) ListBuckets() ([]string, error) {
+	if svc.ObjectStorage == nil {
+		panic("svc.ObjectStorage is nil!")
+	}
+	return svc.ObjectStorage.ListBuckets(objectstorage.NoPrefix)
+}
+
+// GetBucket returns info about the Bucket
+func (svc *Service) GetBucket(bucketName string) (objectstorage.Bucket, error) {
+	if svc.ObjectStorage == nil {
+		panic("svc.Location is nil!")
+	}
+	return svc.ObjectStorage.GetBucket(bucketName)
+}
+
+// PutObject put an object into a Bucket
+func (svc *Service) PutObject(bucketName string, obj model.Object) error {
+	if svc.ObjectStorage == nil {
+		panic("svc.Location is nil!")
+	}
+	b, err := svc.ObjectStorage.GetBucket(bucketName)
+	if err != nil {
+		return err
+	}
+	_, err = b.WriteObject(obj.Name, obj.Content, obj.Size, nil)
+	return err
+}
+
+// UpdateObjectMetadata update an object into  object container
+func (svc *Service) UpdateObjectMetadata(bucketName string, obj model.Object) error {
+	// Stow doesn't allow Object Metadata only update for now
+	return fmt.Errorf("Not implemented")
+}
+
+// GetObject get object content from a Bucket
+func (svc *Service) GetObject(bucketName string, objectName string, ranges []model.Range) (*model.Object, error) {
+	if svc.ObjectStorage == nil {
+		panic("svc.Location is nil!")
+	}
+	o, err := svc.ObjectStorage.GetObject(bucketName, objectName)
 	if err != nil {
 		return nil, err
 	}
-	var defaultNet *api.Network
-	for _, n := range nets {
-		if n.Name == "net-safescale" {
-			defaultNet = &n
-		}
+	mo := model.Object{
+		ID:       o.GetID(),
+		Name:     o.GetName(),
+		Metadata: o.GetMetadata(),
+		Size:     o.GetSize(),
+		ETag:     o.GetETag(),
 	}
-	if defaultNet == nil {
-		defaultNet, err = srv.CreateNetwork(api.NetworkRequest{
-			CIDR:      "10.0.0.0/8",
-			Name:      "net-safescale",
-			IPVersion: IPVersion.IPv4,
-		})
+	mo.LastModified, err = o.GetLastUpdate()
+	if err != nil {
+		return nil, err
+	}
+	if ranges == nil || len(ranges) == 0 {
+		r := model.NewRange(0, 0)
+		ranges = []model.Range{r}
+	}
+	buf := bytes.NewBuffer(nil)
+	for _, r := range ranges {
+		err = o.Read(buf, int64(*r.From), int64(*r.To))
 		if err != nil {
 			return nil, err
 		}
 	}
-	return defaultNet, nil
+	if mo.Size != int64(buf.Len()) {
+		return nil, fmt.Errorf("object size doesn't match with size of read data")
+	}
+	mo.Content = bytes.NewReader(buf.Bytes())
+	return &mo, nil
 }
 
-// CreateHost creates an host that fulfils the request
-func (srv *Service) CreateHost(request api.HostRequest) (*api.Host, error) {
-	if len(request.NetworkIDs) != 0 {
-		return srv.ClientAPI.CreateHost(request)
+// GetObjectMetadata get object metadata from a Bucket
+func (svc *Service) GetObjectMetadata(bucketName string, objectName string) (*model.Object, error) {
+	if svc.ObjectStorage == nil {
+		panic("svc.ObjectStorage is nil!")
 	}
-
-	net, err := srv.getOrCreateDefaultNetwork()
+	o, err := svc.ObjectStorage.GetObject(bucketName, objectName)
 	if err != nil {
 		return nil, err
 	}
-	request.NetworkIDs = append(request.NetworkIDs, net.ID)
-	return srv.ClientAPI.CreateHost(request)
+	mo := model.Object{
+		ID:       o.GetID(),
+		Name:     o.GetName(),
+		Metadata: o.GetMetadata(),
+		Size:     o.GetSize(),
+		ETag:     o.GetETag(),
+	}
+	mo.LastModified, err = o.GetLastUpdate()
+	if err != nil {
+		return nil, err
+	}
+	return &mo, nil
+}
+
+// ListObjects list objects of a container
+func (svc *Service) ListObjects(bucketName string, filter model.ObjectFilter) ([]string, error) {
+	if svc.ObjectStorage == nil {
+		panic("svc.Location is nil!")
+	}
+	return svc.ObjectStorage.ListObjects(bucketName, filter.Path, filter.Prefix)
+}
+
+// CopyObject copies an object
+func (svc *Service) CopyObject(bucketNameSrc, objectSrc, objectDst string) error {
+	// stow doesn't allow object copy for now
+	return fmt.Errorf("not implemented")
+}
+
+// DeleteObject delete an object from a container
+func (svc *Service) DeleteObject(bucketName, objectName string) error {
+	if svc.ObjectStorage == nil {
+		panic("svc.Location is nil!")
+	}
+	return svc.ObjectStorage.DeleteObject(bucketName, objectName)
 }
 
 func runeIndexes(s string, r rune) []int {
@@ -556,7 +680,7 @@ func score(d int, rsize int) float64 {
 	return float64(rsize-1) / float64(d)
 }
 
-//SimilarityScore computes a similariy score between 2 strings
+// SimilarityScore computes a similariy score between 2 strings
 func SimilarityScore(ref string, s string) float64 {
 	size := len(s)
 	rsize := len(ref)
@@ -566,4 +690,22 @@ func SimilarityScore(ref string, s string) float64 {
 	_, d := bestPath(possiblePathes(runesIndexes(ref, s)), size)
 	ds := math.Abs(float64(size-rsize)) / float64(rsize)
 	return score(d, len(ref)) / (math.Log10(10 * (1. + ds)))
+}
+
+// InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
+// id contains a unique identifier of the tenant (something coming from the provider, not the tenant name)
+func InitializeBucket(svc api.ClientAPI, location objectstorage.Location) error {
+	cfg, err := svc.GetCfgOpts()
+	if err != nil {
+		fmt.Printf("failed to get client options: %s\n", err.Error())
+	}
+	anon, found := cfg.Get("MetadataBucket")
+	if !found || anon.(string) == "" {
+		return fmt.Errorf("failed to get value of option 'MetadataBucket'")
+	}
+	_, err = location.CreateBucket(anon.(string))
+	if err != nil {
+		return err
+	}
+	return nil
 }

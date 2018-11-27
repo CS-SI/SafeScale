@@ -16,15 +16,14 @@ func (i *bashInstaller) GetName() string {
 }
 
 // Check checks if the feature is installed, using the check script in Specs
-func (i *bashInstaller) Check(c *Feature, t Target, v Variables, s Settings) (Results, error) {
-	specs := c.Specs()
+func (i *bashInstaller) Check(f *Feature, t Target, v Variables, s Settings) (Results, error) {
 	yamlKey := "feature.install.bash.check"
-	if !specs.IsSet(yamlKey) {
+	if !f.specs.IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename(), yamlKey)
+		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(c, t, Method.Bash, Action.Check, nil)
+	worker, err := newWorker(f, t, Method.Bash, Action.Check, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -39,16 +38,15 @@ func (i *bashInstaller) Check(c *Feature, t Target, v Variables, s Settings) (Re
 
 // Add installs the feature using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
-func (i *bashInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Results, error) {
+func (i *bashInstaller) Add(f *Feature, t Target, v Variables, s Settings) (Results, error) {
 	// Determining if install script is defined in specification file
-	specs := c.Specs()
-	if !specs.IsSet("feature.install.bash.add") {
+	if !f.specs.IsSet("feature.install.bash.add") {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key 'feature.install.bash.add' found`
-		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
+		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename())
 	}
 
-	worker, err := newWorker(c, t, Method.Bash, Action.Add, nil)
+	worker, err := newWorker(f, t, Method.Bash, Action.Add, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -66,15 +64,14 @@ func (i *bashInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Resu
 }
 
 // Remove uninstalls the feature
-func (i *bashInstaller) Remove(c *Feature, t Target, v Variables, s Settings) (Results, error) {
-	specs := c.Specs()
-	if !specs.IsSet("feature.install.bash.remove") {
+func (i *bashInstaller) Remove(f *Feature, t Target, v Variables, s Settings) (Results, error) {
+	if !f.specs.IsSet("feature.install.bash.remove") {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key 'feature.install.bash.remove' found`
-		return nil, fmt.Errorf(msg, c.DisplayName(), c.DisplayFilename())
+		return nil, fmt.Errorf(msg, f.DisplayName(), f.DisplayFilename())
 	}
 
-	worker, err := newWorker(c, t, Method.Bash, Action.Remove, nil)
+	worker, err := newWorker(f, t, Method.Bash, Action.Remove, nil)
 	if err != nil {
 		return nil, err
 	}

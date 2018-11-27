@@ -29,12 +29,17 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"text/template"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"golang.org/x/crypto/ssh"
 )
@@ -109,12 +114,13 @@ type SSHConfig struct {
 	Host          string
 	PrivateKey    string
 	Port          int
+	LocalPort     int
 	GatewayConfig *SSHConfig
 	cmdTpl        string
 }
 
 // SSHTunnel a SSH tunnel
-type sshTunnel struct {
+type SSHTunnel struct {
 	port      int
 	cmd       *exec.Cmd
 	cmdString string
@@ -137,31 +143,33 @@ func SCPErrorString(retcode int) string {
 	return "Unqualified error"
 }
 
-// Close close ssh tunnel
-func (tunnel *sshTunnel) Close() error {
-	defer os.Remove(tunnel.keyFile.Name())
+// Close closes ssh tunnel
+func (tunnel *SSHTunnel) Close() error {
+	defer utils.LazyRemove(tunnel.keyFile.Name())
 
+	// Kills the process of the tunnel
 	err := tunnel.cmd.Process.Kill()
 	if err != nil {
+		log.Printf("tunnel.cmd.Process.Kill() failed: %s\n", reflect.TypeOf(err).String())
 		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
 	}
+	// Kills remaining processes if there are some
 	bytes, err := exec.Command("pgrep", "-f", tunnel.cmdString).Output()
-	if err != nil {
-		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
-	}
-	portStr := strings.Trim(string(bytes), "\n")
-	_, err = strconv.Atoi(portStr)
-	if err != nil {
-		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
-	}
-	err = exec.Command("kill", "-9", portStr).Run()
-	if err != nil {
-		return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+	if err == nil {
+		portStr := strings.Trim(string(bytes), "\n")
+		_, err = strconv.Atoi(portStr)
+		if err == nil {
+			err = exec.Command("kill", "-9", portStr).Run()
+			if err != nil {
+				log.Printf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
+				return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+			}
+		}
 	}
 	return nil
 }
 
-// GetFreePort get a frre port
+// GetFreePort get a free port
 func getFreePort() (int, error) {
 	listener, err := net.Listen("tcp", ":0")
 	defer listener.Close()
@@ -174,13 +182,30 @@ func getFreePort() (int, error) {
 
 // CreateTempFileFromString creates a tempory file containing 'content'
 func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, error) {
-	f, err := ioutil.TempFile("/tmp", "")
+	defaultTmpDir := "/tmp"
+	if runtime.GOOS == "windows" {
+		defaultTmpDir = ""
+	}
+
+	f, err := ioutil.TempFile(defaultTmpDir, "") // TODO Windows friendly
 	if err != nil {
 		return nil, err
 	}
-	f.WriteString(content)
-	f.Chmod(filemode)
-	f.Close()
+	_, err = f.WriteString(content)
+	if err != nil {
+		log.Warnf("Error writing string: %v", err)
+	}
+
+	err = f.Chmod(filemode)
+	if err != nil {
+		log.Warnf("Error changing directory: %v", err)
+	}
+
+	err = f.Close()
+	if err != nil {
+		log.Warnf("Error closing file: %v", err)
+	}
+
 	return f, nil
 }
 
@@ -190,25 +215,33 @@ func isTunnelReady(port int) bool {
 	if err != nil {
 		return true
 	}
-	server.Close()
+	err = server.Close()
+	if err != nil {
+		log.Warnf("Error closing server: %v", err)
+	}
 	return false
 
 }
 
-// createTunnel create SSH from local host to remote host throw gateway
-func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
+// createTunnel create SSH from local host to remote host through gateway
+// if localPort is set to 0 then it's  automatically choosed
+func createTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
 		return nil, err
 	}
-	freePort, err := getFreePort()
-	if err != nil {
-		return nil, err
+	localPort := cfg.LocalPort
+	if localPort == 0 {
+		localPort, err = getFreePort()
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	options := "-q -oServerAliveInterval=60 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 	cmdString := fmt.Sprintf("ssh -i %s -NL %d:%s:%d %s@%s %s -p %d",
 		f.Name(),
-		freePort,
+		localPort,
 		cfg.Host,
 		cfg.Port,
 		cfg.GatewayConfig.User,
@@ -223,11 +256,11 @@ func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 		return nil, err
 	}
 
-	for nbiter := 0; !isTunnelReady(freePort) && nbiter < 100; nbiter++ {
+	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
 	}
-	return &sshTunnel{
-		port:      freePort,
+	return &SSHTunnel{
+		port:      localPort,
 		cmd:       cmd,
 		cmdString: cmdString,
 		keyFile:   f,
@@ -237,7 +270,7 @@ func createTunnel(cfg *SSHConfig) (*sshTunnel, error) {
 // SSHCommand defines a SSH command
 type SSHCommand struct {
 	cmd     *exec.Cmd
-	tunnels []*sshTunnel
+	tunnels []*SSHTunnel
 	keyFile *os.File
 }
 
@@ -247,6 +280,9 @@ func (c *SSHCommand) closeTunnels() error {
 		err = t.Close()
 	}
 	//Tunnels are imbricated only last error is significant
+	if err != nil {
+		log.Printf("closeTunnels: %s\n", reflect.TypeOf(err).String())
+	}
 	return err
 }
 
@@ -255,10 +291,13 @@ func (c *SSHCommand) closeTunnels() error {
 // The returned error is nil if the command runs, has no problems copying stdin, stdout, and stderr, and exits with a zero exit status.
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
-// Wait releases any resources associated with the Cmd.
+// Wait releases any resources associated with the cmd.
 func (c *SSHCommand) Wait() error {
 	err := c.cmd.Wait()
-	c.end()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warnf("Error waiting for command end: %v", nerr)
+	}
 	return err
 
 }
@@ -266,7 +305,10 @@ func (c *SSHCommand) Wait() error {
 // Kill kills SSHCommand process and releases any resources associated with the SSHCommand.
 func (c *SSHCommand) Kill() error {
 	err := c.cmd.Process.Kill()
-	c.end()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warnf("Error waiting for command end: %v", nerr)
+	}
 	return err
 }
 
@@ -296,7 +338,10 @@ func (c *SSHCommand) StdinPipe() (io.WriteCloser, error) {
 // If c.Stderr was nil, Output populates ExitError.Stderr.
 func (c *SSHCommand) Output() ([]byte, error) {
 	content, err := c.cmd.Output()
-	c.end()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warnf("Error waiting for command end: %v", nerr)
+	}
 	return content, err
 }
 
@@ -304,7 +349,10 @@ func (c *SSHCommand) Output() ([]byte, error) {
 // output and standard error.
 func (c *SSHCommand) CombinedOutput() ([]byte, error) {
 	content, err := c.cmd.CombinedOutput()
-	c.end()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warnf("Error waiting for command end: %v", nerr)
+	}
 	return content, err
 }
 
@@ -348,7 +396,10 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 	msgErr, _ := ioutil.ReadAll(stderr)
 
 	err = c.Wait()
-	c.end()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warnf("Error waiting for command end: %v", nerr)
+	}
 	if err != nil {
 		msgError, retCode, erro := ExtractRetCode(err)
 		if erro != nil {
@@ -363,17 +414,18 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 
 func (c *SSHCommand) end() error {
 	err1 := c.closeTunnels()
-	err2 := os.Remove(c.keyFile.Name())
+	err2 := utils.LazyRemove(c.keyFile.Name())
 	if err1 != nil {
-		return fmt.Errorf("Unable to close ssh tunnels : %s", err1.Error())
+		log.Printf("closeTunnels() failed: %s\n", reflect.TypeOf(err1).String())
+		return fmt.Errorf("Unable to close ssh tunnels: %s", err1.Error())
 	}
 	if err2 != nil {
-		return fmt.Errorf("Unable to close ssh tunnels : %s", err2.Error())
+		return fmt.Errorf("Unable to close ssh tunnels: %s", err2.Error())
 	}
 	return nil
 }
 
-func recCreateTunnels(ssh *SSHConfig, tunnels *[]*sshTunnel) (*sshTunnel, error) {
+func recCreateTunnels(ssh *SSHConfig, tunnels *[]*SSHTunnel) (*SSHTunnel, error) {
 	if ssh != nil {
 		tunnel, err := recCreateTunnels(ssh.GatewayConfig, tunnels)
 		if err != nil {
@@ -400,8 +452,8 @@ func recCreateTunnels(ssh *SSHConfig, tunnels *[]*sshTunnel) (*sshTunnel, error)
 
 }
 
-func (ssh *SSHConfig) createTunnels() ([]*sshTunnel, *SSHConfig, error) {
-	var tunnels []*sshTunnel
+func (ssh *SSHConfig) CreateTunnels() ([]*SSHTunnel, *SSHConfig, error) {
+	var tunnels []*SSHTunnel
 	tunnel, err := recCreateTunnels(ssh, &tunnels)
 	if err != nil {
 		if err != nil {
@@ -453,18 +505,18 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 
 }
 
-// Command returns the Cmd struct to execute cmdString remotely
+// Command returns the cmd struct to execute cmdString remotely
 func (ssh *SSHConfig) Command(cmdString string) (*SSHCommand, error) {
 	return ssh.command(cmdString, false)
 }
 
-// SudoCommand returns the Cmd struct to execute cmdString remotely. Command is executed with sudo
+// SudoCommand returns the cmd struct to execute cmdString remotely. Command is executed with sudo
 func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
 	return ssh.command(cmdString, true)
 }
 
 func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, error) {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -486,7 +538,10 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			cmd, _ := ssh.Command("sudo cat /var/tmp/user_data.done")
+			cmd, err := ssh.Command("sudo cat /var/tmp/user_data.done")
+			if err != nil {
+				return err
+			}
 
 			retcode, _, stderr, err := cmd.Run()
 			if err != nil {
@@ -503,25 +558,28 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		timeout,
 	)
 	if err != nil {
-		logCmd, _ := ssh.Command("sudo cat /var/tmp/user_data.log")
+		originalErr := err
+		logCmd, err := ssh.Command("sudo cat /var/tmp/user_data.log")
+		if err != nil {
+			return err
+		}
 
 		retcode, stdout, stderr, logErr := logCmd.Run()
 		if logErr == nil {
 			if retcode == 0 {
-				return fmt.Errorf("server '%s' is not ready yet : %s, Log content of file user_data.log: %s", ssh.Host, err.Error(), stdout)
-			} else {
-				return fmt.Errorf("server '%s' is not ready yet : %s, Error reading user_data.log: %s", ssh.Host, err.Error(), stderr)
+				return fmt.Errorf("server '%s' is not ready yet : %s, Log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)
 			}
+			return fmt.Errorf("server '%s' is not ready yet : %s, Error reading user_data.log: %s", ssh.Host, originalErr.Error(), stderr)
 		}
 
-		return fmt.Errorf("server '%s' is not ready yet : %s", ssh.Host, err.Error())
+		return fmt.Errorf("server '%s' is not ready yet : %s", ssh.Host, originalErr.Error())
 	}
 	return nil
 }
 
 // Copy copy a file/directory from/to local to/from remote
 func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, string, string, error) {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		return 0, "", "", fmt.Errorf("Unable to create tunnels : %s", err.Error())
 	}
@@ -560,7 +618,6 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	}
 
 	sshCmdString := copyCommand.String()
-
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
@@ -573,30 +630,45 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 
 // Exec executes the cmd using ssh
 func (ssh *SSHConfig) Exec(cmdString string) error {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		if keyFile != nil {
-			os.Remove(keyFile.Name())
+			nerr := utils.LazyRemove(keyFile.Name())
+			if nerr != nil {
+				log.Warnf("Error removing file %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
 	bash, err := exec.LookPath("bash")
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		if keyFile != nil {
-			os.Remove(keyFile.Name())
+			nerr := utils.LazyRemove(keyFile.Name())
+			if nerr != nil {
+				log.Warnf("Error removing file %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -607,16 +679,21 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 		args = []string{"-c", sshCmdString}
 	}
 	err = syscall.Exec(bash, args, nil)
-	os.Remove(keyFile.Name())
+	nerr := utils.LazyRemove(keyFile.Name())
+	if nerr != nil {
+	}
 	return err
 }
 
 // Enter Enter to interactive shell
 func (ssh *SSHConfig) Enter() error {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -624,10 +701,16 @@ func (ssh *SSHConfig) Enter() error {
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, "", false)
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		if keyFile != nil {
-			os.Remove(keyFile.Name())
+			nerr := utils.LazyRemove(keyFile.Name())
+			if nerr != nil {
+				log.Warnf("Error removing file %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -635,10 +718,16 @@ func (ssh *SSHConfig) Enter() error {
 	bash, err := exec.LookPath("bash")
 	if err != nil {
 		for _, t := range tunnels {
-			t.Close()
+			nerr := t.Close()
+			if nerr != nil {
+				log.Warnf("Error closing ssh tunnel: %v", nerr)
+			}
 		}
 		if keyFile != nil {
-			os.Remove(keyFile.Name())
+			nerr := utils.LazyRemove(keyFile.Name())
+			if nerr != nil {
+				log.Warnf("Error removing file %v", nerr)
+			}
 		}
 		return fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -648,7 +737,10 @@ func (ssh *SSHConfig) Enter() error {
 	proc.Stdout = os.Stdout
 	proc.Stderr = os.Stderr
 	err = proc.Run()
-	os.Remove(keyFile.Name())
+	nerr := utils.LazyRemove(keyFile.Name())
+	if nerr != nil {
+		log.Warnf("Error removing file %v", nerr)
+	}
 	return err
 }
 
@@ -658,7 +750,7 @@ func (ssh *SSHConfig) Enter() error {
 // os.Process.Kill) if the context becomes done before the command
 // completes on its own.
 func (ssh *SSHConfig) CommandContext(ctx context.Context, cmdString string) (*SSHCommand, error) {
-	tunnels, sshConfig, err := ssh.createTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}

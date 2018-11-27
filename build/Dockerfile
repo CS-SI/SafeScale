@@ -1,7 +1,8 @@
 #FROM golang:1.10
 FROM ubuntu:artful
 LABEL maintainer="CS SI"
-
+ARG http_proxy=
+ARG https_proxy=
 ENV DEBIAN_FRONTEND noninteractive
 
 # -----------------

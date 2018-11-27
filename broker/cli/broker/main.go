@@ -18,52 +18,64 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"sort"
-	"time"
 
-	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
-
+	log "github.com/sirupsen/logrus"
 	cli "github.com/urfave/cli"
 
-	context "golang.org/x/net/context"
-	"google.golang.org/grpc"
+	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
+	"github.com/CS-SI/SafeScale/broker/utils"
 )
-
-const (
-	address           = "localhost:50051"
-	timeoutCtxDefault = 10 * time.Second
-	timeoutCtxHost    = 2 * time.Minute
-)
-
-func getConnection() *grpc.ClientConn {
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	return conn
-}
-
-func getContext(timeout time.Duration) (context.Context, context.CancelFunc) {
-	// Contact the server and print out its response.
-	return context.WithTimeout(context.Background(), timeout)
-}
 
 func main() {
 
 	app := cli.NewApp()
 	app.Name = "broker"
 	app.Usage = "broker COMMAND"
-	app.Version = "0.0.1"
+	app.Version = VERSION + "-" + BUILD_DATE
 	app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "CS-SI",
 			Email: "safescale@c-s.fr",
 		},
 	}
+
 	app.EnableBashCompletion = true
+
+	cli.VersionFlag = cli.BoolFlag{
+		Name:  "version, V",
+		Usage: "Print program version",
+	}
+
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:  "verbose, v",
+			Usage: "Increase verbosity",
+		},
+		cli.BoolFlag{
+			Name:  "debug, d",
+			Usage: "Show debug information",
+		},
+		// cli.IntFlag{
+		// 	Name:  "port, p",
+		// 	Usage: "Bind to specified port `PORT`",
+		// 	Value: 50051,
+		// },
+	}
+
+	app.Before = func(c *cli.Context) error {
+		log.SetLevel(log.WarnLevel)
+		if c.GlobalBool("verbose") {
+			log.SetLevel(log.InfoLevel)
+			utils.Verbose = true
+		}
+		if c.GlobalBool("debug") {
+			log.SetLevel(log.DebugLevel)
+			utils.Debug = true
+		}
+		return nil
+	}
 
 	app.Commands = append(app.Commands, cmd.NetworkCmd)
 	sort.Sort(cli.CommandsByName(cmd.NetworkCmd.Subcommands))
@@ -80,11 +92,11 @@ func main() {
 	app.Commands = append(app.Commands, cmd.SSHCmd)
 	sort.Sort(cli.CommandsByName(cmd.SSHCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.ContainerCmd)
-	sort.Sort(cli.CommandsByName(cmd.ContainerCmd.Subcommands))
+	app.Commands = append(app.Commands, cmd.BucketCmd)
+	sort.Sort(cli.CommandsByName(cmd.BucketCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.NasCmd)
-	sort.Sort(cli.CommandsByName(cmd.NasCmd.Subcommands))
+	app.Commands = append(app.Commands, cmd.ShareCmd)
+	sort.Sort(cli.CommandsByName(cmd.ShareCmd.Subcommands))
 
 	app.Commands = append(app.Commands, cmd.ImageCmd)
 	sort.Sort(cli.CommandsByName(cmd.ImageCmd.Subcommands))

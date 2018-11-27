@@ -19,13 +19,18 @@ package nfs
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"text/template"
 	"time"
 
+	"github.com/pkg/errors"
+
+	log "github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/GeertJohan/go.rice"
 )
@@ -76,28 +81,73 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		return 255, "", "", fmt.Errorf("failed to execute template: %s", err.Error())
 	}
 	content := buffer.String()
+
+	// Copy script to remote host with retries if needed
 	f, err := system.CreateTempFileFromString(content, 0600)
 	if err != nil {
 		return 255, "", "", fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
 	filename := "/var/tmp/" + name
-	retcode, stdout, stderr, err := sshconfig.Copy(filename, f.Name(), true)
-	if err != nil {
-		return 255, "", "", err
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			retcode, stdout, stderr, err := sshconfig.Copy(filename, f.Name(), true)
+			if err != nil {
+				log.Errorf("Ssh operation failed: %s", err.Error())
+				return errors.Wrapf(err, "Ssh operation failed: %s", err.Error())
+			}
+			if retcode != 0 {
+				log.Debugf("Script copy failed: %s, %s", stdout, stderr)
+				return fmt.Errorf(stderr)
+			}
+			return nil
+		},
+		5*time.Minute,
+	)
+	if retryErr != nil {
+		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
 	}
-	if retcode != 0 {
-		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", stderr)
-	}
-	os.Remove(f.Name())
 
-	var cmd string
+	// TODO Remove later
+	k, uperr := sshconfig.Command("which scp")
+	if uperr != nil {
+		_, uptext, _, kerr := k.Run()
+		if kerr == nil {
+			connected := strings.Contains(uptext, "/scp")
+			if !connected {
+				log.Warn("SSH problem ?")
+			}
+		}
+	}
+
+	// TODO Remove later
+	k, uperr = sshconfig.SudoCommand("which scp")
+	if uperr != nil {
+		_, uptext, _, kerr := k.Run()
+		if kerr == nil {
+			connected := strings.Contains(uptext, "/scp")
+			if !connected {
+				log.Warn("SUDO problem ?")
+			}
+		}
+	}
+
+	nerr := utils.LazyRemove(f.Name())
+	if nerr != nil {
+		log.Warnf("Error deleting file: %v", nerr)
+	}
+
+	// Execute script on remote host with retries if needed
+	var (
+		cmd, stdout, stderr string
+		retcode             int
+	)
 	// if debug
 	if false {
 		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s", filename, filename)
 	} else {
 		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; rm -f %s; exit $rc", filename, filename, filename)
 	}
-	retryErr := retry.Action(
+	retryErr = retry.Action(
 		func() error {
 			stdout = ""
 			stderr = ""
@@ -121,22 +171,52 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			}
 			return err
 		},
-		retry.PrevailDone(retry.Unsuccessful255(), retry.Timeout(1*time.Minute)),
+		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(1*time.Minute)),
 		retry.Constant(5*time.Second),
 		nil, nil, nil,
 	)
 	if retryErr != nil {
-		return 255, "", "", retryErr
+		switch retryErr.(type) {
+		case retry.ErrTimeout:
+			log.Errorf("Timeout running remote script '%s'", name)
+			return 255, stdout, stderr, retryErr
+		default:
+			return 255, stdout, stderr, retryErr
+		}
 	}
+
+	/*
+	k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
+	if uperr != nil {
+		log.Warn("Network problem...")
+	} else {
+		_, uptext, _, kerr := k.Run()
+		if kerr == nil {
+			log.Warnf("Network working !!: %s", uptext)
+		}
+	}
+	*/
+
 	return retcode, stdout, stderr, err
 }
 
 func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err error, msg string) error {
 	if err != nil {
-		return err
+		log.Debugf("Standard output: [%s]", stdout)
+		log.Debugf("Standard error: [%s]", stderr)
+
+		// TODO Simplification of error message
+		collected := ""
+		errLines := strings.Split(stderr, "\n")
+		for _, errline := range errLines {
+			if strings.Contains(errline, "An error occurred in line") {
+				collected += errline + ";"
+			}
+		}
+		return errors.Wrapf(err, "%s: std error [%s]", msg, collected)
 	}
 	if retcode != 0 {
-		return fmt.Errorf("%s: %s", msg, stderr)
+		return fmt.Errorf("%s: Errorcode [%d], std error [%s], std output [%s]", msg, retcode, stderr, stdout)
 	}
 	return nil
 }

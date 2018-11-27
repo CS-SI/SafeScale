@@ -18,41 +18,38 @@ package metadata
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/CS-SI/SafeScale/providers/objectstorage"
 )
 
-// InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
-// id contains a unique identifier of the tenant (something coming from the provider, not the tenant name)
-func InitializeBucket(client api.ClientAPI) error {
-	svc := providers.FromClient(client)
-	cfg, err := client.GetCfgOpts()
+var bucketName string
+
+// InitializeBucket creates the Object Storage Bucket that will store the metadata
+func InitializeBucket(location objectstorage.Location) error {
+	_, err := location.CreateBucket(bucketName)
 	if err != nil {
-		fmt.Printf("failed to get client options: %s\n", err.Error())
+		return fmt.Errorf("failed to create Object Storage Bucket '%s': %s", bucketName, err.Error())
 	}
-	anon, found := cfg.Get("MetadataBucket")
-	if !found || anon.(string) == "" {
-		return fmt.Errorf("failed to get value of option 'MetadataBucket'")
-	}
-	return svc.CreateContainer(anon.(string))
+	return nil
 }
 
-// Folder describes a metadata folder
+//Folder describes a metadata folder
 type Folder struct {
 	//path contains the base path where to read/write record in Object Storage
-	path       string
-	svc        *providers.Service
-	bucketName string
+	path     string
+	service  *providers.Service
+	crypt    bool
+	cryptKey []byte
 }
 
 // FolderDecoderCallback is the prototype of the function that will decode data read from Metadata
-type FolderDecoderCallback func(buf *bytes.Buffer) error
+type FolderDecoderCallback func([]byte) error
 
 // NewFolder creates a new Metadata Folder object, ready to help access the metadata inside it
 func NewFolder(svc *providers.Service, path string) *Folder {
@@ -63,20 +60,32 @@ func NewFolder(svc *providers.Service, path string) *Folder {
 	if err != nil {
 		panic(fmt.Sprintf("config options are not available! %s", err.Error()))
 	}
-	name, found := cfg.Get("MetadataBucket")
-	if !found {
-		panic("config option 'MetadataBucket' is not set!")
+	cryptKey, crypt := cfg.Get("MetadataKey")
+	f := &Folder{
+		path:    strings.Trim(path, "/"),
+		service: svc,
+		// bucketName: name.(string),
+		crypt: crypt,
 	}
-	return &Folder{
-		path:       strings.Trim(path, "/"),
-		svc:        svc,
-		bucketName: name.(string),
+	if crypt {
+		f.cryptKey = []byte(cryptKey.(string))
 	}
+	return f
 }
 
 // GetService returns the service used by the folder
 func (f *Folder) GetService() *providers.Service {
-	return f.svc
+	return f.service
+}
+
+// GetClient returns the api.ClientAPI used by the folder
+func (f *Folder) GetClient() api.ClientAPI {
+	return f.service.ClientAPI
+}
+
+// GetBucket returns the bucket used by the folder to store Object Storage
+func (f *Folder) GetBucket() objectstorage.Bucket {
+	return f.service.MetadataBucket
 }
 
 // GetPath returns the base path of the folder
@@ -101,9 +110,7 @@ func (f *Folder) absolutePath(path ...string) string {
 // Search tells if the object named 'name' is inside the ObjectStorage folder
 func (f *Folder) Search(path string, name string) (bool, error) {
 	absPath := strings.Trim(f.absolutePath(path), "/")
-	list, err := f.svc.ListObjects(f.bucketName, api.ObjectFilter{
-		Path: absPath,
-	})
+	list, err := f.service.MetadataBucket.List(absPath, objectstorage.NoPrefix)
 	if err != nil {
 		return false, err
 	}
@@ -122,14 +129,14 @@ func (f *Folder) Search(path string, name string) (bool, error) {
 
 // Delete removes metadata passed as parameter
 func (f *Folder) Delete(path string, name string) error {
-	err := f.svc.DeleteObject(f.bucketName, f.absolutePath(path, name))
+	err := f.service.MetadataBucket.DeleteObject(f.absolutePath(path, name))
 	if err != nil {
 		return fmt.Errorf("failed to remove metadata in Object Storage: %s", err.Error())
 	}
 	return nil
 }
 
-// Read loads the content of the object stored in metadata container
+// Read loads the content of the object stored in metadata bucket
 // returns false, nil if the object is not found
 // returns false, err if an error occured
 // returns true, nil if the object has been found
@@ -140,59 +147,69 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 		return false, err
 	}
 	if found {
-		o, err := f.svc.GetObject(f.bucketName, f.absolutePath(path, name), nil)
+		var buffer bytes.Buffer
+		_, err := f.service.MetadataBucket.ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
 		if err != nil {
 			return false, err
 		}
-		var buffer bytes.Buffer
-		buffer.ReadFrom(o.Content)
-		if err != nil {
-			return true, err
+		data := buffer.Bytes()
+		if f.crypt {
+			data, err = decrypt(f.cryptKey, data)
+			if err != nil {
+				return false, err
+			}
 		}
-		return true, callback(&buffer)
+		return true, callback(data)
 	}
 	return false, nil
 }
 
 // Write writes the content in Object Storage
-func (f *Folder) Write(path string, name string, content interface{}) error {
-	var buffer bytes.Buffer
-	err := gob.NewEncoder(&buffer).Encode(content)
-	if err != nil {
-		return err
+func (f *Folder) Write(path string, name string, content []byte) error {
+	var (
+		data []byte
+		err  error
+	)
+
+	if f.crypt {
+		data, err = encrypt(f.cryptKey, content)
+		if err != nil {
+			return err
+		}
+	} else {
+		data = content
 	}
 
-	return f.svc.PutObject(f.bucketName, api.Object{
-		Name:    f.absolutePath(path, name),
-		Content: bytes.NewReader(buffer.Bytes()),
-	})
+	source := bytes.NewBuffer(data)
+	_, err = f.service.MetadataBucket.WriteObject(f.absolutePath(path, name), source, int64(source.Len()), nil)
+	return err
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
 func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
-	list, err := f.svc.ListObjects(f.bucketName, api.ObjectFilter{
-		Path: strings.Trim(f.absolutePath(path), "/"),
-	})
+	list, err := f.service.MetadataBucket.List(f.absolutePath(path), objectstorage.NoPrefix)
 	if err != nil {
-		//TODO: AWS adherance, to be changed !!!
-		// If bucket not found, return nil; no item will be processed, meaning empty path
-		if awsError, ok := err.(awserr.RequestFailure); ok {
-			if awsError.StatusCode() == 404 {
-				return nil
-			}
-		}
+		log.Errorf("Error browsing metadata: listing objects: %+v", err)
 		return err
 	}
 
 	for _, i := range list {
-		o, err := f.svc.GetObject(f.bucketName, i, nil)
+		var buffer bytes.Buffer
+		_, err = f.service.MetadataBucket.ReadObject(i, &buffer, 0, 0)
 		if err != nil {
+			log.Errorf("Error browsing metadata: reading from buffer: %+v", err)
 			return err
 		}
-		var buffer bytes.Buffer
-		buffer.ReadFrom(o.Content)
-		err = callback(&buffer)
+		data := buffer.Bytes()
+		if f.crypt {
+			data, err = decrypt(f.cryptKey, data)
+			if err != nil {
+				return err
+			}
+		}
+		err = callback(data)
 		if err != nil {
+			log.Errorf("Error browsing metadata: running callback: %+v", err)
 			return err
 		}
 	}

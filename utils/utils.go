@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package utils
 
 import (
@@ -29,7 +30,6 @@ import (
 
 // AbsPathify ...
 func AbsPathify(inPath string) string {
-
 	r, _ := regexp.Compile("(\\$[\\{]{1}[A-Z]+[\\}]{1})|(\\$[A-Z]+)")
 	found := r.FindAllString(inPath, -1)
 
@@ -41,41 +41,16 @@ func AbsPathify(inPath string) string {
 	for _, key := range found {
 		ks := ""
 		if strings.Contains(key, "{") {
-			ks = key[2:len(key)-1]
+			ks = key[2 : len(key)-1]
 		} else {
 			ks = key[1:]
 		}
 
 		if val, ok := overrides[ks]; ok {
 			inPath = strings.Replace(inPath, key, val, -1)
-		} else
-		{
+		} else {
 			inPath = strings.Replace(inPath, key, os.Getenv(ks), -1)
 		}
-	}
-
-	if filepath.IsAbs(inPath) {
-		return filepath.Clean(inPath)
-	}
-
-	p, err := filepath.Abs(inPath)
-	if err == nil {
-		return filepath.Clean(p)
-	}
-
-	return ""
-}
-
-
-// TODO Remove this later
-func OriginalAbsPathify(inPath string) string {
-	if strings.HasPrefix(inPath, "$HOME") {
-		inPath = userHomeDir() + inPath[5:]
-	}
-
-	if strings.HasPrefix(inPath, "$") {
-		end := strings.Index(inPath, string(os.PathSeparator))
-		inPath = os.Getenv(inPath[1:end]) + inPath[end:]
 	}
 
 	if filepath.IsAbs(inPath) {
@@ -126,4 +101,28 @@ func ExtractRetCode(err error) (string, int, error) {
 		return msg, retCode, nil
 	}
 	return msg, retCode, fmt.Errorf("Error is not an 'ExitError'")
+}
+
+// Plural returns 's' if value > 1, "" otherwise
+func Plural(value int) string {
+	if value > 1 {
+		return "s"
+	}
+	return ""
+}
+
+// TitleFirst makes the first letter of the first word uppercased
+func TitleFirst(value string) string {
+	fields := strings.Fields(value)
+	if len(fields) > 0 {
+		// WORKAROUND: strings.Title consider ' as the beginning of a new word, so "can't" becomes "Can'T"...
+		quoted := strings.Split(fields[0], "'")
+		if len(quoted) > 1 {
+			quoted[0] = strings.Title(quoted[0])
+			fields[0] = strings.Join(quoted, "'")
+		} else {
+			fields[0] = strings.Title(fields[0])
+		}
+	}
+	return strings.Join(fields, " ")
 }

@@ -18,24 +18,23 @@ package openstack
 
 import (
 	"fmt"
-	"log"
-	"reflect"
-
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
-
-	"github.com/CS-SI/SafeScale/utils/metadata"
 
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/pagination"
+
+	"net/http"
+
+	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/metadata"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 )
 
-/*AuthOptions fields are the union of those recognized by each identity implementation and
-provider.
-*/
+// AuthOptions fields are the union of those recognized by each identity implementation and
+// provider.
 type AuthOptions struct {
 	// IdentityEndpoint specifies the HTTP endpoint that is required to work with
 	// the Identity API of the appropriate version. While it's ultimately needed by
@@ -67,7 +66,7 @@ type AuthOptions struct {
 	// cache your credentials in memory, and to allow Gophercloud to attempt to
 	// re-authenticate automatically if/when your token expires.  If you set it to
 	// false, it will not cache these settings, but re-authentication will not be
-	// possible.  This setting defaults to false.
+	// possible. This setting defaults to false.
 	//
 	// NOTE: The reauth function will try to re-authenticate endlessly if left unchecked.
 	// The way to limit the number of attempts is to provide a custom HTTP client to the provider client
@@ -91,28 +90,22 @@ type AuthOptions struct {
 type CfgOptions struct {
 	// Name of the provider (external) network
 	ProviderNetwork string
-
 	// DNSList list of DNS
 	DNSList []string
-
 	// UseFloatingIP indicates if floating IP are used (optional)
 	UseFloatingIP bool
-
 	// UseLayer3Networking indicates if layer 3 networking features (router) can be used
 	// if UseFloatingIP is true UseLayer3Networking must be true
 	UseLayer3Networking bool
-
 	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
 	AutoHostNetworkInterfaces bool
-
 	// VolumeSpeeds map volume types with volume speeds
 	VolumeSpeeds map[string]VolumeSpeed.Enum
-
-	// S3Protocol protocol used to mount object storage (ex: swiftks or s3)
-	S3Protocol string
-
-	// MetadataBucketName contains the name of the bucket storing metadata
-	MetadataBucketName string
+	// // ObjectStorageType type of Object Storage (ex: swift or s3)
+	// ObjectStorageType string
+	// MetadataBucket contains the name of the bucket storing metadata
+	MetadataBucket string
+	DefaultImage   string
 }
 
 // ProviderErrorToString creates an error string from openstack api error
@@ -135,9 +128,56 @@ func ProviderErrorToString(err error) string {
 	case *gc.ErrUnexpectedResponseCode:
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
 	default:
-		log.Printf("ProviderErrorToString(%s)\n", reflect.TypeOf(err))
+		// logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%+v)\n", err)
 		return e.Error()
 	}
+}
+
+func verifyServiceEndpoint(service string) (bool, error) {
+	var serviceGone error
+
+	resp, err := http.Get(service)
+	if (err == nil) && (resp.StatusCode != 200) && (resp.StatusCode != 401) && (resp.StatusCode != 403) {
+		serviceGone = fmt.Errorf("%d Http Error: [%s]", resp.StatusCode, service)
+		return false, serviceGone
+	}
+
+	return true, nil
+}
+
+// VerifyEndpoints ...
+func VerifyEndpoints(service *Client) (bool, error) {
+	if service == nil {
+		panic("Nil service !!")
+	}
+
+	ok := true
+
+	pok, err := verifyServiceEndpoint(service.Compute.Endpoint)
+	if err != nil {
+		return false, err
+	}
+	ok = ok && pok
+
+	pok, err = verifyServiceEndpoint(service.Network.Endpoint)
+	if err != nil {
+		return false, err
+	}
+	ok = ok && pok
+
+	pok, err = verifyServiceEndpoint(service.Volume.Endpoint)
+	if err != nil {
+		return false, err
+	}
+	ok = ok && pok
+
+	// pok, err = verifyServiceEndpoint(service.Container.Endpoint)
+	// if err != nil {
+	// 	return false, err
+	// }
+	// ok = ok && pok
+
+	return ok, nil
 }
 
 // AuthenticatedClient returns an authenticated client
@@ -154,6 +194,9 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		AllowReauth:      opts.AllowReauth,
 		TokenID:          opts.TokenID,
 	}
+	if cfg.MetadataBucket == "" {
+		cfg.MetadataBucket = metadata.BuildMetadataBucketName(opts.Username)
+	}
 
 	// Openstack client
 	pClient, err := openstack.AuthenticatedClient(gcOpts)
@@ -165,7 +208,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	compute, err := openstack.NewComputeV2(pClient, gc.EndpointOpts{
 		Region: opts.Region,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
@@ -177,26 +219,19 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
+
+	// Get Identity from network service
 	nID, err := networks.IDFromName(network, cfg.ProviderNetwork)
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
-	// Storage API
-	blocstorage, err := openstack.NewBlockStorageV1(pClient, gc.EndpointOpts{
-		Region: opts.Region,
-	})
-
-	objectstorage, err := openstack.NewObjectStorageV1(pClient, gc.EndpointOpts{
+	// volume API
+	volume, err := openstack.NewBlockStorageV1(pClient, gc.EndpointOpts{
 		Region: opts.Region,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
-
-	if len(cfg.S3Protocol) == 0 {
-		cfg.S3Protocol = "swiftks"
-	}
-	//log.Print("Object storage protocol: ", cfg.S3Protocol)
 
 	clt := Client{
 		Opts:              &opts,
@@ -204,8 +239,7 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		Provider:          pClient,
 		Compute:           compute,
 		Network:           network,
-		Volume:            blocstorage,
-		Container:         objectstorage,
+		Volume:            volume,
 		ProviderNetworkID: nID,
 	}
 
@@ -214,14 +248,6 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 		return nil, err
 	}
 
-	// Creates metadata Object Storage bucket/container
-	if clt.Cfg.MetadataBucketName == "" {
-		clt.Cfg.MetadataBucketName = api.BuildMetadataBucketName(opts.DomainName)
-	}
-	err = metadata.InitializeBucket(&clt)
-	if err != nil {
-		return nil, err
-	}
 	return &clt, nil
 }
 
@@ -230,13 +256,13 @@ const defaultSecurityGroup string = "30ad3142-a5ec-44b5-9560-618bde3de1ef"
 
 // Client is the implementation of the openstack driver regarding to the api.ClientAPI
 type Client struct {
-	Opts      *AuthOptions
-	Cfg       *CfgOptions
-	Provider  *gc.ProviderClient
-	Compute   *gc.ServiceClient
-	Network   *gc.ServiceClient
-	Volume    *gc.ServiceClient
-	Container *gc.ServiceClient
+	Opts     *AuthOptions
+	Cfg      *CfgOptions
+	Provider *gc.ProviderClient
+	Compute  *gc.ServiceClient
+	Network  *gc.ServiceClient
+	Volume   *gc.ServiceClient
+	// Container *gc.ServiceClient
 
 	SecurityGroup     *secgroups.SecurityGroup
 	ProviderNetworkID string
@@ -270,7 +296,7 @@ func (client *Client) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error
 
 // createTCPRules creates TCP rules to configure the default security group
 func (client *Client) createTCPRules(groupID string) error {
-	//Open TCP Ports
+	// Open TCP Ports
 	ruleOpts := secgroups.CreateRuleOpts{
 		ParentGroupID: groupID,
 		FromPort:      1,
@@ -294,9 +320,9 @@ func (client *Client) createTCPRules(groupID string) error {
 	return err
 }
 
-//createTCPRules creates UDP rules to configure the default security group
+// createTCPRules creates UDP rules to configure the default security group
 func (client *Client) createUDPRules(groupID string) error {
-	//Open UDP Ports
+	// Open UDP Ports
 	ruleOpts := secgroups.CreateRuleOpts{
 		ParentGroupID: groupID,
 		FromPort:      1,
@@ -320,9 +346,9 @@ func (client *Client) createUDPRules(groupID string) error {
 	return err
 }
 
-//createICMPRules creates UDP rules to configure the default security group
+// createICMPRules creates UDP rules to configure the default security group
 func (client *Client) createICMPRules(groupID string) error {
-	//Open TCP Ports
+	// Open TCP Ports
 	ruleOpts := secgroups.CreateRuleOpts{
 		ParentGroupID: groupID,
 		FromPort:      -1,
@@ -346,9 +372,9 @@ func (client *Client) createICMPRules(groupID string) error {
 	return err
 }
 
-//initDefaultSecurityGroup create an open Security Group
-//The default security group opens all TCP, UDP, ICMP ports
-//Security is managed individually on each host using a linux firewall
+// initDefaultSecurityGroup create an open Security Group
+// The default security group opens all TCP, UDP, ICMP ports
+// Security is managed individually on each host using a linux firewall
 func (client *Client) initDefaultSecurityGroup() error {
 	sg, err := client.getDefaultSecurityGroup()
 	if err != nil {
@@ -387,22 +413,30 @@ func (client *Client) initDefaultSecurityGroup() error {
 	return nil
 }
 
-//Build build a new Client from configuration parameter
+// Build build a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
-	IdentityEndpoint, _ := params["IdentityEndpoint"].(string)
-	Username, _ := params["Username"].(string)
-	Password, _ := params["Password"].(string)
-	TenantName, _ := params["TenantName"].(string)
-	Region, _ := params["Region"].(string)
-	FloatingIPPool, _ := params["FloatingIPPool"].(string)
+	tenantName, _ := params["name"].(string)
+
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
+	// network, _ := params["network"].(map[string]interface{})
+
+	identityEndpoint, _ := identity["Endpoint"].(string)
+	username, _ := identity["Username"].(string)
+	password, _ := identity["Password"].(string)
+
+	region, _ := compute["Region"].(string)
+	floatingIPPool, _ := compute["FloatingIPPool"].(string)
+	defaultImage, _ := compute["DefaultImage"]
+
 	return AuthenticatedClient(
 		AuthOptions{
-			IdentityEndpoint: IdentityEndpoint,
-			Username:         Username,
-			Password:         Password,
-			TenantName:       TenantName,
-			Region:           Region,
-			FloatingIPPool:   FloatingIPPool,
+			IdentityEndpoint: identityEndpoint,
+			Username:         username,
+			Password:         password,
+			TenantName:       tenantName,
+			Region:           region,
+			FloatingIPPool:   floatingIPPool,
 		},
 		CfgOptions{
 			ProviderNetwork:           "public",
@@ -413,15 +447,15 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 				"standard":   VolumeSpeed.COLD,
 				"performant": VolumeSpeed.HDD,
 			},
-			DNSList:    []string{"185.23.94.244", "185.23.94.244"},
-			S3Protocol: "swiftks",
+			DNSList:      []string{"185.23.94.244", "185.23.94.244"},
+			DefaultImage: defaultImage.(string),
 		},
 	)
 }
 
 // GetAuthOpts returns the auth options
-func (client *Client) GetAuthOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
+func (client *Client) GetAuthOpts() (model.Config, error) {
+	cfg := model.ConfigMap{}
 
 	cfg.Set("TenantName", client.Opts.TenantName)
 	cfg.Set("Login", client.Opts.Username)
@@ -432,14 +466,15 @@ func (client *Client) GetAuthOpts() (api.Config, error) {
 }
 
 // GetCfgOpts return configuration parameters
-func (client *Client) GetCfgOpts() (api.Config, error) {
-	cfg := api.ConfigMap{}
+func (client *Client) GetCfgOpts() (model.Config, error) {
+	cfg := model.ConfigMap{}
 
 	cfg.Set("DNSList", client.Cfg.DNSList)
-	cfg.Set("S3Protocol", client.Cfg.S3Protocol)
+	// cfg.Set("ObjectStorageType", client.Cfg.ObjectStorageType)
 	cfg.Set("AutoHostNetworkInterfaces", client.Cfg.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", client.Cfg.UseLayer3Networking)
-	cfg.Set("MetadataBucket", client.Cfg.MetadataBucketName)
+	cfg.Set("ProviderNetwork", client.Cfg.ProviderNetwork)
+	cfg.Set("MetadataBucket", client.Cfg.MetadataBucket)
 
 	return cfg, nil
 }

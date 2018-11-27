@@ -20,8 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/urfave/cli"
+
+	"github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/utils"
+	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
 // TemplateCmd command
@@ -34,8 +37,9 @@ var TemplateCmd = cli.Command{
 }
 
 var templateList = cli.Command{
-	Name:  "list",
-	Usage: "List available templates",
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available templates",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all",
@@ -44,7 +48,7 @@ var templateList = cli.Command{
 	Action: func(c *cli.Context) error {
 		templates, err := client.New().Template.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return fmt.Errorf("Error response from daemon : %v", client.DecorateError(err, "list of templates", false))
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "list of templates", false).Error()))
 		}
 		out, _ := json.Marshal(templates.GetTemplates())
 		fmt.Println(string(out))

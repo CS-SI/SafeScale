@@ -17,14 +17,11 @@
 package metadata
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/utils/metadata"
-
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/utils/metadata"
 )
 
 const (
@@ -49,61 +46,67 @@ func NewVolume(svc *providers.Service) *Volume {
 }
 
 // Carry links a Volume instance to the Metadata instance
-func (m *Volume) Carry(volume *api.Volume) *Volume {
+func (mv *Volume) Carry(volume *model.Volume) *Volume {
 	if volume == nil {
 		panic("volume is nil!")
 	}
-	m.item.Carry(volume)
-	m.name = &volume.Name
-	m.id = &volume.ID
-	return m
+	if volume.Properties == nil {
+		volume.Properties = model.NewExtensions()
+	}
+	mv.item.Carry(volume)
+	mv.name = &volume.Name
+	mv.id = &volume.ID
+	return mv
 }
 
 // Get returns the Volume instance linked to metadata
-func (m *Volume) Get() *api.Volume {
-	if volume, ok := m.item.Get().(*api.Volume); ok {
+func (mv *Volume) Get() *model.Volume {
+	if mv.item == nil {
+		panic("mv.item is nil!")
+	}
+	if volume, ok := mv.item.Get().(*model.Volume); ok {
 		return volume
 	}
 	panic("invalid content in volume metadata")
 }
 
 // Write updates the metadata corresponding to the volume in the Object Storage
-func (m *Volume) Write() error {
-	if m.item == nil {
-		panic("m.item is nil!")
+func (mv *Volume) Write() error {
+	if mv.item == nil {
+		panic("mv.item is nil!")
 	}
 
-	err := m.item.WriteInto(ByIDFolderName, *m.id)
+	err := mv.item.WriteInto(ByIDFolderName, *mv.id)
 	if err != nil {
 		return err
 	}
-	return m.item.WriteInto(ByNameFolderName, *m.name)
+	return mv.item.WriteInto(ByNameFolderName, *mv.name)
 }
 
-//Reload reloads the content of the Object Storage, overriding what is in the metadata instance
-func (m *Volume) Reload() error {
-	if m.item == nil {
-		panic("item is nil!")
+// Reload reloads the content of the Object Storage, overriding what is in the metadata instance
+func (mv *Volume) Reload() error {
+	if mv.item == nil {
+		panic("mv.item is nil!")
 	}
-	found, err := m.ReadByID(*m.id)
+	found, err := mv.ReadByID(*mv.id)
 	if err != nil {
 		return err
 	}
 	if !found {
-		return fmt.Errorf("metadata of volume '%s' vanished", *m.name)
+		return fmt.Errorf("metadata of volume '%s' vanished", *mv.name)
 	}
 	return nil
 }
 
 // ReadByID reads the metadata of a volume identified by ID from Object Storage
-func (m *Volume) ReadByID(id string) (bool, error) {
-	var data api.Volume
-	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf *bytes.Buffer) (interface{}, error) {
-		err := gob.NewDecoder(buf).Decode(&data)
+func (mv *Volume) ReadByID(id string) (bool, error) {
+	var volume model.Volume
+	found, err := mv.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
+		err := (&volume).Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &data, nil
+		return &volume, nil
 	})
 	if err != nil {
 		return false, err
@@ -111,20 +114,20 @@ func (m *Volume) ReadByID(id string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.id = &data.ID
-	m.name = &data.Name
+
+	mv.Carry(&volume)
 	return true, nil
 }
 
 // ReadByName reads the metadata of a volume identified by name
-func (m *Volume) ReadByName(name string) (bool, error) {
-	var data api.Volume
-	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf *bytes.Buffer) (interface{}, error) {
-		err := gob.NewDecoder(buf).Decode(&data)
+func (mv *Volume) ReadByName(name string) (bool, error) {
+	var volume model.Volume
+	found, err := mv.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
+		err := (&volume).Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &data, nil
+		return &volume, nil
 	})
 	if err != nil {
 		return false, err
@@ -132,71 +135,117 @@ func (m *Volume) ReadByName(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.id = &data.ID
-	m.name = &data.Name
+
+	mv.Carry(&volume)
 	return true, nil
 }
 
 // Delete delete the metadata corresponding to the volume
-func (m *Volume) Delete() error {
-	err := m.item.DeleteFrom(ByIDFolderName, *m.id)
+func (mv *Volume) Delete() error {
+	err := mv.item.DeleteFrom(ByIDFolderName, *mv.id)
 	if err != nil {
 		return err
 	}
-	err = m.item.DeleteFrom(ByNameFolderName, *m.name)
+	err = mv.item.DeleteFrom(ByNameFolderName, *mv.name)
 	if err != nil {
 		return err
 	}
-	m.item = nil
-	m.name = nil
-	m.id = nil
+	mv.item.Reset()
+	mv.name = nil
+	mv.id = nil
 	return nil
 }
 
 // Browse walks through volume folder and executes a callback for each entries
-func (m *Volume) Browse(callback func(*api.Volume) error) error {
-	return m.item.BrowseInto(ByIDFolderName, func(buf *bytes.Buffer) error {
-		var data api.Volume
-		err := gob.NewDecoder(buf).Decode(&data)
+func (mv *Volume) Browse(callback func(*model.Volume) error) error {
+	return mv.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
+		volume := model.Volume{}
+		err := (&volume).Deserialize(buf)
 		if err != nil {
 			return err
 		}
-		return callback(&data)
+		return callback(&volume)
 	})
 }
 
-// Attach add a volume attachment to the volume definition in Object Storage
-func (m *Volume) Attach(va *api.VolumeAttachment) error {
-	if m.item == nil {
-		panic("m.item is nil!")
-	}
-	return metadata.NewFolder(m.item.GetService(), m.item.GetPath()).Write(*m.id, va.ServerID, va)
-}
+// // Attach add a volume attachment to the volume definition in Object Storage
+// func (mv *Volume) Attach(va *model.VolumeAttachment) error {
+// 	if mv.item == nil {
+// 		panic("m.item is nil!")
+// 	}
 
-// Detach remove a volume attachment from the volume definition in Object Storage
-func (m *Volume) Detach(va *api.VolumeAttachment) error {
-	if m.item == nil {
-		panic("m.item is nil!")
-	}
-	return metadata.NewFolder(m.item.GetService(), m.item.GetPath()).Delete(*m.id, va.ServerID)
-}
+// 	// // We will need to update host attaching the volume...
+// 	// mh, err := LoadHostByID(mv.item.GetService(), va.ServerID)
+// 	// if err != nil {
+// 	// 	return err
+// 	// }
 
-// GetAttachment return associated attachment (if any) to this volume
-func (m *Volume) GetAttachment() (*api.VolumeAttachment, error) {
-	if m.item == nil {
-		panic("m.item is nil!")
-	}
+// 	// First save attachment in volume property VolumeAttachments
+// 	volume := mv.Get()
+// 	volumeAttachmentsV1 := propsv1.NewVolumeAttachments()
+// 	err := volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachmentsV1)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	volumeAttachmentsV1.Hosts[va.ServerID] = ""
+// 	err = volume.Properties.Set(VolumeProperty.AttachedV1, volumeAttachmentsV1)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	var data api.VolumeAttachment
-	err := metadata.NewFolder(m.item.GetService(), m.item.GetPath()).Browse(*m.id, func(buf *bytes.Buffer) error {
-		return gob.NewDecoder(buf).Decode(&data)
-	})
+// 	return err
+// }
 
-	return &data, err
-}
+// // Detach remove a volume attachment from the volume definition in Object Storage
+// func (mv *Volume) Detach(va *model.VolumeAttachment) error {
+// 	if mv.item == nil {
+// 		panic("mv.item is nil!")
+// 	}
+// 	volume := mv.Get()
+
+// 	volumeAttachedV1 := propsv1.NewVolumeAttachments()
+// 	err := volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	present := false
+// 	k := 0
+// 	i := ""
+// 	for k, i = range volumeAttachedV1.HostIDs {
+// 		if i == va.ServerID {
+// 			present = true
+// 			break
+// 		}
+// 	}
+// 	if !present {
+// 		log.Warnf("Volume '%s' can't be detached from host '%s', it isn't attached to it.", va.ID, va.ServerID)
+// 		return nil
+// 	}
+// 	volumeAttachedV1.HostIDs = append(volumeAttachedV1.HostIDs[:k], volumeAttachedV1.HostIDs[k+1:]...)
+// 	return volume.Properties.Set(VolumeProperty.AttachedV1, volumeAttachedV1)
+// }
+
+// // GetAttachments returns a list of ID of the hosts which are attached to the volume
+// func (mv *Volume) GetAttachments() ([]string, error) {
+// 	if mv.item == nil {
+// 		panic("m.item is nil!")
+// 	}
+
+// 	v := mv.Get()
+// 	if v == nil {
+// 		panic("No volume instance in metadata!")
+// 	}
+
+// 	volumeAttachedV1 := propsv1.NewVolumeAttachments()
+// 	err := v.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return volumeAttachedV1.HostIDs, nil
+// }
 
 // SaveVolume saves the Volume definition in Object Storage
-func SaveVolume(svc *providers.Service, volume *api.Volume) error {
+func SaveVolume(svc *providers.Service, volume *model.Volume) error {
 	return NewVolume(svc).Carry(volume).Write()
 }
 
@@ -223,141 +272,140 @@ func LoadVolume(svc *providers.Service, ref string) (*Volume, error) {
 		}
 	}
 	if !found {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("volume", ref)
 	}
 	return m, nil
 }
 
-// VolumeAttachment links Object Storage folder and VolumeAttachments
-type VolumeAttachment struct {
-	item     *metadata.Item
-	serverID *string
-	name     *string
-	id       *string
-}
+// // VolumeAttachment links Object Storage folder and VolumeAttachments
+// type VolumeAttachment struct {
+// 	item     *metadata.Item
+// 	serverID *string
+// 	name     *string
+// 	id       *string
+// }
 
-// NewVolumeAttachment creates an instance of metadata.Volume
-func NewVolumeAttachment(svc *providers.Service, vID string) *VolumeAttachment {
-	return &VolumeAttachment{
-		item:     metadata.NewItem(svc, fmt.Sprintf("%s/%s", volumesFolderName, vID)),
-		serverID: nil,
-		name:     nil,
-		id:       nil,
-	}
-}
+// // NewVolumeAttachment creates an instance of metadata.Volume
+// func NewVolumeAttachment(svc api.ClientAPI, vID string) *VolumeAttachment {
+// 	return &VolumeAttachment{
+// 		item:     metadata.NewItem(svc, fmt.Sprintf("%s/%s", volumesFolderName, vID)),
+// 		serverID: nil,
+// 		name:     nil,
+// 		id:       nil,
+// 	}
+// }
 
-// Carry links a Volume instance to the Metadata instance
-func (m *VolumeAttachment) Carry(va *api.VolumeAttachment) *VolumeAttachment {
-	if va == nil {
-		panic("volume is nil!")
-	}
-	m.item.Carry(va)
-	m.serverID = &va.ServerID
-	m.name = &va.Name
-	m.id = &va.ID
-	return m
-}
+// // Carry links a Volume instance to the Metadata instance
+// func (m *VolumeAttachment) Carry(va *model.VolumeAttachment) *VolumeAttachment {
+// 	if va == nil {
+// 		panic("volume is nil!")
+// 	}
+// 	m.item.Carry(va)
+// 	m.serverID = &va.ServerID
+// 	m.name = &va.Name
+// 	m.id = &va.ID
+// 	return m
+// }
 
-// Get returns the Volume instance linked to metadata
-func (m *VolumeAttachment) Get() *api.VolumeAttachment {
-	if va, ok := m.item.Get().(*api.VolumeAttachment); ok {
-		return va
-	}
-	panic("invalid content in volume attachment metadata")
-}
+// // Get returns the Volume instance linked to metadata
+// func (m *VolumeAttachment) Get() *model.VolumeAttachment {
+// 	if va, ok := m.item.Get().(*model.VolumeAttachment); ok {
+// 		return va
+// 	}
+// 	panic("invalid content in volume attachment metadata")
+// }
 
-// Write updates the metadata corresponding to the volume in the Object Storage
-func (m *VolumeAttachment) Write() error {
-	if m.item == nil {
-		panic("m.item is nil!")
-	}
+// // Write updates the metadata corresponding to the volume in the Object Storage
+// func (m *VolumeAttachment) Write() error {
+// 	if m.item == nil {
+// 		panic("m.item is nil!")
+// 	}
 
-	return m.item.WriteInto(".", *m.serverID)
-}
+// 	return m.item.WriteInto(".", *m.serverID)
+// }
 
-// Reload reloads the content of the Object Storage, overriding what is in the metadata instance
-func (m *VolumeAttachment) Reload() error {
-	if m.item == nil {
-		panic("item is nil!")
-	}
-	found, err := m.Read(*m.serverID)
-	if err != nil {
-		return err
-	}
-	if !found {
-		return fmt.Errorf("metadata of volume attachment '%s' vanished", *m.name)
-	}
-	return nil
-}
+// // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
+// func (m *VolumeAttachment) Reload() error {
+// 	if m.item == nil {
+// 		panic("item is nil!")
+// 	}
+// 	found, err := m.Read(*m.serverID)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if !found {
+// 		return fmt.Errorf("metadata of volume attachment '%s' vanished", *m.name)
+// 	}
+// 	return nil
+// }
 
-// Read reads the metadata of a volume attachment identified by ID from Object Storage
-func (m *VolumeAttachment) Read(id string) (bool, error) {
-	var data api.VolumeAttachment
-	found, err := m.item.ReadFrom(".", id, func(buf *bytes.Buffer) (interface{}, error) {
-		err := gob.NewDecoder(buf).Decode(&data)
-		if err != nil {
-			return nil, err
-		}
-		return &data, nil
-	})
-	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
-	}
-	m.id = &data.ID
-	m.name = &data.Name
-	return true, nil
-}
+// // Read reads the metadata of a volume attachment identified by ID from Object Storage
+// func (m *VolumeAttachment) Read(id string) (bool, error) {
+// 	var va model.VolumeAttachment
+// 	found, err := m.item.ReadFrom(".", id, func(buf []byte) (model.Serializable, error) {
+// 		err := (&va).Deserialize(buf)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		return &va, nil
+// 	})
+// 	if err != nil {
+// 		return false, err
+// 	}
+// 	if !found {
+// 		return false, nil
+// 	}
+// 	m.Carry(&va)
+// 	return true, nil
+// }
 
-// Delete delete the metadata corresponding to the volume
-func (m *VolumeAttachment) Delete() error {
-	err := m.item.DeleteFrom(".", *m.serverID)
-	if err != nil {
-		return err
-	}
-	m.item = nil
-	m.name = nil
-	m.id = nil
-	return nil
-}
+// // Delete delete the metadata corresponding to the volume
+// func (m *VolumeAttachment) Delete() error {
+// 	err := m.item.DeleteFrom(".", *m.serverID)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	m.item = nil
+// 	m.name = nil
+// 	m.id = nil
+// 	return nil
+// }
 
-// Browse walks through volume attachment folder and executes a callback for each entry
-func (m *VolumeAttachment) Browse(callback func(*api.VolumeAttachment) error) error {
-	return m.item.BrowseInto(".", func(buf *bytes.Buffer) error {
-		var data api.VolumeAttachment
-		err := gob.NewDecoder(buf).Decode(&data)
-		if err != nil {
-			return err
-		}
-		return callback(&data)
-	})
-}
+// // Browse walks through volume attachment folder and executes a callback for each entry
+// func (m *VolumeAttachment) Browse(callback func(*model.VolumeAttachment) error) error {
+// 	return m.item.BrowseInto(".", func(buf []byte) error {
+// 		va := model.VolumeAttachment{}
+// 		err := (&va).Deserialize(buf)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		return callback(&va)
+// 	})
+// }
 
-// SaveVolumeAttachment saves the Volume Attachment definition in Object Storage
-func SaveVolumeAttachment(svc *providers.Service, va *api.VolumeAttachment) error {
-	return NewVolumeAttachment(svc, va.VolumeID).Carry(va).Write()
-}
+// // SaveVolumeAttachment saves the Volume Attachment definition in Object Storage
+// func SaveVolumeAttachment(svc *providers.Service, va *model.VolumeAttachment) error {
+// 	return NewVolumeAttachment(svc, va.VolumeID).Carry(va).Write()
+// }
 
-// RemoveVolumeAttachment removes the Volume Attachment definition from Object Storage
-func RemoveVolumeAttachment(svc *providers.Service, hostID, volID string) error {
-	m, err := LoadVolumeAttachment(svc, hostID, volID)
-	if err != nil {
-		return err
-	}
-	return m.Delete()
-}
+// // RemoveVolumeAttachment removes the Volume Attachment definition from Object Storage
+// func RemoveVolumeAttachment(svc *providers.Service, hostID, volID string) error {
+// 	m, err := LoadVolumeAttachment(svc, hostID, volID)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return m.Delete()
+// }
 
-// LoadVolumeAttachment gets the Volume attachment definition from Object Storage
-func LoadVolumeAttachment(svc *providers.Service, hostID, volID string) (*VolumeAttachment, error) {
-	m := NewVolumeAttachment(svc, volID)
-	found, err := m.Read(hostID)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, nil
-	}
-	return m, nil
-}
+// // LoadVolumeAttachment gets the Volume attachment definition from Object Storage
+// func LoadVolumeAttachment(svc *providers.Service, hostID, volID string) (*VolumeAttachment, error) {
+// 	m := NewVolumeAttachment(svc, volID)
+// 	found, err := m.Read(hostID)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if !found {
+// 		return nil, nil
+// 	}
+// 	return m, nil
+// }

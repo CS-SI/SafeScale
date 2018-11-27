@@ -33,7 +33,7 @@ message TenantName{
 }
 
 message ImageList{
-    repeated  Image Images= 1;
+    repeated Image Images= 1;
 }
 
 message ImageListRequest{
@@ -98,6 +98,9 @@ message HostDefinition{
     int32 Disk = 7;
     string ImageID = 9;
     bool Public = 10;
+    int32 GPUNumber = 11;
+    float Freq = 12;
+    bool Force = 13;
 }
 
 enum HostState {
@@ -119,12 +122,17 @@ message Host{
     int32 CPU = 3;
     float RAM = 4;
     int32 Disk = 5;
-    string PUBLIC_IP = 6;
-    string PRIVATE_IP = 7;
+    string PublicIP = 6;
+    string PrivateIP = 7;
     HostState State = 8;
     string PrivateKey = 9;
     string GatewayID = 10;
-    string OsKind = 11; 
+    string OsKind = 11;
+}
+
+message HostStatus {
+    string Name = 1;
+    string Status = 2;
 }
 
 message HostList{
@@ -137,7 +145,6 @@ message SshConfig{
     string PrivateKey = 3;
     int32 Port = 4;
     SshConfig gateway = 5;
-
 }
 
 message HostListRequest{
@@ -147,6 +154,7 @@ message HostListRequest{
 service HostService{
     rpc Create(HostDefinition) returns (Host){}
     rpc Inspect(Reference) returns (Host){}
+    rpc Status(Reference) returns (HostStatus){}
     rpc List(HostListRequest) returns (HostList){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
     rpc Start(Reference) returns (google.protobuf.Empty){}
@@ -249,34 +257,34 @@ service VolumeService{
     rpc Inspect(Reference) returns (VolumeInfo){}
 }
 
-// broker container create c1
-// broker container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
-// broker container umount c1 host1
-// broker container delete c1
-// broker container list
-// broker container inspect C1
+// broker bucket|container create c1
+// broker bucket|container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
+// broker bucket|container umount c1 host1
+// broker bucket|container delete c1
+// broker bucket|container list
+// broker bucket|container inspect C1
 
-message Container{
+message Bucket{
     string Name = 1;
 }
 
-message ContainerList{
-    repeated Container Containers = 1;
+message BucketList{
+    repeated Bucket Buckets = 1;
 }
 
-message ContainerMountingPoint{
-    string Container = 1;
+message BucketMountingPoint{
+    string Bucket = 1;
     Reference Host = 2;
     string Path = 3;
 }
 
-service ContainerService{
-    rpc Create(Container) returns (google.protobuf.Empty){}
-    rpc Mount(ContainerMountingPoint) returns (google.protobuf.Empty){}
-    rpc UMount(ContainerMountingPoint) returns (google.protobuf.Empty){}
-    rpc Delete(Container) returns (google.protobuf.Empty){}
-    rpc List(google.protobuf.Empty) returns (ContainerList){}
-    rpc Inspect(Container) returns (ContainerMountingPoint){}
+service BucketService{
+    rpc Create(Bucket) returns (google.protobuf.Empty){}
+    rpc Mount(BucketMountingPoint) returns (google.protobuf.Empty){}
+    rpc Unmount(BucketMountingPoint) returns (google.protobuf.Empty){}
+    rpc Delete(Bucket) returns (google.protobuf.Empty){}
+    rpc List(google.protobuf.Empty) returns (BucketList){}
+    rpc Inspect(Bucket) returns (BucketMountingPoint){}
 }
 
 message SshCommand{
@@ -299,34 +307,38 @@ service SshService{
     rpc Copy(SshCopyCommand) returns (SshResponse){}
 }
 
-// broker nas create nas1 host1 --path="/shared/data"
-//broker nas delete nas1
-//broker nas mount nas1 host2 --path="/data"
-//broker nas umount nas1 host2
-//broker nas list
-//broker nas inspect nas1
+// broker nas|share create share1 host1 --path="/shared/data"
+// broker nas|share delete share1
+// broker nas|share mount share1 host2 --path="/data"
+// broker nas|share umount share1 host2
+// broker nas|share list
+// broker nas|share inspect share1
 
-message NasName{
-    string Name = 1;
-}
-
-message NasDefinition{
+message ShareDefinition{
     string ID = 1;
-    NasName Nas = 2;
+    string Name = 2;
     Reference Host = 3;
-    string path = 4;
-    bool isServer = 5;
+    string Path = 4;
+    string Type = 5;
+    string Acls = 6;
 }
 
-message NasList{
-    repeated NasDefinition nasList = 1;
+message ShareList{
+    repeated ShareDefinition ShareList = 1;
 }
 
-service NasService{
-    rpc Create(NasDefinition) returns (NasDefinition){}
-    rpc Delete(NasName) returns (NasDefinition){}
-    rpc List(google.protobuf.Empty) returns (NasList){}
-    rpc Mount(NasDefinition) returns (NasDefinition){}
-    rpc UMount(NasDefinition) returns (NasDefinition){}
-    rpc Inspect(NasName) returns (NasList){}
+message ShareMountDefinition{
+    Reference Host = 1;
+    Reference Share = 2;
+    string Path = 3;
+    string Type = 4;
+    string Options = 5;
+}
+service ShareService{
+    rpc Create(ShareDefinition) returns (ShareDefinition){}
+    rpc Delete(Reference) returns (google.protobuf.Empty){}
+    rpc List(google.protobuf.Empty) returns (ShareList){}
+    rpc Mount(ShareMountDefinition) returns (ShareMountDefinition){}
+    rpc Unmount(ShareMountDefinition) returns (google.protobuf.Empty){}
+    rpc Inspect(Reference) returns (ShareList){}
 }

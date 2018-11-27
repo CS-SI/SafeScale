@@ -19,24 +19,25 @@ package cmds
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
+	"github.com/urfave/cli"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-
 	"github.com/CS-SI/SafeScale/deploy/cluster"
-	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/install"
-
 	"github.com/CS-SI/SafeScale/utils"
-	cli "github.com/CS-SI/SafeScale/utils/cli"
-	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
+	clitools "github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
 )
 
 const (
@@ -44,94 +45,86 @@ const (
 )
 
 var (
-	clusterName        string
-	clusterServiceName *string
-	clusterInstance    clusterapi.Cluster
+	clusterName string
+	// clusterServiceName *string
+	clusterInstance api.Cluster
 )
 
-// ClusterCommand handles 'deploy cluster'
-var ClusterCommand = &cli.Command{
-	Keyword: "cluster",
-	Aliases: []string{"datacenter", "dc"},
-
-	Commands: []*cli.Command{
-		clusterListCommand,
-		clusterFeatureCommand,
+// ClusterCommand command
+var ClusterCommand = cli.Command{
+	Name:      "cluster",
+	Aliases:   []string{"datacenter", "dc"},
+	Usage:     "create and manage cluster",
+	ArgsUsage: "COMMAND",
+	Subcommands: []cli.Command{
 		clusterNodeCommand,
+		clusterListCommand,
 		clusterCreateCommand,
-		clusterInspectCommand,
 		clusterDeleteCommand,
+		clusterInspectCommand,
+		clusterStateCommand,
+		//clusterSshCommand,
+		clusterStartCommand,
+		clusterStopCommand,
 		clusterExpandCommand,
 		clusterShrinkCommand,
 		clusterDcosCommand,
 		clusterKubectlCommand,
-		clusterMarathonCommand,
-	},
-
-	Before: func(c *cli.Command) {
-		if !c.IsKeywordSet("list,ls") {
-			clusterName = c.StringArgument("<clustername>", "")
-			if clusterName == "" {
-				fmt.Println("Invalid argument <clustername>")
-				os.Exit(int(ExitCode.InvalidArgument))
-			}
-
-			var err error
-			clusterInstance, err = cluster.Get(clusterName)
-			if err != nil {
-				fmt.Printf("%s\n", err.Error())
-				os.Exit(int(ExitCode.RPC))
-			}
-			if !c.IsKeywordSet("create") {
-				if clusterInstance == nil {
-					fmt.Printf("Cluster '%s' not found.\n", clusterName)
-					os.Exit(int(ExitCode.NotFound))
-				}
-			} else {
-				if clusterInstance != nil {
-					fmt.Printf("Cluster '%s' already exists.\n", clusterName)
-					os.Exit(int(ExitCode.Duplicate))
-				}
-			}
-		}
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster <clustername> COMMAND
-       {{.ProgName}} [options] cluster list|ls`,
-		Commands: `
-  create                    Creates a cluster
-  inspect                   Display detailed information on a cluster
-  delete,destroy,remove,rm  Delete a Cluster`,
-		Description: `
-Deploy a new cluster <clustername> or something on the cluster <clustername>.`,
-		Footer: `
-Run 'deploy cluster COMMAND --help' for more information on a command.`,
+		clusterCheckFeatureCommand,
+		clusterAddFeatureCommand,
+		clusterDeleteFeatureCommand,
 	},
 }
 
-// clusterListCommand handles 'deploy cluster list'
-var clusterListCommand = &cli.Command{
-	Keyword: "list",
-	Aliases: []string{"ls"},
+func extractClusterArgument(c *cli.Context) error {
+	if !c.Command.HasName("list") {
+		if c.NArg() < 1 {
+			fmt.Fprintf(os.Stderr, "Missing mandatory argument CLUSTERNAME")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
+		}
+		clusterName = c.Args().First()
+		if clusterName == "" {
+			fmt.Fprintf(os.Stderr, "Invalid argument CLUSTERNAME")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
+		}
 
-	Process: func(c *cli.Command) {
+		var err error
+		clusterInstance, err = cluster.Get(clusterName)
+		if c.Command.HasName("create") && clusterInstance != nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
+		}
+		if err != nil {
+			msg := fmt.Sprintf("Failed to query for cluster '%s': %s\n", clusterName, err.Error())
+			return clitools.ExitOnRPC(msg)
+		}
+		if !c.Command.HasName("create") && clusterInstance == nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
+		}
+	}
+	return nil
+}
+
+// clusterListCommand handles 'deploy cluster list'
+var clusterListCommand = cli.Command{
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List available clusters",
+
+	Action: func(c *cli.Context) error {
 		list, err := cluster.List()
 		if err != nil {
-			fmt.Printf("Could not get cluster list: %v\n", err)
-			os.Exit(int(ExitCode.NotFound))
+			return clitools.ExitOnRPC("Failed to get cluster list")
 		}
 		jsoned, err := json.Marshal(list)
 		if err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(int(ExitCode.Run))
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		var toFormat []interface{}
 		err = json.Unmarshal(jsoned, &toFormat)
 		if err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(int(ExitCode.Run))
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("Failed to interpret list: %s", err.Error()))
 		}
 		var formatted []interface{}
 		for _, value := range toFormat {
@@ -141,17 +134,10 @@ var clusterListCommand = &cli.Command{
 		jsoned, err = json.Marshal(formatted)
 		if err != nil {
 			fmt.Printf("%v\n", err)
-			os.Exit(int(ExitCode.Run))
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("Failed to convert list to json: %s", err.Error()))
 		}
 		fmt.Println(string(jsoned))
-		os.Exit(int(ExitCode.OK))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster list|ls`,
-		Description: `
-List available clusters.`,
+		return nil
 	},
 }
 
@@ -169,6 +155,7 @@ func formatClusterConfig(value interface{}) map[string]interface{} {
 
 	if !Debug {
 		delete(core, "infos")
+		delete(core, "extensions")
 		delete(core, "private_node_ids")
 		delete(core, "public_node_ids")
 		delete(core, "keypair")
@@ -178,22 +165,27 @@ func formatClusterConfig(value interface{}) map[string]interface{} {
 }
 
 // clusterInspectCmd handles 'deploy cluster <clustername> inspect'
-var clusterInspectCommand = &cli.Command{
-	Keyword: "inspect",
-
-	Process: func(c *cli.Command) {
-		err := outputClusterConfig()
+var clusterInspectCommand = cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"show", "get"},
+	Usage:     "inspect CLUSTERNAME",
+	ArgsUsage: "CLUSTERNAME",
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster <clustername> inspect`,
+	// 		Description: `
+	// Displays information about the cluster 'clustername'.`,
+	// 	},
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
 		if err != nil {
-			fmt.Printf("%v\n", err)
+			return err
 		}
-		os.Exit(int(ExitCode.OK))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster <clustername> inspect`,
-		Description: `
-Displays information about the cluster 'clustername'.`,
+		err = outputClusterConfig()
+		if err != nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+		}
+		return nil
 	},
 }
 
@@ -207,7 +199,7 @@ func outputClusterConfig() error {
 
 	jsoned, err := json.Marshal(formatted)
 	if err != nil {
-		return err
+		return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 	}
 	fmt.Println(string(jsoned))
 	return nil
@@ -257,41 +249,99 @@ func convertStructToMap(src interface{}) (map[string]interface{}, error) {
 }
 
 // clusterCreateCmd handles 'deploy cluster <clustername> create'
-var clusterCreateCommand = &cli.Command{
-	Keyword: "create",
+var clusterCreateCommand = cli.Command{
+	Name:      "create",
+	Aliases:   []string{"new"},
+	Usage:     "create a cluster",
+	ArgsUsage: "CLUSTERNAME: name of the cluster to create",
 
-	Process: func(c *cli.Command) {
-		complexityStr := c.StringOption("-C,--complexity", "<complexity>", "Normal")
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "complexity, C",
+			Usage: "Defines the sizing of the cluster: Small, Normal, Large (default: Normal)",
+		},
+		cli.StringFlag{
+			Name:  "flavor, F",
+			Usage: "Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S (default: K8S)",
+		},
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: "If used, the resources are not deleted on failure (default: not set)",
+		},
+		cli.StringFlag{
+			Name:  "cidr, N",
+			Usage: "Defines the CIDR of the network to use with cluster (default: 192.168.0.0/16)",
+		},
+		cli.StringSliceFlag{
+			Name:  "disable",
+			Usage: "Allows to disable addition of default features",
+		},
+		cli.StringFlag{
+			Name:  "os",
+			Usage: "Defines the operating system to use",
+		},
+		cli.UintFlag{
+			Name:  "cpu",
+			Usage: "Defines the number of cpu of masters and nodes in the cluster",
+		},
+		cli.Float64Flag{
+			Name:  "ram",
+			Usage: "Defines the size of RAM of masters and nodes in the cluster (in GB)",
+		},
+		cli.UintFlag{
+			Name:  "disk",
+			Usage: "Defines the size of system disk of masters and nodes (in GB)",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+
+		complexityStr := c.String("complexity")
+		if complexityStr == "" {
+			complexityStr = "Small"
+		}
 		complexity, err := Complexity.Parse(complexityStr)
 		if err != nil {
-			fmt.Printf("Invalid option --complexity,-C: %s\n", err.Error())
-			os.Exit(int(ExitCode.InvalidOption))
+			msg := fmt.Sprintf("Invalid option --complexity|-C: %s\n", err.Error())
+			return clitools.ExitOnInvalidOption(msg)
 		}
 
-		flavorStr := c.StringOption("-F,--flavor", "<flavor>", "BOH")
+		flavorStr := c.String("flavor")
+		if flavorStr == "" {
+			flavorStr = "K8S"
+		}
 		flavor, err := Flavor.Parse(flavorStr)
 		if err != nil {
-			fmt.Printf("Invalid option --flavor,-F: %s\n", err.Error())
-			os.Exit(int(ExitCode.InvalidOption))
+			msg := fmt.Sprintf("Invalid option --flavor|-F: %s\n", err.Error())
+			return clitools.ExitOnInvalidOption(msg)
 		}
 
-		keep := c.Flag("-k,--keep-on-failure", false)
+		keep := c.Bool("keep-on-failure")
 
-		cidr := c.StringOption("-N,--cidr", "<cidr>", "")
+		cidr := c.String("cidr")
 		if cidr == "" {
 			cidr = "192.168.0.0/16"
 		}
 
-		disableFeatures := c.StringSliceArgument("--disable", []string{})
+		disable := c.StringSlice("disable")
+		disableFeatures := map[string]struct{}{}
+		for _, v := range disable {
+			disableFeatures[v] = struct{}{}
+		}
 
-		los := c.StringOption("--os", "<operating system>", ubuntu1604)
+		los := c.String("os")
 		if flavor == Flavor.DCOS {
 			// DCOS forces to use RHEL/CentOS/CoreOS, and we've chosen to use CentOS, so ignore --os option
 			los = ""
 		}
-		cpu := int32(c.IntOption("--cpu", "<number of cpus>", 0))
-		ram := float32(c.FloatOption("--ram", "<ram size>", 0.0))
-		disk := int32(c.IntOption("--disk", "<disk size>", 0))
+
+		cpu := int32(c.Uint("cpu"))
+		ram := float32(c.Float64("ram"))
+		disk := int32(c.Uint("disk"))
 
 		var nodesDef *pb.HostDefinition
 		if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
@@ -302,7 +352,7 @@ var clusterCreateCommand = &cli.Command{
 				ImageID:   los,
 			}
 		}
-		clusterInstance, err = cluster.Create(clusterapi.Request{
+		clusterInstance, err = cluster.Create(api.Request{
 			Name:                    clusterName,
 			Complexity:              complexity,
 			CIDR:                    cidr,
@@ -315,14 +365,13 @@ var clusterCreateCommand = &cli.Command{
 			if clusterInstance != nil {
 				clusterInstance.Delete()
 			}
-			fmt.Printf("failed to create cluster: %s\n", err.Error())
-			os.Exit(int(ExitCode.Run))
+			msg := fmt.Sprintf("failed to create cluster: %s\n", err.Error())
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 		}
 
 		toFormat, err := convertStructToMap(clusterInstance.GetConfig())
 		if err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(int(ExitCode.Run))
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		formatted := formatClusterConfig(toFormat)
 		if !Debug {
@@ -331,137 +380,147 @@ var clusterCreateCommand = &cli.Command{
 		}
 		jsoned, err := json.Marshal(formatted)
 		if err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(int(ExitCode.Run))
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		fmt.Println(string(jsoned))
-		os.Exit(int(ExitCode.OK))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster <clustername> create {cluster options} {host options}`,
-		Options: []string{
-			`
-cluster options:
-  [-N,--cidr <cidr>]              To specify the CIDR of the associated network created with cluster (default: 192.168.0.0/16)
-  [-F,--flavor <flavor>]          To specify the management of cluster; can be DCOS or BOH (Bunch Of Hosts) (default: BOH)
-  [-C,--complexity <complexity>]  To fix the cluster complexity; can be Small, Normal, Large (default: Normal)
-									Small implies: 1 master, 1 node
-									Normal  implies: 3 masters, 3 nodes
-									Large  implies: 5 masters, 3 nodes
-  [-k,--keep-on-failure]          Keep resources on failure`,
-			`
-host options:
-  --os <operating system> To specify linux distribution (default: Ubuntu 16.04)
-  --cpu <number of cpus> To specify number of CPU (default: 4)
-  --ram <ram size) To specify RAM size in GB (default: 15)
-  --disk <disk size> To specify system disk size in GB (default: 100)`,
-		},
-		Description: `
-Creates a new cluster.`,
+		return nil
 	},
 }
 
 // clusterDeleteCmd handles 'deploy cluster <clustername> delete'
-var clusterDeleteCommand = &cli.Command{
-	Keyword: "delete",
-	Aliases: []string{"destroy", "remove", "rm"},
+var clusterDeleteCommand = cli.Command{
+	Name:      "delete",
+	Aliases:   []string{"destroy", "remove", "rm"},
+	Usage:     "delete CLUSTERNAME",
+	ArgsUsage: "CLUSTERNAME",
 
-	Process: func(c *cli.Command) {
-		yes := c.Flag("-y,--assume-yes", false)
-		force := c.Flag("-f,--force", false)
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: deploy [options] cluster <clustername> delete|destroy|remove|rm [-y]`,
+	// 		Options: []string{`
+	// options:
+	//   -y,--assume-yes  Don't ask for confirmation`,
+	// 		},
+	// 		Description: `
+	// Delete a cluster.`,
+	// 	},
+
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name: "assume-yes, yes, y",
+		},
+		cli.BoolFlag{
+			Name: "force, f",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+
+		yes := c.Bool("assume-yes")
+		force := c.Bool("force")
 
 		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete Cluster '%s'", clusterName)) {
 			fmt.Println("Aborted.")
-			os.Exit(0)
+			return nil
 		}
 		if force {
 			log.Println("'-f,--force' does nothing yet")
 		}
 
-		err := clusterInstance.Delete()
+		err = clusterInstance.Delete()
 		if err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(int(ExitCode.RPC))
+			return clitools.ExitOnRPC(err.Error())
 		}
 
 		fmt.Printf("Cluster '%s' deleted.\n", clusterName)
-		os.Exit(int(ExitCode.OK))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: deploy [options] cluster <clustername> delete|destroy|remove|rm [-y]`,
-		Options: []string{`
-options:
-  -y,--assume-yes  Don't ask for confirmation`,
-		},
-		Description: `
-Delete a cluster.`,
+		return nil
 	},
 }
 
 // clusterStopCmd handles 'deploy cluster <clustername> stop'
-var clusterStopCommand = &cli.Command{
-	Keyword: "stop",
-	Aliases: []string{"freeze"},
+var clusterStopCommand = cli.Command{
+	Name:      "stop",
+	Aliases:   []string{"freeze", "halt"},
+	Usage:     "stop CLUSTERNAME",
+	ArgsUsage: "CLUSTERNAME",
 
-	Process: func(c *cli.Command) {
-		err := clusterInstance.Stop()
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: deploy [options] cluster <clustername> stop|freeze`,
+	// 		Description: `
+	// Stop the cluster (make it unavailable for duty).`,
+	// 	},
+
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
 		if err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(int(ExitCode.RPC))
+			return err
+		}
+
+		err = clusterInstance.Stop()
+		if err != nil {
+			return clitools.ExitOnRPC(err.Error())
 		}
 		fmt.Printf("Cluster '%s' stopped.\n", clusterName)
-		os.Exit(int(ExitCode.OK))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: deploy [options] cluster <clustername> stop|freeze`,
-		Description: `
-Stop the cluster (make it unavailable for duty).`,
+		return nil
 	},
 }
 
-// clusterStartCmd handles 'deploy cluster <clustername> start'
-var clusterStartCommand = &cli.Command{
-	Keyword: "start",
-	Aliases: []string{"unfreeze"},
-
-	Process: func(c *cli.Command) {
-		err := clusterInstance.Start()
+var clusterStartCommand = cli.Command{
+	Name:      "start",
+	Aliases:   []string{"unfreeze"},
+	Usage:     "start CLUSTERNAME",
+	ArgsUsage: "CLUSTERNAME",
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster <clustername> start|unfreeze`,
+	// 		Options: []string{`
+	// options:
+	//   --force, -f Force Don't ask for confirmation`,
+	// 		},
+	// 		Description: `
+	// Start the cluster (make it available for duty).`,
+	// 	},
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
 		if err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(int(ExitCode.RPC))
+			return err
 		}
-
+		err = clusterInstance.Start()
+		if err != nil {
+			return clitools.ExitOnRPC(err.Error())
+		}
 		fmt.Printf("Cluster '%s' started.\n", clusterName)
-		os.Exit(int(ExitCode.OK))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster <clustername> start|unfreeze`,
-		Options: []string{`
-options:
-  --force, -f Force Don't ask for confirmation`,
-		},
-		Description: `
-Start the cluster (make it available for duty).`,
+		return nil
 	},
 }
 
 // clusterStateCmd handles 'deploy cluster <clustername> state'
-var clusterStateCommand = &cli.Command{
-	Keyword: "state",
+var clusterStateCommand = cli.Command{
+	Name:      "state",
+	Usage:     "state CLUSTERNAME",
+	ArgsUsage: "CLUSTERNAME",
 
-	Process: func(c *cli.Command) {
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster <clustername> state`,
+	// 		Description: `
+	// Get the cluster state.`,
+	// 	},
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+
 		state, err := clusterInstance.GetState()
 		if err != nil {
-			fmt.Printf("failed to get cluster state: %s", err.Error())
-			os.Exit(int(ExitCode.RPC))
+			msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
+			return clitools.ExitOnRPC(msg)
 		}
 		out, _ := json.Marshal(map[string]interface{}{
 			"Name":       clusterName,
@@ -469,30 +528,87 @@ var clusterStateCommand = &cli.Command{
 			"StateLabel": state.String(),
 		})
 		fmt.Println(string(out))
-		os.Exit(int(ExitCode.OK))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster <clustername> state`,
-		Description: `
-Get the cluster state.`,
+		return nil
 	},
 }
 
 // clusterExpandCmd handles 'deploy cluster <clustername> expand'
-var clusterExpandCommand = &cli.Command{
-	Keyword: "expand",
+var clusterExpandCommand = cli.Command{
+	Name:      "expand",
+	Usage:     "expand CLUSTERNAME",
+	ArgsUsage: "CLUSTERNAME",
 
-	Process: func(c *cli.Command) {
-		count := c.IntOption("-n,--count", "<number of nodes>", 1)
-		public := c.Flag("-p,--public", false)
-		los := c.StringOption("--os", "<operating system", "")
-		cpu := int32(c.IntOption("--cpu", "<number of cpus>", 0))
-		ram := float32(c.FloatOption("--ram", "<ram size>", 0))
-		disk := int32(c.IntOption("--disk", "<disk size>", 0))
-		//gpu := c.Flag("--gpu", false)
-		_ = c.Flag("--gpu", false)
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: deploy [options] cluster <clustername> expand [{command options}] [{host options}]`,
+	// 		Options: []string{
+	// 			`
+	// command options:
+	//   --count,-n <number of nodes> Instructs to expand cluster with <number> of new nodes
+	//   --public,-p                  Allocates public IP address(es) to node(s)`,
+	// 			`
+	// host options:
+	//   --os <operating system> (default: Ubuntu 16.04)
+	//   --cpu <number of cpus> (default: 4)
+	//   --ram <ram size) (default: 15 GB)
+	//   --disk <disk size> (default: 100 GB)`,
+	// 		},
+	// 		Description: `
+	// Expand the cluster by adding nodes.`,
+	// 	},
+
+	Flags: []cli.Flag{
+		cli.UintFlag{
+			Name:  "count, n",
+			Usage: "Define the number of nodes wanted (default: 1)",
+			Value: 1,
+		},
+		cli.BoolFlag{
+			Name:  "public, p",
+			Usage: "If used, the node(s) will have public IP address (default: no)",
+		},
+		cli.StringFlag{
+			Name:  "os",
+			Usage: "Define the Operating System wanted",
+		},
+		cli.UintFlag{
+			Name:  "cpu",
+			Usage: "Define the number of cpu for new node(s); default: number used at cluster creation",
+			Value: 0,
+		},
+		cli.Float64Flag{
+			Name:  "ram",
+			Usage: "Define the size of RAM for new node(s) (in GB); default: size used at cluster creation",
+			Value: 0.0,
+		},
+		cli.UintFlag{
+			Name:  "disk",
+			Usage: "Define the size of system disk for new node(s) (in GB); default: size used at cluster creation",
+			Value: 0,
+		},
+		cli.BoolFlag{
+			Name:   "gpu",
+			Usage:  "Ask for gpu capable host; default: no",
+			Hidden: true,
+		},
+	},
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+
+		count := int(c.Uint("count"))
+		if count == 0 {
+			count = 1
+		}
+		public := c.Bool("public")
+		los := c.String("os")
+		cpu := int32(c.Uint("cpu"))
+		ram := float32(c.Float64("ram"))
+		disk := int32(c.Uint("disk"))
+		//gpu := c.Bool("gpu")
+		_ = c.Bool("gpu")
 
 		// err := createNodes(clusterName, public, count, los, cpu, ram, disk)
 		var nodeRequest *pb.HostDefinition
@@ -504,41 +620,54 @@ var clusterExpandCommand = &cli.Command{
 				ImageID:   los,
 			}
 		}
-		_, err := clusterInstance.AddNodes(count, public, nodeRequest)
+		hosts, err := clusterInstance.AddNodes(count, public, nodeRequest)
 		if err != nil {
-			fmt.Printf("%v\n", err)
-			os.Exit(int(ExitCode.RPC))
+			return clitools.ExitOnRPC(err.Error())
 		}
-		os.Exit(int(ExitCode.OK))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: deploy [options] cluster <clustername> expand [{command options}] [{host options}]`,
-		Options: []string{
-			`
-command options:
-  --count,-n <number of nodes> Instructs to expand cluster with <number> of new nodes
-  --public,-p                  Allocates public IP address(es) to node(s)`,
-			`
-host options:
-  --os <operating system> (default: Ubuntu 16.04)
-  --cpu <number of cpus> (default: 4)
-  --ram <ram size) (default: 15 GB)
-  --disk <disk size> (default: 100 GB)`,
-		},
-		Description: `
-Expand the cluster by adding nodes.`,
+		jsoned, _ := json.Marshal(&hosts)
+		fmt.Println(string(jsoned))
+		return nil
 	},
 }
 
 // clusterShrinkCommand handles 'deploy cluster <clustername> shrink'
-var clusterShrinkCommand = &cli.Command{
-	Keyword: "shrink",
+var clusterShrinkCommand = cli.Command{
+	Name:      "shrink",
+	Usage:     "shrink CLUSTERNAME",
+	ArgsUsage: "CLUSTERNAME",
 
-	Process: func(c *cli.Command) {
-		count := c.IntOption("-n,--count", "<count>", 1)
-		public := c.Flag("-p,--public", false)
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster <clustername> shrink [{command options}]`,
+	// 		Options: []string{
+	// 			`
+	// command options:
+	//   -n,--count <number of nodes>  Number of nodes to delete from the cluster`,
+	// 		},
+	// 		Description: `
+	// Shrink cluster by removing last added node(s).`,
+	// 	},
+
+	Flags: []cli.Flag{
+		cli.UintFlag{
+			Name:  "count, n",
+			Usage: "Define the number of nodes to remove; default: 1",
+			Value: 1,
+		},
+		cli.BoolFlag{
+			Name:  "public, p",
+			Usage: "Tell if the node(s) to remove has(ve) to be public; default: no",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+
+		count := c.Uint("count")
+		public := c.Bool("public")
 
 		var nodeTypeString string
 		if public {
@@ -551,241 +680,233 @@ var clusterShrinkCommand = &cli.Command{
 			countS = "s"
 		}
 		present := clusterInstance.CountNodes(public)
-		if count > int(present) {
-			fmt.Printf("can't delete %d %s node%s, the cluster contains only %d of them", count, nodeTypeString, countS, present)
-			os.Exit(int(ExitCode.InvalidOption))
+		if count > present {
+			msg := fmt.Sprintf("can't delete %d %s node%s, the cluster contains only %d of them", count, nodeTypeString, countS, present)
+			return clitools.ExitOnInvalidOption(msg)
 		}
 
 		msg := fmt.Sprintf("Are you sure you want to delete %d %s node%s from Cluster %s", count, nodeTypeString, countS, clusterName)
 		if !utils.UserConfirmed(msg) {
 			fmt.Println("Aborted.")
-			os.Exit(int(ExitCode.OK))
+			return nil
 		}
 
 		fmt.Printf("Deleting %d %s node%s from Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
-		for i := 0; i < count; i++ {
+		var msgs []string
+		for i := uint(0); i < count; i++ {
 			err := clusterInstance.DeleteLastNode(public)
 			if err != nil {
-				fmt.Printf("Failed to delete node #%d: %s", i+1, err.Error())
-				os.Exit(int(ExitCode.RPC))
+				msgs = append(msgs, fmt.Sprintf("Failed to delete node #%d: %s", i+1, err.Error()))
 			}
 		}
-
-		fmt.Printf("%d %s node%s successfully deleted from cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
-		os.Exit(int(ExitCode.OK))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster <clustername> shrink [{command options}]`,
-		Options: []string{
-			`
-command options:
-  -n,--count <number of nodes>  Number of nodes to delete from the cluster`,
-		},
-		Description: `
-Shrink cluster by removing last added node(s).`,
-	},
-}
-
-// clusterServiceCommand handles 'deploy cluster <clustername> service'
-var clusterServiceCommand = &cli.Command{
-	Keyword: "service",
-	Aliases: []string{"svc"},
-
-	Commands: []*cli.Command{
-		clusterServiceAddCommand,
-		clusterServiceAvailableCommand,
-		clusterServiceCheckCommand,
-		clusterServiceDeleteCommand,
-		clusterServiceStartCommand,
-		clusterServiceStateCommand,
-		clusterServiceStopCommand,
-	},
-
-	Before: func(c *cli.Command) {
-		svcName := c.StringArgument("<svcname>", "")
-		if svcName == "" {
-			fmt.Println("Invalid argument <svcname>")
-			os.Exit(int(ExitCode.InvalidArgument))
+		if len(msgs) > 0 {
+			return clitools.ExitOnRPC(strings.Join(msgs, "\n"))
 		}
-	},
-
-	Help: &cli.HelpContent{},
-}
-
-var clusterServiceAvailableCommand = &cli.Command{
-	Keyword: "available",
-	Aliases: []string{"avail"},
-
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterServiceAvailableCommand not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
-
-	Help: &cli.HelpContent{},
-}
-
-var clusterServiceCheckCommand = &cli.Command{
-	Keyword: "check",
-
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterServiceCheckCmd not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
-
-	Help: &cli.HelpContent{},
-}
-
-var clusterServiceAddCommand = &cli.Command{
-	Keyword: "add",
-
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterServiceAddCmd not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
-
-	Help: &cli.HelpContent{},
-}
-
-var clusterServiceDeleteCommand = &cli.Command{
-	Keyword: "delete",
-	Aliases: []string{"destroy", "remove", "rm"},
-
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterServiceDeleteCmd not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
-
-	Help: &cli.HelpContent{},
-}
-
-var clusterServiceStartCommand = &cli.Command{
-	Keyword: "start",
-
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterServiceStartCmd not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{ .ProgName }} [options] cluster <clustername> start`,
-		Description: `
-Starts a cluster (make it available for duty).`,
+		fmt.Printf("%d %s node%s successfully deleted from cluster '%s'.\n", count, nodeTypeString, countS, clusterName)
+		return nil
 	},
 }
 
-var clusterServiceStateCommand = &cli.Command{
-	Keyword: "state",
+// // clusterServiceCommand handles 'deploy cluster <clustername> service'
+// var clusterServiceCommand = &cli.Command{
+// 	Keyword: "service",
+// 	Aliases: []string{"svc"},
 
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterServiceStateCmd not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
+// 	Commands: []*cli.Command{
+// 		clusterServiceAddCommand,
+// 		clusterServiceAvailableCommand,
+// 		clusterServiceCheckCommand,
+// 		clusterServiceDeleteCommand,
+// 		clusterServiceStartCommand,
+// 		clusterServiceStateCommand,
+// 		clusterServiceStopCommand,
+// 	},
 
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: deploy [options] cluster <clustername> state`,
-		Description: `
-Gets the state of the cluster <clustername>.`,
-	},
-}
+// 	Before: func(c *cli.Command) {
+// 		svcName := c.StringArgument("<svcname>", "")
+// 		if svcName == "" {
+// 			fmt.Println("Invalid argument <svcname>")
+// 			os.Exit(ExitCode.InvalidArgument))
+// 		}
+// 	},
 
-var clusterServiceStopCommand = &cli.Command{
-	Keyword: "stop",
+// 	Help: &cli.HelpContent{},
+// }
 
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterServiceStopCmd not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
+// var clusterServiceAvailableCommand = &cli.Command{
+// 	Keyword: "available",
+// 	Aliases: []string{"avail"},
 
-	Help: &cli.HelpContent{},
-}
+// 	Process: func(c *cli.Command) {
+// 		fmt.Println("clusterServiceAvailableCommand not yet implemented")
+// 		os.Exit(ExitCode.NotImplemented))
+// 	},
 
-var clusterDcosCommand = &cli.Command{
-	Keyword: "dcos",
+// 	Help: &cli.HelpContent{},
+// }
 
-	Process: func(c *cli.Command) {
+// var clusterServiceCheckCommand = &cli.Command{
+// 	Keyword: "check",
+
+// 	Process: func(c *cli.Command) {
+// 		fmt.Println("clusterServiceCheckCmd not yet implemented")
+// 		os.Exit(ExitCode.NotImplemented))
+// 	},
+
+// 	Help: &cli.HelpContent{},
+// }
+
+// var clusterServiceAddCommand = &cli.Command{
+// 	Keyword: "add",
+
+// 	Process: func(c *cli.Command) {
+// 		fmt.Println("clusterServiceAddCmd not yet implemented")
+// 		os.Exit(ExitCode.NotImplemented))
+// 	},
+
+// 	Help: &cli.HelpContent{},
+// }
+
+// var clusterServiceDeleteCommand = &cli.Command{
+// 	Keyword: "delete",
+// 	Aliases: []string{"destroy", "remove", "rm"},
+
+// 	Process: func(c *cli.Command) {
+// 		fmt.Println("clusterServiceDeleteCmd not yet implemented")
+// 		os.Exit(ExitCode.NotImplemented))
+// 	},
+
+// 	Help: &cli.HelpContent{},
+// }
+
+// var clusterServiceStartCommand = &cli.Command{
+// 	Keyword: "start",
+
+// 	Process: func(c *cli.Command) {
+// 		fmt.Println("clusterServiceStartCmd not yet implemented")
+// 		os.Exit(ExitCode.NotImplemented))
+// 	},
+
+// 	Help: &cli.HelpContent{
+// 		Usage: `
+// Usage: {{ .ProgName }} [options] cluster <clustername> start`,
+// 		Description: `
+// Starts a cluster (make it available for duty).`,
+// 	},
+// }
+
+// var clusterServiceStateCommand = &cli.Command{
+// 	Keyword: "state",
+
+// 	Process: func(c *cli.Command) {
+// 		fmt.Println("clusterServiceStateCmd not yet implemented")
+// 		os.Exit(ExitCode.NotImplemented))
+// 	},
+
+// 	Help: &cli.HelpContent{
+// 		Usage: `
+// Usage: deploy [options] cluster <clustername> state`,
+// 		Description: `
+// Gets the state of the cluster <clustername>.`,
+// 	},
+// }
+
+// var clusterServiceStopCommand = &cli.Command{
+// 	Keyword: "stop",
+
+// 	Process: func(c *cli.Command) {
+// 		fmt.Println("clusterServiceStopCmd not yet implemented")
+// 		os.Exit(ExitCode.NotImplemented))
+// 	},
+
+// 	Help: &cli.HelpContent{},
+// }
+
+var clusterDcosCommand = cli.Command{
+	Name:      "dcos",
+	Category:  "Administrative commands",
+	Usage:     "dcos CLUSTERNAME [COMMAND ...]",
+	ArgsUsage: "CLUSTERNAME",
+
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: deploy [options] cluster <clustername> dcos [<arg>...]`,
+	// 		Description: `
+	// Executes DCOS cli on an available DCOS master.
+	// Is meaningful only for a cluster using DCOS flavor.`,
+	// 	},
+
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+
 		config := clusterInstance.GetConfig()
 		if config.Flavor != Flavor.DCOS {
-			fmt.Printf("Can't call dcos on this cluster, its flavor isn't DCOS (%s).\n", config.Flavor.String())
-			os.Exit(int(ExitCode.NotApplicable))
+			msg := fmt.Sprintf("Can't call dcos on this cluster, its flavor isn't DCOS (%s).\n", config.Flavor.String())
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotApplicable, msg)
 		}
-		args := c.StringSliceArgument("<arg>", []string{})
-
+		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i dcos " + strings.Join(args, " ")
-		executeCommand(cmdStr)
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: deploy [options] cluster <clustername> dcos [<arg>...]`,
-		Description: `
-Executes DCOS cli on an available DCOS master.
-Is meaningful only for a cluster using DCOS flavor.`,
+		return executeCommand(cmdStr)
 	},
 }
 
-var clusterKubectlCommand = &cli.Command{
-	Keyword: "kubectl",
+var clusterKubectlCommand = cli.Command{
+	Name:      "kubectl",
+	Category:  "Administrative commands",
+	Usage:     "kubectl CLUSTERNAME [COMMAND ...]",
+	ArgsUsage: "CLUSTERNAME",
 
-	Process: func(c *cli.Command) {
-		args := c.StringSliceArgument("<arg>", []string{})
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: deploy [options] cluster <clustername> kubectl [-- <arg>...]`,
+	// 		Description: `
+	// Executes kubectl cli on the cluster.
+	// Is meaningful only for a cluster where Kubernetes service is installed and running.`,
+	// 	},
 
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+
+		args := c.Args().Tail()
 		cmdStr := "sudo -u cladm -i kubectl " + strings.Join(args, " ")
-		executeCommand(cmdStr)
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: deploy [options] cluster <clustername> kubectl [-- <arg>...]`,
-		Description: `
-Executes kubectl cli on the cluster.
-Is meaningful only for a cluster where Kubernetes service is installed and running.`,
+		return executeCommand(cmdStr)
 	},
 }
 
-var clusterMarathonCommand = &cli.Command{
-	Keyword: "marathon",
+var clusterRunCommand = cli.Command{
+	Name:      "run",
+	Aliases:   []string{"execute", "exec"},
+	Usage:     "run CLUSTERNAME COMMAND",
+	ArgsUsage: "CLUSTERNAME",
 
-	Process: func(c *cli.Command) {
-		args := c.StringSliceArgument("<arg>", []string{})
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster list,ls
+	//        {{.ProgName}} [options] cluster <clustername> run args[,args...]`,
+	// 	},
 
-		cmdStr := "sudo -u cladm -i marathon " + strings.Join(args, " ")
-		executeCommand(cmdStr)
-	},
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
 
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster <clustername> marathon [<arg>...]`,
-		Description: `
-Executes Marathon cli on an available master.
-Is meaningful only for a cluster using DCOS flavor.`,
-	},
-}
-
-var clusterRunCommand = &cli.Command{
-	Keyword: "run",
-	Aliases: []string{"execute", "exec"},
-
-	Process: func(c *cli.Command) {
-		fmt.Println("clusterRunCmd not yet implemented")
-		os.Exit(int(ExitCode.NotImplemented))
-	},
-
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster list,ls
-       {{.ProgName}} [options] cluster <clustername> run args[,args...]`,
+		fmt.Println()
+		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "clusterRunCmd not yet implemented")
 	},
 }
 
-func executeCommand(command string) (int, string, string, error) {
+func executeCommand(command string) error {
 	masters := clusterInstance.ListMasterIDs()
 	if len(masters) <= 0 {
-		fmt.Printf("No masters found for the cluster '%s'", clusterInstance.GetName())
-		os.Exit(int(ExitCode.Run))
+		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetName())
+		return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 	}
 	brokerssh := brokerclient.New().Ssh
 	for i, m := range masters {
@@ -803,126 +924,120 @@ func executeCommand(command string) (int, string, string, error) {
 			}
 			output += stderr
 			// fmt.Fprintf(os.Stderr, "Run on master #%d, retcode=%d\n%s\n", i+1, retcode, output)
-			fmt.Fprintf(os.Stderr, "%s\n", output)
-			os.Exit(int(ExitCode.RPC))
+			return clitools.ExitOnRPC(output)
 		}
 		fmt.Println(stdout)
-		os.Exit(int(ExitCode.OK))
+		return nil
 	}
 
-	fmt.Println("failed to find an available master server to execute the command.")
-	os.Exit(int(ExitCode.RPC))
-
-	return 0, "", "", nil
+	return clitools.ExitOnRPC("failed to find an available master server to execute the command.")
 }
 
-// clusterFeatureCommand handles 'deploy cluster <host name or id> feature'
-var clusterFeatureCommand = &cli.Command{
-	Keyword: "feature",
-	Aliases: []string{"package", "pkg"},
+// clusterAddFeatureCommand handles 'deploy cluster add-feature CLUSTERNAME FEATURENAME'
+var clusterAddFeatureCommand = cli.Command{
+	Name:      "add-feature",
+	Aliases:   []string{"install-feature"},
+	Usage:     "add-feature CLUSTERNAME FEATURENAME",
+	ArgsUsage: "CLUSTERNAME FEATURENAME",
 
-	Commands: []*cli.Command{
-		clusterFeatureCheckCommand,
-		clusterFeatureAddCommand,
-		clusterFeatureDeleteCommand,
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters",
+		},
+		cli.BoolFlag{
+			Name:  "skip-proxy",
+			Usage: "Disables reverse proxy rules",
+		},
 	},
 
-	Before: func(c *cli.Command) {
-		featureName = c.StringArgument("<pkgname>", "")
-		if featureName == "" {
-			fmt.Fprintln(os.Stderr, "Invalid argument <pkgname>")
-			//helpHandler(nil, "")
-			os.Exit(int(ExitCode.InvalidArgument))
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
 		}
-	},
+		err = extractFeatureArgument(c)
+		if err != nil {
+			return err
+		}
 
-	Help: &cli.HelpContent{
-		Usage: `
-Usage: {{.ProgName}} [options] cluster <host name or id> feature,package,pkg <pkgname> COMMAND`,
-		Commands: `
-  add,install                         Installs the package on the host
-  check                               Tells if the package is installed
-  delete,destroy,remove,rm,uninstall  Uninstall the package of the host`,
-		Description: `
-Manages features (SafeScale packages) on a cluster.`,
-	},
-}
-
-// clusterFeatureAddCommand handles 'deploy cluster <host name or id> package <pkgname> add'
-var clusterFeatureAddCommand = &cli.Command{
-	Keyword: "add",
-	Aliases: []string{"install"},
-
-	Process: func(c *cli.Command) {
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(int(ExitCode.Run))
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
-			os.Exit(int(ExitCode.NotFound))
+			msg := fmt.Sprintf("Failed to find a feature named '%s'.\n", featureName)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
 		}
 
 		values := install.Variables{}
-		anon := c.Option("--param", "<param>")
-		if anon != nil {
-			params := anon.([]string)
-			for _, k := range params {
-				res := strings.Split(k, "=")
-				if len(res[0]) > 0 {
-					values[res[0]] = strings.Join(res[1:], "=")
-				}
+		params := c.StringSlice("param")
+		for _, k := range params {
+			res := strings.Split(k, "=")
+			if len(res[0]) > 0 {
+				values[res[0]] = strings.Join(res[1:], "=")
 			}
 		}
 
 		settings := install.Settings{}
-		settings.SkipProxy = c.Flag("--skip-proxy", false)
+		settings.SkipProxy = c.Bool("skip-proxy")
 
 		target := install.NewClusterTarget(clusterInstance)
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
-			os.Exit(int(ExitCode.RPC))
+			msg := fmt.Sprintf("Error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
+			return clitools.ExitOnRPC(msg)
 		}
-		if results.Successful() {
-			fmt.Printf("Feature '%s' installed successfully on cluster '%s'\n", featureName, clusterName)
-			os.Exit(int(ExitCode.OK))
+		if !results.Successful() {
+			msg := fmt.Sprintf("Failed to install feature '%s' on cluster '%s'", featureName, clusterName)
+			if Debug || Verbose {
+				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+			}
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 		}
 
-		fmt.Printf("Failed to install feature '%s' on cluster '%s'\n", featureName, clusterName)
-		fmt.Println(results.AllErrorMessages())
-		os.Exit(int(ExitCode.Run))
+		fmt.Printf("Feature '%s' installed successfully on cluster '%s'\n", featureName, clusterName)
+		return nil
 	},
-
-	Help: &cli.HelpContent{},
 }
 
-// clusterFeatureCheckCommand handles 'deploy host <host name or id> package <pkgname> check'
-var clusterFeatureCheckCommand = &cli.Command{
-	Keyword: "check",
-	Aliases: []string{"verify"},
-
-	Process: func(c *cli.Command) {
+// clusterCheckFeatureCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
+var clusterCheckFeatureCommand = cli.Command{
+	Name:      "check-feature",
+	Aliases:   []string{"verify-feature"},
+	Usage:     "check-feature CLUSTERNAME FEATURENAME",
+	ArgsUsage: "CLUSTERNAME FEATURENAME",
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractFeatureArgument(c)
+		if err != nil {
+			return err
+		}
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(int(ExitCode.Run))
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
-			os.Exit(int(ExitCode.NotFound))
+			msg := fmt.Sprintf("Failed to find a feature named '%s'.\n", featureName)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
 		}
 
 		values := install.Variables{}
-		anon := c.Option("--param", "<param>")
-		if anon != nil {
-			params := anon.([]string)
-			for _, k := range params {
-				res := strings.Split(k, "=")
-				if len(res[0]) > 0 {
-					values[res[0]] = strings.Join(res[1:], "=")
-				}
+		params := c.StringSlice("param")
+		for _, k := range params {
+			res := strings.Split(k, "=")
+			if len(res[0]) > 0 {
+				values[res[0]] = strings.Join(res[1:], "=")
 			}
 		}
 
@@ -931,46 +1046,56 @@ var clusterFeatureCheckCommand = &cli.Command{
 		target := install.NewClusterTarget(clusterInstance)
 		results, err := feature.Check(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
-			os.Exit(int(ExitCode.RPC))
+			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
+			return clitools.ExitOnRPC(msg)
 		}
-		if results.Successful() {
-			fmt.Printf("Feature '%s' is installed on cluster '%s'\n", featureName, clusterName)
-			os.Exit(int(ExitCode.OK))
+		if !results.Successful() {
+			msg := fmt.Sprintf("Feature '%s' not found on cluster '%s'", featureName, clusterName)
+			if Verbose || Debug {
+				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+			}
 		}
-
-		fmt.Printf("Feature '%s' is not installed on cluster '%s'\n", featureName, clusterName)
-		os.Exit(int(ExitCode.NotFound))
+		fmt.Printf("Feature '%s' found on cluster '%s'\n", featureName, clusterName)
+		return nil
 	},
-
-	Help: &cli.HelpContent{},
 }
 
 // clusterFeatureDeleteCommand handles 'deploy host <host name or id> package <pkgname> delete'
-var clusterFeatureDeleteCommand = &cli.Command{
-	Keyword: "delete",
-	Aliases: []string{"destroy", "remove", "rm", "uninstall"},
-
-	Process: func(c *cli.Command) {
+var clusterDeleteFeatureCommand = cli.Command{
+	Name:      "delete-feature",
+	Aliases:   []string{"destroy-feature", "remove-feature", "rm-feature", "uninstall-feature"},
+	Usage:     "delete-feature CLUSTERNAME FEATURENAME",
+	ArgsUsage: "CLUSTERNAME FEATURENAME",
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractFeatureArgument(c)
+		if err != nil {
+			return err
+		}
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(int(ExitCode.Run))
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		if feature == nil {
-			fmt.Fprintf(os.Stderr, "Failed to find a feature named '%s'.\n", featureName)
-			os.Exit(int(ExitCode.NotFound))
+			msg := fmt.Sprintf("Failed to find a feature named '%s'.\n", featureName)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
 		}
 
 		values := install.Variables{}
-		anon := c.Option("--param", "<param>")
-		if anon != nil {
-			params := anon.([]string)
-			for _, k := range params {
-				res := strings.Split(k, "=")
-				if len(res[0]) > 0 {
-					values[res[0]] = strings.Join(res[1:], "=")
-				}
+		params := c.StringSlice("param")
+		for _, k := range params {
+			res := strings.Split(k, "=")
+			if len(res[0]) > 0 {
+				values[res[0]] = strings.Join(res[1:], "=")
 			}
 		}
 
@@ -982,20 +1107,297 @@ var clusterFeatureDeleteCommand = &cli.Command{
 		target := install.NewClusterTarget(clusterInstance)
 		results, err := feature.Remove(target, values, settings)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())
-			os.Exit(int(ExitCode.RPC))
+			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())
+			return clitools.ExitOnRPC(msg)
 		}
-		if results.Successful() {
-			fmt.Printf("Feature '%s' uninstalled successfully from cluster '%s'\n", featureName, clusterName)
-			os.Exit(int(ExitCode.OK))
+		if !results.Successful() {
+			msg := fmt.Sprintf("Failed to delete feature '%s' from cluster '%s'", featureName, clusterName)
+			if Verbose || Debug {
+				msg += fmt.Sprintf(":\n%s\n", results.AllErrorMessages())
+			}
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 		}
-		fmt.Printf("Failed to uninstall feature '%s' from cluster '%s':\n", featureName, clusterName)
-		msg := results.AllErrorMessages()
-		if msg != "" {
-			fmt.Println(msg)
-		}
-		os.Exit(int(ExitCode.Run))
+		fmt.Printf("Feature '%s' deleted successfully from cluster '%s'\n", featureName, clusterName)
+		return nil
+	},
+}
+
+// clusterNodeCommand handles 'deploy cluster <name> node'
+var clusterNodeCommand = cli.Command{
+	Name: "node",
+
+	Subcommands: []cli.Command{
+		clusterNodeListCommand,
+		clusterNodeInspectCommand,
+		clusterNodeStartCommand,
+		clusterNodeStopCommand,
+		clusterNodeStateCommand,
 	},
 
-	Help: &cli.HelpContent{},
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster <clustername> node <nodename> COMMAND
+	//        {{.ProgName}} [options] cluster <clustername> node list|ls`,
+	// 		Commands: `
+	//   list|ls         Lists nodes in cluster
+	//   inspect         Displays information about the node
+	//   stop|freeze     Stops the node
+	//   start|unfreeze  Delete a Cluster
+	//   state           Returns current state of the node`,
+	// 		Description: `
+	// Deploy a new cluster <clustername> or something on the cluster <clustername>.`,
+	// 		Footer: `
+	// Run 'deploy cluster COMMAND --help' for more information on a command.`,
+	// 	},
+
+	Before: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+
+		if !c.Command.HasName("list") {
+			hostName = c.Args().Get(1)
+			if hostName == "" {
+				fmt.Fprintln(os.Stderr, "missing mandatory argument HOSTNAME")
+				_ = cli.ShowSubcommandHelp(c)
+				return clitools.ExitOnInvalidArgument()
+			}
+
+			var err error
+			hostInstance, err = brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
+			if err != nil {
+				msg := fmt.Sprintf("Failed to list nodes of cluster '%s'", clusterName)
+				return clitools.ExitOnRPC(msg)
+			}
+		}
+
+		return nil
+	},
+}
+
+// clusterNodeListCommand handles 'deploy cluster node list CLUSTERNAME'
+var clusterNodeListCommand = cli.Command{
+	Name:      "list",
+	Aliases:   []string{"ls"},
+	Usage:     "list CLUSTERNAME",
+	ArgsUsage: "CLUSTERNAME",
+
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster <clustername> node list|ls`,
+	// 		Description: `
+	// List nodes in the clusters.`,
+	// 	},
+
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "public, p",
+			Usage: "If set, list public nodes. Otherwise list private nodes.",
+		},
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "If set, list all nodes, being private or public. Take precedence over --public",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		public := c.Bool("public")
+		all := c.Bool("all")
+
+		broker := brokerclient.New().Host
+		formatted := []map[string]interface{}{}
+
+		if all || !public {
+			listPriv := clusterInstance.ListNodeIDs(false)
+			for _, i := range listPriv {
+				host, err := broker.Inspect(i, brokerclient.DefaultExecutionTimeout)
+				if err != err {
+					msg := fmt.Sprintf("Failed to get data for node '%s': %s. Ignoring.", i, err.Error())
+					fmt.Println(msg)
+					log.Warnln(msg)
+					continue
+				}
+				formatted = append(formatted, map[string]interface{}{
+					"name":   host.Name,
+					"public": false,
+				})
+			}
+		}
+
+		if all || public {
+			listPub := clusterInstance.ListNodeIDs(true)
+			for _, i := range listPub {
+				host, err := broker.Inspect(i, brokerclient.DefaultExecutionTimeout)
+				if err != err {
+					msg := fmt.Sprintf("failed to get data for node '%s': %s. Ignoring.", i, err.Error())
+					fmt.Println(msg)
+					log.Warnln(msg)
+					continue
+				}
+				formatted = append(formatted, map[string]interface{}{
+					"name":   host.Name,
+					"public": true,
+				})
+			}
+		}
+
+		jsoned, err := json.Marshal(formatted)
+		if err != nil {
+			log.Errorln(err.Error())
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+		}
+		fmt.Println(string(jsoned))
+		return nil
+	},
+}
+
+// formatNodeConfig...
+func formatNodeConfig(value interface{}) map[string]interface{} {
+	core := value.(map[string]interface{})
+	return core
+}
+
+// clusterNodeInspectCmd handles 'deploy cluster <clustername> inspect'
+var clusterNodeInspectCommand = cli.Command{
+	Name:      "inspect",
+	Usage:     "node inspect CLUSTERNAME HOSTNAME",
+	ArgsUsage: "CLUSTERNAME is the name of the cluster\nHOSTNAME is the hostname of the host resource inside the cluster (ie. for a cluster called 'demo', hostname is 'node-1' and host resourcename is 'demo-node-1')",
+
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster <clustername> node <hostname> inspect`,
+	// 		Description: `
+	// Displays information about the node <hostname> of cluster <clustername>.`,
+	// 	},
+
+	Action: func(c *cli.Context) error {
+		host, err := brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.ExitOnRPC(err.Error())
+		}
+
+		jsoned, err := json.Marshal(host)
+		if err != nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+		}
+
+		toFormat := map[string]interface{}{}
+		err = json.Unmarshal(jsoned, &toFormat)
+		if err != nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+		}
+
+		jsoned, err = json.Marshal(toFormat)
+		if err != nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+		}
+		fmt.Printf(string(jsoned))
+		return nil
+	},
+}
+
+// clusterNodeDeleteCmd handles 'deploy cluster <clustername> delete'
+var clusterNodeDeleteCommand = &cli.Command{
+	Name:    "delete",
+	Aliases: []string{"destroy", "remove", "rm"},
+
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: deploy [options] cluster <clustername> node <nodename> delete|destroy|remove|rm [-y]`,
+	// 		Options: []string{`
+	// options:
+	//   -y,--assume-yes  Don't ask for confirmation`,
+	// 		},
+	// 		Description: `
+	// Delete the node <nodename> from the cluster <clustername>.`,
+	// 	},
+
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "yes, assume-yes, y",
+			Usage: "If set, respond automatically yes to all questions",
+		},
+		cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "If set, force node deletion no matter what (ie. metadata inconsistency)",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		yes := c.Bool("yes")
+		force := c.Bool("force")
+
+		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node '%s' of the cluster '%s'", hostName, clusterName)) {
+			fmt.Println("Aborted.")
+			return nil
+		}
+		if force {
+			log.Println("'-f,--force' does nothing yet")
+		}
+
+		err := clusterInstance.Delete()
+		if err != nil {
+			return clitools.ExitOnRPC(err.Error())
+		}
+
+		fmt.Printf("Node '%s' of cluster '%s' deleted successfully.\n", hostName, clusterName)
+		return nil
+	},
+}
+
+// clusterNodeStopCmd handles 'deploy cluster <clustername> node <nodename> stop'
+var clusterNodeStopCommand = cli.Command{
+	Name:    "stop",
+	Aliases: []string{"freeze"},
+	Usage:   "node stop CLUSTERNAME HOSTNAME",
+
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: deploy [options] cluster <clustername> stop|freeze`,
+	// 		Description: `
+	// Stop the cluster (make it unavailable for duty).`,
+	// 	},
+
+	Action: func(c *cli.Context) error {
+		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented")
+	},
+}
+
+// clusterNodeStartCmd handles 'deploy cluster <clustername> node <nodename> start'
+var clusterNodeStartCommand = cli.Command{
+	Name:    "start",
+	Aliases: []string{"unfreeze"},
+
+	//Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster <clustername> node <nodename> start|unfreeze`,
+	// 		Options: []string{`
+	// options:
+	//   --force, -f Force Don't ask for confirmation`,
+	// 		},
+	// 		Description: `
+	// Start the node <nodename> of the cluster <clustername>.`,
+	// 	},
+
+	Action: func(c *cli.Context) error {
+		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented")
+	},
+}
+
+// clusterNodeStateCmd handles 'deploy cluster <clustername> state'
+var clusterNodeStateCommand = cli.Command{
+	Name:  "state",
+	Usage: "node state CLUSTERNAME HOSTNAME",
+
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster <clustername> node <nodename> state`,
+	// 		Description: `
+	// Get the state of the node <nodename> of the cluster <clustername>.`,
+	// 	},
+
+	Action: func(c *cli.Context) error {
+		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented")
+	},
 }

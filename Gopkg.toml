@@ -24,7 +24,7 @@
 #   go-tests = true
 #   unused-packages = true
 
-required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", "github.com/GeertJohan/go.rice/rice", "github.com/golang/protobuf/protoc-gen-go", "github.com/golang/mock/gomock", "github.com/golang/mock/mockgen", "golang.org/x/tools/cmd/cover", "golang.org/x/lint/golint", "github.com/tebeka/go2xunit", "github.com/kisielk/errcheck", "github.com/360EntSecGroup-Skylar/goreporter", "github.com/dlespiau/covertool"]
+required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", "github.com/GeertJohan/go.rice/rice", "github.com/golang/protobuf/protoc-gen-go", "github.com/golang/protobuf/ptypes/empty", "github.com/golang/mock/gomock", "github.com/golang/mock/mockgen", "golang.org/x/tools/cmd/cover", "golang.org/x/lint/golint", "github.com/tebeka/go2xunit", "github.com/kisielk/errcheck", "github.com/360EntSecGroup-Skylar/goreporter", "github.com/dlespiau/covertool"]
 
 [[override]]
   version = "=v1.7.1"
@@ -52,7 +52,8 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[override]]
   name = "github.com/gophercloud/gophercloud"
-  revision = "39db44929bf62867520de8607bd519217a78f802"
+  branch = "master"
+#  source = "github.com/oscarpicas/gophercloud.git"
 
 [[constraint]]
   name = "github.com/gorilla/websocket"
@@ -62,20 +63,17 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/jinzhu/gorm"
   version = "1.9.1"
 
-# TODO Fork & tag
 [[override]]
   name = "github.com/mjibson/go-dsp"
-  branch = "master"
+  revision = "11479a337f1259210b7c8f93f7bf2b0cc87b066e"
 
-# TODO Fork & tag
 [[override]]
   name = "github.com/pengux/check"
-  branch = "master"
+  revision = "53861b30913dfdf93e58e4379d510eba93261097"
 
-# TODO Fork & tag
 [[override]]
-  branch = "master"
   name = "github.com/satori/go.uuid"
+  revision = "36e9d2ebbde5e3f13ab2e25625fd453271d6522e"
 
 [[constraint]]
   name = "github.com/sethvargo/go-password"
@@ -99,22 +97,23 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[constraint]]
   name = "github.com/sirupsen/logrus"
-  version = "v1.1.1"
+  version = "=v1.1.1"
 
-# TODO Fork & tag
 [[constraint]]
+  name = "github.com/nanobox-io/golang-scribble"
   branch = "master"
+
+[[override]]
   name = "golang.org/x/crypto"
+  revision = "0e37d006457bf46f9e6692014ba72ef82c33022c"
 
-# TODO Fork & tag
-[[constraint]]
-  branch = "master"
+[[override]]
   name = "golang.org/x/net"
+  revision = "4dfa2610cdf3b287375bbba5b8f2a14d3b01d8de"
 
-# TODO Fork & tag
-[[constraint]]
-  branch = "master"
+[[override]]
   name = "golang.org/x/oauth2"
+  revision = "d2e6202438beef2727060aa7cabdd924d92ebfd9"
 
 [[override]]
   name = "google.golang.org/grpc"
@@ -123,6 +122,11 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 [[constraint]]
   name = "github.com/dlespiau/covertool"
   branch = "master"
+
+[[constraint]]
+  name = "github.com/graymeta/stow"
+  branch = "master"
+  source = "github.com/appscode/stow.git"
 
 [prune]
   go-tests = true

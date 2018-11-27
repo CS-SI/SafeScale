@@ -11,8 +11,8 @@ vet:
 	@$(GO) vet ./...
 
 clean:
-	@(cd userdata && $(MAKE) $(@))
-	@(cd aws && $(MAKE) $(@))
-	@(cd enums && $(MAKE) $(@))
 	@(cd api && $(MAKE) $@)
+	@(cd aws && $(MAKE) $(@))
+	@(cd model && $(MAKE) $(@))
+	@(cd userdata && $(MAKE) $(@))
 	@$(RM) ./mocks/*.go || true

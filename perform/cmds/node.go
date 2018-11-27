@@ -18,149 +18,168 @@ package cmds
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/CS-SI/SafeScale/utils/cli"
-	"github.com/CS-SI/SafeScale/utils/cli/ExitCode"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/urfave/cli"
 )
 
-// nodeCommand configures arguments for command "perform <clustername> node"
-var nodeCommand = &cli.Command{
-	Keyword: "node",
+// ClusterDeleteNodeCommand ...
+var ClusterDeleteNodeCommand = cli.Command{
+	Name:     "delete-node",
+	Aliases:  []string{"destroy-node", "remove-node", "rm-node"},
+	Usage:    "Deletes a node of the cluster",
+	Category: "Node",
 
-	Commands: []*cli.Command{
-		nodeListCommand,
-		nodeCreateCommand,
-		nodeInspectCommand,
-		nodeStopCommand,
-		nodeStartCommand,
-		nodeStateCommand,
-		nodeDeleteCommand,
-	},
-
-	Before: func(c *cli.Command) {
-		if !c.IsKeywordSet("list,ls") {
-			nodeName := c.StringArgument("<node name or id>", "")
-
-			if nodeName == "" {
-				fmt.Println("Invalid argument <node name or id>")
-				//cli.ShowSubcommandHelp(c)
-				os.Exit(int(ExitCode.InvalidArgument))
-			}
-		}
-	},
-
-	Help: &cli.HelpContent{},
-}
-
-// nodeCreateCommand ...
-var nodeCreateCommand = &cli.Command{
-	Keyword: "create",
-
-	Process: func(c *cli.Command) {
-		count := c.IntOption("count n", "<count>", 1)
-		public := c.Flag("public p", false)
-		cpu := c.IntOption("cpu C", "<number of cpu>", 2)
-		ram := c.FloatOption("ram R", "<ram size>", 7.0)
-		disk := c.IntOption("disk D", "<disk size>", 100)
-		//gpu := c.Flag("gpu", false, "With GPU")
-
-		cmdStr := fmt.Sprintf("deploy cluster %s expand -n %d --cpu %d --ram %f --disk %d",
-			clusterName, count, int32(cpu), float32(ram), int32(disk))
-		if public {
-			cmdStr += " -p"
-		}
-		cmdStr = RebrandCommand(cmdStr)
-		os.Exit(runCommand(cmdStr))
-	},
-
-	Help: &cli.HelpContent{},
-}
-
-// nodeDeleteCommand ...
-var nodeDeleteCommand = &cli.Command{
-	Keyword: "delete",
-	Aliases: []string{"destroy", "remove", "rm"},
-
-	Process: func(c *cli.Command) {
-		yes := c.Flag("y assume-yes", false)
-		cmdStr := fmt.Sprintf("deploy cluster %s node %s delete", clusterName, nodeName)
+	Action: func(c *cli.Context) error {
+		yes := c.Bool("assume-yes")
+		force := c.Bool("force")
+		cmdStr := fmt.Sprintf("deploy cluster delete-node %s %s", clusterName, nodeName)
 		if yes {
 			cmdStr += " -y"
 		}
+		if force {
+			cmdStr += " -f"
+		}
 		cmdStr = RebrandCommand(cmdStr)
-		fmt.Println(cmdStr)
-		os.Exit(runCommand(cmdStr))
+		log.Debugf("Calling '%s'", cmdStr)
+		return runCommand(cmdStr)
 	},
-
-	Help: &cli.HelpContent{},
 }
 
-// nodeListCommand ...
-var nodeListCommand = &cli.Command{
-	Keyword: "list",
-	Aliases: []string{"ls"},
+// ClusterListNodesCommand ...
+var ClusterListNodesCommand = cli.Command{
+	Name:     "list-node",
+	Aliases:  []string{"ls-node", "list-nodes", "ls-nodes"},
+	Usage:    "List nodes in the cluster",
+	Category: "Node",
 
-	Process: func(c *cli.Command) {
-		public := c.Flag("public p", false)
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "public, p",
+			Usage: "If set, list only public nodes",
+		},
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "If set, list all type of nodes (overcomes --public)",
+		},
+	},
 
-		cmdStr := fmt.Sprintf("deploy cluster %s node list", clusterName)
-		if public {
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractNodeArgument(c)
+		if err != nil {
+			return err
+		}
+
+		public := c.Bool("public")
+		all := c.Bool("all")
+
+		cmdStr := fmt.Sprintf("deploy cluster ls-nodes %s", clusterName)
+		if all {
+			cmdStr += " -a"
+		} else if public {
 			cmdStr += " -p"
 		}
 		cmdStr = RebrandCommand(cmdStr)
-		os.Exit(runCommand(cmdStr))
+		log.Debugf("Calling '%s'", cmdStr)
+		return runCommand(cmdStr)
 	},
-
-	Help: &cli.HelpContent{},
 }
 
-// nodeInspectCommand ...
-var nodeInspectCommand = &cli.Command{
-	Keyword: "inspect",
+// ClusterInspectNodeCommand ...
+var ClusterInspectNodeCommand = cli.Command{
+	Name:     "inspect-node",
+	Aliases:  []string{"show-node", "get-node"},
+	Usage:    "Inspects a node of the cluster",
+	Category: "Node",
 
-	Process: func(c *cli.Command) {
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s node %s inspect", clusterName, nodeName))
-		os.Exit(runCommand(cmdStr))
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractNodeArgument(c)
+		if err != nil {
+			return err
+		}
+
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster inspect-node %s %s", clusterName, nodeName))
+		log.Debugf("Calling '%s'", cmdStr)
+		return runCommand(cmdStr)
 	},
-
-	Help: &cli.HelpContent{},
 }
 
-// nodeStopCommand ...
-var nodeStopCommand = &cli.Command{
-	Keyword: "stop",
-	Aliases: []string{"freeze"},
+// ClusterStopNodeCommand ...
+var ClusterStopNodeCommand = cli.Command{
+	Name:      "stop-node",
+	Aliases:   []string{"freeze-node"},
+	Usage:     "Stops a node of the cluster",
+	ArgsUsage: "CLUSTERNAME NODENAME",
+	Category:  "Node",
 
-	Process: func(c *cli.Command) {
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s node %s stop", clusterName, nodeName))
-		os.Exit(runCommand(cmdStr))
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractNodeArgument(c)
+		if err != nil {
+			return err
+		}
+
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster stop-node %s %s", clusterName, nodeName))
+		log.Debugf("Calling '%s'", cmdStr)
+		return runCommand(cmdStr)
 	},
-
-	Help: &cli.HelpContent{},
 }
 
-// nodeStartCommand ...
-var nodeStartCommand = &cli.Command{
-	Keyword: "start",
-	Aliases: []string{"unfreeze"},
+// ClusterStartNodeCommand ...
+var ClusterStartNodeCommand = cli.Command{
+	Name:      "start-node",
+	Aliases:   []string{"unfreeze-node"},
+	Usage:     "Stars a node of the cluster",
+	ArgsUsage: "CLUSTERNAME NODENAME",
+	Category:  "Node",
 
-	Process: func(c *cli.Command) {
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s node %s start", clusterName, nodeName))
-		os.Exit(runCommand(cmdStr))
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractNodeArgument(c)
+		if err != nil {
+			return err
+		}
+
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster start-node %s %s", clusterName, nodeName))
+		log.Debugf("Calling '%s'", cmdStr)
+		return runCommand(cmdStr)
 	},
-
-	Help: &cli.HelpContent{},
 }
 
-// nodeStateCommand ...
-var nodeStateCommand = &cli.Command{
-	Keyword: "state",
+// ClusterProbeNodeCommand ...
+var ClusterProbeNodeCommand = cli.Command{
+	Name:      "probe-node",
+	Usage:     "Determines the state of a node of the cluster",
+	ArgsUsage: "CLUSTERNAME NODENAME",
+	Category:  "Node",
 
-	Process: func(c *cli.Command) {
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster %s node %s state", clusterName, nodeName))
-		os.Exit(runCommand(cmdStr))
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractNodeArgument(c)
+		if err != nil {
+			return err
+		}
+
+		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster probe-node %s %s", clusterName, nodeName))
+		log.Debugf("Calling '%s'", cmdStr)
+		return runCommand(cmdStr)
 	},
-
-	Help: &cli.HelpContent{},
 }

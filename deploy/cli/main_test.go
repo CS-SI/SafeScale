@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path"
+	"runtime"
 	"testing"
 
 	"github.com/dlespiau/covertool/pkg/cover"
@@ -18,7 +19,13 @@ func TestMain(m *testing.M) {
 
 	// If the test binary name is "calc" we've are being asked to run the
 	// coverage-instrumented calc.
-	if path.Base(os.Args[0]) == "deploy-cover" {
+
+	suffix := ""
+	if runtime.GOOS == "windows" {
+		suffix = ".exe"
+	}
+
+	if path.Base(os.Args[0]) == "deploy-cover"+suffix {
 		main()
 		exit.Exit(0)
 	}

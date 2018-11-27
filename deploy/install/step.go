@@ -60,10 +60,10 @@ type stepResults map[string]stepResult
 
 func (s stepResults) ErrorMessages() string {
 	output := ""
-	for _, k := range s {
+	for h, k := range s {
 		val := k.ErrorMessage()
 		if val != "" {
-			output += val + "\n"
+			output += h + ": " + val + "\n"
 		}
 	}
 	return output
@@ -237,7 +237,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 			if false {
 				log.Printf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 			}
-			v["HostIP"] = h.PRIVATE_IP
+			v["HostIP"] = h.PrivateIP
 			v["Hostname"] = h.Name
 			results[h.Name] = is.runOnHost(h, v)
 			//if debug {
@@ -256,7 +256,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 			if false {
 				log.Printf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 			}
-			v["HostIP"] = h.PRIVATE_IP
+			v["HostIP"] = h.PrivateIP
 			v["Hostname"] = h.Name
 			d := make(chan stepResult)
 			dones[h.Name] = d
