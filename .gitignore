@@ -85,3 +85,13 @@ docs/*.md
 docs/*.html
 docs/.nojekyll
 docs/Other
+
+broker/cli/broker/version\.go
+
+broker/cli/brokerd/version\.go
+
+deploy/cli/version\.go
+
+perform/version\.go
+
+scanner/version\.go
