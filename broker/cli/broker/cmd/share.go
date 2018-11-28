@@ -232,22 +232,29 @@ var shareInspect = cli.Command{
 		if err != nil {
 			return clitools.ExitOnRPC(client.DecorateError(err, "inspection of share", false).Error())
 		}
-		var out []byte
-		if len(list.ShareList) == 0 {
-			out, _ = json.Marshal(nil)
-		} else {
-			var output []map[string]interface{}
-			for _, i := range list.ShareList {
-				output = append(output, map[string]interface{}{
-					"ID":   i.GetID(),
-					"Name": i.GetName(),
-					"Host": i.GetHost().GetName(),
-					"Path": i.GetPath(),
-					"Type": i.GetType(),
-				})
-			}
-			out, _ = json.Marshal(output)
+
+		output := map[string]interface{}{
+			"ID":   list.GetShare().GetID(),
+			"Name": list.GetShare().GetName(),
+			"Host": list.GetShare().GetHost().GetName(),
+			"Path": list.GetShare().GetPath(),
+			"Type": list.GetShare().GetType(),
 		}
+
+		mountsOutput := map[string]interface{}{}
+		for _, i := range list.MountList {
+			mountsOutput[i.GetHost().GetName()] = map[string]interface{}{
+				// "ID":   i.GetShare.GetID(),
+				// "Name": i.GetShare().GetName(),
+				// "Host": i.GetHost().GetName(),
+				"Path": i.GetPath(),
+				// "Type": i.GetType(),
+			}
+		}
+
+		output["mounts"] = mountsOutput
+
+		out, _ := json.Marshal(output)
 		fmt.Println(string(out))
 
 		return nil

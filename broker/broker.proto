@@ -334,11 +334,17 @@ message ShareMountDefinition{
     string Type = 4;
     string Options = 5;
 }
+
+message ShareMountList{
+    ShareDefinition Share = 1;
+    repeated ShareMountDefinition MountList = 2;
+}
+
 service ShareService{
     rpc Create(ShareDefinition) returns (ShareDefinition){}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
     rpc List(google.protobuf.Empty) returns (ShareList){}
     rpc Mount(ShareMountDefinition) returns (ShareMountDefinition){}
     rpc Unmount(ShareMountDefinition) returns (google.protobuf.Empty){}
-    rpc Inspect(Reference) returns (ShareList){}
+    rpc Inspect(Reference) returns (ShareMountList){}
 }
