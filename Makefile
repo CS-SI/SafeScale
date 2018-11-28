@@ -107,6 +107,7 @@ ensure:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking versions, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@if [ ! -d ./vendor ]; then printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading all dependencies from zero, this is gonna take a while..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; else printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating vendor dir..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi;
 	@(dep ensure)
+	@($(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
 	@(dep ensure -update "github.com/gophercloud/gophercloud")
 	@(dep ensure -update "github.com/graymeta/stow")
 
@@ -176,6 +177,7 @@ depclean: begin
 	@rm -rf ./vendor
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading all dependencies from zero, this is gonna take a while..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(dep ensure)
+	@($(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
 	@(dep ensure -update "github.com/gophercloud/gophercloud")
 	@(dep ensure -update "github.com/graymeta/stow")
 
