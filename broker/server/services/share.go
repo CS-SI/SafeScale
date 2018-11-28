@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/satori/go.uuid"
 
@@ -485,21 +486,21 @@ func (svc *ShareService) Inspect(shareName string) (*model.Host, *propsv1.HostSh
 	hostName, err := metadata.LoadShare(svc.provider, shareName)
 	if err != nil {
 		err = infraErr(errors.Wrap(err, "error loading share metadata"))
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if hostName == "" {
-		return nil, nil, logicErr(model.ResourceNotFoundError("share", shareName))
+		return nil, nil, nil, logicErr(model.ResourceNotFoundError("share", shareName))
 	}
 
 	hostSvc := NewHostService(svc.provider)
 	server, err := hostSvc.Get(hostName)
 	if err != nil {
-		return nil, nil, infraErr(err)
+		return nil, nil, nil, infraErr(err)
 	}
 	serverSharesV1 := propsv1.NewHostShares()
 	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
 	if err != nil {
-		return nil, nil, infraErr(err)
+		return nil, nil, nil, infraErr(err)
 	}
 
 	shareID, found := serverSharesV1.ByName[shareName]
@@ -508,7 +509,7 @@ func (svc *ShareService) Inspect(shareName string) (*model.Host, *propsv1.HostSh
 		_, found = serverSharesV1.ByID[shareID]
 	}
 	if !found {
-		return nil, nil, infraErr(err)
+		return nil, nil, nil, infraErr(err)
 	}
 	share := serverSharesV1.ByID[shareID]
 
