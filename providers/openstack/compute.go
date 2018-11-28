@@ -302,6 +302,8 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 		panic("hostParam must be a string or a *model.Host!")
 	}
 
+	const timeout = time.Second * 60
+
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			server, err = servers.Get(client.Compute, host.ID).Extract()
@@ -327,13 +329,13 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 			}
 			return fmt.Errorf("server not ready yet")
 		},
-		10*time.Second,
+		timeout,
 		1*time.Second,
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return nil, fmt.Errorf("failed to get host '%s' information after 10s: %s", host.ID, err.Error())
+			return nil, fmt.Errorf("failed to get host '%s' information after %v: %s", host.ID, timeout, err.Error())
 		}
 	}
 	if err != nil {
