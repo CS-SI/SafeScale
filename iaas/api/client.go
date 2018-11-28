@@ -18,7 +18,7 @@ package api
 
 import (
 	"github.com/CS-SI/SafeScale/iaas/provider"
-	"github.com/CS-SI/SafeScale/iaas/resource"
+	"github.com/CS-SI/SafeScale/iaas/model"
 	"github.com/CS-SI/SafeScale/system"
 )
 

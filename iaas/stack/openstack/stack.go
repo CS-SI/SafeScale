@@ -30,10 +30,9 @@ import (
 
 // Stack contains the needs to operate on stack OpenStack
 type Stack struct {
-	Compute       *gc.ServiceClient
-	Network       *gc.ServiceClient
-	Volume        *gc.ServiceClient
-	ObjectStorage *gc.ServiceClient
+	Compute *gc.ServiceClient
+	Network *gc.ServiceClient
+	Volume  *gc.ServiceClient
 
 	AuthOpts *AuthenticationOptions
 	CfgOpts  *ConfigurationOptions
@@ -89,18 +88,6 @@ func New(auth AuthenticationOptions, cfg ConfigurationOptions) (*Stack, error) {
 	volume, err := gcos.NewBlockStorageV1(driver, gc.EndpointOpts{
 		Region: auth.Region,
 	})
-
-	// ObjectStorage API
-	objectstorage, err := gcos.NewObjectStorageV1(driver, gc.EndpointOpts{
-		Region: auth.Region,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("%s", ErrorToString(err))
-	}
-
-	if len(cfg.S3Protocol) == 0 {
-		cfg.S3Protocol = "swiftks"
-	}
 
 	s := stack{
 		AuthOpts:          &auth,

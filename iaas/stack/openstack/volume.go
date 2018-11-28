@@ -18,14 +18,21 @@ package openstack
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeState"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
+	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
+
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
@@ -79,19 +86,28 @@ func (s *Stack) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
-	vol, err := volumes.Create(s.Volume, volumes.CreateOpts{
+	volume, err := client.GetVolume(request.Name)
+	if err != nil {
+		return nil, err
+	}
+	if volume != nil {
+		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
+	}
+
+	vol, err := volumes.Create(client.Volume, volumes.CreateOpts{
 		Name:       request.Name,
 		Size:       request.Size,
 		VolumeType: client.getVolumeType(request.Speed),
 	}).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume : %s", ProviderErrorToString(err))
+		log.Debugf("Error creating volume: volume creation invocation: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume : %s", ProviderErrorToString(err)))
 	}
-	v := api.Volume{
+	v := model.Volume{
 		ID:    vol.ID,
 		Name:  vol.Name,
 		Size:  vol.Size,
-		Speed: s.getVolumeSpeed(vol.VolumeType),
+		Speed: client.getVolumeSpeed(vol.VolumeType),
 		State: toVolumeState(vol.Status),
 	}
 	return &v, nil
@@ -99,31 +115,37 @@ func (s *Stack) CreateVolume(request model.VolumeRequest) (*model.Volume, error)
 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(id string) (*model.Volume, error) {
-	vol, err := volumes.Get(s.Volume, id).Extract()
+	r := volumes.Get(client.Volume, id)
+	volume, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting volume: %s", ProviderErrorToString(err))
+		switch err.(type) {
+		case gc.ErrDefault404:
+			return nil, nil
+		}
+		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", ProviderErrorToString(err)))
 	}
 	av := model.Volume{
-		ID:    vol.ID,
-		Name:  vol.Name,
-		Size:  vol.Size,
-		Speed: s.getVolumeSpeed(vol.VolumeType),
-		State: toVolumeState(vol.Status),
+		ID:    volume.ID,
+		Name:  volume.Name,
+		Size:  volume.Size,
+		Speed: s.getVolumeSpeed(volume.VolumeType),
+		State: toVolumeState(volume.Status),
 	}
 	return &av, nil
 }
 
-// ListVolumes return the list of all volume known on the current tenant (all=ture)
-//or 'only' thode monitored by safescale (all=false) ie those monitored by metadata
+// ListVolumes returns the list of all volumes known on the current tenant
 func (s *Stack) ListVolumes() ([]model.Volume, error) {
-	var vs []api.Volume
-	err := volumes.List(s.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+	var vs []model.Volume
+	err := volumes.List(client.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumes.ExtractVolumes(page)
 		if err != nil {
+			log.Errorf("Error listing volumes: volume extraction: %+v", err)
 			return false, err
 		}
 		for _, vol := range list {
-			av := api.Volume{
+			av := model.Volume{
 				ID:    vol.ID,
 				Name:  vol.Name,
 				Size:  vol.Size,
@@ -134,17 +156,48 @@ func (s *Stack) ListVolumes() ([]model.Volume, error) {
 		}
 		return true, nil
 	})
-	if err != nil {
-		return nil, fmt.Errorf("Error listing volume types: %s", ProviderErrorToString(err))
+	if err != nil || len(vs) == 0 {
+		if err != nil {
+			log.Debugf("Error listing volumes: list invocation: %+v", err)
+			return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
+		}
+		log.Warnf("Complete volume list empty")
 	}
 	return vs, nil
 }
 
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(id string) error {
-	err := volumes.Delete(s.Volume, id).ExtractErr()
-	if err != nil {
-		return fmt.Errorf("Error deleting volume: %s", ProviderErrorToString(err))
+	var (
+		err     error
+		timeout = 30 * time.Second
+	)
+
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			r := volumes.Delete(s.Volume, id)
+			err := r.ExtractErr()
+			if err != nil {
+				switch err.(type) {
+				case gc.ErrDefault400:
+					return fmt.Errorf("volume not in state 'available'")
+				default:
+					return err
+				}
+			}
+			return nil
+		},
+		timeout,
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case retry.ErrTimeout:
+			if err != nil {
+				return fmt.Errorf("timeout after %v to delete volume: %v", timeout, err)
+			}
+		}
+		log.Debugf("Error deleting volume: %+v", retryErr)
+		return errors.Wrap(retryErr, fmt.Sprintf("Error deleting volume: %v", retryErr))
 	}
 	return nil
 }
@@ -153,45 +206,35 @@ func (s *Stack) DeleteVolume(id string) error {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (*model.VolumeAttachment, error) {
-	// Create the attachment
-	va, err := volumeattach.Create(s.Compute, request.ServerID, volumeattach.CreateOpts{
+func (s *Stack) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (string, error) {
+
+	// Creates the attachment
+	r := volumeattach.Create(client.Compute, request.HostID, volumeattach.CreateOpts{
 		VolumeID: request.VolumeID,
-	}).Extract()
+	})
+	va, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume attachment between server %s and volume %s: %s", request.ServerID, request.VolumeID, ProviderErrorToString(err))
+		spew.Dump(r.Err)
+		// switch r.Err.(type) {
+		// 	case
+		// }
+		// message := extractMessageFromBadRequest(r.Err)
+		// if message != ""
+		log.Debugf("Error creating volume attachment: actual attachment creation: %+v", err)
+		return "", errors.Wrap(err, fmt.Sprintf("Error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, ProviderErrorToString(err)))
 	}
 
-	vaapi := &api.VolumeAttachment{
-		ID:       va.ID,
-		ServerID: va.ServerID,
-		VolumeID: va.VolumeID,
-		Device:   va.Device,
-	}
-
-	mtdVol, err := s.GetVolume(request.VolumeID)
-	if err != nil {
-		return nil, err
-	}
-	err = mtdVol.Attach(vaapi)
-	if err != nil {
-		// Detach volume
-		detachErr := volumeattach.Delete(s.Compute, va.ServerID, va.ID).ExtractErr()
-		if detachErr != nil {
-			return nil, fmt.Errorf("Error deleting volume attachment %s: %s", va.ID, ErrorToString(err))
-		}
-	}
-
-	return vaapi, err
+	return va.ID, nil
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachment, error) {
 	va, err := volumeattach.Get(s.Compute, serverID, id).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting volume attachment %s: %s", id, ErrorToString(err))
+		log.Debugf("Error getting volume attachment: get call: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
 	}
-	return &api.VolumeAttachment{
+	return &model.VolumeAttachment{
 		ID:       va.ID,
 		ServerID: va.ServerID,
 		VolumeID: va.VolumeID,
@@ -202,13 +245,14 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachmen
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error) {
 	var vs []model.VolumeAttachment
-	err := volumeattach.List(s.Compute, serverID).EachPage(func(page pagination.Page) (bool, error) {
+	err := volumeattach.List(client.Compute, serverID).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumeattach.ExtractVolumeAttachments(page)
 		if err != nil {
-			return false, err
+			log.Debugf("Error listing volume attachment: extracting attachments: %+v", err)
+			return false, errors.Wrap(err, "Error listing volume attachment: extracting attachments")
 		}
 		for _, va := range list {
-			ava := api.VolumeAttachment{
+			ava := model.VolumeAttachment{
 				ID:       va.ID,
 				ServerID: va.ServerID,
 				VolumeID: va.VolumeID,
@@ -219,32 +263,20 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment
 		return true, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error listing volume types: %s", ProviderErrorToString(err))
+		log.Debugf("Error listing volume attachment: listing attachments: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error listing volume types: %s", ProviderErrorToString(err)))
 	}
 	return vs, nil
 }
 
-// DeleteVolumeAttachment deletes the volume attachment identified by id
-func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
-	va, err := client.GetVolumeAttachment(serverID, id)
+// DeleteVolumeAttachment deletes the volume attachment identifed by id
+func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
+	r := volumeattach.Delete(client.Compute, serverID, vaID)
+	err := r.ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting volume attachment %s: %s", id, ProviderErrorToString(err))
+		spew.Dump(r)
+		log.Debugf("Error deleting volume attachment: deleting attachments: %+v", err)
+		return errors.Wrap(err, fmt.Sprintf("Error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)))
 	}
-
-	err = volumeattach.Delete(s.Compute, serverID, id).ExtractErr()
-	if err != nil {
-		return fmt.Errorf("Error deleting volume attachment %s: %s", id, ProviderErrorToString(err))
-	}
-
-	mtdVol, err := s.GetVolume(id)
-	if err != nil {
-		return fmt.Errorf("Error deleting volume attachment %s: %s", id, ProviderErrorToString(err))
-	}
-
-	err = mtdVol.Detach(va)
-	if err != nil {
-		return fmt.Errorf("Error deleting volume attachment %s: %s", id, ProviderErrorToString(err))
-	}
-
 	return nil
 }
