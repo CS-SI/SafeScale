@@ -24,9 +24,9 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/CS-SI/SafeScale/iaas/resource"
+	"github.com/CS-SI/SafeScale/iaas/model"
 	stackapi "github.com/CS-SI/SafeScale/iaas/stack/api"
-	"github.com/CS-SI/SafeScale/providers/api"
+	
 
 	"github.com/CS-SI/SafeScale/utils"
 
@@ -64,7 +64,7 @@ var userdataTemplate *template.Template
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func Prepare(
-	s stackapi.Stack, request resource.HostRequest, isGateway bool, kp *resource.KeyPair, gw *resource.Host, cidr string,
+	s stackapi.Stack, request resource.HostRequest, kp *model.KeyPair, cidr string,
 ) ([]byte, error) {
 
 	// Generate password for user gpac
@@ -89,12 +89,8 @@ func Prepare(
 
 	// Determine Gateway IP
 	ip := ""
-	if gw != nil {
-		if len(gw.PrivateIPsV4) > 0 {
-			ip = gw.PrivateIPsV4[0]
-		} else if len(gw.PrivateIPsV6) > 0 {
-			ip = gw.PrivateIPsV6[0]
-		}
+	if request.DefaultGateway != nil {
+		ip = request.DefaultGateway.GetPrivateIP()
 	}
 
 	config, err := s.GetCfgOpts()
@@ -132,17 +128,18 @@ func Prepare(
 	}
 
 	data := userData{
-		User:       api.DefaultUser,
+		User:       model.DefaultUser,
 		PublicKey:  strings.Trim(kp.PublicKey, "\n"),
 		PrivateKey: strings.Trim(kp.PrivateKey, "\n"),
 		ConfIF:     !autoHostNetworkInterfaces,
-		IsGateway:  isGateway && !useLayer3Networking,
+		IsGateway:  request.DefaultGateway == nil && request.Networks[0].Name != model.SingleHostNetworkName && !useLayer3Networking,
 		AddGateway: !request.PublicIP && !useLayer3Networking,
 		DNSServers: dnsList,
 		CIDR:       cidr,
 		GatewayIP:  ip,
 		Password:   gpacPassword,
-		HostName:   request.Name,
+
+		//HostName:   request.Name,
 	}
 
 	dataBuffer := bytes.NewBufferString("")
@@ -151,4 +148,29 @@ func Prepare(
 		return nil, err
 	}
 	return dataBuffer.Bytes(), nil
+}
+
+func initUserdataTemplate() error {
+	if userdataTemplate != nil {
+		// Already loaded
+		return nil
+	}
+
+	var (
+		err         error
+		box         *rice.Box
+		userdataStr string
+	)
+
+	box, err = rice.FindBox("../userdata/scripts")
+	if err == nil {
+		userdataStr, err = box.String("userdata.sh")
+		if err == nil {
+			userdataTemplate, err = template.New("user_data").Parse(userdataStr)
+			if err == nil {
+				return nil
+			}
+		}
+	}
+	return err
 }

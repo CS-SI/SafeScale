@@ -17,8 +17,7 @@
 package openstack
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/provider"
-	"github.com/CS-SI/SafeScale/iaas/resource/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeSpeed"
 )
 
 // AuthenticationOptions fields are the union of those recognized by each identity implementation and provider

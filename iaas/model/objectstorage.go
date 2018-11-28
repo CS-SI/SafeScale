@@ -21,7 +21,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 )
 
 // Bucket describes a Bucket

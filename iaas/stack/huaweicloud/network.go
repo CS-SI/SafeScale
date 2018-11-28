@@ -25,9 +25,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	stack_openstack "github.com/CS-SI/SafeScale/iaas/stack/openstack"
-	"github.com/CS-SI/SafeScale/model"
-	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -44,8 +43,8 @@ import (
 
 // VPCRequest defines a request to create a VPC
 type VPCRequest struct {
-	Name string `json:"name"`
-	CIDR string `json:"cidr"`
+	Name string
+	CIDR string
 }
 
 // VPC contains information about a VPC
@@ -103,7 +102,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 	_, err = s.osclt.Driver.Request("POST", url, &opts)
 	vpc, err := resp.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ErrorToString(err))
+		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
 	// Searching for the OpenStack Router corresponding to the VPC (router.id == vpc.id)
@@ -113,14 +112,14 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 		if nerr != nil {
 			log.Warnf("Error deleting VPC: %v", nerr)
 		}
-		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ErrorToString(err))
+		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 	vpc.Router = router
 
 	// Searching for the Network binded to the VPC
 	network, err := s.findVPCBindedNetwork(vpc.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ErrorToString(err))
+		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 	vpc.Network = network
 
@@ -132,7 +131,7 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, error) 
 	found := false
 	routers, err := s.driver.ListRouters()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list routers: %s", openstack.ErrorToString(err))
+		return nil, fmt.Errorf("failed to list routers: %s", openstack.ProviderErrorToString(err))
 	}
 	for _, r := range routers {
 		if r.Name == vpcName {
@@ -147,7 +146,7 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, error) 
 
 	network, err := networks.Get(s.osclt.Network, router.NetworkID).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("failed to find binded network of VPC '%s': %s", vpcName, stack_openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to find binded network of VPC '%s': %s", vpcName, openstack.ProviderErrorToString(err))
 	}
 	return network, nil
 }
@@ -164,7 +163,7 @@ func (s *Stack) GetVPC(id string) (*VPC, error) {
 	r.Err = err
 	vpc, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error getting Network %s: %s", id, stack_openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("Error getting Network %s: %s", id, openstack.ProviderErrorToString(err))
 	}
 	return vpc, nil
 }
@@ -182,7 +181,8 @@ func (s *Stack) DeleteVPC(id string) error {
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (s *Stack) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
-	subnet, err := s.findSubnetByName(req.Name)
+	log.Debugf("iaas/stack.huaweicloud.Stack.CreateNetwork(%s) called\n", req.Name)
+	subnet, err := client.findSubnetByName(req.Name)
 	if subnet == nil && err != nil {
 		return nil, err
 	}
@@ -194,18 +194,29 @@ func (s *Stack) CreateNetwork(req model.NetworkRequest) (*model.Network, error) 
 		return nil, fmt.Errorf("network name '%s' invalid: %s", req.Name, err)
 	}
 
-	subnet, err = s.createSubnet(req.Name, req.CIDR)
+	// Checks if CIDR is valid...
+	_, vpcnetDesc, _ := net.ParseCIDR(client.vpc.CIDR)
+	_, networkDesc, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
-		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, stack_openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error())
+	}
+	// .. and if CIDR is inside VPC's one
+	if !cidrIntersects(vpcnetDesc, networkDesc) {
+		return nil, fmt.Errorf("can't create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, client.vpc.CIDR)
 	}
 
-	// Creates metadata for the subnet
-	network := &model.Network{
-		ID:        subnet.ID,
-		Name:      subnet.Name,
-		CIDR:      subnet.CIDR,
-		IPVersion: fromIntIPVersion(subnet.IPVersion),
+	// Creates the subnet
+	subnet, err = client.createSubnet(req.Name, req.CIDR)
+	if err != nil {
+		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
+
+	network := model.NewNetwork()
+	network.ID = subnet.ID
+	network.Name = subnet.Name
+	network.CIDR = subnet.CIDR
+	network.IPVersion = fromIntIPVersion(subnet.IPVersion)
+
 	return network, nil
 }
 
@@ -231,69 +242,71 @@ func validateNetworkName(req model.NetworkRequest) (bool, error) {
 	return true, nil
 }
 
-// GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(ref string) (*model.Network, error) {
-	subnet, err := s.getSubnet(ref)
-	if err != nil {
-		if !strings.Contains(err.Error(), ref) {
-			return nil, fmt.Errorf("failed getting network id '%s': %s", ref, stack_openstack.ProviderErrorToString(err))
-		}
-	}
-	if subnet != nil && subnet.ID != "" {
-		return &model.Network{
-			ID:        subnet.ID,
-			Name:      subnet.Name,
-			CIDR:      subnet.CIDR,
-			IPVersion: fromIntIPVersion(subnet.IPVersion),
-		}, nil
-
+// GetNetworkByName ...
+func (s *Stack) GetNetworkByName(name string) (*model.Network, error) {
+	if name == "" {
+		panic("name is empty!")
 	}
 
-	// Last chance, we look at all network
-	nets, err := s.ListNetworks()
-	if err != nil {
-		return nil, err
+	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
+	r := networks.GetResult{}
+	_, r.Err = client.osclt.Compute.Get(client.osclt.Network.ServiceURL("subnets?name="+name), &r.Body, &gc.RequestOpts{
+		OkCodes: []int{200, 203},
+	})
+	if r.Err != nil {
+		return nil, fmt.Errorf("query for network '%s' failed: %v", name, r.Err)
 	}
-	for _, n := range nets {
-		if n.ID == ref || n.Name == ref {
-			return &n, err
-		}
+	subnets, found := r.Body.(map[string]interface{})["subnets"].([]interface{})
+	if found && len(subnets) > 0 {
+		entry := subnets[0].(map[string]interface{})
+		id := entry["id"].(string)
+		return client.GetNetwork(id)
 	}
-
-	// At this point, no network has been found with given reference
-	return nil, nil
+	return nil, model.ResourceNotFoundError("network", name)
 }
 
-// ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]model.Network, error) {
-	subnetList, err := s.listSubnets()
+// GetNetwork returns the network identified by id
+func (s *Stack) GetNetwork(id string) (*model.Network, error) {
+	subnet, err := client.getSubnet(id)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list networks: %s", stack_openstack.ProviderErrorToString(err))
+		spew.Dump(err)
+		if !strings.Contains(err.Error(), id) {
+			return nil, fmt.Errorf("failed getting network id '%s': %s", id, openstack.ProviderErrorToString(err))
+		}
 	}
-	var networkList []model.Network
+	if subnet == nil || subnet.ID == "" {
+		return nil, nil
+	}
+
+	net := model.NewNetwork()
+	net.ID = subnet.ID
+	net.Name = subnet.Name
+	net.CIDR = subnet.CIDR
+	net.IPVersion = fromIntIPVersion(subnet.IPVersion)
+	return net, nil
+}
+
+// ListNetworks lists networks
+func (s *Stack) ListNetworks() ([]*model.Network, error) {
+	subnetList, err := client.listSubnets()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get networks list: %s", openstack.ProviderErrorToString(err))
+	}
+	var networkList []*model.Network
 	for _, subnet := range *subnetList {
-		networkList = append(networkList, model.Network{
-			ID:        subnet.ID,
-			Name:      subnet.Name,
-			CIDR:      subnet.CIDR,
-			IPVersion: fromIntIPVersion(subnet.IPVersion),
-		})
+		net := model.NewNetwork()
+		net.ID = subnet.ID
+		net.Name = subnet.Name
+		net.CIDR = subnet.CIDR
+		net.IPVersion = fromIntIPVersion(subnet.IPVersion)
+		networkList = append(networkList, net)
 	}
 	return networkList, nil
 }
 
 // DeleteNetwork consists to delete subnet in FlexibleEngine VPC
-func (s *Stack) DeleteNetwork(networkID string) error {
-	nerr := s.DeleteGateway(networkID)
-	if nerr != nil {
-		log.Warnf("Error deleting gateway: %v", nerr)
-	}
-
-	err = s.deleteSubnet(networkID)
-	if err != nil {
-		return err
-	}
-	return nil
+func (s *Stack) DeleteNetwork(id string) error {
+	return s.deleteSubnet(id)
 }
 
 type subnetRequest struct {
@@ -363,15 +376,7 @@ func cidrIntersects(n1, n2 *net.IPNet) bool {
 
 // createSubnet creates a subnet using native FlexibleEngine API
 func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) {
-	// Checks if subnet is inside CIDR of VPC
-	_, vpcnetDesc, _ := net.ParseCIDR(s.vpc.CIDR)
-	network, networkDesc, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", name, cidr, openstack.ErrorToString(err))
-	}
-	if !cidrIntersects(vpcnetDesc, networkDesc) {
-		return nil, fmt.Errorf("can't create subnet with CIDR '%s': not inside network CIDR '%s'", cidr, s.vpc.CIDR)
-	}
+	network, networkDesc, _ := net.ParseCIDR(cidr)
 
 	// Validates CIDR regarding the existing subnets
 	subnets, err := s.listSubnets()
@@ -388,7 +393,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	// Calculate IP address for gateway
 	n, err := convertIPv4ToNumber(network.To4())
 	if err != nil {
-		return nil, fmt.Errorf("failed to choose gateway IP address for the subnet: %s", stack_openstack.ProviderErrorToString(err))
+		return nil, fmt.Errorf("failed to choose gateway IP address for the subnet: %s", openstack.ProviderErrorToString(err))
 	}
 	gw := convertNumberToIPv4(n + 1)
 
@@ -419,7 +424,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	b, err := gc.BuildRequestBody(req, "subnet")
 	if err != nil {
-		return nil, fmt.Errorf("error preparing Subnet %s creation: %s", req.Name, openstack.ErrorToString(err))
+		return nil, fmt.Errorf("error preparing Subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
 	respCreate := subnetCreateResult{}
@@ -431,11 +436,11 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	_, err = s.driver.Provider.Request("POST", url, &opts)
 	if err != nil {
-		return nil, fmt.Errorf("error requesting Subnet %s creation: %s", req.Name, openstack.ErrorToString(err))
+		return nil, fmt.Errorf("error requesting Subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 	subnet, err := respCreate.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("error creating Subnet %s: %s", req.Name, openstack.ErrorToString(err))
+		return nil, fmt.Errorf("error creating Subnet %s: %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
 	// Subnet creation started, need to wait the subnet to reach the status ACTIVE
@@ -457,7 +462,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 		time.Minute,
 		func(try retry.Try, verdict Verdict.Enum) {
 			if verdict != Verdict.Done {
-				log.Warnf("Network '%s' is not in 'ACTIVE' state, retrying...", name)
+				log.Printf("Network '%s' is not in 'ACTIVE' state, retrying...", name)
 			}
 		},
 	)
@@ -474,19 +479,18 @@ func (s *Stack) listSubnets() (*[]subnets.Subnet, error) {
 	paginationErr := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := subnets.ExtractSubnets(page)
 		if err != nil {
-			return false, fmt.Errorf("Error listing subnets: %s", openstack.ErrorToString(err))
+			return false, fmt.Errorf("Error listing subnets: %s", openstack.ProviderErrorToString(err))
 		}
 
-		// for _, subnet := range list {
-		// 	subnetList = append(subnetList, subnet)
-		// }
-		subnetList = append(subnetList, list...)
+		for _, subnet := range list {
+			subnetList = append(subnetList, subnet)
+		}
 		return true, nil
 	})
 
 	// TODO previously we ignored the error here, consider returning nil, paginationErr
 	if paginationErr != nil {
-		log.Debugf("We have a pagination error: %v", paginationErr)
+		log.Warnf("We have a pagination error: %v", paginationErr)
 	}
 
 	return &subnetList, nil
@@ -504,7 +508,7 @@ func (s *Stack) getSubnet(id string) (*subnets.Subnet, error) {
 	r.Err = err
 	subnet, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get information for subnet id '%s': %s", id, openstack.ErrorToString(err))
+		return nil, fmt.Errorf("Failed to get information for subnet id '%s': %s", id, openstack.ProviderErrorToString(err))
 	}
 	return &subnet.Subnet, nil
 }
@@ -522,22 +526,24 @@ func (s *Stack) deleteSubnet(id string) error {
 	// So we retry subnet deletion until all hosts are really deleted and subnet can be deleted
 	err := retry.Action(
 		func() error {
-			_, err := s.osclt.Provider.Request("DELETE", url, &opts)
-			return err
+			r, _ := s.osclt.Provider.Request("DELETE", url, &opts)
+			if r.StatusCode == 204 || r.StatusCode == 404 {
+				return nil
+			}
+			return fmt.Errorf("%d", r.StatusCode)
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(time.Minute*5)),
 		retry.Constant(time.Second*3),
 		nil, nil,
 		func(t retry.Try, verdict Verdict.Enum) {
-			if r, ok := t.Err.(gc.ErrDefault500); ok {
-				var v map[string]string
-				jsonErr := json.Unmarshal(r.Body, &v)
-				if jsonErr == nil {
-					log.Debugf("network still owns host(s), retrying in 3s...")
-					return
+			if t.Err != nil {
+				switch t.Err.Error() {
+				case "409":
+					log.Debugln("network still owns host(s), retrying in 3s...")
+				default:
+					log.Debugf("error submitting network deletion (status=%s), retrying in 3s...", t.Err.Error())
 				}
 			}
-			log.Debugf("error submitting network deletion, retrying in 3s...")
 		},
 	)
 	if err != nil {
@@ -546,7 +552,7 @@ func (s *Stack) deleteSubnet(id string) error {
 	// Deletion submit has been executed, checking returned error code
 	err = resp.ExtractErr()
 	if err != nil {
-		return fmt.Errorf("Error deleting subnet id '%s': %s", id, openstack.ErrorToString(err))
+		return fmt.Errorf("Error deleting subnet id '%s': %s", id, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }
@@ -555,7 +561,7 @@ func (s *Stack) deleteSubnet(id string) error {
 func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
 	subnetList, err := s.listSubnets()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find in Subnets: %s", openstack.ErrorToString(err))
+		return nil, fmt.Errorf("Failed to find in Subnets: %s", openstack.ProviderErrorToString(err))
 	}
 	found := false
 	var subnet subnets.Subnet
@@ -586,53 +592,34 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
 func (s *Stack) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
-	net, err := s.GetNetwork(req.NetworkID)
-	if err != nil {
-		return nil, fmt.Errorf("Network %s not found: %s", req.NetworkID, openstack.ErrorToString(err))
+	if req.Network == nil {
+		panic("req.Network is nil!")
 	}
-	gwname := req.GWName
+	gwname := req.Name
 	if gwname == "" {
-		gwname = "gw-" + net.Name
+		gwname = "gw-" + req.Network.Name
 	}
 	hostReq := model.HostRequest{
-		ImageID:    req.ImageID,
-		KeyPair:    req.KeyPair,
-		Name:       gwname,
-		TemplateID: req.TemplateID,
-		NetworkIDs: []string{req.NetworkID},
-		PublicIP:   true,
+		ImageID:      req.ImageID,
+		KeyPair:      req.KeyPair,
+		ResourceName: gwname,
+		TemplateID:   req.TemplateID,
+		Networks:     []*model.Network{req.Network},
+		PublicIP:     true,
 	}
-	host, err := s.createHost(hostReq, true)
+	host, err := client.CreateHost(hostReq)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating gateway : %s", openstack.ErrorToString(err))
+		switch err.(type) {
+		case model.ErrResourceInvalidRequest:
+			return nil, err
+		default:
+			return nil, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
+		}
 	}
 	return host, err
 }
 
-// // GetGateway returns the name of the gateway of a network
-// func (s *Stack) GetGateway(networkID string) (*model.Host, error) {
-// 	m, err := metadata.LoadGateway(providers.FromClient(client), networkID)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if m != nil {
-// 		return m.Get(), nil
-// 	}
-// 	return nil, fmt.Errorf("Failed to load gateway metadata")
-// }
-
-// // DeleteGateway deletes the gateway associated with network identified by ID
-// func (s *Stack) DeleteGateway(networkID string) error {
-// 	m, err := metadata.LoadGateway(iaas.FromStack(s), networkID)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if m != nil {
-// 		err = s.DeleteHost(m.Get().ID)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return m.Delete()
-// 	}
-// 	return fmt.Errorf("failed to load gateway metadata")
-// }
+// DeleteGateway deletes the gateway associated with network identified by ID
+func (client *Client) DeleteGateway(id string) error {
+	return client.DeleteHost(id)
+}
