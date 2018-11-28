@@ -353,6 +353,17 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		diskSize = 400
 	}
 
+	// Select useable availability zone, the first one in the list
+	azList, err := client.ListAvailabilityZones(false)
+	if err != nil {
+		return nil, err
+	}
+	var az string
+	for az = range azList {
+		break
+	}
+	log.Debugf("Selected Availability Zone: '%s'", az)
+
 	// Defines boot disk
 	bootdiskOpts := blockDevice{
 		SourceType:          exbfv.SourceImage,
@@ -365,11 +376,12 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	}
 	// Defines server
 	srvOpts := serverCreateOpts{
-		Name:           request.ResourceName,
-		SecurityGroups: []string{client.SecurityGroup.Name},
-		Networks:       nets,
-		FlavorRef:      request.TemplateID,
-		UserData:       userData,
+		Name:             request.ResourceName,
+		SecurityGroups:   []string{client.SecurityGroup.Name},
+		Networks:         nets,
+		FlavorRef:        request.TemplateID,
+		UserData:         userData,
+		AvailabilityZone: az,
 	}
 	// Defines host "Extension bootfromvolume" options
 	bdOpts := bootdiskCreateOptsExt{
@@ -1146,6 +1158,11 @@ func (client *Client) ListKeyPairs() ([]model.KeyPair, error) {
 // DeleteKeyPair deletes the key pair identified by id
 func (client *Client) DeleteKeyPair(id string) error {
 	return client.osclt.DeleteKeyPair(id)
+}
+
+// ListAvailabilityZones lists the usable Availability Zones
+func (client *Client) ListAvailabilityZones(all bool) (map[string]bool, error) {
+	return client.osclt.ListAvailabilityZones(all)
 }
 
 // GetImage returns the Image referenced by id
