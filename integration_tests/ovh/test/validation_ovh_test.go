@@ -92,7 +92,13 @@ func Test_Basic(t *testing.T) {
 	require.Nil(t, err)
 
 	require.True(t, strings.Contains(out, "bnastest"))
+	if !strings.Contains(out, "easyvm") {
+		fmt.Print(out)
+	}
 	require.True(t, strings.Contains(out, "easyvm"))
+	if !strings.Contains(out, "complexvm") {
+		fmt.Print(out)
+	}
 	require.True(t, strings.Contains(out, "complexvm"))
 
 	out, err = getOutput("broker nas  umount bnastest complexvm")
