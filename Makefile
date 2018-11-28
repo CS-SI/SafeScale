@@ -1,3 +1,4 @@
+ndef = $(if $(value $(1)),,$(error $(1) not set))
 .DEFAULT_GOAL := help
 
 .PHONY: default
@@ -7,7 +8,7 @@ ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
 
-VERSION := 0.1.0
+VERSION := 0.1.1
 
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
