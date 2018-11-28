@@ -20,12 +20,15 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	filters "github.com/CS-SI/SafeScale/providers/filters/templates"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 )
+
+// ListAvailabilityZones ...
+func (client *Client) ListAvailabilityZones(all bool) (map[string]bool, error) {
+	return client.osclt.ListAvailabilityZones(all)
+}
 
 // ListImages lists available OS images
 func (client *Client) ListImages(all bool) ([]model.Image, error) {
@@ -136,7 +139,6 @@ func (client *Client) StopHost(id string) error {
 
 // RebootHost ...
 func (client *Client) RebootHost(id string) error {
-	log.Println("Received reboot petition OVH")
 	return client.osclt.RebootHost(id)
 }
 

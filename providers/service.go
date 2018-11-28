@@ -331,7 +331,8 @@ func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force
 		}
 	}
 
-	log.Debugf("Looking for machine with: %d cores, %f RAM, and %d Disk", sizing.MinCores, sizing.MinRAMSize, sizing.MinDiskSize)
+	log.Debugf("Looking for machine with: %d core%s, %.01f GB RAM, and %d GB Disk",
+		sizing.MinCores, safeutils.Plural(sizing.MinCores), sizing.MinRAMSize, sizing.MinDiskSize)
 
 	for _, template := range templates {
 		if template.Cores >= sizing.MinCores && (template.DiskSize == 0 || template.DiskSize >= sizing.MinDiskSize) && template.RAMSize >= sizing.MinRAMSize {

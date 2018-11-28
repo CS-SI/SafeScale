@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	// Gophercloud OpenStack API
+
 	gc "github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
@@ -29,8 +30,6 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	// official AWS API
-
-	awscreds "github.com/aws/aws-sdk-go/aws/credentials"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
@@ -79,45 +78,6 @@ const (
 	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com"
 )
 
-//VPL:BEGIN
-// aws provider isn't finished yet, copying the necessary here meanwhile...
-
-// AuthOpts AWS credentials
-type awsAuthOpts struct {
-	// AWS Access key ID
-	AccessKeyID string
-
-	// AWS Secret Access Key
-	SecretAccessKey string
-	// The region to send requests to. This parameter is required and must
-	// be configured globally or on a per-client basis unless otherwise
-	// noted. A full list of regions is found in the "Regions and Endpoints"
-	// document.
-	//
-	// @see http://docs.aws.amazon.com/general/latest/gr/rande.html
-	//   AWS Regions and Endpoints
-	Region string
-	//Config *Config
-}
-
-// Retrieve returns nil if it successfully retrieved the value.
-// Error is returned if the value were not obtainable, or empty.
-func (o awsAuthOpts) Retrieve() (awscreds.Value, error) {
-	return awscreds.Value{
-		AccessKeyID:     o.AccessKeyID,
-		SecretAccessKey: o.SecretAccessKey,
-		ProviderName:    "internal",
-	}, nil
-}
-
-// IsExpired returns if the credentials are no longer valid, and need
-// to be retrieved.
-func (o awsAuthOpts) IsExpired() bool {
-	return false
-}
-
-//VPL:END
-
 // AuthenticatedClient returns an authenticated client
 func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, error) {
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
@@ -142,6 +102,10 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 	}
 	err = gcos.AuthenticateV3(provider, &authOptions, gc.EndpointOpts{})
 	if err != nil {
+		switch err.(type) {
+		case gc.ErrDefault401:
+			return nil, fmt.Errorf("authentication failed")
+		}
 		return nil, fmt.Errorf("%s", openstack.ProviderErrorToString(err))
 	}
 

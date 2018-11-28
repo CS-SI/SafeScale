@@ -27,6 +27,9 @@ import (
 type ClientAPI interface {
 	Build(map[string]interface{}) (ClientAPI, error)
 
+	// ListAvailabilityZones lists the usable Availability Zones
+	ListAvailabilityZones(bool) (map[string]bool, error)
+
 	// ListImages lists available OS images
 	ListImages(all bool) ([]model.Image, error)
 	// GetImage returns the Image referenced by id

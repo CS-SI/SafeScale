@@ -46,7 +46,8 @@ type ImageService struct {
 
 // List returns the image list
 func (srv *ImageService) List(all bool) ([]model.Image, error) {
-	return srv.provider.ListImages(all)
+	images, err := srv.provider.ListImages(all)
+	return images, infraErr(err)
 }
 
 // Select selects the image that best fits osname

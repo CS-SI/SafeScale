@@ -176,7 +176,6 @@ type HostLocalMount struct {
 	Path       string `json:"mountpoint"`        // Path is the mount point of the device
 	FileSystem string `json:"file_system"`       // FileSystem tells the filesystem used
 	Options    string `json:"options,omitempty"` // Options contains the mount options
-
 }
 
 // NewHostLocalMount ...

@@ -20,8 +20,6 @@ import (
 	"fmt"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
-
 	log "github.com/sirupsen/logrus"
 
 	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
@@ -33,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/openstack"
-	"github.com/CS-SI/SafeScale/utils"
 )
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services NetworkAPI
@@ -72,11 +69,10 @@ func (svc *NetworkService) Create(
 		switch err.(type) {
 		case model.ErrResourceNotFound:
 		default:
-			err = srvLog(errors.Errorf("failed to check if a network already exists with name '%s'", name))
-			return nil, err
+			return nil, infraErrf(err, "failed to check if a network already exists with name '%s'", name)
 		}
 	} else {
-		return nil, fmt.Errorf("network '%s' already exists", name)
+		return nil, logicErr(fmt.Errorf("network '%s' already exists", name))
 	}
 
 	// Create the network
@@ -86,7 +82,7 @@ func (svc *NetworkService) Create(
 		CIDR:      cidr,
 	})
 	if err != nil {
-		err = srvLog(err)
+		err = infraErr(err)
 		return nil, err
 	}
 
@@ -119,7 +115,7 @@ func (svc *NetworkService) Create(
 
 	err = metadata.SaveNetwork(svc.provider, network)
 	if err != nil {
-		return nil, err
+		return nil, infraErr(err)
 	}
 
 	if gwname == "" {
@@ -135,24 +131,21 @@ func (svc *NetworkService) Create(
 		MinDiskSize: disk,
 	}, false)
 	if err != nil {
-		err := srvLog(errors.Wrap(err, "Error creating network: Error selecting template"))
-		return nil, err
+		return nil, infraErrf(err, "Error creating network: Error selecting template")
 	}
 	if len(tpls) < 1 {
-		err := srvLog(errors.New(fmt.Sprintf("Error creating network: No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk)))
-		return nil, err
+		return nil, logicErr(fmt.Errorf("Error creating network: No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
 	}
 	img, err := svc.provider.SearchImage(os)
 	if err != nil {
-		err := srvLog(errors.Wrap(err, "Error creating network: Error searching image"))
+		err := infraErrf(err, "Error creating network: Error searching image")
 		return nil, err
 	}
 
 	keypairName := "kp_" + network.Name
 	keypair, err := svc.provider.CreateKeyPair(keypairName)
 	if err != nil {
-		err = srvLog(err)
-		return nil, err
+		return nil, infraErr(err)
 	}
 
 	gwRequest := model.GatewayRequest{
@@ -164,12 +157,11 @@ func (svc *NetworkService) Create(
 		CIDR:       network.CIDR,
 	}
 
-	log.Infof("Requesting the creation of a gateway '%s' with image '%s'", gwname, img.ID)
+	log.Infof("Requesting the creation of a gateway '%s' with image '%s'", gwname, img.Name)
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
 		//defer svc.provider.DeleteNetwork(network.ID)
-		err := srvLog(errors.Wrapf(err, "Error creating network: Gateway creation with name '%s' failed", gwname))
-		return nil, err
+		return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", gwname)
 	}
 
 	// Starting from here, deletes the gateway if exiting with error
@@ -186,14 +178,14 @@ func (svc *NetworkService) Create(
 	// Reloads the host to be sure all the properties are updated
 	gw, err = svc.provider.GetHost(gw)
 	if err != nil {
-		return nil, err
+		return nil, infraErr(err)
 	}
 
 	// Updates requested sizing in gateway property propsv1.HostSizing
 	gwSizingV1 := propsv1.NewHostSizing()
 	err = gw.Properties.Get(HostProperty.SizingV1, gwSizingV1)
 	if err != nil {
-		return nil, srvLog(errors.Wrapf(err, "Error creating network"))
+		return nil, infraErrf(err, "Error creating network")
 	}
 	gwSizingV1.RequestedSize = &propsv1.HostSize{
 		Cores:    cpu,
@@ -202,15 +194,13 @@ func (svc *NetworkService) Create(
 	}
 	err = gw.Properties.Set(HostProperty.SizingV1, gwSizingV1)
 	if err != nil {
-		return nil, srvLog(errors.Wrapf(err, "Error creating network"))
+		return nil, infraErrf(err, "Error creating network")
 	}
 
 	// Writes Gateway metadata
 	err = metadata.SaveGateway(svc.provider, gw, network.ID)
 	if err != nil {
-		msg := fmt.Sprintf("failed to create gateway: failed to save metadata: %s", err.Error())
-		log.Debugf(utils.TitleFirst(msg))
-		return nil, errors.Wrap(err, msg)
+		return nil, infraErrf(err, "failed to create gateway: failed to save metadata: %s", err.Error())
 	}
 
 	log.Debugf("Waiting until gateway '%s' is available through SSH ...", gwname)
@@ -222,15 +212,14 @@ func (svc *NetworkService) Create(
 	ssh, err := sshSvc.GetConfig(gw.ID)
 	if err != nil {
 		//defer svc.provider.DeleteHost(gw.ID)
-		tbr := srvLog(errors.Wrapf(err, "Error creating network: Error retrieving SSH config of gateway '%s'", gw.Name))
-		return nil, tbr
+		return nil, infraErrf(err, "Error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
 	}
 
 	// TODO Test for failure with 15s !!!
 	err = ssh.WaitServerReady(brokerutils.TimeoutCtxHost)
 	// err = ssh.WaitServerReady(time.Second * 3)
 	if err != nil {
-		return nil, srvLogNew(fmt.Errorf("Error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name))
+		return nil, logicErrf(err, "Error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
 	}
 	log.Infof("SSH service of gateway '%s' started.", gw.Name)
 
@@ -239,7 +228,7 @@ func (svc *NetworkService) Create(
 	//	err = metadata.SaveNetwork(svc.provider, rv)
 	err = metadata.SaveNetwork(svc.provider, network)
 	if err != nil {
-		return nil, srvLog(errors.Wrap(err, "Error creating network: Error saving network metadata"))
+		return nil, infraErrf(err, "Error creating network: Error saving network metadata")
 	}
 
 	return network, nil
@@ -261,36 +250,32 @@ func (svc *NetworkService) List(all bool) ([]*model.Network, error) {
 
 	if err != nil {
 		log.Debugf("Error listing monitored networks: pagination error: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error listing monitored networks: %s", err.Error()))
+		return nil, infraErrf(err, "Error listing monitored networks: %s", err.Error())
 	}
 
-	return netList, err
+	return netList, infraErr(err)
 }
 
 // Get returns the network identified by ref, ref can be the name or the id
 func (svc *NetworkService) Get(ref string) (*model.Network, error) {
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
-		msg := fmt.Sprintf("failed to load metadata of network '%s'", ref)
-		log.Debugf(utils.TitleFirst(msg))
-		return nil, fmt.Errorf(msg)
+		return nil, infraErrf(err, "failed to load metadata of network '%s'", ref)
 	}
 	if mn == nil {
-		return nil, model.ResourceNotFoundError("network(service)", ref)
+		return nil, logicErr(model.ResourceNotFoundError("network(service)", ref))
 	}
-	return mn.Get(), err
+	return mn.Get(), infraErr(err)
 }
 
 // Delete deletes network referenced by ref
 func (svc *NetworkService) Delete(ref string) error {
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
-		msg := fmt.Sprintf("failed to load metadata of network '%s'", ref)
-		log.Debugf(utils.TitleFirst(msg))
-		return fmt.Errorf(msg)
+		return infraErrf(err, "failed to load metadata of network '%s'", ref)
 	}
 	if mn == nil {
-		return fmt.Errorf("network '%s' not found", ref)
+		return logicErr(fmt.Errorf("network '%s' not found", ref))
 	}
 	network := mn.Get()
 	gwID := network.GatewayID
@@ -299,17 +284,17 @@ func (svc *NetworkService) Delete(ref string) error {
 	networkHostsV1 := propsv1.NewNetworkHosts()
 	err = network.Properties.Get(NetworkProperty.HostsV1, networkHostsV1)
 	if err != nil {
-		return errors.Wrap(err, "")
+		return infraErr(err)
 	}
 	if len(networkHostsV1.ByID) > 0 {
-		return fmt.Errorf("can't delete network '%s': at least one host is still attached to it", ref)
+		return logicErr(fmt.Errorf("can't delete network '%s': at least one host is still attached to it", ref))
 	}
 
 	// 1st delete gateway
 	if gwID != "" {
 		mh, err := metadata.LoadHost(svc.provider, gwID)
 		if err != nil {
-			return errors.Wrap(err, "")
+			return infraErr(err)
 		}
 		// allow no metadata, but log it
 		if mh == nil {
@@ -323,7 +308,7 @@ func (svc *NetworkService) Delete(ref string) error {
 			}
 			err = mh.Delete()
 			if err != nil {
-				return err
+				return infraErr(err)
 			}
 		}
 	}
@@ -331,7 +316,9 @@ func (svc *NetworkService) Delete(ref string) error {
 	// 2nd delete network, with no tolerance
 	err = svc.provider.DeleteNetwork(network.ID)
 	if err != nil {
-		return err
+		return infraErr(err)
 	}
-	return mn.Delete()
+
+	delErr := mn.Delete()
+	return infraErr(delErr)
 }

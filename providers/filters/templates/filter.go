@@ -26,7 +26,7 @@ type Filter struct {
 }
 
 // Predicate ...
-type Predicate func(img model.HostTemplate) bool
+type Predicate func(model.HostTemplate) bool
 
 // NewFilter creates a new filter with the given predicate
 func NewFilter(predicate Predicate) *Filter {

@@ -101,7 +101,7 @@ func (n *share) Unmount(def pb.ShareMountDefinition, timeout time.Duration) erro
 }
 
 // Inspect ...
-func (n *share) Inspect(name string, timeout time.Duration) (*pb.ShareList, error) {
+func (n *share) Inspect(name string, timeout time.Duration) (*pb.ShareMountList, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
