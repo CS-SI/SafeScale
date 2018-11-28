@@ -157,7 +157,7 @@ func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
 		id := entry["id"].(string)
 		return client.GetNetwork(id)
 	}
-	return nil, model.ResourceNotFoundError("network(GetNetworkByName)", name)
+	return nil, model.ResourceNotFoundError("network", name)
 }
 
 // GetNetwork returns the network identified by id

@@ -17,6 +17,10 @@
 package opentelekom
 
 import (
+	"strings"
+
+	imgfilters "github.com/CS-SI/SafeScale/providers/filters/images"
+	tmplfilters "github.com/CS-SI/SafeScale/providers/filters/templates"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 )
@@ -71,14 +75,45 @@ func (client *Client) DeleteKeyPair(id string) error {
 	return client.feclt.DeleteKeyPair(id)
 }
 
-// GetImage returns the Image referenced by id
-func (client *Client) GetImage(id string) (*model.Image, error) {
-	return client.feclt.GetImage(id)
+// ListAvailabilityZones ...
+func (client *Client) ListAvailabilityZones(all bool) (map[string]bool, error) {
+	return client.feclt.ListAvailabilityZones(all)
+}
+
+func isWindowsImage(image model.Image) bool {
+	return strings.Contains(strings.ToLower(image.Name), "windows")
+}
+func isLatestImage(image model.Image) bool {
+	return strings.Contains(strings.ToLower(image.Name), "_latest")
+}
+func isSpecializedImage(image model.Image) bool {
+	lower := strings.ToLower(image.Name)
+	return strings.Contains(lower, "_BMS") ||
+		strings.Contains(lower, "_BCS") ||
+		strings.Contains(lower, "_TSI") ||
+		strings.Contains(lower, "_V100") ||
+		strings.Contains(lower, "_FPGA") ||
+		strings.Contains(lower, "_SAPHANA") ||
+		strings.Contains(lower, "_JeOS")
 }
 
 // ListImages lists available OS images
 func (client *Client) ListImages(all bool) ([]model.Image, error) {
-	return client.feclt.ListImages(all)
+	images, err := client.feclt.ListImages(true)
+	if err != nil {
+		return nil, err
+	}
+	if all {
+		return images, nil
+	}
+
+	imageFilter := imgfilters.NewFilter(isLatestImage).And(imgfilters.NewFilter(isWindowsImage).Not()).And(imgfilters.NewFilter(isSpecializedImage).Not())
+	return imgfilters.FilterImages(images, imageFilter), nil
+}
+
+// GetImage returns the Image referenced by id
+func (client *Client) GetImage(id string) (*model.Image, error) {
+	return client.feclt.GetImage(id)
 }
 
 // GetTemplate returns the Template referenced by id
@@ -86,10 +121,24 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 	return client.feclt.GetTemplate(id)
 }
 
+// isC1Template returns true if the template starts with 'c1'
+func isC1Template(template model.HostTemplate) bool {
+	return strings.Index(strings.ToLower(template.Name), "c1") == 0
+}
+
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
-	return client.feclt.ListTemplates(all)
+	templates, err := client.feclt.ListTemplates(true)
+	if err != nil {
+		return nil, err
+	}
+	if all {
+		return templates, nil
+	}
+	templateFilter := tmplfilters.NewFilter(isC1Template).Not()
+	return tmplfilters.FilterTemplates(templates, templateFilter), nil
+
 }
 
 // StopHost stops the host identified by id

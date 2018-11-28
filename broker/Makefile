@@ -1,14 +1,17 @@
-GOINCLUDEPATH?=$(GOPATH)
+ndef = $(if $(value $(1)),,$(error $(1) not set))
+.PHONY:	sdk clean vet
 
 GO?=go
 
-.PHONY:	sdk clean vet
-
 # Handling multiple gopath: use $(HOME)/go by default
-ifeq ($(findstring :,$(GOINCLUDEPATH)),:)
-    GOINCLUDEPATH=$(HOME)/go
+ifeq ($(findstring :,$(GOPATH)),:)
+	GOINCLUDEPATH=$(HOME)/go
 else
 	GOINCLUDEPATH=$(GOPATH)
+endif
+
+ifeq ($(strip $(ǴOPATH)),)
+	GOINCLUDEPATH=$(HOME)/go
 endif
 
 all:	cli
