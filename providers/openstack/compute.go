@@ -31,6 +31,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	gc "github.com/gophercloud/gophercloud"
+	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
@@ -48,6 +49,27 @@ import (
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
+
+// ListAvailabilityZones lists the usable AvailabilityZones
+func (client *Client) ListAvailabilityZones(all bool) (map[string]bool, error) {
+	allPages, err := az.List(client.Compute).AllPages()
+	if err != nil {
+		return nil, err
+	}
+
+	content, err := az.ExtractAvailabilityZones(allPages)
+	if err != nil {
+		return nil, err
+	}
+
+	azList := map[string]bool{}
+	for _, zone := range content {
+		if all || zone.ZoneState.Available {
+			azList[zone.ZoneName] = zone.ZoneState.Available
+		}
+	}
+	return azList, nil
+}
 
 // ListImages lists available OS images
 func (client *Client) ListImages(all bool) ([]model.Image, error) {
@@ -673,14 +695,26 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		return nil, fmt.Errorf("failed to get image: %s", ProviderErrorToString(err))
 	}
 
+	// Select useable availability zone, the first one in the list
+	azList, err := client.ListAvailabilityZones(false)
+	if err != nil {
+		return nil, err
+	}
+	var az string
+	for az = range azList {
+		break
+	}
+	log.Debugf("Selected Availability Zone: '%s'", az)
+
 	// Sets provider parameters to create host
 	srvOpts := servers.CreateOpts{
-		Name:           request.ResourceName,
-		SecurityGroups: []string{client.SecurityGroup.Name},
-		Networks:       nets,
-		FlavorRef:      request.TemplateID,
-		ImageRef:       request.ImageID,
-		UserData:       userData,
+		Name:             request.ResourceName,
+		SecurityGroups:   []string{client.SecurityGroup.Name},
+		Networks:         nets,
+		FlavorRef:        request.TemplateID,
+		ImageRef:         request.ImageID,
+		UserData:         userData,
+		AvailabilityZone: az,
 	}
 
 	// --- Initializes model.Host ---

@@ -75,6 +75,11 @@ func (client *Client) DeleteKeyPair(id string) error {
 	return client.feclt.DeleteKeyPair(id)
 }
 
+// ListAvailabilityZones ...
+func (client *Client) ListAvailabilityZones(all bool) (map[string]bool, error) {
+	return client.feclt.ListAvailabilityZones(all)
+}
+
 func isWindowsImage(image model.Image) bool {
 	return strings.Contains(strings.ToLower(image.Name), "windows")
 }
