@@ -51,7 +51,7 @@ func AuthenticatedClient(opts flexibleengine.AuthOptions, cfg openstack.CfgOptio
 	return client, err
 }
 
-// Build build a new Client from configuration parameter
+// Build builds a new Client from configuration parameter
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	// tenantName, _ := params["name"].(string)
 

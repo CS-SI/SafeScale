@@ -201,6 +201,10 @@ func AuthenticatedClient(opts AuthOptions, cfg CfgOptions) (*Client, error) {
 	// Openstack client
 	pClient, err := openstack.AuthenticatedClient(gcOpts)
 	if err != nil {
+		switch err.(type) {
+		case gc.ErrDefault401:
+			return nil, fmt.Errorf("authentication failed")
+		}
 		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
 

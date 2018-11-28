@@ -277,7 +277,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if request.DefaultGateway == nil && !request.PublicIP {
-		return nil, model.ResourceInvalidRequestError("host creation", "can't create a gateway without public IP")
+		return nil, model.ResourceInvalidRequestError("host creation", "can't create a host without network and without public access (would be unreachable)")
 	}
 
 	// Validating name of the host
@@ -380,7 +380,6 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build query to create host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 	}
-	r := servers.CreateResult{}
 
 	// --- Initializes model.Host ---
 
@@ -412,8 +411,12 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	// --- query provider for host creation ---
 
 	// Retry creation until success, for 10 minutes
-	var httpResp *http.Response
-	err = retry.WhileUnsuccessfulDelay5Seconds(
+	var (
+		httpResp *http.Response
+		r        servers.CreateResult
+	)
+
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			httpResp, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers"), b, &r.Body, &gc.RequestOpts{
 				OkCodes: []int{200, 202},
@@ -431,21 +434,34 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 			}
 			host.ID = server.ID
 
+			defer func() {
+				if err != nil {
+					derr := servers.Delete(client.osclt.Compute, server.ID).ExtractErr()
+					if derr != nil {
+						log.Errorf("Failed to delete host '%s': %v", server.Name, derr)
+					}
+				}
+			}()
+
 			// Wait that host is ready, not just that the build is started
 			host, err = client.WaitHostReady(host, time.Minute*5)
 			if err != nil {
-				servers.Delete(client.osclt.Compute, server.ID)
-				return fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
-				// msg := fmt.Sprintf(msgFail, openstack.ProviderErrorToString(err))
-				// // TODO Gotcha !!
-				// log.Debugf(msg)
-				// return fmt.Errorf(msg)
+				switch err.(type) {
+				case model.ErrResourceNotAvailable:
+					return fmt.Errorf("host '%s' is in ERROR state", request.ResourceName)
+				default:
+					return fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
+					// msg := fmt.Sprintf(msgFail, openstack.ProviderErrorToString(err))
+					// // TODO Gotcha !!
+					// log.Debugf(msg)
+					// return fmt.Errorf(msg)
+				}
 			}
 			return nil
 		},
 		10*time.Minute,
 	)
-	if err != nil {
+	if retryErr != nil {
 		return nil, err
 	}
 	if host == nil {
@@ -457,7 +473,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		if err != nil {
 			derr := client.DeleteHost(host.ID)
 			if derr != nil {
-				log.Warnf("Error deleting host: %v", derr)
+				log.Warnf("Failed to delete host '%s': %v", host.Name, derr)
 			}
 		}
 	}()
@@ -548,6 +564,7 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 		panic("hostParam must be a string or a *model.Host!")
 	}
 
+	const timeout = time.Minute * 15
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			server, err = servers.Get(client.osclt.Compute, host.ID).Extract()
@@ -573,13 +590,22 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 			}
 			return fmt.Errorf("server not ready yet")
 		},
-		10*time.Second,
+		timeout,
 		1*time.Second,
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return nil, fmt.Errorf("failed to get host '%s' information after 10s: %v", host.ID, err)
+			msg := "failed to get host"
+			if host != nil {
+				msg += fmt.Sprintf(" '%s'", host.Name)
+			}
+			msg += fmt.Sprintf(" information after %v", timeout)
+			if err != nil {
+				msg += fmt.Sprintf(": %v", err)
+			}
+			return nil, fmt.Errorf(msg)
+		default:
 		}
 	}
 	if err != nil {
@@ -1201,24 +1227,20 @@ func (client *Client) RebootHost(id string) error {
 // hostParam can be an ID of host, or an instance of *model.Host; any other type will panic
 func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration) (*model.Host, error) {
 	var (
-		host *model.Host
-		err  error
+		host        *model.Host
+		hostInError bool
+		err         error
 	)
-	switch hostParam.(type) {
-	case string:
-		host = model.NewHost()
-		host.ID = hostParam.(string)
-	case *model.Host:
-		host = hostParam.(*model.Host)
-	default:
-		panic("hostParam must be a string or a *model.Host!")
-	}
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			host, err = client.GetHost(host)
+			host, err = client.GetHost(hostParam)
 			if err != nil {
 				return err
+			}
+			if host.LastState == HostState.ERROR {
+				hostInError = true
+				return nil
 			}
 			if host.LastState != HostState.STARTED {
 				return fmt.Errorf("not in ready state (current state: %s)", host.LastState.String())
@@ -1231,9 +1253,23 @@ func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return nil, fmt.Errorf("timeout waiting to get host '%s' information after %v", host.Name, timeout)
+			msg := "timeout waiting to get host"
+			if host != nil {
+				msg += fmt.Sprintf(" '%s'", host.Name)
+			}
+			msg += fmt.Sprintf("information after %v", timeout)
+			if err != nil {
+				msg += fmt.Sprintf(": %v", err)
+			}
+			return nil, fmt.Errorf(msg)
+		default:
+			return nil, retryErr
 		}
-		return nil, retryErr
 	}
+	// If hoste state is ERROR, returns the error
+	if hostInError {
+		return nil, model.ResourceNotAvailableError("host", "")
+	}
+
 	return host, err
 }
