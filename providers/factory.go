@@ -106,7 +106,7 @@ func GetService(tenantName string) (*Service, error) {
 		// Initializes Provider
 		clientAPI, err := client.Build(tenantClient)
 		if err != nil {
-			return nil, fmt.Errorf("Error creating tenant %s on provider %s: %s", tenantName, provider, err.Error())
+			return nil, fmt.Errorf("Error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
 		}
 		clientCfg, err := clientAPI.GetCfgOpts()
 		if err != nil {

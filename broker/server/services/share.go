@@ -45,7 +45,7 @@ type ShareAPI interface {
 	List() (map[string]map[string]*propsv1.HostShare, error)
 	Mount(name, host, path string) (*propsv1.HostRemoteMount, error)
 	Unmount(name, host string) error
-	Inspect(name string) (*model.Host, *propsv1.HostShare, error)
+	Inspect(name string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
 }
 
 // ShareService nas service
@@ -71,7 +71,7 @@ func sanitize(in string) (string, error) {
 // Create a share on host
 func (svc *ShareService) Create(shareName, hostName, path string) (*propsv1.HostShare, error) {
 	// Check if a share already exists with the same name
-	server, _, err := svc.Inspect(shareName)
+	server, _, _, err := svc.Inspect(shareName)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
@@ -177,7 +177,7 @@ func (svc *ShareService) Create(shareName, hostName, path string) (*propsv1.Host
 // Delete a share from host
 func (svc *ShareService) Delete(name string) error {
 	// Retrieve info about the share
-	server, share, err := svc.Inspect(name)
+	server, share, _, err := svc.Inspect(name)
 	if err != nil {
 		return infraErr(err)
 	}
@@ -271,7 +271,7 @@ func (svc *ShareService) List() (map[string]map[string]*propsv1.HostShare, error
 // Mount a share on a local directory of an host
 func (svc *ShareService) Mount(shareName, hostName, path string) (*propsv1.HostRemoteMount, error) {
 	// Retrieve info about the share
-	server, share, err := svc.Inspect(shareName)
+	server, share, _, err := svc.Inspect(shareName)
 	if err != nil {
 		err = infraErr(err)
 		return nil, err
@@ -391,7 +391,7 @@ func (svc *ShareService) Mount(shareName, hostName, path string) (*propsv1.HostR
 
 // Unmount a share from local directory of an host
 func (svc *ShareService) Unmount(shareName, hostName string) error {
-	server, _, err := svc.Inspect(shareName)
+	server, _, _, err := svc.Inspect(shareName)
 	if err != nil {
 		return infraErr(err)
 	}
@@ -481,7 +481,7 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 }
 
 // Inspect returns the host and share corresponding to 'shareName'
-func (svc *ShareService) Inspect(shareName string) (*model.Host, *propsv1.HostShare, error) {
+func (svc *ShareService) Inspect(shareName string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
 	hostName, err := metadata.LoadShare(svc.provider, shareName)
 	if err != nil {
 		err = infraErr(errors.Wrap(err, "error loading share metadata"))
@@ -501,6 +501,7 @@ func (svc *ShareService) Inspect(shareName string) (*model.Host, *propsv1.HostSh
 	if err != nil {
 		return nil, nil, infraErr(err)
 	}
+
 	shareID, found := serverSharesV1.ByName[shareName]
 	if !found {
 		shareID = shareName
@@ -509,7 +510,38 @@ func (svc *ShareService) Inspect(shareName string) (*model.Host, *propsv1.HostSh
 	if !found {
 		return nil, nil, infraErr(err)
 	}
-	return server, serverSharesV1.ByID[shareID], nil
+	share := serverSharesV1.ByID[shareID]
+
+	mounts := map[string]*propsv1.HostRemoteMount{}
+	clientMountsV1 := propsv1.NewHostMounts()
+	for k := range share.ClientsByName {
+		client, err := hostSvc.Get(k)
+		if err != nil {
+			switch err.(type) {
+			case model.ErrResourceNotFound:
+				log.Errorf("Host '%s' not found", k)
+			default:
+				log.Errorf("Failed to find data for host '%s': %v", k, err)
+			}
+			continue
+		}
+
+		err = client.Properties.Get(HostProperty.MountsV1, clientMountsV1)
+		if err != nil {
+			log.Errorln(err.Error())
+			continue
+		}
+		mountPath, ok := clientMountsV1.RemoteMountsByShareID[shareID]
+		if !ok {
+			continue
+		}
+		mount := clientMountsV1.RemoteMountsByPath[mountPath]
+		mounts[client.Name] = &propsv1.HostRemoteMount{
+			Path:       mount.Path,
+			FileSystem: mount.FileSystem,
+		}
+	}
+	return server, serverSharesV1.ByID[shareID], mounts, nil
 }
 
 func (svc *ShareService) findShare(shareName string) (string, error) {

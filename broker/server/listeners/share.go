@@ -69,7 +69,7 @@ func (s *ShareServiceListener) Delete(ctx context.Context, in *pb.Reference) (*g
 	}
 
 	shareService := services.NewShareService(currentTenant.Service)
-	_, _, err := shareService.Inspect(shareName)
+	_, _, _, err := shareService.Inspect(shareName)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
@@ -152,7 +152,7 @@ func (s *ShareServiceListener) Unmount(ctx context.Context, in *pb.ShareMountDef
 }
 
 // Inspect shows the detail of a share and all connected clients
-func (s *ShareServiceListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.ShareList, error) {
+func (s *ShareServiceListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.ShareMountList, error) {
 	shareName := in.GetName()
 	log.Infof("Listeners: share inspect '%s' called", shareName)
 	defer log.Debugf("Listeners: share inspect '%s' done", shareName)
@@ -162,13 +162,11 @@ func (s *ShareServiceListener) Inspect(ctx context.Context, in *pb.Reference) (*
 	}
 
 	shareService := services.NewShareService(currentTenant.Service)
-	host, share, err := shareService.Inspect(shareName)
+	host, share, mounts, err := shareService.Inspect(shareName)
 	if err != nil {
 		err := errors.Wrap(err, fmt.Sprintf("can't inspect share '%s'", shareName))
 		return nil, err
 	}
 
-	// Map propsv1.HostShare to pb.ShareList
-	list := &pb.ShareList{ShareList: []*pb.ShareDefinition{convert.ToPBShare(host.ID, share)}}
-	return list, nil
+	return convert.ToPBShareMountList(host.Name, share, mounts), nil
 }

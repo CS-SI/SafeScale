@@ -136,6 +136,23 @@ func ToPBShareMount(shareName string, hostName string, mount *propsv1.HostRemote
 	}
 }
 
+// ToPBShareMountList converts share mounts to protocol buffer
+func ToPBShareMountList(hostName string, share *propsv1.HostShare, mounts map[string]*propsv1.HostRemoteMount) *pb.ShareMountList {
+	pbMounts := []*pb.ShareMountDefinition{}
+	for k, v := range mounts {
+		pbMounts = append(pbMounts, &pb.ShareMountDefinition{
+			Host:  &pb.Reference{Name: k},
+			Share: &pb.Reference{Name: share.Name},
+			Path:  v.Path,
+			Type:  "nfs",
+		})
+	}
+	return &pb.ShareMountList{
+		Share:     ToPBShare(hostName, share),
+		MountList: pbMounts,
+	}
+}
+
 // ToPBHost convert an host from api to protocolbuffer format
 func ToPBHost(in *model.Host) *pb.Host {
 	hostNetworkV1 := propsv1.NewHostNetwork()

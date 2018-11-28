@@ -485,7 +485,7 @@ func (svc *HostService) Delete(ref string) error {
 		shareSvc := NewShareService(svc.provider)
 		for _, i := range hostMountsV1.RemoteMountsByPath {
 			// Gets share data
-			_, share, err := shareSvc.Inspect(i.ShareID)
+			_, share, _, err := shareSvc.Inspect(i.ShareID)
 			if err != nil {
 				return infraErr(err)
 			}

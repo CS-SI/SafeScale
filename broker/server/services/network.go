@@ -157,7 +157,7 @@ func (svc *NetworkService) Create(
 		CIDR:       network.CIDR,
 	}
 
-	log.Infof("Requesting the creation of a gateway '%s' with image '%s'", gwname, img.ID)
+	log.Infof("Requesting the creation of a gateway '%s' with image '%s'", gwname, img.Name)
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
 		//defer svc.provider.DeleteNetwork(network.ID)
