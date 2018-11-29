@@ -24,7 +24,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
-	"github.com/davecgh/go-spew/spew"
 
 	"github.com/pkg/errors"
 
@@ -513,11 +512,7 @@ func (svc *HostService) Delete(ref string) error {
 	// Conditions are met, delete host
 	err = svc.provider.DeleteHost(host.ID)
 	if err != nil {
-		spew.Dump(err)
-		switch err.(type) {
-
-		}
-		log.Errorf("Failed to delete host: %v", err)
+		return infraErrf(err, "can't delete host")
 	}
 
 	// Update networks property prosv1.NetworkHosts to remove the reference to the host
