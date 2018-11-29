@@ -23,7 +23,7 @@ type MyFormatter struct {
 // Format ...
 func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	if f.TextFormatter.DisableLevelTruncation && f.TextFormatter.ForceColors {
-		if f.pid != "" {
+		if f.pid == "" {
 			f.pid = strconv.Itoa(os.Getpid())
 		}
 		bc, err := f.TextFormatter.Format(entry)
