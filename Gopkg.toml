@@ -102,5 +102,9 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   branch = "master"
   source = "github.com/appscode/stow.git"
 
+[[constraint]]
+  name = "github.com/xrash/smetrics"
+  branch = "master"
+
 [prune]
   go-tests = true
