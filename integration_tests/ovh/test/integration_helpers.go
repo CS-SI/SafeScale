@@ -59,6 +59,7 @@ func runOnlyInIntegrationTest(key string) {
 
 func tearDown() {
 	log.Printf("Starting cleanup...")
+	_, _ = getOutput("broker volume detach volumetest easyvm")
 	_, _ = getOutput("broker volume delete volumetest")
 	_, _ = getOutput("broker host delete easyvm")
 	_, _ = getOutput("broker host delete complexvm")
