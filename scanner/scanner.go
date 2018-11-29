@@ -449,7 +449,7 @@ func dumpImages(service *providers.Service, tenant string) error {
 
 func main() {
 	log.Printf("%s version %s\n", os.Args[0], VERSION)
-	log.Printf("built %s\n", BUILD_DATE)
+	log.Printf("built %s\n", BUILD_DATE  + "-" + REV)
 
 	RunScanner()
 }

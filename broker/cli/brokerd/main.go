@@ -139,7 +139,7 @@ func work() {
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
 
-	version := VERSION + ", build date: " + BUILD_DATE
+	version := VERSION + ", build date: " + BUILD_DATE + "-" + REV
 	fmt.Printf("Brokerd version: %s\nReady to serve :-)\n", version)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)

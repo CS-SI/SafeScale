@@ -39,7 +39,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "deploy"
 	app.Usage = "deploy COMMAND"
-	app.Version = "0.0.1"
+	app.Version = VERSION + ", build date: " + BUILD_DATE + "-" + REV
 	app.Copyright = "(c) 2018 CS-SI"
 	app.Compiled = time.Now()
 	app.Authors = []cli.Author{

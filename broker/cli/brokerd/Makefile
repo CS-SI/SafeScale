@@ -10,6 +10,7 @@ endif
 
 BUILD_DATE := `date +%Y-%m-%d\ %H:%M`
 VERSIONFILE := version.go
+REV := `git rev-parse HEAD 2>/dev/null || echo ""`
 
 .PHONY:	vet clean
 
@@ -32,4 +33,5 @@ gensrc:
 	@echo "const (" >> $(VERSIONFILE)
 	@echo "  VERSION = \"0.1.1\"" >> $(VERSIONFILE)
 	@echo "  BUILD_DATE = \"$(BUILD_DATE)\"" >> $(VERSIONFILE)
+	@echo "  REV = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
