@@ -135,14 +135,14 @@ func Test_Basic(t *testing.T) {
 
 	out, err = getOutput("broker volume inspect volumetest")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, easyvm.ID))
+	require.True(t, strings.Contains(out, easyvm.ID) || strings.Contains(out, "easyvm"))
 
 	out, err = getOutput("broker volume  detach  volumetest easyvm ")
 	require.Nil(t, err)
 
 	out, err = getOutput("broker volume inspect volumetest")
 	require.Nil(t, err)
-	require.False(t, strings.Contains(out, easyvm.ID))
+	require.False(t, strings.Contains(out, easyvm.ID) || strings.Contains(out, "easyvm"))
 
 	out, err = getOutput("broker volume delete volumetest")
 	require.Nil(t, err)
