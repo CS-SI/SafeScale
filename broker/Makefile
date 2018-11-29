@@ -1,4 +1,3 @@
-ndef = $(if $(value $(1)),,$(error $(1) not set))
 .PHONY:	sdk clean vet
 
 GO?=go

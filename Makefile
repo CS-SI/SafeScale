@@ -1,4 +1,5 @@
 ndef = $(if $(value $(1)),,$(error $(1) not set))
+
 .DEFAULT_GOAL := help
 
 .PHONY: default
@@ -31,13 +32,22 @@ GOPATH?=$(HOME)/go
 GOBIN?=$(GOPATH)/bin
 
 ifeq (, $(shell which git))
- $(error "No git in your PATH: $(PATH), you must have git installed and available through your PATH")
+ $(error "No git in your PATH: [$(PATH)], you must have git installed and available through your PATH")
+endif
+
+ifeq (, $(GOPATH))
+ $(error "No GOPATH defined")
 endif
 
 # Handling multiple gopath: use ~/go by default
 ifeq ($(findstring :,$(GOBIN)),:)
     GOBIN=$(HOME)/go/bin
 endif
+
+ifneq ($(findstring $(GOBIN),$(PATH)),$(GOBIN))
+ $(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
+endif
+
 
 # Binaries generated
 EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd/brokerd broker/cli/brokerd/brokerd-cover deploy/cli/deploy deploy/cli/deploy-cover perform/perform perform/perform-cover scanner/scanner
