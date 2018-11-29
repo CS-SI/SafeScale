@@ -2,15 +2,16 @@ package services
 
 import (
 	"fmt"
+	"io"
+	"os"
+
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"io"
-	"os"
 )
 
 func init() {
-	log.SetFormatter(&utils.MyFormatter{ TextFormatter: log.TextFormatter{ForceColors:true, TimestampFormat : "2006-01-02 15:04:05", FullTimestamp:true, DisableLevelTruncation:true}})
+	log.SetFormatter(&utils.MyFormatter{TextFormatter: log.TextFormatter{ForceColors: true, TimestampFormat: "2006-01-02 15:04:05", FullTimestamp: true, DisableLevelTruncation: true}})
 	log.SetLevel(log.DebugLevel)
 
 	// Log as JSON instead of the default ASCII formatter.
@@ -27,6 +28,13 @@ func init() {
 	log.SetOutput(io.MultiWriter(os.Stdout, file))
 }
 
+// throwErr throws error as-is, without change.
+// Used as a way to tell other developers not to alter the error.
+func throwErr(err error) error {
+	return err
+}
+
+// infraErr throws error with stack trace
 func infraErr(err error) error {
 	if err == nil {
 		return nil
@@ -36,6 +44,7 @@ func infraErr(err error) error {
 	return tbr
 }
 
+// infraErrf throws error with stack trace and adds message
 func infraErrf(err error, message string, a ...interface{}) error {
 	if err == nil {
 		return nil
@@ -48,6 +57,7 @@ func infraErrf(err error, message string, a ...interface{}) error {
 	return tbr
 }
 
+// logicErr ...
 func logicErr(err error) error {
 	if err == nil {
 		return nil
@@ -56,6 +66,7 @@ func logicErr(err error) error {
 	return err
 }
 
+// logicErrf ...
 func logicErrf(err error, message string, a ...interface{}) error {
 	if err == nil {
 		return nil

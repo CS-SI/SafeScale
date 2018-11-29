@@ -18,8 +18,9 @@ package providers_test
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/cloudferro"
 	"testing"
+
+	"github.com/CS-SI/SafeScale/providers/cloudferro"
 
 	"github.com/CS-SI/SafeScale/providers/cloudwatt"
 	"github.com/CS-SI/SafeScale/providers/flexibleengine"
@@ -31,10 +32,10 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 )
 
-func TestCompare(t *testing.T) {
-	s1 := providers.SimilarityScore("16.04", "ubuntu-xenial-16.04-amd64-server-20170329")
-	fmt.Println(s1)
-}
+// func TestCompare(t *testing.T) {
+// 	s1 := providers.SimilarityScore("16.04", "ubuntu-xenial-16.04-amd64-server-20170329")
+// 	fmt.Println(s1)
+// }
 
 func TestParameters(t *testing.T) {
 	p := make(map[string]interface{})
