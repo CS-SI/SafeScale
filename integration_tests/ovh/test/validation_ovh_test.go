@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+	"time"
 )
 
 func Test_Basic(t *testing.T) {
@@ -67,44 +68,47 @@ func Test_Basic(t *testing.T) {
 	fmt.Println("Creating VM complexvm...")
 
 	out, err = getOutput("broker host create complexvm --public --net crazy")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	out, err = getOutput("broker host create complexvm --public --net crazy")
+	fmt.Print(out)
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
 	out, err = getOutput("broker nas list")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	fmt.Println("Creating NAS bnastest...")
 
 	out, err = getOutput("broker nas  create bnastest easyvm")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	out, err = getOutput("broker nas  mount bnastest complexvm")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	out, err = getOutput("broker nas list")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "bnastest"))
 
 	out, err = getOutput("broker nas inspect bnastest")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	require.True(t, strings.Contains(out, "bnastest"))
-	if !strings.Contains(out, "easyvm") {
-		fmt.Print(out)
-	}
 	require.True(t, strings.Contains(out, "easyvm"))
-	if !strings.Contains(out, "complexvm") {
-		fmt.Print(out)
-	}
 	require.True(t, strings.Contains(out, "complexvm"))
 
 	out, err = getOutput("broker nas  umount bnastest complexvm")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	out, err = getOutput("broker nas inspect bnastest")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	require.True(t, strings.Contains(out, "bnastest"))
@@ -112,67 +116,86 @@ func Test_Basic(t *testing.T) {
 	require.False(t, strings.Contains(out, "complexvm"))
 
 	out, err = getOutput("broker nas delete bnastest ")
+	fmt.Print(out)
 	require.Nil(t, err)
 
+	time.Sleep(4 * time.Second)
+
 	out, err = getOutput("broker nas list")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.False(t, strings.Contains(out, "bnastest"))
 
 	out, err = getOutput("broker volume list")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "null"))
 
 	fmt.Println("Creating Volume volumetest...")
 
 	out, err = getOutput("broker volume  create volumetest")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	out, err = getOutput("broker volume list")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "volumetest"))
 
 	out, err = getOutput("broker volume  attach  volumetest easyvm ")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	out, err = getOutput("broker volume delete volumetest")
+	fmt.Print(out)
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "still attached"))
 
 	out, err = getOutput("broker volume inspect volumetest")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, easyvm.ID))
 
 	out, err = getOutput("broker volume  detach  volumetest easyvm ")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	out, err = getOutput("broker volume inspect volumetest")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.False(t, strings.Contains(out, easyvm.ID))
 
 	out, err = getOutput("broker volume delete volumetest")
+	fmt.Print(out)
 	require.Nil(t, err)
 
 	out, err = getOutput("broker volume list")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "null"))
 
 	out, err = getOutput("broker ssh run easyvm -c \"uptime\"")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 
 	out, err = getOutput("broker host delete easyvm")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
 	out, err = getOutput("broker host delete complexvm")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
 	out, err = getOutput("broker host delete gw-crazy")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
 	out, err = getOutput("broker network delete crazy")
+	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 }
