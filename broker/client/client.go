@@ -18,6 +18,8 @@ package client
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,9 +62,18 @@ const (
 
 // New returns an instance of broker Client
 func New() Client {
+	brokerdPort := 50051
+
+	if portCandidate := os.Getenv("BROKERD_PORT"); portCandidate != "" {
+		num, err := strconv.Atoi(portCandidate)
+		if err == nil {
+			brokerdPort = num
+		}
+	}
+
 	s := &Session{
 		brokerdHost: "localhost",
-		brokerdPort: 50051,
+		brokerdPort: brokerdPort,
 	}
 
 	s.Bucket = &bucket{session: s}
