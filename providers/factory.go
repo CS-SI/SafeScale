@@ -161,7 +161,7 @@ func GetService(tenantName string) (*Service, error) {
 				}
 			}
 			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {
-				metadataCryptKey = crypt.NewEncryptionKey(metadataConfig["CryptKey"].([]byte))
+				metadataCryptKey = crypt.NewEncryptionKey([]byte(metadataConfig["CryptKey"].(string)))
 			}
 		} else {
 			return nil, fmt.Errorf("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)

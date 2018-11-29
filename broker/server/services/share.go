@@ -95,7 +95,7 @@ func (svc *ShareService) Create(shareName, hostName, path string) (*propsv1.Host
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
-			return nil, err
+			return nil, throwErr(err)
 		default:
 			return nil, infraErr(err)
 		}
@@ -418,7 +418,7 @@ func (svc *ShareService) Unmount(shareName, hostName string) error {
 		if err != nil {
 			switch err.(type) {
 			case model.ErrResourceNotFound:
-				return infraErr(err)
+				return err
 			default:
 				return infraErr(err)
 			}

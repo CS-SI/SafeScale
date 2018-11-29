@@ -263,7 +263,7 @@ func (svc *NetworkService) Get(ref string) (*model.Network, error) {
 		return nil, infraErrf(err, "failed to load metadata of network '%s'", ref)
 	}
 	if mn == nil {
-		return nil, logicErr(model.ResourceNotFoundError("network(service)", ref))
+		return nil, logicErr(model.ResourceNotFoundError("network", ref))
 	}
 	return mn.Get(), infraErr(err)
 }
