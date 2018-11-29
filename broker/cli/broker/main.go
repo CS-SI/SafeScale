@@ -33,7 +33,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "broker"
 	app.Usage = "broker COMMAND"
-	app.Version = VERSION + "-" + BUILD_DATE
+	app.Version = VERSION + "-" + BUILD_DATE + "-" + REV
 	app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "CS-SI",
