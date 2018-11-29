@@ -164,8 +164,8 @@ func Test_Basic(t *testing.T) {
 	require.True(t, strings.Contains(out, "deleted"))
 
 	out, err = getOutput("broker host delete gw-crazy")
-	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "gateway"))
 
 	out, err = getOutput("broker network delete crazy")
 	require.Nil(t, err)
