@@ -20,23 +20,24 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
-	safeutils "github.com/CS-SI/SafeScale/utils"
-	"github.com/nanobox-io/golang-scribble"
+	scribble "github.com/nanobox-io/golang-scribble"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/xrash/smetrics"
 
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	safeutils "github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/crypt"
 )
 
 // Service Client High level service
@@ -44,6 +45,7 @@ type Service struct {
 	api.ClientAPI
 	ObjectStorage  objectstorage.Location
 	MetadataBucket objectstorage.Bucket
+	MetadataKey    *crypt.Key
 }
 
 // // FromClient contructs a Service instance from a ClientAPI
@@ -284,24 +286,24 @@ func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force
 				fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
 				log.Warnf("Problem creating / accessing Scanner database, ignoring for now...: %v", err)
 			} else {
-				noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+				noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency! problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 				log.Error(noHostError)
 				return nil, errors.New(noHostError)
 			}
 		} else {
-			image_list, err := db.ReadAll("images")
+			imageList, err := db.ReadAll("images")
 			if err != nil {
 				if !force {
 					fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
 					log.Warnf("Error reading Scanner database: %v", err)
 				} else {
-					noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem listing images from Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+					noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency! problem listing images from Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 					log.Error(noHostError)
 					return nil, errors.New(noHostError)
 				}
 			} else {
 				images := []model.StoredCPUInfo{}
-				for _, f := range image_list {
+				for _, f := range imageList {
 					imageFound := model.StoredCPUInfo{}
 					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
 						fmt.Println("Error", err)
@@ -331,7 +333,7 @@ func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force
 		}
 	}
 
-	log.Debugf("Looking for machine with: %d core%s, %.01f GB RAM, and %d GB Disk",
+	log.Debugf("Looking for host template with: %d core%s, %.01f GB RAM, and %d GB Disk",
 		sizing.MinCores, safeutils.Plural(sizing.MinCores), sizing.MinRAMSize, sizing.MinDiskSize)
 
 	for _, template := range templates {
@@ -340,7 +342,8 @@ func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force
 				selectedTpls = append(selectedTpls, template)
 			}
 		} else {
-			log.Debugf("Discard machine template '%s' with : %d cores, %f RAM, and %d Disk", template.Name, template.Cores, template.RAMSize, template.DiskSize)
+			log.Debugf("Discarded host template '%s' with: %d core%s, %.01f GB RAM and %d GB Disk",
+				template.Name, template.Cores, safeutils.Plural(template.Cores), template.RAMSize, template.DiskSize)
 		}
 	}
 
@@ -349,28 +352,27 @@ func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force
 }
 
 // FilterImages search an images corresponding to OS Name
-func (svc *Service) FilterImages(filter string) ([]model.Image, error) {
+func (svc *Service) FilterImages(osname string) ([]model.Image, error) {
 	imgs, err := svc.ListImages(false)
 	if err != nil {
 		return nil, err
 	}
-	if len(filter) == 0 {
+	if len(osname) == 0 {
 		return imgs, nil
 	}
 	fimgs := []model.Image{}
 	//fields := strings.Split(strings.ToUpper(osname), " ")
 	for _, img := range imgs {
-		//score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
-		//score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
-		//score := matchScore(fields, strings.ToUpper(img.Name))
-		score := SimilarityScore(filter, img.Name)
+		// score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
+		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
+		// score := matchScore(fields, strings.ToUpper(img.Name))
+		// score := SimilarityScore(filter, img.Name)
 		if score > 0.5 {
 			fimgs = append(fimgs, img)
 		}
 
 	}
 	return fimgs, nil
-
 }
 
 // SearchImage search an image corresponding to OS Name
@@ -384,9 +386,9 @@ func (svc *Service) SearchImage(osname string) (*model.Image, error) {
 	//fields := strings.Split(strings.ToUpper(osname), " ")
 	for i, img := range imgs {
 		//score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
-		//score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
+		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
 		//score := matchScore(fields, strings.ToUpper(img.Name))
-		score := SimilarityScore(osname, img.Name)
+		// score := SimilarityScore(osname, img.Name)
 		if score > maxscore {
 			maxscore = score
 			maxi = i
@@ -410,7 +412,7 @@ func (svc *Service) CreateHostWithKeyPair(request model.HostRequest) (*model.Hos
 		return nil, nil, model.ResourceAlreadyExistsError("Host", request.ResourceName)
 	}
 
-	//Create temporary key pair
+	// Create temporary key pair
 	kpNameuuid, err := uuid.NewV4()
 	if err != nil {
 		return nil, nil, err
@@ -592,121 +594,119 @@ func (svc *Service) DeleteObject(bucketName, objectName string) error {
 	return svc.ObjectStorage.DeleteObject(bucketName, objectName)
 }
 
-func runeIndexes(s string, r rune) []int {
-	positions := []int{}
-	for i, l := range s {
-		if l == r {
-			positions = append(positions, i)
-		}
-	}
-	return positions
+// func runeIndexes(s string, r rune) []int {
+// 	positions := []int{}
+// 	for i, l := range s {
+// 		if l == r {
+// 			positions = append(positions, i)
+// 		}
+// 	}
+// 	return positions
 
-}
+// }
 
-func runesIndexes(ref string, s string) [][]int {
-	positions := [][]int{}
-	uref := strings.ToUpper(ref)
-	us := strings.ToUpper(s)
-	for _, r := range uref {
-		if r != ' ' {
-			positions = append(positions, runeIndexes(us, r))
-		}
+// func runesIndexes(ref string, s string) [][]int {
+// 	positions := [][]int{}
+// 	uref := strings.ToUpper(ref)
+// 	us := strings.ToUpper(s)
+// 	for _, r := range uref {
+// 		if r != ' ' {
+// 			positions = append(positions, runeIndexes(us, r))
+// 		}
+// 	}
+// 	return positions
+// }
 
-	}
-	return positions
-}
+// func recPossiblePathes(positions [][]int, level int) [][]int {
+// 	if level >= len(positions) {
+// 		return [][]int{
+// 			[]int{},
+// 		}
+// 	}
+// 	pathes := recPossiblePathes(positions, level+1)
+// 	newPathes := [][]int{}
+// 	if len(positions[level]) == 0 {
+// 		for _, path := range pathes {
+// 			newPathes = append(newPathes, append([]int{-1}, path...))
+// 		}
+// 	} else {
+// 		for _, idx := range positions[level] {
+// 			for _, path := range pathes {
+// 				newPathes = append(newPathes, append([]int{idx}, path...))
+// 			}
+// 		}
+// 	}
 
-func recPossiblePathes(positions [][]int, level int) [][]int {
-	newPathes := [][]int{}
-	if level >= len(positions) {
-		return [][]int{
-			[]int{},
-		}
-	}
-	pathes := recPossiblePathes(positions, level+1)
-	if len(positions[level]) == 0 {
-		for _, path := range pathes {
-			newPathes = append(newPathes, append([]int{-1}, path...))
-		}
-	} else {
-		for _, idx := range positions[level] {
-			for _, path := range pathes {
-				newPathes = append(newPathes, append([]int{idx}, path...))
-			}
-		}
-	}
+// 	return newPathes
+// }
 
-	return newPathes
-}
+// func possiblePathes(positions [][]int) [][]int {
+// 	return recPossiblePathes(positions, 0)
+// }
 
-func possiblePathes(positions [][]int) [][]int {
-	return recPossiblePathes(positions, 0)
-}
+// func bestPath(pathes [][]int, size int) (int, int) {
+// 	if len(pathes) == 0 {
+// 		return -1, 10000
+// 	}
+// 	minD := distance(pathes[0], size)
+// 	bestI := 0
+// 	for i, p := range pathes[1:] {
+// 		d := distance(p, size)
+// 		if d < minD {
+// 			minD = d
+// 			bestI = i + 1
+// 		}
+// 	}
+// 	return bestI, minD
+// }
 
-func bestPath(pathes [][]int, size int) (int, int) {
-	if len(pathes) == 0 {
-		return -1, 10000
-	}
-	minD := distance(pathes[0], size)
-	bestI := 0
-	for i, p := range pathes {
-		d := distance(p, size)
-		if d < minD {
-			minD = d
-			bestI = i
-		}
-	}
-	return bestI, minD
-}
+// func distance(path []int, size int) int {
+// 	d := 0
+// 	previous := path[0]
+// 	for _, index := range path {
+// 		if index < 0 {
+// 			d += size
+// 		} else {
+// 			di := index - previous
+// 			d += di
+// 			if di < 0 {
+// 				d += di + size
+// 			}
+// 		}
+// 		previous = index
+// 	}
+// 	return d
+// }
 
-func distance(path []int, size int) int {
-	d := 0
-	previous := path[0]
-	for _, index := range path {
-		if index < 0 {
-			d += size
-		} else {
-			di := index - previous
-			d += di
-			if di < 0 {
-				d += di + size
-			}
-		}
-		previous = index
-	}
-	return d
-}
+// func score(d int, rsize int) float64 {
+// 	return float64(rsize-1) / float64(d)
+// }
 
-func score(d int, rsize int) float64 {
-	return float64(rsize-1) / float64(d)
-}
+// // SimilarityScore computes a similarity score between 2 strings
+// func SimilarityScore(ref string, s string) float64 {
+// 	size := len(s)
+// 	rsize := len(ref)
+// 	if rsize > size {
+// 		s, ref = ref, s
+// 		size = len(s)
+// 		rsize = len(ref)
+// 	}
+// 	_, d := bestPath(possiblePathes(runesIndexes(ref, s)), size)
+// 	ds := math.Abs(float64(size-rsize)) / float64(rsize)
+// 	return score(d, len(ref)) / (math.Log10(10 * (1. + ds)))
+// }
 
-// SimilarityScore computes a similariy score between 2 strings
-func SimilarityScore(ref string, s string) float64 {
-	size := len(s)
-	rsize := len(ref)
-	if rsize > size {
-		return SimilarityScore(s, ref)
-	}
-	_, d := bestPath(possiblePathes(runesIndexes(ref, s)), size)
-	ds := math.Abs(float64(size-rsize)) / float64(rsize)
-	return score(d, len(ref)) / (math.Log10(10 * (1. + ds)))
-}
-
-// InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
-// id contains a unique identifier of the tenant (something coming from the provider, not the tenant name)
-func InitializeBucket(svc api.ClientAPI, location objectstorage.Location) error {
-	cfg, err := svc.GetCfgOpts()
-	if err != nil {
-		fmt.Printf("failed to get client options: %s\n", err.Error())
-	}
-	anon, found := cfg.Get("MetadataBucket")
-	if !found || anon.(string) == "" {
-		return fmt.Errorf("failed to get value of option 'MetadataBucket'")
-	}
-	_, err = location.CreateBucket(anon.(string))
-	if err != nil {
-		return err
-	}
-	return nil
-}
+// // SimilarityScore computes a similarity score between 2 strings
+// func SimilarityScore(ref, s string) float64 {
+// 	size := len(s)
+// 	rsize := len(ref)
+// 	// if rsize > size {
+// 	// 	s, ref = ref, s
+// 	// 	size = len(s)
+// 	// 	rsize = len(ref)
+// 	// }
+// 	// _, d := bestPath(possiblePathes(runesIndexes(ref, s)), size)
+// 	d := textdistance.JaroWinklerDistance(s, ref)
+// 	ds := math.Abs(float64(size-rsize)) / float64(rsize)
+// 	return score(d, len(ref)) / (math.Log10(10 * (1. + ds)))
+// }
