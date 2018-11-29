@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/utils/crypt"
 )
 
 var (
@@ -116,7 +117,7 @@ func GetService(tenantName string) (*Service, error) {
 		// Initializes Object Storage
 		var objectStorageLocation objectstorage.Location
 		if tenantObjectStorageFound {
-			objectStorageConfig, err := fillObjectStorageConfig(tenant)
+			objectStorageConfig, err := initObjectStorageLocationConfig(tenant)
 			if err != nil {
 				return nil, err
 			}
@@ -129,9 +130,12 @@ func GetService(tenantName string) (*Service, error) {
 		}
 
 		// Initializes Metadata Object Storage (may be different than the Object Storage)
-		var metadataBucket objectstorage.Bucket
+		var (
+			metadataBucket   objectstorage.Bucket
+			metadataCryptKey *crypt.Key
+		)
 		if tenantMetadataFound || tenantObjectStorageFound {
-			metadataLocationConfig, err := fillMetadataObjectStorageConfig(tenant)
+			metadataLocationConfig, err := initMetadataLocationConfig(tenant)
 			if err != nil {
 				return nil, err
 			}
@@ -156,6 +160,9 @@ func GetService(tenantName string) (*Service, error) {
 					return nil, err
 				}
 			}
+			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {
+				metadataCryptKey = crypt.NewEncryptionKey(metadataConfig["CryptKey"].([]byte))
+			}
 		} else {
 			return nil, fmt.Errorf("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
 		}
@@ -165,6 +172,7 @@ func GetService(tenantName string) (*Service, error) {
 			ClientAPI:      clientAPI,
 			ObjectStorage:  objectStorageLocation,
 			MetadataBucket: metadataBucket,
+			MetadataKey:    metadataCryptKey,
 		}, nil
 	}
 
@@ -174,8 +182,8 @@ func GetService(tenantName string) (*Service, error) {
 	return nil, model.ResourceNotFoundError("Client builder", clientProvider)
 }
 
-// fillObjectStorageConfig initializes objectstorage.Config struct with map
-func fillObjectStorageConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
+// initObjectStorageLocationConfig initializes objectstorage.Config struct with map
+func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -236,8 +244,8 @@ func fillObjectStorageConfig(tenant map[string]interface{}) (objectstorage.Confi
 	return config, nil
 }
 
-// fillMetadataObjectStorageConfig initializes objectstorage.Config struct with map
-func fillMetadataObjectStorageConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
+// initMetadataLocationConfig initializes objectstorage.Config struct with map
+func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
 	var (
 		config objectstorage.Config
 		ok     bool

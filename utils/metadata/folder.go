@@ -26,26 +26,16 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/utils/crypt"
 )
 
-var bucketName string
-
-// InitializeBucket creates the Object Storage Bucket that will store the metadata
-func InitializeBucket(location objectstorage.Location) error {
-	_, err := location.CreateBucket(bucketName)
-	if err != nil {
-		return fmt.Errorf("failed to create Object Storage Bucket '%s': %s", bucketName, err.Error())
-	}
-	return nil
-}
-
-//Folder describes a metadata folder
+// Folder describes a metadata folder
 type Folder struct {
 	//path contains the base path where to read/write record in Object Storage
 	path     string
 	service  *providers.Service
 	crypt    bool
-	cryptKey []byte
+	cryptKey *crypt.Key
 }
 
 // FolderDecoderCallback is the prototype of the function that will decode data read from Metadata
@@ -56,19 +46,15 @@ func NewFolder(svc *providers.Service, path string) *Folder {
 	if svc == nil {
 		panic("svc is nil!")
 	}
-	cfg, err := svc.GetCfgOpts()
-	if err != nil {
-		panic(fmt.Sprintf("config options are not available! %s", err.Error()))
-	}
-	cryptKey, crypt := cfg.Get("MetadataKey")
+	cryptKey := svc.MetadataKey
+	crypt := cryptKey != nil && len(cryptKey) > 0
 	f := &Folder{
 		path:    strings.Trim(path, "/"),
 		service: svc,
-		// bucketName: name.(string),
-		crypt: crypt,
+		crypt:   crypt,
 	}
 	if crypt {
-		f.cryptKey = []byte(cryptKey.(string))
+		f.cryptKey = cryptKey
 	}
 	return f
 }
@@ -154,7 +140,7 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 		}
 		data := buffer.Bytes()
 		if f.crypt {
-			data, err = decrypt(f.cryptKey, data)
+			data, err = crypt.Decrypt(data, f.cryptKey)
 			if err != nil {
 				return false, err
 			}
@@ -172,7 +158,7 @@ func (f *Folder) Write(path string, name string, content []byte) error {
 	)
 
 	if f.crypt {
-		data, err = encrypt(f.cryptKey, content)
+		data, err = crypt.Encrypt(content, f.cryptKey)
 		if err != nil {
 			return err
 		}
@@ -202,7 +188,7 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 		}
 		data := buffer.Bytes()
 		if f.crypt {
-			data, err = decrypt(f.cryptKey, data)
+			data, err = crypt.Decrypt(data, f.cryptKey)
 			if err != nil {
 				return err
 			}
