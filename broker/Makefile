@@ -10,7 +10,7 @@ else
 	GOINCLUDEPATH=$(GOPATH)
 endif
 
-ifeq ($(strip $(ǴOPATH)),)
+ifeq ($(strip $(GOPATH)),)
 	GOINCLUDEPATH=$(HOME)/go
 endif
 
