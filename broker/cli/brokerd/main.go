@@ -105,9 +105,6 @@ func work() {
 		log.Fatalf(err.Error())
 	}
 
-	log.Infoln("Starting server")
-	//lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-
 	brokerdPort := 50051
 
 	if portCandidate := os.Getenv("BROKERD_PORT"); portCandidate != "" {
@@ -116,6 +113,8 @@ func work() {
 			brokerdPort = num
 		}
 	}
+
+	log.Infof("Starting server, listening at port: %d", brokerdPort)
 
 	lis, err := net.Listen("tcp", ":" + strconv.Itoa(brokerdPort))
 	if err != nil {
