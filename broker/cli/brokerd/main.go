@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -106,7 +107,17 @@ func work() {
 
 	log.Infoln("Starting server")
 	//lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	lis, err := net.Listen("tcp", ":50051")
+
+	brokerdPort := 50051
+
+	if portCandidate := os.Getenv("BROKERD_PORT"); portCandidate != "" {
+		num, err := strconv.Atoi(portCandidate)
+		if err == nil {
+			brokerdPort = num
+		}
+	}
+
+	lis, err := net.Listen("tcp", ":" + strconv.Itoa(brokerdPort))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

@@ -21,6 +21,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/urfave/cli"
@@ -55,6 +56,15 @@ func main() {
 	}
 	app.EnableBashCompletion = true
 
+	brokerdPort := 50051
+
+	if portCandidate := os.Getenv("BROKERD_PORT"); portCandidate != "" {
+		num, err := strconv.Atoi(portCandidate)
+		if err == nil {
+			brokerdPort = num
+		}
+	}
+
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name: "verbose, v",
@@ -65,7 +75,7 @@ func main() {
 		cli.IntFlag{
 			Name:  "port, p",
 			Usage: "Bind to specified port `PORT`",
-			Value: 50051,
+			Value: brokerdPort,
 		},
 	}
 

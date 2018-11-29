@@ -17,12 +17,14 @@
 package services
 
 import (
+	"fmt"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/mocks"
 	"github.com/golang/mock/gomock"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -51,8 +53,17 @@ func TestNetworkService_List_with_NO_brokerd_running(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
+	brokerdPort := 50051
+
+	if portCandidate := os.Getenv("BROKERD_PORT"); portCandidate != "" {
+		num, err := strconv.Atoi(portCandidate)
+		if err == nil {
+			brokerdPort = num
+		}
+	}
+
 	mockClientAPI := mocks.NewMockClientAPI(mockCtrl)
-	theError := errors.New("Could not get network list: rpc error: code = Unavailable desc = all SubConns are in TransientFailure, latest connection error: connection error: desc = \"transport: Error while dialing dial tcp 127.0.0.1:50051: connect: connection refused\"")
+	theError := fmt.Errorf("Could not get network list: rpc error: code = Unavailable desc = all SubConns are in TransientFailure, latest connection error: connection error: desc = \"transport: Error while dialing dial tcp 127.0.0.1:%s: connect: connection refused\"", strconv.Itoa(brokerdPort))
 
 	ness := &NetworkService{
 		provider: &providers.Service{
