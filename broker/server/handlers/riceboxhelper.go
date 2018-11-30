@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package services
+package handlers
 
 import (
 	"bytes"
@@ -59,8 +59,8 @@ func exec(script string, data interface{}, hostid string, provider *providers.Se
 		return infraErrf(err, "Unable to get the script string")
 	}
 	// retrieve ssh config to perform some commands
-	sshSvc := NewSSHService(provider)
-	ssh, err := sshSvc.GetConfig(hostid)
+	sshHandler := NewSSHHandler(provider)
+	ssh, err := sshHandler.GetConfig(hostid)
 	if err != nil {
 		return infraErrf(err, "Unable to fetch the SSHConfig from the host")
 	}

@@ -18,19 +18,23 @@ package listeners
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/CS-SI/SafeScale/broker/server/services"
-	conv "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-
-	pb "github.com/CS-SI/SafeScale/broker"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/server/handlers"
+	conv "github.com/CS-SI/SafeScale/broker/utils"
 )
 
 const logListenerBase = "Listeners: bucket"
+
+// BucketHandler ...
+var BucketHandler = handlers.NewBucketHandler
 
 // broker bucket create c1
 // broker bucket mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /buckets/c1)
@@ -39,109 +43,123 @@ const logListenerBase = "Listeners: bucket"
 // broker bucket list
 // broker bucket inspect C1
 
-// BucketServiceListener is the bucket service grpc server
-type BucketServiceListener struct{}
+// BucketListener is the bucket service grpc server
+type BucketListener struct{}
 
 // List available buckets
-func (s *BucketServiceListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.BucketList, error) {
+func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.BucketList, error) {
 	log.Infof("%s list called", logListenerBase)
 	defer log.Debugf("%s list done", logListenerBase)
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot list buckets: No tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list buckets: no tenant set")
 	}
-	service := services.NewBucketService(currentTenant.Service)
-	buckets, err := service.List()
+
+	handler := BucketHandler(tenant.Service)
+	buckets, err := handler.List()
 	if err != nil {
-		tbr := errors.Wrap(err, "Cannot list buckets")
-		return nil, tbr
+		tbr := errors.Wrap(err, "Can't list buckets")
+		return nil, grpc.Errorf(codes.Internal, tbr.Error())
 	}
 
 	return conv.ToPBBucketList(buckets), nil
 }
 
 // Create a new bucket
-func (s *BucketServiceListener) Create(ctx context.Context, in *pb.Bucket) (*google_protobuf.Empty, error) {
+func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_protobuf.Empty, error) {
 	log.Infof("%s create '%s' called", logListenerBase, in.Name)
 	defer log.Debugf("%s create '%s' done", logListenerBase, in.Name)
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("can't create bucket: no tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create bucket: no tenant set")
 	}
 
-	service := services.NewBucketService(currentTenant.Service)
-	err := service.Create(in.GetName())
+	handler := BucketHandler(tenant.Service)
+	err := handler.Create(in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "can't create bucket")
-		return nil, tbr
+		return nil, grpc.Errorf(codes.Internal, tbr.Error())
 	}
 
 	return &google_protobuf.Empty{}, nil
 }
 
 // Delete a bucket
-func (s *BucketServiceListener) Delete(ctx context.Context, in *pb.Bucket) (*google_protobuf.Empty, error) {
+func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_protobuf.Empty, error) {
 	log.Infof("%s delete '%s' called", logListenerBase, in.Name)
 	defer log.Debug("%s delete '%s' done", logListenerBase, in.Name)
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("can't delete bucket: no tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't delete bucket: no tenant set")
 	}
 
-	service := services.NewBucketService(currentTenant.Service)
-	err := service.Delete(in.GetName())
+	handler := BucketHandler(tenant.Service)
+	err := handler.Delete(in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "can't delete bucket")
-		return nil, tbr
+		return nil, grpc.Errorf(codes.Internal, tbr.Error())
 	}
 
 	return &google_protobuf.Empty{}, nil
 }
 
 // Inspect a bucket
-func (s *BucketServiceListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.BucketMountingPoint, error) {
+func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.BucketMountingPoint, error) {
 	log.Infof("%s inspect '%s' called", logListenerBase, in.Name)
 	defer log.Debugf("%s inspect '%s' called", logListenerBase, in.Name)
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("can't inspect bucket: no tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't inspect bucket: no tenant set")
 	}
 
-	service := services.NewBucketService(currentTenant.Service)
-	resp, err := service.Inspect(in.GetName())
+	handler := BucketHandler(tenant.Service)
+	resp, err := handler.Inspect(in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "can't inspect bucket")
-		return nil, tbr
+		return nil, grpc.Errorf(codes.Internal, tbr.Error())
 	}
-
+	if resp == nil {
+		return nil, grpc.Errorf(codes.NotFound, "can't inspect bucket '%s': not found", in.GetName())
+	}
 	return conv.ToPBBucketMountPoint(resp), nil
 }
 
 // Mount a bucket on the filesystem of the host
-func (s *BucketServiceListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) (*google_protobuf.Empty, error) {
+func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) (*google_protobuf.Empty, error) {
 	log.Infof("%s mount '%v' called", logListenerBase, in)
 	defer log.Debugf("%s mount '%v' called", logListenerBase, in)
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("can't mount bucket: no tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't mount bucket: no tenant set")
 	}
 
-	service := services.NewBucketService(currentTenant.Service)
-	err := service.Mount(in.GetBucket(), in.GetHost().GetName(), in.GetPath())
-	return &google_protobuf.Empty{}, err
+	handler := BucketHandler(tenant.Service)
+	err := handler.Mount(in.GetBucket(), in.GetHost().GetName(), in.GetPath())
+	if err != nil {
+		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, err.Error())
+	}
+	return &google_protobuf.Empty{}, nil
 }
 
 // Unmount a bucket from the filesystem of the host
-func (s *BucketServiceListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint) (*google_protobuf.Empty, error) {
+func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint) (*google_protobuf.Empty, error) {
 	log.Infof("%s umount '%v' called", logListenerBase, in)
 	defer log.Debugf("%s umount '%v' done", logListenerBase, in)
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Can't unmount bucket: no tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't unmount bucket: no tenant set")
 	}
 
-	service := services.NewBucketService(currentTenant.Service)
-	err := service.Unmount(in.GetBucket(), in.GetHost().GetName())
-
-	return &google_protobuf.Empty{}, err
+	handler := BucketHandler(tenant.Service)
+	err := handler.Unmount(in.GetBucket(), in.GetHost().GetName())
+	if err != nil {
+		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, err.Error())
+	}
+	return &google_protobuf.Empty{}, nil
 }

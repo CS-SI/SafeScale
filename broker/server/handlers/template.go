@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package services
+package handlers
 
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 )
 
-//go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services TemplateAPI
+//go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers TemplateAPI
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
@@ -30,20 +30,20 @@ type TemplateAPI interface {
 	List(all bool) ([]model.HostTemplate, error)
 }
 
-//NewTemplateService creates a template service
-func NewTemplateService(api *providers.Service) TemplateAPI {
-	return &TemplateService{
+// TemplateHandler template service
+type TemplateHandler struct {
+	provider *providers.Service
+}
+
+// NewTemplateHandler creates a template service
+func NewTemplateHandler(api *providers.Service) TemplateAPI {
+	return &TemplateHandler{
 		provider: api,
 	}
 }
 
-// TemplateService template service
-type TemplateService struct {
-	provider *providers.Service
-}
-
 // List returns the template list
-func (srv *TemplateService) List(all bool) ([]model.HostTemplate, error) {
-	tlist, err := srv.provider.ListTemplates(all)
+func (svc *TemplateHandler) List(all bool) ([]model.HostTemplate, error) {
+	tlist, err := svc.provider.ListTemplates(all)
 	return tlist, infraErr(err)
 }

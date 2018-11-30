@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package services
+package handlers
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
 )
 
-//go:generate mockgen -destination=../mocks/mock_bucketapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services BucketAPI
+//go:generate mockgen -destination=../mocks/mock_bucketapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers BucketAPI
 
 // BucketAPI defines API to manipulate buckets
 type BucketAPI interface {
@@ -37,24 +37,24 @@ type BucketAPI interface {
 	Unmount(string, string) error
 }
 
-// BucketService bucket service
-type BucketService struct {
+// BucketHandler bucket service
+type BucketHandler struct {
 	provider *providers.Service
 }
 
-// NewBucketService creates a Bucket service
-func NewBucketService(api *providers.Service) BucketAPI {
-	return &BucketService{provider: api}
+// NewBucketHandler creates a Bucket service
+func NewBucketHandler(api *providers.Service) BucketAPI {
+	return &BucketHandler{provider: api}
 }
 
 // List retrieves all available buckets
-func (svc *BucketService) List() ([]string, error) {
+func (svc *BucketHandler) List() ([]string, error) {
 	rv, err := svc.provider.ObjectStorage.ListBuckets(objectstorage.RootPath)
 	return rv, infraErr(err)
 }
 
 // Create a bucket
-func (svc *BucketService) Create(name string) error {
+func (svc *BucketHandler) Create(name string) error {
 	bucket, err := svc.provider.ObjectStorage.GetBucket(name)
 	if err != nil {
 		if err.Error() != "not found" {
@@ -72,7 +72,7 @@ func (svc *BucketService) Create(name string) error {
 }
 
 // Delete a bucket
-func (svc *BucketService) Delete(name string) error {
+func (svc *BucketHandler) Delete(name string) error {
 	err := svc.provider.ObjectStorage.DeleteBucket(name)
 	if err != nil {
 		return infraErrf(err, "failed to delete bucket '%s'", name)
@@ -81,7 +81,7 @@ func (svc *BucketService) Delete(name string) error {
 }
 
 // Inspect a bucket
-func (svc *BucketService) Inspect(name string) (*model.Bucket, error) {
+func (svc *BucketHandler) Inspect(name string) (*model.Bucket, error) {
 	b, err := svc.provider.ObjectStorage.GetBucket(name)
 	if err != nil {
 		if err.Error() == "not found" {
@@ -96,7 +96,7 @@ func (svc *BucketService) Inspect(name string) (*model.Bucket, error) {
 }
 
 // Mount a bucket on an host on the given mount point
-func (svc *BucketService) Mount(bucketName, hostName, path string) error {
+func (svc *BucketHandler) Mount(bucketName, hostName, path string) error {
 	// Check bucket existence
 	_, err := svc.provider.ObjectStorage.GetBucket(bucketName)
 	if err != nil {
@@ -104,8 +104,8 @@ func (svc *BucketService) Mount(bucketName, hostName, path string) error {
 	}
 
 	// Get Host ID
-	hostService := NewHostService(svc.provider)
-	host, err := hostService.Inspect(hostName)
+	hostHandler := NewHostHandler(svc.provider)
+	host, err := hostHandler.Inspect(hostName)
 	if err != nil {
 		return logicErr(fmt.Errorf("no host found with name or id '%s'", hostName))
 	}
@@ -159,7 +159,7 @@ func (svc *BucketService) Mount(bucketName, hostName, path string) error {
 }
 
 // Unmount a bucket
-func (svc *BucketService) Unmount(bucketName, hostName string) error {
+func (svc *BucketHandler) Unmount(bucketName, hostName string) error {
 	// Check bucket existence
 	_, err := svc.Inspect(bucketName)
 	if err != nil {
@@ -172,8 +172,8 @@ func (svc *BucketService) Unmount(bucketName, hostName string) error {
 	}
 
 	// Get Host ID
-	hostService := NewHostService(svc.provider)
-	host, err := hostService.Inspect(hostName)
+	hostHandler := NewHostHandler(svc.provider)
+	host, err := hostHandler.Inspect(hostName)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:

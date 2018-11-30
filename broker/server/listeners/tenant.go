@@ -20,11 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
-	"github.com/CS-SI/SafeScale/providers"
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
+
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/providers"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant
@@ -35,23 +38,15 @@ type Tenant struct {
 
 var (
 	currentTenant *Tenant
-	// serviceFactory *providers.ServiceFactory
 )
 
-// //InitServiceFactory initialise the service factory
-// func InitServiceFactory() {
-// 	// serviceFactory = providers.NewFactory()
-// 	// serviceFactory.RegisterClient("ovh", &ovh.Client{})
-// 	// serviceFactory.Load()
-
-// }
-
-// TenantServiceListener server is used to implement SafeScale.broker.
-type TenantServiceListener struct{}
+// TenantListener server is used to implement SafeScale.broker.
+type TenantListener struct{}
 
 // List registerd tenants
-func (s *TenantServiceListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
-	log.Println("List tenant called")
+func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
+	log.Infoln("Listeners: tenant list called")
+	defer log.Debugln("Listeners: tenant list done")
 
 	tenants, err := providers.Tenants()
 	if err != nil {
@@ -70,13 +65,14 @@ func (s *TenantServiceListener) List(ctx context.Context, in *google_protobuf.Em
 }
 
 // Get returns the name of the current tenant used
-func (s *TenantServiceListener) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
-	log.Println("Tenant Get called")
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		return nil, fmt.Errorf("Cannot get tenant : No tenant set")
+func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
+	log.Infoln("Listeners: tenant get called")
+	defer log.Debugln("Listeners: tenant get done")
+
+	if currentTenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't get tenant: no tenant set")
 	}
-	return &pb.TenantName{Name: tenant.name}, nil
+	return &pb.TenantName{Name: currentTenant.name}, nil
 }
 
 // GetCurrentTenant contains the current tenant
@@ -103,11 +99,11 @@ func getCurrentTenant() *Tenant {
 }
 
 // Set the the tenant tu use for each command
-func (s *TenantServiceListener) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
-	log.Printf("Tenant Set called '%s'", in.Name)
+func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
+	log.Infof("Listeners: tenant set '%s' called", in.Name)
+	defer log.Debugf("Listeners: tenant set '%s' done", in.Name)
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
-		log.Printf("Tenant '%s' is already selected", in.GetName())
 		return &google_protobuf.Empty{}, nil
 	}
 
@@ -116,6 +112,6 @@ func (s *TenantServiceListener) Set(ctx context.Context, in *pb.TenantName) (*go
 		return &google_protobuf.Empty{}, fmt.Errorf("Unable to set tenant '%s': %s", in.GetName(), err.Error())
 	}
 	currentTenant = &Tenant{name: in.GetName(), Service: service}
-	log.Printf("Current tenant is now '%s'", in.GetName())
+	log.Infof("Current tenant is now '%s'", in.GetName())
 	return &google_protobuf.Empty{}, nil
 }

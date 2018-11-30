@@ -14,48 +14,48 @@
  * limitations under the License.
  */
 
-package services
+package handlers
 
 import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 )
 
-//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services ImageAPI
+//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers ImageAPI
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
-// ImageAPI defines API to manipulate hosts
+// ImageAPI defines API to manipulate images
 type ImageAPI interface {
 	List(all bool) ([]model.Image, error)
 	Select(osfilter string) (*model.Image, error)
 	Filter(osfilter string) ([]model.Image, error)
 }
 
-//NewImageService creates an host service
-func NewImageService(api *providers.Service) ImageAPI {
-	return &ImageService{
+// NewImageHandler creates an host service
+func NewImageHandler(api *providers.Service) ImageAPI {
+	return &ImageHandler{
 		provider: api,
 	}
 }
 
-// ImageService image service
-type ImageService struct {
+// ImageHandler image service
+type ImageHandler struct {
 	provider *providers.Service
 }
 
 // List returns the image list
-func (srv *ImageService) List(all bool) ([]model.Image, error) {
+func (srv *ImageHandler) List(all bool) ([]model.Image, error) {
 	images, err := srv.provider.ListImages(all)
 	return images, infraErr(err)
 }
 
 // Select selects the image that best fits osname
-func (srv *ImageService) Select(osname string) (*model.Image, error) {
+func (srv *ImageHandler) Select(osname string) (*model.Image, error) {
 	return nil, nil
 }
 
 // Filter filters the images that do not fit osname
-func (srv *ImageService) Filter(osname string) ([]model.Image, error) {
+func (srv *ImageHandler) Filter(osname string) ([]model.Image, error) {
 	return nil, nil
 }

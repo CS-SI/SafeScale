@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	server "github.com/CS-SI/SafeScale/broker/server/services"
+	"github.com/CS-SI/SafeScale/broker/server/handlers"
 	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
@@ -318,7 +318,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				return err
 			}
 
-			sshSvc := server.NewSSHService(service)
+			sshSvc := handlers.NewSSHHandler(service)
 			ssh, err := sshSvc.GetConfig(host.ID)
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
