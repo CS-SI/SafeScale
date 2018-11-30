@@ -161,7 +161,7 @@ func (svc *HostService) Create(
 		return nil, logicErr(fmt.Errorf("failed to create host '%s': name is already used", name))
 	}
 
-	networks := []*model.Network{}
+	var networks []*model.Network
 	var gw *model.Host
 	if len(net) != 0 {
 		networkSvc := NewNetworkService(svc.provider)

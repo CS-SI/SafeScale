@@ -192,7 +192,7 @@ func (svc *ShareService) Delete(name string) error {
 	}
 
 	if len(share.ClientsByName) > 0 {
-		list := []string{}
+		var list []string
 		for k := range share.ClientsByName {
 			list = append(list, k)
 		}
@@ -236,7 +236,7 @@ func (svc *ShareService) Delete(name string) error {
 func (svc *ShareService) List() (map[string]map[string]*propsv1.HostShare, error) {
 	shares := map[string]map[string]*propsv1.HostShare{}
 
-	servers := []string{}
+	var servers []string
 	ms := metadata.NewShare(svc.provider)
 	err := ms.Browse(func(hostName string, shareID string) error {
 		servers = append(servers, hostName)

@@ -22,7 +22,7 @@ import (
 	"sort"
 
 	log "github.com/sirupsen/logrus"
-	cli "github.com/urfave/cli"
+	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
 	"github.com/CS-SI/SafeScale/broker/utils"
