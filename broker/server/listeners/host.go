@@ -218,7 +218,7 @@ func (s *HostServiceListener) Inspect(ctx context.Context, in *pb.Reference) (*p
 
 // Delete an host
 func (s *HostServiceListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Listeners: host delete '%s' called", in.Name)
+	log.Infof("Listeners: host delete '%s' called", in.Name)
 	defer log.Debugf("Listeners: host delete '%s' done", in.Name)
 
 	ref := utils.GetReference(in)

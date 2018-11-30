@@ -41,10 +41,11 @@ type NetworkServiceListener struct{}
 
 // Create a new network
 func (s *NetworkServiceListener) Create(ctx context.Context, in *pb.NetworkDefinition) (*pb.Network, error) {
-	log.Printf("Create Network called '%s'", in.Name)
+	log.Infof("Listeners: network create '%s' called", in.Name)
+	defer log.Debugf("Listeners: network create '%s' done", in.Name)
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot create network : No tenant set")
+		return nil, fmt.Errorf("Can't create network: no tenant set")
 	}
 
 	networkAPI := services.NewNetworkService(currentTenant.Service)
@@ -61,10 +62,11 @@ func (s *NetworkServiceListener) Create(ctx context.Context, in *pb.NetworkDefin
 
 // List existing networks
 func (s *NetworkServiceListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.NetworkList, error) {
-	log.Printf("List Network called")
+	log.Infof("Listeners: network list called")
+	defer log.Debugf("Listeners: network list done")
 
 	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot list networks : No tenant set")
+		return nil, fmt.Errorf("Can't list networks: no tenant set")
 	}
 
 	networkAPI := services.NewNetworkService(currentTenant.Service)
@@ -86,7 +88,7 @@ func (s *NetworkServiceListener) List(ctx context.Context, in *pb.NWListRequest)
 
 // Inspect returns infos on a network
 func (s *NetworkServiceListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
-	log.Debugf("broker.server.listeners.NetworkServiceListener.Inspect(%s) called'", in.Name)
+	log.Infof("Listeners: network inspect '%s' called'", in.Name)
 	defer log.Debugf("broker.server.listeners.NetworkServiceListener.Inspect(%s) done'", in.Name)
 
 	ref := utils.GetReference(in)
