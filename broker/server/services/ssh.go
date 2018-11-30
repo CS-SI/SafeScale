@@ -41,7 +41,6 @@ const protocolSeparator = ":"
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
-
 // SSHAPI defines ssh management API
 type SSHAPI interface {
 	// Connect(name string) error
@@ -70,8 +69,7 @@ func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 	case string:
 		mh, err := metadata.LoadHost(svc.provider, hostParam.(string))
 		if err != nil {
-			err = infraErr(err)
-			return nil, err
+			return nil, infraErr(err)
 		}
 		host = mh.Get()
 	case *model.Host:
@@ -89,15 +87,13 @@ func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 	hostNetworkV1 := propsv1.NewHostNetwork()
 	err := host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
 	if err != nil {
-		err = infraErr(err)
-		return nil, err
+		return nil, infraErr(err)
 	}
 	if hostNetworkV1.DefaultGatewayID != "" {
 		hostSvc := NewHostService(svc.provider)
-		gw, err := hostSvc.Get(hostNetworkV1.DefaultGatewayID)
+		gw, err := hostSvc.Inspect(hostNetworkV1.DefaultGatewayID)
 		if err != nil {
-			err = infraErr(err)
-			return nil, err
+			return nil, throwErr(err)
 		}
 		GatewayConfig := system.SSHConfig{
 			PrivateKey: gw.PrivateKey,
@@ -129,14 +125,13 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 	var err error
 
 	hostSvc := NewHostService(svc.provider)
-	host, err := hostSvc.Get(hostName)
+	host, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
-		return 0, "", "", logicErrf(err, "no host found with name or id '%s'", hostName)
+		return 0, "", "", throwErr(err)
 	}
 
 	// retrieve ssh config to perform some commands
 	ssh, err := svc.GetConfig(host)
-
 	if err != nil {
 		return 0, "", "", infraErr(err)
 	}
@@ -254,9 +249,9 @@ func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
 	}
 
 	hostSvc := NewHostService(svc.provider)
-	host, err := hostSvc.Get(hostName)
+	host, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
-		return 0, "", "", logicErr(fmt.Errorf("no host found with name or id '%s'", hostName))
+		return 0, "", "", throwErr(err)
 	}
 
 	// retrieve ssh config to perform some commands

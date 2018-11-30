@@ -52,11 +52,6 @@ func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, erro
 	return client.feclt.CreateGateway(req)
 }
 
-// // GetGateway returns the name of the gateway of a network
-// func (client *Client) GetGateway(networkID string) (*model.Host, error) {
-// 	return client.feclt.GetGateway(networkID)
-// }
-
 // DeleteGateway deletes the gateway associated with network identified by ID
 func (client *Client) DeleteGateway(networkID string) error {
 	return client.feclt.DeleteGateway(networkID)
