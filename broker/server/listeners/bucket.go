@@ -82,7 +82,7 @@ func (s *BucketServiceListener) Create(ctx context.Context, in *pb.Bucket) (*goo
 // Delete a bucket
 func (s *BucketServiceListener) Delete(ctx context.Context, in *pb.Bucket) (*google_protobuf.Empty, error) {
 	log.Infof("%s delete '%s' called", logListenerBase, in.Name)
-	defer log.Debug("%s delete '%s' done", logListenerBase, in.Name)
+	defer log.Debugf("%s delete '%s' done", logListenerBase, in.Name)
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("can't delete bucket: no tenant set")
