@@ -147,8 +147,8 @@ func (svc *HostService) Create(
 	name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32, force bool,
 ) (*model.Host, error) {
 
-	log.Debugf("broker.server.services.HostService.Create('%s') called", name)
-	defer log.Debugf("broker.server.services.HostService.Create('%s') done", name)
+	log.Debugf("HostService.Create('%s') called", name)
+	defer log.Debugf("HostService.Create('%s') done", name)
 
 	host, err := svc.provider.GetHostByName(name)
 	if err != nil {
@@ -194,6 +194,15 @@ func (svc *HostService) Create(
 		networks = append(networks, net)
 	}
 
+	msg := fmt.Sprintf("Requested template satisfying: %d core%s", cpu, utils.Plural(cpu))
+	if freq > 0 {
+		msg += fmt.Sprintf(" at %.01f GHz", freq)
+	}
+	msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", ram, disk)
+	if gpuNumber > 0 {
+		msg += fmt.Sprintf(", %d GPU%s", gpuNumber, utils.Plural(gpuNumber))
+	}
+	log.Infof(msg)
 	templates, err := svc.provider.SelectTemplatesBySize(
 		model.SizingRequirements{
 			MinCores:    cpu,
@@ -208,7 +217,18 @@ func (svc *HostService) Create(
 	var template model.HostTemplate
 	if len(templates) > 0 {
 		template = templates[0]
-		log.Debugf("Selected template: '%s' (%d core%s, %.01f GB RAM, %d GB disk)", template.Name, template.Cores, utils.Plural(template.Cores), template.RAMSize, template.DiskSize)
+		msg := fmt.Sprintf("Selected template: '%s' (%d core%s", template.Name, cpu, utils.Plural(cpu))
+		if template.CPUFreq > 0 {
+			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+		}
+		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+		if template.GPUNumber > 0 {
+			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
+			if template.GPUType != "" {
+				msg += fmt.Sprintf(" (%s)", template.GPUType)
+			}
+		}
+		log.Infof(msg)
 	}
 
 	img, err := svc.provider.SearchImage(los)
@@ -390,6 +410,9 @@ func (svc *HostService) getOrCreateDefaultNetwork() (*model.Network, error) {
 
 // List returns the host list
 func (svc *HostService) List(all bool) ([]*model.Host, error) {
+	log.Debugf("HostService.List(%v) called", all)
+	defer log.Debugf("HostService.List(%v) done", all)
+
 	if all {
 		return svc.provider.ListHosts()
 	}
@@ -409,6 +432,9 @@ func (svc *HostService) List(all bool) ([]*model.Host, error) {
 // ForceInspect ...
 // If not found, return (nil, err)
 func (svc *HostService) ForceInspect(ref string) (*model.Host, error) {
+	log.Debugf("HostService.ForceInspect(%s) called", ref)
+	defer log.Debugf("HostService.ForceInspect(%s) done", ref)
+
 	host, err := svc.Inspect(ref)
 	if err != nil {
 		return nil, infraErr(errors.Wrap(err, "failed to load host metadata"))
@@ -422,6 +448,9 @@ func (svc *HostService) ForceInspect(ref string) (*model.Host, error) {
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
 func (svc *HostService) Inspect(ref string) (*model.Host, error) {
+	log.Debugf("HostService.Inspect(%s) called", ref)
+	defer log.Debugf("HostService.Inspect(%s) done", ref)
+
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
 		return nil, throwErr(errors.Wrap(err, "failed to load host metadata"))
@@ -439,6 +468,9 @@ func (svc *HostService) Inspect(ref string) (*model.Host, error) {
 
 // Delete deletes host referenced by ref
 func (svc *HostService) Delete(ref string) error {
+	log.Debugf("HostService.Delete(%s) called", ref)
+	defer log.Debugf("HostService.Delete(%s) done", ref)
+
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
 		return infraErrf(err, "can't delete host '%s'", ref)
@@ -546,9 +578,12 @@ func (svc *HostService) Delete(ref string) error {
 
 // SSH returns ssh parameters to access the host referenced by ref
 func (svc *HostService) SSH(ref string) (*system.SSHConfig, error) {
+	log.Debugf("HostService.SSH(%s) called", ref)
+	defer log.Debugf("HostService.SSH(%s) done", ref)
+
 	host, err := svc.Inspect(ref)
 	if err != nil {
-		return nil, logicErrf(err, fmt.Sprintf("Cannot access ssh parameters of host '%s': failed to query host '%s'", ref, ref))
+		return nil, logicErrf(err, fmt.Sprintf("Can't access ssh parameters of host '%s': failed to query host '%s'", ref, ref))
 	}
 	sshSvc := NewSSHService(svc.provider)
 	sshConfig, err := sshSvc.GetConfig(host.ID)
