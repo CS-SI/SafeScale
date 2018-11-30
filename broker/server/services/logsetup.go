@@ -39,8 +39,9 @@ func infraErr(err error) error {
 	if err == nil {
 		return nil
 	}
-	tbr := errors.WithStack(err)
 	log.Errorf("%+v", err)
+
+	tbr := errors.WithStack(err)
 	return tbr
 }
 
@@ -53,7 +54,7 @@ func infraErrf(err error, message string, a ...interface{}) error {
 	tbr := errors.WithStack(err)
 	tbr = errors.WithMessage(tbr, fmt.Sprintf(message, a...))
 
-	log.Errorf("%+v", err)
+	log.Errorf("%+v", tbr)
 	return tbr
 }
 
