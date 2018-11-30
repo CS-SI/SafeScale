@@ -563,7 +563,7 @@ func (client *Client) deleteSubnet(id string) error {
 					case "SubnetInUse":
 						msg := fmt.Sprintf("hosts or services are still attached")
 						log.Warnf(utils.TitleFirst(msg))
-						return model.ResourceNotAvailableError("network", id)
+						return model.ResourceNotAvailableError("subnet", id)
 					default:
 						log.Debugf("NeutronError: type = %s", neutronError["type"])
 					}

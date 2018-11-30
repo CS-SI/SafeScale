@@ -89,7 +89,7 @@ func getCurrentTenant() *Tenant {
 		if err != nil || len(tenants) != 1 {
 			return nil
 		}
-		// Set unqiue tenant as selected
+		// Set unique tenant as selected
 		log.Println("Unique tenant set")
 		for name := range tenants {
 			service, err := providers.GetService(name)

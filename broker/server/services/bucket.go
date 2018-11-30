@@ -105,7 +105,7 @@ func (svc *BucketService) Mount(bucketName, hostName, path string) error {
 
 	// Get Host ID
 	hostService := NewHostService(svc.provider)
-	host, err := hostService.Get(hostName)
+	host, err := hostService.Inspect(hostName)
 	if err != nil {
 		return logicErr(fmt.Errorf("no host found with name or id '%s'", hostName))
 	}
@@ -173,7 +173,7 @@ func (svc *BucketService) Unmount(bucketName, hostName string) error {
 
 	// Get Host ID
 	hostService := NewHostService(svc.provider)
-	host, err := hostService.Get(hostName)
+	host, err := hostService.Inspect(hostName)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:

@@ -92,7 +92,7 @@ func (svc *VolumeService) Delete(ref string) error {
 			return err
 		default:
 			log.Debugf("Failed to delete volume: %+v", err)
-			return infraErrf(err,  "failed to delete volume")
+			return infraErrf(err, "failed to delete volume")
 		}
 	}
 	volume := mv.Get()
@@ -155,7 +155,7 @@ func (svc *VolumeService) Inspect(ref string) (*model.Volume, map[string]*propsv
 	err = volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
 	if err == nil && len(volumeAttachedV1.Hosts) > 0 {
 		for id := range volumeAttachedV1.Hosts {
-			host, err := hostSvc.Get(id)
+			host, err := hostSvc.Inspect(id)
 			if err != nil || host == nil {
 				continue
 			}
@@ -204,7 +204,7 @@ func (svc *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) 
 	err = metadata.SaveVolume(svc.provider, volume)
 	if err != nil {
 		log.Debugf("Error creating volume: saving volume metadata: %+v", err)
-		return nil, infraErrf(err, "Error creating volume '%s' saving its volume metadata", name )
+		return nil, infraErrf(err, "Error creating volume '%s' saving its volume metadata", name)
 	}
 	return volume, nil
 }
@@ -234,15 +234,10 @@ func (svc *VolumeService) Attach(volumeName, hostName, path, format string) erro
 	}
 
 	// Get Host data
-	hostService := NewHostService(svc.provider)
-	host, err := hostService.Get(hostName)
+	hostSvc := NewHostService(svc.provider)
+	host, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
-		switch err.(type) {
-		case model.ErrResourceNotFound:
-			return infraErr(err)
-		default:
-			return infraErrf(err, "can't attach volume")
-		}
+		return throwErr(err)
 	}
 
 	// For now, allows only one attachment...
@@ -466,14 +461,9 @@ func (svc *VolumeService) Detach(volumeName, hostName string) error {
 	}
 	// Load host data
 	hostSvc := NewHostService(svc.provider)
-	host, err := hostSvc.Get(hostName)
+	host, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
-		switch err.(type) {
-		case model.ErrResourceNotFound:
-			return infraErr(err)
-		default:
-			return infraErrf(model.ResourceNotFoundError("host", hostName), "Can't detach volume")
-		}
+		return throwErr(err)
 	}
 
 	// Obtain volume attachment ID
@@ -539,12 +529,12 @@ func (svc *VolumeService) Detach(volumeName, hostName string) error {
 	sshSvc := NewSSHService(svc.provider)
 	sshConfig, err := sshSvc.GetConfig(host.ID)
 	if err != nil {
-		err = logicErrf(err,"error getting ssh config")
+		err = logicErrf(err, "error getting ssh config")
 		return err
 	}
 	nfsServer, err := nfs.NewServer(sshConfig)
 	if err != nil {
-		err = logicErrf(err,"error creating nfs service")
+		err = logicErrf(err, "error creating nfs service")
 		return err
 	}
 	err = nfsServer.UnmountBlockDevice(attachment.Device)
