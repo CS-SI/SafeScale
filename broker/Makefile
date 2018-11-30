@@ -32,10 +32,10 @@ prepare_python:
 
 sdk_python: has_python sdk
 	@mkdir -p ./python3
-	@pipenv update
+	@~/.local/bin/pipenv update
 	@cp broker.proto broker.proto.backup
 	@sed -i 's/github.com\/golang\/protobuf\/ptypes\/empty\/empty.proto/google\/protobuf\/empty.proto/g' broker.proto
-	@pipenv run python3 -m grpc_tools.protoc -I. -I$(GOINCLUDEPATH)/src --python_out=python3/ --grpc_python_out=python3/ broker.proto
+	@~/.local/bin/pipenv run python3 -m grpc_tools.protoc -I. -I$(GOINCLUDEPATH)/src --python_out=python3/ --grpc_python_out=python3/ broker.proto
 	@mv broker.proto.backup broker.proto
 	@protoc -I. -I$(GOINCLUDEPATH)/src --go_out=plugins=grpc:. broker.proto
 
