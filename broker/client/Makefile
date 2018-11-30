@@ -8,7 +8,7 @@ all:	broker
 vet:
 	@$(GO) vet ./...
 
-broker:	main.go cmd/*.go ../utils/*.go ../broker.pb.go
+broker:
 	@$(GO) build -o $(EXEC)
 
 clean:
