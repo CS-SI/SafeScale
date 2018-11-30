@@ -47,6 +47,7 @@ One section 'tenants' with specific authentication parameters for each tenant. S
 
   [tenants.objectstorage]
     Type = "swift"
+    AuthURL = "https://auth.cloud.ovh.net/v2.0"
 
 [[tenants]]
   name = "logical_name_for_this_cloudwatt_tenant"

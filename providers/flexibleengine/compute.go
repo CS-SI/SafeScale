@@ -1082,64 +1082,6 @@ func toHostState(status string) HostState.Enum {
 	}
 }
 
-// // convertAdresses converts adresses returned by the FlexibleEngine driver and arranges them by version in a map
-// func (client *Client) convertAdresses(addresses map[string]interface{}) map[IPVersion.Enum][]string {
-// 	addrs := make(map[IPVersion.Enum][]string)
-// 	for _, obj := range addresses {
-// 		for _, networkAddresses := range obj.([]interface{}) {
-// 			address := networkAddresses.(map[string]interface{})
-// 			version := address["version"].(float64)
-// 			fixedIP := address["addr"].(string)
-// 			switch version {
-// 			case 4:
-// 				addrs[IPVersion.IPv4] = append(addrs[IPVersion.IPv4], fixedIP)
-// 			case 6:
-// 				addrs[IPVersion.IPv6] = append(addrs[IPVersion.IPv4], fixedIP)
-// 			}
-// 		}
-// 	}
-// 	return addrs
-// }
-
-// // toHost converts a FlexibleEngine (almost OpenStack...) server into api host
-// func (client *Client) toHost(server *servers.Server) *model.Host {
-// 	//	adresses, ipv4, ipv6 := client.convertAdresses(server.Addresses)
-// 	adresses := client.convertAdresses(server.Addresses)
-
-// 	host := model.Host{
-// 		ID:         server.ID,
-// 		Name:       server.Name,
-// 		AccessIPv4: server.AccessIPv4,
-// 		AccessIPv6: server.AccessIPv6,
-// 		LastState:  toHostState(server.Status),
-// 	}
-
-// 	networkV1 := &model.HostExtensionNetworkV1{
-// 		PrivateIPsV4: adresses[IPVersion.IPv4],
-// 		PrivateIPsV6: adresses[IPVersion.IPv6],
-// 	}
-// 	err := host.Properties.Set(HostProperty.NetworkV1, networkV1)
-// 	if err != nil {
-// 		log.Errorf(err.Error())
-// 	}
-// 	sizingV1 := model.HostExtensionSizingV1{
-// 		AllocatedSize: client.toHostSize(server.Flavor),
-// 	}
-// 	err = host.Properties.Set(HostProperty.SizingV1, sizingV1)
-// 	if err != nil {
-// 		log.Errorf(err.Error())
-// 	}
-
-// 	if server.AccessIPv4 != "" {
-// 		host.AccessIPv4 = server.AccessIPv4
-// 	}
-// 	if server.AccessIPv6 == "" {
-// 		host.AccessIPv6 = server.AccessIPv6
-// 	}
-
-// 	return &host
-// }
-
 // CreateKeyPair creates and import a key pair
 func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
 	return client.osclt.CreateKeyPair(name)
