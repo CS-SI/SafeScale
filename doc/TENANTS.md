@@ -101,81 +101,83 @@ Combinaisons are possible :
 
 The valid keywords in this section are :
 
-| keyword     | presence    |
-| --- | --- |
-| ``AccessKey`` | MANDATORY, CLIENT |
-| ``ApplicationKey`` | MANDATORY, CLIENT |
-| ``OpenstackID`` | MANDATORY, CLIENT |
-| ``OpenstackPassword`` | MANDATORY, CLIENT |
-| ``Password`` | MANDATORY, CLIENT |
-| ``SecretKey`` | MANDATORY, CLIENT |
-| ``Username`` | MANDATORY, CLIENT |
+> | keyword     | presence    |
+> | --- | --- |
+> | ``AccessKey`` | MANDATORY, CLIENT |
+> | ``ApplicationKey`` | MANDATORY, CLIENT |
+> | ``OpenstackID`` | MANDATORY, CLIENT |
+> | ``OpenstackPassword`` | MANDATORY, CLIENT |
+> | ``Password`` | MANDATORY, CLIENT |
+> | ``SecretKey`` | MANDATORY, CLIENT |
+> | ``Username`` | MANDATORY, CLIENT |
 
 ### Section ``[tenant.compute]``
 
 The valid keywords in this section are :
 
-| keyword     | presence    |
-| --- | --- |
-| ``DefaultImage`` | OPTIONAL |
-| ``Domain`` | OPTIONAL, CLIENT |
-| ``DomainName`` | OPTIONAL, CLIENT |
-| ``ProjectName`` | OPTIONAL, CLIENT |
-| ``ProjectID`` | OPTIONAL, CLIENT |
+> | keyword     | presence    |
+> | --- | --- |
+> | ``DefaultImage`` | OPTIONAL |
+> | ``Domain`` | OPTIONAL, CLIENT |
+> | ``DomainName`` | OPTIONAL, CLIENT |
+> | ``ProjectName`` | OPTIONAL, CLIENT |
+> | ``ProjectID`` | OPTIONAL, CLIENT |
 
 ### Section ``[tenant.network]``
 
 The valid keywords in this section are :
 
-| keyword     | presence    |
-| --- | --- |
-| ``ProviderNetwork`` | OPTIONAL, CLIENT |
-| ``VPCCIDR`` | OPTIONAL, CLIENT |
-| ``VPCName`` | OPTIONAL, CLIENT |
+> | keyword     | presence    |
+> | --- | --- |
+> | ``ProviderNetwork`` | OPTIONAL, CLIENT |
+> | ``VPCCIDR`` | OPTIONAL, CLIENT |
+> | ``VPCName`` | OPTIONAL, CLIENT |
 
 ### Section ``[tenant.objectstorage]``
 
 The valid keywords in this section are :
 
-| keyword     | presence    |
-| --- | --- |
-| ``AccessKey`` | MANDATORY, INHERIT |
-| ``AuthURL`` | OPTIONAL, CLIENT |
-| ``Domain`` | OPTIONAL, CLIENT |
-| ``DomainName`` | OPTIONAL, CLIENT |
-| ``Endpoint`` | OPTIONAL, CLIENT |
-| ``OpenstackPassword`` | MANDATORY, INHERIT |
-| ``ProjectID`` | OPTIONAL, CLIENT |
-| ``ProjectName`` | OPTIONAL, CLIENT |
-| ``Password`` | MANDATORY, INHERIT |
-| ``Region`` | OPTIONAL |
-| ``SecretKey`` | MANDATORY, INHERIT |
-| ``Tenant`` | OPTIONAL, CLIENT |
-| ``Type`` | MANDATORY |
-| ``Username`` | MANDATORY, INHERIT |
+> | keyword     | presence    |
+> | --- | --- |
+> | ``AccessKey`` | MANDATORY, INHERIT |
+> | ``AuthURL`` | OPTIONAL, CLIENT |
+> | ``Domain`` | OPTIONAL, CLIENT |
+> | ``DomainName`` | OPTIONAL, CLIENT |
+> | ``Endpoint`` | OPTIONAL, CLIENT |
+> | ``OpenstackPassword`` | MANDATORY, INHERIT |
+> | ``ProjectID`` | OPTIONAL, CLIENT |
+> | ``ProjectName`` | OPTIONAL, CLIENT |
+> | ``Password`` | MANDATORY, INHERIT |
+> | ``Region`` | OPTIONAL |
+> | ``SecretKey`` | MANDATORY, INHERIT |
+> | ``Tenant`` | OPTIONAL, CLIENT |
+> | ``Type`` | MANDATORY |
+> | ``Username`` | MANDATORY, INHERIT |
 
 ### Section [tenant.metadata]
 
 The valid keywords in this section are :
 
-| keyword     | presence    |
-| --- | --- |
-| ``AccessKey`` | MANDATORY, INHERIT |
-| ``AuthURL`` | OPTIONAL, CLIENT, INHERIT |
-| ``Domain`` | OPTIONAL, CLIENT, INHERIT |
-| ``DomainName`` | OPTIONAL, CLIENT, INHERIT |
-| ``Endpoint`` | OPTIONAL, CLIENT, INHERIT |
-| ``OpenstackPassword`` | MANDATORY, INHERIT |
-| ``ProjectID`` | OPTIONAL, CLIENT, INHERIT |
-| ``ProjectName`` | OPTIONAL, CLIENT, INHERIT |
-| ``Password`` | MANDATORY, INHERIT |
-| ``Region`` | OPTIONAL |
-| ``SecretKey`` | MANDATORY, INHERIT |
-| ``Tenant`` | OPTIONAL, CLIENT, INHERIT |
-| ``Type``| MANDATORY, INHERIT |
-| ``Username`` | MANDATORY, INHERIT |
+> | keyword     | presence    |
+> | --- | --- |
+> | ``AccessKey`` | MANDATORY, INHERIT |
+> | ``AuthURL`` | OPTIONAL, CLIENT, INHERIT |
+> | ``DomainName`` | OPTIONAL, CLIENT, INHERIT |
+> | ``Endpoint`` | OPTIONAL, CLIENT, INHERIT |
+> | ``Domain`` | OPTIONAL, CLIENT, INHERIT |
+> | ``OpenstackPassword`` | MANDATORY, INHERIT |
+> | ``ProjectID`` | OPTIONAL, CLIENT, INHERIT |
+> | ``ProjectName`` | OPTIONAL, CLIENT, INHERIT |
+> | ``Password`` | MANDATORY, INHERIT |
+> | ``Region`` | OPTIONAL |
+> | ``SecretKey`` | MANDATORY, INHERIT |
+> | ``Tenant`` | OPTIONAL, CLIENT, INHERIT |
+> | ``Type``| MANDATORY, INHERIT |
+> | ``Username`` | MANDATORY, INHERIT |
 
-## Fields in details
+___
+
+## Keywords in details
 
 ### name
 
@@ -183,12 +185,100 @@ This field contains a string giving a name to the tenant
 
 ### client
 
-It defines the driver to communicate with the provider. It can contain:
+It defines the "driver" to communicate with the provider. Valid values are:
 
-- ``cloudwatt``
-- ``cloudferro``
-- ``flexibleengine``
-- ``opentelekom``
-- ``ovh``
+> | |
+> | --- |
+> | ``"cloudwatt"`` |
+> | ``"cloudferro"`` |
+> | ``"flexibleengine"`` |
+> | ``"opentelekom"`` |
+> | ``"ovh"`` |
 
-###
+### ``AccessKey``: alias, see ``Username``
+
+### ``ApplicationKey``
+
+### ``AuthURL``
+
+Contains the URL used to authenticate.<br>
+May be used in sections ``tenants.objectstorage`` and ``tenants.metadata``, especially when ``Type`` == ``"swift"``.
+
+### ``Domain``
+
+### ``DomainName``: alias, see ``Domain``
+
+### ``Endpoint``
+
+Contains the URL of the Object Storage backend to use.<br>
+May be used in sections ``tenants.objectstorage`` and ``tenants.metadata``, especially when ``Type`` == ``"s3"``.
+
+### ``OpenstackID``: alias, see ``Username``
+
+### ``OpenstackPassword``: alias, see ``Password``
+
+### ``Password``
+
+Contains the password for the authentication necessary to connect to the provider.<br>
+May be used in sections ``tenants.identity``, ``tenants.objectstorage`` and ``tenants.metadata``.
+
+### ``ProjectID``
+
+### ``ProjectName``
+
+### ``ProviderNetwork``
+
+Contains the name of the provider network connected host resources to public network.<br>
+Is meaningful for some providers:
+
+> | |
+> | --- |
+> | ``ovh`` |
+> | --- |
+>
+### ``Region``
+
+Contains the region to connect to. Values depend on provider.<br>
+May be used in ``tenants.compute``, ``tenants.objectstorage`` and ``torrents.metadata``.
+
+### ``SecretKey``: alias, see ``Password``
+
+### ``Username``
+
+Contains the username for the authentication necessary to connect to the provider.
+
+it (or one of its aliases) must be present in section ``tenants.identity``, and may be present in sections ``tenants.objectstorage`` and ``tenants.metadata``.
+
+### ``Tenant``
+
+### ``Type``
+
+Allows to specify the type of Object Storage protocol.<br>
+Valid values are:
+
+> | | |
+> | --- | --- |
+> | ``"s3"`` | S3 protocol as proposed by AWS or tools like minio |
+> | ``"swift"`` | SwiftKS protocol proposed by OpenStack Cloud implementations |
+> | ``"azure"`` | Azure protocol (not tested) |
+> | ``"gce"`` | Google GCE protocol (not tested) |
+
+### ``VPCCIDR``
+
+Contains the name of the VPC where networks will be created. If the VPC doesn't exist, will be created.<br>
+IS meaningful for some drivers only:
+
+> | |
+> | --- |
+> | ``flexibleengine`` |
+> | ``opentelekom`` |
+
+### ``VPCName``
+
+Contains the CIDR of the VPC where networks will be created.<br>
+Is meaningful for some drivers only:
+
+> | |
+> | --- |
+> | ``flexibleengine`` |
+> | ``opentelekom`` |

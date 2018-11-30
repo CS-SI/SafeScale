@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/broker/utils"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -61,7 +62,8 @@ type StoredCPUInfo struct {
 
 // Start ...
 func (s *HostServiceListener) Start(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Start host called '%s'", in.Name)
+	log.Infof("Listeners: host start '%s' called", in.Name)
+	defer log.Debugf("Listeners: host start '%s' done", in.Name)
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Can't start host: no tenant set")
@@ -81,7 +83,8 @@ func (s *HostServiceListener) Start(ctx context.Context, in *pb.Reference) (*goo
 
 // Stop ...
 func (s *HostServiceListener) Stop(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Stop host called '%s'", in.Name)
+	log.Infof("Listeners: host stop '%s' called", in.Name)
+	defer log.Debugf("Listeners: host stop '%s' done", in.Name)
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Can't stop host: no tenant set")
@@ -101,7 +104,8 @@ func (s *HostServiceListener) Stop(ctx context.Context, in *pb.Reference) (*goog
 
 // Reboot ...
 func (s *HostServiceListener) Reboot(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Reboot host called, '%s'", in.Name)
+	log.Infof("Listeners: host reboot '%s' called", in.Name)
+	defer log.Debugf("Listeners: host reboot '%s' done", in.Name)
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Can't reboot host: no tenant set")
@@ -121,7 +125,8 @@ func (s *HostServiceListener) Reboot(ctx context.Context, in *pb.Reference) (*go
 
 // List available hosts
 func (s *HostServiceListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.HostList, error) {
-	log.Printf("List hosts called")
+	log.Infoln("Listeners: host list called")
+	defer log.Debugln("Listeners: host list done")
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Can't list hosts: no tenant set")
@@ -146,7 +151,9 @@ func (s *HostServiceListener) List(ctx context.Context, in *pb.HostListRequest) 
 
 // Create a new host
 func (s *HostServiceListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
-	log.Infof("Create host called '%s'", in.Name)
+	log.Infof("Listeners: host create '%s' done", in.Name)
+	defer log.Debugf("Listeners: host create '%s' done", in.Name)
+
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Can't create host: no tenant set")
 	}
@@ -167,7 +174,8 @@ func (s *HostServiceListener) Create(ctx context.Context, in *pb.HostDefinition)
 
 // Status of a host
 func (s *HostServiceListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostStatus, error) {
-	log.Infof("Host Status '%s' called", in.Name)
+	log.Infof("Listeners: host status '%s' called", in.Name)
+	defer log.Debugf("Listeners: host status '%s' done", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -178,46 +186,40 @@ func (s *HostServiceListener) Status(ctx context.Context, in *pb.Reference) (*pb
 		return nil, fmt.Errorf("Can't get host status: no tenant set")
 	}
 
-	hostService := services.NewHostService(currentTenant.Service)
-	host, err := hostService.Get(ref)
+	hostSvc := services.NewHostService(currentTenant.Service)
+	host, err := hostSvc.ForceInspect(ref)
 	if err != nil {
 		return nil, err
 	}
-	if host == nil {
-		return nil, fmt.Errorf("Can't get host status: no host '%s' found", ref)
-	}
-
 	return conv.ToHostStatus(host), nil
 }
 
 // Inspect an host
 func (s *HostServiceListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host, error) {
-	log.Printf("Inspect Host called '%s'", in.Name)
+	log.Infof("Listeners: host inspect '%s' called", in.Name)
+	defer log.Debugf("Listeners: host inspect '%s' done", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Can't inspect host: neither name nor id given as reference")
+		return nil, fmt.Errorf("can't inspect host: neither name nor id given as reference")
 	}
 
 	if GetCurrentTenant() == nil {
 		return nil, fmt.Errorf("Can't inspect host: no tenant set")
 	}
 
-	hostService := services.NewHostService(currentTenant.Service)
-	host, err := hostService.Get(ref)
+	hostSvc := services.NewHostService(currentTenant.Service)
+	host, err := hostSvc.ForceInspect(ref)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "can't inspect host")
 	}
-	if host == nil {
-		return nil, fmt.Errorf("Can't inspect host: no host '%s' found", ref)
-	}
-
 	return conv.ToPBHost(host), nil
 }
 
 // Delete an host
 func (s *HostServiceListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Delete Host called '%s'", in.Name)
+	log.Infof("Listeners: host delete '%s' called", in.Name)
+	defer log.Debugf("Listeners: host delete '%s' done", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -238,7 +240,8 @@ func (s *HostServiceListener) Delete(ctx context.Context, in *pb.Reference) (*go
 
 // SSH returns ssh parameters to access an host
 func (s *HostServiceListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
-	log.Printf("Ssh Host called '%s'", in.Name)
+	log.Debugf("HostServiceListener.SSH(%s) called", in.Name)
+	defer log.Debugf("HostServiceListener.SSH(%s) called", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -253,6 +256,5 @@ func (s *HostServiceListener) SSH(ctx context.Context, in *pb.Reference) (*pb.Ss
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Got Ssh config for host '%s'", ref)
 	return conv.ToPBSshConfig(sshConfig), nil
 }
