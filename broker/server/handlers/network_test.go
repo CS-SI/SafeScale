@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package services
+package handlers
 
 import (
 	"testing"
@@ -26,13 +26,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNetworkService_List_with_brokerd_running(t *testing.T) {
+func TestNetworkHandler_List_with_brokerd_running(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
 	mockClientAPI := mocks.NewMockClientAPI(mockCtrl)
 
-	ness := &NetworkService{
+	ness := &NetworkHandler{
 		provider: &providers.Service{
 			ClientAPI: mockClientAPI,
 		},
@@ -47,14 +47,14 @@ func TestNetworkService_List_with_brokerd_running(t *testing.T) {
 	_ = result
 }
 
-func TestNetworkService_List_with_NO_brokerd_running(t *testing.T) {
+func TestNetworkHandler_List_with_NO_brokerd_running(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
 	mockClientAPI := mocks.NewMockClientAPI(mockCtrl)
 	theError := errors.New("Could not get network list: rpc error: code = Unavailable desc = all SubConns are in TransientFailure, latest connection error: connection error: desc = \"transport: Error while dialing dial tcp 127.0.0.1:50051: connect: connection refused\"")
 
-	ness := &NetworkService{
+	ness := &NetworkHandler{
 		provider: &providers.Service{
 			ClientAPI: mockClientAPI,
 		},

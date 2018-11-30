@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package services
+package handlers
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
-//go:generate mockgen -destination=../mocks/mock_volumeapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services VolumeAPI
+//go:generate mockgen -destination=../mocks/mock_volumeapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers VolumeAPI
 
 // VolumeAPI defines API to manipulate hosts
 type VolumeAPI interface {
@@ -50,20 +50,20 @@ type VolumeAPI interface {
 	Detach(volume string, host string) error
 }
 
-// VolumeService volume service
-type VolumeService struct {
+// VolumeHandler volume service
+type VolumeHandler struct {
 	provider *providers.Service
 }
 
-// NewVolumeService creates a Volume service
-func NewVolumeService(api *providers.Service) VolumeAPI {
-	return &VolumeService{
+// NewVolumeHandler creates a Volume service
+func NewVolumeHandler(api *providers.Service) VolumeAPI {
+	return &VolumeHandler{
 		provider: api,
 	}
 }
 
 // List returns the network list
-func (svc *VolumeService) List(all bool) ([]model.Volume, error) {
+func (svc *VolumeHandler) List(all bool) ([]model.Volume, error) {
 	if all {
 		volumes, err := svc.provider.ListVolumes()
 		return volumes, infraErr(err)
@@ -84,7 +84,7 @@ func (svc *VolumeService) List(all bool) ([]model.Volume, error) {
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // Delete deletes volume referenced by ref
-func (svc *VolumeService) Delete(ref string) error {
+func (svc *VolumeHandler) Delete(ref string) error {
 	mv, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		switch err.(type) {
@@ -123,7 +123,7 @@ func (svc *VolumeService) Delete(ref string) error {
 }
 
 // Get returns the volume identified by ref, ref can be the name or the id
-func (svc *VolumeService) Get(ref string) (*model.Volume, error) {
+func (svc *VolumeHandler) Get(ref string) (*model.Volume, error) {
 	mv, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		err := infraErr(err)
@@ -137,7 +137,7 @@ func (svc *VolumeService) Get(ref string) (*model.Volume, error) {
 }
 
 // Inspect returns the volume identified by ref and its attachment (if any)
-func (svc *VolumeService) Inspect(ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error) {
+func (svc *VolumeHandler) Inspect(ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error) {
 	volume, err := svc.Get(ref)
 	if err != nil {
 		err := infraErr(err)
@@ -149,7 +149,7 @@ func (svc *VolumeService) Inspect(ref string) (*model.Volume, map[string]*propsv
 	}
 
 	mounts := map[string]*propsv1.HostLocalMount{}
-	hostSvc := NewHostService(svc.provider)
+	hostSvc := NewHostHandler(svc.provider)
 
 	volumeAttachedV1 := propsv1.NewVolumeAttachments()
 	err = volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
@@ -182,7 +182,7 @@ func (svc *VolumeService) Inspect(ref string) (*model.Volume, map[string]*propsv
 }
 
 // Create a volume
-func (svc *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error) {
+func (svc *VolumeHandler) Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error) {
 	volume, err := svc.provider.CreateVolume(model.VolumeRequest{
 		Name:  name,
 		Size:  size,
@@ -210,7 +210,7 @@ func (svc *VolumeService) Create(name string, size int, speed VolumeSpeed.Enum) 
 }
 
 // Attach a volume to an host
-func (svc *VolumeService) Attach(volumeName, hostName, path, format string) error {
+func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string) error {
 	// Get volume data
 	volume, err := svc.Get(volumeName)
 	if err != nil {
@@ -234,7 +234,7 @@ func (svc *VolumeService) Attach(volumeName, hostName, path, format string) erro
 	}
 
 	// Get Host data
-	hostSvc := NewHostService(svc.provider)
+	hostSvc := NewHostHandler(svc.provider)
 	host, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
 		return throwErr(err)
@@ -355,8 +355,8 @@ func (svc *VolumeService) Attach(volumeName, hostName, path, format string) erro
 	}
 
 	// Create mount point
-	sshSvc := NewSSHService(svc.provider)
-	sshConfig, err := sshSvc.GetConfig(host.ID)
+	sshHandler := NewSSHHandler(svc.provider)
+	sshConfig, err := sshHandler.GetConfig(host.ID)
 	if err != nil {
 		err = infraErr(err)
 		return err
@@ -408,17 +408,17 @@ func (svc *VolumeService) Attach(volumeName, hostName, path, format string) erro
 	return nil
 }
 
-func (svc *VolumeService) listAttachedDevices(host *model.Host) (mapset.Set, error) {
+func (svc *VolumeHandler) listAttachedDevices(host *model.Host) (mapset.Set, error) {
 	var (
 		retcode        int
 		stdout, stderr string
 		err            error
 	)
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
-	sshSvc := NewSSHService(svc.provider)
+	sshHandler := NewSSHHandler(svc.provider)
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			retcode, stdout, stderr, err = sshSvc.Run(host.ID, cmd)
+			retcode, stdout, stderr, err = sshHandler.Run(host.ID, cmd)
 			if err != nil {
 				err = infraErr(err)
 				return err
@@ -445,7 +445,7 @@ func (svc *VolumeService) listAttachedDevices(host *model.Host) (mapset.Set, err
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (svc *VolumeService) Detach(volumeName, hostName string) error {
+func (svc *VolumeHandler) Detach(volumeName, hostName string) error {
 	// Load volume data
 	volume, err := svc.Get(volumeName)
 	if err != nil {
@@ -460,7 +460,7 @@ func (svc *VolumeService) Detach(volumeName, hostName string) error {
 
 	}
 	// Load host data
-	hostSvc := NewHostService(svc.provider)
+	hostSvc := NewHostHandler(svc.provider)
 	host, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
 		return throwErr(err)
@@ -526,8 +526,8 @@ func (svc *VolumeService) Detach(volumeName, hostName string) error {
 	}
 
 	// Unmount the Block Device ...
-	sshSvc := NewSSHService(svc.provider)
-	sshConfig, err := sshSvc.GetConfig(host.ID)
+	sshHandler := NewSSHHandler(svc.provider)
+	sshConfig, err := sshHandler.GetConfig(host.ID)
 	if err != nil {
 		err = logicErrf(err, "error getting ssh config")
 		return err

@@ -22,29 +22,38 @@ import (
 
 	"github.com/CS-SI/SafeScale/system"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/server/services"
+	"github.com/CS-SI/SafeScale/broker/server/handlers"
 )
+
+// SSHHandler exists to ease integration tests
+var SSHHandler = handlers.NewSSHHandler
 
 // broker ssh connect host2
 // broker ssh run host2 -c "uname -a"
 // broker ssh copy /file/test.txt host1://tmp
 // broker ssh copy host1:/file/test.txt /tmp
 
-// SSHServiceListener SSH service server grpc
-type SSHServiceListener struct{}
+// SSHListener SSH service server grpc
+type SSHListener struct{}
 
 // Run executes an ssh command an an host
-func (s *SSHServiceListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
-	log.Printf("Ssh run called '%s', '%s'", in.Host, in.Command)
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot execute ssh command : No tenant set")
+func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
+	log.Infof("Listeners: ssh run '%s' -c '%s'", in.Host, in.Command)
+
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't execute ssh command: no tenant set")
 	}
 
-	service := services.NewSSHService(currentTenant.Service)
-	retcode, stdout, stderr, err := service.Run(in.GetHost().GetName(), in.GetCommand())
-
+	handler := SSHHandler(tenant.Service)
+	retcode, stdout, stderr, err := handler.Run(in.GetHost().GetName(), in.GetCommand())
+	if err != nil {
+		err = grpc.Errorf(codes.Internal, err.Error())
+	}
 	return &pb.SshResponse{
 		Status:    int32(retcode),
 		OutputStd: stdout,
@@ -53,27 +62,29 @@ func (s *SSHServiceListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.Ss
 }
 
 // Copy copy file from/to an host
-func (s *SSHServiceListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshResponse, error) {
+func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshResponse, error) {
 	log.Printf("Ssh copy called '%s', '%s'", in.Source, in.Destination)
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot copy ssh : No tenant set")
+
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't copy by ssh: no tenant set")
 	}
 
-	service := services.NewSSHService(currentTenant.Service)
-	retcode, stdout, stderr, err := service.Copy(in.GetSource(), in.GetDestination())
+	handler := SSHHandler(tenant.Service)
+	retcode, stdout, stderr, err := handler.Copy(in.GetSource(), in.GetDestination())
 	if err != nil {
 		return nil, err
 	}
 	if retcode != 0 {
-		return nil, fmt.Errorf("Cannot copy ssh : copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
+		return nil, fmt.Errorf("Can't copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
 	}
 	if err != nil {
-		return nil, err
+		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
 	return &pb.SshResponse{
 		Status:    int32(retcode),
 		OutputStd: stdout,
 		OutputErr: stderr,
-	}, err
+	}, nil
 }

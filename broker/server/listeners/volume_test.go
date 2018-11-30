@@ -23,8 +23,8 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/server/handlers"
 	"github.com/CS-SI/SafeScale/broker/server/listeners"
-	"github.com/CS-SI/SafeScale/broker/server/services"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
@@ -63,10 +63,10 @@ func TestCreate(t *testing.T) {
 	myMockedVolService := &MyMockedVolService{}
 	myMockedVolService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return()
 	//Mock VolumeServiceCreator
-	old := listeners.NewVolumeService
-	defer func() { listeners.NewVolumeService = old }()
+	old := listeners.VolumeHandler
+	defer func() { listeners.VolumeHandler = old }()
 
-	listeners.NewVolumeService = func(api *providers.Service) services.VolumeAPI {
+	listeners.VolumeHandler = func(api *providers.Service) handlers.VolumeAPI {
 		return nil
 		// TODO Fix this
 		// return myMockedVolService
@@ -79,7 +79,7 @@ func TestCreate(t *testing.T) {
 		return &listeners.Tenant{Service: &providers.Service{}}
 	}
 
-	underTest := &listeners.VolumeServiceListener{}
+	underTest := &listeners.VolumeListener{}
 
 	// ACT
 	underTest.Create(nil, &pb.VolumeDefinition{
@@ -103,10 +103,10 @@ func TestCreate_Err(t *testing.T) {
 	myMockedVolService := &MyMockedVolService{err: errors.New("plop")}
 	myMockedVolService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("Fake Error"))
 	//Mock VolumeServiceCreator
-	old := listeners.NewVolumeService
-	defer func() { listeners.NewVolumeService = old }()
+	old := listeners.VolumeHandler
+	defer func() { listeners.VolumeHandler = old }()
 
-	listeners.NewVolumeService = func(api *providers.Service) services.VolumeAPI {
+	listeners.VolumeHandler = func(api *providers.Service) handlers.VolumeAPI {
 		// TODO Fix this
 		return nil
 		// return myMockedVolService
@@ -119,7 +119,7 @@ func TestCreate_Err(t *testing.T) {
 		return &listeners.Tenant{Service: &providers.Service{}}
 	}
 
-	underTest := &listeners.VolumeServiceListener{}
+	underTest := &listeners.VolumeListener{}
 
 	// ACT
 	_, err := underTest.Create(nil, &pb.VolumeDefinition{
@@ -139,7 +139,7 @@ func TestCreate_Err_NoTenantSet(t *testing.T) {
 		return nil
 	}
 	myMockedVolService := &MyMockedVolService{err: errors.New("plop")}
-	underTest := &listeners.VolumeServiceListener{}
+	underTest := &listeners.VolumeListener{}
 
 	// ACT
 	_, err := underTest.Create(nil, &pb.VolumeDefinition{
