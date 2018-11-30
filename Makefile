@@ -44,10 +44,11 @@ ifeq ($(findstring :,$(GOBIN)),:)
     GOBIN=$(HOME)/go/bin
 endif
 
+ifneq ($(OS),Windows_NT)
 ifneq ($(findstring $(GOBIN),$(PATH)),$(GOBIN))
  $(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
 endif
-
+endif
 
 # Binaries generated
 EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd/brokerd broker/cli/brokerd/brokerd-cover deploy/cli/deploy deploy/cli/deploy-cover perform/perform perform/perform-cover scanner/scanner
