@@ -411,6 +411,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	}
 
 	// Adds Host property SizingV1
+	template.HostSize.DiskSize = diskSize // Makes sure the size of disk is correctly saved
 	err = host.Properties.Set(HostProperty.SizingV1, &propsv1.HostSizing{
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		Template:      request.TemplateID,
@@ -660,17 +661,17 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 		return err
 	}
 
-	// Updates Host Property propsv1.HostSizing
-	hostSizingV1 := propsv1.NewHostSizing()
-	err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
-	if err != nil {
-		return err
-	}
-	hostSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
-	err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
-	if err != nil {
-		return err
-	}
+	// // Updates Host Property propsv1.HostSizing
+	// hostSizingV1 := propsv1.NewHostSizing()
+	// err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
+	// if err != nil {
+	// 	return err
+	// }
+	// hostSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
+	// err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// Updates Host Property HostNetwork
 	hostNetworkV1 := propsv1.NewHostNetwork()
