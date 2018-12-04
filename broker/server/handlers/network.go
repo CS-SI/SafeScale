@@ -118,6 +118,18 @@ func (svc *NetworkHandler) Create(
 		return nil, infraErr(err)
 	}
 
+	defer func() {
+		if err != nil {
+			mn, derr := metadata.LoadNetwork(svc.provider, network.ID)
+			if derr == nil {
+				derr = mn.Delete()
+			}
+			if derr != nil {
+				log.Errorf("Failed to delete network metadata: %+v", derr)
+			}
+		}
+	}()
+
 	if gwname == "" {
 		gwname = "gw-" + network.Name
 	}
@@ -202,6 +214,18 @@ func (svc *NetworkHandler) Create(
 	if err != nil {
 		return nil, infraErrf(err, "failed to create gateway: failed to save metadata: %s", err.Error())
 	}
+
+	defer func() {
+		if err != nil {
+			mh, derr := metadata.LoadHost(svc.provider, gw.ID)
+			if derr == nil {
+				derr = mh.Delete()
+			}
+			if derr != nil {
+				log.Errorf("Failed to delete gateway metadata: %+v", derr)
+			}
+		}
+	}()
 
 	log.Debugf("Waiting until gateway '%s' is available through SSH ...", gwname)
 

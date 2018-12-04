@@ -148,7 +148,15 @@ func work() {
 
 func main() {
 	app := cli.NewApp()
-
+	app.Name = "brokerd"
+	app.Usage = "brokerd [OPTIONS]"
+	app.Version = VERSION + " (" + BUILD_DATE + ")"
+	app.Authors = []cli.Author{
+		cli.Author{
+			Name:  "CS-SI",
+			Email: "safescale@c-s.fr",
+		},
+	}
 	cli.VersionFlag = cli.BoolFlag{
 		Name:  "version, V",
 		Usage: "Print program version",
