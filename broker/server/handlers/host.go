@@ -225,9 +225,10 @@ func (svc *HostHandler) Create(
 		if template.GPUNumber > 0 {
 			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
 			if template.GPUType != "" {
-				msg += fmt.Sprintf(" (%s)", template.GPUType)
+				msg += fmt.Sprintf(" %s", template.GPUType)
 			}
 		}
+		msg += ")"
 		log.Infof(msg)
 	}
 
@@ -583,7 +584,10 @@ func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
 
 	host, err := svc.Inspect(ref)
 	if err != nil {
-		return nil, logicErrf(err, fmt.Sprintf("Can't access ssh parameters of host '%s': failed to query host '%s'", ref, ref))
+		return nil, logicErrf(err, fmt.Sprintf("Can't access ssh parameters of host '%s': failed to query host", ref))
+	}
+	if host == nil {
+		return nil, logicErr(fmt.Errorf("Can't access ssh parameters of host '%s': host not found", ref))
 	}
 	sshHandler := NewSSHHandler(svc.provider)
 	sshConfig, err := sshHandler.GetConfig(host.ID)
