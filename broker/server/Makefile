@@ -1,20 +1,20 @@
 GO?=go
 EXEC:=brokerd
 
-.PHONY:	brokerd services clean
+.PHONY:	brokerd handlers clean
 
 all:	brokerd 
 
 vet:
 	@$(GO) vet ./...
 
-brokerd: services
+brokerd: handlers main.go commands/*.go ../utils/*.go ../broker.pb.go
 	@$(GO) build -o $(EXEC)
 
-services:
-	@(cd services && $(MAKE))
+handlers:
+	@(cd handlers && $(MAKE))
 
 clean:
-	@(cd services && $(MAKE) $@)
+	@(cd handlers && $(MAKE) $@)
 	@$(RM) $(EXEC) || true
 	@$(RM) ./mocks/*.go || true

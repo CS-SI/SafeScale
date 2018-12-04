@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package services
+package handlers
 
 import (
 	"fmt"
@@ -42,7 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
-//go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services HostAPI
+//go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers HostAPI
 
 // TODO At service level, we need to log before returning, because it's the last chance to track the real issue in server side
 
@@ -59,22 +59,22 @@ type HostAPI interface {
 	Stop(ref string) error
 }
 
-// HostService host service
-type HostService struct {
+// HostHandler host service
+type HostHandler struct {
 	provider *providers.Service
 }
 
-// NewHostService ...
-func NewHostService(api *providers.Service) HostAPI {
-	return &HostService{
+// NewHostHandler ...
+func NewHostHandler(api *providers.Service) HostAPI {
+	return &HostHandler{
 		provider: api,
 	}
 }
 
 // Start starts a host
-func (svc *HostService) Start(ref string) error {
-	log.Debugf("server.services.HostService.Start(%s) called", ref)
-	defer log.Debugf("server.services.HostService.Start(%s) done", ref)
+func (svc *HostHandler) Start(ref string) error {
+	log.Debugf("server.services.HostHandler.Start(%s) called", ref)
+	defer log.Debugf("server.services.HostHandler.Start(%s) done", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -93,9 +93,9 @@ func (svc *HostService) Start(ref string) error {
 }
 
 // Stop stops a host
-func (svc *HostService) Stop(ref string) error {
-	log.Debugf("server.services.HostService.Stop(%s) called", ref)
-	defer log.Debugf("server.services.HostService.Stop(%s) done", ref)
+func (svc *HostHandler) Stop(ref string) error {
+	log.Debugf("server.services.HostHandler.Stop(%s) called", ref)
+	defer log.Debugf("server.services.HostHandler.Stop(%s) done", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -114,9 +114,9 @@ func (svc *HostService) Stop(ref string) error {
 }
 
 // Reboot reboots a host
-func (svc *HostService) Reboot(ref string) error {
-	log.Debugf("server.services.HostService.Reboot(%s) called", ref)
-	defer log.Debugf("server.services.HostService.Reboot(%s) done", ref)
+func (svc *HostHandler) Reboot(ref string) error {
+	log.Debugf("server.services.HostHandler.Reboot(%s) called", ref)
+	defer log.Debugf("server.services.HostHandler.Reboot(%s) done", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -143,12 +143,12 @@ func (svc *HostService) Reboot(ref string) error {
 }
 
 // Create creates a host
-func (svc *HostService) Create(
+func (svc *HostHandler) Create(
 	name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32, force bool,
 ) (*model.Host, error) {
 
-	log.Debugf("HostService.Create('%s') called", name)
-	defer log.Debugf("HostService.Create('%s') done", name)
+	log.Debugf("HostHandler.Create('%s') called", name)
+	defer log.Debugf("HostHandler.Create('%s') done", name)
 
 	host, err := svc.provider.GetHostByName(name)
 	if err != nil {
@@ -164,8 +164,8 @@ func (svc *HostService) Create(
 	var networks []*model.Network
 	var gw *model.Host
 	if len(net) != 0 {
-		networkSvc := NewNetworkService(svc.provider)
-		n, err := networkSvc.Get(net)
+		networkHandler := NewNetworkHandler(svc.provider)
+		n, err := networkHandler.Inspect(net)
 		if err != nil {
 			switch err.(type) {
 			case model.ErrResourceNotFound:
@@ -366,8 +366,8 @@ func (svc *HostService) Create(
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
 	log.Infof("Waiting start of SSH service on remote host '%s' ...", host.Name)
-	sshSvc := NewSSHService(svc.provider)
-	sshCfg, err := sshSvc.GetConfig(host.ID)
+	sshHandler := NewSSHHandler(svc.provider)
+	sshCfg, err := sshHandler.GetConfig(host.ID)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -385,7 +385,7 @@ func (svc *HostService) Create(
 
 // getOrCreateDefaultNetwork gets network model.SingleHostNetworkName or create it if necessary
 // We don't want metadata on this network, so we use directly provider api instead of services
-func (svc *HostService) getOrCreateDefaultNetwork() (*model.Network, error) {
+func (svc *HostHandler) getOrCreateDefaultNetwork() (*model.Network, error) {
 	network, err := svc.provider.GetNetworkByName(model.SingleHostNetworkName)
 	if err != nil {
 		switch err.(type) {
@@ -409,9 +409,9 @@ func (svc *HostService) getOrCreateDefaultNetwork() (*model.Network, error) {
 }
 
 // List returns the host list
-func (svc *HostService) List(all bool) ([]*model.Host, error) {
-	log.Debugf("HostService.List(%v) called", all)
-	defer log.Debugf("HostService.List(%v) done", all)
+func (svc *HostHandler) List(all bool) ([]*model.Host, error) {
+	log.Debugf("HostHandler.List(%v) called", all)
+	defer log.Debugf("HostHandler.List(%v) done", all)
 
 	if all {
 		return svc.provider.ListHosts()
@@ -431,9 +431,9 @@ func (svc *HostService) List(all bool) ([]*model.Host, error) {
 
 // ForceInspect ...
 // If not found, return (nil, err)
-func (svc *HostService) ForceInspect(ref string) (*model.Host, error) {
-	log.Debugf("HostService.ForceInspect(%s) called", ref)
-	defer log.Debugf("HostService.ForceInspect(%s) done", ref)
+func (svc *HostHandler) ForceInspect(ref string) (*model.Host, error) {
+	log.Debugf("HostHandler.ForceInspect(%s) called", ref)
+	defer log.Debugf("HostHandler.ForceInspect(%s) done", ref)
 
 	host, err := svc.Inspect(ref)
 	if err != nil {
@@ -447,9 +447,9 @@ func (svc *HostService) ForceInspect(ref string) (*model.Host, error) {
 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
-func (svc *HostService) Inspect(ref string) (*model.Host, error) {
-	log.Debugf("HostService.Inspect(%s) called", ref)
-	defer log.Debugf("HostService.Inspect(%s) done", ref)
+func (svc *HostHandler) Inspect(ref string) (*model.Host, error) {
+	log.Debugf("HostHandler.Inspect(%s) called", ref)
+	defer log.Debugf("HostHandler.Inspect(%s) done", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -467,9 +467,9 @@ func (svc *HostService) Inspect(ref string) (*model.Host, error) {
 }
 
 // Delete deletes host referenced by ref
-func (svc *HostService) Delete(ref string) error {
-	log.Debugf("HostService.Delete(%s) called", ref)
-	defer log.Debugf("HostService.Delete(%s) done", ref)
+func (svc *HostHandler) Delete(ref string) error {
+	log.Debugf("HostHandler.Delete(%s) called", ref)
+	defer log.Debugf("HostHandler.Delete(%s) done", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -518,16 +518,16 @@ func (svc *HostService) Delete(ref string) error {
 	if err != nil {
 		return logicErr(err)
 	}
-	shareSvc := NewShareService(svc.provider)
+	shareHandler := NewShareHandler(svc.provider)
 	for _, i := range hostMountsV1.RemoteMountsByPath {
 		// Gets share data
-		_, share, _, err := shareSvc.Inspect(i.ShareID)
+		_, share, _, err := shareHandler.Inspect(i.ShareID)
 		if err != nil {
 			return infraErr(err)
 		}
 
 		// Unmounts share from host
-		err = shareSvc.Unmount(share.Name, host.Name)
+		err = shareHandler.Unmount(share.Name, host.Name)
 		if err != nil {
 			return infraErr(err)
 		}
@@ -535,7 +535,7 @@ func (svc *HostService) Delete(ref string) error {
 
 	// if host has shares, delete them
 	for _, share := range hostSharesV1.ByID {
-		err = shareSvc.Delete(share.Name)
+		err = shareHandler.Delete(share.Name)
 		if err != nil {
 			return throwErr(err)
 		}
@@ -549,9 +549,9 @@ func (svc *HostService) Delete(ref string) error {
 
 	// Update networks property prosv1.NetworkHosts to remove the reference to the host
 	networkHostsV1 := propsv1.NewNetworkHosts()
-	networkSvc := NewNetworkService(svc.provider)
+	netHandler := NewNetworkHandler(svc.provider)
 	for k := range hostNetworkV1.NetworksByID {
-		network, err := networkSvc.Get(k)
+		network, err := netHandler.Inspect(k)
 		if err != nil {
 			log.Errorf(err.Error())
 		}
@@ -577,16 +577,16 @@ func (svc *HostService) Delete(ref string) error {
 }
 
 // SSH returns ssh parameters to access the host referenced by ref
-func (svc *HostService) SSH(ref string) (*system.SSHConfig, error) {
-	log.Debugf("HostService.SSH(%s) called", ref)
-	defer log.Debugf("HostService.SSH(%s) done", ref)
+func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
+	log.Debugf("HostHandler.SSH(%s) called", ref)
+	defer log.Debugf("HostHandler.SSH(%s) done", ref)
 
 	host, err := svc.Inspect(ref)
 	if err != nil {
 		return nil, logicErrf(err, fmt.Sprintf("Can't access ssh parameters of host '%s': failed to query host '%s'", ref, ref))
 	}
-	sshSvc := NewSSHService(svc.provider)
-	sshConfig, err := sshSvc.GetConfig(host.ID)
+	sshHandler := NewSSHHandler(svc.provider)
+	sshConfig, err := sshHandler.GetConfig(host.ID)
 	if err != nil {
 		return nil, logicErr(err)
 	}

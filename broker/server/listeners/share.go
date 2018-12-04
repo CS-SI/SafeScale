@@ -20,15 +20,20 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/broker/server/services"
 	"github.com/CS-SI/SafeScale/providers/model"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/server/handlers"
 	convert "github.com/CS-SI/SafeScale/broker/utils"
 )
+
+// ShareHandler ...
+var ShareHandler = handlers.NewShareHandler
 
 // broker nas|share create share1 host1 --path="/shared/data"
 // broker nas|share delete share1
@@ -37,69 +42,73 @@ import (
 // broker nas|share list
 // broker nas|share inspect share1
 
-// ShareServiceListener Share service server grpc
-type ShareServiceListener struct{}
+// ShareListener Share service server grpc
+type ShareListener struct{}
 
 // Create calls share service creation
-func (s *ShareServiceListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb.ShareDefinition, error) {
+func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb.ShareDefinition, error) {
 	log.Infof("Listeners: share create '%v'", in)
 	defer log.Debugf("Listeners: share create '%v' done", in)
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("can't create share: no tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create share: no tenant set")
 	}
-	shareService := services.NewShareService(currentTenant.Service)
+
+	handler := ShareHandler(tenant.Service)
 	shareName := in.GetName()
-	share, err := shareService.Create(shareName, in.GetHost().GetName(), in.GetPath())
+	share, err := handler.Create(shareName, in.GetHost().GetName(), in.GetPath())
 	if err != nil {
 		tbr := errors.Wrap(err, fmt.Sprintf("can't create share '%s'", shareName))
-		return nil, tbr
+		return nil, grpc.Errorf(codes.Internal, tbr.Error())
 	}
 	return convert.ToPBShare(in.GetName(), share), err
 }
 
 // Delete call share service deletion
-func (s *ShareServiceListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
+func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	shareName := in.GetName()
 	log.Infof("Listeners: share delete '%s' called", shareName)
 	defer log.Debugf("Listeners: share delete '%s' done", shareName)
 
-	if GetCurrentTenant() == nil {
-		return &google_protobuf.Empty{}, fmt.Errorf("can't delete share '%s': no tenant set", shareName)
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't delete share: no tenant set")
 	}
 
-	shareService := services.NewShareService(currentTenant.Service)
-	_, _, _, err := shareService.Inspect(shareName)
+	handler := ShareHandler(tenant.Service)
+	_, _, _, err := handler.Inspect(shareName)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
-			return &google_protobuf.Empty{}, err
+			return &google_protobuf.Empty{}, grpc.Errorf(codes.NotFound, err.Error())
 		default:
-			return &google_protobuf.Empty{}, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName))
+			return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
 		}
 	}
 
-	err = shareService.Delete(shareName)
+	err = handler.Delete(shareName)
 	if err != nil {
-		return &google_protobuf.Empty{}, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName))
+		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
 	}
 	return &google_protobuf.Empty{}, nil
 }
 
 // List return the list of all available shares
-func (s *ShareServiceListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.ShareList, error) {
+func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.ShareList, error) {
 	log.Infof("Listeners: share list '%v' called", in)
 	defer log.Debugf("Listeners: share list '%v' done", in)
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Can't list Shares: no tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list shares: no tenant set")
 	}
 
-	shareService := services.NewShareService(currentTenant.Service)
-	shares, err := shareService.List()
+	handler := ShareHandler(tenant.Service)
+	shares, err := handler.List()
 	if err != nil {
 		tbr := errors.Wrap(err, "Can't list Shares")
-		return nil, tbr
+		return nil, grpc.Errorf(codes.Internal, tbr.Error())
 	}
 
 	var pbshares []*pb.ShareDefinition
@@ -113,59 +122,63 @@ func (s *ShareServiceListener) List(ctx context.Context, in *google_protobuf.Emp
 }
 
 // Mount mounts share on a local directory of the given host
-func (s *ShareServiceListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) (*pb.ShareMountDefinition, error) {
+func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) (*pb.ShareMountDefinition, error) {
 	log.Infof("Listeners: share mount '%v' called", in)
 	defer log.Debugf("Listeners: share mount '%v' called", in)
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Can't mount share: no tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't mount share: no tenant set")
 	}
 
-	shareService := services.NewShareService(currentTenant.Service)
 	shareName := in.GetShare().GetName()
-	mount, err := shareService.Mount(shareName, in.GetHost().GetName(), in.GetPath())
+
+	handler := ShareHandler(tenant.Service)
+	mount, err := handler.Mount(shareName, in.GetHost().GetName(), in.GetPath())
 	if err != nil {
 		tbr := errors.Wrap(err, fmt.Sprintf("Can't mount share '%s'", shareName))
-		return nil, tbr
+		return nil, grpc.Errorf(codes.Internal, tbr.Error())
 	}
-	return convert.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount), err
+	return convert.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
 }
 
 // Unmount unmounts share from the given host
-func (s *ShareServiceListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition) (*google_protobuf.Empty, error) {
+func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition) (*google_protobuf.Empty, error) {
 	log.Infof("Listeners: share unmount '%v' called", in)
 	defer log.Debugf("Listeners: share unmount '%v' called", in)
 
-	shareName := in.GetShare().GetName()
-	if GetCurrentTenant() == nil {
-		err := fmt.Errorf("Can't unmount share '%s': no tenant set", shareName)
-		return &google_protobuf.Empty{}, err
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't unmount share: no tenant set")
 	}
 
-	shareService := services.NewShareService(currentTenant.Service)
+	shareName := in.GetShare().GetName()
 	hostName := in.GetHost().GetName()
-	err := shareService.Unmount(shareName, hostName)
+
+	handler := ShareHandler(tenant.Service)
+	err := handler.Unmount(shareName, hostName)
 	if err != nil {
-		return &google_protobuf.Empty{}, errors.Wrap(err, fmt.Sprintf("Can't unmount share '%s'", shareName))
+		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("Can't unmount share '%s'", shareName)).Error())
 	}
 	return &google_protobuf.Empty{}, nil
 }
 
 // Inspect shows the detail of a share and all connected clients
-func (s *ShareServiceListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.ShareMountList, error) {
+func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.ShareMountList, error) {
 	shareName := in.GetName()
 	log.Infof("Listeners: share inspect '%s' called", shareName)
 	defer log.Debugf("Listeners: share inspect '%s' done", shareName)
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("can't inspect share '%s': no tenant set", shareName)
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't inspect share: no tenant set")
 	}
 
-	shareService := services.NewShareService(currentTenant.Service)
-	host, share, mounts, err := shareService.Inspect(shareName)
+	handler := ShareHandler(tenant.Service)
+	host, share, mounts, err := handler.Inspect(shareName)
 	if err != nil {
 		err := errors.Wrap(err, fmt.Sprintf("can't inspect share '%s'", shareName))
-		return nil, err
+		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
 	return convert.ToPBShareMountList(host.Name, share, mounts), nil

@@ -18,37 +18,41 @@ package listeners
 
 import (
 	"context"
-	"fmt"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/server/services"
+	"github.com/CS-SI/SafeScale/broker/server/handlers"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 	log "github.com/sirupsen/logrus"
 )
 
+// ImageHandler ...
+var ImageHandler = handlers.NewImageHandler
+
 // broker image list --all=false
 
-//ImageServiceListener image service server grpc
-type ImageServiceListener struct{}
+//ImageListener image service server grpc
+type ImageListener struct{}
 
 // List available images
-func (s *ImageServiceListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.ImageList, error) {
+func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.ImageList, error) {
 	log.Printf("List images called")
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot list images : No tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list images: no tenant set")
 	}
 
-	service := services.NewImageService(currentTenant.Service)
-
-	images, err := service.List(in.GetAll())
+	handler := ImageHandler(currentTenant.Service)
+	images, err := handler.List(in.GetAll())
 	if err != nil {
-		return nil, err
+		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
+	// Map model.Image to pb.Image
 	var pbImages []*pb.Image
-
-	// Map api.Image to pb.Image
 	for _, image := range images {
 		pbImages = append(pbImages, conv.ToPBImage(&image))
 	}

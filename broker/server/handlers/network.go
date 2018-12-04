@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package services
+package handlers
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/openstack"
 )
 
-//go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services NetworkAPI
+//go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers NetworkAPI
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
@@ -41,25 +41,25 @@ import (
 type NetworkAPI interface {
 	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*model.Network, error)
 	List(all bool) ([]*model.Network, error)
-	Get(ref string) (*model.Network, error)
+	Inspect(ref string) (*model.Network, error)
 	Delete(ref string) error
 }
 
-// NetworkService an implementation of NetworkAPI
-type NetworkService struct {
+// NetworkHandler an implementation of NetworkAPI
+type NetworkHandler struct {
 	provider  *providers.Service
 	ipVersion IPVersion.Enum
 }
 
-// NewNetworkService Creates new Network service
-func NewNetworkService(api *providers.Service) NetworkAPI {
-	return &NetworkService{
+// NewNetworkHandler Creates new Network service
+func NewNetworkHandler(api *providers.Service) NetworkAPI {
+	return &NetworkHandler{
 		provider: api,
 	}
 }
 
 // Create creates a network
-func (svc *NetworkService) Create(
+func (svc *NetworkHandler) Create(
 	name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string,
 ) (*model.Network, error) {
 
@@ -208,8 +208,8 @@ func (svc *NetworkService) Create(
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
-	sshSvc := NewSSHService(svc.provider)
-	ssh, err := sshSvc.GetConfig(gw.ID)
+	sshHandler := NewSSHHandler(svc.provider)
+	ssh, err := sshHandler.GetConfig(gw.ID)
 	if err != nil {
 		//defer svc.provider.DeleteHost(gw.ID)
 		return nil, infraErrf(err, "Error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
@@ -235,7 +235,7 @@ func (svc *NetworkService) Create(
 }
 
 // List returns the network list
-func (svc *NetworkService) List(all bool) ([]*model.Network, error) {
+func (svc *NetworkHandler) List(all bool) ([]*model.Network, error) {
 	if all {
 		return svc.provider.ListNetworks()
 	}
@@ -256,8 +256,8 @@ func (svc *NetworkService) List(all bool) ([]*model.Network, error) {
 	return netList, infraErr(err)
 }
 
-// Get returns the network identified by ref, ref can be the name or the id
-func (svc *NetworkService) Get(ref string) (*model.Network, error) {
+// Inspect returns the network identified by ref, ref can be the name or the id
+func (svc *NetworkHandler) Inspect(ref string) (*model.Network, error) {
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
 		return nil, infraErrf(err, "failed to load metadata of network '%s'", ref)
@@ -269,7 +269,7 @@ func (svc *NetworkService) Get(ref string) (*model.Network, error) {
 }
 
 // Delete deletes network referenced by ref
-func (svc *NetworkService) Delete(ref string) error {
+func (svc *NetworkHandler) Delete(ref string) error {
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
 		return infraErrf(err, "failed to load metadata of network '%s'", ref)
