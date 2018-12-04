@@ -490,8 +490,7 @@ func SaveGateway(svc *providers.Service, host *model.Host, networkID string) err
 	if !ok || err != nil {
 		return fmt.Errorf("metadata about the network '%s' doesn't exist anymore", networkID)
 	}
-	network := mn.Get()
-	network.GatewayID = host.ID
+	mn.Get().GatewayID = host.ID
 	err = mn.Write()
 	if err != nil {
 		return err
