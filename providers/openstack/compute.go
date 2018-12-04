@@ -569,11 +569,15 @@ func (client *Client) GetHostByName(name string) (*model.Host, error) {
 	}
 	servers, found := r.Body.(map[string]interface{})["servers"].([]interface{})
 	if found && len(servers) > 0 {
-		entry := servers[0].(map[string]interface{})
-		host := model.NewHost()
-		host.ID = entry["id"].(string)
-		host.Name = name
-		return client.GetHost(host)
+		for _, anon := range servers {
+			entry := anon.(map[string]interface{})
+			if entry["name"].(string) == name {
+				host := model.NewHost()
+				host.ID = entry["id"].(string)
+				host.Name = name
+				return client.GetHost(host)
+			}
+		}
 	}
 	return nil, model.ResourceNotFoundError("host", name)
 }

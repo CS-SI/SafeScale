@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package services
+package handlers
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ import (
 
 const protocolSeparator = ":"
 
-//go:generate mockgen -destination=../mocks/mock_sshapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/services SSHAPI
+//go:generate mockgen -destination=../mocks/mock_sshapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers SSHAPI
 
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
@@ -49,20 +49,20 @@ type SSHAPI interface {
 	GetConfig(interface{}) (*system.SSHConfig, error)
 }
 
-// SSHService SSH service
-type SSHService struct {
+// SSHHandler SSH service
+type SSHHandler struct {
 	provider *providers.Service
 }
 
-// NewSSHService ...
-func NewSSHService(api *providers.Service) *SSHService {
-	return &SSHService{
+// NewSSHHandler ...
+func NewSSHHandler(api *providers.Service) *SSHHandler {
+	return &SSHHandler{
 		provider: api,
 	}
 }
 
 // GetConfig creates SSHConfig to connect to an host
-func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, error) {
+func (svc *SSHHandler) GetConfig(hostParam interface{}) (*system.SSHConfig, error) {
 	var host *model.Host
 
 	switch hostParam.(type) {
@@ -90,7 +90,7 @@ func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 		return nil, infraErr(err)
 	}
 	if hostNetworkV1.DefaultGatewayID != "" {
-		hostSvc := NewHostService(svc.provider)
+		hostSvc := NewHostHandler(svc.provider)
 		gw, err := hostSvc.Inspect(hostNetworkV1.DefaultGatewayID)
 		if err != nil {
 			return nil, throwErr(err)
@@ -107,9 +107,9 @@ func (svc *SSHService) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
-func (svc *SSHService) WaitServerReady(hostParam interface{}, timeout time.Duration) error {
+func (svc *SSHHandler) WaitServerReady(hostParam interface{}, timeout time.Duration) error {
 	var err error
-	sshSvc := NewSSHService(svc.provider)
+	sshSvc := NewSSHHandler(svc.provider)
 	ssh, err := sshSvc.GetConfig(hostParam)
 	if err != nil {
 		return logicErrf(err, "Failed to read SSH config")
@@ -119,12 +119,12 @@ func (svc *SSHService) WaitServerReady(hostParam interface{}, timeout time.Durat
 }
 
 // Run tries to execute command 'cmd' on the host
-func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
+func (svc *SSHHandler) Run(hostName, cmd string) (int, string, string, error) {
 	var stdOut, stdErr string
 	var retCode int
 	var err error
 
-	hostSvc := NewHostService(svc.provider)
+	hostSvc := NewHostHandler(svc.provider)
 	host, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
 		return 0, "", "", throwErr(err)
@@ -156,7 +156,7 @@ func (svc *SSHService) Run(hostName, cmd string) (int, string, string, error) {
 }
 
 // run executes command on the host
-func (svc *SSHService) run(ssh *system.SSHConfig, cmd string) (int, string, string, error) {
+func (svc *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, string, error) {
 	// Create the command
 	sshCmd, err := ssh.Command(cmd)
 	if err != nil {
@@ -201,7 +201,7 @@ func extractPath(in string) (string, error) {
 }
 
 // Copy copy file/directory
-func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
+func (svc *SSHHandler) Copy(from, to string) (int, string, string, error) {
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -248,7 +248,7 @@ func (svc *SSHService) Copy(from, to string) (int, string, string, error) {
 		upload = true
 	}
 
-	hostSvc := NewHostService(svc.provider)
+	hostSvc := NewHostHandler(svc.provider)
 	host, err := hostSvc.ForceInspect(hostName)
 	if err != nil {
 		return 0, "", "", throwErr(err)

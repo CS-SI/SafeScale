@@ -114,13 +114,19 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfWaitForApt && apt-get remove -y docker-ce
+                                    systemctl disable docker
+                                    systemctl stop docker
+                                    sfWaitForApt && apt-get purge -y docker-ce*
                                     ;;
                                 centos|rhel)
-                                    yum remove -y docker-ce
+                                    systemctl disable docker
+                                    systemctl stop docker
+                                    yum remove -y docker-ce*
                                     ;;
                                 fedora)
-                                    dnf erase -y docker-ce
+                                    systemctl disable docker
+                                    systemctl stop docker
+                                    dnf erase -y docker-ce*
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

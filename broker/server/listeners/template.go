@@ -18,36 +18,41 @@ package listeners
 
 import (
 	"context"
-	"fmt"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/server/services"
+	"github.com/CS-SI/SafeScale/broker/server/handlers"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
+
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 )
+
+// TemplateHandler exists to ease integration tests
+var TemplateHandler = handlers.NewTemplateHandler
 
 // broker template list --all=false
 
-//TemplateServiceListener host service server grpc
-type TemplateServiceListener struct{}
+// TemplateListener host service server grpc
+type TemplateListener struct{}
 
 // List available templates
-func (s *TemplateServiceListener) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
+func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
 	log.Printf("Template List called")
 
-	if GetCurrentTenant() == nil {
-		return nil, fmt.Errorf("Cannot list templates : No tenant set")
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list templates: no tenant set")
 	}
 
-	service := services.NewTemplateService(currentTenant.Service)
-	templates, err := service.List(in.GetAll())
+	handler := TemplateHandler(tenant.Service)
+	templates, err := handler.List(in.GetAll())
 	if err != nil {
 		return nil, err
 	}
 
+	// Map model.Host to pb.Host
 	var pbTemplates []*pb.HostTemplate
-
-	// Map api.Host to pb.Host
 	for _, template := range templates {
 		pbTemplates = append(pbTemplates, conv.ToPBHostTemplate(&template))
 	}
