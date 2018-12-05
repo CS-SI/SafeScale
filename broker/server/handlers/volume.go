@@ -196,7 +196,7 @@ func (svc *VolumeHandler) Create(name string, size int, speed VolumeSpeed.Enum) 
 		if err != nil {
 			derr := svc.provider.DeleteVolume(volume.ID)
 			if derr != nil {
-				log.Debugf("failed to delete volume '%': %v", volume.Name, derr)
+				log.Debugf("failed to delete volume '%s': %v", volume.Name, derr)
 			}
 		}
 	}()
