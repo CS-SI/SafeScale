@@ -278,7 +278,11 @@ func (m *Network) ListHosts() ([]*model.Host, error) {
 		if err != nil {
 			break
 		}
-		list = append(list, mh.Get())
+		if mh != nil {
+			list = append(list, mh.Get())
+		} else {
+			log.Warnf("Host metadata for '%s' not found !", id)
+		}
 	}
 	if err != nil {
 		log.Errorf("Error listing hosts: %+v", err)

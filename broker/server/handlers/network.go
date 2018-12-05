@@ -219,7 +219,11 @@ func (svc *NetworkHandler) Create(
 		if err != nil {
 			mh, derr := metadata.LoadHost(svc.provider, gw.ID)
 			if derr == nil {
-				derr = mh.Delete()
+				if mh != nil {
+					derr = mh.Delete()
+				} else {
+					log.Errorf("Gateway metadata of '%s' not found: ", gw.ID)
+				}
 			}
 			if derr != nil {
 				log.Errorf("Failed to delete gateway metadata: %+v", derr)

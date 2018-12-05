@@ -71,7 +71,11 @@ func (svc *SSHHandler) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 		if err != nil {
 			return nil, infraErr(err)
 		}
-		host = mh.Get()
+		if mh != nil {
+			host = mh.Get()
+		} else {
+			return nil, logicErr(fmt.Errorf("Host metadata of '%s' not found !", hostParam.(string)))
+		}
 	case *model.Host:
 		host = hostParam.(*model.Host)
 	default:
