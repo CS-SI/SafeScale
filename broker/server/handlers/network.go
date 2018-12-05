@@ -18,7 +18,6 @@ package handlers
 
 import (
 	"fmt"
-
 	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 
@@ -60,7 +59,7 @@ func NewNetworkHandler(api *providers.Service) NetworkAPI {
 
 // Create creates a network
 func (svc *NetworkHandler) Create(
-	name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string,
+	name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, theos string, gwname string,
 ) (*model.Network, error) {
 
 	// Verify that the network doesn't exist first
@@ -148,7 +147,7 @@ func (svc *NetworkHandler) Create(
 	if len(tpls) < 1 {
 		return nil, logicErr(fmt.Errorf("Error creating network: No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
 	}
-	img, err := svc.provider.SearchImage(os)
+	img, err := svc.provider.SearchImage(theos)
 	if err != nil {
 		err := infraErrf(err, "Error creating network: Error searching image")
 		return nil, err
@@ -179,11 +178,13 @@ func (svc *NetworkHandler) Create(
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
 		if err != nil {
+			log.Warnf("Cleaning up, deleting gateway '%s'", gw.Name)
 			derr := svc.provider.DeleteHost(gw.ID)
 			if derr != nil {
 				spew.Dump(derr)
 				log.Errorf("failed to delete gateway '%s': %v", gw.Name, derr)
 			}
+			log.Infof("Gateway '%s' deleted", gw.Name)
 		}
 	}()
 
@@ -231,7 +232,7 @@ func (svc *NetworkHandler) Create(
 		}
 	}()
 
-	log.Debugf("Waiting until gateway '%s' is available through SSH ...", gwname)
+	log.Infof("Waiting until gateway '%s' is available through SSH ...", gwname)
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
