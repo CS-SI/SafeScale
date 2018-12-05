@@ -42,6 +42,9 @@ broker/cli/broker/broker-cover
 broker/cli/brokerd/brokerd
 broker/cli/brokerd/brokerd-cover
 
+# ignore pipfile.lock
+broker/Pipfile.lock
+
 # ignore binaries from perform
 perform/perform
 perform/perform-cover
