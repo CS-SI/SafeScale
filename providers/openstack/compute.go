@@ -793,6 +793,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
+			log.Infof("Cleanup, deleting host '%s'", host.Name)
 			derr := client.DeleteHost(host.ID)
 			if derr != nil {
 				log.Warnf("Error deleting host: %v", derr)
@@ -814,6 +815,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
 			if err != nil {
+				log.Debugf("Cleanup, deleting floating ip '%s'", ip.ID)
 				derr := floatingips.Delete(client.Compute, ip.ID).ExtractErr()
 				if derr != nil {
 					log.Errorf("Error deleting Floating IP: %v", derr)

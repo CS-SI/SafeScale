@@ -549,9 +549,11 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 			}
 			if retcode != 0 {
 				if retcode == 255 {
-					return fmt.Errorf("ssh not ready")
+					log.Debug("Ssh not ready: error code: 255")
+					return fmt.Errorf("Ssh not ready: error code: 255")
 				}
-				return fmt.Errorf("%s", stderr)
+				log.Debugf("Ssh not ready: error code: %s", stderr)
+				return fmt.Errorf("Ssh not ready: error code: %s", stderr)
 			}
 			return nil
 		},
@@ -568,6 +570,9 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		if logErr == nil {
 			if retcode == 0 {
 				return fmt.Errorf("server '%s' is not ready yet: %s - log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)
+			}
+			if len(stdout) > 0 {
+				log.Error(fmt.Errorf("Captured output: %s", stdout))
 			}
 			return fmt.Errorf("server '%s' is not ready yet: %s - error reading user_data.log: %s", ssh.Host, originalErr.Error(), stderr)
 		}
