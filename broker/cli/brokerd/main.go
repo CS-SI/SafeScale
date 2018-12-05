@@ -139,7 +139,7 @@ func work() {
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
 
-	version := VERSION + ", build date: " + BUILD_DATE + "-" + REV
+	version := VERSION + ", build date: " + BUILD_DATE + ", build hash: " + REV
 	fmt.Printf("Brokerd version: %s\nReady to serve :-)\n", version)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
@@ -180,7 +180,7 @@ func main() {
 
 	app.Before = func(c *cli.Context) error {
 		if strings.Contains(path.Base(os.Args[0]), "-cover") {
-			log.SetLevel(log.InfoLevel)
+			log.SetLevel(log.DebugLevel)
 			utils.Verbose = true
 		} else {
 			log.SetLevel(log.WarnLevel)
