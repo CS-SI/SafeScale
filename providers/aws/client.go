@@ -23,6 +23,8 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/service/pricing"
+	"github.com/oscarpicas/SafeScale/providers/aws/s3"
 	"regexp"
 	"strconv"
 	"strings"
@@ -36,7 +38,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/pricing"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -164,11 +165,31 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 			AccessKeyID:     accessKeyID,
 			SecretAccessKey: secretAccessKey,
 			Region:          region,
-		}, CfgOpts{
-			DefaultImage: defaultImage,
 		},
 	)
 
+}
+
+// CfgOptions configuration options
+type CfgOptions struct {
+	// Name of the provider (external) network
+	ProviderNetwork string
+	// DNSList list of DNS
+	DNSList []string
+	// UseFloatingIP indicates if floating IP are used (optional)
+	UseFloatingIP bool
+	// UseLayer3Networking indicates if layer 3 networking features (router) can be used
+	// if UseFloatingIP is true UseLayer3Networking must be true
+	UseLayer3Networking bool
+	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
+	AutoHostNetworkInterfaces bool
+	// VolumeSpeeds map volume types with volume speeds
+	VolumeSpeeds map[string]VolumeSpeed.Enum
+	// // ObjectStorageType type of Object Storage (ex: swift or s3)
+	// ObjectStorageType string
+	// MetadataBucket contains the name of the bucket storing metadata
+	MetadataBucket string
+	DefaultImage   string
 }
 
 // Client a AWS provider client
@@ -179,29 +200,27 @@ type Client struct {
 	AuthOpts    AuthOpts
 	UserDataTpl *template.Template
 	//ImageOwners []string
+
+	Cfg      *CfgOptions
 }
 
-func (c *Client) ListNetworks(all bool) ([]api.Network, error) {
+func (c *Client) ListAvailabilityZones(bool) (map[string]bool, error) {
 	panic("implement me")
 }
 
-func (c *Client) ListHosts(all bool) ([]api.Host, error) {
+func (c *Client) GetNetworkByName(name string) (*model.Network, error) {
+	panic("implement me")
+}
+
+func (c *Client) GetHostByName(string) (*model.Host, error) {
+	panic("implement me")
+}
+
+func (c *Client) GetHostState(interface{}) (HostState.Enum, error) {
 	panic("implement me")
 }
 
 func (c *Client) RebootHost(id string) error {
-	panic("implement me")
-}
-
-func (c *Client) ListVolumes(all bool) ([]api.Volume, error) {
-	panic("implement me")
-}
-
-func (c *Client) GetContainer(name string) (*api.ContainerInfo, error) {
-	panic("implement me")
-}
-
-func (c *Client) GetAuthOpts() (api.Config, error) {
 	panic("implement me")
 }
 
@@ -242,11 +261,14 @@ func createFilters() []*ec2.Filter {
 		Name:   aws.String("owner-id"),
 		Values: owners,
 	})
+
 	return filters
 }
 
 // ListImages lists available OS images
 func (c *Client) ListImages(all bool) ([]model.Image, error) {
+
+	ec2.EC2.WaitUntilBundleTaskComplete()
 
 	images, err := c.EC2.DescribeImages(&ec2.DescribeImagesInput{
 		//Owners: []*string{aws.String("aws-marketplace"), aws.String("self")},
@@ -777,6 +799,7 @@ func (c *Client) GetNetwork(id string) (*model.Network, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	out, err := c.EC2.DescribeVpcs(&ec2.DescribeVpcsInput{
 		VpcIds: []*string{aws.String(id)},
 	})
@@ -789,12 +812,12 @@ func (c *Client) GetNetwork(id string) (*model.Network, error) {
 }
 
 // ListNetworks lists available networks
-func (c *Client) ListNetworks() ([]model.Network, error) {
+func (c *Client) ListNetworks() ([]*model.Network, error) {
 	out, err := c.EC2.DescribeVpcs(&ec2.DescribeVpcsInput{})
 	if err != nil {
 		return nil, err
 	}
-	nets := []model.Network{}
+	nets := []*model.Network{}
 	for _, vpc := range out.Vpcs {
 		net, err := c.getNetwork(*vpc.VpcId)
 		if err != nil {
@@ -802,7 +825,7 @@ func (c *Client) ListNetworks() ([]model.Network, error) {
 		}
 		net.CIDR = *vpc.CidrBlock
 		net.CIDR = *vpc.VpcId
-		nets = append(nets, *net)
+		nets = append(nets, net)
 	}
 	return nets, nil
 
@@ -1215,7 +1238,7 @@ func (c *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 		return nil, err
 	}
 	instance := out.Reservations[0].Instances[0]
-	host, err := c.readHost(id)
+	host, err = c.readHost(id)
 	if err != nil {
 		host = &api.Host{
 			ID: *instance.InstanceId,
@@ -1246,7 +1269,7 @@ func (c *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 }
 
 // ListHosts lists available hosts
-func (c *Client) ListHosts() ([]model.Host, error) {
+func (c *Client) ListHosts() ([]*model.Host, error) {
 	panic("Not Implemented")
 }
 
@@ -1531,7 +1554,7 @@ func (c *Client) DeleteVolume(id string) error {
 //- name the name of the volume attachment
 //- volume the volume to attach
 //- host on which the volume is attached
-func (c *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (*model.VolumeAttachment, error) {
+func (c *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (string, error) {
 	va, err := c.EC2.AttachVolume(&ec2.AttachVolumeInput{
 		InstanceId: aws.String(request.ServerID),
 		VolumeId:   aws.String(request.VolumeID),
@@ -1539,6 +1562,8 @@ func (c *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (
 	if err != nil {
 		return nil, err
 	}
+
+	/*
 	return &api.VolumeAttachment{
 		Device:   pStr(va.Device),
 		ID:       pStr(va.VolumeId),
@@ -1546,6 +1571,11 @@ func (c *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (
 		ServerID: pStr(va.InstanceId),
 		VolumeID: pStr(va.VolumeId),
 	}, nil
+	*/
+
+	// TODO Fix this
+
+	return "", nil
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
