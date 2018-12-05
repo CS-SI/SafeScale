@@ -82,26 +82,31 @@ o_PU_IF=
 
 sfSaveIptablesRules() {
    case $LINUX_KIND in
-       rhel|centos) iptables-save >/etc/sysconfig/iptables ;;
-       debian|ubuntu) iptables-save >/etc/iptables/rules.v4 ;;
+       rhel|centos) iptables-save >/etc/sysconfig/iptables;;
+       debian|ubuntu) iptables-save >/etc/iptables/rules.v4;;
    esac
 }
 
 create_user() {
-    echo "Creating user {{ .User }}..."
-    useradd {{ .User }} --home-dir /home/{{ .User }} --shell /bin/bash --comment "" --create-home
-    echo "gpac:{{ .Password }}" | chpasswd
+    echo "Creating user {{.User}}..."
+    useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+    echo "gpac:{{.Password}}" | chpasswd
     groupadd -r docker
     usermod -aG docker gpac
-    echo "{{ .User }} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
+    SUDOERS_FILE=/etc/sudoers.d/{{.User}}
+    [ ! -d "$(dirname $SUDOERS_FILE)" ] && SUDOERS_FILE=/etc/sudoers
+    cat >>$SUDOERS_FILE <<-'EOF'
+Defaults:{{.User}} !requiretty
+{{.User}} ALL=(ALL) NOPASSWD:ALL
+EOF
 
-    mkdir /home/{{ .User }}/.ssh
-    echo "{{ .PublicKey }}" >>/home/{{ .User }}/.ssh/authorized_keys
-    echo "{{ .PrivateKey }}" >/home/{{ .User }}/.ssh/id_rsa
-    chmod 0700 /home/{{ .User }}/.ssh
-    chmod -R 0600 /home/{{ .User }}/.ssh/*
+    mkdir /home/{{.User}}/.ssh
+    echo "{{.PublicKey}}" >>/home/{{.User}}/.ssh/authorized_keys
+    echo "{{.PrivateKey}}" >/home/{{.User}}/.ssh/id_rsa
+    chmod 0700 /home/{{.User}}/.ssh
+    chmod -R 0600 /home/{{.User}}/.ssh/*
 
-    touch /home/{{ .User }}/.hushlogin
+    touch /home/{{.User}}/.hushlogin
 
     cat >>/home/gpac/.bashrc <<-'EOF'
 pathremove() {
@@ -129,7 +134,7 @@ pathappend() {
 pathprepend $HOME/.local/bin
 EOF
 
-    chown -R {{ .User }}:{{ .User }} /home/{{ .User }}
+    chown -R {{.User}}:{{.User}} /home/{{.User}}
     echo done
 }
 
@@ -168,7 +173,7 @@ network:
     ens4:
       dhcp4: true
 {{- if .GatewayIP }}
-      gateway4: {{ .GatewayIP }}
+      gateway4: {{.GatewayIP}}
 {{- end }}
 EOF
     netplan generate
@@ -185,7 +190,7 @@ configure_network_redhat() {
     systemctl disable NetworkManager &>/dev/null
     systemctl stop NetworkManager &>/dev/null
     yum remove -y NetworkManager &>/dev/null
-    systemctl restart network
+    #systemctl restart network
 
     # Configure all network interfaces in dhcp
     for IF in $(ls /sys/class/net); do
@@ -197,6 +202,15 @@ ONBOOT=yes
 EOF
         fi
     done
+    # Disable resolv.conf by dhcp
+    mkdir -p /etc/dhcp
+    HOOK_FILE=/etc/dhcp/dhclient-enter-hooks
+    cat >>$HOOK_FILE <<EOF
+make_resolv_conf() {
+    :
+}
+EOF
+    chmod +x $HOOK_FILE
     systemctl restart network
 
     echo done
@@ -459,6 +473,14 @@ install_packages() {
      esac
 }
 
+disable_sudo_requiretty() {
+    sed -i -e 's/^Defaults[[:space:]]+requiretty$/Defaults !requiretty/g' /etc/sudoers
+}
+
+# ---- Main
+
+#disable_sudo_requiretty
+
 case $LINUX_KIND in
     debian|ubuntu)
         export DEBIAN_FRONTEND=noninteractive
@@ -483,8 +505,9 @@ case $LINUX_KIND in
         {{- end }}
         {{- if .IsGateway }}
         configure_as_gateway
-        {{- else if .AddGateway }}
-        configure_dns_legacy
+        {{- end }}
+        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_legacy
+        {{- if .AddGateway }}
         configure_gateway_redhat
         {{- end }}
         ;;
