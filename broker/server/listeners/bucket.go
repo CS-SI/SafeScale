@@ -89,7 +89,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_pro
 // Delete a bucket
 func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_protobuf.Empty, error) {
 	log.Infof("%s delete '%s' called", logListenerBase, in.Name)
-	defer log.Debug("%s delete '%s' done", logListenerBase, in.Name)
+	defer log.Debugf("%s delete '%s' done", logListenerBase, in.Name)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
