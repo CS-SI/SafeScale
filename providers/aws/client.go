@@ -23,8 +23,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/pricing"
-	"github.com/oscarpicas/SafeScale/providers/aws/s3"
+	"github.com/CS-SI/SafeScale/providers/aws/s3"
 	"regexp"
 	"strconv"
 	"strings"
@@ -38,6 +37,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/pricing"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 
 	"github.com/CS-SI/SafeScale/providers"
@@ -204,7 +204,7 @@ type Client struct {
 	UserDataTpl *template.Template
 	//ImageOwners []string
 
-	Cfg      *CfgOptions
+	Cfg *CfgOptions
 }
 
 func (c *Client) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
@@ -782,7 +782,6 @@ func (c *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error)
 		return nil, err
 	}
 
-
 	// TODO Fix this
 	host, err := c.CreateHost(model.HostRequest{})
 	if err != nil {
@@ -1073,7 +1072,6 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	gwID := ""
 	var gw *model.Host
 
-
 	isGateway := request.DefaultGateway == nil && request.Networks[0].Name != model.SingleHostNetworkName // FIX it later
 
 	if !isGateway {
@@ -1090,7 +1088,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}
 
 	var nets []string
-	for _, netid := range(request.Networks) {
+	for _, netid := range request.Networks {
 		nets = append(nets, netid.ID)
 	}
 
@@ -1211,10 +1209,10 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}
 
 	host := model.Host{
-		ID:           pStr(instance.InstanceId),
-		Name:         request.HostName,
-		PrivateKey:   kp.PrivateKey,
-		LastState:    state,
+		ID:         pStr(instance.InstanceId),
+		Name:       request.HostName,
+		PrivateKey: kp.PrivateKey,
+		LastState:  state,
 	}
 	c.saveHost(host)
 	return &host, nil
@@ -1562,13 +1560,13 @@ func (c *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (
 	}
 
 	/*
-	return &api.VolumeAttachment{
-		Device:   pStr(va.Device),
-		ID:       pStr(va.VolumeId),
-		Name:     request.Name,
-		ServerID: pStr(va.InstanceId),
-		VolumeID: pStr(va.VolumeId),
-	}, nil
+		return &api.VolumeAttachment{
+			Device:   pStr(va.Device),
+			ID:       pStr(va.VolumeId),
+			Name:     request.Name,
+			ServerID: pStr(va.InstanceId),
+			VolumeID: pStr(va.VolumeId),
+		}, nil
 	*/
 
 	// TODO Fix this
@@ -1623,7 +1621,6 @@ func (c *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAttachmen
 	return vas, nil
 
 }
-
 
 // DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (c *Client) DeleteVolumeAttachment(serverID, id string) error {
