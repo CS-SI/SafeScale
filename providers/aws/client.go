@@ -147,17 +147,21 @@ func wrapError(msg string, err error) error {
 // Build build a new Client from configuration parameter
 func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	tenantName, _ := params["name"].(string)
+	_ = tenantName
 
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	network, _ := params["network"].(map[string]interface{})
+	_ = network
 
 	accessKeyID, _ := identity["AccessKeyID"].(string)
 	secretAccessKey, _ := identity["SecretAccessKey"].(string)
 	identityEndpoint, _ := identity["EndPoint"].(string)
+	_ = identityEndpoint
 
 	region, _ := compute["Region"].(string)
 	defaultImage, _ := compute["DefaultImage"]
+	_ = defaultImage
 
 	return AuthenticatedClient(
 		AuthOpts{
@@ -201,6 +205,14 @@ type Client struct {
 	//ImageOwners []string
 
 	Cfg      *CfgOptions
+}
+
+func (c *Client) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
+	return nil, fmt.Errorf("aws.CreateGateway() isn't available by design")
+}
+
+func (c *Client) DeleteGateway(string) error {
+	return fmt.Errorf("aws.DeleteGateway() isn't available by design")
 }
 
 func (c *Client) ListAvailabilityZones(bool) (map[string]bool, error) {
@@ -267,7 +279,8 @@ func createFilters() []*ec2.Filter {
 // ListImages lists available OS images
 func (c *Client) ListImages(all bool) ([]model.Image, error) {
 
-	ec2.EC2.WaitUntilBundleTaskComplete()
+	// TODO Fix this
+	// ec2.EC2.WaitUntilBundleTaskComplete(&ec2.DescribeBundleTasksInput{})
 
 	images, err := c.EC2.DescribeImages(&ec2.DescribeImagesInput{
 		//Owners: []*string{aws.String("aws-marketplace"), aws.String("self")},
@@ -769,10 +782,9 @@ func (c *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error)
 		return nil, err
 	}
 
-	req.GWRequest.PublicIP = true
-	req.GWRequest.IsGateway = true
-	req.GWRequest.NetworkIDs = append(req.GWRequest.NetworkIDs, *vpcOut.Vpc.VpcId)
-	host, err := c.CreateHost(req.GWRequest)
+
+	// TODO Fix this
+	host, err := c.CreateHost(model.HostRequest{})
 	if err != nil {
 		c.DeleteNetwork(*vpcOut.Vpc.VpcId)
 		return nil, wrapError("Error creating network", err)
@@ -865,16 +877,6 @@ func (c *Client) DeleteNetwork(id string) error {
 		VpcId: aws.String(id),
 	})
 	return err
-}
-
-// CreateGateway exists only to comply with api.ClientAPI interface
-func (c *Client) CreateGateway(req model.GWRequest) (*model.Host, error) {
-	return nil, fmt.Errorf("aws.CreateGateway() isn't available by design")
-}
-
-// DeleteGateway exists only to comply with api.ClientAPI interface
-func (c *Client) DeleteGateway(networkID string) error {
-	return fmt.Errorf("aws.DeleteGateway() isn't available by design")
 }
 
 func (c *Client) getSubnets(vpcIDs []string) ([]*ec2.Subnet, error) {
@@ -1075,7 +1077,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	isGateway := request.DefaultGateway == nil && request.Networks[0].Name != model.SingleHostNetworkName // FIX it later
 
 	if !isGateway {
-		net, err := c.getNetwork(request.NetworkIDs[0])
+		net, err := c.getNetwork(request.Networks[0].ID)
 		if err != nil {
 			return nil, err
 		}
@@ -1086,8 +1088,14 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 		}
 
 	}
+
+	var nets []string
+	for _, netid := range(request.Networks) {
+		nets = append(nets, netid.ID)
+	}
+
 	//get subnet of each network
-	sns, err := c.getSubnets(request.NetworkIDs)
+	sns, err := c.getSubnets(nets)
 
 	//Prepare user data
 	userData, err := c.prepareUserData(request, kp, gw)
@@ -1105,7 +1113,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}
 
 	i := 0
-	for _, netID := range request.NetworkIDs {
+	for _, netID := range nets {
 		if len(vpcs[netID]) < 1 {
 			continue
 		}
@@ -1186,7 +1194,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}
 	//Create api.Host
 
-	tpl, err := c.GetTemplate(*instance.InstanceType)
+	_, err = c.GetTemplate(*instance.InstanceType)
 	if err != nil {
 		c.DeleteHost(*instance.InstanceId)
 		return nil, err
@@ -1195,10 +1203,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	for _, nif := range instance.NetworkInterfaces {
 		v4IPs = append(v4IPs, *nif.PrivateIpAddress)
 	}
-	accessAddr := ""
-	if instance.PublicIpAddress != nil {
-		accessAddr = *instance.PublicIpAddress
-	}
+
 	state, err := getState(instance.State)
 	if err != nil {
 		c.DeleteHost(*instance.InstanceId)
@@ -1207,13 +1212,9 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 
 	host := model.Host{
 		ID:           pStr(instance.InstanceId),
-		Name:         request.Name,
-		Size:         tpl.HostSize,
-		PrivateIPsV4: v4IPs,
-		AccessIPv4:   accessAddr,
+		Name:         request.HostName,
 		PrivateKey:   kp.PrivateKey,
-		State:        state,
-		GatewayID:    gwID,
+		LastState:    state,
 	}
 	c.saveHost(host)
 	return &host, nil
@@ -1249,25 +1250,18 @@ func (c *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 		}
 	}
 
-	host.State, err = getState(instance.State)
+	host.LastState, err = getState(instance.State)
 	if err != nil {
 		return nil, err
 	}
-	tpl, err := c.GetTemplate(*instance.InstanceType)
+	_, err = c.GetTemplate(*instance.InstanceType)
 	if err != nil {
 		return nil, err
 	}
-	host.Size = tpl.HostSize
 	v4IPs := []string{}
 	for _, nif := range instance.NetworkInterfaces {
 		v4IPs = append(v4IPs, *nif.PrivateIpAddress)
 	}
-	accessAddr := ""
-	if instance.PublicIpAddress != nil {
-		accessAddr = *instance.PublicIpAddress
-	}
-	host.PrivateIPsV4 = v4IPs
-	host.AccessIPv4 = accessAddr
 
 	return host, nil
 }
@@ -1466,7 +1460,7 @@ func (c *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error
 	volume := model.Volume{
 		ID:    pStr(v.VolumeId),
 		Name:  request.Name,
-		Size:  int(pInt64(v.Size)),
+		Size:  int(*(v.Size)),
 		Speed: toVolumeSpeed(v.VolumeType),
 		State: toVolumeState(v.State),
 	}
@@ -1489,7 +1483,7 @@ func (c *Client) GetVolume(id string) (*model.Volume, error) {
 	volume := model.Volume{
 		ID:    pStr(v.VolumeId),
 		Name:  name,
-		Size:  int(pInt64(v.Size)),
+		Size:  int(*(v.Size)),
 		Speed: toVolumeSpeed(v.VolumeType),
 		State: toVolumeState(v.State),
 	}
@@ -1511,7 +1505,7 @@ func (c *Client) ListVolumes() ([]model.Volume, error) {
 		volume := model.Volume{
 			ID:    pStr(v.VolumeId),
 			Name:  name,
-			Size:  int(pInt64(v.Size)),
+			Size:  int(*(v.Size)),
 			Speed: toVolumeSpeed(v.VolumeType),
 			State: toVolumeState(v.State),
 		}
@@ -1559,12 +1553,12 @@ func (c *Client) DeleteVolume(id string) error {
 //- volume the volume to attach
 //- host on which the volume is attached
 func (c *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (string, error) {
-	va, err := c.EC2.AttachVolume(&ec2.AttachVolumeInput{
-		InstanceId: aws.String(request.ServerID),
+	_, err := c.EC2.AttachVolume(&ec2.AttachVolumeInput{
+		InstanceId: aws.String(request.HostID),
 		VolumeId:   aws.String(request.VolumeID),
 	})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	/*
@@ -1642,7 +1636,7 @@ func (c *Client) DeleteVolumeAttachment(serverID, id string) error {
 
 // CreateContainer creates an object container
 func (c *Client) CreateContainer(name string) error {
-	return s3.CreateContainer(awss3.New(c.Session), name)
+	return s3.CreateContainer(awss3.New(c.Session), name, "")
 }
 
 // DeleteContainer deletes an object container
@@ -1701,7 +1695,6 @@ func (c *Client) GetCfgOpts() (model.Config, error) {
 	cfg := model.ConfigMap{}
 
 	cfg.Set("DNSList", c.Cfg.DNSList)
-	cfg.Set("S3Protocol", c.Cfg.S3Protocol)
 	cfg.Set("AutoHostNetworkInterfaces", c.Cfg.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", c.Cfg.UseLayer3Networking)
 
