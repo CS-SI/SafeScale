@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
+	"os"
+	"strconv"
+	"time"
 
 	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
@@ -244,8 +247,18 @@ func (svc *NetworkHandler) Create(
 		return nil, infraErrf(err, "Error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
 	}
 
+	sshDefaultTimeout := int(brokerutils.TimeoutCtxHost.Minutes())
+
+	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
+		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
+		if err == nil {
+			log.Debugf("Using custom timeout of %d minutes", num)
+			sshDefaultTimeout = num
+		}
+	}
+
 	// TODO Test for failure with 15s !!!
-	err = ssh.WaitServerReady(brokerutils.TimeoutCtxHost)
+	err = ssh.WaitServerReady(time.Duration(sshDefaultTimeout) * time.Minute)
 	// err = ssh.WaitServerReady(time.Second * 3)
 	if err != nil {
 		return nil, logicErrf(err, "Error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)

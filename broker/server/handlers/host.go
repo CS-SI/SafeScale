@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"strconv"
 	"time"
 
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
@@ -372,7 +373,19 @@ func (svc *HostHandler) Create(
 	if err != nil {
 		return nil, infraErr(err)
 	}
-	err = sshCfg.WaitServerReady(brokerutils.TimeoutCtxHost)
+
+	sshDefaultTimeout := int(brokerutils.TimeoutCtxHost.Minutes())
+
+	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
+		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
+		if err == nil {
+			log.Debugf("Using custom timeout of %d minutes", num)
+			sshDefaultTimeout = num
+		}
+	}
+
+	// TODO configurable timeout here
+	err = sshCfg.WaitServerReady(time.Duration(sshDefaultTimeout) * time.Minute)
 	if err != nil {
 		return nil, infraErr(err)
 	}
