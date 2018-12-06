@@ -10,7 +10,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[override]]
   name = "github.com/aws/aws-sdk-go"
-  version = "=v1.14.33"
+  version = "=v1.14.32"
 
 [[constraint]]
   name = "github.com/coreos/go-oidc"
