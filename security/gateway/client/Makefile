@@ -9,7 +9,7 @@ vet:
 	@$(GO) vet ./...
 
 safe-security:	main.go
-	@$(GO) build -o $(EXEC)
+	@$(GO) build -race -o $(EXEC)
 
 clean:
 	@$(RM) $(EXEC) || true
