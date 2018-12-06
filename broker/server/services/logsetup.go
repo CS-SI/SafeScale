@@ -42,7 +42,7 @@ func infraErrf(err error, message string, a ...interface{}) error {
 	}
 
 	tbr := errors.WithStack(err)
-	tbr = errors.WithMessage(tbr, fmt.Sprintf(message, a))
+	tbr = errors.WithMessage(tbr, fmt.Sprintf(message, a...))
 
 	log.Errorf("%+v", err)
 	return tbr
@@ -60,7 +60,7 @@ func logicErrf(err error, message string, a ...interface{}) error {
 	if err == nil {
 		return nil
 	}
-	tbr := errors.Wrap(err, fmt.Sprintf(message, a))
+	tbr := errors.Wrap(err, fmt.Sprintf(message, a...))
 	log.Errorf("%+v", tbr)
 	return tbr
 }
