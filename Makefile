@@ -111,6 +111,7 @@ ensure:
 	@($(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
 	@(dep ensure -update "github.com/gophercloud/gophercloud")
 	@(dep ensure -update "github.com/graymeta/stow")
+	@$(GO) version | grep 1.10 > /dev/null || dep ensure -update "golang.org/x/tools"
 
 utils: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
