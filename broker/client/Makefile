@@ -9,7 +9,7 @@ vet:
 	@$(GO) vet ./...
 
 broker:
-	@$(GO) build -o $(EXEC)
+	@$(GO) build -race -o $(EXEC)
 
 clean:
 	@$(RM) $(EXEC) || true

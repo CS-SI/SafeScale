@@ -13,7 +13,7 @@ REV := `git rev-parse HEAD 2>/dev/null || echo ""`
 default: all
 
 all: clean gensrc
-	@$(GO) build -o $(EXEC)
+	@$(GO) build -race -o $(EXEC)
 
 vet:
 	@$(GO) vet ./...
