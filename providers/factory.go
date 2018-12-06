@@ -70,7 +70,7 @@ func GetService(tenantName string) (*Service, error) {
 		tenant, _ := t.(map[string]interface{})
 		name, found = tenant["name"].(string)
 		if !found {
-			log.Errorf("tenant found without 'name'")
+			log.Error("tenant found without 'name'")
 			continue
 		}
 		if name != tenantName {
@@ -80,7 +80,7 @@ func GetService(tenantName string) (*Service, error) {
 		tenantInCfg = true
 		provider, found := tenant["client"].(string)
 		if !found {
-			log.Errorf("Missing field 'client' in tenant '%s'")
+			log.Error("Missing field 'client' in tenant")
 			continue
 		}
 
