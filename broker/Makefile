@@ -13,7 +13,9 @@ ifeq ($(strip $(GOPATH)),)
 	GOINCLUDEPATH=$(HOME)/go
 endif
 
+ifneq ($(OS),Windows_NT)
 PATH = $(HOME)/.local/bin:$(shell printenv PATH)
+endif
 
 all:	cli
 
