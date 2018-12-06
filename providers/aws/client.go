@@ -31,7 +31,7 @@ import (
 	"text/template"
 	"time"
 
-	rice "github.com/GeertJohan/go.rice"
+	"github.com/GeertJohan/go.rice"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -49,7 +49,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils/metadata"
 )
 
 // //Config AWS configurations
@@ -975,10 +974,11 @@ func (c *Client) prepareUserData(request model.HostRequest, kp *model.KeyPair, g
 			ip = hpNetworkV1.IPv6Addresses[hpNetworkV1.DefaultNetworkID]
 		}
 	}
+
 	data := userData{
 		User:       model.DefaultUser,
 		Key:        strings.Trim(kp.PublicKey, "\n"),
-		IsGateway:  request.IsGateway,
+		IsGateway:  request.DefaultGateway == nil && request.Networks[0].Name != model.SingleHostNetworkName, // FIX it later
 		AddGateway: !request.PublicIP,
 		ResolvConf: ResolvConf,
 		GatewayIP:  ip,
@@ -1070,7 +1070,11 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	// If the host is not a Gateway, get gateway of the first network
 	gwID := ""
 	var gw *model.Host
-	if !request.isGateway {
+
+
+	isGateway := request.DefaultGateway == nil && request.Networks[0].Name != model.SingleHostNetworkName // FIX it later
+
+	if !isGateway {
 		net, err := c.getNetwork(request.NetworkIDs[0])
 		if err != nil {
 			return nil, err
@@ -1201,7 +1205,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 		return nil, err
 	}
 
-	host := api.Host{
+	host := model.Host{
 		ID:           pStr(instance.InstanceId),
 		Name:         request.Name,
 		Size:         tpl.HostSize,
@@ -1232,15 +1236,15 @@ func (c *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 	}
 
 	out, err := c.EC2.DescribeInstances(&ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(id)},
+		InstanceIds: []*string{aws.String(host.ID)},
 	})
 	if err != nil {
 		return nil, err
 	}
 	instance := out.Reservations[0].Instances[0]
-	host, err = c.readHost(id)
+	host, err = c.readHost(host.ID)
 	if err != nil {
-		host = &api.Host{
+		host = &model.Host{
 			ID: *instance.InstanceId,
 		}
 	}
@@ -1414,7 +1418,7 @@ func toVolumeState(s *string) VolumeState.Enum {
 }
 
 func (c *Client) saveVolumeName(id, name string) error {
-	return c.PutObject("gpac.aws.volumes", api.Object{
+	return c.PutObject("gpac.aws.volumes", model.Object{
 		Name:    id,
 		Content: strings.NewReader(name),
 	})
@@ -1440,7 +1444,7 @@ func (c *Client) removeVolumeName(id string) error {
 //- volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (c *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
 	// Check if a volume already exists with the same name
-	_volume, err := metadata.LoadVolume(client, request.Name)
+	_volume, err := c.GetVolume(request.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -1459,7 +1463,7 @@ func (c *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error
 	if err != nil {
 		c.DeleteVolume(*v.VolumeId)
 	}
-	volume := api.Volume{
+	volume := model.Volume{
 		ID:    pStr(v.VolumeId),
 		Name:  request.Name,
 		Size:  int(pInt64(v.Size)),
@@ -1482,7 +1486,7 @@ func (c *Client) GetVolume(id string) (*model.Volume, error) {
 	if err != nil {
 		return nil, err
 	}
-	volume := api.Volume{
+	volume := model.Volume{
 		ID:    pStr(v.VolumeId),
 		Name:  name,
 		Size:  int(pInt64(v.Size)),
@@ -1498,13 +1502,13 @@ func (c *Client) ListVolumes() ([]model.Volume, error) {
 	if err != nil {
 		return nil, err
 	}
-	volumes := []api.Volume{}
+	volumes := []model.Volume{}
 	for _, v := range out.Volumes {
 		name, err := c.getVolumeName(*v.VolumeId)
 		if err != nil {
 			return nil, err
 		}
-		volume := api.Volume{
+		volume := model.Volume{
 			ID:    pStr(v.VolumeId),
 			Name:  name,
 			Size:  int(pInt64(v.Size)),
@@ -1589,7 +1593,7 @@ func (c *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachme
 	v := out.Volumes[0]
 	for _, va := range v.Attachments {
 		if *va.InstanceId == serverID {
-			return &api.VolumeAttachment{
+			return &model.VolumeAttachment{
 				Device:   pStr(va.Device),
 				ServerID: pStr(va.InstanceId),
 				VolumeID: pStr(va.VolumeId),
@@ -1612,10 +1616,10 @@ func (c *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAttachmen
 	if err != nil {
 		return nil, err
 	}
-	vas := []api.VolumeAttachment{}
+	vas := []model.VolumeAttachment{}
 	for _, v := range out.Volumes {
 		for _, va := range v.Attachments {
-			vas = append(vas, api.VolumeAttachment{
+			vas = append(vas, model.VolumeAttachment{
 				Device:   pStr(va.Device),
 				ServerID: pStr(va.InstanceId),
 				VolumeID: pStr(va.VolumeId),
@@ -1625,6 +1629,7 @@ func (c *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAttachmen
 	return vas, nil
 
 }
+
 
 // DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (c *Client) DeleteVolumeAttachment(serverID, id string) error {
