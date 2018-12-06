@@ -39,9 +39,6 @@ feature:
                                 centos|rhel)
                                     rpm -qa | grep docker-ce &>/dev/null
                                     ;;
-                                fedora)
-                                    dnf list installed | grep docker-ce &>/dev/null
-                                    ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
                                     exit 1
@@ -85,16 +82,6 @@ feature:
                                     systemctl enable docker
                                     systemctl start docker
                                     ;;
-                                fedora)
-                                    dnf install -y dnf-plugins-core || exit 192
-                                    dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo || exit 193
-                                    dnf install -y docker-ce jq || exit 194
-                                    mkdir /etc/docker
-                                    echo -e "{\n\t\"iptables\": false\n}" > ~/daemon.json && mv ~/daemon.json /etc/docker/daemon.json
-
-                                    systemctl enable docker
-                                    systemctl start docker
-                                    ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
                                     exit 195
@@ -122,11 +109,6 @@ feature:
                                     systemctl disable docker
                                     systemctl stop docker
                                     yum remove -y docker-ce*
-                                    ;;
-                                fedora)
-                                    systemctl disable docker
-                                    systemctl stop docker
-                                    dnf erase -y docker-ce*
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
