@@ -70,7 +70,12 @@ func (kc *KeyCloak) GetAccessToken() (string, error) {
 		return "", err
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		clErr := body.Close()
+		if clErr != nil {
+			log.Error(clErr)
+		}
+	}()
 	buffer, err := ioutil.ReadAll(body)
 	if err != nil {
 		return "", err

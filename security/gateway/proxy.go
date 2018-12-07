@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/security/model"
 
+	log "github.com/sirupsen/logrus"
 	oidc "github.com/coreos/go-oidc"
 	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/viper"
@@ -176,8 +176,18 @@ func authorizedAndAuthenticated(w http.ResponseWriter, r *http.Request, info req
 }
 
 func fowardWSMessages(from *websocket.Conn, to *websocket.Conn) {
-	defer from.Close()
-	defer to.Close()
+	defer func() {
+		fromErr := from.Close()
+		if fromErr != nil {
+			log.Error(fromErr)
+		}
+	}()
+	defer func() {
+		toErr := to.Close()
+		if toErr != nil {
+			log.Error(toErr)
+		}
+	}()
 	for {
 		mType, buffer, err := from.ReadMessage()
 		if err != nil {

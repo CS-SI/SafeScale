@@ -218,7 +218,10 @@ func RunScanner() {
 
 	for _, tenantName := range targetedProviders {
 		fmt.Printf("Working with tenant %s\n", tenantName)
-		analyzeTenant(nil, tenantName)
+		err := analyzeTenant(nil, tenantName)
+		if err != nil {
+			fmt.Printf("Error working with tenant %s\n", tenantName)
+		}
 	}
 
 	collect()
@@ -273,7 +276,12 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			Name:      netName,
 		})
 		if err == nil {
-			defer service.DeleteNetwork(net.ID)
+			defer func() {
+				delerr := service.DeleteNetwork(net.ID)
+				if delerr != nil {
+					log.Warnf("Error leleting network '%s'", net.ID)
+				}
+			}()
 		} else {
 			return errors.Wrapf(err, "Error waiting for server ready: %v", err)
 		}
@@ -312,7 +320,13 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				Networks:     []*model.Network{net},
 			})
 
-			defer service.DeleteHost(hostName)
+			defer func() {
+				delerr := service.DeleteHost(hostName)
+				if delerr != nil {
+					log.Warnf("Error deleting host '%s'", hostName)
+				}
+			}()
+
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err

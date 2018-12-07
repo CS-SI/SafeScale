@@ -72,7 +72,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
 
 		if err != nil {
-			fmt.Fprintln(os.Stderr, DecorateError(err, "deletion of volume", true).Error())
+			_, _ = fmt.Fprintln(os.Stderr, DecorateError(err, "deletion of volume", true).Error())
 			errs++
 		} else {
 			fmt.Printf("Volume '%s' deleted\n", aname)

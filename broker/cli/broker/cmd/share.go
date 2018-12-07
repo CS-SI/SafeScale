@@ -167,7 +167,7 @@ var shareMount = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
-			fmt.Fprintln(os.Stderr, "Missing mandatory argument <Nas_name> and/or <Host_name>")
+			_, _ = fmt.Fprintln(os.Stderr, "Missing mandatory argument <Nas_name> and/or <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
