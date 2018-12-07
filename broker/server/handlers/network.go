@@ -247,7 +247,7 @@ func (svc *NetworkHandler) Create(
 		return nil, infraErrf(err, "Error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
 	}
 
-	sshDefaultTimeout := int(brokerutils.TimeoutCtxHost.Minutes())
+	sshDefaultTimeout := int(brokerutils.GetTimeoutCtxHost().Minutes())
 
 	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
 		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
