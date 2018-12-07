@@ -48,7 +48,6 @@ func main() {
 			Email: "safescale@c-s.fr",
 		},
 	}
-	//app.EnableBashCompletion = true
 
 	cli.VersionFlag = cli.BoolFlag{
 		Name:  "version, V",
@@ -83,6 +82,8 @@ func main() {
 		}
 		return nil
 	}
+
+	app.EnableBashCompletion = true
 
 	app.Commands = append(app.Commands, cmds.ClusterCommand)
 	sort.Sort(cli.CommandsByName(cmds.ClusterCommand.Subcommands))
