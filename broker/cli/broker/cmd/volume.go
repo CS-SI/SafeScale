@@ -77,7 +77,7 @@ var volumeInspect = cli.Command{
 	ArgsUsage: "<Volume_name|Volume_ID>",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Fprintln(os.Stderr, "Missing mandatory argument <Volume_name|Volume_ID>")
+			_, _ = fmt.Fprintln(os.Stderr, "Missing mandatory argument <Volume_name|Volume_ID>")
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
@@ -99,7 +99,7 @@ var volumeDelete = cli.Command{
 	ArgsUsage: "<Volume_name|Volume_ID> [<Volume_name|Volume_ID>...]",
 	Action: func(c *cli.Context) error {
 		if c.NArg() < 1 {
-			fmt.Fprintln(os.Stderr, "Missing mandatory argument <Volume_name|Volume_ID>")
+			_, _ = fmt.Fprintln(os.Stderr, "Missing mandatory argument <Volume_name|Volume_ID>")
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
@@ -136,7 +136,7 @@ var volumeCreate = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
-			fmt.Fprintln(os.Stderr, "Missing mandatory argument <Volume_name>")
+			_, _ = fmt.Fprintln(os.Stderr, "Missing mandatory argument <Volume_name>")
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}

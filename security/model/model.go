@@ -1,6 +1,7 @@
 package model
 
 import (
+	log "github.com/sirupsen/logrus"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mssql"    //Import gorm mssql driver
 	_ "github.com/jinzhu/gorm/dialects/mysql"    //Import gorm mysql driver
@@ -63,7 +64,12 @@ func (da *DataAccess) Get() *gorm.DB {
 //GetUserAccessPermissionsByService get user access permission by service
 func (da *DataAccess) GetUserAccessPermissionsByService(email, serviceName string) []AccessPermission {
 	db := da.Get()
-	defer db.Close()
+	defer func() {
+		clErr := db.Close()
+		if clErr != nil {
+			log.Error(clErr)
+		}
+	}()
 	var service Service
 	if db.Where(&Service{Name: serviceName}).Take(&service).Error != nil {
 		return nil
@@ -86,7 +92,12 @@ func (da *DataAccess) GetUserAccessPermissionsByService(email, serviceName strin
 //GetServiceByName get service by name
 func (da *DataAccess) GetServiceByName(name string) *Service {
 	db := da.Get()
-	defer db.Close()
+	defer func() {
+		clErr := db.Close()
+		if clErr != nil {
+			log.Error(clErr)
+		}
+	}()
 	var srv Service
 	if db.Where(&Service{Name: name}).Take(&srv).Error != nil {
 		return nil
@@ -97,7 +108,12 @@ func (da *DataAccess) GetServiceByName(name string) *Service {
 //Init initialize the database: drop tables if exists and create new empty ones
 func (da *DataAccess) Init() error {
 	db := da.Get()
-	defer db.Close()
+	defer func() {
+		clErr := db.Close()
+		if clErr != nil {
+			log.Error(clErr)
+		}
+	}()
 	err := db.DropTableIfExists(&Service{}, &Role{}, &AccessPermission{}, &User{}).Error
 	if err != nil {
 		return err

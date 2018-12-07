@@ -79,12 +79,16 @@ func runCommand(cmdStr string) error {
 	}()
 	go func() {
 		for stderrScanner.Scan() {
-			fmt.Fprintln(os.Stderr, stderrScanner.Text())
+			_, _ = fmt.Fprintln(os.Stderr, stderrScanner.Text())
 		}
 	}()
 
-	cmd.Start()
-	err := cmd.Wait()
+	err := cmd.Start()
+	if err != nil {
+		return cli.NewExitError(err.Error(), int(ExitCode.Run))
+	}
+
+	err = cmd.Wait()
 	if err != nil {
 		return cli.NewExitError(err.Error(), int(ExitCode.Run))
 	}

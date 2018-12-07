@@ -136,7 +136,12 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 	if err != nil {
 		return err
 	}
-	defer source.Close()
+	defer func() {
+		clerr := source.Close()
+		if clerr != nil {
+			log.Error("Error closing item")
+		}
+	}()
 
 	if seekTo == 0 && length >= size {
 		_, err := io.CopyN(target, source, size)

@@ -145,7 +145,12 @@ func SCPErrorString(retcode int) string {
 
 // Close closes ssh tunnel
 func (tunnel *SSHTunnel) Close() error {
-	defer utils.LazyRemove(tunnel.keyFile.Name())
+	defer func() {
+		lazyErr := utils.LazyRemove(tunnel.keyFile.Name())
+		if lazyErr != nil {
+			log.Error(lazyErr)
+		}
+	}()
 
 	// Kills the process of the tunnel
 	err := tunnel.cmd.Process.Kill()
@@ -172,7 +177,12 @@ func (tunnel *SSHTunnel) Close() error {
 // GetFreePort get a free port
 func getFreePort() (int, error) {
 	listener, err := net.Listen("tcp", ":0")
-	defer listener.Close()
+	defer func() {
+		clErr := listener.Close()
+		if clErr != nil {
+			log.Error(clErr)
+		}
+	}()
 	if err != nil {
 		return 0, err
 	}

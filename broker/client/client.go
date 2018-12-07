@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	logr "github.com/sirupsen/logrus"
 	"github.com/pkg/errors"
 
 	"google.golang.org/grpc"
@@ -98,7 +99,10 @@ func (s *Session) Connect() {
 // Disconnect cuts the connection with brokerd
 func (s *Session) Disconnect() {
 	if s.connection != nil {
-		s.connection.Close()
+		err := s.connection.Close()
+		if err != nil {
+			logr.Error(err)
+		}
 		s.connection = nil
 	}
 }
