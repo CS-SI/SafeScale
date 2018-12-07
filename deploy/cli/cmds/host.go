@@ -42,6 +42,7 @@ var HostCommand = cli.Command{
 		hostCheckFeatureCommand,
 		hostAddFeatureCommand,
 		hostDeleteFeatureCommand,
+		hostListFeatureCommand,
 	},
 
 	// 	Help: &cli.HelpContent{
@@ -158,6 +159,40 @@ var hostAddFeatureCommand = cli.Command{
 		}
 
 		fmt.Printf("Feature '%s' added successfully on host '%s'\n", featureName, hostName)
+		return nil
+	},
+}
+
+
+// hostCheckFeatureCommand handles 'deploy host <host name or id> package <pkgname> check'
+var hostListFeatureCommand = cli.Command{
+	Name:      "list-features",
+	Aliases:   []string{"list-available-features"},
+	Usage:     "list-features",
+	ArgsUsage: "",
+
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		feats, err := install.ListFeatures()
+		if err != nil {
+			return err
+		}
+
+		for _, feat := range feats {
+			view, ok := feat.(string)
+			if ok {
+				fmt.Println(view)
+			} else {
+				view = ""
+			}
+		}
+
 		return nil
 	},
 }

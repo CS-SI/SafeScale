@@ -18,6 +18,8 @@ package install
 
 import (
 	"fmt"
+	"github.com/deckarep/golang-set"
+	"io/ioutil"
 	"log"
 	"strings"
 
@@ -67,6 +69,51 @@ type Feature struct {
 	// specs is the Viper instance containing feature specification
 	specs *viper.Viper
 }
+
+// ListFeature lists all features suitable for hosts
+func ListFeatures() ([]interface{}, error){
+	cfgFiles := mapset.NewSet()
+
+	captured := mapset.NewSet()
+
+	if len(allEmbeddedMap) == 0 {
+		var paths []string
+		paths = append(paths, utils.AbsPathify("$HOME/.safescale/features"))
+		paths = append(paths, utils.AbsPathify("$HOME/.config/safescale/features"))
+		paths = append(paths, utils.AbsPathify("/etc/safescale/features"))
+
+		for _, path := range paths {
+			files, err := ioutil.ReadDir(path)
+			if err == nil {
+				for _, f := range files {
+					if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile == true {
+						cfgFiles.Add(strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+					}
+				}
+			}
+		}
+	} else {
+		for _, feat := range allEmbeddedMap {
+			yamlKey := "feature.suitableFor.host"
+
+			if !captured.Contains(feat.displayName) {
+				ok := false
+				if feat.Specs().IsSet(yamlKey) {
+					value := strings.ToLower(feat.Specs().GetString(yamlKey))
+					ok = value == "ok" || value == "yes" || value == "true" || value == "1"
+				}
+				if ok {
+					cfgFiles.Add(feat.fileName)
+				}
+
+				captured.Add(feat.displayName)
+			}
+		}
+	}
+
+	return cfgFiles.ToSlice(), nil
+}
+
 
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
