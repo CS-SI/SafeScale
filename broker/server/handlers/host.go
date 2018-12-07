@@ -90,7 +90,7 @@ func (svc *HostHandler) Start(ref string) error {
 	if err != nil {
 		return infraErr(err)
 	}
-	return infraErr(svc.provider.WaitHostState(id, HostState.STARTED, brokerutils.TimeoutCtxHost))
+	return infraErr(svc.provider.WaitHostState(id, HostState.STARTED, brokerutils.GetTimeoutCtxHost()))
 }
 
 // Stop stops a host
@@ -111,7 +111,7 @@ func (svc *HostHandler) Stop(ref string) error {
 	if err != nil {
 		return infraErr(err)
 	}
-	return infraErr(svc.provider.WaitHostState(id, HostState.STOPPED, brokerutils.TimeoutCtxHost))
+	return infraErr(svc.provider.WaitHostState(id, HostState.STOPPED, brokerutils.GetTimeoutCtxHost()))
 }
 
 // Reboot reboots a host
@@ -133,7 +133,7 @@ func (svc *HostHandler) Reboot(ref string) error {
 	}
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			return svc.provider.WaitHostState(id, HostState.STARTED, brokerutils.TimeoutCtxHost)
+			return svc.provider.WaitHostState(id, HostState.STARTED, brokerutils.GetTimeoutCtxHost())
 		},
 		5*time.Minute,
 	)
@@ -374,7 +374,7 @@ func (svc *HostHandler) Create(
 		return nil, infraErr(err)
 	}
 
-	sshDefaultTimeout := int(brokerutils.TimeoutCtxHost.Minutes())
+	sshDefaultTimeout := int(brokerutils.GetTimeoutCtxHost().Minutes())
 
 	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
 		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)

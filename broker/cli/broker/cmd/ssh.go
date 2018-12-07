@@ -64,7 +64,7 @@ var sshRun = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
-		timeout := brokerutils.TimeoutCtxHost
+		timeout := brokerutils.GetTimeoutCtxHost()
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}
@@ -107,7 +107,7 @@ var sshCopy = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
-		timeout := brokerutils.TimeoutCtxHost
+		timeout := brokerutils.GetTimeoutCtxHost()
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}

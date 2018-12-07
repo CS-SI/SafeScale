@@ -54,8 +54,8 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		return 0, "", "", err
 	}
 
-	if executionTimeout < utils.TimeoutCtxHost {
-		executionTimeout = utils.TimeoutCtxHost
+	if executionTimeout < utils.GetTimeoutCtxHost() {
+		executionTimeout = utils.GetTimeoutCtxHost()
 	}
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
@@ -197,8 +197,8 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 		return 0, "", "", err
 	}
 
-	if executionTimeout < utils.TimeoutCtxHost {
-		executionTimeout = utils.TimeoutCtxHost
+	if executionTimeout < utils.GetTimeoutCtxHost() {
+		executionTimeout = utils.GetTimeoutCtxHost()
 	}
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
@@ -362,8 +362,8 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 
 // WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
 func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {
-	if timeout < utils.TimeoutCtxHost {
-		timeout = utils.TimeoutCtxHost
+	if timeout < utils.GetTimeoutCtxHost() {
+		timeout = utils.GetTimeoutCtxHost()
 	}
 	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {

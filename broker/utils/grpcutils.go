@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +35,32 @@ const (
 	// TimeoutCtxHost timeout for grpc command relative to host creation
 	TimeoutCtxHost = 5 * time.Minute
 )
+
+func GetTimeoutCtxDefault() time.Duration {
+	sshDefaultTimeout := int(TimeoutCtxDefault.Minutes())
+
+	if sshDefaultTimeoutCandidate := os.Getenv("CTX_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
+		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
+		if err == nil {
+			sshDefaultTimeout = num
+		}
+	}
+
+	return time.Duration(sshDefaultTimeout) * time.Minute
+}
+
+func GetTimeoutCtxHost() time.Duration {
+	sshDefaultTimeout := int(TimeoutCtxHost.Minutes())
+
+	if sshDefaultTimeoutCandidate := os.Getenv("CTX_HOST_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
+		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
+		if err == nil {
+			sshDefaultTimeout = num
+		}
+	}
+
+	return time.Duration(sshDefaultTimeout) * time.Minute
+}
 
 // GetConnection returns a connection to GRPC server
 func GetConnection(host string, port int) *grpc.ClientConn {
