@@ -160,6 +160,7 @@ service HostService{
     rpc Start(Reference) returns (google.protobuf.Empty){}
     rpc Stop(Reference) returns (google.protobuf.Empty){}
     rpc Reboot(Reference) returns (google.protobuf.Empty){}
+    rpc Resize(HostDefinition) returns (Host){}
     rpc SSH(Reference) returns (SshConfig){}
 }
 

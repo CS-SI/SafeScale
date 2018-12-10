@@ -102,6 +102,11 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	return client.osclt.CreateHost(request)
 }
 
+// ResizeHost creates an host satisfying request
+func (client *Client) ResizeHost(request model.HostRequest) (*model.Host, error) {
+	return client.osclt.ResizeHost(request)
+}
+
 // WaitHostReady waits an host achieve ready state
 func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*model.Host, error) {
 	return client.osclt.WaitHostReady(hostID, timeout)

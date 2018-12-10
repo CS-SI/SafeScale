@@ -56,6 +56,7 @@ type HostAPI interface {
 	Delete(ref string) error
 	SSH(ref string) (*system.SSHConfig, error)
 	Reboot(ref string) error
+	Resize(name string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*model.Host, error)
 	Start(ref string) error
 	Stop(ref string) error
 }
@@ -141,6 +142,32 @@ func (svc *HostHandler) Reboot(ref string) error {
 		return infraErrf(err, "timeout waiting host '%s' to be rebooted", ref)
 	}
 	return nil
+}
+
+func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*model.Host, error) {
+	log.Debugf("server.services.HostHandler.Resize(%s) called", ref)
+	defer log.Debugf("server.services.HostHandler.Resize(%s) done", ref)
+
+	mh, err := metadata.LoadHost(svc.provider, ref)
+	if err != nil {
+		// TODO Introduce error level as parameter
+		return nil, infraErrf(err, "Error getting ssh config of host '%s': loading host metadata", ref)
+	}
+	if mh == nil {
+		return nil, infraErr(fmt.Errorf("host '%s' not found", ref))
+	}
+
+	// TODO Fill this data
+	id := mh.Get().ID
+	hostRequest := model.HostRequest{
+		ImageID:        id,
+		ResourceName:   ref,
+	}
+
+	svc.provider.ResizeHost(hostRequest)
+
+	// TODO Implement Resize
+	panic("implement me")
 }
 
 // Create creates a host

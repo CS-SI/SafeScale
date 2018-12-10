@@ -35,6 +35,7 @@ var HostCmd = cli.Command{
 	Subcommands: []cli.Command{
 		hostList,
 		hostCreate,
+		hostResize,
 		hostDelete,
 		hostInspect,
 		hostStatus,
@@ -287,6 +288,68 @@ var hostCreate = cli.Command{
 		// 		fmt.Printf("Feature '%s' added successfully on host '%s'\n", featureName, hostName)
 		// 	}
 		// }
+
+		out, _ := json.Marshal(resp)
+		fmt.Println(string(out))
+
+		return nil
+	},
+}
+
+
+var hostResize = cli.Command{
+	Name:      "resize",
+	Aliases:   []string{"upgrade"},
+	Usage:     "resizes a host",
+	ArgsUsage: "<Host_name>",
+	Flags: []cli.Flag{
+		cli.IntFlag{
+			Name:  "cpu",
+			Value: 1,
+			Usage: "Number of CPU for the host",
+		},
+		cli.Float64Flag{
+			Name:  "ram",
+			Value: 1,
+			Usage: "RAM for the host (GB)",
+		},
+		cli.IntFlag{
+			Name:  "disk",
+			Value: 16,
+			Usage: "Disk space for the host (GB)",
+		},
+		cli.IntFlag{
+			Name:  "gpu",
+			Value: 0,
+			Usage: "Number of GPU for the host",
+		},
+		cli.Float64Flag{
+			Name:  "cpu-freq, cpufreq",
+			Value: 0,
+			Usage: "Minimum cpu frequency required for the host (GHz)",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			fmt.Println("Missing mandatory argument <Host_name>")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
+		}
+		// hostName := c.Args().Get(1)
+
+		def := pb.HostDefinition{
+			Name:      c.Args().First(),
+			CPUNumber: int32(c.Int("cpu")),
+			Disk:      int32(c.Float64("disk")),
+			RAM:       float32(c.Float64("ram")),
+			GPUNumber: int32(c.Int("gpu")),
+			Freq:      float32(c.Float64("cpu-freq")),
+			Force:     c.Bool("force"),
+		}
+		resp, err := client.New().Host.Resize(def, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "creation of host", true).Error()))
+		}
 
 		out, _ := json.Marshal(resp)
 		fmt.Println(string(out))
