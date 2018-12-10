@@ -536,6 +536,13 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	return host, nil
 }
 
+
+// ResizeHost creates an host satisfying request
+func (client *Client) ResizeHost(request model.HostRequest) (*model.Host, error) {
+	// TODO Implement Resize Host
+	return nil, nil
+}
+
 // validatehostName validates the name of an host based on known FlexibleEngine requirements
 func validatehostName(req model.HostRequest) (bool, error) {
 	s := check.Struct{

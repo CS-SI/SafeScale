@@ -624,6 +624,11 @@ type userData struct {
 // 	return gw, nil
 // }
 
+func (client *Client) ResizeHost(request model.HostRequest) (*model.Host, error) {
+	// TODO Implement Resize Host
+	return nil, nil
+}
+
 // CreateHost creates an host satisfying request
 func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	msgFail := "Failed to create Host resource: %s"

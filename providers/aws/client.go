@@ -207,6 +207,10 @@ type Client struct {
 	Cfg *CfgOptions
 }
 
+func (c *Client) ResizeHost(request model.HostRequest) (*model.Host, error) {
+	panic("implement me")
+}
+
 func (c *Client) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
 	return nil, fmt.Errorf("aws.CreateGateway() isn't available by design")
 }

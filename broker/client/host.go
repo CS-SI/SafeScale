@@ -166,3 +166,12 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 	}
 	return sshCfg, err
 }
+
+func (h *host) Resize(def pb.HostDefinition, duration time.Duration) (*pb.Host, error) {
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+	ctx := context.Background()
+
+	return service.Resize(ctx, &def)
+}
