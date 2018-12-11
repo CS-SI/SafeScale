@@ -18,6 +18,7 @@ package model
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 // extensions ...
@@ -47,7 +48,7 @@ func (x *Extensions) Get(key string, value interface{}) error {
 	if jsoned, ok := x.extensions[key]; ok {
 		return json.Unmarshal([]byte(jsoned), value)
 	}
-	return nil
+	return fmt.Errorf("Unable to unmarshal key '%s', not found", key)
 }
 
 // Set adds/replaces the content of key 'key' with 'value'
