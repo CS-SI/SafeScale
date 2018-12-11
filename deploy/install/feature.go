@@ -18,9 +18,12 @@ package install
 
 import (
 	"fmt"
+	"io/ioutil"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/deckarep/golang-set"
 
 	"github.com/spf13/viper"
 
@@ -68,8 +71,8 @@ type Feature struct {
 	specs *viper.Viper
 }
 
-// ListFeature lists all features suitable for hosts
-func ListFeatures() ([]interface{}, error){
+// ListFeatures lists all features suitable for hosts
+func ListFeatures() ([]interface{}, error) {
 	cfgFiles := mapset.NewSet()
 
 	captured := mapset.NewSet()
@@ -111,7 +114,6 @@ func ListFeatures() ([]interface{}, error){
 
 	return cfgFiles.ToSlice(), nil
 }
-
 
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
