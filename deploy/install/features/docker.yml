@@ -46,7 +46,7 @@ feature:
                             esac
 
             add:
-                pace: docker-ce,systemctl
+                pace: docker-ce,ready
                 steps:
                     docker-ce:
                         serial: true
@@ -96,9 +96,10 @@ feature:
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            while true;
+                            while true; do
                                 systemctl status docker &>/dev/null
                                 [ $? -eq 0 ] && break
+                                sleep 5
                             done
                             exit 0
 
