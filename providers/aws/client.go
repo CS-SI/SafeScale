@@ -19,8 +19,6 @@ package aws
 //go:generate rice embed-go
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"github.com/CS-SI/SafeScale/providers/aws/s3"
@@ -31,6 +29,8 @@ import (
 	"time"
 
 	"github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -38,16 +38,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
-	awss3 "github.com/aws/aws-sdk-go/service/s3"
 
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/providers/openstack"
+	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
 )
 
@@ -57,7 +56,7 @@ import (
 // 	DefaultNetwork string
 // }
 
-//AuthOpts AWS credentials
+// AuthOpts AWS credentials
 type AuthOpts struct {
 	// AWS Access key ID
 	AccessKeyID string
@@ -111,20 +110,20 @@ func AuthenticatedClient(opts AuthOpts) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	userDataStr, err := box.String("userdata.sh")
-	if err != nil {
-		return nil, err
-	}
-	tpl, err := template.New("user_data").Parse(userDataStr)
-	if err != nil {
-		return nil, err
-	}
+	// userDataStr, err := box.String("userdata.sh")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// tpl, err := template.New("user_data").Parse(userDataStr)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	c := Client{
-		Session:     s,
-		EC2:         ec2.New(s),
-		Pricing:     pricing.New(sPricing),
-		AuthOpts:    opts,
-		UserDataTpl: tpl,
+		Session:  s,
+		EC2:      ec2.New(s),
+		Pricing:  pricing.New(sPricing),
+		AuthOpts: opts,
+		// UserDataTpl: tpl,
 	}
 	//providers.InitializeBucket(&c)
 	//c.CreateContainer("gpac.aws.networks")
@@ -684,52 +683,33 @@ func (c *Client) DeleteKeyPair(id string) error {
 	return err
 }
 
-func (c *Client) saveNetwork(n model.Network) error {
-	b, err := json.Marshal(n)
-	if err != nil {
-		return err
-	}
-	buffer := bytes.NewReader(b)
-	return c.PutObject("gpac.aws.networks", model.Object{
-		Name:    n.ID,
-		Content: buffer,
-	})
-}
-
-func (c *Client) getNetwork(netID string) (*model.Network, error) {
-	o, err := c.GetObject("gpac.aws.networks", netID, nil)
-	if err != nil {
-		return nil, err
-	}
-	var buffer bytes.Buffer
-	buffer.ReadFrom(o.Content)
-	net := model.Network{}
-	err = json.Unmarshal(buffer.Bytes(), &net)
-	if err != nil {
-		return nil, err
-	}
-	return &net, err
-}
-func (c *Client) removeNetwork(netID string) error {
-	return c.DeleteObject("gpac.aws.networks", netID)
-}
+// func (c *Client) getNetwork(netID string) (*model.Network, error) {
+// 	o, err := c.GetObject("gpac.aws.networks", netID, nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	var buffer bytes.Buffer
+// 	buffer.ReadFrom(o.Content)
+// 	net := model.Network{}
+// 	err = json.Unmarshal(buffer.Bytes(), &net)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return &net, err
+// }
+// func (c *Client) removeNetwork(netID string) error {
+// 	return c.DeleteObject("gpac.aws.networks", netID)
+// }
 
 // CreateNetwork creates a network
 func (c *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
-	// m, err := metadata.LoadNetwork(c, req.Name)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if m != nil {
-	// 	return nil, fmt.Errorf("A network already exists with name '%s'", req.Name)
-	// }
-
 	vpcOut, err := c.EC2.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: aws.String(req.CIDR),
 	})
 	if err != nil {
 		return nil, err
 	}
+
 	sn, err := c.EC2.CreateSubnet(&ec2.CreateSubnetInput{
 		CidrBlock: aws.String(req.CIDR),
 		VpcId:     vpcOut.Vpc.VpcId,
@@ -798,12 +778,7 @@ func (c *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error)
 		ID:        pStr(vpcOut.Vpc.VpcId),
 		Name:      req.Name,
 		IPVersion: req.IPVersion,
-		GatewayID: host.ID,
-	}
-	err = c.saveNetwork(net)
-	if err != nil {
-		c.DeleteNetwork(*vpcOut.Vpc.VpcId)
-		return nil, err
+		// GatewayID: host.ID,
 	}
 	return &net, nil
 }
@@ -821,8 +796,10 @@ func (c *Client) GetNetwork(id string) (*model.Network, error) {
 	if err != nil {
 		return nil, err
 	}
-	net.CIDR = *out.Vpcs[0].CidrBlock
-	net.ID = *out.Vpcs[0].VpcId
+	net := &model.Network{
+		CIDR: *out.Vpcs[0].CidrBlock,
+		ID:   *out.Vpcs[0].VpcId,
+	}
 	return net, nil
 }
 
@@ -834,7 +811,7 @@ func (c *Client) ListNetworks() ([]*model.Network, error) {
 	}
 	nets := []*model.Network{}
 	for _, vpc := range out.Vpcs {
-		net, err := c.getNetwork(*vpc.VpcId)
+		net, err := c.GetNetwork(*vpc.VpcId)
 		if err != nil {
 			return nil, err
 		}
@@ -843,52 +820,51 @@ func (c *Client) ListNetworks() ([]*model.Network, error) {
 		nets = append(nets, net)
 	}
 	return nets, nil
-
 }
 
 // DeleteNetwork deletes the network identified by id
 func (c *Client) DeleteNetwork(id string) error {
-	net, err := c.getNetwork(id)
-	if err == nil {
-		c.DeleteHost(net.GatewayID)
-		addrs, _ := c.EC2.DescribeAddresses(&ec2.DescribeAddressesInput{
-			Filters: []*ec2.Filter{
-				{
-					Name: aws.String("domain"),
-					Values: []*string{
-						aws.String("vpc"),
-					},
-				},
-				{
-					Name: aws.String("instance-id"),
-					Values: []*string{
-						aws.String(net.GatewayID),
-					},
-				},
-			},
-		})
-		for _, addr := range addrs.Addresses {
-			c.EC2.DisassociateAddress(&ec2.DisassociateAddressInput{
-				AssociationId: addr.AssociationId,
-			})
-			c.EC2.ReleaseAddress(&ec2.ReleaseAddressInput{
-				AllocationId: addr.AllocationId,
-			})
-		}
-	}
+	// net, err := c.getNetwork(id)
+	// if err == nil {
+	// 	c.DeleteHost(net.GatewayID)
+	// 	addrs, _ := c.EC2.DescribeAddresses(&ec2.DescribeAddressesInput{
+	// 		Filters: []*ec2.Filter{
+	// 			{
+	// 				Name: aws.String("domain"),
+	// 				Values: []*string{
+	// 					aws.String("vpc"),
+	// 				},
+	// 			},
+	// 			{
+	// 				Name: aws.String("instance-id"),
+	// 				Values: []*string{
+	// 					aws.String(net.GatewayID),
+	// 				},
+	// 			},
+	// 		},
+	// 	})
+	// 	for _, addr := range addrs.Addresses {
+	// 		c.EC2.DisassociateAddress(&ec2.DisassociateAddressInput{
+	// 			AssociationId: addr.AssociationId,
+	// 		})
+	// 		c.EC2.ReleaseAddress(&ec2.ReleaseAddressInput{
+	// 			AllocationId: addr.AllocationId,
+	// 		})
+	// 	}
+	// }
 
-	_, err = c.EC2.DeleteVpc(&ec2.DeleteVpcInput{
+	_, err := c.EC2.DeleteVpc(&ec2.DeleteVpcInput{
 		VpcId: aws.String(id),
 	})
 	return err
 }
 
-func (c *Client) getSubnets(vpcIDs []string) ([]*ec2.Subnet, error) {
+func (c *Client) getSubnets(networks []*model.Network) ([]*ec2.Subnet, error) {
 	filters := []*ec2.Filter{}
-	for _, id := range vpcIDs {
+	for _, net := range networks {
 		filters = append(filters, &ec2.Filter{
 			Name:   aws.String("vpc-id"),
-			Values: []*string{&id},
+			Values: []*string{&net.ID},
 		})
 	}
 	out, err := c.EC2.DescribeSubnets(&ec2.DescribeSubnetsInput{
@@ -940,22 +916,36 @@ func getState(state *ec2.InstanceState) (HostState.Enum, error) {
 	return HostState.ERROR, fmt.Errorf("unexpected host state")
 }
 
-// Data structure to apply to userdata.sh template
-type userData struct {
-	//Name of the default user (api.DefaultUser)
-	User string
-	//Private key used to create the host
-	Key string
-	//If true activate IP frowarding
-	IsGateway bool
-	//If true configure default gateway
-	AddGateway bool
-	//Content of the /etc/resolv.conf of the Gateway
-	//Used only if IsGateway is true
-	ResolvConf string
-	//IP of the gateway
-	GatewayIP string
-}
+// func (c *Client) saveHost(host model.Host) error {
+// 	var buffer bytes.Buffer
+// 	enc := gob.NewEncoder(&buffer)
+// 	err := enc.Encode(host)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return c.PutObject("gpac.aws.wms", model.Object{
+// 		Name:    host.ID,
+// 		Content: bytes.NewReader(buffer.Bytes()),
+// 	})
+// }
+// func (c *Client) removeHost(hostID string) error {
+// 	return c.DeleteObject("gpac.aws.wms", hostID)
+// }
+// func (c *Client) readHost(hostID string) (*model.Host, error) {
+// 	o, err := c.GetObject("gpac.aws.wms", hostID, nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	var buffer bytes.Buffer
+// 	buffer.ReadFrom(o.Content)
+// 	enc := gob.NewDecoder(&buffer)
+// 	var host model.Host
+// 	err = enc.Decode(&host)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return &host, nil
+// }
 
 func (c *Client) prepareUserData(request model.HostRequest, kp *model.KeyPair, gw *model.Host) (string, error) {
 	dataBuffer := bytes.NewBufferString("")
@@ -1085,7 +1075,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 			return nil, err
 		}
 		gwID = net.GatewayID
-		gw, err = c.GetHost(gwID)
+		gw, err := c.GetHost(gwID)
 		if err != nil {
 			return nil, err
 		}
@@ -1100,13 +1090,19 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	//get subnet of each network
 	sns, err := c.getSubnets(nets)
 
-	//Prepare user data
-	userData, err := c.prepareUserData(request, kp, gw)
+	// get subnet of each network
+	sns, err := c.getSubnets(request.Networks)
 	if err != nil {
 		return nil, err
 	}
 
-	//Create networks interfaces
+	// Prepare user data
+	userData, err := userdata.Prepare(request, kp, gw)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create networks interfaces
 	networkInterfaces := []*ec2.InstanceNetworkInterfaceSpecification{}
 
 	vpcs := map[string][]*ec2.Subnet{}
@@ -1116,11 +1112,13 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}
 
 	i := 0
+	for _, net := range request.Networks {
+		if len(vpcs[net.ID]) < 1 {
 	for _, netID := range nets {
 		if len(vpcs[netID]) < 1 {
 			continue
 		}
-		sn := vpcs[netID][0]
+		sn := vpcs[net.ID][0]
 		networkInterfaces = append(networkInterfaces, &ec2.InstanceNetworkInterfaceSpecification{
 			SubnetId:                 sn.SubnetId,
 			AssociatePublicIpAddress: aws.Bool(false),
@@ -1130,7 +1128,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 		i++
 	}
 
-	//Run instance
+	// Run instance
 	out, err := c.EC2.RunInstances(&ec2.RunInstancesInput{
 		ImageId:           aws.String(request.ImageID),
 		KeyName:           aws.String(kp.Name),
@@ -1138,7 +1136,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 		NetworkInterfaces: networkInterfaces,
 		MaxCount:          aws.Int64(1),
 		MinCount:          aws.Int64(1),
-		UserData:          aws.String(userData),
+		UserData:          aws.String(string(userData)),
 		// TagSpecifications: []*ec2.TagSpecification{
 		// 	{
 		// 		Tags: []*ec2.Tag{
@@ -1155,6 +1153,15 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}
 	instance := out.Instances[0]
 
+	defer func() {
+		if err != nil {
+			derr := c.DeleteHost(*instance.InstanceId)
+			if derr != nil {
+				log.Errorf("failed to delete host: %+v", derr)
+			}
+		}
+	}()
+
 	netIFs, err := c.EC2.DescribeNetworkInterfaces(&ec2.DescribeNetworkInterfacesInput{
 		Filters: []*ec2.Filter{
 			&ec2.Filter{
@@ -1168,7 +1175,6 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 		},
 	})
 	if err != nil {
-		c.DeleteHost(*instance.InstanceId)
 		return nil, err
 	}
 
@@ -1176,14 +1182,11 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 		Domain: aws.String("vpc"),
 	})
 	if err != nil {
-		c.DeleteHost(*instance.InstanceId)
 		return nil, err
 	}
-	//Wait that host is started
-	service := providers.Service{
-		ClientAPI: c,
-	}
-	err = service.WaitHostState(*instance.InstanceId, HostState.STARTED, 120*time.Second)
+
+	// Create model.Host
+	tpl, err := c.GetTemplate(*instance.InstanceType)
 	if err != nil {
 		return nil, err
 	}
@@ -1192,10 +1195,8 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 		AllocationId:       addr.AllocationId,
 	})
 	if err != nil {
-		c.DeleteHost(*instance.InstanceId)
 		return nil, err
 	}
-	//Create api.Host
 
 	_, err = c.GetTemplate(*instance.InstanceType)
 	if err != nil {
@@ -1209,7 +1210,6 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 
 	state, err := getState(instance.State)
 	if err != nil {
-		c.DeleteHost(*instance.InstanceId)
 		return nil, err
 	}
 
@@ -1219,7 +1219,22 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 		PrivateKey: kp.PrivateKey,
 		LastState:  state,
 	}
-	c.saveHost(host)
+
+	// Wait that host is ready, not just that the build is started
+	host, err = c.WaitHostReady(host, time.Minute*5)
+	if err != nil {
+		switch err.(type) {
+		case model.ErrResourceNotAvailable:
+			return nil, fmt.Errorf("host '%s' is in ERROR state", request.ResourceName)
+		default:
+			return nil, fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
+			// msg := fmt.Sprintf(msgFail, openstack.ProviderErrorToString(err))
+			// // TODO Gotcha !!
+			// log.Debugf(msg)
+			// return fmt.Errorf(msg)
+		}
+	}
+
 	return &host, nil
 }
 
@@ -1247,6 +1262,7 @@ func (c *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 	}
 	instance := out.Reservations[0].Instances[0]
 	host, err = c.readHost(host.ID)
+	host, err = c.complementHost(host)
 	if err != nil {
 		host = &model.Host{
 			ID: *instance.InstanceId,
@@ -1258,6 +1274,8 @@ func (c *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 		return nil, err
 	}
 	_, err = c.GetTemplate(*instance.InstanceType)
+
+	tpl, err := c.GetTemplate(*instance.InstanceType)
 	if err != nil {
 		return nil, err
 	}
@@ -1276,7 +1294,6 @@ func (c *Client) ListHosts() ([]*model.Host, error) {
 
 // DeleteHost deletes the host identified by id
 func (c *Client) DeleteHost(id string) error {
-	c.removeHost(id)
 	ips, err := c.EC2.DescribeAddresses(&ec2.DescribeAddressesInput{
 		Filters: []*ec2.Filter{
 			&ec2.Filter{
@@ -1296,7 +1313,6 @@ func (c *Client) DeleteHost(id string) error {
 		InstanceIds: []*string{aws.String(id)},
 	})
 	return err
-
 }
 
 // StopHost stops the host identified by id
@@ -1414,27 +1430,6 @@ func toVolumeState(s *string) VolumeState.Enum {
 	return VolumeState.OTHER
 }
 
-func (c *Client) saveVolumeName(id, name string) error {
-	return c.PutObject("gpac.aws.volumes", model.Object{
-		Name:    id,
-		Content: strings.NewReader(name),
-	})
-}
-
-func (c *Client) getVolumeName(id string) (string, error) {
-	obj, err := c.GetObject("gpac.aws.volumes", id, nil)
-	if err != nil {
-		return "", err
-	}
-	buffer := bytes.Buffer{}
-	buffer.ReadFrom(obj.Content)
-	return buffer.String(), nil
-}
-
-func (c *Client) removeVolumeName(id string) error {
-	return c.DeleteObject("gpac.aws.volumes", id)
-}
-
 // CreateVolume creates a block volume
 //- name is the name of the volume
 //- size is the size of the volume in GB
@@ -1442,10 +1437,11 @@ func (c *Client) removeVolumeName(id string) error {
 func (c *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
 	// Check if a volume already exists with the same name
 	_volume, err := c.GetVolume(request.Name)
+	volume, err := c.GetVolume(requets.Name)
 	if err != nil {
 		return nil, err
 	}
-	if _volume != nil {
+	if volume != nil {
 		return nil, fmt.Errorf("Volume '%s' already exists", request.Name)
 	}
 
@@ -1456,11 +1452,12 @@ func (c *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error
 	if err != nil {
 		return nil, err
 	}
+
+	volume = model.Volume{
 	err = c.saveVolumeName(*v.VolumeId, request.Name)
-	if err != nil {
 		c.DeleteVolume(*v.VolumeId)
 	}
-	volume := model.Volume{
+	if err != nil {
 		ID:    pStr(v.VolumeId),
 		Name:  request.Name,
 		Size:  int(*(v.Size)),
@@ -1479,14 +1476,14 @@ func (c *Client) GetVolume(id string) (*model.Volume, error) {
 		return nil, err
 	}
 	v := out.Volumes[0]
-	name, err := c.getVolumeName(id)
-	if err != nil {
-		return nil, err
-	}
-	volume := model.Volume{
-		ID:    pStr(v.VolumeId),
-		Name:  name,
-		Size:  int(*(v.Size)),
+	// name, err := c.getVolumeName(id)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	volume := api.Volume{
+		ID: pStr(v.VolumeId),
+		// Name:  name,
+		Size:  int(pInt64(v.Size)),
 		Speed: toVolumeSpeed(v.VolumeType),
 		State: toVolumeState(v.State),
 	}
@@ -1501,14 +1498,15 @@ func (c *Client) ListVolumes() ([]model.Volume, error) {
 	}
 	volumes := []model.Volume{}
 	for _, v := range out.Volumes {
-		name, err := c.getVolumeName(*v.VolumeId)
-		if err != nil {
-			return nil, err
-		}
-		volume := model.Volume{
-			ID:    pStr(v.VolumeId),
+		// name, err := c.getVolumeName(*v.VolumeId)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		volume := api.Volume{
+			ID: pStr(v.VolumeId),
+			// Name:  name,
+			Size:  int(pInt64(v.Size)),
 			Name:  name,
-			Size:  int(*(v.Size)),
 			Speed: toVolumeSpeed(v.VolumeType),
 			State: toVolumeState(v.State),
 		}
@@ -1563,20 +1561,13 @@ func (c *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (
 	if err != nil {
 		return "", err
 	}
-
-	/*
-		return &api.VolumeAttachment{
-			Device:   pStr(va.Device),
-			ID:       pStr(va.VolumeId),
-			Name:     request.Name,
-			ServerID: pStr(va.InstanceId),
-			VolumeID: pStr(va.VolumeId),
-		}, nil
-	*/
-
-	// TODO AWS Fix this
-
-	return "", nil
+	return &model.VolumeAttachment{
+		Device:   pStr(va.Device),
+		ID:       pStr(va.VolumeId),
+		Name:     request.Name,
+		ServerID: pStr(va.InstanceId),
+		VolumeID: pStr(va.VolumeId),
+	}, nil
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
@@ -1597,7 +1588,7 @@ func (c *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachme
 			}, nil
 		}
 	}
-	return nil, fmt.Errorf("Volume attachment of volume %s on server %s does not exist", serverID, id)
+	return nil, fmt.Errorf("Volume attachment of volume '%s' to server '%s' doesn't exist", serverID, id)
 }
 
 // ListVolumeAttachments lists available volume attachment
@@ -1636,57 +1627,7 @@ func (c *Client) DeleteVolumeAttachment(serverID, id string) error {
 	return err
 }
 
-// CreateContainer creates an object container
-func (c *Client) CreateContainer(name string) error {
-	return s3.CreateContainer(awss3.New(c.Session), name, "")
-}
-
-// DeleteContainer deletes an object container
-func (c *Client) DeleteContainer(name string) error {
-	return s3.DeleteContainer(awss3.New(c.Session), name)
-}
-
-// ListContainers list object containers
-func (c *Client) ListContainers() ([]string, error) {
-	return s3.ListContainers(awss3.New(c.Session))
-}
-
-// PutObject put an object into an object container
-func (c *Client) PutObject(container string, obj model.Object) error {
-	return s3.PutObject(awss3.New(c.Session), container, obj)
-}
-
-// UpdateObjectMetadata update an object into  object container
-func (c *Client) UpdateObjectMetadata(container string, obj model.Object) error {
-	return s3.UpdateObjectMetadata(awss3.New(c.Session), container, obj)
-}
-
-// GetObject get  object content from an object container
-func (c *Client) GetObject(container string, name string, ranges []model.Range) (*model.Object, error) {
-	return s3.GetObject(awss3.New(c.Session), container, name, ranges)
-}
-
-// GetObjectMetadata get  object metadata from an object container
-func (c *Client) GetObjectMetadata(container string, name string) (*model.Object, error) {
-	return s3.GetObjectMetadata(awss3.New(c.Session), container, name)
-}
-
-// ListObjects list objects of a container
-func (c *Client) ListObjects(container string, filter model.ObjectFilter) ([]string, error) {
-	return s3.ListObjects(awss3.New(c.Session), container, filter)
-}
-
-// CopyObject copies an object
-func (c *Client) CopyObject(containerSrc, objectSrc, objectDst string) error {
-	return s3.CopyObject(awss3.New(c.Session), containerSrc, objectSrc, objectDst)
-}
-
-// DeleteObject deleta an object from a container
-func (c *Client) DeleteObject(container, object string) error {
-	return s3.DeleteObject(awss3.New(c.Session), container, object)
-}
-
-// GetAuthOpts
+// GetAuthOpts ...
 func (c *Client) GetAuthOpts() (model.Config, error) {
 	cfg := model.ConfigMap{}
 	return cfg, nil
@@ -1697,6 +1638,7 @@ func (c *Client) GetCfgOpts() (model.Config, error) {
 	cfg := model.ConfigMap{}
 
 	cfg.Set("DNSList", c.Cfg.DNSList)
+	// cfg.Set("S3Protocol", c.Cfg.S3Protocol)
 	cfg.Set("AutoHostNetworkInterfaces", c.Cfg.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", c.Cfg.UseLayer3Networking)
 

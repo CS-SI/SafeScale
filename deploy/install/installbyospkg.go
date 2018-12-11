@@ -2,8 +2,9 @@ package install
 
 import (
 	"fmt"
-	"log"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"

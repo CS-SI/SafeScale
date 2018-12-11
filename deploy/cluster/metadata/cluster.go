@@ -1,5 +1,3 @@
-package metadata
-
 /*
 * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
 *
@@ -16,14 +14,15 @@ package metadata
 * limitations under the License.
  */
 
+package metadata
+
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/deploy/cluster/core"
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/metadata"
-	"github.com/CS-SI/SafeScale/utils/provideruse"
-
-	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 )
 
 const (
@@ -38,18 +37,19 @@ type Cluster struct {
 }
 
 // NewCluster creates a new Cluster metadata
-func NewCluster() (*Cluster, error) {
-	svc, err := provideruse.GetProviderService()
-	if err != nil {
-		return nil, err
-	}
+func NewCluster(svc *providers.Service) (*Cluster, error) {
 	return &Cluster{
 		item: metadata.NewItem(svc, clusterFolderName),
 	}, nil
 }
 
+// GetService returns the service used by metadata
+func (m *Cluster) GetService() *providers.Service {
+	return m.item.GetService()
+}
+
 // Carry links metadata with cluster struct
-func (m *Cluster) Carry(cluster *api.ClusterCore) *Cluster {
+func (m *Cluster) Carry(cluster *core.Cluster) *Cluster {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
@@ -69,8 +69,8 @@ func (m *Cluster) Delete() error {
 // Read reads metadata of cluster named 'name' from Object Storage
 func (m *Cluster) Read(name string) (bool, error) {
 	var (
-		target api.ClusterCore
-		ptr    *api.ClusterCore
+		target core.Cluster
+		ptr    *core.Cluster
 		ok     bool
 	)
 	// If m.item is already carrying data, overwrites it
@@ -79,7 +79,7 @@ func (m *Cluster) Read(name string) (bool, error) {
 	if anon == nil {
 		ptr = &target
 	} else {
-		ptr, ok = anon.(*api.ClusterCore)
+		ptr, ok = anon.(*core.Cluster)
 		if !ok {
 			ptr = &target
 		}
@@ -123,11 +123,11 @@ func (m *Cluster) Reload() error {
 }
 
 // Get returns the content of the metadata
-func (m *Cluster) Get() *api.ClusterCore {
+func (m *Cluster) Get() *core.Cluster {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	if p, ok := m.item.Get().(*api.ClusterCore); ok {
+	if p, ok := m.item.Get().(*core.Cluster); ok {
 		return p
 	}
 	panic("invalid cluster content in metadata")
@@ -136,12 +136,12 @@ func (m *Cluster) Get() *api.ClusterCore {
 // Browse walks through cluster folder and executes a callback for each entry
 func (m *Cluster) Browse(callback func(*Cluster) error) error {
 	return m.item.Browse(func(buf []byte) error {
-		cc := api.ClusterCore{}
+		cc := core.Cluster{}
 		err := (&cc).Deserialize(buf)
 		if err != nil {
 			return err
 		}
-		cm, err := NewCluster()
+		cm, err := NewCluster(m.GetService())
 		if err != nil {
 			return err
 		}

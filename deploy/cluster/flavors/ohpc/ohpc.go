@@ -40,6 +40,7 @@ import (
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/core"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
@@ -49,7 +50,6 @@ import (
 	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 	"github.com/CS-SI/SafeScale/deploy/install"
-	"github.com/CS-SI/SafeScale/providers"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
@@ -113,7 +113,7 @@ type managerData struct {
 // Cluster is the object describing a cluster
 type Cluster struct {
 	// Core cluster data
-	Core *clusterapi.ClusterCore
+	Core *core.Cluster
 
 	// manager contains data specific to the cluster management
 	manager *managerData
@@ -123,9 +123,6 @@ type Cluster struct {
 
 	// metadata of cluster
 	metadata *metadata.Cluster
-
-	// provider is a pointer to current provider service instance
-	provider *providers.Service
 }
 
 // GetNetworkID returns the ID of the network used by the cluster
@@ -138,44 +135,24 @@ func (c *Cluster) CountNodes(public bool) uint {
 	return c.Core.CountNodes(public)
 }
 
-// GetExtension returns additional info of the cluster
-func (c *Cluster) GetExtension(ctx Extension.Enum) interface{} {
-	return c.Core.GetExtension(ctx)
-}
-
-// SetExtension returns additional info of the cluster
-func (c *Cluster) SetExtension(ctx Extension.Enum, info interface{}) {
-	c.Core.SetExtension(ctx, info)
-}
-
 // Load loads the internals of an existing cluster from metadata
 func Load(data *metadata.Cluster) (clusterapi.Cluster, error) {
-	svc, err := provideruse.GetProviderService()
-	if err != nil {
-		return nil, err
-	}
-
 	core := data.Get()
 	instance := &Cluster{
 		Core:     core,
 		metadata: data,
-		provider: svc,
 	}
-	instance.resetExtensions(core)
+	instance.reset()
 	return instance, nil
 }
 
-func (c *Cluster) resetExtensions(core *clusterapi.ClusterCore) {
-	if core == nil {
-		return
+func (c *Cluster) reset() {
+	manager := &managerData{}
+	err := c.Core.Extensions.Get(Extension.FlavorV1, manager)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get cluster manager data: %+v", err))
 	}
-	anon := core.GetExtension(Extension.FlavorV1)
-	if anon != nil {
-		manager := anon.(managerData)
-		c.manager = &manager
-		// Note: On Load(), need to replace Extensions that are structs to pointers to struct
-		core.SetExtension(Extension.FlavorV1, &manager)
-	}
+	c.manager = manager
 }
 
 // Reload reloads metadata of Cluster from ObjectStorage
@@ -184,12 +161,13 @@ func (c *Cluster) Reload() error {
 	if err != nil {
 		return err
 	}
-	c.resetExtensions(c.metadata.Get())
+	c.Core = c.metadata.Get()
+	c.reset()
 	return nil
 }
 
 // Create creates the necessary infrastructure of cluster
-func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
+func Create(req core.Request) (*Cluster, error) {
 	var (
 		instance         Cluster
 		privateNodeCount int
@@ -276,7 +254,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 	// Saving cluster parameters, with status 'Creating'
 	instance = Cluster{
-		Core: &clusterapi.ClusterCore{
+		Core: &core.Cluster{
 			Name:          req.Name,
 			CIDR:          req.CIDR,
 			Flavor:        Flavor.OHPC,
@@ -288,8 +266,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			AdminPassword: cladmPassword,
 			NodesDef:      nodesDef,
 		},
-		manager:  &managerData{},
-		provider: svc,
+		manager: &managerData{},
 	}
 	err = instance.updateMetadata(nil)
 	if err != nil {
@@ -338,8 +315,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	err = instance.updateMetadata(func() error {
 		instance.Core.GatewayIP = gw.GetPrivateIP()
 		instance.Core.PublicIP = gw.GetAccessIP()
-		instance.SetExtension(Extension.FlavorV1, instance.manager)
-		return nil
+		return instance.Core.Extensions.Set(Extension.FlavorV1, instance.manager)
 	})
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
@@ -1097,7 +1073,8 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 }
 
 // DeleteLastNode deletes the last Agent node added
-func (c *Cluster) DeleteLastNode(public bool) error {
+// Note: 'selectedMaster' is not used in K8S
+func (c *Cluster) DeleteLastNode(public bool, selectedMaster string) error {
 	var hostID string
 
 	if public {
@@ -1124,7 +1101,8 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
-func (c *Cluster) DeleteSpecificNode(hostID string) error {
+// Note: 'selectedMaster' is not used in K8S
+func (c *Cluster) DeleteSpecificNode(hostID string, selectedMaster string) error {
 	var foundInPrivate bool
 	foundInPublic, idx := contains(c.Core.PublicNodeIDs, hostID)
 	if !foundInPublic {
@@ -1214,7 +1192,7 @@ func (c *Cluster) SearchNode(hostID string, public bool) bool {
 }
 
 // GetConfig returns the public properties of the cluster
-func (c *Cluster) GetConfig() clusterapi.ClusterCore {
+func (c *Cluster) GetConfig() core.Cluster {
 	return *c.Core
 }
 
@@ -1275,7 +1253,7 @@ func (c *Cluster) FindAvailableNode(public bool) (string, error) {
 // updateMetadata writes cluster config in Object Storage
 func (c *Cluster) updateMetadata(updatefn func() error) error {
 	if c.metadata == nil {
-		m, err := metadata.NewCluster()
+		m, err := metadata.NewCluster(c.Core.Service)
 		if err != nil {
 			return err
 		}

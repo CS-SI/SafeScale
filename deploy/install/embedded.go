@@ -20,11 +20,11 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
-
 	"github.com/spf13/viper"
 
 	rice "github.com/GeertJohan/go.rice"
+
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 )
 
 //go:generate rice embed-go

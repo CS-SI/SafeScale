@@ -18,13 +18,13 @@ package install
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
 )
 

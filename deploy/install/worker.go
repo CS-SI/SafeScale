@@ -18,18 +18,17 @@ package install
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
-
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
 )

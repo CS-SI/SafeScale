@@ -18,11 +18,12 @@ package cluster
 
 import (
 	"fmt"
-	"log"
+
+	log "github.com/sirupsen/logrus"
 
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-
-	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/core"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos"
@@ -30,11 +31,18 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/swarm"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/utils/provideruse"
 )
 
 // Get returns the Cluster instance corresponding to the cluster named 'name'
-func Get(name string) (clusterapi.Cluster, error) {
-	m, err := metadata.NewCluster()
+func Get(name string) (api.Cluster, error) {
+	svc, err := provideruse.GetProviderService()
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := metadata.NewCluster(svc)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +54,7 @@ func Get(name string) (clusterapi.Cluster, error) {
 		return nil, nil
 	}
 
-	var instance clusterapi.Cluster
+	var instance api.Cluster
 	clusterCore := m.Get()
 	switch clusterCore.Flavor {
 	case Flavor.DCOS:
@@ -81,7 +89,7 @@ func Get(name string) (clusterapi.Cluster, error) {
 }
 
 // Create creates a cluster following the parameters of the request
-func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
+func Create(req core.Request) (api.Cluster, error) {
 	// Validates parameters
 	if req.Name == "" {
 		panic("req.Name is empty!")
@@ -90,7 +98,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		panic("req.CIDR is empty!")
 	}
 
-	var instance clusterapi.Cluster
+	var instance api.Cluster
 
 	log.Printf("Creating infrastructure for cluster '%s'", req.Name)
 
@@ -149,23 +157,28 @@ func Delete(name string) error {
 }
 
 // List lists the clusters already created
-func List() ([]clusterapi.Cluster, error) {
-	var clusterList []clusterapi.Cluster
-	m, err := metadata.NewCluster()
+func List() ([]api.Cluster, error) {
+	svc, err := provideruse.GetProviderService()
+	if err != nil {
+		return nil, err
+	}
+
+	var clusterList []api.Cluster
+	m, err := metadata.NewCluster(svc)
 	if err != nil {
 		return clusterList, err
 	}
-	var instance clusterapi.Cluster
+	var instance api.Cluster
 	err = m.Browse(func(cm *metadata.Cluster) error {
 		cluster := cm.Get()
 		switch cluster.Flavor {
-		case Flavor.DCOS:
-			instance, err = dcos.Load(cm)
+		case Flavor.BOH:
+			instance, err = boh.Load(cm)
 			if err != nil {
 				return err
 			}
-		case Flavor.BOH:
-			instance, err = boh.Load(cm)
+		case Flavor.DCOS:
+			instance, err = dcos.Load(cm)
 			if err != nil {
 				return err
 			}
@@ -193,8 +206,8 @@ func List() ([]clusterapi.Cluster, error) {
 }
 
 // Sanitize ...
-func Sanitize(name string) error {
-	m, err := metadata.NewCluster()
+func Sanitize(svc *providers.Service, name string) error {
+	m, err := metadata.NewCluster(svc)
 	if err != nil {
 		return err
 	}
@@ -207,6 +220,7 @@ func Sanitize(name string) error {
 	}
 
 	clusterCore := m.Get()
+	clusterCore.Service = svc
 	switch clusterCore.Flavor {
 	case Flavor.DCOS:
 		return dcos.Sanitize(m)

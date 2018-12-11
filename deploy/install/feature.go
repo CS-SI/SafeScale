@@ -18,16 +18,14 @@ package install
 
 import (
 	"fmt"
-	"github.com/deckarep/golang-set"
-	"io/ioutil"
-	"log"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
-
-	"github.com/CS-SI/SafeScale/utils"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/viper"
+
+	"github.com/CS-SI/SafeScale/deploy/install/enums/Method"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 var (

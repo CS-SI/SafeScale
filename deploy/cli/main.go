@@ -23,10 +23,10 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/deploy/cli/cmds"
-
 	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialise provider cloudferro
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise provider cloudwatt
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise provider flexibleengine
