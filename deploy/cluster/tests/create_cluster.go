@@ -18,15 +18,15 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"runtime"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster"
-	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
+	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/deploy/cluster"
+	"github.com/CS-SI/SafeScale/deploy/cluster/core"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 )
 
 // Run runs the deployment
@@ -41,7 +41,7 @@ func Run() {
 	}
 	if instance == nil {
 		log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
-		instance, err = cluster.Create(clusterapi.Request{
+		instance, err = cluster.Create(core.Request{
 			Name:       clusterName,
 			Complexity: Complexity.Small,
 			//Complexity: Complexity.Normal,

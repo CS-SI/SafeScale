@@ -68,7 +68,8 @@ func (b *bucket) GetObject(objectName string) (Object, error) {
 func (b *bucket) List(path, prefix string) ([]string, error) {
 	list := []string{}
 
-	fullPath := path
+	// Make sure there is only one / at the end of the path
+	fullPath := strings.TrimRight(path, "/")
 	if fullPath != "" {
 		fullPath += "/"
 	}

@@ -32,7 +32,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/core"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
@@ -100,7 +100,7 @@ type managerData struct {
 // Cluster is the object describing a cluster based on DCOS
 type Cluster struct {
 	// Core cluster data; serialized in ObjectStorage
-	Core *clusterapi.ClusterCore
+	Core *core.Cluster
 
 	// manager is a pointer to Extension of type Flavor stored in Core, corresponding to
 	// DCOS data wanted in Object Storage
@@ -124,49 +124,33 @@ func (c *Cluster) GetNetworkID() string {
 	return c.Core.GetNetworkID()
 }
 
-// GetExtension returns additional info corresponding to 'ctx'
-func (c *Cluster) GetExtension(ctx Extension.Enum) interface{} {
-	return c.Core.GetExtension(ctx)
-}
-
-// SetExtension returns additional info corresponding to 'ctx'
-func (c *Cluster) SetExtension(ctx Extension.Enum, info interface{}) {
-	c.Core.SetExtension(ctx, info)
-}
-
 // CountNodes returns the number of public or private nodes in the cluster
 func (c *Cluster) CountNodes(public bool) uint {
 	return c.Core.CountNodes(public)
 }
 
 // Load loads the internals of an existing cluster from metadata
-func Load(data *metadata.Cluster) (clusterapi.Cluster, error) {
-	svc, err := provideruse.GetProviderService()
-	if err != nil {
-		return nil, err
+func Load(data *metadata.Cluster) (*Cluster, error) {
+	if data == nil {
+		panic("data is nil!")
 	}
 
 	core := data.Get()
 	instance := &Cluster{
 		Core:     core,
 		metadata: data,
-		provider: svc,
 	}
-	instance.resetExtensions(core)
+	instance.reset()
 	return instance, nil
 }
 
-func (c *Cluster) resetExtensions(Core *clusterapi.ClusterCore) {
-	if Core == nil {
-		return
+func (c *Cluster) reset() {
+	manager := &managerData{}
+	err := c.Core.Extensions.Get(Extension.FlavorV1, manager)
+	if err != nil {
+		panic("failed to get cluster manager data!")
 	}
-	anon := Core.GetExtension(Extension.FlavorV1)
-	if anon != nil {
-		manager := anon.(managerData)
-		c.manager = &manager
-		// Note: On Load(), need to replace Extensions that are struct to pointers to struct
-		Core.SetExtension(Extension.FlavorV1, &manager)
-	}
+	c.manager = manager
 }
 
 // Reload reloads metadata of Cluster from ObjectStorage
@@ -175,12 +159,13 @@ func (c *Cluster) Reload() error {
 	if err != nil {
 		return err
 	}
-	c.resetExtensions(c.metadata.Get())
+	c.Core = c.metadata.Get()
+	c.reset()
 	return nil
 }
 
 // Create creates the necessary infrastructure of cluster
-func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
+func Create(req core.Request) (*Cluster, error) {
 	// Generate needed password for account cladm
 	cladmPassword, err := utils.GeneratePassword(16)
 	if err != nil {
@@ -286,7 +271,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 	// Saving cluster metadata, with status 'Creating'
 	instance = Cluster{
-		Core: &clusterapi.ClusterCore{
+		Core: &core.Cluster{
 			Name:             req.Name,
 			CIDR:             req.CIDR,
 			Flavor:           Flavor.K8S,
@@ -305,7 +290,6 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		manager:  &managerData{},
 		gateway:  gw,
 	}
-	instance.SetExtension(Extension.FlavorV1, instance.manager)
 	err = instance.updateMetadata(nil)
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
@@ -1256,7 +1240,8 @@ func (c *Cluster) FindAvailableNode(public bool) (string, error) {
 }
 
 // DeleteLastNode deletes the last Agent node added
-func (c *Cluster) DeleteLastNode(public bool) error {
+// Note: 'selectedMaster' is not used in K8S
+func (c *Cluster) DeleteLastNode(public bool, selectedMaster string) error {
 	var hostID string
 
 	if public {
@@ -1280,7 +1265,8 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
-func (c *Cluster) DeleteSpecificNode(ID string) error {
+// Note: 'selectedMaster' is not used in K8S
+func (c *Cluster) DeleteSpecificNode(ID string, selectedMaster string) error {
 	var foundInPrivate bool
 	foundInPublic, idx := contains(c.Core.PublicNodeIDs, ID)
 	if !foundInPublic {
@@ -1367,14 +1353,14 @@ func (c *Cluster) SearchNode(ID string, public bool) bool {
 }
 
 // GetConfig returns the public properties of the cluster
-func (c *Cluster) GetConfig() clusterapi.ClusterCore {
+func (c *Cluster) GetConfig() core.Cluster {
 	return *c.Core
 }
 
 // updateMetadata writes cluster config in Object Storage
 func (c *Cluster) updateMetadata(updatefn func() error) error {
 	if c.metadata == nil {
-		m, err := metadata.NewCluster()
+		m, err := metadata.NewCluster(c.Core.Service)
 		if err != nil {
 			return err
 		}

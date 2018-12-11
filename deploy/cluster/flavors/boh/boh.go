@@ -33,7 +33,7 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
 
-	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/core"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
@@ -47,7 +47,6 @@ import (
 	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 	"github.com/CS-SI/SafeScale/deploy/install"
-	"github.com/CS-SI/SafeScale/providers"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
@@ -109,7 +108,7 @@ type managerData struct {
 // Cluster is the object describing a cluster
 type Cluster struct {
 	// Core cluster data
-	Core *clusterapi.ClusterCore
+	Core *core.Cluster
 
 	// manager contains data specific to the cluster management
 	manager *managerData
@@ -119,9 +118,6 @@ type Cluster struct {
 
 	// metadata of cluster
 	metadata *metadata.Cluster
-
-	// provider is a pointer to current provider service instance
-	provider *providers.Service
 }
 
 // GetNetworkID returns the ID of the network used by the cluster
@@ -134,44 +130,28 @@ func (c *Cluster) CountNodes(public bool) uint {
 	return c.Core.CountNodes(public)
 }
 
-// GetExtension returns additional info of the cluster
-func (c *Cluster) GetExtension(ctx Extension.Enum) interface{} {
-	return c.Core.GetExtension(ctx)
-}
-
-// SetExtension returns additional info of the cluster
-func (c *Cluster) SetExtension(ctx Extension.Enum, info interface{}) {
-	c.Core.SetExtension(ctx, info)
-}
-
 // Load loads the internals of an existing cluster from metadata
-func Load(data *metadata.Cluster) (clusterapi.Cluster, error) {
-	svc, err := provideruse.GetProviderService()
-	if err != nil {
-		return nil, err
-	}
-
+func Load(data *metadata.Cluster) (*Cluster, error) {
 	core := data.Get()
+	core.Service = data.GetService()
 	instance := &Cluster{
 		Core:     core,
 		metadata: data,
-		provider: svc,
 	}
-	instance.resetExtensions(core)
+	instance.reset()
 	return instance, nil
 }
 
-func (c *Cluster) resetExtensions(core *clusterapi.ClusterCore) {
-	if core == nil {
-		return
+func (c *Cluster) reset() {
+	if c.manager == nil {
+		c.manager = &managerData{}
 	}
-	anon := core.GetExtension(Extension.FlavorV1)
-	if anon != nil {
-		manager := anon.(managerData)
-		c.manager = &manager
-		// Note: On Load(), need to replace Extensions that are structs to pointers to struct
-		core.SetExtension(Extension.FlavorV1, &manager)
+	manager := &managerData{}
+	err := c.Core.Extensions.Get(Extension.FlavorV1, manager)
+	if err != nil {
+		panic("failed to get cluster manager data!")
 	}
+	c.manager = manager
 }
 
 // Reload reloads metadata of Cluster from ObjectStorage
@@ -180,12 +160,13 @@ func (c *Cluster) Reload() error {
 	if err != nil {
 		return err
 	}
-	c.resetExtensions(c.metadata.Get())
+	c.Core = c.metadata.Get()
+	c.reset()
 	return nil
 }
 
 // Create creates the necessary infrastructure of cluster
-func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
+func Create(req core.Request) (*Cluster, error) {
 	var (
 		instance         Cluster
 		privateNodeCount int
@@ -246,31 +227,40 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			ImageID: "Ubuntu 16.04",
 		},
 	}
-	network, err := brokerclient.New().Network.Create(def, brokerclient.DefaultExecutionTimeout)
+	brokerclt := brokerclient.New()
+	network, err := brokerclt.Network.Create(def, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
 		return nil, err
 	}
 	req.NetworkID = network.ID
 
-	broker := brokerclient.New()
+	// Starting from here, delete network if exit with err and it's not requested to keep resources on failure
+	defer func() {
+		if err != nil && !req.KeepOnFailure {
+			derr := brokerclt.Network.Delete([]string{network.ID}, brokerclient.DefaultExecutionTimeout)
+			if derr != nil {
+				log.Errorf("failed to delete network: %+v", derr)
+			}
+		}
+	}()
 
 	svc, err := provideruse.GetProviderService()
 	if err != nil {
-		goto cleanNetwork
+		return nil, err
 	}
 
 	m, err = providermetadata.NewGateway(svc, req.NetworkID)
 	if err != nil {
-		goto cleanNetwork
+		return nil, err
 	}
 	ok, err = m.Read()
 	if err != nil {
-		goto cleanNetwork
+		return nil, err
 	}
 	if !ok {
 		err = fmt.Errorf("failed to load gateway metadata")
-		goto cleanNetwork
+		return nil, err
 	}
 	gw = m.Get()
 
@@ -279,12 +269,12 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	kp, err = svc.CreateKeyPair(kpName)
 	if err != nil {
 		err = fmt.Errorf("failed to create Key Pair: %s", err.Error())
-		goto cleanNetwork
+		return nil, err
 	}
 
 	// Saving cluster parameters, with status 'Creating'
 	instance = Cluster{
-		Core: &clusterapi.ClusterCore{
+		Core: &core.Cluster{
 			Name:             req.Name,
 			CIDR:             req.CIDR,
 			Flavor:           Flavor.BOH,
@@ -298,16 +288,29 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			AdminPassword:    cladmPassword,
 			NodesDef:         nodesDef,
 			DisabledFeatures: req.DisabledDefaultFeatures,
+			Service:          svc,
 		},
-		manager:  &managerData{},
-		provider: svc,
+		manager: &managerData{},
 	}
-	instance.SetExtension(Extension.FlavorV1, instance.manager)
+	err = instance.Core.Extensions.Set(Extension.FlavorV1, instance.manager)
+	if err != nil {
+		return nil, err
+	}
 	err = instance.updateMetadata(nil)
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
-		goto cleanNetwork
+		return nil, err
 	}
+
+	// Starting from here, delete cluster metadata if exit with err and it's not requested to keep resources on failure
+	defer func() {
+		if err != nil && !req.KeepOnFailure {
+			derr := instance.metadata.Delete()
+			if derr != nil {
+				log.Errorf("failed to remove cluster metadata: %+v", err)
+			}
+		}
+	}()
 
 	switch req.Complexity {
 	case Complexity.Small:
@@ -326,16 +329,26 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 		target = install.NewHostTarget(pbutils.ToPBHost(gw))
 		feature, err = install.NewFeature("proxycache-server")
 		if err != nil {
-			goto cleanNetwork
+			return nil, err
 		}
 		results, err = feature.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
-			goto cleanNetwork
+			return nil, err
 		}
 		if !results.Successful() {
 			err = fmt.Errorf(results.AllErrorMessages())
-			goto cleanNetwork
+			return nil, err
 		}
+
+		// Starting from here, remove feature if exit with error and it's not requested to keep resources
+		defer func() {
+			if err != nil && !req.KeepOnFailure {
+				_, derr := feature.Remove(target, install.Variables{}, install.Settings{})
+				if derr != nil {
+					log.Errorf("failed to remove 'proxycache' feature: %+v", derr)
+				}
+			}
+		}()
 	}
 
 	// step 1: Launching reverseproxy installation on gateway, in parallel
@@ -345,7 +358,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 	// Step 2: starts master creation and nodes creation
 	err = instance.createMaster(nodesDef)
 	if err != nil {
-		goto cleanNetwork
+		return nil, err
 	}
 
 	// // step 2: configure master asynchronously
@@ -404,14 +417,9 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 cleanNodes:
 	if !req.KeepOnFailure {
-		broker.Host.Delete(instance.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
-		broker.Host.Delete(instance.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
-		broker.Host.Delete(instance.manager.MasterIDs, brokerclient.DefaultExecutionTimeout)
-	}
-cleanNetwork:
-	if !req.KeepOnFailure {
-		broker.Network.Delete([]string{instance.Core.NetworkID}, brokerclient.DefaultExecutionTimeout)
-		instance.metadata.Delete()
+		brokerclt.Host.Delete(instance.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
+		brokerclt.Host.Delete(instance.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
+		brokerclt.Host.Delete(instance.manager.MasterIDs, brokerclient.DefaultExecutionTimeout)
 	}
 	return nil, err
 }
@@ -1020,7 +1028,8 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 }
 
 // DeleteLastNode deletes the last Agent node added
-func (c *Cluster) DeleteLastNode(public bool) error {
+// Note: 'selectedMaster' is not used in BOH
+func (c *Cluster) DeleteLastNode(public bool, selectedMaster string) error {
 	var hostID string
 
 	if public {
@@ -1044,7 +1053,8 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
-func (c *Cluster) DeleteSpecificNode(hostID string) error {
+// Note: 'selectedMaster' is not used in BOH
+func (c *Cluster) DeleteSpecificNode(hostID string, selectedMaster string) error {
 	var foundInPrivate bool
 	foundInPublic, idx := contains(c.Core.PublicNodeIDs, hostID)
 	if !foundInPublic {
@@ -1132,7 +1142,7 @@ func (c *Cluster) SearchNode(hostID string, public bool) bool {
 }
 
 // GetConfig returns the public properties of the cluster
-func (c *Cluster) GetConfig() clusterapi.ClusterCore {
+func (c *Cluster) GetConfig() core.Cluster {
 	return *c.Core
 }
 
@@ -1192,7 +1202,7 @@ func (c *Cluster) FindAvailableNode(public bool) (string, error) {
 // updateMetadata writes cluster config in Object Storage
 func (c *Cluster) updateMetadata(updatefn func() error) error {
 	if c.metadata == nil {
-		m, err := metadata.NewCluster()
+		m, err := metadata.NewCluster(c.Core.Service)
 		if err != nil {
 			return err
 		}

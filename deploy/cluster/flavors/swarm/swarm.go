@@ -36,7 +36,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 	pbutils "github.com/CS-SI/SafeScale/broker/utils"
-	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/core"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
@@ -45,7 +45,6 @@ import (
 	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 	"github.com/CS-SI/SafeScale/deploy/install"
-	"github.com/CS-SI/SafeScale/providers"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
@@ -83,27 +82,27 @@ var (
 // managerData defines the data used by the manager of cluster we want to keep in Object Storage
 type managerData struct {
 	// MasterIDs contains the ID of the masters
-	MasterIDs []string
+	MasterIDs []string `json:"master_ids"`
 	// MasterIPs contains the IP of the masters
-	MasterIPs []string
+	MasterIPs []string `json:"master_ips"`
 	// PublicNodeIPs contains a list of IP of the Public Agent nodes
-	PublicNodeIPs []string
+	PublicNodeIPs []string `json:"public_node_ips"`
 	// PrivateAvgentIPs contains a list of IP of the Private Agent Nodes
-	PrivateNodeIPs []string
+	PrivateNodeIPs []string `json:"private_node_ips"`
 	// StateCollectInterval in seconds
-	StateCollectInterval time.Duration
+	StateCollectInterval time.Duration `json:"state_collect_interval,omitempty"`
 	// MasterLastIndex
-	MasterLastIndex int
+	MasterLastIndex int `json:"master_last_index"`
 	// PrivateLastIndex
-	PrivateLastIndex int
+	PrivateLastIndex int `json:"private_last_index"`
 	// PublicLastIndex
-	PublicLastIndex int
+	PublicLastIndex int `json:"public_last_index"`
 }
 
 // Cluster is the object describing a cluster
 type Cluster struct {
 	// Core cluster data
-	Core *clusterapi.ClusterCore
+	Core *core.Cluster
 
 	// manager contains data specific to the cluster management
 	manager *managerData
@@ -113,9 +112,6 @@ type Cluster struct {
 
 	// metadata of cluster
 	metadata *metadata.Cluster
-
-	// provider is a pointer to current provider service instance
-	provider *providers.Service
 }
 
 // GetNetworkID returns the ID of the network used by the cluster
@@ -128,43 +124,32 @@ func (c *Cluster) CountNodes(public bool) uint {
 	return c.Core.CountNodes(public)
 }
 
-// GetExtension returns additional info of the cluster
-func (c *Cluster) GetExtension(ctx Extension.Enum) interface{} {
-	return c.Core.GetExtension(ctx)
-}
-
-// SetExtension returns additional info of the cluster
-func (c *Cluster) SetExtension(ctx Extension.Enum, info interface{}) {
-	c.Core.SetExtension(ctx, info)
-}
-
 // Load loads the internals of an existing cluster from metadata
-func Load(data *metadata.Cluster) (clusterapi.Cluster, error) {
-	svc, err := provideruse.GetProviderService()
-	if err != nil {
-		return nil, err
+func Load(data *metadata.Cluster) (*Cluster, error) {
+	if data == nil {
+		panic("data")
 	}
-
 	core := data.Get()
+	core.Service = data.GetService()
 	instance := &Cluster{
 		Core:     core,
 		metadata: data,
-		provider: svc,
 	}
-	instance.resetExtensions(core)
+
+	instance.reset()
 	return instance, nil
 }
 
-func (c *Cluster) resetExtensions(core *clusterapi.ClusterCore) {
-	if core == nil {
-		return
+func (c *Cluster) reset() {
+	manager := &managerData{}
+	err := c.Core.Extensions.Get(Extension.FlavorV1, manager)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get cluster manager data: %+v", err))
 	}
-	anon := core.GetExtension(Extension.FlavorV1)
-	if anon != nil {
-		manager := anon.(managerData)
-		c.manager = &manager
-		// Note: On Load(), need to replace Extensions that are structs to pointers to struct
-		core.SetExtension(Extension.FlavorV1, &manager)
+	c.manager = manager
+
+	if c.Core.Extensions == nil {
+		c.Core.Extensions = &model.Extensions{}
 	}
 }
 
@@ -174,12 +159,13 @@ func (c *Cluster) Reload() error {
 	if err != nil {
 		return err
 	}
-	c.resetExtensions(c.metadata.Get())
+	c.Core = c.metadata.Get()
+	c.reset()
 	return nil
 }
 
 // Create creates the necessary infrastructure of cluster
-func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
+func Create(req core.Request) (*Cluster, error) {
 	// Generate needed password for account cladm
 	cladmPassword, err := utils.GeneratePassword(16)
 	if err != nil {
@@ -287,7 +273,7 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 
 	// Saving cluster metadata, with status 'Creating'
 	instance = Cluster{
-		Core: &clusterapi.ClusterCore{
+		Core: &core.Cluster{
 			Name:             req.Name,
 			CIDR:             req.CIDR,
 			Flavor:           Flavor.SWARM,
@@ -301,11 +287,11 @@ func Create(req clusterapi.Request) (clusterapi.Cluster, error) {
 			AdminPassword:    cladmPassword,
 			NodesDef:         nodesDef,
 			DisabledFeatures: req.DisabledDefaultFeatures,
+			Extensions:       &model.Extensions{},
+			Service:          svc,
 		},
-		provider: svc,
-		manager:  &managerData{},
+		manager: &managerData{},
 	}
-	instance.SetExtension(Extension.FlavorV1, instance.manager)
 	err = instance.updateMetadata(func() error {
 		// Saves gateway information in cluster metadata
 		instance.Core.PublicIP = gw.GetAccessIP()
@@ -981,7 +967,7 @@ func (c *Cluster) asyncConfigureGateway(gw *pb.Host, done chan error) {
 	log.Printf("[gateway] starting configuration...")
 
 	var dnsServers []string
-	cfg, err := c.provider.GetCfgOpts()
+	cfg, err := c.Core.Service.GetCfgOpts()
 	if err == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
@@ -1218,10 +1204,10 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 			errors = append(errors, err.Error())
 		}
 	}
+	cltHost := brokerclient.New().Host
 	if len(errors) > 0 {
 		if len(hosts) > 0 {
-			broker := brokerclient.New().Host
-			broker.Delete(hosts, brokerclient.DefaultExecutionTimeout)
+			cltHost.Delete(hosts, brokerclient.DefaultExecutionTimeout)
 		}
 		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
 	}
@@ -1229,25 +1215,35 @@ func (c *Cluster) AddNodes(count int, public bool, req *pb.HostDefinition) ([]st
 	// Now configure new nodes
 	err := c.configureNodes(hosts)
 	if err != nil {
-		broker := brokerclient.New().Host
-		broker.Delete(hosts, brokerclient.DefaultExecutionTimeout)
+		cltHost.Delete(hosts, brokerclient.DefaultExecutionTimeout)
 		return nil, err
 	}
 	return hosts, nil
 }
 
 // DeleteLastNode deletes the last Agent node added
-func (c *Cluster) DeleteLastNode(public bool) error {
-	var hostID string
+func (c *Cluster) DeleteLastNode(public bool, selectedMaster string) error {
+	var (
+		hostID string
+		err    error
+	)
+
+	if selectedMaster == "" {
+		selectedMaster, err = c.FindAvailableMaster()
+		if err != nil {
+			return err
+		}
+	}
 
 	if public {
 		hostID = c.Core.PublicNodeIDs[len(c.Core.PublicNodeIDs)-1]
 	} else {
 		hostID = c.Core.PrivateNodeIDs[len(c.Core.PrivateNodeIDs)-1]
 	}
-	err := brokerclient.New().Host.Delete([]string{hostID}, brokerclient.DefaultExecutionTimeout)
+
+	err = c.deleteNode(hostID, selectedMaster)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return c.updateMetadata(func() error {
@@ -1260,9 +1256,59 @@ func (c *Cluster) DeleteLastNode(public bool) error {
 	})
 }
 
+func (c *Cluster) deleteNode(hostRef string, selectedMaster string) error {
+	if hostRef == "" {
+		panic("hostRef is empty!")
+	}
+	if selectedMaster == "" {
+		panic("selectedMaster is empty!")
+	}
+
+	mh, err := providermetadata.LoadHost(c.Core.Service, hostRef)
+	if err != nil {
+		return err
+	}
+	host := mh.Get()
+
+	// Ask node to leave swarm
+	clt := brokerclient.New()
+	cmd := "docker swarm leave"
+	retcode, _, stderr, err := clt.Ssh.Run(hostRef, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("failed to make node '%s' leave swarm: %s", host.Name, stderr)
+	}
+
+	// Ask master to remove node from swarm
+	cmd = fmt.Sprintf("docker node rm %s", host.Name)
+	retcode, _, stderr, err = clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
+	if retcode != 0 {
+		return fmt.Errorf("failed to remove worker '%s' from swarm on master '%s': %s", host.Name, selectedMaster, stderr)
+	}
+
+	// Finally delete node
+	err = clt.Host.Delete([]string{hostRef}, brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return nil
+	}
+	return err
+}
+
 // DeleteSpecificNode deletes the node specified by its ID
-func (c *Cluster) DeleteSpecificNode(hostID string) error {
-	var foundInPrivate bool
+func (c *Cluster) DeleteSpecificNode(hostID string, selectedMaster string) error {
+	if hostID == "" {
+		panic("hostID is empty!")
+	}
+
+	var (
+		foundInPrivate bool
+		err            error
+	)
 	foundInPublic, idx := contains(c.Core.PublicNodeIDs, hostID)
 	if !foundInPublic {
 		foundInPrivate, idx = contains(c.Core.PrivateNodeIDs, hostID)
@@ -1271,7 +1317,14 @@ func (c *Cluster) DeleteSpecificNode(hostID string) error {
 		return fmt.Errorf("host '%s' isn't a registered Node of the Cluster '%s'", hostID, c.Core.Name)
 	}
 
-	err := brokerclient.New().Host.Delete([]string{hostID}, brokerclient.DefaultExecutionTimeout)
+	if selectedMaster == "" {
+		selectedMaster, err = c.FindAvailableMaster()
+		if err != nil {
+			return err
+		}
+	}
+
+	err = c.deleteNode(hostID, selectedMaster)
 	if err != nil {
 		return err
 	}
@@ -1347,7 +1400,7 @@ func (c *Cluster) SearchNode(hostID string, public bool) bool {
 }
 
 // GetConfig returns the public properties of the cluster
-func (c *Cluster) GetConfig() clusterapi.ClusterCore {
+func (c *Cluster) GetConfig() core.Cluster {
 	return *c.Core
 }
 
@@ -1408,7 +1461,7 @@ func (c *Cluster) FindAvailableNode(public bool) (string, error) {
 // updateMetadata writes cluster config in Object Storage
 func (c *Cluster) updateMetadata(updatefn func() error) error {
 	if c.metadata == nil {
-		m, err := metadata.NewCluster()
+		m, err := metadata.NewCluster(c.Core.Service)
 		if err != nil {
 			return err
 		}
@@ -1420,16 +1473,26 @@ func (c *Cluster) updateMetadata(updatefn func() error) error {
 		c.metadata.Acquire()
 		c.Reload()
 	}
+
+	defer c.metadata.Release()
+
 	if updatefn != nil {
 		err := updatefn()
 		if err != nil {
-			c.metadata.Release()
 			return err
 		}
 	}
-	err := c.metadata.Write()
-	c.metadata.Release()
-	return err
+
+	// Serialize manager data into appropriare c.Core.Extensions if needed
+	if c.manager != nil {
+		err := c.Core.Extensions.Set(Extension.FlavorV1, c.manager)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Write metadata
+	return c.metadata.Write()
 }
 
 // Delete destroys everything related to the infrastructure built for the cluster

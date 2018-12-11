@@ -16,19 +16,15 @@
 
 package Extension
 
-//go:generate stringer -type=Enum
-
-// Enum represents the type of additional info for an host
-type Enum uint
-
 const (
-	_ Enum = iota
 	// DescriptionV1 contains optional additional info describing cluster (purpose, ...)
-	DescriptionV1
+	DescriptionV1 = "1"
+	// DefaultNodeV1 contains additional info about default node (sizing, ...)
+	DefaultNodeV1 = "2"
 	// FlavorV1 contains optional additional info used by the cluster manager software
-	FlavorV1
+	FlavorV1 = "3"
 	// FeaturesV1 contains optional additional info describing installed features on cluster
-	FeaturesV1
-	// NasV1 contains optional additional info describing Nas and shared folders on cluster
-	NasV1
+	FeaturesV1 = "4"
+	// NasV1 contains optional additional info describing Nases and shared folders on cluster
+	NasV1 = "5"
 )
