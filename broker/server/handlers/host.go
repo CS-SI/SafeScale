@@ -157,7 +157,7 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 	}
 
 	id := mh.Get().ID
-	hostRequest := model.SizingRequirements{
+	hostSizeRequest := model.SizingRequirements{
 		MinDiskSize: disk,
 		MinRAMSize: ram,
 		MinCores: cpu,
@@ -166,8 +166,31 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 	}
 
 	// TODO 1st check new requirements vs old requirements
+	host := mh.Get()
+	host, err = svc.provider.GetHost(host)
+	if err != nil {
+		return nil, infraErr(err)
+	}
 
-	newHost, err := svc.provider.ResizeHost(id, hostRequest)
+	nhs := propsv1.NewHostSizing()
+	err = host.Properties.Get(HostProperty.SizingV1, nhs)
+	if err != nil {
+		return nil, infraErrf(err, "Unable to parse host metadata '%s", ref)
+	}
+
+	descent := false
+
+	descent = descent || (hostSizeRequest.MinCores < nhs.RequestedSize.Cores)
+	descent = descent || (hostSizeRequest.MinRAMSize < nhs.RequestedSize.RAMSize)
+	descent = descent || (hostSizeRequest.MinGPU < nhs.RequestedSize.GPUNumber)
+	descent = descent || (hostSizeRequest.MinFreq < nhs.RequestedSize.CPUFreq)
+	descent = descent || (hostSizeRequest.MinDiskSize < nhs.RequestedSize.DiskSize)
+
+	if descent {
+		log.Warn("Asking for less resources..., ain't gonna happen :(")
+	}
+
+	newHost, err := svc.provider.ResizeHost(id, hostSizeRequest)
 
 	if err != nil {
 		return nil, infraErrf(err, "Error resizing host '%s'", ref)
