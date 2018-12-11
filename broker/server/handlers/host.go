@@ -656,10 +656,10 @@ func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
 
 	host, err := svc.Inspect(ref)
 	if err != nil {
-		return nil, logicErrf(err, fmt.Sprintf("Can't access ssh parameters of host '%s': failed to query host", ref))
+		return nil, logicErrf(err, fmt.Sprintf("can't access ssh parameters of host '%s': failed to query host", ref), nil)
 	}
 	if host == nil {
-		return nil, logicErr(fmt.Errorf("Can't access ssh parameters of host '%s': host not found", ref))
+		return nil, logicErr(fmt.Errorf("can't access ssh parameters of host '%s': host not found", ref))
 	}
 	sshHandler := NewSSHHandler(svc.provider)
 	sshConfig, err := sshHandler.GetConfig(host.ID)

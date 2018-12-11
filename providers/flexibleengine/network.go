@@ -180,7 +180,9 @@ func (client *Client) DeleteVPC(id string) error {
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
-	log.Debugf("providers.flexibleengine.CreateNetwork(%s) called\n", req.Name)
+	log.Debugf("providers.flexibleengine.CreateNetwork(%s) called", req.Name)
+	defer log.Debugf("providers.flexibleengine.CreateNetwork(%s) done", req.Name)
+
 	subnet, err := client.findSubnetByName(req.Name)
 	if subnet == nil && err != nil {
 		return nil, err
