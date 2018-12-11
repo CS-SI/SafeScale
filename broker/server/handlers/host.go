@@ -150,24 +150,33 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
-		// TODO Introduce error level as parameter
-		return nil, infraErrf(err, "Error getting ssh config of host '%s': loading host metadata", ref)
+		return nil, infraErrf(err, "failed to load host metadata")
 	}
 	if mh == nil {
-		return nil, infraErr(fmt.Errorf("host '%s' not found", ref))
+		return nil, throwErrf("host '%s' not found", ref)
 	}
 
-	// TODO Fill this data
 	id := mh.Get().ID
-	hostRequest := model.HostRequest{
-		ImageID:        id,
-		ResourceName:   ref,
+	hostRequest := model.SizingRequirements{
+		MinDiskSize: disk,
+		MinRAMSize: ram,
+		MinCores: cpu,
+		MinFreq: freq,
+		MinGPU: gpuNumber,
 	}
 
-	svc.provider.ResizeHost(hostRequest)
+	// TODO 1st check new requirements vs old requirements
 
-	// TODO Implement Resize
-	panic("implement me")
+	newHost, err := svc.provider.ResizeHost(id, hostRequest)
+
+	if err != nil {
+		return nil, infraErrf(err, "Error resizing host '%s'", ref)
+	}
+	if newHost == nil {
+		return nil, throwErrf("Unknown error resizing host '%s'", ref)
+	}
+
+	return newHost, err
 }
 
 // Create creates a host
