@@ -68,12 +68,7 @@ func (b *bucket) GetObject(objectName string) (Object, error) {
 func (b *bucket) List(path, prefix string) ([]string, error) {
 	list := []string{}
 
-	// Make sure there is only one / at the end of the path
-	fullPath := strings.TrimRight(path, "/")
-	if fullPath != "" {
-		fullPath += "/"
-	}
-	fullPath += prefix
+	fullPath := buildFullPath(path, prefix)
 
 	//log.Println("Location.Container => : ", c.Name())
 	err := stow.Walk(b.container, path, 100,
@@ -95,11 +90,7 @@ func (b *bucket) List(path, prefix string) ([]string, error) {
 
 // Browse walks through the objects in the Bucket and executes callback on each Object found
 func (b *bucket) Browse(path, prefix string, callback func(Object) error) error {
-	fullPath := path
-	if fullPath != "" {
-		fullPath += "/"
-	}
-	fullPath += prefix
+	fullPath := buildFullPath(path, prefix)
 
 	err := stow.Walk(b.container, path, 100,
 		func(item stow.Item, err error) error {
@@ -117,11 +108,7 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) error) error 
 
 // Clear empties a bucket
 func (b *bucket) Clear(path, prefix string) error {
-	fullPath := path
-	if fullPath != "" {
-		fullPath += "/"
-	}
-	fullPath += prefix
+	fullPath := buildFullPath(path, prefix)
 
 	return stow.Walk(b.container, path, 100,
 		func(item stow.Item, err error) error {
@@ -209,11 +196,7 @@ func (b *bucket) GetCount(path, prefix string) (int64, error) {
 	// defer log.Debugf("objectstorage.Location.Count(%s,%s) done", path, prefix)
 
 	var count int64
-	fullPath := path
-	if fullPath != "" {
-		fullPath += "/"
-	}
-	fullPath += prefix
+	fullPath := buildFullPath(path, prefix)
 
 	err := stow.Walk(b.container, path, 100,
 		func(c stow.Item, err error) error {
@@ -237,11 +220,7 @@ func (b *bucket) GetSize(path, prefix string) (int64, string, error) {
 	var err error
 	var totalSize int64
 
-	fullPath := path
-	if fullPath != "" {
-		fullPath += "/"
-	}
-	fullPath += prefix
+	fullPath := buildFullPath(path, prefix)
 
 	err = stow.Walk(b.container, path, 100,
 		func(item stow.Item, err error) error {
@@ -304,4 +283,12 @@ func humanReadableSize(bytes int64) string {
 	stringValue := fmt.Sprintf("%.1f", value)
 	stringValue = strings.TrimSuffix(stringValue, ".0")
 	return fmt.Sprintf("%s%s", stringValue, unit)
+}
+
+// buildFullPath builds the full path to use in object storage
+func buildFullPath(path, prefix string) string {
+	if path != "" {
+		path += "/"
+	}
+	return strings.TrimRight(path, "/") + prefix
 }
