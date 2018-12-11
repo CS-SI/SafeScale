@@ -624,10 +624,6 @@ type userData struct {
 // 	return gw, nil
 // }
 
-func (client *Client) ResizeHost(request model.HostRequest) (*model.Host, error) {
-	// TODO Implement Resize Host
-	return nil, nil
-}
 
 // CreateHost creates an host satisfying request
 func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
@@ -1158,4 +1154,11 @@ func (client *Client) StartHost(id string) error {
 	}
 
 	return nil
+}
+
+func (client *Client) ResizeHost(id string, request model.SizingRequirements) (*model.Host, error) {
+	// TODO RESIZE Implement Resize Host HERE
+	log.Warn("Trying to resize a Host...")
+
+	return nil, errors.New("Not implemented yet !")
 }

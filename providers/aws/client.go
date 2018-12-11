@@ -207,7 +207,8 @@ type Client struct {
 	Cfg *CfgOptions
 }
 
-func (c *Client) ResizeHost(request model.HostRequest) (*model.Host, error) {
+func (c *Client) ResizeHost(id string, request model.SizingRequirements) (*model.Host, error) {
+	// TODO RESIZE
 	panic("implement me")
 }
 
@@ -283,7 +284,7 @@ func createFilters() []*ec2.Filter {
 // ListImages lists available OS images
 func (c *Client) ListImages(all bool) ([]model.Image, error) {
 
-	// TODO Fix this
+	// TODO AWS Fix this
 	// ec2.EC2.WaitUntilBundleTaskComplete(&ec2.DescribeBundleTasksInput{})
 
 	images, err := c.EC2.DescribeImages(&ec2.DescribeImagesInput{
@@ -786,7 +787,7 @@ func (c *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error)
 		return nil, err
 	}
 
-	// TODO Fix this
+	// TODO AWS Fix this
 	host, err := c.CreateHost(model.HostRequest{})
 	if err != nil {
 		c.DeleteNetwork(*vpcOut.Vpc.VpcId)
@@ -1573,7 +1574,7 @@ func (c *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (
 		}, nil
 	*/
 
-	// TODO Fix this
+	// TODO AWS Fix this
 
 	return "", nil
 }

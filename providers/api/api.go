@@ -67,7 +67,7 @@ type ClientAPI interface {
 
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request model.HostRequest) (*model.Host, error)
-	ResizeHost(request model.HostRequest) (*model.Host, error)
+	ResizeHost(id string, request model.SizingRequirements) (*model.Host, error)
 
 	// GetHost returns the host identified by id or updates content of a *model.Host
 	GetHost(interface{}) (*model.Host, error)

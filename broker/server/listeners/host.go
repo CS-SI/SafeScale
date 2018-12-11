@@ -186,32 +186,27 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 
 // Create a new host
 func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
-	// TODO Implement this
-	log.Infof("Listeners: host create '%s' done", in.Name)
-	defer log.Debugf("Listeners: host create '%s' done", in.Name)
+	log.Infof("Listeners: host resize '%s' done", in.Name)
+	defer log.Debugf("Listeners: host resize '%s' done", in.Name)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create host: no tenant set")
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't resize host: no tenant set")
 	}
 
 	handler := HostHandler(tenant.Service)
-	host, err := handler.Create(
+	host, err := handler.Resize(
 		in.GetName(),
-		in.GetNetwork(),
 		int(in.GetCPUNumber()),
 		in.GetRAM(),
 		int(in.GetDisk()),
-		in.GetImageID(),
-		in.GetPublic(),
 		int(in.GetGPUNumber()),
 		float32(in.GetFreq()),
-		in.Force,
 	)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
-	log.Infof("Host '%s' created", in.GetName())
+	log.Infof("Host '%s' resized", in.GetName())
 	return conv.ToPBHost(host), nil
 }
 

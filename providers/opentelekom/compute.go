@@ -31,8 +31,8 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 }
 
 // ResizeHost creates an host satisfying request
-func (client *Client) ResizeHost(request model.HostRequest) (*model.Host, error) {
-	return client.feclt.ResizeHost(request)
+func (client *Client) ResizeHost(id string, request model.SizingRequirements) (*model.Host, error) {
+	return client.feclt.ResizeHost(id, request)
 }
 
 // GetHost returns the host identified by id or updates an already existing *model.Host instance

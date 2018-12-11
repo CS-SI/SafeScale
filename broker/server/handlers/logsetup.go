@@ -50,6 +50,10 @@ func throwErr(err error) error {
 	return err
 }
 
+func throwErrf(format string, a ...interface{}) error {
+	return fmt.Errorf(format, a...)
+}
+
 // infraErr throws error with stack trace
 func infraErr(err error) error {
 	if err == nil {
