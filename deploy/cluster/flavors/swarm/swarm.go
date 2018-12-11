@@ -1241,7 +1241,7 @@ func (c *Cluster) DeleteLastNode(public bool, selectedMaster string) error {
 		hostID = c.Core.PrivateNodeIDs[len(c.Core.PrivateNodeIDs)-1]
 	}
 
-	err = c.deleteNode(hostID, selectedMaster)
+	err = c.deleteSwarmWorker(hostID, selectedMaster)
 	if err != nil {
 		return err
 	}
@@ -1256,7 +1256,7 @@ func (c *Cluster) DeleteLastNode(public bool, selectedMaster string) error {
 	})
 }
 
-func (c *Cluster) deleteNode(hostRef string, selectedMaster string) error {
+func (c *Cluster) deleteSwarmWorker(hostRef string, selectedMaster string) error {
 	if hostRef == "" {
 		panic("hostRef is empty!")
 	}
@@ -1270,25 +1270,58 @@ func (c *Cluster) deleteNode(hostRef string, selectedMaster string) error {
 	}
 	host := mh.Get()
 
-	// Ask node to leave swarm
 	clt := brokerclient.New()
-	cmd := "docker swarm leave"
-	retcode, _, stderr, err := clt.Ssh.Run(hostRef, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		return fmt.Errorf("failed to make node '%s' leave swarm: %s", host.Name, stderr)
-	}
 
-	// Ask master to remove node from swarm
-	cmd = fmt.Sprintf("docker node rm %s", host.Name)
-	retcode, _, stderr, err = clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	// Check worker is member of the Swarm
+	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", host.Name, host.Name)
+	retcode, _, _, err := clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
-	if retcode != 0 {
-		return fmt.Errorf("failed to remove worker '%s' from swarm on master '%s': %s", host.Name, selectedMaster, stderr)
+	if retcode == 0 {
+		// node is a worker in the Swarm: 1st ask worker to leave Swarm
+		cmd = "docker swarm leave"
+		retcode, _, stderr, err := clt.Ssh.Run(hostRef, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+		if err != nil {
+			return err
+		}
+		if retcode != 0 {
+			return fmt.Errorf("failed to make node '%s' leave swarm: %s", host.Name, stderr)
+		}
+
+		// 2nd: wait the Swarm worker to appear as down from Swarm master
+		cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", host.Name)
+		retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+			func() error {
+				retcode, _, _, err := clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+				if err != nil {
+					return err
+				}
+				if retcode != 0 {
+					return fmt.Errorf("'%s' not in Down state", host.Name)
+				}
+				return nil
+			},
+			time.Minute*5,
+		)
+		if retryErr != nil {
+			switch retryErr.(type) {
+			case retry.ErrTimeout:
+				return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state after %v", host.Name, time.Minute*5)
+			default:
+				return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state: %v", host.Name, retryErr)
+			}
+		}
+
+		// 3rd, ask master to remove node from Swarm
+		cmd = fmt.Sprintf("docker node rm %s", host.Name)
+		retcode, _, stderr, err = clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+		if err != nil {
+			return err
+		}
+		if retcode != 0 {
+			return fmt.Errorf("failed to remove worker '%s' from Swarm on master '%s': %s", host.Name, selectedMaster, stderr)
+		}
 	}
 
 	// Finally delete node
@@ -1324,7 +1357,7 @@ func (c *Cluster) DeleteSpecificNode(hostID string, selectedMaster string) error
 		}
 	}
 
-	err = c.deleteNode(hostID, selectedMaster)
+	err = c.deleteSwarmWorker(hostID, selectedMaster)
 	if err != nil {
 		return err
 	}
