@@ -59,6 +59,11 @@ func (c *Client) RebootHost(id string) error {
 	panic("implement me")
 }
 
+// ResizeHost ...
+func (c *Client) ResizeHost(id string, request model.SizingRequirements) (*model.Host, error) {
+	panic("ResizeHost() not implemented")
+}
+
 func createFilters() []*ec2.Filter {
 	filters := []*ec2.Filter{
 		&ec2.Filter{
