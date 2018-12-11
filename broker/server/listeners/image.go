@@ -42,6 +42,7 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't list images: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list images: no tenant set")
 	}
 

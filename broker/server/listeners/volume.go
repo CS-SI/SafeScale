@@ -52,6 +52,7 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't list volumes: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list volumes: no tenant set")
 	}
 
@@ -77,6 +78,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't create volumes: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create volume: no tenant set")
 	}
 
@@ -95,7 +97,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	log.Printf("Attach volume called '%s', '%s'", in.Host.Name, in.MountPath)
 
 	tenant := GetCurrentTenant()
-	if tenant == nil {
+	if tenant == nil {log.Info("Can't attach volumes: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't attach volume: no tenant set")
 	}
 
@@ -116,6 +118,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 	volumeName := in.GetVolume().GetName()
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't detach volumes: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't detach volume: no tenant set")
 	}
 
@@ -141,6 +144,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't delete volumes: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't delete volume: no tenant set")
 	}
 
@@ -164,6 +168,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Vol
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't inspect volumes: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't inspect volume: no tenant set")
 	}
 

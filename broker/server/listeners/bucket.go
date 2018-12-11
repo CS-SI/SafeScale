@@ -53,6 +53,7 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't list buckets: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list buckets: no tenant set")
 	}
 
@@ -73,6 +74,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_pro
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't create bucket: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create bucket: no tenant set")
 	}
 
@@ -93,6 +95,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_pro
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't delete buckets: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't delete bucket: no tenant set")
 	}
 
@@ -113,6 +116,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.Bucket
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't inspect bucket: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't inspect bucket: no tenant set")
 	}
 
@@ -135,6 +139,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't mount buckets: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't mount bucket: no tenant set")
 	}
 
@@ -153,6 +158,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't unmount bucket: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't unmount bucket: no tenant set")
 	}
 

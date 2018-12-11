@@ -1160,5 +1160,8 @@ func (client *Client) ResizeHost(id string, request model.SizingRequirements) (*
 	// TODO RESIZE Implement Resize Host HERE
 	log.Warn("Trying to resize a Host...")
 
+	// TODO RESIZE Call this
+	// servers.Resize()
+
 	return nil, errors.New("Not implemented yet !")
 }

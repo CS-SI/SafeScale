@@ -165,7 +165,7 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 		MinGPU: gpuNumber,
 	}
 
-	// TODO 1st check new requirements vs old requirements
+	// TODO RESIZE 1st check new requirements vs old requirements
 	host := mh.Get()
 	host, err = svc.provider.GetHost(host)
 	if err != nil {
@@ -173,7 +173,7 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 	}
 
 	nhs := propsv1.NewHostSizing()
-	err = host.Properties.Get(HostProperty.SizingV1, nhs)
+	err = host.Properties.SafeGet(HostProperty.SizingV1, nhs)
 	if err != nil {
 		return nil, infraErrf(err, "Unable to parse host metadata '%s", ref)
 	}
