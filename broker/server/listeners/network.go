@@ -52,6 +52,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't create network: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create network: no tenant set")
 	}
 
@@ -81,6 +82,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.N
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't list network: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list networks: no tenant set")
 	}
 
@@ -111,6 +113,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't inspect network: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't inspect network: no tenant set")
 	}
 
@@ -137,6 +140,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't delete network: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't delete network: no tenant set")
 	}
 

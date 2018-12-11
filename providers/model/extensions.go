@@ -19,6 +19,7 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 )
 
 // extensions ...
@@ -48,6 +49,16 @@ func (x *Extensions) Get(key string, value interface{}) error {
 	if jsoned, ok := x.extensions[key]; ok {
 		return json.Unmarshal([]byte(jsoned), value)
 	}
+
+	logrus.Debugf("Unable to unmarshal key '%s', not found", key)
+	return nil
+}
+
+func (x *Extensions) SafeGet(key string, value interface{}) error {
+	if jsoned, ok := x.extensions[key]; ok {
+		return json.Unmarshal([]byte(jsoned), value)
+	}
+
 	return fmt.Errorf("Unable to unmarshal key '%s', not found", key)
 }
 

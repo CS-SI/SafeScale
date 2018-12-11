@@ -46,6 +46,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshRespon
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't execute ssh command: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't execute ssh command: no tenant set")
 	}
 
@@ -67,6 +68,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshR
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't copy by ssh command: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't copy by ssh: no tenant set")
 	}
 

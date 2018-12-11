@@ -73,6 +73,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't start host: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "Can't start host: no tenant set")
 	}
 
@@ -94,6 +95,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_prot
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't stop host: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't stop host: no tenant set")
 	}
 
@@ -115,6 +117,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_pr
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't reboot host: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't reboot host: no tenant set")
 	}
 
@@ -136,6 +139,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't list host: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list hosts: no tenant set")
 	}
 
@@ -161,6 +165,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't create host: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create host: no tenant set")
 	}
 
@@ -191,6 +196,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.H
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't resize host: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't resize host: no tenant set")
 	}
 
@@ -222,6 +228,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't get host status: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't get host status: no tenant set")
 	}
 
@@ -245,6 +252,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host,
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't inspect host: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't inspect host: no tenant set")
 	}
 
@@ -268,6 +276,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't delete host: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't delete host: no tenant set")
 	}
 
@@ -292,6 +301,7 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't delete host: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't ssh host: no tenant set")
 	}
 

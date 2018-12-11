@@ -70,6 +70,7 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*p
 	defer log.Debugln("Listeners: tenant get done")
 
 	if currentTenant == nil {
+		log.Info("Can't get tenant: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't get tenant: no tenant set")
 	}
 	return &pb.TenantName{Name: currentTenant.name}, nil

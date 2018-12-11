@@ -52,6 +52,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't create share: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create share: no tenant set")
 	}
 
@@ -73,6 +74,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't delete share: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't delete share: no tenant set")
 	}
 
@@ -101,6 +103,7 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (*p
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't list share: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list shares: no tenant set")
 	}
 
@@ -128,6 +131,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't mount share: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't mount share: no tenant set")
 	}
 
@@ -149,6 +153,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't mount share: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't unmount share: no tenant set")
 	}
 
@@ -171,6 +176,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Shar
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
+		log.Info("Can't inspect share: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't inspect share: no tenant set")
 	}
 
