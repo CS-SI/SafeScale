@@ -335,7 +335,12 @@ var hostResize = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
-		// hostName := c.Args().Get(1)
+
+		if c.NumFlags() == 0 {
+			fmt.Println("Missing arguments, a resize command requires that at least one argument (cpu, ram, disk, gpu, freq) is specified")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
+		}
 
 		def := pb.HostDefinition{
 			Name:      c.Args().First(),
