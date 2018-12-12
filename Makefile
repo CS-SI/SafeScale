@@ -176,7 +176,7 @@ perform/perform: perform
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
 
-docs:
+godocs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(godoc -http=:6060 &)
 
