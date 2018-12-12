@@ -279,7 +279,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			defer func() {
 				delerr := service.DeleteNetwork(net.ID)
 				if delerr != nil {
-					log.Warnf("Error leleting network '%s'", net.ID)
+					log.Warnf("Error deleting network '%s'", net.ID)
 				}
 			}()
 		} else {
