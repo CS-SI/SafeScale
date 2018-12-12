@@ -165,6 +165,18 @@ func ToPBHost(in *model.Host) *pb.Host {
 	if err != nil {
 		return nil
 	}
+
+	hostVolumesV1 := propsv1.NewHostVolumes()
+	err = in.Properties.Get(HostProperty.VolumesV1, hostVolumesV1)
+	if err != nil {
+		return nil
+	}
+
+	var volumes []string
+	for k, _ := range hostVolumesV1.VolumesByName {
+		volumes = append(volumes, k)
+	}
+
 	return &pb.Host{
 		CPU:        int32(hostSizingV1.AllocatedSize.Cores),
 		Disk:       int32(hostSizingV1.AllocatedSize.DiskSize),
@@ -176,6 +188,7 @@ func ToPBHost(in *model.Host) *pb.Host {
 		PrivateKey: in.PrivateKey,
 		RAM:        hostSizingV1.AllocatedSize.RAMSize,
 		State:      pb.HostState(in.LastState),
+		AttachedVolumeNames: volumes,
 	}
 }
 
