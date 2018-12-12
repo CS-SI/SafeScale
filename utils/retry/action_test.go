@@ -57,7 +57,6 @@ func TestWhileUnsuccessfulDelay5Seconds(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
 		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second }, false},
 		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * time.Second }, true},
 		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * time.Second }, false},
@@ -83,7 +82,6 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
 		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second }, false},
 		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * time.Second }, true},
 		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * time.Second }, false},
