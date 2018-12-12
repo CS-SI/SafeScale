@@ -357,7 +357,7 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return nil, fmt.Errorf("failed to get host '%s' information after %v: %s", host.ID, timeout, err.Error())
+			return nil, fmt.Errorf("failed to get host '%s' information after %v: %s", host.ID, timeout, retryErr.Error())
 		}
 	}
 	if err != nil {
