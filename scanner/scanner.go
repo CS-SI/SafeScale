@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/providers/metadata"
 	"io/ioutil"
 	"math"
 	"os"
@@ -232,25 +233,25 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		defer group.Done()
 	}
 
-	service, err := providers.GetService(theTenant)
+	serviceProvider, err := providers.GetService(theTenant)
 	if err != nil {
-		log.Warnf("Unable to get service for tenant '%s': %s", theTenant, err.Error())
+		log.Warnf("Unable to get serviceProvider for tenant '%s': %s", theTenant, err.Error())
 		return err
 	}
 
-	err = dumpImages(service, theTenant)
-	if err != nil {
-		return err
-	}
-
-	err = dumpTemplates(service, theTenant)
+	err = dumpImages(serviceProvider, theTenant)
 	if err != nil {
 		return err
 	}
 
-	templates, err := service.ListTemplates(true)
+	err = dumpTemplates(serviceProvider, theTenant)
+	if err != nil {
+		return err
+	}
 
-	img, err := service.SearchImage("Ubuntu 16.04")
+	templates, err := serviceProvider.ListTemplates(true)
+
+	img, err := serviceProvider.SearchImage("Ubuntu 16.04")
 	if err != nil {
 		log.Warnf("No image here...")
 		return err
@@ -261,8 +262,8 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	there := true
 	var net *model.Network
 
-	netName := "scanner"
-	if net, err = service.GetNetwork(netName); net != nil && err == nil {
+	netName := "net-safescale"
+	if net, err = serviceProvider.GetNetwork(netName); net != nil && err == nil {
 		there = true
 		log.Warnf("Network '%s' already there", netName)
 	} else {
@@ -270,14 +271,14 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	}
 
 	if !there {
-		net, err = service.CreateNetwork(model.NetworkRequest{
+		net, err = serviceProvider.CreateNetwork(model.NetworkRequest{
 			CIDR:      "192.168.0.0/24",
 			IPVersion: IPVersion.IPv4,
 			Name:      netName,
 		})
 		if err == nil {
 			defer func() {
-				delerr := service.DeleteNetwork(net.ID)
+				delerr := serviceProvider.DeleteNetwork(net.ID)
 				if delerr != nil {
 					log.Warnf("Error deleting network '%s'", net.ID)
 				}
@@ -287,6 +288,11 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		}
 		if net == nil {
 			return errors.Errorf("Failure creating network")
+		}
+
+		err = metadata.SaveNetwork(serviceProvider, net)
+		if err != nil {
+			return errors.Errorf("Failure saving network metadata")
 		}
 	}
 
@@ -302,17 +308,16 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		if net != nil {
 
 			// TODO Remove this later
-
 			/*
-				if template.Name != "s1-2" {
-					return nil
-				}
+			if !strings.Contains(template.Name, "s1-") {
+				return nil
+			}
 			*/
 
 			log.Printf("Checking template %s\n", template.Name)
 
 			hostName := "scanhost-" + template.Name
-			host, err := service.CreateHost(model.HostRequest{
+			host, err := serviceProvider.CreateHost(model.HostRequest{
 				ResourceName: hostName,
 				PublicIP:     true,
 				ImageID:      img.ID,
@@ -320,10 +325,26 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				Networks:     []*model.Network{net},
 			})
 
+			err = metadata.NewHost(serviceProvider).Carry(host).Write()
+			if err != nil {
+				return err
+			}
+
 			defer func() {
-				delerr := service.DeleteHost(hostName)
+				log.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.ID)
+				delerr := serviceProvider.DeleteHost(host.ID)
 				if delerr != nil {
-					log.Warnf("Error deleting host '%s'", hostName)
+					log.Warnf("Error deleting host '%s'", host.ID)
+				}
+
+				md, err := metadata.LoadHostByID(serviceProvider, host.ID)
+				if err != nil {
+					log.Warnf("Error loading host metadata of '%s'", hostName)
+				} else {
+					mdDeleteErr := md.Delete()
+					if mdDeleteErr != nil {
+						log.Warnf("Error deleting metadata of '%s'", hostName)
+					}
 				}
 			}()
 
@@ -332,7 +353,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				return err
 			}
 
-			sshSvc := handlers.NewSSHHandler(service)
+			sshSvc := handlers.NewSSHHandler(serviceProvider)
 			ssh, err := sshSvc.GetConfig(host.ID)
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
@@ -377,6 +398,8 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			if nerr != nil {
 				log.Warnf("template [%s] : Error writing file: %v", template.Name, nerr)
 				return nerr
+			} else {
+				log.Infof("template [%s] : Stored in file: %s", template.Name, "$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json")
 			}
 		} else {
 			return errors.New("No gateway network !")
@@ -389,13 +412,14 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 
 	for _, target := range templates {
 		sem <- true
+		localTarget := target
 		go func(inner model.HostTemplate) {
-			defer func() { <-sem }()
-			err = hostAnalysis(inner)
-			if err != nil {
-				log.Warnf("Error running scanner: %+v", err)
+			defer func() {<-sem}()
+			lerr := hostAnalysis(inner)
+			if lerr != nil {
+				log.Warnf("Error running scanner: %+v", lerr)
 			}
-		}(target)
+		}(localTarget)
 	}
 
 	for i := 0; i < cap(sem); i++ {
@@ -463,7 +487,9 @@ func dumpImages(service *providers.Service, tenant string) error {
 
 func main() {
 	log.Printf("%s version %s\n", os.Args[0], VERSION)
-	log.Printf("built %s\n", BUILD_DATE  + "-" + REV)
+	log.Printf("built on %s, hash id: %s\n", BUILD_DATE, REV)
+
+	// time.Sleep(time.Duration(10) * time.Second)
 
 	RunScanner()
 }
