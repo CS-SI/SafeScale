@@ -307,12 +307,25 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		defer wg.Done()
 		if net != nil {
 
-			// TODO Remove this later
-			/*
-			if !strings.Contains(template.Name, "s1-") {
+			// Limit scanner tests for integration test purposes
+			testSubset := ""
+
+			if testSubsetCandidate := os.Getenv("SCANNER_SUBSET"); testSubsetCandidate != "" {
+				testSubset = testSubsetCandidate
+			}
+
+			if len(testSubset) > 0  {
+				if !strings.Contains(template.Name, testSubset) {
+					return nil
+				}
+			}
+
+			// TODO If there is a file with today's date, skip it...
+			fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json")
+			if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
+				// path/to/whatever exists
 				return nil
 			}
-			*/
 
 			log.Printf("Checking template %s\n", template.Name)
 
@@ -359,7 +372,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
-			nerr := ssh.WaitServerReady(time.Duration(concurrency-1) * time.Minute)
+			nerr := ssh.WaitServerReady(time.Duration( 6 + concurrency-1) * time.Minute)
 			if nerr != nil {
 				log.Warnf("template [%s] : Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
