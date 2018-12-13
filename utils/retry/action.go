@@ -128,7 +128,7 @@ func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) err
 	return WhileUnsuccessful(run, 5*time.Second, timeout)
 }
 
-func WhileUnsuccessfulDelay5SecondsX(run func() error, timeout time.Duration) error {
+func WhileUnsuccessfulDelay5SecondsTimeout(run func() error, timeout time.Duration) error {
 	return WhileUnsuccessfulTimeout(run, 5*time.Second, timeout)
 }
 
@@ -372,13 +372,13 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 		}()
 
 		select {
-		case reachable := <-ch:
-			err = reachable
+		case response := <-ch:
+			err = response
 		case <-time.After(timeout):
 			// call timed out
-			err = fmt.Errorf("What to say")
+			err = fmt.Errorf("Operation timeout")
 		case <-desist:
-			err = fmt.Errorf("Global timeout")
+			err = fmt.Errorf("Desist timeout")
 		}
 
 		// Collects the result of the try
@@ -418,7 +418,17 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 		default:
 			// Retry is wanted, so blocks the loop the amount of time needed
 			if a.Officer != nil {
-				a.Officer.Block(try)
+				go func() {
+					a.Officer.Block(try)
+					ch <- nil
+				}()
+
+				select {
+				case response := <-ch:
+					err = response
+				case <-desist:
+					err = fmt.Errorf("Desist timeout")
+				}
 			}
 		}
 	}
