@@ -80,7 +80,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, false},
+		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, true},
 		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * time.Second}, true},
 		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * time.Second}, false},
 		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * time.Second}, true},
@@ -92,7 +92,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 				t.Errorf("WhileUnsuccessfulDelay5Seconds() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			delta := time.Since(testStart)
-			if delta.Seconds() >= tt.args.timeout.Seconds() {
+			if delta.Seconds() >= tt.args.timeout.Seconds()+1.5 {
 				t.Errorf("WhileUnsuccessfulDelay5Seconds() error = %v", fmt.Errorf("It's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
 			}
 		})
@@ -109,7 +109,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheckX(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, false},
+		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * time.Second}, true},
 		{"OneTimeSlowFails", args{sleepy_failure, time.Duration(15) * time.Second}, true},
 		{"OneTimeQuickOK", args{quick_sleepy, time.Duration(15) * time.Second}, false},
 		{"UntilTimeouts", args{quick_sleepy_failure, time.Duration(15) * time.Second}, true},
@@ -117,12 +117,12 @@ func TestWhileUnsuccessfulDelay5SecondsCheckX(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testStart := time.Now()
-			if err := WhileUnsuccessfulDelay5SecondsX(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
-				t.Errorf("WhileUnsuccessfulDelay5SecondsX() error = %v, wantErr %v", err, tt.wantErr)
+			if err := WhileUnsuccessfulDelay5SecondsTimeout(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
+				t.Errorf("WhileUnsuccessfulDelay5SecondsTimeout() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			delta := time.Since(testStart)
-			if delta.Seconds() >= tt.args.timeout.Seconds()+0.5 { // 0.5 seconds tolerance
-				t.Errorf("WhileUnsuccessfulDelay5SecondsX() error = %v", fmt.Errorf("It's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
+			if delta.Seconds() >= tt.args.timeout.Seconds()+1.5 { // 0.5 seconds tolerance
+				t.Errorf("WhileUnsuccessfulDelay5SecondsTimeout() error = %v", fmt.Errorf("It's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
 			}
 		})
 	}
