@@ -1035,6 +1035,9 @@ func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, err
 
 // DeleteHost deletes the host identified by id
 func (client *Client) DeleteHost(id string) error {
+	log.Debugf("openstack.Client.DeleteHost(%s) called", id)
+	defer log.Debugf("openstack.Client.DeleteHost(%s) done", id)
+
 	if client.Cfg.UseFloatingIP {
 		fip, err := client.getFloatingIP(id)
 		if err == nil {
@@ -1052,6 +1055,8 @@ func (client *Client) DeleteHost(id string) error {
 					return errors.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
 				}
 			}
+		} else {
+			return errors.Wrap(err, fmt.Sprintf("error retrieving floating ip for '%s'", id))
 		}
 	}
 
@@ -1064,7 +1069,8 @@ func (client *Client) DeleteHost(id string) error {
 			if err != nil {
 				switch err.(type) {
 				case gc.ErrDefault404:
-					// Resource not found, consider deletion succeeful
+					// Resource not found, consider deletion successful
+					log.Debugf("Host '%s' not found, deletion considered successful", id)
 					return nil
 				default:
 					return fmt.Errorf("failed to submit host '%s' deletion: %s", id, ProviderErrorToString(err))
@@ -1101,6 +1107,7 @@ func (client *Client) DeleteHost(id string) error {
 				}
 			}
 			if !resourcePresent {
+				log.Debugf("Host '%s' not found, deletion considered successful after a few retries", id)
 				return nil
 			}
 			return fmt.Errorf("host '%s' in state 'ERROR', retrying to delete", id)

@@ -70,7 +70,7 @@ type Subnet struct {
 // CreateNetwork creates a network named name
 func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
 	log.Debugf("providers.openstack.Client.CreateNetwork(%s) called", req.Name)
-	defer log.Debugf("providers.openstack.Client.CreateNetwork(%s) called", req.Name)
+	defer log.Debugf("providers.openstack.Client.CreateNetwork(%s) done", req.Name)
 
 	// // We 1st check if name is not already used
 	// _net, err := metadata.LoadNetwork(client, req.Name)

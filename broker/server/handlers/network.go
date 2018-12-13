@@ -78,6 +78,7 @@ func (svc *NetworkHandler) Create(
 	}
 
 	// Create the network
+	log.Debugf("Creating network '%s' ...", name)
 	network, err := svc.provider.CreateNetwork(model.NetworkRequest{
 		Name:      name,
 		IPVersion: ipVersion,
@@ -90,22 +91,6 @@ func (svc *NetworkHandler) Create(
 
 	// Starting from here, delete network if exiting with err
 	defer func() {
-		// r := recover()
-		// if r != nil {
-		// 	derr := svc.provider.DeleteNetwork(network.ID)
-		// 	if derr != nil {
-		// 		log.Errorf("%+v", derr)
-		// 	}
-
-		// 	switch t := r.(type) {
-		// 	case string:
-		// 		err = fmt.Errorf("%q", t)
-		// 	case error:
-		// 		err = t
-		// 	}
-		// 	tbr := errors.Wrap(err, "panic occured during network creation")
-		// 	log.Errorf("%+v", tbr)
-		// } else
 		if err != nil {
 			derr := svc.provider.DeleteNetwork(network.ID)
 			if derr != nil {
@@ -115,6 +100,7 @@ func (svc *NetworkHandler) Create(
 		}
 	}()
 
+	log.Debugf("Saving network metadata '%s' ...", network.Name)
 	err = metadata.SaveNetwork(svc.provider, network)
 	if err != nil {
 		return nil, infraErr(err)
