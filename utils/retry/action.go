@@ -21,9 +21,8 @@ package retry
 
 import (
 	"fmt"
-	"time"
-
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
+	"time"
 )
 
 // Try keeps track of the number of tries, starting from 1. Action is valid only when Err is nil.
@@ -96,6 +95,27 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 	}.loop()
 }
 
+// WhileUnsuccessful retries every 'delay' while 'run' is unsuccessful with a 'timeout'
+func WhileUnsuccessfulTimeout(run func() error, delay time.Duration, timeout time.Duration) error {
+	if delay <= 0 {
+		delay = time.Second
+	}
+	var arbiter Arbiter
+	if timeout <= 0 {
+		arbiter = Unsuccessful()
+	} else {
+		arbiter = PrevailDone(Unsuccessful(), Timeout(timeout))
+	}
+	return action{
+		Arbiter: arbiter,
+		Officer: Constant(delay),
+		Run:     run,
+		First:   nil,
+		Last:    nil,
+		Notify:  nil,
+	}.loopWithTimeout(timeout)
+}
+
 // WhileUnsuccessfulDelay1Second retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 1 second after each try, expiring after 'timeout'
 func WhileUnsuccessfulDelay1Second(run func() error, timeout time.Duration) error {
@@ -106,6 +126,10 @@ func WhileUnsuccessfulDelay1Second(run func() error, timeout time.Duration) erro
 // waiting 5 seconds after each try, expiring after 'timeout'
 func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) error {
 	return WhileUnsuccessful(run, 5*time.Second, timeout)
+}
+
+func WhileUnsuccessfulDelay5SecondsX(run func() error, timeout time.Duration) error {
+	return WhileUnsuccessfulTimeout(run, 5*time.Second, timeout)
 }
 
 // WhileUnsuccessfulWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
@@ -276,6 +300,86 @@ func (a action) loop() error {
 	for count := uint(1); ; count++ {
 		// Perform action
 		err := a.Run()
+
+		// Collects the result of the try
+		try := Try{
+			Start: start,
+			Count: count,
+			Err:   err,
+		}
+
+		// Asks what to do now
+		verdict, retryErr := arbiter(try)
+		if a.Notify != nil {
+			a.Notify(try, verdict)
+		}
+
+		switch verdict {
+		case Verdict.Done:
+			// Returns the error if no retry is wanted
+			var errLast error
+			if a.Last != nil {
+				errLast = a.Last()
+			}
+			if errLast != nil {
+				return fmt.Errorf("%s + %s", err.Error(), errLast.Error())
+			}
+			return err
+		case Verdict.Abort:
+			// Abort wanted, returns an error explaining why
+			var errLast error
+			if a.Last != nil {
+				errLast = a.Last()
+			}
+			if errLast != nil {
+				return fmt.Errorf("%s + %s", retryErr.Error(), errLast.Error())
+			}
+			return retryErr
+		default:
+			// Retry is wanted, so blocks the loop the amount of time needed
+			if a.Officer != nil {
+				a.Officer.Block(try)
+			}
+		}
+	}
+}
+
+// loop executes the tries
+func (a action) loopWithTimeout(timeout time.Duration) error {
+	var (
+		arbiter = a.Arbiter
+		start   = time.Now()
+	)
+	if arbiter == nil {
+		arbiter = DefaultArbiter
+	}
+
+	if a.First != nil {
+		err := a.First()
+		if err != nil {
+			return err
+		}
+	}
+
+	desist := time.After(timeout)
+	for count := uint(1); ; count++ {
+		var err error
+
+		// Perform action
+		ch := make(chan error)
+		go func() {
+			ch <- a.Run()
+		}()
+
+		select {
+		case reachable := <-ch:
+			err = reachable
+		case <-time.After(timeout):
+			// call timed out
+			err = fmt.Errorf("What to say")
+		case <-desist:
+			err = fmt.Errorf("Global timeout")
+		}
 
 		// Collects the result of the try
 		try := Try{
