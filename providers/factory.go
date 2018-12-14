@@ -95,6 +95,7 @@ func GetService(tenantName string) (*Service, error) {
 		tenantIdentity, found := tenant["identity"].(map[string]interface{})
 		tenantCompute, found := tenant["compute"].(map[string]interface{})
 		tenantNetwork, found := tenant["network"].(map[string]interface{})
+
 		// Merge identity compute and network in single map
 		tenantClient := map[string]interface{}{
 			"identity": tenantIdentity,
@@ -149,15 +150,18 @@ func GetService(tenantName string) (*Service, error) {
 			}
 			bucketName := anon.(string)
 			found, err = metadataLocation.FindBucket(bucketName)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to find metadata bucket : %s", err)
+			}
 			if found {
 				metadataBucket, err = metadataLocation.GetBucket(bucketName)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("Failed to get metadata bucket : %s", err)
 				}
 			} else {
 				metadataBucket, err = metadataLocation.CreateBucket(bucketName)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("Failed to create metadata bucket : %s", err)
 				}
 			}
 			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {
@@ -238,7 +242,10 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 	}
 
 	if config.Region, ok = objectstorage["Region"].(string); !ok {
-		config.Region, _ = compute["Region"].(string)
+		if config.Region, ok = compute["Region"].(string); !ok {
+			//stow refuses to connect to object storage if the region is not initialized even if he does not need it
+			config.Region = "stub"
+		}
 	}
 
 	return config, nil
@@ -336,7 +343,10 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 
 	if config.Region, ok = metadata["Region"].(string); !ok {
 		if config.Region, ok = objectstorage["Region"].(string); !ok {
-			config.Region, _ = compute["Region"].(string)
+			if config.Region, ok = compute["Region"].(string); !ok {
+				//stow refuses to connect to object storage if the region is not initialized even if he does not need it
+				config.Region = "stub"
+			}
 		}
 	}
 

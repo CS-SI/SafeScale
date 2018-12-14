@@ -159,10 +159,10 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 	id := mh.Get().ID
 	hostSizeRequest := model.SizingRequirements{
 		MinDiskSize: disk,
-		MinRAMSize: ram,
-		MinCores: cpu,
-		MinFreq: freq,
-		MinGPU: gpuNumber,
+		MinRAMSize:  ram,
+		MinCores:    cpu,
+		MinFreq:     freq,
+		MinGPU:      gpuNumber,
 	}
 
 	// TODO RESIZE 1st check new requirements vs old requirements

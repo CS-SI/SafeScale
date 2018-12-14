@@ -189,6 +189,7 @@ It defines the "driver" to communicate with the provider. Valid values are:
 
 > | |
 > | --- |
+> | ``"local"`` |
 > | ``"cloudwatt"`` |
 > | ``"cloudferro"`` |
 > | ``"flexibleengine"`` |
