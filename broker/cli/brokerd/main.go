@@ -114,7 +114,12 @@ func work() {
 		}
 	}
 
-	log.Infof("Starting server, listening at port: %d", brokerdPort)
+	suffix := ""
+	if suffixCandidate := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffixCandidate != "" {
+		suffix = suffixCandidate
+	}
+
+	log.Infof("Starting server, listening at port: %d, using metadata suffix: [%s]", brokerdPort, suffix)
 
 	lis, err := net.Listen("tcp", ":" + strconv.Itoa(brokerdPort))
 	if err != nil {
