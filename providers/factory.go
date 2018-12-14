@@ -200,10 +200,15 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 	if config.Domain, ok = objectstorage["Domain"].(string); !ok {
 		if config.Domain, ok = objectstorage["DomainName"].(string); !ok {
 			if config.Domain, ok = compute["Domain"].(string); !ok {
-				config.Domain, _ = compute["DomainName"].(string)
+				if config.Domain, ok = compute["DomainName"].(string); !ok {
+					if config.Domain, ok = identity["Domain"].(string); !ok {
+						config.Domain, ok = identity["DomainName"].(string)
+					}
+				}
 			}
 		}
 	}
+	config.TenantDomain = config.Domain
 
 	if config.Tenant, ok = objectstorage["Tenant"].(string); !ok {
 		if config.Tenant, ok = objectstorage["ProjectName"].(string); !ok {
@@ -217,22 +222,29 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 
 	config.AuthURL, _ = objectstorage["AuthURL"].(string)
 	config.Endpoint, _ = objectstorage["Endpoint"].(string)
-	config.User, _ = objectstorage["Username"].(string)
 
-	if config.Key, ok = objectstorage["AccessKey"].(string); !ok {
-		if config.Key, ok = objectstorage["OpenStackID"].(string); !ok {
-			if config.Key, ok = objectstorage["Username"].(string); !ok {
-				if config.Key, ok = identity["OpenstackID"].(string); !ok {
-					config.Key, _ = identity["Username"].(string)
+	if config.User, ok = objectstorage["AccessKey"].(string); !ok {
+		if config.User, ok = objectstorage["OpenStackID"].(string); !ok {
+			if config.User, ok = objectstorage["Username"].(string); !ok {
+				if config.User, ok = identity["OpenstackID"].(string); !ok {
+					config.User, _ = identity["Username"].(string)
 				}
 			}
 		}
 	}
-	config.User = config.Key
+
+	if config.Key, ok = objectstorage["ApplicationKey"].(string); !ok {
+		config.Key, _ = identity["ApplicationKey"].(string)
+	}
+
 	if config.SecretKey, ok = objectstorage["SecretKey"].(string); !ok {
 		if config.SecretKey, ok = objectstorage["OpenstackPassword"].(string); !ok {
 			if config.SecretKey, ok = objectstorage["Password"].(string); !ok {
-				config.SecretKey, _ = identity["OpenstackPassword"].(string)
+				if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
+					if config.SecretKey, ok = identity["OpenstackPassword"].(string); !ok {
+						config.SecretKey, _ = identity["Password"].(string)
+					}
+				}
 			}
 		}
 	}
@@ -267,12 +279,17 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 			if config.Domain, ok = objectstorage["Domain"].(string); !ok {
 				if config.Domain, ok = objectstorage["DomainName"].(string); !ok {
 					if config.Domain, ok = compute["Domain"].(string); !ok {
-						config.Domain, _ = compute["DomainName"].(string)
+						if config.Domain, ok = compute["DomainName"].(string); !ok {
+							if config.Domain, ok = identity["Domain"].(string); !ok {
+								config.Domain, _ = identity["DomainName"].(string)
+							}
+						}
 					}
 				}
 			}
 		}
 	}
+	config.TenantDomain = config.Domain
 
 	if config.Tenant, ok = metadata["Tenant"].(string); !ok {
 		if config.Tenant, ok = metadata["ProjectName"].(string); !ok {
@@ -280,8 +297,10 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 				if config.Tenant, ok = objectstorage["Tenant"].(string); !ok {
 					if config.Tenant, ok = objectstorage["ProjectName"].(string); !ok {
 						if config.Tenant, ok = objectstorage["ProjectID"].(string); !ok {
-							if config.Tenant, ok = compute["ProjectName"].(string); !ok {
-								config.Tenant, _ = compute["ProjectID"].(string)
+							if config.Tenant, ok = compute["Tenant"].(string); !ok {
+								if config.Tenant, ok = compute["ProjectName"].(string); !ok {
+									config.Tenant, _ = compute["ProjectID"].(string)
+								}
 							}
 						}
 					}
@@ -298,14 +317,14 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 		config.Endpoint, _ = objectstorage["Endpoint"].(string)
 	}
 
-	if config.Key, ok = metadata["AccessKey"].(string); !ok {
-		if config.Key, ok = metadata["OpenstackID"].(string); !ok {
-			if config.Key, ok = metadata["Username"].(string); !ok {
-				if config.Key, ok = objectstorage["AccessKey"].(string); !ok {
-					if config.Key, ok = objectstorage["OpenStackID"].(string); !ok {
-						if config.Key, ok = objectstorage["Username"].(string); !ok {
-							if config.Key, ok = identity["Username"].(string); !ok {
-								config.Key, _ = identity["OpenstackID"].(string)
+	if config.User, ok = metadata["AccessKey"].(string); !ok {
+		if config.User, ok = metadata["OpenstackID"].(string); !ok {
+			if config.User, ok = metadata["Username"].(string); !ok {
+				if config.User, ok = objectstorage["AccessKey"].(string); !ok {
+					if config.User, ok = objectstorage["OpenStackID"].(string); !ok {
+						if config.User, ok = objectstorage["Username"].(string); !ok {
+							if config.User, ok = identity["Username"].(string); !ok {
+								config.User, _ = identity["OpenstackID"].(string)
 							}
 						}
 					}
@@ -313,7 +332,13 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 			}
 		}
 	}
-	config.User = config.Key
+
+	if config.Key, ok = metadata["ApplicationKey"].(string); !ok {
+		if config.Key, ok = objectstorage["ApplicationKey"].(string); !ok {
+			config.Key, _ = identity["ApplicationKey"].(string)
+		}
+	}
+
 	if config.SecretKey, ok = metadata["SecretKey"].(string); !ok {
 		if config.SecretKey, ok = metadata["AccessPassword"].(string); !ok {
 			if config.SecretKey, ok = metadata["OpenstackPassword"].(string); !ok {
@@ -322,8 +347,12 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 						if config.SecretKey, ok = objectstorage["AccessPassword"].(string); !ok {
 							if config.SecretKey, ok = objectstorage["OpenstackPassword"].(string); !ok {
 								if config.SecretKey, ok = objectstorage["Password"].(string); !ok {
-									if config.SecretKey, ok = identity["Password"].(string); !ok {
-										config.SecretKey, _ = identity["OpenstackPassword"].(string)
+									if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
+										if config.SecretKey, ok = identity["AccessPassword"].(string); !ok {
+											if config.SecretKey, ok = identity["Password"].(string); !ok {
+												config.SecretKey, _ = identity["OpenstackPassword"].(string)
+											}
+										}
 									}
 								}
 							}
