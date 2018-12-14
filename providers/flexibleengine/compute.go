@@ -440,10 +440,6 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 					servers.Delete(client.osclt.Compute, server.ID)
 				}
 				return fmt.Errorf("query to create host '%s' failed: %s (HTTP return code: %d)", request.ResourceName, openstack.ProviderErrorToString(err), httpResp.StatusCode)
-				// msg := fmt.Sprintf(msgFail, openstack.ProviderErrorToString(err))
-				// // TODO Gotcha !!
-				// log.Debugf(msg)
-				// return fmt.Errorf(msg)
 			}
 			host.ID = server.ID
 
@@ -464,10 +460,6 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 					return fmt.Errorf("host '%s' is in ERROR state", request.ResourceName)
 				default:
 					return fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
-					// msg := fmt.Sprintf(msgFail, openstack.ProviderErrorToString(err))
-					// // TODO Gotcha !!
-					// log.Debugf(msg)
-					// return fmt.Errorf(msg)
 				}
 			}
 			return nil
