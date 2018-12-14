@@ -278,11 +278,7 @@ func (m *Network) ListHosts() ([]*model.Host, error) {
 		if err != nil {
 			break
 		}
-		if mh != nil {
-			list = append(list, mh.Get())
-		} else {
-			log.Warnf("Host metadata for '%s' not found !", id)
-		}
+		list = append(list, mh.Get())
 	}
 	if err != nil {
 		log.Errorf("Error listing hosts: %+v", err)
@@ -318,7 +314,7 @@ func LoadNetworkByID(svc *providers.Service, networkID string) (*Network, error)
 		return nil, err
 	}
 	if !found {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("network", networkID)
 	}
 	return m, nil
 }
@@ -331,7 +327,7 @@ func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, er
 		return nil, err
 	}
 	if !found {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("network", networkname)
 	}
 	return m, nil
 }
@@ -340,20 +336,23 @@ func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, er
 func LoadNetwork(svc *providers.Service, ref string) (*Network, error) {
 	m, err := LoadNetworkByID(svc, ref)
 	if err != nil {
-		return nil, err
-	}
-	if m != nil {
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return nil, err
+		}
+	} else {
 		return m, nil
 	}
 
 	m, err = LoadNetworkByName(svc, ref)
 	if err != nil {
-		return nil, err
-	}
-	if m != nil {
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return nil, err
+		}
+	} else {
 		return m, nil
 	}
-	return nil, nil
+
+	return nil, model.ResourceNotFoundError("network", ref)
 }
 
 // Gateway links Object Storage folder and Network
@@ -476,7 +475,7 @@ func LoadGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 		return nil, err
 	}
 	if !found {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("gateway", networkID)
 	}
 	return mg, nil
 }

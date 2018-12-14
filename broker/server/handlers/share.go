@@ -96,9 +96,6 @@ func (svc *ShareHandler) Create(shareName, hostName, path string) (*propsv1.Host
 	if err != nil {
 		return nil, throwErr(err)
 	}
-	if server == nil {
-		return nil, logicErr(fmt.Errorf("failed to query host '%s'", hostName))
-	}
 
 	// Check if the path to share isn't a remote mount or contains a remote mount
 	serverMountsV1 := propsv1.NewHostMounts()
@@ -245,7 +242,7 @@ func (svc *ShareHandler) List() (map[string]map[string]*propsv1.HostShare, error
 
 	// Now walks through the hosts acting as Nas
 	if len(servers) == 0 {
-		return nil, nil
+		return shares, nil
 	}
 
 	hostSvc := NewHostHandler(svc.provider)
@@ -512,10 +509,6 @@ func (svc *ShareHandler) Inspect(shareName string) (*model.Host, *propsv1.HostSh
 		client, err := hostSvc.Inspect(k)
 		if err != nil {
 			log.Errorf("%+v", err)
-			continue
-		}
-		if client == nil {
-			log.Errorf("failed to query client '%s'", k)
 			continue
 		}
 

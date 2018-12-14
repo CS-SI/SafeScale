@@ -208,15 +208,13 @@ func (svc *NetworkHandler) Create(
 	defer func() {
 		if err != nil {
 			mh, derr := metadata.LoadHost(svc.provider, gw.ID)
-			if derr == nil {
-				if mh != nil {
-					derr = mh.Delete()
-				} else {
-					log.Errorf("Gateway metadata of '%s' not found: ", gw.ID)
-				}
-			}
 			if derr != nil {
-				log.Errorf("Failed to delete gateway metadata: %+v", derr)
+				log.Error(derr)
+			} else {
+				delerr := mh.Delete()
+				if delerr != nil {
+					log.Errorf("Failed to delete gateway metadata: %+v", derr)
+				}
 			}
 		}
 	}()
@@ -324,20 +322,16 @@ func (svc *NetworkHandler) Delete(ref string) error {
 		if err != nil {
 			return infraErr(err)
 		}
-		// allow no metadata, but log it
-		if mh == nil {
-			log.Warnf("Failed to find metadata of gateway; continuing assuming gateway is gone")
-		} else {
-			err = svc.provider.DeleteGateway(gwID)
-			// allow no gateway, but log it
-			if err != nil {
-				spew.Dump(err)
-				log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
-			}
-			err = mh.Delete()
-			if err != nil {
-				return infraErr(err)
-			}
+
+		err = svc.provider.DeleteGateway(gwID)
+		// allow no gateway, but log it
+		if err != nil {
+			spew.Dump(err)
+			log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
+		}
+		err = mh.Delete()
+		if err != nil {
+			return infraErr(err)
 		}
 	}
 

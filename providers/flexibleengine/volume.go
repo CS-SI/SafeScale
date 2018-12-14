@@ -120,7 +120,7 @@ func (client *Client) GetVolume(id string) (*model.Volume, error) {
 	if err != nil {
 		switch err.(type) {
 		case gc.ErrDefault404:
-			return nil, nil
+			return nil, errors.Wrapf(err, fmt.Sprintf("Error getting volume %s: not found !", id))
 		}
 		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", openstack.ProviderErrorToString(err)))

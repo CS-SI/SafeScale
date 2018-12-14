@@ -223,7 +223,7 @@ func LoadHostByID(svc *providers.Service, hostID string) (*Host, error) {
 		return nil, err
 	}
 	if !found {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("host", hostID)
 	}
 	return mh, nil
 }
@@ -236,32 +236,36 @@ func LoadHostByName(svc *providers.Service, hostName string) (*Host, error) {
 		return nil, err
 	}
 	if !found {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("host", hostName)
 	}
 	return mh, nil
 }
 
 // LoadHost gets the host definition from Object Storage
 func LoadHost(svc *providers.Service, ref string) (*Host, error) {
+	
 	// We first try looking for host by ID from metadata
 	mh, err := LoadHostByID(svc, ref)
 	if err != nil {
-		return nil, err
-	}
-	if mh != nil {
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return nil, err
+		}
+	} else {
 		return mh, nil
 	}
 
 	// If not found, we try looking for host by name from metadata
 	mh, err = LoadHostByName(svc, ref)
 	if err != nil {
-		return nil, err
-	}
-	if mh != nil {
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return nil, err
+		}
+	} else  {
 		return mh, nil
 	}
 
-	return nil, nil
+	// Not found
+	return nil, model.ResourceNotFoundError("host", ref)
 }
 
 // Acquire waits until the write lock is available, then locks the metadata
