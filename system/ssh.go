@@ -546,7 +546,7 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 // WaitServerReady waits until the SSH server is ready
 // the 'timeout' parameter is in minutes
 func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
-	log.Debugf("SSH, WaitServerReady, Here starts a timeout of %d minutes", int(timeout.Minutes()))
+	log.Debugf("Provisioning server, Waiting for SSH, timeout of %d minutes", int(timeout.Minutes()))
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			cmd, err := ssh.Command("sudo cat /var/tmp/user_data.done")
@@ -560,13 +560,13 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 			}
 			if retcode != 0 {
 				if retcode == 255 {
-					log.Debugf("Ssh NOT ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
+					log.Debugf("Provisioning server, Ssh NOT ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
 					return fmt.Errorf("Ssh not ready: error code: 255")
 				}
-				log.Debugf("Ssh NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
+				log.Debugf("Provisioning server, Ssh NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
 				return fmt.Errorf("Ssh not ready: error code: %s", stderr)
 			} else {
-				log.Debugf("Ssh ready: command finished with content: [%s]", stdout)
+				log.Debugf("Provisioning server, Ssh ready: command finished with content: [%s]", stdout)
 			}
 			return nil
 		},
@@ -582,15 +582,15 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		retcode, stdout, stderr, logErr := logCmd.Run()
 		if logErr == nil {
 			if retcode == 0 {
-				return fmt.Errorf("server '%s' is not ready yet: %s - log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)
+				return fmt.Errorf("Provisioning server, server '%s' is not ready yet: %s - log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)
 			}
 			if len(stdout) > 0 {
 				log.Error(fmt.Errorf("Captured output: %s", stdout))
 			}
-			return fmt.Errorf("server '%s' is not ready yet: %s - error reading user_data.log: %s", ssh.Host, originalErr.Error(), stderr)
+			return fmt.Errorf("Provisioning server, server '%s' is not ready yet: %s - error reading user_data.log: %s", ssh.Host, originalErr.Error(), stderr)
 		}
 
-		return fmt.Errorf("server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
+		return fmt.Errorf("Provisioning server, server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
 	}
 	return nil
 }
