@@ -144,11 +144,9 @@ func TestMock_ListImages_Mock(t *testing.T) {
 	require.Nil(t, err)
 
 	if amok != nil {
-		// TODO Create ListImagesGenerator
-		amok.EXPECT().ListImages(false).AnyTimes()
+		amok.EXPECT().ListImages(false).Return([]model.Image{{ID: "I1", Name: "Ubuntu"},{ID: "I2", Name: "Debian"}}, nil).AnyTimes()
 	}
 
-	// TODO Result should NOT be empty
 	cli.ListImages(t)
 }
 
@@ -156,8 +154,15 @@ func TestMock_ListHostTemplates_Mock(t *testing.T) {
 	cli, amok, err := getMockableClient(t)
 	require.Nil(t, err)
 
-	// TODO use Mock object
-	_ = amok
+	if amok != nil {
+		ht := propsv1.NewHostTemplate()
+		ht.ID = "ID1"
+		ht.Name = "TemplateUbuntu"
+		ht.Cores = 1
+
+		amok.EXPECT().ListTemplates(false).Return([]model.HostTemplate{model.HostTemplate{HostTemplate: ht}}, nil).AnyTimes()
+		amok.EXPECT().ListImages(false).Return([]model.Image{{ID: "I1", Name: "Ubuntu"},{ID: "I2", Name: "Debian"}}, nil).AnyTimes()
+	}
 
 	cli.ListHostTemplates(t)
 	tpls, err := cli.Service.ListTemplates(false)
@@ -173,8 +178,10 @@ func TestMock_CreateKeyPair_Mock(t *testing.T) {
 	cli, amok, err := getMockableClient(t)
 	require.Nil(t, err)
 
-	// TODO use Mock object
-	_ = amok
+	if amok != nil {
+		amok.EXPECT().CreateKeyPair("kp").Return(&model.KeyPair{ID:"1", Name:"2", PublicKey:"3", PrivateKey:"4"}, nil)
+		amok.EXPECT().DeleteKeyPair("1").Return(nil)
+	}
 
 	cli.CreateKeyPair(t)
 }
