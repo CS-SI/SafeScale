@@ -206,6 +206,9 @@ May be used in sections ``tenants.objectstorage`` and ``tenants.metadata``, espe
 
 ### ``Domain``
 
+Contains the Domain name wanted by the provider.<br>
+May be used in every section.
+
 ### ``DomainName``: alias, see ``Domain``
 
 ### ``Endpoint``

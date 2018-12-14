@@ -67,7 +67,7 @@ func (l *location) connect() error {
 	// defer log.Debugln("objectstorage.Location.Connect() done")
 
 	config := stow.ConfigMap{
-		"access_key_id":   l.config.Key,
+		"access_key_id":   l.config.User,
 		"secret_key":      l.config.SecretKey,
 		"username":        l.config.User,
 		"key":             l.config.SecretKey,

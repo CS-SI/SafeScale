@@ -115,7 +115,7 @@ func (c *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 
 	username, _ := identity["Username"].(string)
 	password, _ := identity["Password"].(string)
-	domainName, _ := identity["UserDomainName"].(string)
+	domainName, _ := identity["DomainName"].(string)
 
 	region, _ := compute["Region"].(string)
 	projectName, _ := compute["ProjectName"].(string)
