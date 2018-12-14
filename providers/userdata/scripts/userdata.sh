@@ -284,8 +284,7 @@ configure_as_gateway() {
     fw_i_accept -m conntrack --ctstate ESTABLISHED,RELATED
     fw_i_accept -p tcp --dport ssh
 
-    PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
-    PU_IF=$(netstat -ie | grep -B1 ${PU_IP} | head -n1 | awk '{print $1}')
+    PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null)
     PU_IF=${PU_IF%%:}
 
     for IF in $(ls /sys/class/net); do
@@ -395,6 +394,8 @@ After=network.target
 
 [Service]
 ExecStart=/sbin/gateway
+Restart=on-failure
+StartLimitIntervalSec=10
 
 [Install]
 WantedBy=multi-user.target

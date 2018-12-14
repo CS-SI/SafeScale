@@ -23,6 +23,7 @@ import (
 	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/providers/local"          // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise tenants
 )
