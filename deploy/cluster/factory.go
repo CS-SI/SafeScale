@@ -18,6 +18,7 @@ package cluster
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/providers/model"
 
 	log "github.com/sirupsen/logrus"
 
@@ -51,7 +52,7 @@ func Get(name string) (api.Cluster, error) {
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
 	}
 	if !found {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("cluster", name)
 	}
 
 	var instance api.Cluster
@@ -147,9 +148,6 @@ func Delete(name string) error {
 	instance, err := Get(name)
 	if err != nil {
 		return fmt.Errorf("failed to find a cluster named '%s': %s", name, err.Error())
-	}
-	if instance == nil {
-		return fmt.Errorf("Cluster '%s' not found", name)
 	}
 
 	// Deletes all the infrastructure built for the cluster

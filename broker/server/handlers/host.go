@@ -83,9 +83,7 @@ func (svc *HostHandler) Start(ref string) error {
 		// TODO Introduce error level as parameter
 		return infraErrf(err, "Error getting ssh config of host '%s': loading host metadata", ref)
 	}
-	if mh == nil {
-		return infraErr(fmt.Errorf("host '%s' not found", ref))
-	}
+
 	id := mh.Get().ID
 	err = svc.provider.StartHost(id)
 	if err != nil {
@@ -104,9 +102,6 @@ func (svc *HostHandler) Stop(ref string) error {
 		// TODO Introduce error level as parameter
 		return infraErrf(err, "Error getting ssh config of host '%s': loading host metadata", ref)
 	}
-	if mh == nil {
-		return infraErr(fmt.Errorf("host '%s' not found", ref))
-	}
 	id := mh.Get().ID
 	err = svc.provider.StopHost(id)
 	if err != nil {
@@ -123,9 +118,6 @@ func (svc *HostHandler) Reboot(ref string) error {
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
 		return infraErr(fmt.Errorf("failed to load metadata of host '%s': %v", ref, err))
-	}
-	if mh == nil {
-		return infraErr(fmt.Errorf("host '%s' not found", ref))
 	}
 	id := mh.Get().ID
 	err = svc.provider.RebootHost(id)
@@ -151,9 +143,6 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
 		return nil, infraErrf(err, "failed to load host metadata")
-	}
-	if mh == nil {
-		return nil, throwErrf("host '%s' not found", ref)
 	}
 
 	id := mh.Get().ID
@@ -241,9 +230,6 @@ func (svc *HostHandler) Create(
 		mgw, err := metadata.LoadHost(svc.provider, n.GatewayID)
 		if err != nil {
 			return nil, infraErr(err)
-		}
-		if mgw == nil {
-			return nil, logicErr(fmt.Errorf("failed to find gateway of network '%s'", net))
 		}
 		gw = mgw.Get()
 	} else {
@@ -512,9 +498,6 @@ func (svc *HostHandler) ForceInspect(ref string) (*model.Host, error) {
 	if err != nil {
 		return nil, infraErr(errors.Wrap(err, "failed to load host metadata"))
 	}
-	if host == nil {
-		return nil, logicErr(fmt.Errorf("failed to find host '%s'", ref))
-	}
 	return host, nil
 }
 
@@ -528,9 +511,7 @@ func (svc *HostHandler) Inspect(ref string) (*model.Host, error) {
 	if err != nil {
 		return nil, throwErr(errors.Wrap(err, "failed to load host metadata"))
 	}
-	if mh == nil {
-		return nil, nil
-	}
+
 	host := mh.Get()
 	host, err = svc.provider.GetHost(host)
 	if err != nil {
@@ -547,9 +528,6 @@ func (svc *HostHandler) Delete(ref string) error {
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
 		return infraErrf(err, "can't delete host '%s'", ref)
-	}
-	if mh == nil {
-		return logicErr(model.ResourceNotFoundError("host", ref))
 	}
 	host := mh.Get()
 
@@ -657,9 +635,6 @@ func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
 	host, err := svc.Inspect(ref)
 	if err != nil {
 		return nil, logicErrf(err, fmt.Sprintf("can't access ssh parameters of host '%s': failed to query host", ref), nil)
-	}
-	if host == nil {
-		return nil, logicErr(fmt.Errorf("can't access ssh parameters of host '%s': host not found", ref))
 	}
 	sshHandler := NewSSHHandler(svc.provider)
 	sshConfig, err := sshHandler.GetConfig(host.ID)

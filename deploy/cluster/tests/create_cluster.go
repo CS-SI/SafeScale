@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"runtime"
 
 	log "github.com/sirupsen/logrus"
@@ -36,10 +37,12 @@ func Run() {
 	clusterName := "test-cluster"
 	instance, err := cluster.Get(clusterName)
 	if err != nil {
-		fmt.Printf("Failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
-		return
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			fmt.Printf("Failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
+			return
+		}
 	}
-	if instance == nil {
+	if err == nil {
 		log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
 		instance, err = cluster.Create(core.Request{
 			Name:       clusterName,

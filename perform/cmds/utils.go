@@ -19,6 +19,7 @@ package cmds
 import (
 	"bufio"
 	"fmt"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"os"
 	"os/exec"
 
@@ -108,10 +109,10 @@ func extractClusterArgument(c *cli.Context) error {
 			return cli.NewExitError(msg, int(ExitCode.Duplicate))
 		}
 		if err != nil {
-			msg := fmt.Sprintf("Failed to get cluster '%s' information: %s\n", clusterName, err.Error())
-			return cli.NewExitError(msg, int(ExitCode.RPC))
-		}
-		if clusterInstance == nil {
+			if _, ok := err.(model.ErrResourceNotFound); !ok {
+				msg := fmt.Sprintf("Failed to get cluster '%s' information: %s\n", clusterName, err.Error())
+				return cli.NewExitError(msg, int(ExitCode.RPC))
+			}
 			msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)
 			return cli.NewExitError(msg, int(ExitCode.NotFound))
 		}
