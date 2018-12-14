@@ -181,6 +181,9 @@ func (svc *ShareHandler) Delete(name string) error {
 	if err != nil {
 		return throwErr(err)
 	}
+	if server == nil {
+		return throwErrf("Delete share: unable to inspect host '%s'", name)
+	}
 
 	serverSharesV1 := propsv1.NewHostShares()
 	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
