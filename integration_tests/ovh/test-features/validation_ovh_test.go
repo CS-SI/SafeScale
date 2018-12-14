@@ -67,7 +67,7 @@ func Test_Docker_Feature(t *testing.T) {
 
 	out, err = getOutput("broker ssh run gw-deploytest -c \"docker ps\"")
 	fmt.Print(out)
-	require.Nil(t, err)
+	require.NotNil(t, err)
 	require.False(t, strings.Contains(out, "CONTAINER"))
 }
 
@@ -133,7 +133,7 @@ func Test_Docker_Feature_Not_Gateway(t *testing.T) {
 
 	out, err = getOutput("broker ssh run easyvm -c \"docker ps\"")
 	fmt.Print(out)
-	require.Nil(t, err)
+	require.NotNil(t, err)
 	require.False(t, strings.Contains(out, "CONTAINER"))
 }
 
