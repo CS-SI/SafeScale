@@ -285,7 +285,7 @@ func (client *Client) GetNetwork(id string) (*model.Network, error) {
 		}
 	}
 	if subnet == nil || subnet.ID == "" {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("subnet", id)
 	}
 
 	net := model.NewNetwork()
@@ -583,7 +583,7 @@ func (client *Client) findSubnetByName(name string) (*subnets.Subnet, error) {
 		}
 	}
 	if !found {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("subnet", name)
 	}
 	return &subnet, nil
 }

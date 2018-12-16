@@ -18,15 +18,15 @@ package main
 
 import (
 	"fmt"
-	"runtime"
-
-	log "github.com/sirupsen/logrus"
-
-	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/deploy/cluster"
 	"github.com/CS-SI/SafeScale/deploy/cluster/core"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/providers/model"
+	"log"
+	"runtime"
+
+	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/deploy/cluster"
 )
 
 // Run runs the deployment
@@ -36,25 +36,24 @@ func Run() {
 	clusterName := "test-cluster"
 	instance, err := cluster.Get(clusterName)
 	if err != nil {
+		if _, ok := err.(model.ErrResourceNotFound); ok {
+			log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
+			instance, err = cluster.Create(core.Request{
+				Name:       clusterName,
+				Complexity: Complexity.Small,
+				//Complexity: Complexity.Normal,
+				//Complexity: Complexity.Large,
+				CIDR:   "192.168.0.0/28",
+				Flavor: Flavor.DCOS,
+			})
+			if err != nil {
+				fmt.Printf("Failed to create cluster: %s\n", err.Error())
+				return
+			}
+		}
+
 		fmt.Printf("Failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
 		return
-	}
-	if instance == nil {
-		log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
-		instance, err = cluster.Create(core.Request{
-			Name:       clusterName,
-			Complexity: Complexity.Small,
-			//Complexity: Complexity.Normal,
-			//Complexity: Complexity.Large,
-			CIDR:   "192.168.0.0/28",
-			Flavor: Flavor.DCOS,
-		})
-		if err != nil {
-			fmt.Printf("Failed to create cluster: %s\n", err.Error())
-			return
-		}
-	} else {
-		fmt.Printf("Cluster '%s' already created.\n", clusterName)
 	}
 
 	state, err := instance.GetState()

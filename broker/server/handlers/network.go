@@ -290,9 +290,6 @@ func (svc *NetworkHandler) Inspect(ref string) (*model.Network, error) {
 	if err != nil {
 		return nil, infraErrf(err, "failed to load metadata of network '%s'", ref)
 	}
-	if mn == nil {
-		return nil, logicErr(model.ResourceNotFoundError("network", ref))
-	}
 	return mn.Get(), infraErr(err)
 }
 
@@ -301,9 +298,6 @@ func (svc *NetworkHandler) Delete(ref string) error {
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
 		return infraErrf(err, "failed to load metadata of network '%s'", ref)
-	}
-	if mn == nil {
-		return logicErr(fmt.Errorf("network '%s' not found", ref))
 	}
 	network := mn.Get()
 	gwID := network.GatewayID

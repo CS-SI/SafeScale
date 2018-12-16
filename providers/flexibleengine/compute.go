@@ -528,7 +528,6 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	return host, nil
 }
 
-
 // ResizeHost creates an host satisfying request
 func (client *Client) ResizeHost(id string, request model.SizingRequirements) (*model.Host, error) {
 	return client.osclt.ResizeHost(id, request)
@@ -1000,6 +999,9 @@ func (client *Client) disableHostRouterMode(host *model.Host) error {
 	if err != nil {
 		return fmt.Errorf("Failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
+	if portID == nil {
+		return fmt.Errorf("Failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Name)
+	}
 
 	opts := ports.UpdateOpts{AllowedAddressPairs: nil}
 	_, err = ports.Update(client.osclt.Network, *portID, opts).Extract()
@@ -1046,7 +1048,7 @@ func (client *Client) getOpenstackPortID(host *model.Host) (*string, error) {
 	if found {
 		return &nic.PortID, nil
 	}
-	return nil, nil
+	return nil, model.ResourceNotFoundError("Port ID", host.Name)
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into api.Host

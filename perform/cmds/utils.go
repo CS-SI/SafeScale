@@ -19,6 +19,7 @@ package cmds
 import (
 	"bufio"
 	"fmt"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"os"
 	"os/exec"
 
@@ -103,17 +104,18 @@ func extractClusterArgument(c *cli.Context) error {
 			return cli.NewExitError("Invalid argument CLUSTERNAME", int(ExitCode.InvalidArgument))
 		}
 		clusterInstance, err = cluster.Get(clusterName)
-		if c.Command.HasName("create") && clusterInstance != nil {
-			msg := fmt.Sprintf("Cluster '%s' already exists", clusterName)
-			return cli.NewExitError(msg, int(ExitCode.Duplicate))
-		}
 		if err != nil {
+			if _, ok := err.(model.ErrResourceNotFound); ok {
+				msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)
+				return cli.NewExitError(msg, int(ExitCode.NotFound))
+			}
+
 			msg := fmt.Sprintf("Failed to get cluster '%s' information: %s\n", clusterName, err.Error())
 			return cli.NewExitError(msg, int(ExitCode.RPC))
 		}
-		if clusterInstance == nil {
-			msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)
-			return cli.NewExitError(msg, int(ExitCode.NotFound))
+		if c.Command.HasName("create") {
+			msg := fmt.Sprintf("Cluster '%s' already exists", clusterName)
+			return cli.NewExitError(msg, int(ExitCode.Duplicate))
 		}
 	}
 	return nil

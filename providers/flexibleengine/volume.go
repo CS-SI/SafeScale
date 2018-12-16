@@ -118,11 +118,11 @@ func (client *Client) GetVolume(id string) (*model.Volume, error) {
 	r := volumes.Get(client.osclt.Volume, id)
 	volume, err := r.Extract()
 	if err != nil {
+		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		switch err.(type) {
 		case gc.ErrDefault404:
-			return nil, nil
+			return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", openstack.ProviderErrorToString(err)))
 		}
-		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", openstack.ProviderErrorToString(err)))
 	}
 

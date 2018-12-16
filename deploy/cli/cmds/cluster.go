@@ -19,6 +19,7 @@ package cmds
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"os"
 	"strings"
 	"time"
@@ -93,15 +94,19 @@ func extractClusterArgument(c *cli.Context) error {
 
 		var err error
 		clusterInstance, err = cluster.Get(clusterName)
-		if c.Command.HasName("create") && clusterInstance != nil {
-			return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
-		}
 		if err != nil {
+			if _, ok := err.(model.ErrResourceNotFound); ok {
+				if !c.Command.HasName("create") { // nil, nil
+					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
+				}
+			}
+
 			msg := fmt.Sprintf("Failed to query for cluster '%s': %s\n", clusterName, err.Error())
 			return clitools.ExitOnRPC(msg)
 		}
-		if !c.Command.HasName("create") && clusterInstance == nil {
-			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
+
+		if c.Command.HasName("create") {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
 		}
 	}
 	return nil

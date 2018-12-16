@@ -159,10 +159,10 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 	id := mh.Get().ID
 	hostSizeRequest := model.SizingRequirements{
 		MinDiskSize: disk,
-		MinRAMSize: ram,
-		MinCores: cpu,
-		MinFreq: freq,
-		MinGPU: gpuNumber,
+		MinRAMSize:  ram,
+		MinCores:    cpu,
+		MinFreq:     freq,
+		MinGPU:      gpuNumber,
 	}
 
 	// TODO RESIZE 1st check new requirements vs old requirements
@@ -388,9 +388,6 @@ func (svc *HostHandler) Create(
 		if err != nil {
 			return nil, infraErr(err)
 		}
-		if mn == nil {
-			return nil, logicErr(fmt.Errorf("failed to load metadata of network '%s'", net))
-		}
 		network := mn.Get()
 		hostNetworkV1.NetworksByID[network.ID] = network.Name
 		hostNetworkV1.NetworksByName[network.Name] = network.ID
@@ -512,9 +509,7 @@ func (svc *HostHandler) ForceInspect(ref string) (*model.Host, error) {
 	if err != nil {
 		return nil, infraErr(errors.Wrap(err, "failed to load host metadata"))
 	}
-	if host == nil {
-		return nil, logicErr(fmt.Errorf("failed to find host '%s'", ref))
-	}
+
 	return host, nil
 }
 
@@ -529,7 +524,7 @@ func (svc *HostHandler) Inspect(ref string) (*model.Host, error) {
 		return nil, throwErr(errors.Wrap(err, "failed to load host metadata"))
 	}
 	if mh == nil {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("host", ref)
 	}
 	host := mh.Get()
 	host, err = svc.provider.GetHost(host)
@@ -599,6 +594,10 @@ func (svc *HostHandler) Delete(ref string) error {
 			return infraErr(err)
 		}
 
+		if share == nil {
+			return model.ResourceNotFoundError("share", i.ShareID)
+		}
+
 		// Unmounts share from host
 		err = shareHandler.Unmount(share.Name, host.Name)
 		if err != nil {
@@ -658,9 +657,7 @@ func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
 	if err != nil {
 		return nil, logicErrf(err, fmt.Sprintf("can't access ssh parameters of host '%s': failed to query host", ref), nil)
 	}
-	if host == nil {
-		return nil, logicErr(fmt.Errorf("can't access ssh parameters of host '%s': host not found", ref))
-	}
+
 	sshHandler := NewSSHHandler(svc.provider)
 	sshConfig, err := sshHandler.GetConfig(host.ID)
 	if err != nil {
