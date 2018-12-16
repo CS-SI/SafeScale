@@ -186,6 +186,9 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Shar
 		err := errors.Wrap(err, fmt.Sprintf("can't inspect share '%s'", shareName))
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
+	if host == nil {
+		return nil, model.ResourceNotFoundError("host", "host:"+shareName)
+	}
 
 	return convert.ToPBShareMountList(host.Name, share, mounts), nil
 }

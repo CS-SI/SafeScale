@@ -248,10 +248,8 @@ func (svc *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 
 func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, cout chan int, next chan bool, hostc chan *model.Volume) {
 	for {
-
 		v, err := client.GetVolume(volumeID)
 		if err != nil {
-
 			cout <- 0
 			return
 		}

@@ -92,7 +92,7 @@ func Prepare(
 
 	config, err := client.GetCfgOpts()
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	anon, ok = config.Get("AutoHostNetworkInterfaces")
 	if ok {

@@ -96,9 +96,6 @@ func (svc *ShareHandler) Create(shareName, hostName, path string) (*propsv1.Host
 	if err != nil {
 		return nil, throwErr(err)
 	}
-	if server == nil {
-		return nil, logicErr(fmt.Errorf("failed to query host '%s'", hostName))
-	}
 
 	// Check if the path to share isn't a remote mount or contains a remote mount
 	serverMountsV1 := propsv1.NewHostMounts()
@@ -184,6 +181,9 @@ func (svc *ShareHandler) Delete(name string) error {
 	if server == nil {
 		return throwErrf("Delete share: unable to inspect host '%s'", name)
 	}
+	if share == nil {
+		return throwErrf("Delete share: unable to found share of host '%s'", name)
+	}
 
 	serverSharesV1 := propsv1.NewHostShares()
 	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
@@ -248,7 +248,7 @@ func (svc *ShareHandler) List() (map[string]map[string]*propsv1.HostShare, error
 
 	// Now walks through the hosts acting as Nas
 	if len(servers) == 0 {
-		return nil, nil
+		return shares, nil
 	}
 
 	hostSvc := NewHostHandler(svc.provider)
@@ -275,6 +275,12 @@ func (svc *ShareHandler) Mount(shareName, hostName, path string) (*propsv1.HostR
 	server, share, _, err := svc.Inspect(shareName)
 	if err != nil {
 		return nil, throwErr(err)
+	}
+	if share == nil {
+		return nil, model.ResourceNotFoundError("share", shareName)
+	}
+	if server == nil {
+		return nil, model.ResourceNotFoundError("host", hostName)
 	}
 
 	// Sanitize path
@@ -488,7 +494,7 @@ func (svc *ShareHandler) Inspect(shareName string) (*model.Host, *propsv1.HostSh
 		return nil, nil, nil, infraErr(errors.Wrap(err, "error loading share metadata"))
 	}
 	if hostName == "" {
-		return nil, nil, nil, nil
+		return nil, nil, nil, model.ResourceNotFoundError("share", shareName)
 	}
 
 	hostSvc := NewHostHandler(svc.provider)
@@ -518,10 +524,6 @@ func (svc *ShareHandler) Inspect(shareName string) (*model.Host, *propsv1.HostSh
 		client, err := hostSvc.Inspect(k)
 		if err != nil {
 			log.Errorf("%+v", err)
-			continue
-		}
-		if client == nil {
-			log.Errorf("failed to query client '%s'", k)
 			continue
 		}
 

@@ -156,7 +156,7 @@ func (svc *VolumeHandler) Inspect(ref string) (*model.Volume, map[string]*propsv
 	if err == nil && len(volumeAttachedV1.Hosts) > 0 {
 		for id := range volumeAttachedV1.Hosts {
 			host, err := hostSvc.Inspect(id)
-			if err != nil || host == nil {
+			if err != nil {
 				continue
 			}
 			hostVolumesV1 := propsv1.NewHostVolumes()
