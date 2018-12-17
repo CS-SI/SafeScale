@@ -108,30 +108,30 @@ func Test_Docker_Feature_Not_Gateway(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 
-	out, err = getOutput("broker host create easyvm --public --net deploytest")
+	out, err = getOutput("broker host create dockervm --public --net deploytest")
 	require.Nil(t, err)
 
-	out, err = getOutput("deploy host check-feature easyvm docker")
+	out, err = getOutput("deploy host check-feature dockervm docker")
 	require.NotNil(t, err)
 
-	out, err = getOutput("deploy host add-feature easyvm docker")
+	out, err = getOutput("deploy host add-feature dockervm docker")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker ssh run easyvm -c \"docker ps\"")
+	out, err = getOutput("broker ssh run dockervm -c \"docker ps\"")
 	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "CONTAINER"))
 
-	out, err = getOutput("deploy host check-feature easyvm docker")
+	out, err = getOutput("deploy host check-feature dockervm docker")
 	require.Nil(t, err)
 
-	out, err = getOutput("deploy host delete-feature easyvm docker")
+	out, err = getOutput("deploy host delete-feature dockervm docker")
 	require.Nil(t, err)
 
-	out, err = getOutput("deploy host check-feature easyvm docker")
+	out, err = getOutput("deploy host check-feature dockervm docker")
 	require.NotNil(t, err)
 
-	out, err = getOutput("broker ssh run easyvm -c \"docker ps\"")
+	out, err = getOutput("broker ssh run dockervm -c \"docker ps\"")
 	fmt.Print(out)
 	require.NotNil(t, err)
 	require.False(t, strings.Contains(out, "CONTAINER"))
@@ -139,7 +139,7 @@ func Test_Docker_Feature_Not_Gateway(t *testing.T) {
 
 func featureTeardown()  {
 	log.Printf("Starting cleanup...")
-	_, _ = getOutput("broker host delete easyvm")
+	_, _ = getOutput("broker host delete dockervm")
 	_, _ = getOutput("broker network delete deploytest")
 	log.Printf("Finishing cleanup...")
 }

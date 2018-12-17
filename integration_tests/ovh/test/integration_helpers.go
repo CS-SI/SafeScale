@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"github.com/sirupsen/logrus"
 	"log"
 	"os"
 	"os/exec"
@@ -39,15 +40,19 @@ func canBeRun(command string) (bool, error) {
 }
 
 func getOutput(command string) (string, error) {
+	logrus.Warningf("Running command: [%s]", command)
 	out, err := exec.Command("bash", "-c", command).CombinedOutput()
 	if err != nil {
+		logrus.Warning(string(out))
 		return string(out), err
 	}
 
 	if strings.Contains(strings.ToUpper(string(out)), strings.ToUpper("Error")) {
+		logrus.Warning(string(out))
 		return string(out), errors.New(string(out))
 	}
 
+	logrus.Warning(string(out))
 	return string(out), nil
 }
 
