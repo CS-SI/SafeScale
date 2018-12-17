@@ -18,7 +18,6 @@ package flexibleengine
 
 import (
 	"fmt"
-
 	// Gophercloud OpenStack API
 
 	gc "github.com/gophercloud/gophercloud"
@@ -585,7 +584,7 @@ func (client *Client) findVPCID() (*string, error) {
 	if found {
 		return &router.ID, nil
 	}
-	return nil, nil
+	return nil, model.ResourceNotFoundError("VPC ID", "")
 }
 
 // GetAuthOpts returns the auth options

@@ -278,7 +278,11 @@ func (m *Network) ListHosts() ([]*model.Host, error) {
 		if err != nil {
 			break
 		}
-		list = append(list, mh.Get())
+		if mh != nil {
+			list = append(list, mh.Get())
+		} else {
+			log.Warnf("Host metadata for '%s' not found !", id)
+		}
 	}
 	if err != nil {
 		log.Errorf("Error listing hosts: %+v", err)
@@ -345,14 +349,9 @@ func LoadNetwork(svc *providers.Service, ref string) (*Network, error) {
 
 	m, err = LoadNetworkByName(svc, ref)
 	if err != nil {
-		if _, ok := err.(model.ErrResourceNotFound); !ok {
-			return nil, err
-		}
-	} else {
-		return m, nil
+		return nil, err
 	}
-
-	return nil, model.ResourceNotFoundError("network", ref)
+	return m, nil
 }
 
 // Gateway links Object Storage folder and Network
