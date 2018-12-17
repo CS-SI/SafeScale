@@ -829,11 +829,7 @@ func (client *Client) DeleteHost(id string) error {
 			return fmt.Errorf("Failed to get domain name : %s", err.Error())
 		}
 		if domainName == volumeName {
-			libvirtVolume, err := GetLibvirtVolume(volume.Name, client.LibvirtService)
-			if err != nil {
-				return fmt.Errorf("Failed to get libvirt volume %s : %s", volumeName, err.Error())
-			}
-			err = libvirtVolume.Delete(0)
+			err = client.DeleteVolume(volume.Name)
 			if err != nil {
 				return fmt.Errorf("Failed to delete volume %s : %s", volumeName, err.Error())
 			}

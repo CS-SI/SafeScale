@@ -59,25 +59,45 @@ func getAttachmentId(volume *libvirt.StorageVol, domain *libvirt.Domain) (string
 	return hash(volumeName) + "-" + hash(domainName), nil
 }
 
-func GetLibvirtVolume(ref string, libvirtService *libvirt.Connect) (*libvirt.StorageVol, error) {
-	storagePools, err := libvirtService.ListAllStoragePools(3)
+func (client *Client) getStoragePoolByPath(path string) (*libvirt.StoragePool, error) {
+	storagePools, err := client.LibvirtService.ListAllStoragePools(3)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to list all storagePools : %s", err.Error())
 	}
 
 	for _, storagePool := range storagePools {
-		libvirtVolumes, err := storagePool.ListAllStorageVolumes(0)
+		storagePoolXML, err := storagePool.GetXMLDesc(0)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to list all storages volumes : %s", err.Error())
+			return nil, fmt.Errorf(fmt.Sprintf("Failed get xml description of the storage pool : %s", err.Error()))
 		}
-		for _, libvirtVolume := range libvirtVolumes {
-			name, err := libvirtVolume.GetName()
-			if err != nil {
-				return nil, fmt.Errorf("Failed to get volume name : %s", err.Error())
-			}
-			if hash, _ := getVolumeId(&libvirtVolume); ref == hash || ref == name {
-				return &libvirtVolume, nil
-			}
+		storagePoolDescription := &libvirtxml.StoragePool{}
+		err = xml.Unmarshal([]byte(storagePoolXML), storagePoolDescription)
+
+		if storagePoolDescription.Target.Path == path {
+			return &storagePool, nil
+		}
+	}
+
+	return nil, fmt.Errorf("No matching storage pool found")
+}
+
+func (client *Client) getLibvirtVolume(ref string) (*libvirt.StorageVol, error) {
+	storagePool, err := client.getStoragePoolByPath(client.Config.LibvirtStorage)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get storage pool from path : %s", err.Error())
+	}
+
+	libvirtVolumes, err := storagePool.ListAllStorageVolumes(0)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list all storages volumes : %s", err.Error())
+	}
+	for _, libvirtVolume := range libvirtVolumes {
+		name, err := libvirtVolume.GetName()
+		if err != nil {
+			return nil, fmt.Errorf("Failed to get volume name : %s", err.Error())
+		}
+		if hash, _ := getVolumeId(&libvirtVolume); ref == hash || ref == name {
+			return &libvirtVolume, nil
 		}
 	}
 
@@ -179,34 +199,26 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
 	//volume speed is ignored
-
-	storagePools, err := client.LibvirtService.ListAllStoragePools(3)
+	storagePool, err := client.getStoragePoolByPath(client.Config.LibvirtStorage)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list all storagePools : %s", err.Error())
-	}
-	var freeStoragePool *libvirt.StoragePool
-	for _, storagePool := range storagePools {
-		info, err := storagePool.GetInfo()
-		if err != nil {
-			return nil, fmt.Errorf("Failed to get storagePool name : %s", err.Error())
-		}
-
-		if info.Available > uint64(request.Size)*1024*1024*1024 {
-			freeStoragePool = &storagePool
-			break
-		}
+		return nil, fmt.Errorf("Failed to get storage pool from path : %s", err.Error())
 	}
 
-	if freeStoragePool == nil {
-		return nil, fmt.Errorf("Free disk space is not sufficient to create a new volume")
+	info, err := storagePool.GetInfo()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get storagePool name : %s", err.Error())
 	}
 
-	freeStoragePoolXML, err := freeStoragePool.GetXMLDesc(0)
+	if info.Available < uint64(request.Size)*1024*1024*1024 {
+		return nil, fmt.Errorf("Free disk space is not sufficient to create a new volume, only %f GB left", float32(info.Available)/1024/1024/1024)
+	}
+
+	storagePoolXML, err := storagePool.GetXMLDesc(0)
 	if err != nil {
 		return nil, fmt.Errorf(fmt.Sprintf("Failed get xml description of the storage pool : %s", err.Error()))
 	}
 	storagePoolDescription := &libvirtxml.StoragePool{}
-	err = xml.Unmarshal([]byte(freeStoragePoolXML), storagePoolDescription)
+	err = xml.Unmarshal([]byte(storagePoolXML), storagePoolDescription)
 
 	requestXML := `
 	<volume>
@@ -218,7 +230,7 @@ func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, 
         </target>
 	</volume>`
 
-	libvirtVolume, err := freeStoragePool.StorageVolCreateXML(requestXML, 0)
+	libvirtVolume, err := storagePool.StorageVolCreateXML(requestXML, 0)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create the volume %s on pool %s : %s", request.Name, storagePoolDescription.Name, err.Error())
 	}
@@ -233,7 +245,7 @@ func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, 
 
 // GetVolume returns the volume identified by id
 func (client *Client) GetVolume(ref string) (*model.Volume, error) {
-	libvirtVolume, err := GetLibvirtVolume(ref, client.LibvirtService)
+	libvirtVolume, err := client.getLibvirtVolume(ref)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get the libvirt.Volume from ref : %s", err.Error())
 	}
@@ -246,27 +258,24 @@ func (client *Client) GetVolume(ref string) (*model.Volume, error) {
 	return volume, nil
 }
 
-//ListVolumes return the list of all volume known on the current tenant (all=ture)
-//or 'only' thode monitored by safescale (all=false) ie those monitored by metadata
+//ListVolumes return the list of all volume known on the current tenant
 func (client *Client) ListVolumes() ([]model.Volume, error) {
-	storagePools, err := client.LibvirtService.ListAllStoragePools(3)
+	storagePool, err := client.getStoragePoolByPath(client.Config.LibvirtStorage)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list all storagePools : %s", err.Error())
+		return nil, fmt.Errorf("Failed to get storage pool from path : %s", err.Error())
 	}
 
 	var volumes []model.Volume
-	for _, storagePool := range storagePools {
-		libvirtVolumes, err := storagePool.ListAllStorageVolumes(0)
+	libvirtVolumes, err := storagePool.ListAllStorageVolumes(0)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list all storages volumes : %s", err.Error())
+	}
+	for _, libvirtVolume := range libvirtVolumes {
+		volume, err := getVolumeFromLibvirtVolume(&libvirtVolume)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to list all storages volumes : %s", err.Error())
+			return nil, fmt.Errorf("Failed to get model.Valume from libvirt.Volume : %s", err.Error())
 		}
-		for _, libvirtVolume := range libvirtVolumes {
-			volume, err := getVolumeFromLibvirtVolume(&libvirtVolume)
-			if err != nil {
-				return nil, fmt.Errorf("Failed to get model.Valume from libvirt.Volume : %s", err.Error())
-			}
-			volumes = append(volumes, *volume)
-		}
+		volumes = append(volumes, *volume)
 	}
 
 	return volumes, nil
@@ -274,7 +283,7 @@ func (client *Client) ListVolumes() ([]model.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(ref string) error {
-	libvirtVolume, err := GetLibvirtVolume(ref, client.LibvirtService)
+	libvirtVolume, err := client.getLibvirtVolume(ref)
 	if err != nil {
 		return fmt.Errorf("Failed to get the libvirt.Volume from ref : %s", err.Error())
 	}
@@ -303,7 +312,7 @@ func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentReque
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
 
-	libvirtVolume, err := GetLibvirtVolume(request.VolumeID, client.LibvirtService)
+	libvirtVolume, err := client.getLibvirtVolume(request.VolumeID)
 	if err != nil {
 		return "", fmt.Errorf("Failed to get the libvirt.Volume from ref : %s", err.Error())
 	}
@@ -351,7 +360,7 @@ func (client *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAtt
 		return nil, fmt.Errorf("Failed to get domain from ref : %s", err.Error())
 	}
 
-	libvirtVolume, err := GetLibvirtVolume(strings.Split(id, "-")[0], client.LibvirtService)
+	libvirtVolume, err := client.getLibvirtVolume(strings.Split(id, "-")[0])
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get the libvirt.Volume from ref : %s", err.Error())
 	}
@@ -371,7 +380,7 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 		return fmt.Errorf("Failed to get domain from ref : %s", err.Error())
 	}
 
-	libvirtVolume, err := GetLibvirtVolume(strings.Split(id, "-")[0], client.LibvirtService)
+	libvirtVolume, err := client.getLibvirtVolume(strings.Split(id, "-")[0])
 	if err != nil {
 		return fmt.Errorf("Failed to get the libvirt.Volume from ref : %s", err.Error())
 	}
@@ -431,7 +440,7 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAtta
 		split := strings.Split(disk.Source.File.File, "/")
 		diskName := split[len(split)-1]
 		if strings.Split(diskName, "-")[0] == "volume" {
-			volume, err := GetLibvirtVolume(diskName, client.LibvirtService)
+			volume, err := client.getLibvirtVolume(diskName)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to get volume : %s", err.Error())
 			}
