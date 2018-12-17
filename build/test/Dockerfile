@@ -1,7 +1,10 @@
 #FROM golang:1.10
 FROM ubuntu:artful
 LABEL maintainer="CS SI"
-
+ARG http_proxy=
+ARG https_proxy=
+ARG LC_ALL=C.UTF-8
+ARG LANG=C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
 # -----------------
@@ -18,6 +21,8 @@ wget \
 unzip \
 vim \
 git \
+python3.6 \
+python3-pip \
 && apt-get autoclean -y \
 && apt-get autoremove -y \
 && rm -rf /var/lib/apt/lists/*
