@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"strconv"
 	"strings"
 	"time"
@@ -136,7 +137,7 @@ func (w *worker) Host() (*pb.Host, error) {
 // for all the life of the action (prevent to request too often)
 func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 	if w.cluster == nil {
-		return nil, nil
+		return nil, model.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
 		hostID, err := w.cluster.FindAvailableMaster()
@@ -154,7 +155,7 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 // identifyAvailableNode finds a node available and will use this one during all the install session
 func (w *worker) identifyAvailableNode(public bool) (*pb.Host, error) {
 	if w.cluster == nil {
-		return nil, nil
+		return nil, model.ResourceNotAvailableError("cluster", "")
 	}
 	found := false
 	if public {

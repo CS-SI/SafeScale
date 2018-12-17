@@ -178,7 +178,7 @@ func (client *Client) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) 
 	if found {
 		return &fip, nil
 	}
-	return nil, nil
+	return nil, model.ResourceNotFoundError("Floating IP", ipAddress)
 }
 
 // CreateFloatingIP creates a floating IP

@@ -178,6 +178,12 @@ func (svc *ShareHandler) Delete(name string) error {
 	if err != nil {
 		return throwErr(err)
 	}
+	if server == nil {
+		return throwErrf("Delete share: unable to inspect host '%s'", name)
+	}
+	if share == nil {
+		return throwErrf("Delete share: unable to found share of host '%s'", name)
+	}
 
 	serverSharesV1 := propsv1.NewHostShares()
 	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
@@ -269,6 +275,12 @@ func (svc *ShareHandler) Mount(shareName, hostName, path string) (*propsv1.HostR
 	server, share, _, err := svc.Inspect(shareName)
 	if err != nil {
 		return nil, throwErr(err)
+	}
+	if share == nil {
+		return nil, model.ResourceNotFoundError("share", shareName)
+	}
+	if server == nil {
+		return nil, model.ResourceNotFoundError("host", hostName)
 	}
 
 	// Sanitize path
@@ -467,6 +479,9 @@ func (svc *ShareHandler) ForceInspect(shareName string) (*model.Host, *propsv1.H
 	host, share, mounts, err := svc.Inspect(shareName)
 	if err != nil {
 		return nil, nil, nil, throwErr(err)
+	}
+	if host == nil {
+		return nil, nil, nil, logicErr(fmt.Errorf("failed to find host exporting the share '%s'", shareName))
 	}
 	return host, share, mounts, nil
 }
