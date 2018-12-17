@@ -117,8 +117,6 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	cidr := req.CIDR
 	dns := req.DNSServers
 
-	//TODO check what permanant/autostart means
-
 	if ipVersion != IPVersion.IPv4 {
 		// TODO implement IPV6 networks
 		panic("only ipv4 networks are implemented")

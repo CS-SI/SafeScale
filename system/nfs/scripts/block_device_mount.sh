@@ -25,17 +25,9 @@ function print_error {
 }
 trap print_error ERR
 
-function dns_fallback {
-    grep nameserver /etc/resolv.conf && return 0
-    echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
-    sudo cp /tmp/resolv.conf /etc/resolv.conf
-    return 0
-}
-
-dns_fallback
-
-mkfs -F -t {{.FileSystem}} "{{.Device}}" && \
-mkdir -p "{{.MountPoint}}" && \
-echo "{{.Device}} {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
-mount "{{.MountPoint}}" && \
-chmod a+rwx "{{.MountPoint}}"
+UUID=$(mkfs -F -t {{.FileSystem}} "{{.Device}}" | grep "Filesystem UUID:" | rev | cut -d' ' -f1 | rev) >/dev/null && \
+mkdir -p "{{.MountPoint}}" >/dev/null && \
+echo "/dev/disk/by-uuid/$UUID {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
+mount "{{.MountPoint}}" >/dev/null && \
+chmod a+rwx "{{.MountPoint}}" >/dev/null && \
+echo -n $UUID
