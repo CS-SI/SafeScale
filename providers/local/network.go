@@ -148,9 +148,17 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 		</ip>
 	</network>`
 
-	libvirtNetwork, err = client.LibvirtService.NetworkCreateXML(requestXML)
+	libvirtNetwork, err = client.LibvirtService.NetworkDefineXML(requestXML)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create network : %s", err.Error())
+	}
+	err = libvirtNetwork.SetAutostart(true)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to enable network autostart : %s", err.Error())
+	}
+	err = libvirtNetwork.Create()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to start network : %s", err.Error())
 	}
 
 	network, err := getNetworkFromLibvirtNetwork(libvirtNetwork)
