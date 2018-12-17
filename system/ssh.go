@@ -24,7 +24,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"net"
@@ -437,30 +436,30 @@ func (c *SSHCommand) end() error {
 }
 
 func recCreateTunnels(ssh *SSHConfig, tunnels *[]*SSHTunnel) (*SSHTunnel, error) {
-	if ssh == nil || tunnels == nil {
-		panic("Unable to recreate SSH tunnel")
-	}
-
-	tunnel, err := recCreateTunnels(ssh.GatewayConfig, tunnels)
-	if err != nil {
-		return nil, err
-	}
-	cfg := ssh
-	if tunnel != nil {
-		gateway := *ssh.GatewayConfig
-		gateway.Port = tunnel.port
-		gateway.Host = "127.0.0.1"
-		cfg.GatewayConfig = &gateway
-	}
-	if cfg.GatewayConfig != nil {
-		tunnel, err = createTunnel(cfg)
+	if ssh != nil {
+		tunnel, err := recCreateTunnels(ssh.GatewayConfig, tunnels)
 		if err != nil {
 			return nil, err
 		}
-		*tunnels = append(*tunnels, tunnel)
-		return tunnel, err
+		cfg := ssh
+		if tunnel != nil {
+			gateway := *ssh.GatewayConfig
+			gateway.Port = tunnel.port
+			gateway.Host = "127.0.0.1"
+			cfg.GatewayConfig = &gateway
+		}
+		if cfg.GatewayConfig != nil {
+			tunnel, err = createTunnel(cfg)
+			if err != nil {
+				return nil, err
+			}
+			*tunnels = append(*tunnels, tunnel)
+			return tunnel, err
+		}
+		return nil, nil
 	}
-	return nil, errors.New("Unable to recreate tunnel: gateway not found")
+	return nil, nil
+
 }
 
 func (ssh *SSHConfig) CreateTunnels() ([]*SSHTunnel, *SSHConfig, error) {

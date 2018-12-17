@@ -46,13 +46,20 @@ func (x *Extensions) Lookup(key string) bool {
 // Get returns the value of extension identified by key
 // if returns nil: key not found
 func (x *Extensions) Get(key string, value interface{}) error {
-	if x.extensions != nil {
-		if jsoned, ok := x.extensions[key]; ok {
-			return json.Unmarshal([]byte(jsoned), value)
-		}
+	if x == nil {
+		panic("Nil Extensions")
 	}
 
-	logrus.Debugf("Unable to unmarshal key '%s', not found", key)
+	if x.extensions == nil {
+		panic("Nil Extensions.extensions")
+	}
+
+	if jsoned, ok := x.extensions[key]; ok {
+		return json.Unmarshal([]byte(jsoned), value)
+	} else {
+		logrus.Debugf("Unable to unmarshal key '%s', not found", key)
+	}
+
 	return nil
 }
 

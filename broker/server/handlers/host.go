@@ -330,6 +330,8 @@ func (svc *HostHandler) Create(
 	if err != nil {
 		return nil, infraErr(err)
 	}
+	// TODO OPP Unsafe
+
 	hostSizingV1.Template = hostRequest.TemplateID
 	hostSizingV1.RequestedSize = &propsv1.HostSize{
 		Cores:     cpu,
@@ -546,8 +548,8 @@ func (svc *HostHandler) Delete(ref string) error {
 	if mh == nil {
 		return logicErr(model.ResourceNotFoundError("host", ref))
 	}
-	host := mh.Get()
 
+	host := mh.Get()
 	// Don't remove a host having shares
 	hostSharesV1 := propsv1.NewHostShares()
 	err = host.Properties.Get(HostProperty.SharesV1, hostSharesV1)

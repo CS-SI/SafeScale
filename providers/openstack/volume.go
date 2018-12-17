@@ -88,7 +88,9 @@ func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
 	volume, err := client.GetVolume(request.Name)
 	if err != nil {
-		return nil, err
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return nil, err
+		}
 	}
 	if volume != nil {
 		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
@@ -121,7 +123,7 @@ func (client *Client) GetVolume(id string) (*model.Volume, error) {
 		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		switch err.(type) {
 		case gc.ErrDefault404:
-			return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", ProviderErrorToString(err)))
+			return nil, model.ResourceNotFoundError("volume", id)
 		}
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", ProviderErrorToString(err)))
 	}
