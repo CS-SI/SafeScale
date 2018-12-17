@@ -32,7 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
-	"github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 )
 
 //go:generate rice embed-go
@@ -186,15 +186,15 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	}
 
 	/*
-	k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
-	if uperr != nil {
-		log.Warn("Network problem...")
-	} else {
-		_, uptext, _, kerr := k.Run()
-		if kerr == nil {
-			log.Warnf("Network working !!: %s", uptext)
+		k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
+		if uperr != nil {
+			log.Warn("Network problem...")
+		} else {
+			_, uptext, _, kerr := k.Run()
+			if kerr == nil {
+				log.Warnf("Network working !!: %s", uptext)
+			}
 		}
-	}
 	*/
 
 	return retcode, stdout, stderr, err

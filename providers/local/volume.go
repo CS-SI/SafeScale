@@ -122,7 +122,6 @@ func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*model.Volum
 	volume.Name = volumeDescription.Name
 	volume.Size = int(volumeDescription.Capacity.Value / 1024 / 1024 / 1024)
 	//volume.Speed =
-	// TODO find a way to generate an UUID from string (no UUID given to a volume by libvirt)
 	volume.ID = hash
 	//volume.State =
 

@@ -434,36 +434,10 @@ func (client *Client) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.H
 			)
 
 		}
-		// if iface.Source.Direct != nil {
-		// 	var ip string
-		// 	err = retry.WhileUnsuccessfulDelay5Seconds(
-		// 		func() error {
-		// 			//TODO dynamic ip range
-		// 			cmd := exec.Command("bash", "-c", "sleep 30 && nmap -T5 -sP --host-timeout 1 172.26.128.0/24 > /dev/null && arp | grep "+iface.MAC.Address+" | cut -f1 -d\\ ")
-		// 			cmdOutput := &bytes.Buffer{}
-		// 			cmd.Stdout = cmdOutput
-		// 			err = cmd.Run()
-		// 			if err != nil {
-		// 				return fmt.Errorf("Commands failled : ", err.Error())
-		// 			}
-		// 			ip = strings.Trim(fmt.Sprintf("%s", cmdOutput), " \n")
-		// 			if len(strings.Split(ip, ".")) == 4 {
-		// 				hostNetwork.PublicIPv4 = ip
-		// 			} else if len(strings.Split(ip, ":")) == 8 {
-		// 				hostNetwork.PublicIPv6 = ip
-		// 			} else {
-		// 				return fmt.Errorf("Unknown adressType")
-		// 			}
-		// 			return nil
-		// 		},
-		// 		5*time.Minute,
-		// 	)
-		// }
 	}
 	return hostNetwork, nil
 }
 
-//TODO propose a version without the properties(time consuming)
 // getHostFromDomain build a model.Host struct representing a Domain
 func (client *Client) getHostFromDomain(domain *libvirt.Domain) (*model.Host, error) {
 	id, err := domain.GetUUIDString()
@@ -891,8 +865,6 @@ func (client *Client) StartHost(id string) error {
 		return fmt.Errorf(fmt.Sprintf("Failed to launch the host : %s", err.Error()))
 	}
 
-	//TODO wait domain to be fully operational?
-
 	return nil
 }
 
@@ -907,8 +879,6 @@ func (client *Client) RebootHost(id string) error {
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Failed to reboot the host : %s", err.Error()))
 	}
-
-	//TODO wait domain to be fully operational?
 
 	return nil
 }

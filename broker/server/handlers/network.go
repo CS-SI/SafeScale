@@ -18,11 +18,12 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	log "github.com/sirupsen/logrus"
 
 	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
