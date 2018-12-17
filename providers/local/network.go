@@ -152,6 +152,12 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create network : %s", err.Error())
 	}
+	defer func(*libvirt.Network) {
+		if err != nil {
+			libvirtNetwork.Destroy()
+		}
+	}(libvirtNetwork)
+
 	err = libvirtNetwork.SetAutostart(true)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to enable network autostart : %s", err.Error())
