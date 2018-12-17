@@ -66,7 +66,7 @@ func AuthenticatedClient(opts AuthOptions, cfg openstack.CfgOptions) (*Client, e
 				"SSD": VolumeSpeed.SSD,
 			},
 			MetadataBucket: metadata.BuildMetadataBucketName(opts.ProjectID),
-			DNSList:        []string{"1.1.1.1", "8.8.8.8"},
+			DNSList:        []string{"185.48.234.234", "185.48.234.238"},
 			DefaultImage:   cfg.DefaultImage,
 		},
 	)
