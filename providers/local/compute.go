@@ -26,7 +26,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
 	"os/exec"
 	"regexp"
@@ -47,7 +46,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-var public_ip_waiter net.Listener
+const port int = 59872
 
 //-------------IMAGES---------------------------------------------------------------------------------------------------
 
@@ -435,31 +434,31 @@ func (client *Client) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.H
 			)
 
 		}
-		if iface.Source.Direct != nil {
-			var ip string
-			err = retry.WhileUnsuccessfulDelay5Seconds(
-				func() error {
-					//TODO dynamic ip range
-					cmd := exec.Command("bash", "-c", "sleep 30 && nmap -T5 -sP --host-timeout 1 172.26.128.0/24 > /dev/null && arp | grep "+iface.MAC.Address+" | cut -f1 -d\\ ")
-					cmdOutput := &bytes.Buffer{}
-					cmd.Stdout = cmdOutput
-					err = cmd.Run()
-					if err != nil {
-						return fmt.Errorf("Commands failled : ", err.Error())
-					}
-					ip = strings.Trim(fmt.Sprintf("%s", cmdOutput), " \n")
-					if len(strings.Split(ip, ".")) == 4 {
-						hostNetwork.PublicIPv4 = ip
-					} else if len(strings.Split(ip, ":")) == 8 {
-						hostNetwork.PublicIPv6 = ip
-					} else {
-						return fmt.Errorf("Unknown adressType")
-					}
-					return nil
-				},
-				5*time.Minute,
-			)
-		}
+		// if iface.Source.Direct != nil {
+		// 	var ip string
+		// 	err = retry.WhileUnsuccessfulDelay5Seconds(
+		// 		func() error {
+		// 			//TODO dynamic ip range
+		// 			cmd := exec.Command("bash", "-c", "sleep 30 && nmap -T5 -sP --host-timeout 1 172.26.128.0/24 > /dev/null && arp | grep "+iface.MAC.Address+" | cut -f1 -d\\ ")
+		// 			cmdOutput := &bytes.Buffer{}
+		// 			cmd.Stdout = cmdOutput
+		// 			err = cmd.Run()
+		// 			if err != nil {
+		// 				return fmt.Errorf("Commands failled : ", err.Error())
+		// 			}
+		// 			ip = strings.Trim(fmt.Sprintf("%s", cmdOutput), " \n")
+		// 			if len(strings.Split(ip, ".")) == 4 {
+		// 				hostNetwork.PublicIPv4 = ip
+		// 			} else if len(strings.Split(ip, ":")) == 8 {
+		// 				hostNetwork.PublicIPv6 = ip
+		// 			} else {
+		// 				return fmt.Errorf("Unknown adressType")
+		// 			}
+		// 			return nil
+		// 		},
+		// 		5*time.Minute,
+		// 	)
+		// }
 	}
 	return hostNetwork, nil
 }
@@ -555,8 +554,6 @@ func (client *Client) complementHost(host *model.Host, newHost *model.Host) erro
 	hpNetworkV1.IPv6Addresses = newhpNetworkV1.IPv6Addresses
 	hpNetworkV1.NetworksByID = newhpNetworkV1.NetworksByID
 	hpNetworkV1.NetworksByName = newhpNetworkV1.NetworksByName
-	hpNetworkV1.PublicIPv4 = newhpNetworkV1.PublicIPv4
-	hpNetworkV1.PublicIPv6 = newhpNetworkV1.PublicIPv6
 	err = host.Properties.Set(HostProperty.NetworkV1, hpNetworkV1)
 	if err != nil {
 		return err
@@ -639,25 +636,61 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare user data content: %+v", err)
 	}
-	err = ioutil.WriteFile(client.Config.LibvirtStorage+"/"+resourceName+"_userdata.sh", userData, 0644)
+	userdataFileName := client.Config.LibvirtStorage + "/" + resourceName + "_userdata.sh"
+	err = ioutil.WriteFile(userdataFileName, userData, 0644)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to write userData in %s_userdata.sh file : %s", resourceName, err.Error())
 	}
 
 	//----Commands----
+	var vmInfoChannel (chan VmInfo)
+	firstbootCommandString := ""
 	networksCommandString := ""
 	for _, network := range networks {
 		networksCommandString += fmt.Sprintf(" --network network=%s", network.Name)
 	}
 	if publicIP {
-		cmd := exec.Command("bash", "-c", "ip route | grep default | awk '{{print $5}}'")
+		infoPublisherFileName := client.Config.LibvirtStorage + "/" + resourceName + "_InfoPublisher.sh"
+
+		command := "ip route get 8.8.8.8 | awk -F\"src \" 'NR==1{split($2,a,\" \");print a[1]}'"
+		cmd := exec.Command("bash", "-c", command)
 		cmdOutput := &bytes.Buffer{}
 		cmd.Stdout = cmdOutput
 		err = cmd.Run()
 		if err != nil {
-			return nil, fmt.Errorf("Commands failed : \n%s\n%s", cmd, err.Error())
+			return nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
 		}
-		networksCommandString += fmt.Sprintf(" --network type=direct,source=%s,source_mode=bridge", strings.Trim(fmt.Sprint(cmdOutput), "\n "))
+		ip := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
+
+		f, err := os.OpenFile(infoPublisherFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to open userdata file : %s", err.Error())
+		}
+		defer f.Close()
+		_, err = f.WriteString(fmt.Sprintf("#!/bin/bash \nmkdir /plopiplop \napt install -y netcat \nHOSTNAME=$(hostname)\nLANIP=$(ip route get 8.8.8.8 | awk -F\"src \" 'NR==1{split($2,a,\" \");print a[1]}')\necho -n \"$HOSTNAME|$LANIP\" | netcat %s %d \nexit 0\n", ip, port))
+		if err != nil {
+			return nil, fmt.Errorf("Failed to edit userdata file : %s", err.Error())
+		}
+
+		command = "ip route | grep default | awk '{{print $5}}'"
+		cmd = exec.Command("bash", "-c", command)
+		cmdOutput = &bytes.Buffer{}
+		cmd.Stdout = cmdOutput
+		err = cmd.Run()
+		if err != nil {
+			return nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+		}
+		lanIf := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
+		networksCommandString += fmt.Sprintf(" --network type=direct,source=%s,source_mode=bridge", lanIf)
+		firstbootCommandString += fmt.Sprintf(" --firstboot %s && rm %s", infoPublisherFileName, infoPublisherFileName)
+	}
+
+	if publicIP {
+		infoWaiter, err := GetInfoWaiter(port)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get info waiter : %s", err.Error())
+		}
+		vmInfoChannel = infoWaiter.Register(hostName)
 	}
 
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
@@ -666,7 +699,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	command_setup := fmt.Sprintf("IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"", imagePath, client.Config.LibvirtStorage, resourceName)
 	command_copy := fmt.Sprintf("cd $LIBVIRT_STORAGE && cp $IMAGE_PATH . && chmod 666 $IMAGE")
 	command_resize := fmt.Sprintf("truncate $VM_IMAGE -s %dG && virt-resize --expand /dev/sda1 $IMAGE $VM_IMAGE && rm $IMAGE", template.DiskSize)
-	command_sysprep := fmt.Sprintf("virt-sysprep -a $VM_IMAGE --hostname %s --operations all,-ssh-hostkeys --firstboot %s_userdata.sh && rm %s_userdata.sh", hostName, resourceName, resourceName)
+	command_sysprep := fmt.Sprintf("virt-sysprep -a $VM_IMAGE --hostname %s --operations all,-ssh-hostkeys --firstboot %s %s && rm %s", hostName, userdataFileName, firstbootCommandString, userdataFileName)
 	command_virt_install := fmt.Sprintf("virt-install --name=%s --vcpus=%d --memory=%d --import --disk=$VM_IMAGE %s --noautoconsole", resourceName, template.Cores, int(template.RAMSize*1024), networksCommandString)
 	command := strings.Join([]string{command_setup, command_copy, command_resize, command_sysprep, command_virt_install}, " && ")
 
@@ -686,6 +719,11 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	}()
 
 	//----Generate model.Host----
+	var vmInfo VmInfo
+	if publicIP {
+		vmInfo = <-vmInfoChannel
+	}
+
 	domain, err := client.LibvirtService.LookupDomainByName(resourceName)
 	if err != nil {
 		return nil, fmt.Errorf(fmt.Sprintf("Can't find domain %s : %s", resourceName, err.Error()))
@@ -700,6 +738,10 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 
 	hostNetworkV1 := propsv1.NewHostNetwork()
 	host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+
+	if publicIP {
+		hostNetworkV1.PublicIPv4 = vmInfo.publicIp
+	}
 
 	hostNetworkV1.DefaultNetworkID = request.Networks[0].ID
 	hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != model.SingleHostNetworkName
