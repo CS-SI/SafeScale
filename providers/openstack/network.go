@@ -72,6 +72,10 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	log.Debugf("providers.openstack.Client.CreateNetwork(%s) called", req.Name)
 	defer log.Debugf("providers.openstack.Client.CreateNetwork(%s) done", req.Name)
 
+	if client == nil {
+		panic("No client set")
+	}
+
 	// // We 1st check if name is not already used
 	// _net, err := metadata.LoadNetwork(client, req.Name)
 	// if err != nil {
@@ -143,6 +147,13 @@ func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
 		panic("name is empty!")
 	}
 
+	log.Debugf("openstack.Client.GetNetworkByName(%s) called", name)
+	defer log.Debugf("openstack.Client.GetNetworkByName(%s) done", name)
+
+	if client == nil {
+		panic("No client set")
+	}
+
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
 	_, r.Err = client.Compute.Get(client.Network.ServiceURL("networks?name="+name), &r.Body, &gc.RequestOpts{
@@ -162,6 +173,14 @@ func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
 
 // GetNetwork returns the network identified by id
 func (client *Client) GetNetwork(id string) (*model.Network, error) {
+
+	log.Debugf("openstack.Client.GetNetwork(%s) called", id)
+	defer log.Debugf("openstack.Client.GetNetwork(%s) done", id)
+
+	if client == nil {
+		panic("No client set")
+	}
+
 	// If not found, we look for any network from provider
 	// 1st try with id
 	network, err := networks.Get(client.Network, id).Extract()
@@ -213,6 +232,13 @@ func (client *Client) GetNetwork(id string) (*model.Network, error) {
 
 // ListNetworks lists available networks
 func (client *Client) ListNetworks() ([]*model.Network, error) {
+	log.Debug("openstack.Client.ListNetworks() called")
+	defer log.Debug("openstack.Client.ListNetworks() done")
+
+	if client == nil {
+		panic("No client set")
+	}
+
 	// Retrieve a pager (i.e. a paginated collection)
 	var netList []*model.Network
 	pager := networks.List(client.Network, networks.ListOpts{})
@@ -262,6 +288,10 @@ func (client *Client) DeleteNetwork(id string) error {
 	log.Debugf("providers.openstack.Client.DeleteNetwork(%s) called", id)
 	defer log.Debugf("providers.openstack.Client.DeleteNetwork(%s) done", id)
 
+	if client == nil {
+		panic("No client set")
+	}
+
 	network, err := networks.Get(client.Network, id).Extract()
 	if err != nil {
 		log.Errorf("Failed to delete network: %+v", err)
@@ -306,6 +336,13 @@ func (client *Client) DeleteNetwork(id string) error {
 
 // CreateGateway creates a public Gateway for a private network
 func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
+	log.Debug("openstack.Client.CreateGateway() called")
+	defer log.Debug("openstack.Client.CreateGateway() done")
+
+	if client == nil {
+		panic("No client set")
+	}
+
 	// Ensure network exists
 	if req.Network == nil {
 		panic("req.Network is nil!")
@@ -354,6 +391,13 @@ func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, erro
 
 // DeleteGateway delete the public gateway of a private network
 func (client *Client) DeleteGateway(id string) error {
+	log.Debugf("openstack.Client.DeleteGateway(%s) called", id)
+	defer log.Debugf("openstack.Client.DeleteGateway(%s) done", id)
+
+	if client == nil {
+		panic("No client set")
+	}
+
 	return client.DeleteHost(id)
 }
 
@@ -391,6 +435,10 @@ func FromIntIPversion(v int) IPVersion.Enum {
 // - name is the name of the sub network
 // - mask is a network mask defined in CIDR notation
 func (client *Client) createSubnet(name string, networkID string, cidr string, ipVersion IPVersion.Enum, dnsServers []string) (*Subnet, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
 	// You must associate a new subnet with an existing network - to do this you
 	// need its UUID. You must also provide a well-formed CIDR value.
 	dhcp := true
@@ -475,6 +523,10 @@ func (client *Client) createSubnet(name string, networkID string, cidr string, i
 
 // getSubnet returns the sub network identified by id
 func (client *Client) getSubnet(id string) (*Subnet, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
 	// Execute the operation and get back a subnets.Subnet struct
 	subnet, err := subnets.Get(client.Network, id).Extract()
 	if err != nil {
@@ -492,6 +544,10 @@ func (client *Client) getSubnet(id string) (*Subnet, error) {
 
 // listSubnets lists available sub networks of network net
 func (client *Client) listSubnets(netID string) ([]Subnet, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
 	pager := subnets.List(client.Network, subnets.ListOpts{
 		NetworkID: netID,
 	})
@@ -528,6 +584,10 @@ func (client *Client) listSubnets(netID string) ([]Subnet, error) {
 func (client *Client) deleteSubnet(id string) error {
 	log.Debugf("providers.openstack.deleteSubnet(%s) called", id)
 	defer log.Debugf("providers.openstack.deleteSubnet(%s) done", id)
+
+	if client == nil {
+		panic("No client set")
+	}
 
 	routerList, _ := client.ListRouters()
 	var router *Router
@@ -593,6 +653,10 @@ func (client *Client) deleteSubnet(id string) error {
 
 // createRouter creates a router satisfying req
 func (client *Client) createRouter(req RouterRequest) (*Router, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
 	//Create a router to connect external Provider network
 	gi := routers.GatewayInfo{
 		NetworkID: req.NetworkID,
@@ -618,6 +682,10 @@ func (client *Client) createRouter(req RouterRequest) (*Router, error) {
 
 // getRouter returns the router identified by id
 func (client *Client) getRouter(id string) (*Router, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
 	r, err := routers.Get(client.Network, id).Extract()
 	if err != nil {
 		log.Debugf("Error getting router '%s': %+v", id, err)
@@ -632,6 +700,10 @@ func (client *Client) getRouter(id string) (*Router, error) {
 
 // ListRouters lists available routers
 func (client *Client) ListRouters() ([]Router, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
 	var ns []Router
 	err := routers.List(client.Network, routers.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := routers.ExtractRouters(page)
@@ -656,6 +728,10 @@ func (client *Client) ListRouters() ([]Router, error) {
 
 // deleteRouter deletes the router identified by id
 func (client *Client) deleteRouter(id string) error {
+	if client == nil {
+		panic("No client set")
+	}
+
 	err := routers.Delete(client.Network, id).ExtractErr()
 	if err != nil {
 		log.Debugf("Error deleting router: delete: %+v", err)
@@ -666,6 +742,10 @@ func (client *Client) deleteRouter(id string) error {
 
 // addSubnetToRouter attaches subnet to router
 func (client *Client) addSubnetToRouter(routerID string, subnetID string) error {
+	if client == nil {
+		panic("No client set")
+	}
+
 	_, err := routers.AddInterface(client.Network, routerID, routers.AddInterfaceOpts{
 		SubnetID: subnetID,
 	}).Extract()
@@ -678,6 +758,10 @@ func (client *Client) addSubnetToRouter(routerID string, subnetID string) error 
 
 // removeSubnetFromRouter detachesa subnet from router interface
 func (client *Client) removeSubnetFromRouter(routerID string, subnetID string) error {
+	if client == nil {
+		panic("No client set")
+	}
+
 	r := routers.RemoveInterface(client.Network, routerID, routers.RemoveInterfaceOpts{
 		SubnetID: subnetID,
 	})
