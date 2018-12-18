@@ -18,7 +18,6 @@ package cluster
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/model"
 
 	log "github.com/sirupsen/logrus"
 
