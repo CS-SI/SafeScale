@@ -143,12 +143,12 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 
 // GetNetworkByName ...
 func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
+	log.Debugf("openstack.Client.GetNetworkByName(%s) called", name)
+	defer log.Debugf("openstack.Client.GetNetworkByName(%s) done", name)
+
 	if name == "" {
 		panic("name is empty!")
 	}
-
-	log.Debugf("openstack.Client.GetNetworkByName(%s) called", name)
-	defer log.Debugf("openstack.Client.GetNetworkByName(%s) done", name)
 
 	if client == nil {
 		panic("No client set")
@@ -173,7 +173,6 @@ func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
 
 // GetNetwork returns the network identified by id
 func (client *Client) GetNetwork(id string) (*model.Network, error) {
-
 	log.Debugf("openstack.Client.GetNetwork(%s) called", id)
 	defer log.Debugf("openstack.Client.GetNetwork(%s) done", id)
 
