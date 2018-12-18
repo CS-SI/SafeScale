@@ -277,7 +277,7 @@ func (svc *HostHandler) Create(
 	var template model.HostTemplate
 	if len(templates) > 0 {
 		template = templates[0]
-		msg := fmt.Sprintf("Selected template: '%s' (%d core%s", template.Name, cpu, utils.Plural(cpu))
+		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, cpu, utils.Plural(cpu))
 		if template.CPUFreq > 0 {
 			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
 		}
