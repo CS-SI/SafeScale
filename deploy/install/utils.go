@@ -326,6 +326,7 @@ func setImplicitParameters(t Target, v Variables) {
 		v["ClusterComplexity"] = strings.ToLower(config.Complexity.String())
 		v["ClusterFlavor"] = strings.ToLower(config.Flavor.String())
 		v["GatewayIP"] = config.GatewayIP
+		v["PublicIP"] = config.PublicIP
 		v["MasterIDs"] = cluster.ListMasterIDs()
 		v["MasterIPs"] = cluster.ListMasterIPs()
 		if _, ok := v["Username"]; !ok {
