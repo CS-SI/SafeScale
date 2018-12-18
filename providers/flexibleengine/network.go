@@ -99,6 +99,9 @@ func (client *Client) CreateVPC(req VPCRequest) (*VPC, error) {
 		OkCodes:      []int{200, 201},
 	}
 	_, err = client.osclt.Provider.Request("POST", url, &opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send a POST request to provider '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+	}
 	vpc, err := resp.Extract()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))

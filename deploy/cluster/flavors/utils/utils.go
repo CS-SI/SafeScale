@@ -78,7 +78,7 @@ func UploadTemplateToFile(
 	}
 	broker := brokerclient.New()
 	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
-	if err != err {
+	if err != nil {
 		return "", fmt.Errorf("failed to get host information: %s", err)
 	}
 

@@ -699,6 +699,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 	err = syscall.Exec(bash, args, nil)
 	nerr := utils.LazyRemove(keyFile.Name())
 	if nerr != nil {
+		log.Warnf("Error removing (lazy) file %v", nerr)
 	}
 	return err
 }

@@ -21,8 +21,9 @@ package retry
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 	"time"
+
+	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 )
 
 // Try keeps track of the number of tries, starting from 1. Action is valid only when Err is nil.
@@ -426,8 +427,10 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 				select {
 				case response := <-ch:
 					err = response
+					_ = err
 				case <-desist:
 					err = fmt.Errorf("Desist timeout")
+					_ = err
 				}
 			}
 		}

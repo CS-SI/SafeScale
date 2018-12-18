@@ -52,6 +52,8 @@ func (g *genericPackager) Add(f *Feature, t Target, v Variables, s Settings) (Re
 
 	worker, err := newWorker(f, t, g.method, Action.Add, g.addCommand)
 	if err != nil {
+		log.Println(err.Error())
+		return nil, err
 	}
 	err = worker.CanProceed(s)
 	if err != nil {

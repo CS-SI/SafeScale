@@ -297,7 +297,7 @@ func determineContext(t Target) (hT *HostTarget, cT *ClusterTarget, nT *NodeTarg
 	if !ok {
 		cT, ok = t.(*ClusterTarget)
 		if !ok {
-			nT, ok = t.(*NodeTarget)
+			nT, _ = t.(*NodeTarget)
 		}
 	}
 	return

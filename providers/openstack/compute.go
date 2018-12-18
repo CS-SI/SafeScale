@@ -904,7 +904,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		if err != nil {
 			msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
 			log.Debugf(msg)
-			return nil, errors.Wrap(err, fmt.Sprintf(msg))
+			return nil, errors.Wrap(err, msg)
 		}
 
 		err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)

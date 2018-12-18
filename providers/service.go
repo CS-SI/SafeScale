@@ -131,7 +131,7 @@ func (svc *Service) WaitHostState(hostID string, state HostState.Enum, timeout t
 		case <-timer:
 			return fmt.Errorf("timeout waiting host '%s' to reach state '%s'", host.Name, state.String())
 		default:
-			time.Sleep(1)
+			time.Sleep(time.Duration(1) * time.Second)
 		}
 	}
 	return err
