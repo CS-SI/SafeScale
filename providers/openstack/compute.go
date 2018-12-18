@@ -52,6 +52,13 @@ import (
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (client *Client) ListAvailabilityZones(all bool) (map[string]bool, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debug("openstack.Client.ListAvailabilityZones() called")
+	defer log.Debug("openstack.Client.ListAvailabilityZones() done")
+
 	allPages, err := az.List(client.Compute).AllPages()
 	if err != nil {
 		return nil, err
@@ -73,6 +80,13 @@ func (client *Client) ListAvailabilityZones(all bool) (map[string]bool, error) {
 
 // ListImages lists available OS images
 func (client *Client) ListImages(all bool) ([]model.Image, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debug("openstack.Client.ListImages() called")
+	defer log.Debug("openstack.Client.ListImages() done")
+
 	opts := images.ListOpts{}
 
 	// Retrieve a pager (i.e. a paginated collection)
@@ -106,6 +120,13 @@ func (client *Client) ListImages(all bool) ([]model.Image, error) {
 
 // GetImage returns the Image referenced by id
 func (client *Client) GetImage(id string) (*model.Image, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debugf("openstack.Client.GetImage(%s) called", id)
+	defer log.Debugf("openstack.Client.GetImage(%s) done", id)
+
 	img, err := images.Get(client.Compute, id).Extract()
 	if err != nil {
 		log.Debugf("Error getting image: %+v", err)
@@ -116,6 +137,13 @@ func (client *Client) GetImage(id string) (*model.Image, error) {
 
 // GetTemplate returns the Template referenced by id
 func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debugf("openstack.Client.GetTemplate(%s) called", id)
+	defer log.Debugf("openstack.Client.GetTemplate(%s) done", id)
+
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
 	err := retry.WhileUnsuccessfulDelay1Second(
@@ -146,6 +174,13 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debugf("openstack.Client.ListTemplates() called")
+	defer log.Debugf("openstack.Client.ListTemplates() done")
+
 	opts := flavors.ListOpts{}
 
 	// Retrieve a pager (i.e. a paginated collection)
@@ -189,6 +224,13 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 
 // CreateKeyPair creates and import a key pair
 func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debugf("openstack.Client.CreateKeyPair(%s) called", name)
+	defer log.Debugf("openstack.Client.CreateKeyPair(%s) done", name)
+
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := privateKey.PublicKey
 	pub, _ := ssh.NewPublicKey(&publicKey)
@@ -213,6 +255,13 @@ func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (client *Client) GetKeyPair(id string) (*model.KeyPair, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debugf("openstack.Client.GetKeyPair(%s) called", id)
+	defer log.Debugf("openstack.Client.GetKeyPair(%s) done", id)
+
 	kp, err := keypairs.Get(client.Compute, id).Extract()
 	if err != nil {
 		log.Debugf("Error getting keypair: %+v", err)
@@ -228,6 +277,13 @@ func (client *Client) GetKeyPair(id string) (*model.KeyPair, error) {
 
 // ListKeyPairs lists available key pairs
 func (client *Client) ListKeyPairs() ([]model.KeyPair, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debug("openstack.Client.ListKeyPairs() called")
+	defer log.Debug("openstack.Client.ListKeyPairs() done")
+
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := keypairs.List(client.Compute)
 
@@ -263,6 +319,13 @@ func (client *Client) ListKeyPairs() ([]model.KeyPair, error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (client *Client) DeleteKeyPair(id string) error {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debugf("openstack.Client.DeleteKeyPair(%s) called", id)
+	defer log.Debugf("openstack.Client.DeleteKeyPair(%s) done", id)
+
 	err := keypairs.Delete(client.Compute, id).ExtractErr()
 	if err != nil {
 		log.Debugf("Error deleting keypair: %+v", err)
@@ -273,6 +336,10 @@ func (client *Client) DeleteKeyPair(id string) error {
 
 // toHostSize converts flavor attributes returned by OpenStack driver into mdel.Host
 func (client *Client) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
+	if client == nil {
+		panic("No client set")
+	}
+
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
 		tpl, err := client.GetTemplate(fid)
@@ -307,6 +374,13 @@ func toHostState(status string) HostState.Enum {
 
 // GetHost updates the data inside host with the data from provider
 func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debug("openstack.Client.GetHost() called")
+	defer log.Debug("openstack.Client.GetHost() done")
+
 	var (
 		host     *model.Host
 		server   *servers.Server
@@ -379,6 +453,9 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 func (client *Client) interpretAddresses(
 	addresses map[string]interface{},
 ) ([]string, map[IPVersion.Enum]map[string]string, string, string) {
+	if client == nil {
+		panic("No client set")
+	}
 
 	var (
 		networks    = []string{}
@@ -418,6 +495,10 @@ func (client *Client) interpretAddresses(
 
 // complementHost complements Host data with content of server parameter
 func (client *Client) complementHost(host *model.Host, server *servers.Server) error {
+	if client == nil {
+		panic("No client set")
+	}
+
 	networks, addresses, ipv4, ipv6 := client.interpretAddresses(server.Addresses)
 
 	// Updates intrinsic data of host if needed
@@ -555,9 +636,16 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 
 // GetHostByName returns the host using the name passed as parameter
 func (client *Client) GetHostByName(name string) (*model.Host, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
 	if name == "" {
 		panic("name is empty!")
 	}
+
+	log.Debugf("openstack.Client.GetHostByName(%s) called", name)
+	defer log.Debugf("openstack.Client.GetHostByName(%s) done", name)
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
@@ -603,30 +691,15 @@ type userData struct {
 	Password string
 }
 
-// func (client *Client) readGateway(networkID string) (*servers.Server, error) {
-// 	m, err := metadata.NewGateway(client, networkID)
-// 	found, err := m.Read()
-// 	if err != nil {
-// 		log.Debugf("Error reading gateway metadata: reading: %+v", err)
-// 		return nil, errors.Wrap(err, fmt.Sprintf("Error reading gateway metadata"))
-// 	}
-// 	if !found {
-// 		err := fmt.Errorf("unable to find gateway of network '%s'", networkID)
-// 		log.Debugf("Error reading gateway metadata: not found : %+v", err)
-// 		return nil, errors.Wrap(err, fmt.Sprintf("Error reading gateway metadata: not found"))
-// 	}
-
-// 	gw, err := servers.Get(client.Compute, m.Get().ID).Extract()
-// 	if err != nil {
-// 		log.Debugf("Error reading gateway metadata: getting server : %+v", err)
-// 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating Host: Unable to get gateway: %s", ProviderErrorToString(err)))
-// 	}
-// 	return gw, nil
-// }
-
-
 // CreateHost creates an host satisfying request
 func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debugf("openstack.Client.CreateHost(%s) called", request.ResourceName)
+	defer log.Debugf("openstack.Client.CreateHost(%s) done", request.ResourceName)
+
 	msgFail := "Failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
@@ -858,6 +931,10 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *model.Host; any other type will panic
 func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration) (*model.Host, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
 	var (
 		host *model.Host
 		err  error
@@ -896,62 +973,16 @@ func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration
 	return host, nil
 }
 
-// // GetHost updates the data inside host with the data from provider
-// // TODO: move this method on the model.Host struct
-// func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
-// 	var (
-// 		host *model.Host
-// 		server *servers.Server
-// 		err    error
-// 	)
-
-// 	retryErr := retry.WhileUnsuccessful(
-// 		func() error {
-// 			server, err = servers.Get(client.Compute, host.ID).Extract()
-// 			if err != nil {
-// 				switch err.(type) {
-// 				case gc.ErrDefault404:
-// 					// If error is "resource not found", we want to return GopherCloud error as-is to be able
-// 					// to behave differently in this special case. To do so, stop the retry
-// 					return nil
-// 				case gc.ErrDefault500:
-// 					// When the response is "Internal Server Error", retries
-// 					log.Println("received 'Internal Server Error', retrying servers.Get...")
-// 					return err
-// 				}
-// 				// Any other error stops the retry
-// 				err = fmt.Errorf("Error getting host '%s': %s", host.ID, ProviderErrorToString(err))
-// 				return nil
-// 			}
-// 			//spew.Dump(server)
-// 			if server.Status != "ERROR" && server.Status != "CREATING" {
-// 				host.LastState = toHostState(server.Status)
-// 				return nil
-// 			}
-// 			return fmt.Errorf("server not ready yet")
-// 		},
-// 		10*time.Second,
-// 		1*time.Second,
-// 	)
-// 	if retryErr != nil {
-// 		switch retryErr.(type) {
-// 		case retry.ErrTimeout:
-// 			return fmt.Errorf("failed to get host '%s' information after 10s: %s", host.ID, err.Error())
-// 		}
-// 	}
-// 	if err != nil {
-// 		return err
-// 	}
-// 	err = client.complementHost(host, server)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *model.Host; any other type will panic
 func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debug("openstack.Client.GetHostState() called")
+	defer log.Debug("openstack.Client.GetHostState() done")
+
 	host, err := client.GetHost(hostParam)
 	if err != nil {
 		return HostState.ERROR, err
@@ -961,6 +992,13 @@ func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error
 
 // ListHosts lists all hosts
 func (client *Client) ListHosts() ([]*model.Host, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debug("openstack.Client.ListHosts() called")
+	defer log.Debug("openstack.Client.ListHosts() done")
+
 	pager := servers.List(client.Compute, servers.ListOpts{})
 	var hosts []*model.Host
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -988,23 +1026,13 @@ func (client *Client) ListHosts() ([]*model.Host, error) {
 	return hosts, nil
 }
 
-// // listMonitoredHosts lists available hosts created by SafeScale (ie registered in object storage)
-// func (client *Client) listMonitoredHosts() ([]*model.Host, error) {
-// 	var hosts []*model.Host
-// 	m := metadata.NewHost(client)
-// 	err := m.Browse(func(host *model.Host) error {
-// 		hosts = append(hosts, host)
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		return hosts, errors.Wrap(err, fmt.Sprintf("Error listing monitored hosts: browse"))
-// 	}
-// 	return hosts, nil
-// }
-
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
 func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
 	pager := floatingips.List(client.Compute)
 	var fips []floatingips.FloatingIP
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
@@ -1035,6 +1063,10 @@ func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, err
 
 // DeleteHost deletes the host identified by id
 func (client *Client) DeleteHost(id string) error {
+	if client == nil {
+		panic("No client set")
+	}
+
 	log.Debugf("openstack.Client.DeleteHost(%s) called", id)
 	defer log.Debugf("openstack.Client.DeleteHost(%s) done", id)
 
@@ -1124,6 +1156,10 @@ func (client *Client) DeleteHost(id string) error {
 
 // StopHost stops the host identified by id
 func (client *Client) StopHost(id string) error {
+	if client == nil {
+		panic("No client set")
+	}
+
 	log.Debugf("openstack.Client.StopHost(%s) called", id)
 	defer log.Debugf("openstack.Client.StopHost(%s) done", id)
 
@@ -1137,6 +1173,10 @@ func (client *Client) StopHost(id string) error {
 
 // RebootHost reboots inconditionnaly the host identified by id
 func (client *Client) RebootHost(id string) error {
+	if client == nil {
+		panic("No client set")
+	}
+
 	log.Debugf("openstack.Client.Reboot(%s) called", id)
 	defer log.Debugf("openstack.Client.Reboot(%s) done", id)
 
@@ -1151,6 +1191,10 @@ func (client *Client) RebootHost(id string) error {
 
 // StartHost starts the host identified by id
 func (client *Client) StartHost(id string) error {
+	if client == nil {
+		panic("No client set")
+	}
+
 	log.Debugf("openstack.Client.StartHost(%s) called", id)
 	defer log.Debugf("openstack.Client.StartHost(%s) done", id)
 
@@ -1164,6 +1208,13 @@ func (client *Client) StartHost(id string) error {
 }
 
 func (client *Client) ResizeHost(id string, request model.SizingRequirements) (*model.Host, error) {
+	if client == nil {
+		panic("No client set")
+	}
+
+	log.Debugf("openstack.Client.ResizeHost(%s) called", id)
+	defer log.Debugf("openstack.Client.ResizeHost(%s) done", id)
+
 	// TODO RESIZE Implement Resize Host HERE
 	log.Warn("Trying to resize a Host...")
 
