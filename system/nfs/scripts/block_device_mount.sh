@@ -27,7 +27,7 @@ trap print_error ERR
 
 UUID=$(mkfs -F -t {{.FileSystem}} "{{.Device}}" | grep "Filesystem UUID:" | rev | cut -d' ' -f1 | rev) >/dev/null && \
 mkdir -p "{{.MountPoint}}" >/dev/null && \
-chmod a+rwx "{{.MountPoint}}" >/dev/null && \
 echo "/dev/disk/by-uuid/$UUID {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
 mount {{.Device}} {{.MountPoint}} >/dev/null && \
+chmod a+rwx "{{.MountPoint}}" >/dev/null && \
 echo -n $UUID
