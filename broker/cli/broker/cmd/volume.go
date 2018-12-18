@@ -177,6 +177,10 @@ var volumeAttach = cli.Command{
 			Value: "ext4",
 			Usage: "Filesystem format",
 		},
+		cli.BoolFlag{
+			Name:  "do-not-format",
+			Usage: "Prevent the volume to be formated if possible (if he is already formated in the right format)",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
@@ -185,10 +189,11 @@ var volumeAttach = cli.Command{
 			return clitools.ExitOnInvalidArgument()
 		}
 		def := pb.VolumeAttachment{
-			Format:    c.String("format"),
-			MountPath: c.String("path"),
-			Host:      &pb.Reference{Name: c.Args().Get(1)},
-			Volume:    &pb.Reference{Name: c.Args().Get(0)},
+			Format:      c.String("format"),
+			DoNotFormat: c.Bool("do-not-format"),
+			MountPath:   c.String("path"),
+			Host:        &pb.Reference{Name: c.Args().Get(1)},
+			Volume:      &pb.Reference{Name: c.Args().Get(0)},
 		}
 		err := client.New().Volume.Attach(def, client.DefaultExecutionTimeout)
 		if err != nil {

@@ -46,7 +46,7 @@ type VolumeAPI interface {
 	Inspect(ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error)
 	List(all bool) ([]model.Volume, error)
 	Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error)
-	Attach(volume string, host string, path string, format string) error
+	Attach(volume string, host string, path string, format string, doNotFormat bool) error
 	Detach(volume string, host string) error
 }
 
@@ -210,7 +210,7 @@ func (svc *VolumeHandler) Create(name string, size int, speed VolumeSpeed.Enum) 
 }
 
 // Attach a volume to an host
-func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string) error {
+func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNotFormat bool) error {
 	// Get volume data
 	volume, err := svc.Get(volumeName)
 	if err != nil {
@@ -354,7 +354,7 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string) erro
 		err = infraErr(err)
 		return err
 	}
-	volumeUUID, err := server.MountBlockDevice(deviceName, mountPoint, format)
+	volumeUUID, err := server.MountBlockDevice(deviceName, mountPoint, format, doNotFormat)
 	if err != nil {
 		err = infraErr(err)
 		return err

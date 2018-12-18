@@ -243,6 +243,7 @@ message VolumeAttachment{
     string MountPath = 4;
     string Format = 5;
     string Device = 6;
+    bool DoNotFormat = 7;
 }
 
 message VolumeDetachment{
