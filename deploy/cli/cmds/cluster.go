@@ -96,18 +96,19 @@ func extractClusterArgument(c *cli.Context) error {
 		var err error
 		clusterInstance, err = cluster.Get(clusterName)
 		if err != nil {
-			if _, ok := err.(model.ErrResourceNotFound); ok {
-				if !c.Command.HasName("create") { // nil, nil
+			switch err.(type) {
+			case model.ErrResourceNotFound:
+				if !c.Command.HasName("create") {
 					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
 				}
+			default:
+				msg := fmt.Sprintf("Failed to query for cluster '%s': %s\n", clusterName, err.Error())
+				return clitools.ExitOnRPC(msg)
 			}
-
-			msg := fmt.Sprintf("Failed to query for cluster '%s': %s\n", clusterName, err.Error())
-			return clitools.ExitOnRPC(msg)
-		}
-
-		if c.Command.HasName("create") {
-			return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
+		} else {
+			if c.Command.HasName("create") {
+				return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
+			}
 		}
 	}
 	return nil
