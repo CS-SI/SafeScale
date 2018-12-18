@@ -19,10 +19,11 @@ package cmds
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/model"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/providers/model"
 
 	log "github.com/sirupsen/logrus"
 
@@ -817,6 +818,7 @@ func executeCommand(command string) error {
 			fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {
 				fmt.Fprintln(os.Stderr, "Trying another master...")
+				continue
 			}
 		}
 		if retcode != 0 {
@@ -1114,7 +1116,7 @@ var clusterNodeListCommand = cli.Command{
 			listPriv := clusterInstance.ListNodeIDs(false)
 			for _, i := range listPriv {
 				host, err := broker.Inspect(i, brokerclient.DefaultExecutionTimeout)
-				if err != err {
+				if err != nil {
 					msg := fmt.Sprintf("Failed to get data for node '%s': %s. Ignoring.", i, err.Error())
 					fmt.Println(msg)
 					log.Warnln(msg)
@@ -1131,7 +1133,7 @@ var clusterNodeListCommand = cli.Command{
 			listPub := clusterInstance.ListNodeIDs(true)
 			for _, i := range listPub {
 				host, err := broker.Inspect(i, brokerclient.DefaultExecutionTimeout)
-				if err != err {
+				if err != nil {
 					msg := fmt.Sprintf("failed to get data for node '%s': %s. Ignoring.", i, err.Error())
 					fmt.Println(msg)
 					log.Warnln(msg)
@@ -1194,7 +1196,7 @@ var clusterNodeInspectCommand = cli.Command{
 		if err != nil {
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
-		fmt.Printf(string(jsoned))
+		fmt.Println(string(jsoned))
 		return nil
 	},
 }

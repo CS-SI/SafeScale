@@ -570,6 +570,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	var nets []string
 	for _, netid := range request.Networks {
 		nets = append(nets, netid.ID)
+		_ = nets
 	}
 
 	// get subnet of each network
@@ -683,6 +684,7 @@ func (c *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
 	v4IPs := []string{}
 	for _, nif := range instance.NetworkInterfaces {
 		v4IPs = append(v4IPs, *nif.PrivateIpAddress)
+		_ = v4IPs
 	}
 
 	state, err := getState(instance.State)

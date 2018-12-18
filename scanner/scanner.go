@@ -19,7 +19,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/metadata"
 	"io/ioutil"
 	"math"
 	"os"
@@ -27,6 +26,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/CS-SI/SafeScale/providers/metadata"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -250,6 +251,9 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	}
 
 	templates, err := serviceProvider.ListTemplates(true)
+	if err != nil {
+		return err
+	}
 
 	img, err := serviceProvider.SearchImage("Ubuntu 16.04")
 	if err != nil {
@@ -314,14 +318,14 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				testSubset = testSubsetCandidate
 			}
 
-			if len(testSubset) > 0  {
+			if len(testSubset) > 0 {
 				if !strings.Contains(template.Name, testSubset) {
 					return nil
 				}
 			}
 
 			// TODO If there is a file with today's date, skip it...
-			fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json")
+			fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + theTenant + "#" + template.Name + ".json")
 			if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
 				// path/to/whatever exists
 				return nil
@@ -337,6 +341,9 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				TemplateID:   template.ID,
 				Networks:     []*model.Network{net},
 			})
+			if err != nil {
+				return err
+			}
 
 			err = metadata.NewHost(serviceProvider).Carry(host).Write()
 			if err != nil {
@@ -372,7 +379,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
-			nerr := ssh.WaitServerReady(time.Duration( 6 + concurrency-1) * time.Minute)
+			nerr := ssh.WaitServerReady(time.Duration(6+concurrency-1) * time.Minute)
 			if nerr != nil {
 				log.Warnf("template [%s] : Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
@@ -427,7 +434,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		sem <- true
 		localTarget := target
 		go func(inner model.HostTemplate) {
-			defer func() {<-sem}()
+			defer func() { <-sem }()
 			lerr := hostAnalysis(inner)
 			if lerr != nil {
 				log.Warnf("Error running scanner: %+v", lerr)
@@ -459,6 +466,9 @@ func dumpTemplates(service *providers.Service, tenant string) error {
 	content, err := json.Marshal(TemplateList{
 		Templates: templates,
 	})
+	if err != nil {
+		return err
+	}
 
 	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", tenant)
 	f = utils.AbsPathify(f)
@@ -486,6 +496,9 @@ func dumpImages(service *providers.Service, tenant string) error {
 	content, err := json.Marshal(ImageList{
 		Images: images,
 	})
+	if err != nil {
+		return err
+	}
 
 	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", tenant)
 	f = utils.AbsPathify(f)

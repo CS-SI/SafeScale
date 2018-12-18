@@ -13,9 +13,9 @@ import (
 
 	"github.com/CS-SI/SafeScale/security/model"
 
-	log "github.com/sirupsen/logrus"
 	oidc "github.com/coreos/go-oidc"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 )
@@ -219,6 +219,10 @@ func wsProxyFunc(w http.ResponseWriter, r *http.Request) {
 	}
 	header := http.Header{}
 	cDest, _, err := websocket.DefaultDialer.Dial(url.String(), header)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
+		return
+	}
 
 	go fowardWSMessages(cOrig, cDest)
 	go fowardWSMessages(cDest, cOrig)

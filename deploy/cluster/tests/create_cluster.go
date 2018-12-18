@@ -18,12 +18,13 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"runtime"
+
 	"github.com/CS-SI/SafeScale/deploy/cluster/core"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"log"
-	"runtime"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/deploy/cluster"
@@ -50,10 +51,10 @@ func Run() {
 				fmt.Printf("Failed to create cluster: %s\n", err.Error())
 				return
 			}
+		} else {
+			fmt.Printf("Failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
+			return
 		}
-
-		fmt.Printf("Failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
-		return
 	}
 
 	state, err := instance.GetState()
