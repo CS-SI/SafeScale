@@ -51,11 +51,12 @@ func (s *Server) Install() error {
 }
 
 // MountBlockDevice mounts a block device in the remote system
-func (s *Server) MountBlockDevice(device, mountPoint, format string) (string, error) {
+func (s *Server) MountBlockDevice(device, mountPoint, format string, doNotFormat bool) (string, error) {
 	data := map[string]interface{}{
-		"Device":     device,
-		"MountPoint": mountPoint,
-		"FileSystem": format,
+		"Device":      device,
+		"MountPoint":  mountPoint,
+		"FileSystem":  format,
+		"DoNotFormat": doNotFormat,
 	}
 	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "block_device_mount.sh", data)
 	err = handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")

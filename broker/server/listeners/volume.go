@@ -97,12 +97,13 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	log.Printf("Attach volume called '%s', '%s'", in.Host.Name, in.MountPath)
 
 	tenant := GetCurrentTenant()
-	if tenant == nil {log.Info("Can't attach volumes: no tenant set")
+	if tenant == nil {
+		log.Info("Can't attach volumes: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't attach volume: no tenant set")
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Attach(in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat())
+	err := handler.Attach(in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
