@@ -138,6 +138,11 @@ EOF
     echo done
 }
 
+# Don't request dns name servers from DHCP server
+configure_dhcp_client() {
+    sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf
+}
+
 # Configure network for Debian distribution
 configure_network_debian() {
     echo "Configuring network (debian-based)..."
@@ -152,6 +157,8 @@ configure_network_debian() {
             echo "iface ${IF} inet dhcp" >>$cfg
         fi
     done
+
+    configure_dhcp_client
 
     systemctl restart networking
     echo done
@@ -176,7 +183,11 @@ network:
       gateway4: {{.GatewayIP}}
 {{- end }}
 EOF
+
     netplan generate
+
+    configure_dhcp_client
+
     netplan apply
 
     echo done
