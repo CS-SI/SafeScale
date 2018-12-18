@@ -487,14 +487,14 @@ func (svc *ShareHandler) ForceInspect(shareName string) (*model.Host, *propsv1.H
 }
 
 // Inspect returns the host and share corresponding to 'shareName'
-// If share isn't found, return (nil, nil, nil, nil)
+// If share isn't found, return (nil, nil, nil, model.ErrResourceNotFound)
 func (svc *ShareHandler) Inspect(shareName string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
 	hostName, err := metadata.LoadShare(svc.provider, shareName)
 	if err != nil {
 		return nil, nil, nil, infraErr(errors.Wrap(err, "error loading share metadata"))
 	}
 	if hostName == "" {
-		return nil, nil, nil, model.ResourceNotFoundError("share", shareName)
+		return nil, nil, nil, model.ResourceNotFoundError("host", hostName)
 	}
 
 	hostSvc := NewHostHandler(svc.provider)

@@ -33,10 +33,12 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/swarm"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/provideruse"
 )
 
 // Get returns the Cluster instance corresponding to the cluster named 'name'
+// TODO: renamed to Inspect ?
 func Get(name string) (api.Cluster, error) {
 	svc, err := provideruse.GetProviderService()
 	if err != nil {
