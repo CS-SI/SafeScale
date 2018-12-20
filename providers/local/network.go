@@ -128,7 +128,7 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 
 	libvirtNetwork, err := getNetworkFromRef(name, client.LibvirtService)
 	if libvirtNetwork != nil {
-		return nil, fmt.Errorf("Network %s already exists !", name)
+		return nil, fmt.Errorf("Network %s already exists", name)
 	}
 
 	ip, netmask, dhcpStart, dhcpEnd, err := infoFromCidr(cidr)
@@ -190,7 +190,7 @@ func (client *Client) GetNetwork(ref string) (*model.Network, error) {
 	return network, nil
 }
 
-// GetNetwork returns the network identified by ref (id or name)
+// GetNetworkByName returns the network identified by ref (id or name)
 func (client *Client) GetNetworkByName(ref string) (*model.Network, error) {
 	return client.GetNetwork(ref)
 }

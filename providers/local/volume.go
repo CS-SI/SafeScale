@@ -37,7 +37,7 @@ func hash(s string) string {
 	return strconv.Itoa(int(h.Sum32()))
 }
 
-func getVolumeId(volume *libvirt.StorageVol) (string, error) {
+func getVolumeID(volume *libvirt.StorageVol) (string, error) {
 	volumeName, err := volume.GetName()
 	if err != nil {
 		return "", fmt.Errorf("Failed to get volume name : %s", err.Error())
@@ -46,7 +46,7 @@ func getVolumeId(volume *libvirt.StorageVol) (string, error) {
 	return hash(volumeName), nil
 }
 
-func getAttachmentId(volume *libvirt.StorageVol, domain *libvirt.Domain) (string, error) {
+func getAttachmentID(volume *libvirt.StorageVol, domain *libvirt.Domain) (string, error) {
 	volumeName, err := volume.GetName()
 	if err != nil {
 		return "", fmt.Errorf("Failed to get volume name : %s", err.Error())
@@ -96,7 +96,7 @@ func (client *Client) getLibvirtVolume(ref string) (*libvirt.StorageVol, error) 
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get volume name : %s", err.Error())
 		}
-		if hash, _ := getVolumeId(&libvirtVolume); ref == hash || ref == name {
+		if hash, _ := getVolumeID(&libvirtVolume); ref == hash || ref == name {
 			return &libvirtVolume, nil
 		}
 	}
@@ -114,7 +114,7 @@ func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*model.Volum
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
 
-	hash, err := getVolumeId(libvirtVolume)
+	hash, err := getVolumeID(libvirtVolume)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to hash the volume : %s", err.Error())
 	}
@@ -146,7 +146,7 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
 
 	//----ID----
-	id, err := getAttachmentId(volume, domain)
+	id, err := getAttachmentID(volume, domain)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to hash attachement : %s", err.Error())
 	}
@@ -165,7 +165,7 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 	}
 
 	//----VolumeID----
-	volumeID, err := getVolumeId(volume)
+	volumeID, err := getVolumeID(volume)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to hash volume : %s", err.Error())
 	}
