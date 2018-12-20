@@ -152,7 +152,9 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	}
 	defer func(*libvirt.Network) {
 		if err != nil {
-			libvirtNetwork.Destroy()
+			if err := libvirtNetwork.Destroy(); err != nil {
+				fmt.Printf("Failed to destroy network %s : %s\n", name, err.Error())
+			}
 		}
 	}(libvirtNetwork)
 
@@ -167,7 +169,7 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 
 	network, err := getNetworkFromLibvirtNetwork(libvirtNetwork)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to convert a libvirt network into a network : ", err.Error())
+		return nil, fmt.Errorf("Failed to convert a libvirt network into a network : %s", err.Error())
 	}
 
 	return network, nil
@@ -182,7 +184,7 @@ func (client *Client) GetNetwork(ref string) (*model.Network, error) {
 
 	network, err := getNetworkFromLibvirtNetwork(libvirtNetwork)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to convert a libvirt network into a network : ", err.Error())
+		return nil, fmt.Errorf("Failed to convert a libvirt network into a network : %s", err.Error())
 	}
 
 	return network, nil
@@ -222,7 +224,7 @@ func (client *Client) DeleteNetwork(ref string) error {
 
 	err = libvirtNetwork.Destroy()
 	if err != nil {
-		return fmt.Errorf("Failed to destroy network : ", err.Error())
+		return fmt.Errorf("Failed to destroy network : %s", err.Error())
 	}
 
 	return nil
@@ -243,7 +245,7 @@ func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, erro
 	if gwName == "" {
 		name, err := networkLibvirt.GetName()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get network name : ", err.Error())
+			return nil, fmt.Errorf("Failed to get network name : %s", err.Error())
 		}
 		gwName = "gw-" + name
 	}
@@ -259,7 +261,7 @@ func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, erro
 
 	host, err := client.CreateHost(hostReq)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create geateway host : ", err.Error())
+		return nil, fmt.Errorf("Failed to create geateway host : %s", err.Error())
 	}
 
 	return host, nil

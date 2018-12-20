@@ -86,7 +86,9 @@ func infoHandler() {
 
 		go func(net.Conn) {
 			defer func() {
-				conn.Close()
+				if err := conn.Close(); err != nil {
+					fmt.Printf("Failed to close the tcp connection: %s", err.Error())
+				}
 			}()
 
 			buffer := make([]byte, 1024)
