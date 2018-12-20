@@ -523,4 +523,5 @@ lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
 echo "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
 systemctl reboot
+sleep 100
 exit 0

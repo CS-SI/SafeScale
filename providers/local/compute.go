@@ -483,7 +483,10 @@ func (client *Client) getHostAndDomainFromRef(ref string) (*model.Host, *libvirt
 	domain, err := client.LibvirtService.LookupDomainByUUIDString(ref)
 	if err != nil {
 		domain, err = client.LibvirtService.LookupDomainByName(ref)
-		re := regexp.MustCompile("[0-9]+")
+		re, err2 := regexp.Compile("[0-9]+")
+		if err2 != nil {
+			return nil, nil, fmt.Errorf(fmt.Sprintf("Failed to fetch domain from ref : %s", err.Error()))
+		}
 		errCode, _ := strconv.Atoi(re.FindString(err.Error()))
 		if errCode == 42 {
 			return nil, nil, model.ResourceNotFoundError("host", ref)
@@ -626,7 +629,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	if publicIP {
 		infoPublisherFileName := client.Config.LibvirtStorage + "/" + resourceName + "_InfoPublisher.sh"
 
-		command := "ip route get 8.8.8.8 | awk -F\"src \" 'NR==1{split($2,a,\" \");print a[1]}'"
+		command := "ip route get 8.8.8.8 |awk -F\"src \" 'NR==1{split($2,a,\" \");print a[1]}'"
 		cmd := exec.Command("bash", "-c", command)
 		cmdOutput := &bytes.Buffer{}
 		cmd.Stdout = cmdOutput
@@ -641,7 +644,15 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 			return nil, fmt.Errorf("Failed to open userdata file : %s", err.Error())
 		}
 		defer f.Close()
-		_, err = f.WriteString(fmt.Sprintf("#!/bin/bash \nmkdir /plopiplop \napt install -y netcat \nHOSTNAME=$(hostname)\nLANIP=$(ip route get 8.8.8.8 | awk -F\"src \" 'NR==1{split($2,a,\" \");print a[1]}')\necho -n \"$HOSTNAME|$LANIP\" | netcat %s %d \nexit 0\n", ip, port))
+		_, err = f.WriteString(fmt.Sprintf(
+			`#!/bin/bash
+echo Started at $(date) >> /root/log.txt
+apt install -y netcat &>> /root/log.txt
+LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}') &>> /root/log.txt
+echo -n "%s|$LANIP" | netcat %s %d &>> /root/log.txt
+exit 0
+`,
+			hostName, ip, port))
 		if err != nil {
 			return nil, fmt.Errorf("Failed to edit userdata file : %s", err.Error())
 		}
