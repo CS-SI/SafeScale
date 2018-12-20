@@ -242,10 +242,7 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 	}
 
 	if config.Region, ok = objectstorage["Region"].(string); !ok {
-		if config.Region, ok = compute["Region"].(string); !ok {
-			//stow refuses to connect to object storage if the region is not initialized even if he does not need it
-			config.Region = "stub"
-		}
+		config.Region, _ = compute["Region"].(string)
 	}
 
 	return config, nil
@@ -343,10 +340,7 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 
 	if config.Region, ok = metadata["Region"].(string); !ok {
 		if config.Region, ok = objectstorage["Region"].(string); !ok {
-			if config.Region, ok = compute["Region"].(string); !ok {
-				//stow refuses to connect to object storage if the region is not initialized even if he does not need it
-				config.Region = "stub"
-			}
+			config.Region, _ = compute["Region"].(string)
 		}
 	}
 
