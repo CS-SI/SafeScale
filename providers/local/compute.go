@@ -60,7 +60,11 @@ func (client *Client) ListImages(all bool) ([]model.Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", client.Config.ImagesJSONPath, err.Error())
 	}
-	defer jsonFile.Close()
+	defer func() {
+		if err := jsonFile.Close(); err != nil {
+			fmt.Println("Failed to close images file")
+		}
+	}()
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
@@ -68,14 +72,16 @@ func (client *Client) ListImages(all bool) ([]model.Image, error) {
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal([]byte(byteValue), &result)
+	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
+		return nil, fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.ImagesJSONPath, err.Error())
+	}
 
 	imagesJson := result["images"].([]interface{})
 	images := []model.Image{}
 	for _, imageJson := range imagesJson {
 		image := model.Image{
-			imageJson.(map[string]interface{})["imageID"].(string),
-			imageJson.(map[string]interface{})["imageName"].(string),
+			ID:   imageJson.(map[string]interface{})["imageID"].(string),
+			Name: imageJson.(map[string]interface{})["imageName"].(string),
 		}
 		images = append(images, image)
 	}
@@ -89,7 +95,11 @@ func (client *Client) GetImage(id string) (*model.Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", client.Config.ImagesJSONPath, err.Error())
 	}
-	defer jsonFile.Close()
+	defer func() {
+		if err := jsonFile.Close(); err != nil {
+			fmt.Println("Failed to close images file")
+		}
+	}()
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
@@ -97,20 +107,22 @@ func (client *Client) GetImage(id string) (*model.Image, error) {
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal([]byte(byteValue), &result)
+	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
+		return nil, fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.ImagesJSONPath, err.Error())
+	}
 
 	imagesJson := result["images"].([]interface{})
 	for _, imageJson := range imagesJson {
 		if imageID, ok := imageJson.(map[string]interface{})["imageID"]; ok && imageID == id {
 			return &model.Image{
-				imageJson.(map[string]interface{})["imageID"].(string),
-				imageJson.(map[string]interface{})["imageName"].(string),
+				ID:   imageJson.(map[string]interface{})["imageID"].(string),
+				Name: imageJson.(map[string]interface{})["imageName"].(string),
 			}, nil
 		}
 		if imageName, ok := imageJson.(map[string]interface{})["imageName"]; ok && imageName == id {
 			return &model.Image{
-				imageJson.(map[string]interface{})["imageID"].(string),
-				imageJson.(map[string]interface{})["imageName"].(string),
+				ID:   imageJson.(map[string]interface{})["imageID"].(string),
+				Name: imageJson.(map[string]interface{})["imageName"].(string),
 			}, nil
 		}
 	}
@@ -130,7 +142,11 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", client.Config.TemplatesJSONPath, err.Error())
 	}
-	defer jsonFile.Close()
+	defer func() {
+		if err := jsonFile.Close(); err != nil {
+			fmt.Println("Failed to close template file")
+		}
+	}()
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
@@ -138,7 +154,9 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal([]byte(byteValue), &result)
+	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
+		return nil, fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.TemplatesJSONPath, err.Error())
+	}
 
 	templatesJson := result["templates"].([]interface{})
 	templates := []model.HostTemplate{}
@@ -168,7 +186,11 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", client.Config.TemplatesJSONPath, err.Error())
 	}
-	defer jsonFile.Close()
+	defer func() {
+		if err := jsonFile.Close(); err != nil {
+			fmt.Println("Failed to close template file")
+		}
+	}()
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
@@ -176,7 +198,9 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal([]byte(byteValue), &result)
+	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
+		return nil, fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.TemplatesJSONPath, err.Error())
+	}
 
 	templatesJson := result["templates"].([]interface{})
 	for _, templateJson := range templatesJson {
@@ -253,7 +277,11 @@ func getImagePathFromID(client *Client, id string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Failed to open %s : %s", client.Config.ImagesJSONPath, err.Error())
 	}
-	defer jsonFile.Close()
+	defer func() {
+		if err := jsonFile.Close(); err != nil {
+			fmt.Println("Failed to close image file")
+		}
+	}()
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
@@ -261,7 +289,9 @@ func getImagePathFromID(client *Client, id string) (string, error) {
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal([]byte(byteValue), &result)
+	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
+		return "", fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.ImagesJSONPath, err.Error())
+	}
 
 	imagesJson := result["images"].([]interface{})
 	for _, imageJson := range imagesJson {
@@ -471,9 +501,15 @@ func (client *Client) getHostFromDomain(domain *libvirt.Domain) (*model.Host, er
 	host.Name = name
 	host.PrivateKey = "Impossible to fetch them from the domain, the private key is unknown by the domain"
 	host.LastState = stateConvert(state)
-	host.Properties.Set(HostProperty.DescriptionV1, hostDescriptionV1)
-	host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
-	host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
+	if err := host.Properties.Set(HostProperty.DescriptionV1, hostDescriptionV1); err != nil {
+		return nil, fmt.Errorf("Failed to set HostProperty.DescriptionV1 : %s", err.Error())
+	}
+	if err := host.Properties.Set(HostProperty.SizingV1, hostSizingV1); err != nil {
+		return nil, fmt.Errorf("Failed to set HostProperty.SizingV1 : %s", err.Error())
+	}
+	if err := host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1); err != nil {
+		return nil, fmt.Errorf("Failed to set HostProperty.NetworkV1 : %s", err.Error())
+	}
 
 	return host, nil
 }
@@ -506,7 +542,7 @@ func (client *Client) getHostAndDomainFromRef(ref string) (*model.Host, *libvirt
 
 func (client *Client) complementHost(host *model.Host, newHost *model.Host) error {
 	if host == nil || newHost == nil {
-		return fmt.Errorf("host and newHost have to been set!")
+		return fmt.Errorf("host and newHost have to been set")
 	}
 
 	if host.ID == "" {
@@ -643,7 +679,12 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to open userdata file : %s", err.Error())
 		}
-		defer f.Close()
+		defer func() {
+			if err := f.Close(); err != nil {
+				fmt.Printf("Failed to close the file %s : %s\n", infoPublisherFileName, err.Error())
+			}
+		}()
+
 		_, err = f.WriteString(fmt.Sprintf(
 			`#!/bin/bash
 echo Started at $(date) >> /root/log.txt
@@ -699,7 +740,9 @@ exit 0
 
 	defer func() {
 		if err != nil {
-			client.DeleteHost(resourceName)
+			if err := client.DeleteHost(resourceName); err != nil {
+				fmt.Printf("Failed to Delete the host %s : %s", resourceName, err.Error())
+			}
 		}
 	}()
 
@@ -722,7 +765,9 @@ exit 0
 	host.PrivateKey = keyPair.PrivateKey
 
 	hostNetworkV1 := propsv1.NewHostNetwork()
-	host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+	if err := host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1); err != nil {
+		return nil, fmt.Errorf("Failed to get the HostProperty.NetworkV1 : %s", err.Error())
+	}
 
 	if publicIP {
 		hostNetworkV1.PublicIPv4 = vmInfo.publicIp
@@ -742,7 +787,9 @@ exit 0
 	}
 
 	hostSizingV1 := propsv1.NewHostSizing()
-	host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
+	if err := host.Properties.Get(HostProperty.SizingV1, hostSizingV1); err != nil {
+		return nil, fmt.Errorf("Failed to get the HostProperty.SizingV1 : %s", err.Error())
+	}
 
 	hostSizingV1.RequestedSize.RAMSize = float32(template.RAMSize * 1024)
 	hostSizingV1.RequestedSize.Cores = template.Cores
@@ -751,8 +798,12 @@ exit 0
 	hostSizingV1.RequestedSize.GPUNumber = template.GPUNumber
 	hostSizingV1.RequestedSize.GPUType = template.GPUType
 
-	host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
-	host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
+	if err := host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1); err != nil {
+		return nil, fmt.Errorf("Failed to set the HostProperty.NetworkV1 : %s", err.Error())
+	}
+	if err := host.Properties.Set(HostProperty.SizingV1, hostSizingV1); err != nil {
+		return nil, fmt.Errorf("Failed to set the HostProperty.SizingV1 : %s", err.Error())
+	}
 
 	return host, nil
 }
@@ -775,7 +826,9 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 		return nil, err
 	}
 
-	client.complementHost(host, newHost)
+	if err := client.complementHost(host, newHost); err != nil {
+		return nil, fmt.Errorf("Failed to complement the host : %s", err.Error())
+	}
 
 	return host, nil
 }
