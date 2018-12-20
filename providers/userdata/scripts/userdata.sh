@@ -503,8 +503,9 @@ case $LINUX_KIND in
         {{- end }}
         {{- if .IsGateway }}
         configure_as_gateway
-        {{- else if .AddGateway }}
+        {{- end }}
         systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_resolvconf
+        {{- if .AddGateway }}
         configure_gateway
         {{- end }}
         ;;
