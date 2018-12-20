@@ -24,22 +24,25 @@ import (
 	"sync"
 )
 
-type VmInfo struct {
-	publicIp string
+// VMInfo represents the usefull informations package send from each new local vm
+type VMInfo struct {
+	publicIP string
 }
 
-type vmInfoWaiter_ struct {
+// VMInfoWaiterStruct represents the golbal info waiter
+type VMInfoWaiterStruct struct {
 	listner     *net.Listener
-	chansByName map[string](chan VmInfo)
+	chansByName map[string](chan VMInfo)
 	mutex       sync.Mutex
 }
 
-var vmInfoWaiter = vmInfoWaiter_{
-	chansByName: map[string](chan VmInfo){},
+var vmInfoWaiter = VMInfoWaiterStruct{
+	chansByName: map[string](chan VMInfo){},
 }
 
-func (iw *vmInfoWaiter_) Register(name string) chan VmInfo {
-	channel := make(chan VmInfo)
+// Register will register a vmCreator who wants to be notified if the listner recieve informations of the vm he created
+func (iw *VMInfoWaiterStruct) Register(name string) chan VMInfo {
+	channel := make(chan VMInfo)
 
 	iw.mutex.Lock()
 	iw.chansByName[name] = channel
@@ -48,7 +51,7 @@ func (iw *vmInfoWaiter_) Register(name string) chan VmInfo {
 	return channel
 }
 
-func (iw *vmInfoWaiter_) Deregister(name string) error {
+func (iw *VMInfoWaiterStruct) deregister(name string) error {
 	iw.mutex.Lock()
 	channel, found := iw.chansByName[name]
 	if found {
@@ -63,7 +66,8 @@ func (iw *vmInfoWaiter_) Deregister(name string) error {
 	return nil
 }
 
-func GetInfoWaiter(port int) (*vmInfoWaiter_, error) {
+// GetInfoWaiter get the global var vmInfoWaiter and setup the listner if it is not set
+func GetInfoWaiter(port int) (*VMInfoWaiterStruct, error) {
 	if vmInfoWaiter.listner == nil {
 		listner, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 		if err != nil {
@@ -103,8 +107,8 @@ func infoHandler() {
 			splittedMessage := strings.Split(message, "|")
 			hostName := splittedMessage[0]
 			ip := splittedMessage[1]
-			info := VmInfo{
-				publicIp: ip,
+			info := VMInfo{
+				publicIP: ip,
 			}
 			vmInfoWaiter.mutex.Lock()
 			channel, found := vmInfoWaiter.chansByName[hostName]
@@ -113,7 +117,7 @@ func infoHandler() {
 				panic(fmt.Sprintf("Info handler, Recived info from an unregisterd host: \n%s", message))
 			}
 			channel <- info
-			err = vmInfoWaiter.Deregister(hostName)
+			err = vmInfoWaiter.deregister(hostName)
 			if err != nil {
 				panic(fmt.Sprintf("Info handler, Error deregistering: %s", err.Error()))
 			}

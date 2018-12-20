@@ -27,24 +27,34 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 )
 
+// Client is the implementation of the local driver regarding to the api.ClientAPI
 type Client struct {
 	LibvirtService *libvirt.Connect
-
-	Config      *CfgOptions
-	AuthOptions *AuthOptions
+	Config         *CfgOptions
+	AuthOptions    *AuthOptions
 }
 
+//AuthOptions fields are the union of those recognized by each identity implementation and provider.
 type AuthOptions struct {
 }
+
+// CfgOptions configuration options
 type CfgOptions struct {
 	// MetadataBucketName contains the name of the bucket storing metadata
-	MetadataBucketName        string
-	ProviderNetwork           string
+	MetadataBucketName string
+	// Name of the default network of the provider
+	ProviderNetwork string
+	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
 	AutoHostNetworkInterfaces bool
-	UseLayer3Networking       bool
-	ImagesJSONPath            string
-	TemplatesJSONPath         string
-	LibvirtStorage            string
+	// UseLayer3Networking indicates if layer 3 networking features (router) can be used
+	// if UseFloatingIP is true UseLayer3Networking must be true
+	UseLayer3Networking bool
+	// Local Path of the json file defining the images
+	ImagesJSONPath string
+	// Local Path of the json file defining the templates
+	TemplatesJSONPath string
+	// Local Path of the libvirt pool where all disks created by libvirt come from and are stored
+	LibvirtStorage string
 }
 
 // Build Create and initialize a ClientAPI
@@ -74,11 +84,11 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 		clientAPI.Config.MetadataBucketName = metadata.BuildMetadataBucketName("id")
 	}
 
-	imagesJsonPath, found := compute["imagesJSONPath"].(string)
+	imagesJSONPath, found := compute["imagesJSONPath"].(string)
 	if !found {
 		return nil, fmt.Errorf("imagesJsonPath is not set")
 	}
-	templatesJsonPath, found := compute["templatesJSONPath"].(string)
+	templatesJSONPath, found := compute["templatesJSONPath"].(string)
 	if !found {
 		return nil, fmt.Errorf("templatesJsonPath is not set")
 	}
@@ -87,8 +97,8 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 		return nil, fmt.Errorf("libvirtStorage is not set")
 	}
 
-	clientAPI.Config.ImagesJSONPath = imagesJsonPath
-	clientAPI.Config.TemplatesJSONPath = templatesJsonPath
+	clientAPI.Config.ImagesJSONPath = imagesJSONPath
+	clientAPI.Config.TemplatesJSONPath = templatesJSONPath
 	clientAPI.Config.LibvirtStorage = libvirtStorage
 
 	return clientAPI, nil

@@ -76,12 +76,12 @@ func (client *Client) ListImages(all bool) ([]model.Image, error) {
 		return nil, fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.ImagesJSONPath, err.Error())
 	}
 
-	imagesJson := result["images"].([]interface{})
+	imagesJSON := result["images"].([]interface{})
 	images := []model.Image{}
-	for _, imageJson := range imagesJson {
+	for _, imageJSON := range imagesJSON {
 		image := model.Image{
-			ID:   imageJson.(map[string]interface{})["imageID"].(string),
-			Name: imageJson.(map[string]interface{})["imageName"].(string),
+			ID:   imageJSON.(map[string]interface{})["imageID"].(string),
+			Name: imageJSON.(map[string]interface{})["imageName"].(string),
 		}
 		images = append(images, image)
 	}
@@ -111,18 +111,18 @@ func (client *Client) GetImage(id string) (*model.Image, error) {
 		return nil, fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.ImagesJSONPath, err.Error())
 	}
 
-	imagesJson := result["images"].([]interface{})
-	for _, imageJson := range imagesJson {
-		if imageID, ok := imageJson.(map[string]interface{})["imageID"]; ok && imageID == id {
+	imagesJSON := result["images"].([]interface{})
+	for _, imageJSON := range imagesJSON {
+		if imageID, ok := imageJSON.(map[string]interface{})["imageID"]; ok && imageID == id {
 			return &model.Image{
-				ID:   imageJson.(map[string]interface{})["imageID"].(string),
-				Name: imageJson.(map[string]interface{})["imageName"].(string),
+				ID:   imageJSON.(map[string]interface{})["imageID"].(string),
+				Name: imageJSON.(map[string]interface{})["imageName"].(string),
 			}, nil
 		}
-		if imageName, ok := imageJson.(map[string]interface{})["imageName"]; ok && imageName == id {
+		if imageName, ok := imageJSON.(map[string]interface{})["imageName"]; ok && imageName == id {
 			return &model.Image{
-				ID:   imageJson.(map[string]interface{})["imageID"].(string),
-				Name: imageJson.(map[string]interface{})["imageName"].(string),
+				ID:   imageJSON.(map[string]interface{})["imageID"].(string),
+				Name: imageJSON.(map[string]interface{})["imageName"].(string),
 			}, nil
 		}
 	}
@@ -158,20 +158,20 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 		return nil, fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.TemplatesJSONPath, err.Error())
 	}
 
-	templatesJson := result["templates"].([]interface{})
+	templatesJSON := result["templates"].([]interface{})
 	templates := []model.HostTemplate{}
-	for _, templateJson := range templatesJson {
+	for _, templateJSON := range templatesJSON {
 		template := model.HostTemplate{
 			HostTemplate: &propsv1.HostTemplate{
 				HostSize: &propsv1.HostSize{
-					Cores:     int(templateJson.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
-					RAMSize:   float32(templateJson.(map[string]interface{})["templateSpecs"].(map[string]interface{})["ramSize"].(float64)),
-					DiskSize:  int(templateJson.(map[string]interface{})["templateSpecs"].(map[string]interface{})["diskSize"].(float64)),
-					GPUNumber: int(templateJson.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuNumber"].(float64)),
-					GPUType:   templateJson.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuType"].(string),
+					Cores:     int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
+					RAMSize:   float32(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["ramSize"].(float64)),
+					DiskSize:  int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["diskSize"].(float64)),
+					GPUNumber: int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuNumber"].(float64)),
+					GPUType:   templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuType"].(string),
 				},
-				ID:   templateJson.(map[string]interface{})["templateID"].(string),
-				Name: templateJson.(map[string]interface{})["templateName"].(string),
+				ID:   templateJSON.(map[string]interface{})["templateID"].(string),
+				Name: templateJSON.(map[string]interface{})["templateName"].(string),
 			},
 		}
 		templates = append(templates, template)
@@ -202,20 +202,20 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 		return nil, fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.TemplatesJSONPath, err.Error())
 	}
 
-	templatesJson := result["templates"].([]interface{})
-	for _, templateJson := range templatesJson {
-		if templateID, _ := templateJson.(map[string]interface{})["templateID"]; templateID == id {
+	templatesJSON := result["templates"].([]interface{})
+	for _, templateJSON := range templatesJSON {
+		if templateID, _ := templateJSON.(map[string]interface{})["templateID"]; templateID == id {
 			return &model.HostTemplate{
 				HostTemplate: &propsv1.HostTemplate{
 					HostSize: &propsv1.HostSize{
-						Cores:     int(templateJson.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
-						RAMSize:   float32(templateJson.(map[string]interface{})["templateSpecs"].(map[string]interface{})["ramSize"].(float64)),
-						DiskSize:  int(templateJson.(map[string]interface{})["templateSpecs"].(map[string]interface{})["diskSize"].(float64)),
-						GPUNumber: int(templateJson.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuNumber"].(float64)),
-						GPUType:   templateJson.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuType"].(string),
+						Cores:     int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
+						RAMSize:   float32(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["ramSize"].(float64)),
+						DiskSize:  int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["diskSize"].(float64)),
+						GPUNumber: int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuNumber"].(float64)),
+						GPUType:   templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuType"].(string),
 					},
-					ID:   templateJson.(map[string]interface{})["templateID"].(string),
-					Name: templateJson.(map[string]interface{})["templateName"].(string),
+					ID:   templateJSON.(map[string]interface{})["templateID"].(string),
+					Name: templateJSON.(map[string]interface{})["templateName"].(string),
 				},
 			}, nil
 		}
@@ -293,10 +293,10 @@ func getImagePathFromID(client *Client, id string) (string, error) {
 		return "", fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.ImagesJSONPath, err.Error())
 	}
 
-	imagesJson := result["images"].([]interface{})
-	for _, imageJson := range imagesJson {
-		if imageID, _ := imageJson.(map[string]interface{})["imageID"]; imageID == id {
-			return imageJson.(map[string]interface{})["imagePath"].(string), nil
+	imagesJSON := result["images"].([]interface{})
+	for _, imageJSON := range imagesJSON {
+		if imageID, _ := imageJSON.(map[string]interface{})["imageID"]; imageID == id {
+			return imageJSON.(map[string]interface{})["imagePath"].(string), nil
 		}
 	}
 
@@ -656,7 +656,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	}
 
 	//----Commands----
-	var vmInfoChannel (chan VmInfo)
+	var vmInfoChannel (chan VMInfo)
 	firstbootCommandString := ""
 	networksCommandString := ""
 	for _, network := range networks {
@@ -722,12 +722,12 @@ exit 0
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
 	// TODO gpu is ignored
 	// TODO use libvirt-go functions not bash commands
-	command_setup := fmt.Sprintf("IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"", imagePath, client.Config.LibvirtStorage, resourceName)
-	command_copy := fmt.Sprintf("cd $LIBVIRT_STORAGE && cp $IMAGE_PATH . && chmod 666 $IMAGE")
-	command_resize := fmt.Sprintf("truncate $VM_IMAGE -s %dG && virt-resize --expand /dev/sda1 $IMAGE $VM_IMAGE && rm $IMAGE", template.DiskSize)
-	command_sysprep := fmt.Sprintf("virt-sysprep -a $VM_IMAGE --hostname %s --operations all,-ssh-hostkeys --firstboot %s %s && rm %s", hostName, userdataFileName, firstbootCommandString, userdataFileName)
-	command_virt_install := fmt.Sprintf("virt-install --name=%s --vcpus=%d --memory=%d --import --disk=$VM_IMAGE %s --noautoconsole", resourceName, template.Cores, int(template.RAMSize*1024), networksCommandString)
-	command := strings.Join([]string{command_setup, command_copy, command_resize, command_sysprep, command_virt_install}, " && ")
+	commandSetup := fmt.Sprintf("IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"", imagePath, client.Config.LibvirtStorage, resourceName)
+	commandCopy := fmt.Sprintf("cd $LIBVIRT_STORAGE && cp $IMAGE_PATH . && chmod 666 $IMAGE")
+	commandResize := fmt.Sprintf("truncate $VM_IMAGE -s %dG && virt-resize --expand /dev/sda1 $IMAGE $VM_IMAGE && rm $IMAGE", template.DiskSize)
+	commandSysprep := fmt.Sprintf("virt-sysprep -a $VM_IMAGE --hostname %s --operations all,-ssh-hostkeys --firstboot %s %s && rm %s", hostName, userdataFileName, firstbootCommandString, userdataFileName)
+	commandVirtInstall := fmt.Sprintf("virt-install --name=%s --vcpus=%d --memory=%d --import --disk=$VM_IMAGE %s --noautoconsole", resourceName, template.Cores, int(template.RAMSize*1024), networksCommandString)
+	command := strings.Join([]string{commandSetup, commandCopy, commandResize, commandSysprep, commandVirtInstall}, " && ")
 
 	cmd := exec.Command("bash", "-c", command)
 
@@ -747,7 +747,7 @@ exit 0
 	}()
 
 	//----Generate model.Host----
-	var vmInfo VmInfo
+	var vmInfo VMInfo
 	if publicIP {
 		vmInfo = <-vmInfoChannel
 	}
@@ -770,7 +770,7 @@ exit 0
 	}
 
 	if publicIP {
-		hostNetworkV1.PublicIPv4 = vmInfo.publicIp
+		hostNetworkV1.PublicIPv4 = vmInfo.publicIP
 	}
 
 	hostNetworkV1.DefaultNetworkID = request.Networks[0].ID
@@ -808,6 +808,7 @@ exit 0
 	return host, nil
 }
 
+// GetHost returns the host identified by ref (name or id) or by a *model.Host containing an id
 func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 	var host *model.Host
 
@@ -833,6 +834,7 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 	return host, nil
 }
 
+// GetHostByName returns the host identified by ref (name or id)
 func (client *Client) GetHostByName(name string) (*model.Host, error) {
 	return client.GetHost(name)
 }
