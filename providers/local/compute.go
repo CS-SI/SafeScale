@@ -257,17 +257,17 @@ func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (client *Client) GetKeyPair(id string) (*model.KeyPair, error) {
-	panic("Not implemented yet")
+	return nil, fmt.Errorf("Not implemented")
 }
 
 // ListKeyPairs lists available key pairs
 func (client *Client) ListKeyPairs() ([]model.KeyPair, error) {
-	panic("Not implemented yet")
+	return nil, fmt.Errorf("Not implemented")
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (client *Client) DeleteKeyPair(id string) error {
-	panic("Not implemented yet")
+	return fmt.Errorf("Not implemented")
 }
 
 //-------------HOST MANAGEMENT------------------------------------------------------------------------------------------
@@ -698,7 +698,7 @@ exit 0
 			return nil, fmt.Errorf("Failed to edit userdata file : %s", err.Error())
 		}
 
-		command = "ip route | grep default | awk '{{print $5}}'"
+		command = "ip route get 8.8.8.8 | awk -F\"dev \" 'NR==1{split($2,a,\" \");print a[1]}'"
 		cmd = exec.Command("bash", "-c", command)
 		cmdOutput = &bytes.Buffer{}
 		cmd.Stdout = cmdOutput
@@ -726,7 +726,7 @@ exit 0
 	commandCopy := fmt.Sprintf("cd $LIBVIRT_STORAGE && cp $IMAGE_PATH . && chmod 666 $IMAGE")
 	commandResize := fmt.Sprintf("truncate $VM_IMAGE -s %dG && virt-resize --expand /dev/sda1 $IMAGE $VM_IMAGE && rm $IMAGE", template.DiskSize)
 	commandSysprep := fmt.Sprintf("virt-sysprep -a $VM_IMAGE --hostname %s --operations all,-ssh-hostkeys --firstboot %s %s && rm %s", hostName, userdataFileName, firstbootCommandString, userdataFileName)
-	commandVirtInstall := fmt.Sprintf("virt-install --name=%s --vcpus=%d --memory=%d --import --disk=$VM_IMAGE %s --noautoconsole", resourceName, template.Cores, int(template.RAMSize*1024), networksCommandString)
+	commandVirtInstall := fmt.Sprintf("virt-install --noautoconsole	--name=%s --vcpus=%d --memory=%d --import --disk=$VM_IMAGE %s", resourceName, template.Cores, int(template.RAMSize*1024), networksCommandString)
 	command := strings.Join([]string{commandSetup, commandCopy, commandResize, commandSysprep, commandVirtInstall}, " && ")
 
 	cmd := exec.Command("bash", "-c", command)
