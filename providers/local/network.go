@@ -227,6 +227,11 @@ func (client *Client) DeleteNetwork(ref string) error {
 		return fmt.Errorf("Failed to destroy network : %s", err.Error())
 	}
 
+	err = libvirtNetwork.Undefine()
+	if err != nil {
+		return fmt.Errorf("Failed to undefine network : %s", err.Error())
+	}
+
 	return nil
 }
 
