@@ -38,6 +38,7 @@ import (
 	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialize tenant cloudwatt
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialize tenant flexibleengine
+	_ "github.com/CS-SI/SafeScale/providers/local"          // Imported to initialize tenant local
 	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialize tenant opentelekoms
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialize tenant ovh
 )
@@ -155,12 +156,12 @@ func (tester *ClientTester) ListKeyPairs(t *testing.T) {
 }
 
 //CreateNetwork creates a test network
-func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool) (*model.Network, *model.KeyPair) {
+func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool, cidr string) (*model.Network, *model.KeyPair) {
 
 	network, err := tester.Service.CreateNetwork(model.NetworkRequest{
 		Name:      name,
 		IPVersion: IPVersion.IPv4,
-		CIDR:      "192.168.1.0/24",
+		CIDR:      cidr,
 	})
 	require.NoError(t, err)
 
@@ -183,39 +184,42 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool
 	}
 
 	if withGW {
-		_, err = tester.Service.CreateGateway(gwRequest)
+		gateway, err := tester.Service.CreateGateway(gwRequest)
 		require.Nil(t, err)
+		network.GatewayID = gateway.ID
 	}
 
 	return network, keypair
 }
 
 // CreateHost creates a test host
-func (tester *ClientTester) CreateHost(t *testing.T, name string, networkID string, public bool) (*model.Host, error) {
+func (tester *ClientTester) CreateHost(t *testing.T, name string, network *model.Network, public bool) (*model.Host, error) {
 	tpls, err := tester.Service.SelectTemplatesBySize(model.SizingRequirements{
 		MinCores:    1,
-		MinRAMSize:  4,
+		MinRAMSize:  1,
 		MinDiskSize: 10,
 	}, false)
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 16.04")
 	assert.Nil(t, err)
+	gw, err := tester.Service.GetHost(network.GatewayID)
+	assert.Nil(t, err)
 	hostRequest := model.HostRequest{
-		ImageID:      img.ID,
-		ResourceName: name,
-		TemplateID:   tpls[0].ID,
-		// VPL: field 'NetworkIDs []string' becomes 'Network []*model.Network'
-		// NetworkIDs:   []string{networkID},
-		PublicIP: public,
+		ImageID:        img.ID,
+		ResourceName:   name,
+		TemplateID:     tpls[0].ID,
+		Networks:       []*model.Network{network},
+		DefaultGateway: gw,
+		PublicIP:       public,
 	}
 	return tester.Service.CreateHost(hostRequest)
 }
 
 //CreateGW creates a test GW
-func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
+func (tester *ClientTester) CreateGW(t *testing.T, network *model.Network) error {
 	tpls, err := tester.Service.SelectTemplatesBySize(model.SizingRequirements{
 		MinCores:    1,
-		MinRAMSize:  4,
+		MinRAMSize:  1,
 		MinDiskSize: 10,
 	}, false)
 	assert.Nil(t, err)
@@ -224,11 +228,14 @@ func (tester *ClientTester) CreateGW(t *testing.T, networkID string) error {
 	gwRequest := model.GatewayRequest{
 		ImageID:    img.ID,
 		TemplateID: tpls[0].ID,
-		//VPL: field 'NetworkID string' becomes 'Network *model.Network'
-		// NetworkID:  networkID,
+		Network:    network,
 	}
-	_, err = tester.Service.CreateGateway(gwRequest)
-	return err
+	gw, err := tester.Service.CreateGateway(gwRequest)
+	if err != nil {
+		return err
+	}
+	network.GatewayID = gw.ID
+	return nil
 }
 
 // CreateNetworkTest test
@@ -239,8 +246,8 @@ func (tester *ClientTester) CreateNetworkTest(t *testing.T) {
 	nbAllNetworks := len(nets)
 	require.True(t, nbAllNetworks > 0)
 
-	fmt.Println("Creating unit_test_network1")
-	network1, kp1 := tester.CreateNetwork(t, "unit_test_network_1", true)
+	fmt.Println("Creating unit_test_network_6")
+	network1, kp1 := tester.CreateNetwork(t, "unit_test_network_6", true, "1.1.1.0/24")
 	require.NotNil(t, network1)
 	require.NotNil(t, kp1)
 	fmt.Println(fmt.Sprintf("Created a Network with name %v and id %v", network1.Name, kp1.ID))
@@ -250,13 +257,13 @@ func (tester *ClientTester) CreateNetworkTest(t *testing.T) {
 	nets, err = tester.Service.ListNetworks()
 	require.Nil(t, err)
 	for _, net := range nets {
-		if net.Name == "unit_test_network_1" {
+		if net.Name == "unit_test_network61" {
 			networkFound = true
 			break
 		}
 	}
 
-	net, err := tester.Service.GetNetwork("unit_test_network_1")
+	net, err := tester.Service.GetNetwork("unit_test_network_6")
 	require.NotNil(t, net)
 	require.Nil(t, err)
 
@@ -276,10 +283,13 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	// nbMonitoredNetworks := len(nets)
 
 	fmt.Println("Creating unit_test_network1")
-	network1, kp1 := tester.CreateNetwork(t, "unit_test_network_1", true)
+	network1, kp1 := tester.CreateNetwork(t, "unit_test_network_1", true, "1.1.2.0/24")
 	fmt.Println("unit_test_network1 created")
-	defer tester.Service.DeleteKeyPair(kp1.ID)
-	defer tester.Service.DeleteNetwork(network1.ID)
+	defer func() {
+		tester.Service.DeleteKeyPair(kp1.ID)
+		tester.Service.DeleteHost(network1.GatewayID)
+		tester.Service.DeleteNetwork(network1.ID)
+	}()
 
 	// host, err := tester.Service.GetHostByName("gw_" + network1.Name)
 	// require.Nil(t, err)
@@ -301,11 +311,13 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	// assert.Equal(t, model.DefaultUser, content)
 
 	fmt.Println("Creating unit_test_network2")
-	network2, kp2 := tester.CreateNetwork(t, "unit_test_network_2", false)
+	network2, kp2 := tester.CreateNetwork(t, "unit_test_network_2", false, "1.1.3.0/24")
 	fmt.Println("unit_test_network2 created ")
 
-	defer tester.Service.DeleteKeyPair(kp2.ID)
-	defer tester.Service.DeleteNetwork(network2.ID)
+	defer func() {
+		tester.Service.DeleteKeyPair(kp2.ID)
+		tester.Service.DeleteNetwork(network2.ID)
+	}()
 
 	nets, err = tester.Service.ListNetworks()
 	assert.Nil(t, err)
@@ -339,14 +351,15 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 	nbHosts := len(hosts)
 
 	// TODO: handle kp delete
-	network, kp := tester.CreateNetwork(t, "unit_test_network", false)
-	defer tester.Service.DeleteNetwork(network.ID)
-	defer tester.Service.DeleteKeyPair(kp.ID)
-
-	host, err := tester.CreateHost(t, "host1", network.ID, true)
-	defer tester.Service.DeleteHost(host.ID)
-
+	network, kp := tester.CreateNetwork(t, "unit_test_network_3", false, "1.1.4.0/24")
+	defer func() {
+		tester.Service.DeleteNetwork(network.ID)
+		tester.Service.DeleteKeyPair(kp.ID)
+	}()
+	host1, err := tester.CreateHost(t, "host1", network, true)
 	assert.NoError(t, err)
+	defer tester.Service.DeleteHost(host1.ID)
+
 	// time.Sleep(30 * time.Second)
 
 	// ssh, err := tester.Service.GetSSHConfig(host.ID)
@@ -371,13 +384,14 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 	// _, _, _, err = cmd.Run()
 	// assert.Nil(t, err)
 
-	_, err = tester.CreateHost(t, "host2", network.ID, false)
+	_, err = tester.CreateHost(t, "host2", network, false)
 	assert.Error(t, err)
-	err = tester.CreateGW(t, network.ID)
+	err = tester.CreateGW(t, network)
 	assert.NoError(t, err)
-	host2, err := tester.CreateHost(t, "host2", network.ID, false)
+	defer tester.Service.DeleteGateway(network.GatewayID)
+	host2, err := tester.CreateHost(t, "host2", network, false)
+	assert.NoError(t, err)
 	defer tester.Service.DeleteHost(host2.ID)
-	assert.NoError(t, err)
 
 	// // time.Sleep(30 * time.Second)
 	// ssh2, err := tester.Service.GetSSHConfig(host2.ID)
@@ -396,9 +410,9 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 	assert.Equal(t, nbHosts+3, len(hosts))
 	found := 0
 	for _, v := range hosts {
-		if v.Name == "gw_"+network.Name {
+		if v.Name == "gw-"+network.Name {
 			found++
-		} else if v.ID == host.ID {
+		} else if v.ID == host1.ID {
 			found++
 		} else if v.ID == host2.ID {
 			found++
@@ -410,21 +424,22 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 	}
 	assert.Equal(t, 3, found)
 
-	host2, err = tester.CreateHost(t, "host1", network.ID, true)
-
-	host, err = tester.Service.GetHost(host)
+	host1_bis, err := tester.Service.GetHost(host1)
 	assert.NoError(t, err)
 	// //VPL: PublicIPv? moved in Host Property NetworkV1.PublicIPv?...
 	// assert.Equal(t, host2.PublicIPv4, host.PublicIPv4)
 	// assert.Equal(t, host2.PublicIPv6, host.PublicIPv6)
 	// //VPL: GatewayID moved in Host Property NetworkV1.DefaultGatewayID...
 	//assert.Equal(t, host2.GatewayID, host.GatewayID)
-	assert.Equal(t, host2.ID, host.ID)
-	assert.Equal(t, host2.Name, host.Name)
-	assert.Equal(t, host2.PrivateKey, host.PrivateKey)
+	assert.Equal(t, host1.ID, host1_bis.ID)
+	assert.Equal(t, host1.Name, host1_bis.Name)
+	assert.Equal(t, host1.PrivateKey, host1_bis.PrivateKey)
+	assert.Equal(t, host1.LastState, host1_bis.LastState)
+	assert.Equal(t, host1.GetPrivateIP(), host1.GetPrivateIP())
+	assert.Equal(t, host1.GetPublicIP(), host1_bis.GetPublicIP())
+	assert.Equal(t, host1.GetAccessIP(), host1_bis.GetAccessIP())
 	//VPL: Size moved in Host Extension SizingV1.AllocatedSize
 	//assert.Equal(t, host2.Size, host.Size)
-	assert.Equal(t, host2.LastState, host.LastState)
 
 	//VPL: PrivateIPsVx moved in Host Extension NetworkV1.IPvxAddresses
 	// for _, addr := range v.PrivateIPsV4 {
@@ -438,10 +453,12 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 // StartStopHost test
 func (tester *ClientTester) StartStopHost(t *testing.T) {
 	// TODO: handle kp delete
-	net, kp := tester.CreateNetwork(t, "unit_test_network", true)
-	defer tester.Service.DeleteKeyPair(kp.ID)
-	defer tester.Service.DeleteNetwork(net.ID)
-	host, err := tester.Service.GetHostByName("gw_" + net.Name)
+	net, kp := tester.CreateNetwork(t, "unit_test_network_4", true, "1.1.5.0/24")
+	defer func() {
+		tester.Service.DeleteKeyPair(kp.ID)
+		tester.Service.DeleteNetwork(net.ID)
+	}()
+	host, err := tester.Service.GetHostByName("gw-" + net.Name)
 	require.Nil(t, err)
 	require.NotNil(t, host)
 	{
@@ -515,7 +532,7 @@ func (tester *ClientTester) Volume(t *testing.T) {
 //VolumeAttachment test
 func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	// TODO: handle kp delete
-	net, kp := tester.CreateNetwork(t, "unit_test_network", true)
+	net, kp := tester.CreateNetwork(t, "unit_test_network_5", true, "1.1.6.0/24")
 
 	defer tester.Service.DeleteKeyPair(kp.ID)
 	defer tester.Service.DeleteNetwork(net.ID)
