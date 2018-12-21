@@ -548,7 +548,9 @@ func (client *Client) initVPC() error {
 	// Tries to get VPC information
 	vpcID, err := client.findVPCID()
 	if err != nil {
-		return err
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return err
+		}
 	}
 	if vpcID != nil {
 		client.vpc, err = client.GetVPC(*vpcID)
