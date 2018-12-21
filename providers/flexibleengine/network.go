@@ -187,8 +187,10 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	defer log.Debugf("providers.flexibleengine.CreateNetwork(%s) done", req.Name)
 
 	subnet, err := client.findSubnetByName(req.Name)
-	if subnet == nil && err != nil {
-		return nil, err
+	if err != nil {
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return nil, err
+		}
 	}
 	if subnet != nil {
 		return nil, fmt.Errorf("network '%s' already exists", req.Name)
