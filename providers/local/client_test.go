@@ -124,14 +124,14 @@ func Test_VolumeAttachment(t *testing.T) {
 	tt.VolumeAttachment(t)
 }
 
-func Test_Containers(t *testing.T) {
-	tt, err := getTester()
-	require.Nil(t, err)
-	tt.Containers(t)
-}
+// func Test_Containers(t *testing.T) {
+// 	tt, err := getTester()
+// 	require.Nil(t, err)
+// 	tt.Containers(t)
+// }
 
-func Test_Objects(t *testing.T) {
-	tt, err := getTester()
-	require.Nil(t, err)
-	tt.Objects(t)
+// func Test_Objects(t *testing.T) {
+// 	tt, err := getTester()
+// 	require.Nil(t, err)
+// 	tt.Objects(t)
 // }

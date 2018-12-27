@@ -25,6 +25,8 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
@@ -121,9 +123,9 @@ func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*model.Volum
 
 	volume.Name = volumeDescription.Name
 	volume.Size = int(volumeDescription.Capacity.Value / 1024 / 1024 / 1024)
-	//volume.Speed =
+	volume.Speed = VolumeSpeed.HDD
 	volume.ID = hash
-	//volume.State =
+	volume.State = VolumeState.AVAILABLE
 
 	return volume, nil
 }
@@ -334,10 +336,10 @@ func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentReque
 	//TODO not working for a name only made of z (ex: 'zzz' will became '1aaa')
 
 	requestXML := `
-	<disk type='file' device='disk'>
-		<source volume='' file='` + volumeDescription.Target.Path + `'/>
-		<target dev='` + newDiskName + `' bus='virtio'/>
-	</disk>`
+<disk type='file' device='disk'>
+	<source volume='' file='` + volumeDescription.Target.Path + `'/>
+	<target dev='` + newDiskName + `' bus='virtio'/>
+</disk>`
 
 	err = domain.AttachDevice(requestXML)
 	if err != nil {
@@ -438,7 +440,8 @@ func (client *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAtta
 	for _, disk := range domainDescription.Devices.Disks {
 		split := strings.Split(disk.Source.File.File, "/")
 		diskName := split[len(split)-1]
-		if strings.Split(diskName, "-")[0] == "volume" {
+
+		if strings.Split(diskName, ".")[0] != domainDescription.Name {
 			volume, err := client.getLibvirtVolume(diskName)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to get volume : %s", err.Error())

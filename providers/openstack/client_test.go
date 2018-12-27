@@ -19,9 +19,10 @@ package openstack_test
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/providers"
 
@@ -59,9 +60,7 @@ func getClient() (*openstack.Client, error) {
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name))
 		}
-		tester = &tests.ClientTester{
-			Service: *service,
-		}
+		client = service.ClientAPI(*openstack.Client)
 
 	}
 	return client, nil
