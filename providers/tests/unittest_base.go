@@ -29,10 +29,12 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
+	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
 
 	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialize tenant ovh
@@ -156,7 +158,7 @@ func (tester *ClientTester) ListKeyPairs(t *testing.T) {
 }
 
 //CreateNetwork creates a test network
-func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool, cidr string) (*model.Network, *model.KeyPair) {
+func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool, cidr string) (*model.Network, *model.Host) {
 
 	network, err := tester.Service.CreateNetwork(model.NetworkRequest{
 		Name:      name,
@@ -183,13 +185,15 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool
 		TemplateID: tpls[0].ID,
 	}
 
+	var gateway *model.Host
+
 	if withGW {
-		gateway, err := tester.Service.CreateGateway(gwRequest)
+		gateway, err = tester.Service.CreateGateway(gwRequest)
 		require.Nil(t, err)
 		network.GatewayID = gateway.ID
 	}
 
-	return network, keypair
+	return network, gateway
 }
 
 // CreateHost creates a test host
@@ -202,8 +206,7 @@ func (tester *ClientTester) CreateHost(t *testing.T, name string, network *model
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 16.04")
 	assert.Nil(t, err)
-	gw, err := tester.Service.GetHost(network.GatewayID)
-	assert.Nil(t, err)
+	gw, _ := tester.Service.GetHost(network.GatewayID)
 	hostRequest := model.HostRequest{
 		ImageID:        img.ID,
 		ResourceName:   name,
@@ -264,6 +267,7 @@ func (tester *ClientTester) CreateNetworkTest(t *testing.T) {
 	}
 
 	net, err := tester.Service.GetNetwork("unit_test_network_6")
+
 	require.NotNil(t, net)
 	require.Nil(t, err)
 
@@ -278,44 +282,39 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	nets, err := tester.Service.ListNetworks()
 	assert.Nil(t, err)
 	nbAllNetworks := len(nets)
-	// nets, err = tester.Service.ListNetworks(false)
-	// assert.Nil(t, err)
-	// nbMonitoredNetworks := len(nets)
 
+	net1CIDR := "1.1.2.0/24"
+	net1Name := "unit_test_network_1"
 	fmt.Println("Creating unit_test_network1")
-	network1, kp1 := tester.CreateNetwork(t, "unit_test_network_1", true, "1.1.2.0/24")
+	network1, gw1 := tester.CreateNetwork(t, net1Name, true, net1CIDR)
 	fmt.Println("unit_test_network1 created")
 	defer func() {
-		tester.Service.DeleteKeyPair(kp1.ID)
-		tester.Service.DeleteHost(network1.GatewayID)
+		tester.Service.DeleteHost(gw1.ID)
 		tester.Service.DeleteNetwork(network1.ID)
 	}()
 
-	// host, err := tester.Service.GetHostByName("gw_" + network1.Name)
-	// require.Nil(t, err)
-	// assert.True(t, host.PublicIPv4 != "" || host.PublicIPv6 != "")
-	// assert.NotEmpty(t, host.PrivateKey)
-	// //assert.Empty(t, host.GatewayID)
-	// fmt.Println(host.PublicIPv4)
-	// fmt.Println(host.PrivateKey)
-	// // ssh, err := tester.Service.GetSSHConfig(host.ID)
-	// assert.Nil(t, err)
+	assert.NotNil(t, network1)
+	assert.NotNil(t, gw1)
 
-	// // Waits sshd deamon is up
-	// ssh.WaitServerReady(1 * time.Minute)
-	// cmd, err := ssh.Command("whoami")
-	// assert.Nil(t, err)
-	// out, err := cmd.Output()
-	// assert.Nil(t, err)
-	// content := strings.Trim(string(out), "\n")
-	// assert.Equal(t, model.DefaultUser, content)
+	assert.Equal(t, network1.CIDR, net1CIDR)
+	assert.Equal(t, network1.GatewayID, gw1.ID)
+	assert.Equal(t, gw1.Name, "gw-"+network1.Name)
+	assert.NotEmpty(t, gw1.GetPublicIP)
+	gw1NetworkV1 := propsv1.NewHostNetwork()
+	err = gw1.Properties.Get(HostProperty.NetworkV1, gw1NetworkV1)
+	assert.Nil(t, err)
+	assert.Empty(t, gw1NetworkV1.DefaultGatewayID)
+	assert.Equal(t, gw1NetworkV1.NetworksByName[net1Name], network1.ID)
+	assert.Equal(t, gw1NetworkV1.NetworksByID[network1.ID], net1Name)
+	assert.Equal(t, gw1NetworkV1.IsGateway, true)
 
 	fmt.Println("Creating unit_test_network2")
-	network2, kp2 := tester.CreateNetwork(t, "unit_test_network_2", false, "1.1.3.0/24")
+	network2, gw2 := tester.CreateNetwork(t, "unit_test_network_2", false, "1.1.3.0/24")
 	fmt.Println("unit_test_network2 created ")
 
+	assert.Nil(t, gw2)
+
 	defer func() {
-		tester.Service.DeleteKeyPair(kp2.ID)
 		tester.Service.DeleteNetwork(network2.ID)
 	}()
 
@@ -324,13 +323,10 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	assert.Equal(t, nbAllNetworks+2, len(nets))
 	found := 0
 	for _, n := range nets {
-		if n.ID == network1.ID {
-			found++
-		} else if n.ID == network2.ID {
+		if n.ID == network1.ID || n.ID == network2.ID {
 			found++
 		} else {
 			continue
-			// t.Fail()
 		}
 	}
 	assert.Equal(t, 2, found)
@@ -339,7 +335,7 @@ func (tester *ClientTester) Networks(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, n1.CIDR, network1.CIDR)
 	assert.Equal(t, n1.ID, network1.ID)
-	//assert.Equal(t, n1.IPVersion, network1.IPVersion)
+	assert.Equal(t, n1.IPVersion, network1.IPVersion)
 	assert.Equal(t, n1.Name, network1.Name)
 }
 
@@ -351,16 +347,12 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 	nbHosts := len(hosts)
 
 	// TODO: handle kp delete
-	network, kp := tester.CreateNetwork(t, "unit_test_network_3", false, "1.1.4.0/24")
-	defer func() {
-		tester.Service.DeleteNetwork(network.ID)
-		tester.Service.DeleteKeyPair(kp.ID)
-	}()
+	network, gw := tester.CreateNetwork(t, "unit_test_network_3", false, "1.1.4.0/24")
+	defer tester.Service.DeleteNetwork(network.ID)
+	assert.Nil(t, gw)
 	host1, err := tester.CreateHost(t, "host1", network, true)
 	assert.NoError(t, err)
 	defer tester.Service.DeleteHost(host1.ID)
-
-	// time.Sleep(30 * time.Second)
 
 	// ssh, err := tester.Service.GetSSHConfig(host.ID)
 	// err = ssh.WaitServerReady(1 * time.Minute)
@@ -393,17 +385,6 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 	assert.NoError(t, err)
 	defer tester.Service.DeleteHost(host2.ID)
 
-	// // time.Sleep(30 * time.Second)
-	// ssh2, err := tester.Service.GetSSHConfig(host2.ID)
-	// err = ssh2.WaitServerReady(2 * time.Minute)
-	// assert.NoError(t, err)
-	// cmd2, err := ssh2.Command("whoami")
-	// assert.NoError(t, err)
-	// out2, err := cmd2.Output()
-	// assert.NoError(t, err)
-	// content2 := strings.Trim(string(out2), "\n")
-	// assert.Equal(t, model.DefaultUser, content2)
-
 	network, err = tester.Service.GetNetwork(network.ID)
 	assert.NoError(t, err)
 	hosts, err = tester.Service.ListHosts()
@@ -419,43 +400,21 @@ func (tester *ClientTester) Hosts(t *testing.T) {
 		} else {
 			fmt.Printf("Unknown (preexisting?) host %+v\n", v)
 			continue
-			// t.Fatalf("Unknown host %+v\n", v)
 		}
 	}
 	assert.Equal(t, 3, found)
 
-	host1_bis, err := tester.Service.GetHost(host1)
+	host1Bis, err := tester.Service.GetHost(host1)
 	assert.NoError(t, err)
-	// //VPL: PublicIPv? moved in Host Property NetworkV1.PublicIPv?...
-	// assert.Equal(t, host2.PublicIPv4, host.PublicIPv4)
-	// assert.Equal(t, host2.PublicIPv6, host.PublicIPv6)
-	// //VPL: GatewayID moved in Host Property NetworkV1.DefaultGatewayID...
-	//assert.Equal(t, host2.GatewayID, host.GatewayID)
-	assert.Equal(t, host1.ID, host1_bis.ID)
-	assert.Equal(t, host1.Name, host1_bis.Name)
-	assert.Equal(t, host1.PrivateKey, host1_bis.PrivateKey)
-	assert.Equal(t, host1.LastState, host1_bis.LastState)
-	assert.Equal(t, host1.GetPrivateIP(), host1.GetPrivateIP())
-	assert.Equal(t, host1.GetPublicIP(), host1_bis.GetPublicIP())
-	assert.Equal(t, host1.GetAccessIP(), host1_bis.GetAccessIP())
-	//VPL: Size moved in Host Extension SizingV1.AllocatedSize
-	//assert.Equal(t, host2.Size, host.Size)
-
-	//VPL: PrivateIPsVx moved in Host Extension NetworkV1.IPvxAddresses
-	// for _, addr := range v.PrivateIPsV4 {
-	// 	fmt.Println(addr)
-	// }
-	// for _, addr := range v.PrivateIPsV6 {
-	// 	fmt.Println(addr)
-	// }
+	assert.Equal(t, host1.ID, host1Bis.ID)
+	assert.Equal(t, host1.Name, host1Bis.Name)
 }
 
 // StartStopHost test
 func (tester *ClientTester) StartStopHost(t *testing.T) {
-	// TODO: handle kp delete
-	net, kp := tester.CreateNetwork(t, "unit_test_network_4", true, "1.1.5.0/24")
+	net, gw := tester.CreateNetwork(t, "unit_test_network_4", true, "1.1.5.0/24")
 	defer func() {
-		tester.Service.DeleteKeyPair(kp.ID)
+		tester.Service.DeleteGateway(gw.ID)
 		tester.Service.DeleteNetwork(net.ID)
 	}()
 	host, err := tester.Service.GetHostByName("gw-" + net.Name)
@@ -490,34 +449,36 @@ func (tester *ClientTester) Volume(t *testing.T) {
 	lst, err := tester.Service.ListVolumes()
 	nbVolumes := len(lst)
 
-	v, err := tester.Service.CreateVolume(model.VolumeRequest{
+	v1, err := tester.Service.CreateVolume(model.VolumeRequest{
 		Name:  "test_volume1",
-		Size:  100,
+		Size:  25,
 		Speed: VolumeSpeed.HDD,
 	})
-	defer tester.Service.DeleteVolume(v.ID)
 	assert.Nil(t, err)
-	assert.Equal(t, "test_volume1", v.Name)
-	assert.Equal(t, 100, v.Size)
-	assert.Equal(t, VolumeSpeed.HDD, v.Speed)
+	defer tester.Service.DeleteVolume(v1.ID)
 
-	tester.Service.WaitVolumeState(v.ID, VolumeState.AVAILABLE, 40*time.Second)
+	assert.Equal(t, "test_volume1", v1.Name)
+	assert.Equal(t, 25, v1.Size)
+	assert.Equal(t, VolumeSpeed.HDD, v1.Speed)
+
+	tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, 40*time.Second)
 	v2, err := tester.Service.CreateVolume(model.VolumeRequest{
 		Name:  "test_volume2",
-		Size:  100,
+		Size:  35,
 		Speed: VolumeSpeed.HDD,
 	})
-	defer tester.Service.DeleteVolume(v2.ID)
 	assert.Nil(t, err)
+	defer tester.Service.DeleteVolume(v2.ID)
+
 	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
 	lst, err = tester.Service.ListVolumes()
 	assert.Nil(t, err)
 	assert.Equal(t, nbVolumes+2, len(lst))
 	for _, vl := range lst {
-		if vl.ID == v.ID {
-			assert.Equal(t, v.Name, vl.Name)
-			assert.Equal(t, v.Size, vl.Size)
-			assert.Equal(t, v.Speed, vl.Speed)
+		if vl.ID == v1.ID {
+			assert.Equal(t, v1.Name, vl.Name)
+			assert.Equal(t, v1.Size, vl.Size)
+			assert.Equal(t, v1.Speed, vl.Speed)
 		} else if vl.ID == v2.ID {
 			assert.Equal(t, v2.Name, vl.Name)
 			assert.Equal(t, v2.Size, vl.Size)
@@ -532,73 +493,77 @@ func (tester *ClientTester) Volume(t *testing.T) {
 //VolumeAttachment test
 func (tester *ClientTester) VolumeAttachment(t *testing.T) {
 	// TODO: handle kp delete
-	net, kp := tester.CreateNetwork(t, "unit_test_network_5", true, "1.1.6.0/24")
+	net, gw := tester.CreateNetwork(t, "unit_test_network_5", true, "1.1.6.0/24")
 
-	defer tester.Service.DeleteKeyPair(kp.ID)
-	defer tester.Service.DeleteNetwork(net.ID)
-	host, err := tester.Service.GetHostByName("gw_" + net.Name)
+	defer func() {
+		tester.Service.DeleteGateway(gw.ID)
+		defer tester.Service.DeleteNetwork(net.ID)
+	}()
+
+	host, err := tester.Service.GetHostByName("gw-" + net.Name)
 	require.Nil(t, err)
 	require.NotNil(t, host)
 
 	defer tester.Service.DeleteHost(host.ID)
-	assert.NoError(t, err)
 
-	v, err := tester.Service.CreateVolume(model.VolumeRequest{
+	v1, err := tester.Service.CreateVolume(model.VolumeRequest{
 		Name:  "test_volume1",
-		Size:  100,
+		Size:  25,
 		Speed: VolumeSpeed.HDD,
 	})
-	defer tester.Service.DeleteVolume(v.ID)
 	assert.Nil(t, err)
+	defer tester.Service.DeleteVolume(v1.ID)
+	tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, 40*time.Second)
 
 	v2, err := tester.Service.CreateVolume(model.VolumeRequest{
 		Name:  "test_volume2",
-		Size:  100,
+		Size:  35,
 		Speed: VolumeSpeed.HDD,
 	})
-	defer tester.Service.DeleteVolume(v2.ID)
 	assert.Nil(t, err)
-	//defer clt.DeleteVolume(v.ID)
+	defer tester.Service.DeleteVolume(v2.ID)
 	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, 40*time.Second)
-	vaID, err := tester.Service.CreateVolumeAttachment(model.VolumeAttachmentRequest{
+
+	va1ID, err := tester.Service.CreateVolumeAttachment(model.VolumeAttachmentRequest{
 		Name:     "Attachment1",
 		HostID:   host.ID,
-		VolumeID: v.ID,
+		VolumeID: v1.ID,
 	})
-	defer tester.Service.DeleteVolumeAttachment(host.ID, vaID)
 	assert.Nil(t, err)
-	// assert.NotEmpty(t, va.Device)
+	assert.NotEmpty(t, va1ID)
+	defer tester.Service.DeleteVolumeAttachment(host.ID, va1ID)
+
 	va2ID, err := tester.Service.CreateVolumeAttachment(model.VolumeAttachmentRequest{
 		Name:     "Attachment2",
 		HostID:   host.ID,
 		VolumeID: v2.ID,
 	})
+	assert.Nil(t, err)
+	assert.NotEmpty(t, va2ID)
 	defer tester.Service.DeleteVolumeAttachment(host.ID, va2ID)
+
+	va1, err := tester.Service.GetVolumeAttachment(host.ID, v1.ID)
 	assert.Nil(t, err)
-	// assert.NotEmpty(t, va2.Device)
-	val, err := tester.Service.GetVolumeAttachment(host.ID, v.ID)
+
+	va2, err := tester.Service.GetVolumeAttachment(host.ID, v2.ID)
 	assert.Nil(t, err)
-	assert.Equal(t, vaID, val.ID)
-	// assert.Equal(t, va.Name, val.Name)
-	// assert.Equal(t, va.Device, val.Device)
-	// assert.Equal(t, va.ServerID, val.ServerID)
-	// assert.Equal(t, va.VolumeID, val.VolumeID)
-	assert.Nil(t, err)
+
 	lst, err := tester.Service.ListVolumeAttachments(host.ID)
+	assert.Nil(t, err)
 	assert.Equal(t, 2, len(lst))
 	for _, val := range lst {
-		if val.ID == vaID {
-			assert.Equal(t, vaID, val.ID)
-			// assert.Equal(t, va.Name, val.Name)
-			// assert.Equal(t, va.Device, val.Device)
-			// assert.Equal(t, va.ServerID, val.ServerID)
-			// assert.Equal(t, va.VolumeID, val.VolumeID)
+		if val.ID == va1ID {
+			assert.Equal(t, va1ID, val.ID)
+			assert.Equal(t, va1.Name, val.Name)
+			assert.Equal(t, va1.Device, val.Device)
+			assert.Equal(t, va1.ServerID, val.ServerID)
+			assert.Equal(t, va1.VolumeID, val.VolumeID)
 		} else if val.ID == va2ID {
 			assert.Equal(t, va2ID, val.ID)
-			// assert.Equal(t, va2.Name, val.Name)
-			// assert.Equal(t, va2.Device, val.Device)
-			// assert.Equal(t, va2.ServerID, val.ServerID)
-			// assert.Equal(t, va2.VolumeID, val.VolumeID)
+			assert.Equal(t, va2.Name, val.Name)
+			assert.Equal(t, va2.Device, val.Device)
+			assert.Equal(t, va2.ServerID, val.ServerID)
+			assert.Equal(t, va2.VolumeID, val.VolumeID)
 		} else {
 			t.Fail()
 		}

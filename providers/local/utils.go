@@ -19,7 +19,6 @@ package local
 import (
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -32,6 +31,7 @@ type VMInfo struct {
 // VMInfoWaiterStruct represents the golbal info waiter
 type VMInfoWaiterStruct struct {
 	listner     *net.Listener
+	port        int
 	chansByName map[string](chan VMInfo)
 	mutex       sync.Mutex
 }
@@ -47,6 +47,7 @@ func (iw *VMInfoWaiterStruct) Register(name string) chan VMInfo {
 	iw.mutex.Lock()
 	iw.chansByName[name] = channel
 	iw.mutex.Unlock()
+	fmt.Println("Registerd : ", name)
 
 	return channel
 }
@@ -63,17 +64,19 @@ func (iw *VMInfoWaiterStruct) deregister(name string) error {
 	if !found {
 		return fmt.Errorf("Nothing registered with the name %s", name)
 	}
+	fmt.Println("Deregisterd : ", name)
 	return nil
 }
 
 // GetInfoWaiter get the global var vmInfoWaiter and setup the listner if it is not set
-func GetInfoWaiter(port int) (*VMInfoWaiterStruct, error) {
+func GetInfoWaiter() (*VMInfoWaiterStruct, error) {
 	if vmInfoWaiter.listner == nil {
-		listner, err := net.Listen("tcp", ":"+strconv.Itoa(port))
+		listener, err := net.Listen("tcp", ":0")
 		if err != nil {
 			return nil, fmt.Errorf("Failed to open a tcp connection : %s", err.Error())
 		}
-		vmInfoWaiter.listner = &listner
+		vmInfoWaiter.port = listener.Addr().(*net.TCPAddr).Port
+		vmInfoWaiter.listner = &listener
 
 		go infoHandler()
 	}
@@ -87,6 +90,7 @@ func infoHandler() {
 		if err != nil {
 			panic(fmt.Sprintf("Info handler, Error accepting: %s", err.Error()))
 		}
+		fmt.Println("Info Handler launched : ", vmInfoWaiter.chansByName)
 
 		go func(net.Conn) {
 			defer func() {
@@ -104,12 +108,14 @@ func infoHandler() {
 
 			message := string(buffer[0:nbChars])
 			message = strings.Trim(message, "\n")
+			fmt.Println("Info readed : ", message)
 			splittedMessage := strings.Split(message, "|")
 			hostName := splittedMessage[0]
 			ip := splittedMessage[1]
 			info := VMInfo{
 				publicIP: ip,
 			}
+			fmt.Println("Infos : ", info)
 			vmInfoWaiter.mutex.Lock()
 			channel, found := vmInfoWaiter.chansByName[hostName]
 			vmInfoWaiter.mutex.Unlock()
@@ -121,6 +127,9 @@ func infoHandler() {
 			if err != nil {
 				panic(fmt.Sprintf("Info handler, Error deregistering: %s", err.Error()))
 			}
+			fmt.Printf("Goroutine done")
 		}(conn)
+
+		fmt.Printf("infoHanler done")
 	}
 }

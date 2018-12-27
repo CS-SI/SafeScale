@@ -46,8 +46,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-const port int = 59872
-
 //-------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
@@ -519,15 +517,15 @@ func (client *Client) getHostAndDomainFromRef(ref string) (*model.Host, *libvirt
 	domain, err := client.LibvirtService.LookupDomainByUUIDString(ref)
 	if err != nil {
 		domain, err = client.LibvirtService.LookupDomainByName(ref)
-		re, err2 := regexp.Compile("[0-9]+")
-		if err2 != nil {
-			return nil, nil, fmt.Errorf(fmt.Sprintf("Failed to fetch domain from ref : %s", err.Error()))
-		}
-		errCode, _ := strconv.Atoi(re.FindString(err.Error()))
-		if errCode == 42 {
-			return nil, nil, model.ResourceNotFoundError("host", ref)
-		}
 		if err != nil {
+			re, err2 := regexp.Compile("[0-9]+")
+			if err2 != nil {
+				return nil, nil, fmt.Errorf(fmt.Sprintf("Failed to fetch domain from ref : %s", err.Error()))
+			}
+			errCode, _ := strconv.Atoi(re.FindString(err.Error()))
+			if errCode == 42 {
+				return nil, nil, model.ResourceNotFoundError("host", ref)
+			}
 			return nil, nil, fmt.Errorf(fmt.Sprintf("Failed to fetch domain from ref : %s", err.Error()))
 		}
 	}
@@ -545,9 +543,7 @@ func (client *Client) complementHost(host *model.Host, newHost *model.Host) erro
 		return fmt.Errorf("host and newHost have to been set")
 	}
 
-	if host.ID == "" {
-		host.ID = newHost.ID
-	}
+	host.ID = newHost.ID
 	if host.Name == "" {
 		host.Name = newHost.Name
 	}
@@ -685,6 +681,11 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 			}
 		}()
 
+		infoWaiter, err := GetInfoWaiter()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get info waiter : %s", err.Error())
+		}
+
 		_, err = f.WriteString(fmt.Sprintf(
 			`#!/bin/bash
 echo Started at $(date) >> /root/log.txt
@@ -693,7 +694,7 @@ LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
 echo -n "%s|$LANIP" | netcat %s %d &>> /root/log.txt
 exit 0
 `,
-			hostName, ip, port))
+			hostName, ip, infoWaiter.port))
 		if err != nil {
 			return nil, fmt.Errorf("Failed to edit userdata file : %s", err.Error())
 		}
@@ -709,13 +710,7 @@ exit 0
 		lanIf := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 		networksCommandString += fmt.Sprintf(" --network type=direct,source=%s,source_mode=bridge", lanIf)
 		firstbootCommandString += fmt.Sprintf(" --firstboot %s && rm %s", infoPublisherFileName, infoPublisherFileName)
-	}
 
-	if publicIP {
-		infoWaiter, err := GetInfoWaiter(port)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get info waiter : %s", err.Error())
-		}
 		vmInfoChannel = infoWaiter.Register(hostName)
 	}
 
