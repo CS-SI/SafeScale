@@ -1,4 +1,4 @@
-package main
+package integration_tests
 
 import (
 	"errors"
@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+//HostInfo ...
 type HostInfo struct {
 	ID         string
 	Name       string
@@ -20,7 +21,8 @@ type HostInfo struct {
 	PrivateKey string
 }
 
-func isBrokerdLaunched() (bool, error) {
+//IsBrokerdLaunched ...
+func IsBrokerdLaunched() (bool, error) {
 	cmd := "ps -ef | grep brokerd | grep -v grep"
 	out, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {
@@ -29,7 +31,8 @@ func isBrokerdLaunched() (bool, error) {
 	return strings.Contains(string(out), "brokerd"), nil
 }
 
-func canBeRun(command string) (bool, error) {
+//CanBeRun ...
+func CanBeRun(command string) (bool, error) {
 	cmd := "which " + command
 	out, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {
@@ -38,7 +41,8 @@ func canBeRun(command string) (bool, error) {
 	return strings.Contains(string(out), command), nil
 }
 
-func getOutput(command string) (string, error) {
+//GetOutput ...
+func GetOutput(command string) (string, error) {
 	out, err := exec.Command("bash", "-c", command).CombinedOutput()
 	if err != nil {
 		return string(out), err
@@ -51,21 +55,23 @@ func getOutput(command string) (string, error) {
 	return string(out), nil
 }
 
-func runOnlyInIntegrationTest(key string) {
+//RunOnlyInIntegrationTest ...
+func RunOnlyInIntegrationTest(key string) {
 	if tenant_override := os.Getenv(key); tenant_override == "" {
 		panic("This only runs as an integration test")
 	}
 }
 
-func tearDown() {
+//TearDown ...
+func TearDown() {
 	log.Printf("Starting cleanup...")
-	_, _ = getOutput("broker volume detach volumetest easyvm")
-	_, _ = getOutput("broker volume delete volumetest")
-	_, _ = getOutput("broker host delete easyvm")
-	_, _ = getOutput("broker host delete complexvm")
-	_, _ = getOutput("broker nas delete bnastest")
-	_, _ = getOutput("broker host delete easyvm")
-	_, _ = getOutput("broker host delete complexvm")
-	_, _ = getOutput("broker network delete crazy")
+	_, _ = GetOutput("broker volume detach volumetest easyvm")
+	_, _ = GetOutput("broker volume delete volumetest")
+	_, _ = GetOutput("broker host delete easyvm")
+	_, _ = GetOutput("broker host delete complexvm")
+	_, _ = GetOutput("broker nas delete bnastest")
+	_, _ = GetOutput("broker host delete easyvm")
+	_, _ = GetOutput("broker host delete complexvm")
+	_, _ = GetOutput("broker network delete crazy")
 	log.Printf("Finishing cleanup...")
 }
