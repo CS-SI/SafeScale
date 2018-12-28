@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
@@ -177,7 +177,7 @@ func (svc *ShareHandler) Create(shareName, hostName, path string) (*propsv1.Host
 // Delete a share from host
 func (svc *ShareHandler) Delete(name string) error {
 	// Retrieve info about the share
-	server, share, _, err := svc.Inspect(name)
+	server, share, _, err := svc.ForceInspect(name)
 	if err != nil {
 		return throwErr(err)
 	}
