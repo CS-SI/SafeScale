@@ -90,7 +90,6 @@ func infoHandler() {
 		if err != nil {
 			panic(fmt.Sprintf("Info handler, Error accepting: %s", err.Error()))
 		}
-		fmt.Println("Info Handler launched : ", vmInfoWaiter.chansByName)
 
 		go func(net.Conn) {
 			defer func() {
@@ -127,9 +126,6 @@ func infoHandler() {
 			if err != nil {
 				panic(fmt.Sprintf("Info handler, Error deregistering: %s", err.Error()))
 			}
-			fmt.Printf("Goroutine done")
 		}(conn)
-
-		fmt.Printf("infoHanler done")
 	}
 }
