@@ -8,13 +8,13 @@ import (
 )
 
 func Test_Basic(t *testing.T) {
-	integration_tests.Basic(t, Providers.OVH)
+	integration_tests.Basic(t, Providers.LOCAL)
 }
 
 func Test_ReadyToSsh(t *testing.T) {
-	integration_tests.ReadyToSsh(t, Providers.OVH)
+	integration_tests.ReadyToSsh(t, Providers.LOCAL)
 }
 
 func Test_NasError(t *testing.T) {
-	integration_tests.NasError(t, Providers.OVH)
+	integration_tests.NasError(t, Providers.LOCAL)
 }
