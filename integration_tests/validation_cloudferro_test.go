@@ -1,107 +1,108 @@
-package main
+package integration_tests
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"log"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_Nas_Error(t *testing.T) {
-	runOnlyInIntegrationTest("TEST_CLOUDFERRO")
+	RunOnlyInIntegrationTest("TEST_CLOUDFERRO")
 
 	ferroTearDown()
 	defer ferroTearDown()
 
-	brokerd_launched, err := isBrokerdLaunched()
+	brokerd_launched, err := IsBrokerdLaunched()
 	if !brokerd_launched {
 		fmt.Println("This requires that you launch brokerd in background and set the tenant")
 		require.True(t, brokerd_launched)
 	}
 	require.Nil(t, err)
 
-	in_path, err := canBeRun("broker")
+	in_path, err := CanBeRun("broker")
 	require.Nil(t, err)
 
 	require.True(t, brokerd_launched)
 	require.True(t, in_path)
 
-	out, err := getOutput("broker tenant list")
+	out, err := GetOutput("broker tenant list")
 	require.Nil(t, err)
 	require.True(t, len(out) > 0)
 
-	out, err = getOutput("broker tenant get")
+	out, err = GetOutput("broker tenant get")
 	if err != nil {
 		fmt.Println("This requires that you set the right tenant before launching the tests")
 		require.Nil(t, err)
 	}
 	require.True(t, len(out) > 0)
 
-	out, err = getOutput("broker network list")
+	out, err = GetOutput("broker network list")
 	require.Nil(t, err)
 
 	fmt.Println("Creating network ferronet...")
 
-	out, err = getOutput("broker network create ferronet")
+	out, err = GetOutput("broker network create ferronet")
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM ferrohost...")
 
-	out, err = getOutput("broker host create ferrohost --public --net ferronet")
+	out, err = GetOutput("broker host create ferrohost --public --net ferronet")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host inspect ferrohost")
+	out, err = GetOutput("broker host inspect ferrohost")
 	require.Nil(t, err)
 
 	fmt.Println("Creating Nas ferronas...")
 
-	out, err = getOutput("broker nas create ferronas ferrohost")
+	out, err = GetOutput("broker nas create ferronas ferrohost")
 	require.Nil(t, err)
 
 	fmt.Println("Creating Volume volumetest...")
 
-	out, err = getOutput("broker volume create --speed SSD volumetest")
+	out, err = GetOutput("broker volume create --speed SSD volumetest")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker volume list")
+	out, err = GetOutput("broker volume list")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "volumetest"))
 
-	out, err = getOutput("broker volume  attach volumetest ferrohost")
+	out, err = GetOutput("broker volume  attach volumetest ferrohost")
 	require.Nil(t, err)
 
 	time.Sleep(5 * time.Second)
 
-	out, err = getOutput("broker volume delete volumetest")
+	out, err = GetOutput("broker volume delete volumetest")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "still attached"))
 
 	time.Sleep(5 * time.Second)
 
-	out, err = getOutput("broker volume  detach volumetest ferrohost")
+	out, err = GetOutput("broker volume  detach volumetest ferrohost")
 	require.Nil(t, err)
 
 	time.Sleep(5 * time.Second)
 
-	out, err = getOutput("broker volume delete volumetest")
+	out, err = GetOutput("broker volume delete volumetest")
 	require.Nil(t, err)
 
 	time.Sleep(5 * time.Second)
 
-	out, err = getOutput("broker volume list")
+	out, err = GetOutput("broker volume list")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "null"))
 
-	out, err = getOutput("broker ssh run ferrohost -c \"uptime\"")
+	out, err = GetOutput("broker ssh run ferrohost -c \"uptime\"")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 
-	out, err = getOutput("broker nas delete ferronas ")
+	out, err = GetOutput("broker nas delete ferronas ")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host delete ferrohost")
+	out, err = GetOutput("broker host delete ferrohost")
 	if err != nil {
 		fmt.Println(err.Error())
 		fmt.Println(out)
@@ -109,147 +110,146 @@ func Test_Nas_Error(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
-	out, err = getOutput("broker network delete ferronet")
+	out, err = GetOutput("broker network delete ferronet")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 }
 
 func Test_Until_Volume_Error(t *testing.T) {
-	runOnlyInIntegrationTest("TEST_CLOUDFERRO")
+	RunOnlyInIntegrationTest("TEST_CLOUDFERRO")
 
 	ferroTearDown()
 	// defer ferroTearDown()
 
-	brokerd_launched, err := isBrokerdLaunched()
+	brokerd_launched, err := IsBrokerdLaunched()
 	if !brokerd_launched {
 		fmt.Println("This requires that you launch brokerd in background and set the tenant")
 		require.True(t, brokerd_launched)
 	}
 	require.Nil(t, err)
 
-	in_path, err := canBeRun("broker")
+	in_path, err := CanBeRun("broker")
 	require.Nil(t, err)
 
 	require.True(t, brokerd_launched)
 	require.True(t, in_path)
 
-	out, err := getOutput("broker tenant list")
+	out, err := GetOutput("broker tenant list")
 	require.Nil(t, err)
 	require.True(t, len(out) > 0)
 
-	out, err = getOutput("broker tenant get")
+	out, err = GetOutput("broker tenant get")
 	if err != nil {
 		fmt.Println("This requires that you set the right tenant before launching the tests")
 		require.Nil(t, err)
 	}
 	require.True(t, len(out) > 0)
 
-	out, err = getOutput("broker network list")
+	out, err = GetOutput("broker network list")
 	require.Nil(t, err)
 
 	fmt.Println("Creating network ferronet...")
 
-	out, err = getOutput("broker network create ferronet")
+	out, err = GetOutput("broker network create ferronet")
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM ferrohost...")
 
-	out, err = getOutput("broker host create ferrohost --public --net ferronet")
+	out, err = GetOutput("broker host create ferrohost --public --net ferronet")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host inspect ferrohost")
+	out, err = GetOutput("broker host inspect ferrohost")
 	require.Nil(t, err)
 
 	fmt.Println("Creating Nas ferronas...")
 
-	out, err = getOutput("broker nas create ferronas ferrohost")
+	out, err = GetOutput("broker nas create ferronas ferrohost")
 	require.Nil(t, err)
 
 	fmt.Println("Creating Volume volumetest...")
 
-	out, err = getOutput("broker volume create volumetest")
+	out, err = GetOutput("broker volume create volumetest")
 	require.Nil(t, err)
 
 	time.Sleep(5 * time.Second)
 
-	out, err = getOutput("broker volume  attach volumetest ferrohost")
+	out, err = GetOutput("broker volume  attach volumetest ferrohost")
 	require.Nil(t, err)
 
 	time.Sleep(5 * time.Second)
 
-	out, err = getOutput("broker volume delete volumetest")
+	out, err = GetOutput("broker volume delete volumetest")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "still attached"))
 }
 
-
 func Test_Ready_To_Ssh(t *testing.T) {
-	runOnlyInIntegrationTest("TEST_CLOUDFERRO")
+	RunOnlyInIntegrationTest("TEST_CLOUDFERRO")
 
 	ferroTearDown()
 
-	brokerd_launched, err := isBrokerdLaunched()
+	brokerd_launched, err := IsBrokerdLaunched()
 	if !brokerd_launched {
 		fmt.Println("This requires that you launch brokerd in background and set the tenant")
 		require.True(t, brokerd_launched)
 	}
 	require.Nil(t, err)
 
-	in_path, err := canBeRun("broker")
+	in_path, err := CanBeRun("broker")
 	require.Nil(t, err)
 
 	require.True(t, brokerd_launched)
 	require.True(t, in_path)
 
-	out, err := getOutput("broker tenant list")
+	out, err := GetOutput("broker tenant list")
 	require.Nil(t, err)
 	require.True(t, len(out) > 0)
 
-	out, err = getOutput("broker tenant get")
+	out, err = GetOutput("broker tenant get")
 	if err != nil {
 		fmt.Println("This requires that you set the right tenant before launching the tests")
 		require.Nil(t, err)
 	}
 	require.True(t, len(out) > 0)
 
-	out, err = getOutput("broker network list")
+	out, err = GetOutput("broker network list")
 	require.Nil(t, err)
 
 	fmt.Println("Creating network ferronet...")
 
-	out, err = getOutput("broker network create ferronet")
+	out, err = GetOutput("broker network create ferronet")
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM ferrohost...")
 
-	out, err = getOutput("broker host create ferrohost --public --net ferronet")
+	out, err = GetOutput("broker host create ferrohost --public --net ferronet")
 	require.Nil(t, err)
 
-	out, err = getOutput("broker host inspect ferrohost")
+	out, err = GetOutput("broker host inspect ferrohost")
 	require.Nil(t, err)
 
 	fmt.Println(out)
 }
 
 func Test_Nas_Cleanup(t *testing.T) {
-	runOnlyInIntegrationTest("TEST_CLOUDFERRO")
+	RunOnlyInIntegrationTest("TEST_CLOUDFERRO")
 
 	ferroTearDown()
 }
 
 func ferroTearDown() {
-	runOnlyInIntegrationTest("TEST_CLOUDFERRO")
+	RunOnlyInIntegrationTest("TEST_CLOUDFERRO")
 
 	log.Printf("Starting cleanup...")
-	_, _ = getOutput("broker nas delete ferronas")
+	_, _ = GetOutput("broker nas delete ferronas")
 	time.Sleep(5 * time.Second)
-	_, _ = getOutput("broker volume detach volumetest ferrohost")
+	_, _ = GetOutput("broker volume detach volumetest ferrohost")
 	time.Sleep(5 * time.Second)
-	_, _ = getOutput("broker volume delete volumetest")
+	_, _ = GetOutput("broker volume delete volumetest")
 	time.Sleep(5 * time.Second)
-	_, _ = getOutput("broker host delete ferrohost")
+	_, _ = GetOutput("broker host delete ferrohost")
 	time.Sleep(5 * time.Second)
-	_, _ = getOutput("broker network delete ferronet")
+	_, _ = GetOutput("broker network delete ferronet")
 	time.Sleep(5 * time.Second)
 	log.Printf("Finishing cleanup...")
 }
