@@ -326,6 +326,12 @@ func (svc *HostHandler) Create(
 
 	// Updates property propsv1.HostSizing
 	hostSizingV1 := propsv1.NewHostSizing()
+	if host == nil {
+		return nil, throwErrf("unexpected error creating host instance: host is nil !")
+	}
+	if host.Properties == nil {
+		return nil, throwErrf("error populating host properties: host.Properties is nil !")
+	}
 	err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
 	if err != nil {
 		return nil, infraErr(err)
