@@ -60,7 +60,7 @@ func getClient() (*openstack.Client, error) {
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name))
 		}
-		client = service.ClientAPI(*openstack.Client)
+		client = service.ClientAPI.(*openstack.Client)
 
 	}
 	return client, nil
