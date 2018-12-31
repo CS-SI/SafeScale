@@ -18,3 +18,23 @@ func Test_ReadyToSsh(t *testing.T) {
 func Test_NasError(t *testing.T) {
 	integration_tests.NasError(t, Providers.FLEXIBLEENGINE)
 }
+
+func Test_VolumeError(t *testing.T) {
+	integration_tests.VolumeError(t, Providers.FLEXIBLEENGINE)
+}
+
+func Test_StopStart(t *testing.T) {
+	integration_tests.StopStart(t, Providers.FLEXIBLEENGINE)
+}
+
+func Test_DeleteVolumeMounted(t *testing.T) {
+	integration_tests.DeleteVolumeMounted(t, Providers.FLEXIBLEENGINE)
+}
+
+func Test_UntilNas(t *testing.T) {
+	integration_tests.UntilNas(t, Providers.FLEXIBLEENGINE)
+}
+
+func Test_UntilVolume(t *testing.T) {
+	integration_tests.UntilVolume(t, Providers.FLEXIBLEENGINE)
+}
