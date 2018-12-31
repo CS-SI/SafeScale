@@ -3,6 +3,7 @@ package integration_tests
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 	"time"
@@ -79,8 +80,8 @@ func Setup(t *testing.T, provider Providers.Enum) {
 }
 
 func Basic(t *testing.T, provider Providers.Enum) {
-	TearDown()
-	defer TearDown()
+	tearDown()
+	defer tearDown()
 
 	Setup(t, provider)
 
@@ -251,8 +252,8 @@ func Basic(t *testing.T, provider Providers.Enum) {
 }
 
 func ReadyToSsh(t *testing.T, provider Providers.Enum) {
-	TearDown()
-	defer TearDown()
+	tearDown()
+	defer tearDown()
 
 	Setup(t, provider)
 
@@ -276,8 +277,8 @@ func ReadyToSsh(t *testing.T, provider Providers.Enum) {
 }
 
 func NasError(t *testing.T, provider Providers.Enum) {
-	TearDown()
-	defer TearDown()
+	tearDown()
+	defer tearDown()
 
 	Setup(t, provider)
 
@@ -357,8 +358,8 @@ func NasError(t *testing.T, provider Providers.Enum) {
 }
 
 func VolumeError(t *testing.T, provider Providers.Enum) {
-	TearDown()
-	defer TearDown()
+	tearDown()
+	defer tearDown()
 
 	Setup(t, provider)
 
@@ -401,8 +402,8 @@ func VolumeError(t *testing.T, provider Providers.Enum) {
 }
 
 func StopStart(t *testing.T, provider Providers.Enum) {
-	TearDown()
-	defer TearDown()
+	tearDown()
+	defer tearDown()
 
 	Setup(t, provider)
 
@@ -442,8 +443,8 @@ func StopStart(t *testing.T, provider Providers.Enum) {
 }
 
 func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
-	TearDown()
-	defer TearDown()
+	tearDown()
+	defer tearDown()
 
 	Setup(t, provider)
 
@@ -550,8 +551,8 @@ func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
 }
 
 func UntilNas(t *testing.T, provider Providers.Enum) {
-	TearDown()
-	defer TearDown()
+	tearDown()
+	defer tearDown()
 
 	Setup(t, provider)
 
@@ -601,8 +602,8 @@ func UntilNas(t *testing.T, provider Providers.Enum) {
 }
 
 func UntilVolume(t *testing.T, provider Providers.Enum) {
-	TearDown()
-	defer TearDown()
+	tearDown()
+	defer tearDown()
 
 	Setup(t, provider)
 
@@ -654,4 +655,17 @@ func UntilVolume(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("broker volume list")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "volumetest"))
+}
+
+func tearDown() {
+	log.Printf("Starting cleanup...")
+	_, _ = GetOutput("broker volume detach volumetest easyvm")
+	_, _ = GetOutput("broker volume delete volumetest")
+	_, _ = GetOutput("broker host delete easyvm")
+	_, _ = GetOutput("broker host delete complexvm")
+	_, _ = GetOutput("broker nas delete bnastest")
+	_, _ = GetOutput("broker host delete easyvm")
+	_, _ = GetOutput("broker host delete complexvm")
+	_, _ = GetOutput("broker network delete crazy")
+	log.Printf("Finishing cleanup...")
 }

@@ -2,7 +2,6 @@ package integration_tests
 
 import (
 	"errors"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -60,18 +59,4 @@ func RunOnlyInIntegrationTest(key string) {
 	if tenant_override := os.Getenv(key); tenant_override == "" {
 		panic("This only runs as an integration test")
 	}
-}
-
-//TearDown ...
-func TearDown() {
-	log.Printf("Starting cleanup...")
-	_, _ = GetOutput("broker volume detach volumetest easyvm")
-	_, _ = GetOutput("broker volume delete volumetest")
-	_, _ = GetOutput("broker host delete easyvm")
-	_, _ = GetOutput("broker host delete complexvm")
-	_, _ = GetOutput("broker nas delete bnastest")
-	_, _ = GetOutput("broker host delete easyvm")
-	_, _ = GetOutput("broker host delete complexvm")
-	_, _ = GetOutput("broker network delete crazy")
-	log.Printf("Finishing cleanup...")
 }

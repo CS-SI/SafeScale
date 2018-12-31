@@ -8,9 +8,9 @@ import (
 )
 
 func Test_Docker(t *testing.T) {
-	integration_tests.Docker(t, Providers.OVH)
+	integration_tests.Docker(t, Providers.FLEXIBLEENGINE)
 }
 
 func Test_DockerNotGateway(t *testing.T) {
-	integration_tests.DockerNotGateway(t, Providers.OVH)
+	integration_tests.DockerNotGateway(t, Providers.FLEXIBLEENGINE)
 }
