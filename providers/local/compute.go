@@ -301,6 +301,38 @@ func getImagePathFromID(client *Client, id string) (string, error) {
 	return "", fmt.Errorf("Image with id=%s not found", id)
 }
 
+// getImagePathFromID retrieve the disk with root partition of an image from this image ID
+func getDiskFromID(client *Client, id string) (string, error) {
+	jsonFile, err := os.Open(client.Config.ImagesJSONPath)
+	if err != nil {
+		return "", fmt.Errorf("Failed to open %s : %s", client.Config.ImagesJSONPath, err.Error())
+	}
+	defer func() {
+		if err := jsonFile.Close(); err != nil {
+			fmt.Println("Failed to close image file")
+		}
+	}()
+
+	byteValue, err := ioutil.ReadAll(jsonFile)
+	if err != nil {
+		return "", fmt.Errorf("Failed to read %s : %s", client.Config.ImagesJSONPath, err.Error())
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
+		return "", fmt.Errorf("Failed to unmarshal jsonFile %s : %s", client.Config.ImagesJSONPath, err.Error())
+	}
+
+	imagesJSON := result["images"].([]interface{})
+	for _, imageJSON := range imagesJSON {
+		if imageID, _ := imageJSON.(map[string]interface{})["imageID"]; imageID == id {
+			return imageJSON.(map[string]interface{})["disk"].(string), nil
+		}
+	}
+
+	return "", fmt.Errorf("Image with id=%s not found", id)
+}
+
 func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) ([]*libvirtxml.StorageVolume, error) {
 	volumeDescriptions := []*libvirtxml.StorageVolume{}
 	domainVolumePaths := []string{}
@@ -638,7 +670,11 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	}
 	imagePath, err := getImagePathFromID(client, imageID)
 	if err != nil {
-		return nil, fmt.Errorf("GetImageFromPath failled %s: ", err.Error())
+		return nil, fmt.Errorf("GetImagePathFromID failled %s: ", err.Error())
+	}
+	imageDisk, err := getDiskFromID(client, imageID)
+	if err != nil {
+		return nil, fmt.Errorf("GetDiskFromID failled %s: ", err.Error())
 	}
 
 	userData, err := userdata.Prepare(client, request, keyPair, networks[0].CIDR)
@@ -688,13 +724,10 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 
 		_, err = f.WriteString(fmt.Sprintf(
 			`#!/bin/bash
-echo Started at $(date) >> /root/log.txt
-apt install -y netcat &>> /root/log.txt
-LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}') &>> /root/log.txt
-echo -n "%s|$LANIP" | netcat %s %d &>> /root/log.txt
+LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
+echo -n "%s|$LANIP" > /dev/tcp/%s/%d
 exit 0
-`,
-			hostName, ip, infoWaiter.port))
+`, hostName, ip, infoWaiter.port))
 		if err != nil {
 			return nil, fmt.Errorf("Failed to edit userdata file : %s", err.Error())
 		}
@@ -720,7 +753,7 @@ exit 0
 	// TODO use libvirt-go functions not bash commands
 	commandSetup := fmt.Sprintf("IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"", imagePath, client.Config.LibvirtStorage, resourceName)
 	commandCopy := fmt.Sprintf("cd $LIBVIRT_STORAGE && cp $IMAGE_PATH . && chmod 666 $IMAGE")
-	commandResize := fmt.Sprintf("truncate $VM_IMAGE -s %dG && virt-resize --expand /dev/sda1 $IMAGE $VM_IMAGE && rm $IMAGE", template.DiskSize)
+	commandResize := fmt.Sprintf("truncate $VM_IMAGE -s %dG && virt-resize --expand %s $IMAGE $VM_IMAGE && rm $IMAGE", template.DiskSize, imageDisk)
 	commandSysprep := fmt.Sprintf("virt-sysprep -a $VM_IMAGE --hostname %s --operations all,-ssh-hostkeys --firstboot %s %s && rm %s", hostName, userdataFileName, firstbootCommandString, userdataFileName)
 	commandVirtInstall := fmt.Sprintf("virt-install --noautoconsole	--name=%s --vcpus=%d --memory=%d --import --disk=$VM_IMAGE %s", resourceName, template.Cores, int(template.RAMSize*1024), networksCommandString)
 	command := strings.Join([]string{commandSetup, commandCopy, commandResize, commandSysprep, commandVirtInstall}, " && ")
