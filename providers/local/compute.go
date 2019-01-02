@@ -715,6 +715,7 @@ exit 0
 	}
 
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
+	// The main partition of the disk image should be /dev/sda1
 	// TODO gpu is ignored
 	// TODO use libvirt-go functions not bash commands
 	commandSetup := fmt.Sprintf("IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"", imagePath, client.Config.LibvirtStorage, resourceName)

@@ -23,6 +23,7 @@ One section 'tenants' with specific authentication parameters for each tenant. S
  - `client` can be one of the available provider's drivers in
    - cloudwatt
    - cloudferro
+   - local
    - flexibleengine
    - opentelekom
    - ovh
