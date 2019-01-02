@@ -846,6 +846,13 @@ func (client *Client) DeleteHost(id string) error {
 		return fmt.Errorf(fmt.Sprintf("Failed to get the volumes from the domain : %s", err.Error()))
 	}
 
+	isActive, err := domain.IsActive()
+	if err != nil {
+		return fmt.Errorf(fmt.Sprintf("Failed to know if the domain is active : %s", err.Error()))
+	} else if !isActive {
+		client.StartHost(id)
+	}
+
 	err = domain.Destroy()
 	if err != nil {
 		return fmt.Errorf(fmt.Sprintf("Failed to destroy the domain : %s", err.Error()))
