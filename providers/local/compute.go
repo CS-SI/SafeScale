@@ -872,28 +872,31 @@ func (client *Client) GetHostByName(name string) (*model.Host, error) {
 func (client *Client) DeleteHost(id string) error {
 	_, domain, err := client.getHostAndDomainFromRef(id)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("getHostAndDomainFromRef failed : %s", err.Error()))
+		return fmt.Errorf("getHostAndDomainFromRef failed : %s", err.Error())
 	}
 
 	volumes, err := getVolumesFromDomain(domain, client.LibvirtService)
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Failed to get the volumes from the domain : %s", err.Error()))
+		return fmt.Errorf("Failed to get the volumes from the domain : %s", err.Error())
 	}
 
 	isActive, err := domain.IsActive()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Failed to know if the domain is active : %s", err.Error()))
+		return fmt.Errorf("Failed to know if the domain is active : %s", err.Error())
 	} else if !isActive {
-		client.StartHost(id)
+		err := client.StartHost(id)
+		if err != nil {
+			return fmt.Errorf("Failed to start the domain : %s", err.Error())
+		}
 	}
 
 	err = domain.Destroy()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Failed to destroy the domain : %s", err.Error()))
+		return fmt.Errorf("Failed to destroy the domain : %s", err.Error())
 	}
 	err = domain.Undefine()
 	if err != nil {
-		return fmt.Errorf(fmt.Sprintf("Failed to undefine the domain : %s", err.Error()))
+		return fmt.Errorf("Failed to undefine the domain : %s", err.Error())
 	}
 
 	for _, volume := range volumes {
