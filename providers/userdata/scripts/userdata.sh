@@ -200,6 +200,15 @@ DEVICE=$IF
 BOOTPROTO=dhcp
 ONBOOT=yes
 EOF
+            {{- if .DNSServers }}
+                i=1
+                {{- range .DNSServers }}
+                    echo "DNS$i={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-$IF 
+                    i=$((i+1))
+                {{- end }}
+            {{- else }}
+                echo "DNS1=1.1.1.1"
+            {{- end }}
         fi
     done
     # Disable resolv.conf by dhcp
@@ -493,8 +502,9 @@ case $LINUX_KIND in
         {{- end }}
         {{- if .IsGateway }}
         configure_as_gateway
-        {{- else if .AddGateway }}
+        {{- end }}
         systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_resolvconf
+        {{- if .AddGateway }}
         configure_gateway
         {{- end }}
         ;;
@@ -507,7 +517,6 @@ case $LINUX_KIND in
         {{- if .IsGateway }}
         configure_as_gateway
         {{- end }}
-        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_legacy
         {{- if .AddGateway }}
         configure_gateway_redhat
         {{- end }}
