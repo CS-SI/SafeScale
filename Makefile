@@ -92,10 +92,10 @@ INFO_STRING  = "[INFO]"
 ERROR_STRING = "[ERROR]"
 WARN_STRING  = "[WARNING]"
 
-all: begin ground getdevdeps ensure generate providers broker system deploy perform scanner utils vet err
+all: begin ground getdevdeps providers broker system deploy perform scanner utils vet err
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
-common: begin ground getdevdeps ensure generate
+common: begin ground getdevdeps
 
 begin:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
