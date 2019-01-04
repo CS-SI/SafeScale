@@ -3,7 +3,6 @@ package integration_tests
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"testing"
 	"time"
@@ -80,143 +79,144 @@ func Setup(t *testing.T, provider Providers.Enum) {
 }
 
 func Basic(t *testing.T, provider Providers.Enum) {
-	tearDown()
-	defer tearDown()
-
 	Setup(t, provider)
+
+	names := GetNames("BasicTest", 0, 1, 1, 2, 1)
+	names.TearDown()
+	defer names.TearDown()
 
 	out, err := GetOutput("broker network list")
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	fmt.Println("Creating network crazy...")
+	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	fmt.Println(out)
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
-	fmt.Println("Creating VM easyVM...")
+	fmt.Println("Creating VM " + names.Hosts[0])
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	fmt.Println(out)
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
-	out, err = GetOutput("broker host inspect easyvm")
+	out, err = GetOutput("broker host inspect " + names.Hosts[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	easyvm := HostInfo{}
-	json.Unmarshal([]byte(out), &easyvm)
+	host0 := HostInfo{}
+	json.Unmarshal([]byte(out), &host0)
 
-	fmt.Println("Creating VM complexvm...")
+	fmt.Println("Creating VM ", names.Hosts[1])
 
-	out, err = GetOutput("broker host create complexvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host create complexvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
 	fmt.Println(out)
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
-	out, err = GetOutput("broker nas list")
+	out, err = GetOutput("broker share list")
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	fmt.Println("Creating NAS bnastest...")
+	fmt.Println("Creating Share " + names.Shares[0])
 
-	out, err = GetOutput("broker nas  create bnastest easyvm")
+	out, err = GetOutput("broker share create " + names.Shares[0] + " " + names.Hosts[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker nas  mount bnastest complexvm")
+	out, err = GetOutput("broker share mount " + names.Shares[0] + " " + names.Hosts[1])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker nas list")
+	out, err = GetOutput("broker share list")
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "bnastest"))
+	require.True(t, strings.Contains(out, names.Shares[0]))
 
-	out, err = GetOutput("broker nas inspect bnastest")
-	fmt.Println(out)
-	require.Nil(t, err)
-
-	require.True(t, strings.Contains(out, "bnastest"))
-	require.True(t, strings.Contains(out, "easyvm"))
-	require.True(t, strings.Contains(out, "complexvm"))
-
-	out, err = GetOutput("broker nas  umount bnastest complexvm")
+	out, err = GetOutput("broker share inspect " + names.Shares[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker nas inspect bnastest")
+	require.True(t, strings.Contains(out, names.Shares[0]))
+	require.True(t, strings.Contains(out, names.Hosts[0]))
+	require.True(t, strings.Contains(out, names.Hosts[1]))
+
+	out, err = GetOutput("broker share umount " + names.Shares[0] + " " + names.Hosts[1])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	require.True(t, strings.Contains(out, "bnastest"))
-	require.True(t, strings.Contains(out, "easyvm"))
-	require.False(t, strings.Contains(out, "complexvm"))
-
-	out, err = GetOutput("broker nas delete bnastest ")
+	out, err = GetOutput("broker share inspect " + names.Shares[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker nas list")
+	require.True(t, strings.Contains(out, names.Shares[0]))
+	require.True(t, strings.Contains(out, names.Hosts[0]))
+	require.False(t, strings.Contains(out, names.Hosts[1]))
+
+	out, err = GetOutput("broker share delete " + names.Shares[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.False(t, strings.Contains(out, "bnastest"))
+
+	out, err = GetOutput("broker share list")
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.False(t, strings.Contains(out, names.Shares[0]))
 
 	out, err = GetOutput("broker volume list")
 	fmt.Println(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "null"))
 
-	fmt.Println("Creating Volume volumetest...")
+	fmt.Println("Creating Volume " + names.Volumes[0])
 
-	out, err = GetOutput("broker volume  create volumetest")
+	out, err = GetOutput("broker volume create " + names.Volumes[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
 	out, err = GetOutput("broker volume list")
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "volumetest"))
+	require.True(t, strings.Contains(out, names.Volumes[0]))
 
-	out, err = GetOutput("broker volume  attach  volumetest easyvm ")
+	out, err = GetOutput("broker volume attach " + names.Volumes[0] + " " + names.Hosts[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker volume delete volumetest")
+	out, err = GetOutput("broker volume delete " + names.Volumes[0])
 	fmt.Println(out)
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "still attached"))
 
-	out, err = GetOutput("broker volume inspect volumetest")
+	out, err = GetOutput("broker volume inspect " + names.Volumes[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, easyvm.ID) || strings.Contains(out, "easyvm"))
+	require.True(t, strings.Contains(out, host0.ID) || strings.Contains(out, names.Hosts[0]))
 
-	out, err = GetOutput("broker volume  detach  volumetest easyvm ")
+	out, err = GetOutput("broker volume  detach " + names.Volumes[0] + " " + names.Hosts[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker volume inspect volumetest")
+	out, err = GetOutput("broker volume inspect " + names.Volumes[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.False(t, strings.Contains(out, easyvm.ID) || strings.Contains(out, "easyvm"))
+	require.False(t, strings.Contains(out, host0.ID) || strings.Contains(out, names.Hosts[0]))
 
-	out, err = GetOutput("broker volume delete volumetest")
+	out, err = GetOutput("broker volume delete " + names.Volumes[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
@@ -225,110 +225,112 @@ func Basic(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "null"))
 
-	out, err = GetOutput("broker ssh run easyvm -c \"uptime\"")
+	out, err = GetOutput("broker ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	fmt.Println(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 
-	out, err = GetOutput("broker host delete easyvm")
+	out, err = GetOutput("broker host delete " + names.Hosts[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
-	out, err = GetOutput("broker host delete complexvm")
+	out, err = GetOutput("broker host delete " + names.Hosts[1])
 	fmt.Println(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
-	out, err = GetOutput("broker host delete gw-crazy")
+	out, err = GetOutput("broker host delete gw-" + names.Networks[0])
 	fmt.Println(out)
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "gateway"))
 
-	out, err = GetOutput("broker network delete crazy")
+	out, err = GetOutput("broker network delete " + names.Networks[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 }
 
 func ReadyToSsh(t *testing.T, provider Providers.Enum) {
-	tearDown()
-	defer tearDown()
-
 	Setup(t, provider)
+
+	names := GetNames("ReadyToSSH", 0, 0, 0, 1, 1)
+	names.TearDown()
+	defer names.TearDown()
 
 	out, err := GetOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network crazy...")
+	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.Nil(t, err)
 
-	fmt.Println("Creating VM easyvm...")
+	fmt.Println("Creating VM " + names.Hosts[0])
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host inspect easyvm")
+	out, err = GetOutput("broker host inspect " + names.Hosts[0])
 	require.Nil(t, err)
 
 	fmt.Println(out)
 }
 
-func NasError(t *testing.T, provider Providers.Enum) {
-	tearDown()
-	defer tearDown()
-
+func ShareError(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
+
+	names := GetNames("ShareError", 0, 1, 1, 1, 1)
+	names.TearDown()
+	defer names.TearDown()
 
 	out, err := GetOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network crazy...")
+	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.Nil(t, err)
 
-	fmt.Println("Creating VM easyvm...")
+	fmt.Println("Creating VM " + names.Hosts[0])
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host inspect easyvm")
+	out, err = GetOutput("broker host inspect " + names.Hosts[0])
 	require.Nil(t, err)
 
-	fmt.Println("Creating Nas bnastest...")
+	fmt.Println("Creating Share " + names.Shares[0])
 
-	out, err = GetOutput("broker nas create bnastest easyvm")
+	out, err = GetOutput("broker share create " + names.Shares[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
-	fmt.Println("Creating Volume volumetest...")
+	fmt.Println("Creating Volume " + names.Volumes[0])
 
-	out, err = GetOutput("broker volume create --speed SSD volumetest")
+	out, err = GetOutput("broker volume create --speed SSD " + names.Volumes[0])
 	require.Nil(t, err)
 
 	out, err = GetOutput("broker volume list")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "volumetest"))
+	require.True(t, strings.Contains(out, names.Volumes[0]))
 
-	out, err = GetOutput("broker volume  attach volumetest easyvm")
+	out, err = GetOutput("broker volume attach " + names.Volumes[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
 	time.Sleep(5 * time.Second)
 
-	out, err = GetOutput("broker volume delete volumetest")
+	out, err = GetOutput("broker volume delete " + names.Volumes[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "still attached"))
 
 	time.Sleep(5 * time.Second)
 
-	out, err = GetOutput("broker volume  detach volumetest easyvm")
+	out, err = GetOutput("broker volume detach " + names.Volumes[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
 	time.Sleep(5 * time.Second)
 
-	out, err = GetOutput("broker volume delete volumetest")
+	out, err = GetOutput("broker volume delete " + names.Volumes[0])
 	require.Nil(t, err)
 
 	time.Sleep(5 * time.Second)
@@ -337,14 +339,14 @@ func NasError(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "null"))
 
-	out, err = GetOutput("broker ssh run easyvm -c \"uptime\"")
+	out, err = GetOutput("broker ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 
-	out, err = GetOutput("broker nas delete bnastest ")
+	out, err = GetOutput("broker share delete " + names.Shares[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host delete easyvm")
+	out, err = GetOutput("broker host delete " + names.Hosts[0])
 	if err != nil {
 		fmt.Println(err.Error())
 		fmt.Println(out)
@@ -352,194 +354,194 @@ func NasError(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 
-	out, err = GetOutput("broker network delete crazy")
+	out, err = GetOutput("broker network delete " + names.Networks[0])
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "deleted"))
 }
 
 func VolumeError(t *testing.T, provider Providers.Enum) {
-	tearDown()
-	defer tearDown()
-
 	Setup(t, provider)
+
+	names := GetNames("VolumeError", 0, 1, 1, 1, 1)
+	names.TearDown()
+	defer names.TearDown()
 
 	out, err := GetOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network ferronet...")
+	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.Nil(t, err)
 
-	fmt.Println("Creating VM easyvm...")
+	fmt.Println("Creating VM " + names.Hosts[0])
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host inspect easyvm")
+	out, err = GetOutput("broker host inspect " + names.Hosts[0])
 	require.Nil(t, err)
 
-	fmt.Println("Creating Nas bnastest...")
+	fmt.Println("Creating Share " + names.Shares[0])
 
-	out, err = GetOutput("broker nas create bnastest easyvm")
+	out, err = GetOutput("broker share create " + names.Shares[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
-	fmt.Println("Creating Volume volumetest...")
+	fmt.Println("Creating Volume " + names.Volumes[0])
 
-	out, err = GetOutput("broker volume create volumetest")
-	require.Nil(t, err)
-
-	time.Sleep(5 * time.Second)
-
-	out, err = GetOutput("broker volume  attach volumetest easyvm")
+	out, err = GetOutput("broker volume create " + names.Volumes[0])
 	require.Nil(t, err)
 
 	time.Sleep(5 * time.Second)
 
-	out, err = GetOutput("broker volume delete volumetest")
+	out, err = GetOutput("broker volume  attach " + names.Volumes[0] + " " + names.Hosts[0])
+	require.Nil(t, err)
+
+	time.Sleep(5 * time.Second)
+
+	out, err = GetOutput("broker volume delete " + names.Volumes[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "still attached"))
 }
 
 func StopStart(t *testing.T, provider Providers.Enum) {
-	tearDown()
-	defer tearDown()
-
 	Setup(t, provider)
+
+	names := GetNames("StopStart", 0, 1, 1, 1, 1)
+	names.TearDown()
+	defer names.TearDown()
 
 	out, err := GetOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network crazy...")
+	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
-	fmt.Println("Creating VM easyvm...")
+	fmt.Println("Creating VM " + names.Hosts[0])
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host stop easyvm")
+	out, err = GetOutput("broker host stop " + names.Hosts[0])
 	require.Nil(t, err)
 
 	out = ""
 	for !strings.Contains(out, "STOPPED") {
-		out, err = GetOutput("broker host status easyvm")
+		out, err = GetOutput("broker host status " + names.Hosts[0])
 	}
 
-	out, err = GetOutput("broker host start easyvm")
+	out, err = GetOutput("broker host start " + names.Hosts[0])
 	require.Nil(t, err)
 
 	time.Sleep(4 * time.Second)
 
-	out, err = GetOutput("broker ssh run easyvm -c \"uptime\"")
+	out, err = GetOutput("broker ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 }
 
 func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
-	tearDown()
-	defer tearDown()
-
 	Setup(t, provider)
+
+	names := GetNames("DeleteVolumeMounted", 0, 1, 1, 2, 1)
+	names.TearDown()
+	defer names.TearDown()
 
 	out, err := GetOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network crazy...")
+	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
-	fmt.Println("Creating VM easyVM...")
+	fmt.Println("Creating VM " + names.Hosts[0])
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
-	out, err = GetOutput("broker host inspect easyvm")
+	out, err = GetOutput("broker host inspect " + names.Hosts[0])
 	require.Nil(t, err)
 
-	easyvm := HostInfo{}
-	json.Unmarshal([]byte(out), &easyvm)
+	fmt.Println("Creating VM " + names.Hosts[1])
 
-	fmt.Println("Creating VM complexvm...")
-
-	out, err = GetOutput("broker host create complexvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host create complexvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
-	out, err = GetOutput("broker nas list")
+	out, err = GetOutput("broker share list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating NAS bnastest...")
+	fmt.Println("Creating Share " + names.Shares[0])
 
-	out, err = GetOutput("broker nas  create bnastest easyvm")
+	out, err = GetOutput("broker share create " + names.Shares[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker nas  mount bnastest complexvm")
+	out, err = GetOutput("broker share mount " + names.Shares[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker nas list")
+	out, err = GetOutput("broker share list")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "bnastest"))
+	require.True(t, strings.Contains(out, names.Shares[0]))
 
-	out, err = GetOutput("broker nas inspect bnastest")
-	require.Nil(t, err)
-
-	require.True(t, strings.Contains(out, "bnastest"))
-	require.True(t, strings.Contains(out, "easyvm"))
-	require.True(t, strings.Contains(out, "complexvm"))
-
-	out, err = GetOutput("broker nas  umount bnastest complexvm")
+	out, err = GetOutput("broker share inspect " + names.Shares[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker nas inspect bnastest")
+	require.True(t, strings.Contains(out, names.Shares[0]))
+	require.True(t, strings.Contains(out, names.Hosts[0]))
+	require.True(t, strings.Contains(out, names.Hosts[1]))
+
+	out, err = GetOutput("broker share umount " + names.Shares[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
-	require.True(t, strings.Contains(out, "bnastest"))
-	require.True(t, strings.Contains(out, "easyvm"))
-	require.False(t, strings.Contains(out, "complexvm"))
-
-	out, err = GetOutput("broker nas delete bnastest ")
+	out, err = GetOutput("broker share inspect " + names.Shares[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker nas list")
+	require.True(t, strings.Contains(out, names.Shares[0]))
+	require.True(t, strings.Contains(out, names.Hosts[0]))
+	require.False(t, strings.Contains(out, names.Hosts[1]))
+
+	out, err = GetOutput("broker share delete " + names.Shares[0])
 	require.Nil(t, err)
-	require.False(t, strings.Contains(out, "bnastest"))
+
+	out, err = GetOutput("broker share list")
+	require.Nil(t, err)
+	require.False(t, strings.Contains(out, names.Shares[0]))
 
 	out, err = GetOutput("broker volume list")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "null"))
 
-	fmt.Println("Creating Volume volumetest...")
+	fmt.Println("Creating Volume " + names.Volumes[0])
 
-	out, err = GetOutput("broker volume  create volumetest")
+	out, err = GetOutput("broker volume create " + names.Volumes[0])
 	require.Nil(t, err)
 
 	out, err = GetOutput("broker volume list")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "volumetest"))
+	require.True(t, strings.Contains(out, names.Volumes[0]))
 
-	out, err = GetOutput("broker volume  attach  volumetest easyvm ")
+	out, err = GetOutput("broker volume attach " + names.Volumes[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker volume delete volumetest")
+	out, err = GetOutput("broker volume delete " + names.Volumes[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "still attached"))
 
@@ -550,96 +552,92 @@ func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
 	fmt.Println(err.Error())
 }
 
-func UntilNas(t *testing.T, provider Providers.Enum) {
-	tearDown()
-	defer tearDown()
-
+func UntilShare(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
+
+	names := GetNames("DeleteVolumeMounted", 0, 1, 1, 2, 1)
+	names.TearDown()
+	defer names.TearDown()
 
 	out, err := GetOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network crazy...")
+	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
-	fmt.Println("Creating VM easyVM...")
+	fmt.Println("Creating VM " + names.Hosts[0])
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
-	out, err = GetOutput("broker host inspect easyvm")
+	out, err = GetOutput("broker host inspect " + names.Hosts[0])
 	require.Nil(t, err)
 
-	easyvm := HostInfo{}
-	json.Unmarshal([]byte(out), &easyvm)
+	fmt.Println("Creating VM " + names.Hosts[1])
 
-	fmt.Println("Creating VM complexvm...")
-
-	out, err = GetOutput("broker host create complexvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host create complexvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
-	out, err = GetOutput("broker nas list")
+	out, err = GetOutput("broker share list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating NAS bnastest...")
+	fmt.Println("Creating Share " + names.Shares[0])
 
-	out, err = GetOutput("broker nas create bnastest easyvm")
+	out, err = GetOutput("broker share create " + names.Shares[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 }
 
 func UntilVolume(t *testing.T, provider Providers.Enum) {
-	tearDown()
-	defer tearDown()
-
 	Setup(t, provider)
+
+	names := GetNames("DeleteVolumeMounted", 0, 1, 1, 2, 1)
+	names.TearDown()
+	defer names.TearDown()
 
 	out, err := GetOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network crazy...")
+	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker network create crazy")
+	out, err = GetOutput("broker network create " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
-	fmt.Println("Creating VM easyVM...")
+	fmt.Println("Creating VM " + names.Hosts[0])
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host create easyvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
-	out, err = GetOutput("broker host inspect easyvm")
+	out, err = GetOutput("broker host inspect " + names.Hosts[0])
 	require.Nil(t, err)
 
-	easyvm := HostInfo{}
-	json.Unmarshal([]byte(out), &easyvm)
+	fmt.Println("Creating VM " + names.Hosts[1])
 
-	fmt.Println("Creating VM complexvm...")
-
-	out, err = GetOutput("broker host create complexvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker host create complexvm --public --net crazy")
+	out, err = GetOutput("broker host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
@@ -647,25 +645,12 @@ func UntilVolume(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "null"))
 
-	fmt.Println("Creating Volume volumetest...")
+	fmt.Println("Creating Volume " + names.Volumes[0])
 
-	out, err = GetOutput("broker volume  create volumetest")
+	out, err = GetOutput("broker volume create " + names.Volumes[0])
 	require.Nil(t, err)
 
 	out, err = GetOutput("broker volume list")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "volumetest"))
-}
-
-func tearDown() {
-	log.Printf("Starting cleanup...")
-	_, _ = GetOutput("broker volume detach volumetest easyvm")
-	_, _ = GetOutput("broker volume delete volumetest")
-	_, _ = GetOutput("broker host delete easyvm")
-	_, _ = GetOutput("broker host delete complexvm")
-	_, _ = GetOutput("broker nas delete bnastest")
-	_, _ = GetOutput("broker host delete easyvm")
-	_, _ = GetOutput("broker host delete complexvm")
-	_, _ = GetOutput("broker network delete crazy")
-	log.Printf("Finishing cleanup...")
+	require.True(t, strings.Contains(out, names.Volumes[0]))
 }
