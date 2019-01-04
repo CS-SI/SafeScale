@@ -91,11 +91,11 @@ func Basic(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.0.0/24")
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.0.0/24")
 	fmt.Println(out)
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
@@ -261,9 +261,9 @@ func ReadyToSsh(t *testing.T, provider Providers.Enum) {
 	out, err := GetOutput("broker network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network " + names.Networks[0])
+	fmt.Println("Creating network " + names.Networks[0] + " --cidr 168.192.1.0/24")
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.1.0/24")
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM " + names.Hosts[0])
@@ -289,7 +289,7 @@ func ShareError(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.2.0/24")
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM " + names.Hosts[0])
@@ -371,7 +371,7 @@ func VolumeError(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.3.0/24")
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM " + names.Hosts[0])
@@ -416,10 +416,10 @@ func StopStart(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.4.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.4.0/24")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
@@ -444,6 +444,15 @@ func StopStart(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("broker ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
+
+	out, err = GetOutput("broker host reboot " + names.Hosts[0])
+	require.Nil(t, err)
+
+	time.Sleep(4 * time.Second)
+
+	out, err = GetOutput("broker ssh run " + names.Hosts[0] + " -c \"uptime\"")
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "0 users"))
 }
 
 func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
@@ -458,10 +467,10 @@ func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.5.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.5.0/24")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
@@ -494,7 +503,7 @@ func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("broker share create " + names.Shares[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker share mount " + names.Shares[0] + " " + names.Hosts[0])
+	out, err = GetOutput("broker share mount " + names.Shares[0] + " " + names.Hosts[1])
 	require.Nil(t, err)
 
 	out, err = GetOutput("broker share list")
@@ -508,7 +517,7 @@ func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
 	require.True(t, strings.Contains(out, names.Hosts[0]))
 	require.True(t, strings.Contains(out, names.Hosts[1]))
 
-	out, err = GetOutput("broker share umount " + names.Shares[0] + " " + names.Hosts[0])
+	out, err = GetOutput("broker share umount " + names.Shares[0] + " " + names.Hosts[1])
 	require.Nil(t, err)
 
 	out, err = GetOutput("broker share inspect " + names.Shares[0])
@@ -555,7 +564,7 @@ func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
 func UntilShare(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("DeleteVolumeMounted", 0, 1, 1, 2, 1)
+	names := GetNames("UntilShare", 0, 1, 1, 2, 1)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -564,10 +573,10 @@ func UntilShare(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.6.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.6.0/24")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
@@ -604,7 +613,7 @@ func UntilShare(t *testing.T, provider Providers.Enum) {
 func UntilVolume(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("DeleteVolumeMounted", 0, 1, 1, 2, 1)
+	names := GetNames("UntilVolume", 0, 1, 1, 2, 1)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -613,10 +622,10 @@ func UntilVolume(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.7.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker network create " + names.Networks[0])
+	out, err = GetOutput("broker network create " + names.Networks[0] + " --cidr 168.192.7.0/24")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
