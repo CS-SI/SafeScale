@@ -381,7 +381,7 @@ func (svc *ShareHandler) Mount(shareName, hostName, path string) (*propsv1.HostR
 
 // Unmount a share from local directory of an host
 func (svc *ShareHandler) Unmount(shareName, hostName string) error {
-	server, _, _, err := svc.Inspect(shareName)
+	server, _, _, err := svc.ForceInspect(shareName)
 	if err != nil {
 		return throwErr(err)
 	}
@@ -403,7 +403,7 @@ func (svc *ShareHandler) Unmount(shareName, hostName string) error {
 		target = server
 	} else {
 		hostSvc := NewHostHandler(svc.provider)
-		target, err = hostSvc.Inspect(hostName)
+		target, err = hostSvc.ForceInspect(hostName)
 		if err != nil {
 			return throwErr(err)
 		}
