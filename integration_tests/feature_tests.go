@@ -2,7 +2,6 @@ package integration_tests
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"testing"
 
@@ -11,91 +10,86 @@ import (
 )
 
 func Docker(t *testing.T, provider Providers.Enum) {
-	featureTeardown()
-	defer featureTeardown()
-
 	Setup(t, provider)
 
-	out, err := GetOutput("broker network create deploytest")
+	names := GetNames("Docker", 0, 0, 0, 0, 1)
+	names.TearDown()
+	defer names.TearDown()
+
+	out, err := GetOutput("broker network create " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker ssh run gw-deploytest -c \"uptime\"")
+	out, err = GetOutput("broker ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
 	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 
-	out, err = GetOutput("deploy host check-feature gw-deploytest docker")
+	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " docker")
 	require.NotNil(t, err)
 
-	out, err = GetOutput("deploy host add-feature gw-deploytest docker")
+	out, err = GetOutput("deploy host add-feature gw-" + names.Networks[0] + " docker")
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker ssh run gw-deploytest -c \"docker ps\"")
+	out, err = GetOutput("broker ssh run gw-" + names.Networks[0] + " -c \"docker ps\"")
 	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "CONTAINER"))
 
-	out, err = GetOutput("deploy host check-feature gw-deploytest docker")
+	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " docker")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host delete-feature gw-deploytest docker")
+	out, err = GetOutput("deploy host delete-feature gw-" + names.Networks[0] + " docker")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature gw-deploytest docker")
+	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " docker")
 	require.NotNil(t, err)
 
-	out, err = GetOutput("broker ssh run gw-deploytest -c \"docker ps\"")
+	out, err = GetOutput("broker ssh run gw-" + names.Networks[0] + " -c \"docker ps\"")
 	fmt.Print(out)
 	require.NotNil(t, err)
 	require.False(t, strings.Contains(out, "CONTAINER"))
 }
 
 func DockerNotGateway(t *testing.T, provider Providers.Enum) {
-	featureTeardown()
-	defer featureTeardown()
-
 	Setup(t, provider)
 
-	out, err := GetOutput("broker network create deploytest")
+	names := GetNames("Docker", 0, 0, 0, 1, 1)
+	names.TearDown()
+	defer names.TearDown()
+
+	out, err := GetOutput("broker network create " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker ssh run gw-deploytest -c \"uptime\"")
+	out, err = GetOutput("broker ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
 	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 
-	out, err = GetOutput("broker host create easyvm --public --net deploytest")
+	out, err = GetOutput("broker host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature easyvm docker")
+	out, err = GetOutput("deploy host check-feature " + names.Hosts[0] + " docker")
 	require.NotNil(t, err)
 
-	out, err = GetOutput("deploy host add-feature easyvm docker")
+	out, err = GetOutput("deploy host add-feature " + names.Hosts[0] + " docker")
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker ssh run easyvm -c \"docker ps\"")
+	out, err = GetOutput("broker ssh run " + names.Hosts[0] + " -c \"docker ps\"")
 	fmt.Print(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "CONTAINER"))
 
-	out, err = GetOutput("deploy host check-feature easyvm docker")
+	out, err = GetOutput("deploy host check-feature " + names.Hosts[0] + " docker")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host delete-feature easyvm docker")
+	out, err = GetOutput("deploy host delete-feature " + names.Hosts[0] + " docker")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature easyvm docker")
+	out, err = GetOutput("deploy host check-feature " + names.Hosts[0] + " docker")
 	require.NotNil(t, err)
 
-	out, err = GetOutput("broker ssh run easyvm -c \"docker ps\"")
+	out, err = GetOutput("broker ssh run " + names.Hosts[0] + " -c \"docker ps\"")
 	fmt.Print(out)
 	require.NotNil(t, err)
 	require.False(t, strings.Contains(out, "CONTAINER"))
-}
-
-func featureTeardown() {
-	log.Printf("Starting cleanup...")
-	_, _ = GetOutput("broker host delete easyvm")
-	_, _ = GetOutput("broker network delete deploytest")
-	log.Printf("Finishing cleanup...")
 }

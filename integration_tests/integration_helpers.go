@@ -1,7 +1,6 @@
 package integration_tests
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -45,10 +44,6 @@ func GetOutput(command string) (string, error) {
 	out, err := exec.Command("bash", "-c", command).CombinedOutput()
 	if err != nil {
 		return string(out), err
-	}
-
-	if strings.Contains(strings.ToUpper(string(out)), strings.ToUpper("Error")) {
-		return string(out), errors.New(string(out))
 	}
 
 	return string(out), nil

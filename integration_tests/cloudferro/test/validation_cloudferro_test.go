@@ -14,8 +14,8 @@ func Test_ReadyToSsh(t *testing.T) {
 	integration_tests.ReadyToSsh(t, Providers.CLOUDFERRO)
 }
 
-func Test_NasError(t *testing.T) {
-	integration_tests.NasError(t, Providers.CLOUDFERRO)
+func Test_ShareError(t *testing.T) {
+	integration_tests.ShareError(t, Providers.CLOUDFERRO)
 }
 
 func Test_VolumeError(t *testing.T) {
@@ -30,8 +30,8 @@ func Test_DeleteVolumeMounted(t *testing.T) {
 	integration_tests.DeleteVolumeMounted(t, Providers.CLOUDFERRO)
 }
 
-func Test_UntilNas(t *testing.T) {
-	integration_tests.UntilNas(t, Providers.CLOUDFERRO)
+func Test_UntilShare(t *testing.T) {
+	integration_tests.UntilShare(t, Providers.CLOUDFERRO)
 }
 
 func Test_UntilVolume(t *testing.T) {
