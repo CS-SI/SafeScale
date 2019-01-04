@@ -14,3 +14,7 @@ func Test_Docker(t *testing.T) {
 func Test_DockerNotGateway(t *testing.T) {
 	integration_tests.DockerNotGateway(t, Providers.FLEXIBLEENGINE)
 }
+
+func Test_DockerCompose(t *testing.T) {
+	integration_tests.DockerCompose(t, Providers.FLEXIBLEENGINE)
+}

@@ -36,7 +36,7 @@ feature:
                             publicNodes: all
                         run: |
                             case $LINUX_KIND in
-                                debian|ubuntu|centos|rhel[fedora)
+                                debian|ubuntu|centos|rhel|fedora)
                                     docker-compose -v &>/dev/null
                                     ;;
                                 *)
@@ -91,5 +91,5 @@ feature:
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            rm -f /usr/local/bin/docker-compose
+                            rm /usr/bin/docker-compose || rm -f /usr/local/bin/docker-compose
 ...
