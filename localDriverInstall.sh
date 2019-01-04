@@ -6,8 +6,7 @@
 LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
 case $LINUX_KIND in
     debian|ubuntu)
-        #linux 16.04
-        #linux 18.04 (need universe repository for virtinst & libguestfs-tools)
+        #linux 16.04/18.04 (need universe repository for virtinst & libguestfs-tools)
         sudo apt install -y qemu-kvm libvirt-bin libvirt-dev virtinst libguestfs-tools
 		;;
 
@@ -28,6 +27,9 @@ esac
 USER=$(whoami)
 sudo usermod -a -G libvirtd $USER || sudo usermod -a -G libvirt $USER
 sudo usermod -a -G kvm $USER
+# Enable the new groups
+# TODO stay in the same shell 
+sudo su $USER
 
 # Add read rights to the kernel executable to allow virt-sysprep to works well without admin privileges
 sudo chmod 744 /boot/vmlinuz/`uname -r` || sudo chmod 744 /boot/vmlinuz-`uname -r`
