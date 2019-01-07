@@ -135,7 +135,7 @@ pathprepend $HOME/.local/bin
 EOF
 
     chown -R {{.User}}:{{.User}} /home/{{.User}}
-    echo done
+    echo "done"
 }
 
 # Configure network for Debian distribution
@@ -154,7 +154,7 @@ configure_network_debian() {
     done
 
     systemctl restart networking
-    echo done
+    echo "done"
 }
 
 # Configure network using netplan
@@ -179,7 +179,7 @@ EOF
     netplan generate
     netplan apply
 
-    echo done
+    echo "done"
 }
 
 # Configure network for redhat-like distributions (rhel, centos, ...)
@@ -330,7 +330,7 @@ configure_as_gateway() {
     mv /etc/ssh/sshd_config.new /etc/ssh/sshd_config
     systemctl restart ssh
 
-    echo done
+    echo "done"
 }
 
 configure_dns_legacy() {
@@ -350,7 +350,7 @@ EOF
 configure_dns_resolvconf() {
     echo "Configuring resolvconf..."
 
-    cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/base
+    cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/head
 {{- if .DNSServers }}
   {{- range .DNSServers }}
 nameserver {{ . }}
@@ -360,7 +360,8 @@ nameserver 1.1.1.1
 {{- end }}
 EOF
     #rm -f /etc/resolvconf/resolv.conf.d/tail
-    systemctl restart resolvconf
+    resolvconf -u
+    echo "done"
 }
 
 configure_dns_systemd_resolved() {
@@ -382,6 +383,7 @@ Cache=yes
 DNSStubListener=yes
 EOF
     systemctl restart systemd-resolved
+    echo "done"
 }
 
 configure_gateway() {
@@ -498,12 +500,15 @@ case $LINUX_KIND in
         systemctl kill --kill-who=all apt-daily.service &>/dev/null
         create_user
         {{- if .ConfIF }}
-        systemctl status systemd-networkd &>/dev/null && configure_network_netplan || configure_network_debian
+        which netplan &>/dev/null && netplanconfigure_network_netplan 
+        systemctl status networking &>/dev/null && configure_network_debian
         {{- end }}
+        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved
+        systemctl status resolvconf &>/dev/null && configure_dns_resolvconf
         {{- if .IsGateway }}
         configure_as_gateway
         {{- end }}
-        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_resolvconf
+
         {{- if .AddGateway }}
         configure_gateway
         {{- end }}
