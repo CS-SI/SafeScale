@@ -21,41 +21,11 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/openstack"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/iaas/stack/openstack"
 
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 )
-
-// // CreateNetwork creates a network named name
-// func (client *Client) CreateNetwork(req api.NetworkRequest) (*api.Network, error) {
-// 	return client.osclt.CreateNetwork(req)
-// }
-
-// // GetNetwork returns the network identified by ref (id or name)
-// func (client *Client) GetNetwork(ref string) (*api.Network, error) {
-// 	return client.osclt.GetNetwork(ref)
-// }
-
-// // ListNetworks lists available networks
-// func (client *Client) ListNetworks(all bool) ([]api.Network, error) {
-// 	return client.osclt.ListNetworks(all)
-// }
-
-// // DeleteNetwork deletes the network identified by id
-// func (client *Client) DeleteNetwork(networkRef string) error {
-// 	return client.osclt.DeleteNetwork(networkRef)
-// }
-
-// // CreateGateway creates a public Gateway for a private network
-// func (client *Client) CreateGateway(req api.GWRequest) (*api.Host, error) {
-// 	return client.osclt.CreateGateway(req)
-// }
-
-// // DeleteGateway delete the public gateway of a private network
-// func (client *Client) DeleteGateway(networkID string) error {
-// 	return client.osclt.DeleteGateway(networkID)
-// }
 
 // CreateSubnet creates a sub network
 //- netID ID of the parent network
@@ -120,48 +90,3 @@ func (p *Ovh) CreateSubnet(name string, networkID string, cidr string, ipVersion
 		NetworkID: subnet.NetworkID,
 	}, nil
 }
-
-// // GetSubnet returns the sub network identified by id
-// func (client *Client) GetSubnet(id string) (*openstack.Subnet, error) {
-// 	return client.osclt.GetSubnet(id)
-// }
-
-// // ListSubnets lists available sub networks of network net
-// func (client *Client) ListSubnets(netID string) ([]openstack.Subnet, error) {
-// 	return client.osclt.ListSubnets(netID)
-// }
-
-// // DeleteSubnet deletes the sub network identified by id
-// func (client *Client) DeleteSubnet(id string) error {
-// 	return client.osclt.DeleteSubnet(id)
-// }
-
-// // CreateRouter creates a router satisfying req
-// func (client *Client) CreateRouter(req openstack.RouterRequest) (*openstack.Router, error) {
-// 	return client.osclt.CreateRouter(req)
-// }
-
-// // GetRouter returns the router identified by id
-// func (client *Client) GetRouter(id string) (*openstack.Router, error) {
-// 	return client.osclt.GetRouter(id)
-// }
-
-// // ListRouters lists available routers
-// func (client *Client) ListRouters() ([]openstack.Router, error) {
-// 	return client.osclt.ListRouters()
-// }
-
-// // DeleteRouter deletes the router identified by id
-// func (client *Client) DeleteRouter(id string) error {
-// 	return client.osclt.DeleteRouter(id)
-// }
-
-// // AddSubnetToRouter attaches subnet to router
-// func (client *Client) AddSubnetToRouter(routerID string, subnetID string) error {
-// 	return client.osclt.AddSubnetToRouter(routerID, subnetID)
-// }
-
-// // RemoveSubnetFromRouter detachesa subnet from router interface
-// func (client *Client) RemoveSubnetFromRouter(routerID string, subnetID string) error {
-// 	return client.osclt.RemoveSubnetFromRouter(routerID, subnetID)
-// }

@@ -77,8 +77,10 @@ func New(auth AuthenticationOptions, cfg ConfigurationOptions) (*Stack, error) {
 		Region: auth.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%s", ErrorToString(err))
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
 	}
+
+	// Get Identity from network service
 	nID, err := networks.IDFromName(network, cfg.ProviderNetwork)
 	if err != nil {
 		return nil, fmt.Errorf("%s", ErrorToString(err))
@@ -88,6 +90,9 @@ func New(auth AuthenticationOptions, cfg ConfigurationOptions) (*Stack, error) {
 	volume, err := gcos.NewBlockStorageV1(driver, gc.EndpointOpts{
 		Region: auth.Region,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+	}
 
 	s := stack{
 		AuthOpts:          &auth,
@@ -96,7 +101,6 @@ func New(auth AuthenticationOptions, cfg ConfigurationOptions) (*Stack, error) {
 		Compute:           compute,
 		Network:           network,
 		Volume:            volume,
-		ObjectStorage:     objectstorage,
 		ProviderNetworkID: nID,
 	}
 
@@ -105,14 +109,6 @@ func New(auth AuthenticationOptions, cfg ConfigurationOptions) (*Stack, error) {
 		return nil, err
 	}
 
-	// Creates metadata Object Storage bucket/container
-	if s.CfgOpts.MetadataBucketName == "" {
-		s.CfgOpts.MetadataBucketName = BuildMetadataBucketName(auth.DomainName)
-	}
-	// err = metadata.InitializeBucket(&clt)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	return &s, nil
 }
 

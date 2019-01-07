@@ -35,13 +35,13 @@ type SizingRequirements struct {
 	MinCores    int     `json:"min_cores,omitempty"`
 	MinRAMSize  float32 `json:"min_ram_size,omitempty"`
 	MinDiskSize int     `json:"min_disk_size,omitempty"`
-	MinGPU      int     `json:"min_gpu,omitempty"`
-	MinFreq     float32 `json:"min_freq,omitempty"`
+	MinGPU 		int     `json:"min_gpu,omitempty"`
+	MinFreq 	float32 `json:"min_freq,omitempty"`
 }
 
 // StoredCPUInfo ...
 type StoredCPUInfo struct {
-	Id           string `bow:"key"`
+	Id      string `bow:"key"`
 	TenantName   string `json:"tenant_name,omitempty"`
 	TemplateID   string `json:"template_id,omitempty"`
 	TemplateName string `json:"template_name,omitempty"`

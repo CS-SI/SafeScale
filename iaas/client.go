@@ -17,25 +17,31 @@
 package iaas
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
+	"os"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/iaas/api"
+	scribble "github.com/nanobox-io/golang-scribble"
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/iaas/model"
 	"github.com/CS-SI/SafeScale/iaas/model/enums/HostState"
-	"github.com/CS-SI/SafeScale/iaas/model/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	providerapi "github.com/CS-SI/SafeScale/iaas/provider/api"
-	resource "github.com/CS-SI/SafeScale/iaas/resource.obsolete"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
-// client is the implementation of interface api.Client
-type client struct {
+// Client ...
+type Client struct {
 	providerapi.Provider
-	ObjectStorage  objectstorage.Location
+	objectstorage.Location
 	MetadataBucket objectstorage.Bucket
 }
 
@@ -100,7 +106,11 @@ func (access *HostAccess) GetAccessIP() string {
 // }
 
 // WaitHostState waits an host achieve state
-func (clt *client) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) error {
+func (clt *Client) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) error {
+	if clt == nil {
+		panic("Calling clt.WaitHostState with clt==nil!")
+	}
+
 	var err error
 
 	timer := time.After(timeout)
@@ -108,7 +118,7 @@ func (clt *client) WaitHostState(hostID string, state HostState.Enum, timeout ti
 	host := model.NewHost()
 	host.ID = hostID
 	for next {
-		host, err = svc.GetHost(host)
+		host, err = clt.GetHost(host)
 		if err != nil {
 			return err
 		}
@@ -129,7 +139,11 @@ func (clt *client) WaitHostState(hostID string, state HostState.Enum, timeout ti
 }
 
 // WaitVolumeState waits an host achieve state
-func (clt *client) WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*model.Volume, error) {
+func (clt *Client) WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*model.Volume, error) {
+	if clt == nil {
+		panic("Calling clt.WaitVolumeState with clt==nil!")
+	}
+
 	cout := make(chan int)
 	next := make(chan bool)
 	vc := make(chan *model.Volume)
@@ -156,7 +170,7 @@ func (clt *client) WaitVolumeState(volumeID string, state VolumeState.Enum, time
 	}
 }
 
-func pollVolume(clt *client, volumeID string, state VolumeState.Enum, cout chan int, next chan bool, hostc chan *model.Volume) {
+func pollVolume(clt *Client, volumeID string, state VolumeState.Enum, cout chan int, next chan bool, hostc chan *model.Volume) {
 	for {
 		v, err := clt.GetVolume(volumeID)
 		if err != nil {
@@ -178,8 +192,12 @@ func pollVolume(clt *client, volumeID string, state VolumeState.Enum, cout chan 
 
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (clt *client) SelectTemplatesBySize(sizing model.SizingRequirements, force bool) ([]model.HostTemplate, error) {
-	templates, err := svc.ListTemplates(false)
+func (clt *Client) SelectTemplatesBySize(sizing model.SizingRequirements, force bool) ([]model.HostTemplate, error) {
+	if clt == nil {
+		panic("Calling clt.SelectTemplatesBySize with clt==nil!")
+	}
+
+	templates, err := clt.ListTemplates(false)
 	var selectedTpls []model.HostTemplate
 	scannerTemplates := map[string]bool{}
 	if err != nil {
@@ -188,8 +206,8 @@ func (clt *client) SelectTemplatesBySize(sizing model.SizingRequirements, force 
 
 	askedForSpecificScannerInfo := sizing.MinGPU > 0 || sizing.MinFreq != 0
 	if askedForSpecificScannerInfo {
-		_ = os.MkdirAll(safeutils.AbsPathify("$HOME/.safescale/scanner"), 0777)
-		db, err := scribble.New(safeutils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
+		_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
+		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 		if err != nil {
 			if !force {
 				fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
@@ -200,7 +218,7 @@ func (clt *client) SelectTemplatesBySize(sizing model.SizingRequirements, force 
 				return nil, errors.New(noHostError)
 			}
 		} else {
-			image_list, err := db.ReadAll("images")
+			imageList, err := db.ReadAll("images")
 			if err != nil {
 				if !force {
 					fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
@@ -212,7 +230,7 @@ func (clt *client) SelectTemplatesBySize(sizing model.SizingRequirements, force 
 				}
 			} else {
 				images := []model.StoredCPUInfo{}
-				for _, f := range image_list {
+				for _, f := range imageList {
 					imageFound := model.StoredCPUInfo{}
 					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
 						fmt.Println("Error", err)
@@ -259,7 +277,11 @@ func (clt *client) SelectTemplatesBySize(sizing model.SizingRequirements, force 
 }
 
 // FilterImages search an images corresponding to OS Name
-func (clt *client) FilterImages(filter string) ([]model.Image, error) {
+func (clt *Client) FilterImages(filter string) ([]model.Image, error) {
+	if clt == nil {
+		panic("Calling clt.FilterImages with clt==nil!")
+	}
+
 	imgs, err := clt.ListImages(false)
 	if err != nil {
 		return nil, err
@@ -284,7 +306,11 @@ func (clt *client) FilterImages(filter string) ([]model.Image, error) {
 }
 
 // SearchImage search an image corresponding to OS Name
-func (clt *client) SearchImage(osname string) (*model.Image, error) {
+func (clt *Client) SearchImage(osname string) (*model.Image, error) {
+	if clt == nil {
+		panic("Calling clt.SearchImage with clt==nil!")
+	}
+
 	imgs, err := clt.ListImages(false)
 	if err != nil {
 		return nil, err
@@ -314,8 +340,12 @@ func (clt *client) SearchImage(osname string) (*model.Image, error) {
 }
 
 // CreateHostWithKeyPair creates an host
-func (clt *client) CreateHostWithKeyPair(request model.HostRequest) (*model.Host, *model.KeyPair, error) {
-	_, err := svc.GetHostByName(request.ResourceName)
+func (clt *Client) CreateHostWithKeyPair(request model.HostRequest) (*model.Host, *model.KeyPair, error) {
+	if clt == nil {
+		panic("Calling clt.CreateHostWithKeyPair clt==nil!")
+	}
+
+	_, err := clt.GetHostByName(request.ResourceName)
 	if err == nil {
 		return nil, nil, model.ResourceAlreadyExistsError("Host", request.ResourceName)
 	}
@@ -351,7 +381,11 @@ func (clt *client) CreateHostWithKeyPair(request model.HostRequest) (*model.Host
 }
 
 // ListHostsByName list hosts by name
-func (clt *client) ListHostsByName() (map[string]*model.Host, error) {
+func (clt *Client) ListHostsByName() (map[string]*model.Host, error) {
+	if clt == nil {
+		panic("Calling clt.ListHostsByName() with clt==nil!")
+	}
+
 	hosts, err := clt.ListHosts()
 	if err != nil {
 		return nil, err
@@ -361,144 +395,6 @@ func (clt *client) ListHostsByName() (map[string]*model.Host, error) {
 		hostMap[host.Name] = host
 	}
 	return hostMap, nil
-}
-
-// CreateBucket creates an object container
-func (svc *Service) CreateBucket(bucketName string) error {
-	if svc.ObjectStorage == nil {
-		panic("svc.Location is nil!")
-	}
-	_, err := svc.ObjectStorage.CreateBucket(bucketName)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// DeleteBucket deletes an object container
-func (svc *Service) DeleteBucket(bucketName string) error {
-	if svc.ObjectStorage == nil {
-		panic("svc.Location is nil!")
-	}
-	return svc.ObjectStorage.DeleteBucket(bucketName)
-}
-
-// ListBuckets list object containers
-func (svc *Service) ListBuckets() ([]string, error) {
-	if svc.ObjectStorage == nil {
-		panic("svc.ObjectStorage is nil!")
-	}
-	return svc.ObjectStorage.ListBuckets(objectstorage.NoPrefix)
-}
-
-// GetBucket returns info about the Bucket
-func (svc *Service) GetBucket(bucketName string) (objectstorage.Bucket, error) {
-	if svc.ObjectStorage == nil {
-		panic("svc.Location is nil!")
-	}
-	return svc.ObjectStorage.GetBucket(bucketName)
-}
-
-// PutObject put an object into a Bucket
-func (svc *Service) PutObject(bucketName string, obj model.Object) error {
-	if svc.ObjectStorage == nil {
-		panic("svc.Location is nil!")
-	}
-	b, err := svc.ObjectStorage.GetBucket(bucketName)
-	if err != nil {
-		return err
-	}
-	_, err = b.WriteObject(obj.Name, obj.Content, obj.Size, nil)
-	return err
-}
-
-// UpdateObjectMetadata update an object into  object container
-func (svc *Service) UpdateObjectMetadata(bucketName string, obj model.Object) error {
-	// Stow doesn't allow Object Metadata only update for now
-	return fmt.Errorf("Not implemented")
-}
-
-// GetObject get object content from a Bucket
-func (svc *Service) GetObject(bucketName string, objectName string, ranges []model.Range) (*model.Object, error) {
-	if svc.ObjectStorage == nil {
-		panic("svc.Location is nil!")
-	}
-	o, err := svc.ObjectStorage.GetObject(bucketName, objectName)
-	if err != nil {
-		return nil, err
-	}
-	mo := model.Object{
-		ID:       o.GetID(),
-		Name:     o.GetName(),
-		Metadata: o.GetMetadata(),
-		Size:     o.GetSize(),
-		ETag:     o.GetETag(),
-	}
-	mo.LastModified, err = o.GetLastUpdate()
-	if err != nil {
-		return nil, err
-	}
-	if ranges == nil || len(ranges) == 0 {
-		r := model.NewRange(0, 0)
-		ranges = []model.Range{r}
-	}
-	buf := bytes.NewBuffer(nil)
-	for _, r := range ranges {
-		err = o.Read(buf, int64(*r.From), int64(*r.To))
-		if err != nil {
-			return nil, err
-		}
-	}
-	if mo.Size != int64(buf.Len()) {
-		return nil, fmt.Errorf("object size doesn't match with size of read data")
-	}
-	mo.Content = bytes.NewReader(buf.Bytes())
-	return &mo, nil
-}
-
-// GetObjectMetadata get object metadata from a Bucket
-func (svc *Service) GetObjectMetadata(bucketName string, objectName string) (*model.Object, error) {
-	if svc.ObjectStorage == nil {
-		panic("svc.ObjectStorage is nil!")
-	}
-	o, err := svc.ObjectStorage.GetObject(bucketName, objectName)
-	if err != nil {
-		return nil, err
-	}
-	mo := model.Object{
-		ID:       o.GetID(),
-		Name:     o.GetName(),
-		Metadata: o.GetMetadata(),
-		Size:     o.GetSize(),
-		ETag:     o.GetETag(),
-	}
-	mo.LastModified, err = o.GetLastUpdate()
-	if err != nil {
-		return nil, err
-	}
-	return &mo, nil
-}
-
-// ListObjects list objects of a container
-func (svc *Service) ListObjects(bucketName string, filter model.ObjectFilter) ([]string, error) {
-	if svc.ObjectStorage == nil {
-		panic("svc.Location is nil!")
-	}
-	return svc.ObjectStorage.ListObjects(bucketName, filter.Path, filter.Prefix)
-}
-
-// CopyObject copies an object
-func (svc *Service) CopyObject(bucketNameSrc, objectSrc, objectDst string) error {
-	// stow doesn't allow object copy for now
-	return fmt.Errorf("not implemented")
-}
-
-// DeleteObject delete an object from a container
-func (svc *Service) DeleteObject(bucketName, objectName string) error {
-	if svc.ObjectStorage == nil {
-		panic("svc.Location is nil!")
-	}
-	return svc.ObjectStorage.DeleteObject(bucketName, objectName)
 }
 
 func runeIndexes(s string, r rune) []int {
@@ -602,9 +498,8 @@ func SimilarityScore(ref string, s string) float64 {
 }
 
 // InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
-// id contains a unique identifier of the tenant (something coming from the provider, not the tenant name)
-func InitializeBucket(svc api.ClientAPI, location objectstorage.Location) error {
-	cfg, err := svc.GetCfgOpts()
+func InitializeBucket(clt *Client, location objectstorage.Location) error {
+	cfg, err := clt.GetCfgOpts()
 	if err != nil {
 		fmt.Printf("failed to get client options: %s\n", err.Error())
 	}

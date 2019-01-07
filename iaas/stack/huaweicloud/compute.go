@@ -30,17 +30,6 @@ import (
 
 	"github.com/pengux/check"
 
-	filters "github.com/CS-SI/SafeScale/providers/filters/images"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
-	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
-	"github.com/CS-SI/SafeScale/providers/openstack"
-	"github.com/CS-SI/SafeScale/providers/userdata"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/retry"
-
 	uuid "github.com/satori/go.uuid"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -52,11 +41,16 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/iaas/resource/enums/HostState"
-	"github.com/CS-SI/SafeScale/iaas/resource/enums/IPVersion"
-	openstack "github.com/CS-SI/SafeScale/iaas/stack/openstack"
+	filters "github.com/CS-SI/SafeScale/iaas/filters/images"
+	"github.com/CS-SI/SafeScale/iaas/model"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/HostState"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/IPVersion"
+	propsv1 "github.com/CS-SI/SafeScale/iaas/model/properties/v1"
+	"github.com/CS-SI/SafeScale/iaas/stack/openstack"
 	"github.com/CS-SI/SafeScale/iaas/userdata"
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 

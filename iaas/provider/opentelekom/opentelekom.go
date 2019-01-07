@@ -18,8 +18,8 @@ package opentelekom
 
 import (
 	"github.com/CS-SI/SafeScale/iaas/stack/huaweicloud"
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/iaas/provider"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeSpeed"
 )
 
 const (

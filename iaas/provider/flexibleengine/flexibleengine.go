@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/iaas/provider/api"
-	"github.com/CS-SI/SafeScale/iaas/resource/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/iaas/stack/huaweicloud"
 
 	// official AWS API

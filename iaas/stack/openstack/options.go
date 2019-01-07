@@ -105,11 +105,6 @@ type ConfigurationOptions struct {
 	// VolumeSpeeds map volume types with volume speeds
 	VolumeSpeeds map[string]VolumeSpeed.Enum
 
-	// S3Protocol protocol used to mount object storage (ex: swiftks or s3)
-	S3Protocol string
-
-	// MetadataBucketName contains the name of the bucket storing metadata
-	MetadataBucketName string
 }
 
 // GetCfgOpts return configuration parameters
@@ -117,10 +112,10 @@ func (s *Stack) GetCfgOpts() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	cfg.Set("DNSList", s.CfgOpts.DNSList)
-	cfg.Set("S3Protocol", s.CfgOpts.S3Protocol)
+
 	cfg.Set("AutoHostNetworkInterfaces", s.CfgOpts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", s.CfgOpts.UseLayer3Networking)
-	cfg.Set("MetadataBucket", s.CfgOpts.MetadataBucketName)
+	cfg.Set("ProviderNetwork", client.Cfg.ProviderNetwork)
 
 	return cfg, nil
 }
