@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/model"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	providerapi "github.com/CS-SI/SafeScale/iaas/provider/api"
+	"github.com/CS-SI/SafeScale/utils/crypt"
 )
 
 var (
@@ -43,7 +44,7 @@ func Register(name string, provider providerapi.Provider) {
 	if _, ok := providers[name]; ok {
 		return
 	}
-	providers[name] = &service{Provider: provider}
+	providers[name] = &Client{Provider: provider}
 }
 
 // Tenants returns all known tenants
@@ -71,7 +72,7 @@ func GetService(tenantName string) (api.Client, error) {
 		tenant, _ := t.(map[string]interface{})
 		name, found = tenant["name"].(string)
 		if !found {
-			log.Errorf("tenant found without 'name'")
+			log.Error("tenant found without 'name'")
 			continue
 		}
 		if name != tenantName {
@@ -81,7 +82,7 @@ func GetService(tenantName string) (api.Client, error) {
 		tenantInCfg = true
 		provider, found := tenant["client"].(string)
 		if !found {
-			log.Errorf("Missing field 'client' in tenant '%s'")
+			log.Error("Missing field 'client' in tenant")
 			continue
 		}
 
@@ -93,8 +94,17 @@ func GetService(tenantName string) (api.Client, error) {
 		}
 
 		tenantIdentity, found := tenant["identity"].(map[string]interface{})
+		if !found {
+			log.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
+		}
 		tenantCompute, found := tenant["compute"].(map[string]interface{})
+		if !found {
+			log.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
+		}
 		tenantNetwork, found := tenant["network"].(map[string]interface{})
+		if !found {
+			log.Debugf("No section 'network' found in tenant '%s', continuing.", name)
+		}
 		// Merge identity compute and network in single map
 		tenantClient := map[string]interface{}{
 			"identity": tenantIdentity,
@@ -107,7 +117,7 @@ func GetService(tenantName string) (api.Client, error) {
 		// Initializes Provider
 		clientAPI, err := client.Build(tenantClient)
 		if err != nil {
-			return nil, fmt.Errorf("Error creating tenant %s on provider %s: %s", tenantName, provider, err.Error())
+			return nil, fmt.Errorf("Error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
 		}
 		clientCfg, err := clientAPI.GetCfgOpts()
 		if err != nil {
@@ -117,7 +127,7 @@ func GetService(tenantName string) (api.Client, error) {
 		// Initializes Object Storage
 		var objectStorageLocation objectstorage.Location
 		if tenantObjectStorageFound {
-			objectStorageConfig, err := fillObjectStorageConfig(tenant)
+			objectStorageConfig, err := initObjectStorageLocationConfig(tenant)
 			if err != nil {
 				return nil, err
 			}
@@ -130,9 +140,12 @@ func GetService(tenantName string) (api.Client, error) {
 		}
 
 		// Initializes Metadata Object Storage (may be different than the Object Storage)
-		var metadataBucket objectstorage.Bucket
+		var (
+			metadataBucket   objectstorage.Bucket
+			metadataCryptKey *crypt.Key
+		)
 		if tenantMetadataFound || tenantObjectStorageFound {
-			metadataLocationConfig, err := fillMetadataObjectStorageConfig(tenant)
+			metadataLocationConfig, err := initMetadataLocationConfig(tenant)
 			if err != nil {
 				return nil, err
 			}
@@ -146,6 +159,9 @@ func GetService(tenantName string) (api.Client, error) {
 			}
 			bucketName := anon.(string)
 			found, err = metadataLocation.FindBucket(bucketName)
+			if err != nil {
+				return nil, fmt.Errorf("Error accessing metadata location: %s", err.Error())
+			}
 			if found {
 				metadataBucket, err = metadataLocation.GetBucket(bucketName)
 				if err != nil {
@@ -157,6 +173,9 @@ func GetService(tenantName string) (api.Client, error) {
 					return nil, err
 				}
 			}
+			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {
+				metadataCryptKey = crypt.NewEncryptionKey([]byte(metadataConfig["CryptKey"].(string)))
+			}
 		} else {
 			return nil, fmt.Errorf("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
 		}
@@ -166,6 +185,7 @@ func GetService(tenantName string) (api.Client, error) {
 			ClientAPI:      clientAPI,
 			ObjectStorage:  objectStorageLocation,
 			MetadataBucket: metadataBucket,
+			MetadataKey:    metadataCryptKey,
 		}, nil
 	}
 
@@ -175,8 +195,8 @@ func GetService(tenantName string) (api.Client, error) {
 	return nil, model.ResourceNotFoundError("Client builder", clientProvider)
 }
 
-// fillObjectStorageConfig initializes objectstorage.Config struct with map
-func fillObjectStorageConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
+// initObjectStorageLocationConfig initializes objectstorage.Config struct with map
+func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -193,10 +213,15 @@ func fillObjectStorageConfig(tenant map[string]interface{}) (objectstorage.Confi
 	if config.Domain, ok = objectstorage["Domain"].(string); !ok {
 		if config.Domain, ok = objectstorage["DomainName"].(string); !ok {
 			if config.Domain, ok = compute["Domain"].(string); !ok {
-				config.Domain, _ = compute["DomainName"].(string)
+				if config.Domain, ok = compute["DomainName"].(string); !ok {
+					if config.Domain, ok = identity["Domain"].(string); !ok {
+						config.Domain, _ = identity["DomainName"].(string)
+					}
+				}
 			}
 		}
 	}
+	config.TenantDomain = config.Domain
 
 	if config.Tenant, ok = objectstorage["Tenant"].(string); !ok {
 		if config.Tenant, ok = objectstorage["ProjectName"].(string); !ok {
@@ -210,22 +235,29 @@ func fillObjectStorageConfig(tenant map[string]interface{}) (objectstorage.Confi
 
 	config.AuthURL, _ = objectstorage["AuthURL"].(string)
 	config.Endpoint, _ = objectstorage["Endpoint"].(string)
-	config.User, _ = objectstorage["Username"].(string)
 
-	if config.Key, ok = objectstorage["AccessKey"].(string); !ok {
-		if config.Key, ok = objectstorage["OpenStackID"].(string); !ok {
-			if config.Key, ok = objectstorage["Username"].(string); !ok {
-				if config.Key, ok = identity["OpenstackID"].(string); !ok {
-					config.Key, _ = identity["Username"].(string)
+	if config.User, ok = objectstorage["AccessKey"].(string); !ok {
+		if config.User, ok = objectstorage["OpenStackID"].(string); !ok {
+			if config.User, ok = objectstorage["Username"].(string); !ok {
+				if config.User, ok = identity["OpenstackID"].(string); !ok {
+					config.User, _ = identity["Username"].(string)
 				}
 			}
 		}
 	}
-	config.User = config.Key
+
+	if config.Key, ok = objectstorage["ApplicationKey"].(string); !ok {
+		config.Key, _ = identity["ApplicationKey"].(string)
+	}
+
 	if config.SecretKey, ok = objectstorage["SecretKey"].(string); !ok {
 		if config.SecretKey, ok = objectstorage["OpenstackPassword"].(string); !ok {
 			if config.SecretKey, ok = objectstorage["Password"].(string); !ok {
-				config.SecretKey, _ = identity["OpenstackPassword"].(string)
+				if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
+					if config.SecretKey, ok = identity["OpenstackPassword"].(string); !ok {
+						config.SecretKey, _ = identity["Password"].(string)
+					}
+				}
 			}
 		}
 	}
@@ -237,8 +269,8 @@ func fillObjectStorageConfig(tenant map[string]interface{}) (objectstorage.Confi
 	return config, nil
 }
 
-// fillMetadataObjectStorageConfig initializes objectstorage.Config struct with map
-func fillMetadataObjectStorageConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
+// initMetadataLocationConfig initializes objectstorage.Config struct with map
+func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Config, error) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -260,12 +292,17 @@ func fillMetadataObjectStorageConfig(tenant map[string]interface{}) (objectstora
 			if config.Domain, ok = objectstorage["Domain"].(string); !ok {
 				if config.Domain, ok = objectstorage["DomainName"].(string); !ok {
 					if config.Domain, ok = compute["Domain"].(string); !ok {
-						config.Domain, _ = compute["DomainName"].(string)
+						if config.Domain, ok = compute["DomainName"].(string); !ok {
+							if config.Domain, ok = identity["Domain"].(string); !ok {
+								config.Domain, _ = identity["DomainName"].(string)
+							}
+						}
 					}
 				}
 			}
 		}
 	}
+	config.TenantDomain = config.Domain
 
 	if config.Tenant, ok = metadata["Tenant"].(string); !ok {
 		if config.Tenant, ok = metadata["ProjectName"].(string); !ok {
@@ -273,8 +310,10 @@ func fillMetadataObjectStorageConfig(tenant map[string]interface{}) (objectstora
 				if config.Tenant, ok = objectstorage["Tenant"].(string); !ok {
 					if config.Tenant, ok = objectstorage["ProjectName"].(string); !ok {
 						if config.Tenant, ok = objectstorage["ProjectID"].(string); !ok {
-							if config.Tenant, ok = compute["ProjectName"].(string); !ok {
-								config.Tenant, _ = compute["ProjectID"].(string)
+							if config.Tenant, ok = compute["Tenant"].(string); !ok {
+								if config.Tenant, ok = compute["ProjectName"].(string); !ok {
+									config.Tenant, _ = compute["ProjectID"].(string)
+								}
 							}
 						}
 					}
@@ -291,14 +330,14 @@ func fillMetadataObjectStorageConfig(tenant map[string]interface{}) (objectstora
 		config.Endpoint, _ = objectstorage["Endpoint"].(string)
 	}
 
-	if config.Key, ok = metadata["AccessKey"].(string); !ok {
-		if config.Key, ok = metadata["OpenstackID"].(string); !ok {
-			if config.Key, ok = metadata["Username"].(string); !ok {
-				if config.Key, ok = objectstorage["AccessKey"].(string); !ok {
-					if config.Key, ok = objectstorage["OpenStackID"].(string); !ok {
-						if config.Key, ok = objectstorage["Username"].(string); !ok {
-							if config.Key, ok = identity["Username"].(string); !ok {
-								config.Key, _ = identity["OpenstackID"].(string)
+	if config.User, ok = metadata["AccessKey"].(string); !ok {
+		if config.User, ok = metadata["OpenstackID"].(string); !ok {
+			if config.User, ok = metadata["Username"].(string); !ok {
+				if config.User, ok = objectstorage["AccessKey"].(string); !ok {
+					if config.User, ok = objectstorage["OpenStackID"].(string); !ok {
+						if config.User, ok = objectstorage["Username"].(string); !ok {
+							if config.User, ok = identity["Username"].(string); !ok {
+								config.User, _ = identity["OpenstackID"].(string)
 							}
 						}
 					}
@@ -306,7 +345,13 @@ func fillMetadataObjectStorageConfig(tenant map[string]interface{}) (objectstora
 			}
 		}
 	}
-	config.User = config.Key
+
+	if config.Key, ok = metadata["ApplicationKey"].(string); !ok {
+		if config.Key, ok = objectstorage["ApplicationKey"].(string); !ok {
+			config.Key, _ = identity["ApplicationKey"].(string)
+		}
+	}
+
 	if config.SecretKey, ok = metadata["SecretKey"].(string); !ok {
 		if config.SecretKey, ok = metadata["AccessPassword"].(string); !ok {
 			if config.SecretKey, ok = metadata["OpenstackPassword"].(string); !ok {
@@ -315,8 +360,12 @@ func fillMetadataObjectStorageConfig(tenant map[string]interface{}) (objectstora
 						if config.SecretKey, ok = objectstorage["AccessPassword"].(string); !ok {
 							if config.SecretKey, ok = objectstorage["OpenstackPassword"].(string); !ok {
 								if config.SecretKey, ok = objectstorage["Password"].(string); !ok {
-									if config.SecretKey, ok = identity["Password"].(string); !ok {
-										config.SecretKey, _ = identity["OpenstackPassword"].(string)
+									if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
+										if config.SecretKey, ok = identity["AccessPassword"].(string); !ok {
+											if config.SecretKey, ok = identity["Password"].(string); !ok {
+												config.SecretKey, _ = identity["OpenstackPassword"].(string)
+											}
+										}
 									}
 								}
 							}

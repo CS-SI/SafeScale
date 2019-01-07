@@ -14,18 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -u -o pipefail
+
+function print_error {
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+}
+trap print_error ERR
+
 # Redirects outputs to /var/tmp/user_data.log
 exec 1<&-
 exec 2<&-
 exec 1<>/var/tmp/user_data.log
 exec 2>&1
-
-currentscript="$0"
-finish() {
-    systemctl reboot &
-    rm -- "${currentscript}"
-}
-trap finish EXIT
 
 sfDetectFacts() {
    local -g LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
@@ -81,26 +82,31 @@ o_PU_IF=
 
 sfSaveIptablesRules() {
    case $LINUX_KIND in
-       rhel|centos) iptables-save >/etc/sysconfig/iptables ;;
-       debian|ubuntu) iptables-save >/etc/iptables/rules.v4 ;;
+       rhel|centos) iptables-save >/etc/sysconfig/iptables;;
+       debian|ubuntu) iptables-save >/etc/iptables/rules.v4;;
    esac
 }
 
 create_user() {
-    echo "Creating user {{ .User }}..."
-    useradd {{ .User }} --home-dir /home/{{ .User }} --shell /bin/bash --comment "" --create-home
-    echo "gpac:{{ .Password }}" | chpasswd
+    echo "Creating user {{.User}}..."
+    useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+    echo "gpac:{{.Password}}" | chpasswd
     groupadd -r docker
     usermod -aG docker gpac
-    echo "{{ .User }} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers
+    SUDOERS_FILE=/etc/sudoers.d/{{.User}}
+    [ ! -d "$(dirname $SUDOERS_FILE)" ] && SUDOERS_FILE=/etc/sudoers
+    cat >>$SUDOERS_FILE <<-'EOF'
+Defaults:{{.User}} !requiretty
+{{.User}} ALL=(ALL) NOPASSWD:ALL
+EOF
 
-    mkdir /home/{{ .User }}/.ssh
-    echo "{{ .Key }}" >>/home/{{ .User }}/.ssh/authorized_keys
-    echo "{{ .PKey }}" >/home/{{ .User }}/.ssh/id_rsa
-    chmod 0700 /home/{{ .User }}/.ssh
-    chmod -R 0600 /home/{{ .User }}/.ssh/*
+    mkdir /home/{{.User}}/.ssh
+    echo "{{.PublicKey}}" >>/home/{{.User}}/.ssh/authorized_keys
+    echo "{{.PrivateKey}}" >/home/{{.User}}/.ssh/id_rsa
+    chmod 0700 /home/{{.User}}/.ssh
+    chmod -R 0600 /home/{{.User}}/.ssh/*
 
-    touch /home/{{ .User }}/.hushlogin
+    touch /home/{{.User}}/.hushlogin
 
     cat >>/home/gpac/.bashrc <<-'EOF'
 pathremove() {
@@ -128,8 +134,13 @@ pathappend() {
 pathprepend $HOME/.local/bin
 EOF
 
-    chown -R {{ .User }}:{{ .User }} /home/{{ .User }}
+    chown -R {{.User}}:{{.User}} /home/{{.User}}
     echo done
+}
+
+# Don't request dns name servers from DHCP server
+configure_dhcp_client() {
+    sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf
 }
 
 # Configure network for Debian distribution
@@ -146,6 +157,8 @@ configure_network_debian() {
             echo "iface ${IF} inet dhcp" >>$cfg
         fi
     done
+
+    configure_dhcp_client
 
     systemctl restart networking
     echo done
@@ -167,10 +180,14 @@ network:
     ens4:
       dhcp4: true
 {{- if .GatewayIP }}
-      gateway4: {{ .GatewayIP }}
+      gateway4: {{.GatewayIP}}
 {{- end }}
 EOF
+
     netplan generate
+
+    configure_dhcp_client
+
     netplan apply
 
     echo done
@@ -184,7 +201,7 @@ configure_network_redhat() {
     systemctl disable NetworkManager &>/dev/null
     systemctl stop NetworkManager &>/dev/null
     yum remove -y NetworkManager &>/dev/null
-    systemctl restart network
+    #systemctl restart network
 
     # Configure all network interfaces in dhcp
     for IF in $(ls /sys/class/net); do
@@ -196,6 +213,15 @@ ONBOOT=yes
 EOF
         fi
     done
+    # Disable resolv.conf by dhcp
+    mkdir -p /etc/dhcp
+    HOOK_FILE=/etc/dhcp/dhclient-enter-hooks
+    cat >>$HOOK_FILE <<EOF
+make_resolv_conf() {
+    :
+}
+EOF
+    chmod +x $HOOK_FILE
     systemctl restart network
 
     echo done
@@ -407,6 +433,65 @@ configure_gateway_redhat() {
     echo done
 }
 
+install_drivers_nvidia() {
+    case $LINUX_KIND in
+        ubuntu)
+            add-apt-repository -y ppa:graphics-drivers &>/dev/null
+            apt update &>/dev/null
+            apt -y install nvidia-410 &>/dev/null || apt -y install nvidia-driver-410 &>/dev/null
+            ;;
+        debian)
+            if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
+                echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
+                rmmod nouveau
+            fi
+            apt update &>/dev/null && apt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null
+            dpkg --add-architecture i386 &>/dev/null
+            apt update &>/dev/null && apt install -y lib32z1 lib32ncurses5 &>/dev/null
+            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null
+            bash NVIDIA-Linux-x86_64-410.78.run -s
+            ;;
+        centos)
+            if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
+                echo -e "blacklist nouveau\noptions nouveau modeset=0" >>/etc/modprobe.d/blacklist-nouveau.conf
+                dracut --force
+                rmmod nouveau
+            fi
+            yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null
+            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run
+            bash NVIDIA-Linux-x86_64-410.78.run -s
+            rm NVIDIA-Linux-x86_64-410.78.run
+            ;;
+        *)
+            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            exit 1
+            ;;
+    esac
+}
+
+install_packages() {
+     case $LINUX_KIND in
+        ubuntu|debian)
+            apt install -y -qq pciutils &>/dev/null
+            ;;
+        redhat|centos)
+            yum install -y -q pciutils wget &>/dev/null
+            ;;
+        *)
+            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            exit 1
+            ;;
+     esac
+}
+
+disable_sudo_requiretty() {
+    sed -i -e 's/^Defaults[[:space:]]+requiretty$/Defaults !requiretty/g' /etc/sudoers
+}
+
+# ---- Main
+
+#disable_sudo_requiretty
+
 case $LINUX_KIND in
     debian|ubuntu)
         export DEBIAN_FRONTEND=noninteractive
@@ -418,8 +503,9 @@ case $LINUX_KIND in
         {{- end }}
         {{- if .IsGateway }}
         configure_as_gateway
-        {{- else if .AddGateway }}
+        {{- end }}
         systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_resolvconf
+        {{- if .AddGateway }}
         configure_gateway
         {{- end }}
         ;;
@@ -431,8 +517,9 @@ case $LINUX_KIND in
         {{- end }}
         {{- if .IsGateway }}
         configure_as_gateway
-        {{- else if .AddGateway }}
-        configure_dns_legacy
+        {{- end }}
+        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_legacy
+        {{- if .AddGateway }}
         configure_gateway_redhat
         {{- end }}
         ;;
@@ -441,6 +528,9 @@ case $LINUX_KIND in
         exit 1
         ;;
 esac
+
+install_packages
+lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
 echo "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
 systemctl reboot

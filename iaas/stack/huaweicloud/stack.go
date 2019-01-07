@@ -18,7 +18,6 @@ package huaweicloud
 
 import (
 	"fmt"
-	"net/url"
 
 	"github.com/CS-SI/SafeScale/providers/openstack"
 
@@ -30,11 +29,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
-
-	// official AWS API
-	"github.com/aws/aws-sdk-go/aws"
-	awscreds "github.com/aws/aws-sdk-go/aws/credentials"
-	awssession "github.com/aws/aws-sdk-go/aws/session"
 )
 
 // Stack is the implementation for huaweicloud following api.Stack
@@ -45,8 +39,6 @@ type Stack struct {
 	CfgOpts *Stack_openstack.ConfigurationOptions
 	// Identity contains service client of Identity openstack service
 	Identity *gc.ServiceClient
-	// S3Session is the "AWS Session" for object storage use (compatible S3)
-	S3Session *awssession.Session
 	// osclt is the openstack.Stack instance to use when fully openstack compliant
 	osclt *openstack.Stack
 	// Instance of the VPC
@@ -101,57 +93,6 @@ func New(auth openstack.AuthenticationOptions, cfg openstack.ConfigurationOption
 		return nil, fmt.Errorf("failed to found project ID corresponding to region '%s': %s", opts.Region, openstack.ErrorToString(err))
 	}
 
-	// // Compute API
-	// compute, err := gcos.NewComputeV2(provider, gc.EndpointOpts{})
-	// if err != nil {
-	// 	return nil, fmt.Errorf("%s", openstack.ErrorToString(err))
-	// }
-
-	// // Network API
-	// network, err := gcos.NewNetworkV2(provider, gc.EndpointOpts{
-	// 	Type:   "network",
-	// 	Region: opts.Region,
-	// })
-	// if err != nil {
-	// 	return nil, fmt.Errorf("%s", openstack.ErrorToString(err))
-	// }
-
-	// // Storage API
-	// blockStorage, err := gcos.NewBlockStorageV2(provider, gc.EndpointOpts{
-	// 	Type:   "volumev2",
-	// 	Region: opts.Region,
-	// })
-	// if err != nil {
-	// 	return nil, fmt.Errorf("%s", openstack.ErrorToString(err))
-	// }
-
-	// // Need to get Endpoint URL for ObjectStorage, that will be used with AWS S3 protocol
-	// objectStorage, err := gcos.NewObjectStorageV1(provider, gc.EndpointOpts{
-	// 	Type:   "object",
-	// 	Region: opts.Region,
-	// })
-	// if err != nil {
-	// 	return nil, fmt.Errorf("%s", openstack.ErrorToString(err))
-	// }
-
-	// Fix URL of ObjectStorage for HuaweiCloud...
-	u, _ := url.Parse(objectStorage.Endpoint)
-	endpoint := u.Scheme + "://" + u.Hostname() + "/"
-	// FlexibleEngine uses a protocol compatible with S3, so we need to get aws.Session instance
-	authOpts := awsAuthOpts{
-		AccessKeyID:     auth.S3AccessKeyID,
-		SecretAccessKey: auth.S3AccessKeyPassword,
-		Region:          auth.Region,
-	}
-	awsSession, err := awssession.NewSession(&aws.Config{
-		Region:      aws.String(auth.Region),
-		Credentials: awscreds.NewCredentials(authOpts),
-		Endpoint:    &endpoint,
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	s := Stack{
 		AuthOpts: &openstack.AuthOptions{
 			IdentityEndpoint: auth.IdentityEndpoint,
@@ -166,13 +107,9 @@ func New(auth openstack.AuthenticationOptions, cfg openstack.ConfigurationOption
 			UseFloatingIP:       true,
 			UseLayer3Networking: cfg.UseLayer3Networking,
 			VolumeSpeeds:        cfg.VolumeSpeeds,
-			S3Protocol:          "s3",
-			MetadataBucketName:  BuildMetadataBucketName(auth.DomainName),
 		},
-		Identity:      identity,
-		ObjectStorage: awsSession,
-
-		osclt: openStack,
+		Identity: identity,
+		osclt:    openStack,
 	}
 
 	// Initializes the VPC
@@ -187,11 +124,6 @@ func New(auth openstack.AuthenticationOptions, cfg openstack.ConfigurationOption
 		return nil, err
 	}
 
-	// // Creates metadata Object Storage container
-	// err = metadata.InitializeBucket(&clt)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	return &s, nil
 }
 

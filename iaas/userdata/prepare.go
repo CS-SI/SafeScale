@@ -24,13 +24,11 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/CS-SI/SafeScale/iaas/model"
-	stackapi "github.com/CS-SI/SafeScale/iaas/stack/api"
-	
-
-	"github.com/CS-SI/SafeScale/utils"
-
 	rice "github.com/GeertJohan/go.rice"
+
+	"github.com/CS-SI/SafeScale/iaas/model"
+	"github.com/CS-SI/SafeScale/iaas/provider/api"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 // userData is the structure to apply to userdata.sh template
@@ -64,7 +62,7 @@ var userdataTemplate *template.Template
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func Prepare(
-	s stackapi.Stack, request resource.HostRequest, kp *model.KeyPair, cidr string,
+	provider api.Provider, request model.HostRequest, kp *model.KeyPair, cidr string,
 ) ([]byte, error) {
 
 	// Generate password for user gpac
@@ -93,9 +91,9 @@ func Prepare(
 		ip = request.DefaultGateway.GetPrivateIP()
 	}
 
-	config, err := s.GetCfgOpts()
+	config, err := provider.GetCfgOpts()
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	anon, ok = config.Get("AutoHostNetworkInterfaces")
 	if ok {

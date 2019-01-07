@@ -19,20 +19,10 @@ package ovh
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/model"
-	"github.com/CS-SI/SafeScale/providers/api"
-	filters "github.com/CS-SI/SafeScale/providers/filters/templates"
+	filters "github.com/CS-SI/SafeScale/iaas/filters/templates"
+	"github.com/CS-SI/SafeScale/iaas/model"
+	"github.com/CS-SI/SafeScale/iaas/provider/api"
 )
-
-// // ListImages lists available OS images
-// func (p *Ovh) ListImages() ([]model.Image, error) {
-// 	return p.stack.ListImages()
-// }
-
-// // GetImage returns the Image referenced by id
-// func (p *Ovh) GetImage(id string) (*model.Image, error) {
-// 	return p.stack.GetImage(id)
-// }
 
 // GetTemplate overload OpenStack GetTemplate method to add GPU configuration
 func (p *Ovh) GetTemplate(id string) (*model.HostTemplate, error) {
@@ -70,68 +60,3 @@ func isWindowsTemplate(t api.HostTemplate) bool {
 func isFlexTemplate(t api.HostTemplate) bool {
 	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
-
-// // CreateKeyPair creates and import a key pair
-// func (client *Client) CreateKeyPair(name string) (*api.KeyPair, error) {
-// 	return client.osclt.CreateKeyPair(name)
-// }
-
-// // GetKeyPair returns the key pair identified by id
-// func (client *Client) GetKeyPair(id string) (*api.KeyPair, error) {
-// 	return client.osclt.GetKeyPair(id)
-// }
-
-// // ListKeyPairs lists available key pairs
-// func (client *Client) ListKeyPairs() ([]api.KeyPair, error) {
-// 	return client.osclt.ListKeyPairs()
-// }
-
-// // DeleteKeyPair deletes the key pair identified by id
-// func (client *Client) DeleteKeyPair(id string) error {
-// 	return client.osclt.DeleteKeyPair(id)
-// }
-
-// // CreateHost creates an host satisfying request
-// func (client *Client) CreateHost(request api.HostRequest) (*api.Host, error) {
-// 	return client.osclt.CreateHost(request)
-// }
-
-// // WaitHostReady waits an host achieve ready state
-// func (client *Client) WaitHostReady(hostID string, timeout time.Duration) (*api.Host, error) {
-// 	return client.osclt.WaitHostReady(hostID, timeout)
-// }
-
-// // GetHost returns the host identified by id
-// func (client *Client) GetHost(ref string) (*api.Host, error) {
-// 	return client.osclt.GetHost(ref)
-// }
-
-// // ListHosts lists available hosts
-// func (client *Client) ListHosts(all bool) ([]api.Host, error) {
-// 	return client.osclt.ListHosts(all)
-// }
-
-// // DeleteHost deletes the host identified by id
-// func (client *Client) DeleteHost(ref string) error {
-// 	return client.osclt.DeleteHost(ref)
-// }
-
-// // StopHost stops the host identified by id
-// func (client *Client) StopHost(id string) error {
-// 	return client.osclt.StopHost(id)
-// }
-
-// func (client *Client) RebootHost(id string) error {
-// 	log.Println("Received reboot petition OVH")
-// 	return client.osclt.RebootHost(id)
-// }
-
-// // StartHost starts the host identified by id
-// func (client *Client) StartHost(id string) error {
-// 	return client.osclt.StartHost(id)
-// }
-
-// //GetSSHConfig creates SSHConfig to connect an host
-// func (client *Client) GetSSHConfig(id string) (*system.SSHConfig, error) {
-// 	return client.osclt.GetSSHConfig(id)
-// }

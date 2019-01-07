@@ -17,16 +17,28 @@
 package api
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/provider"
+	"time"
+
 	"github.com/CS-SI/SafeScale/iaas/model"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/HostState"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/iaas/provider"
 	"github.com/CS-SI/SafeScale/system"
 )
 
 //go:generate mockgen -destination=../mocks/mock_clientapi.go -package=mocks github.com/CS-SI/SafeScale/iaas/api Client
 
 // Client is an API defining an IaaS driver
-type Client struct {
-	Build(map[string]interface{}) (Client, error)
+type oldClient interface {
+	WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) error
+	WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*model.Volume, error)
+	SelectTemplatesBySize(sizing model.SizingRequirements, force bool) ([]model.HostTemplate, error)
+	FilterImages(filter string) ([]model.Image, error)
+	SearchImage(osname string) (*model.Image, error)
+	CreateHostWithKeyPair(request model.HostRequest) (*model.Host, *model.KeyPair, error)
+	ListHostsByName() (map[string]*model.Host, error)
+
+	Build(map[string]interface{}) (oldClient, error)
 
 	// ListImages lists available OS images
 	ListImages(all bool) ([]model.Image, error)
@@ -79,9 +91,6 @@ type Client struct {
 	RebootHost(id string) error
 
 	// CreateVolume creates a block volume
-	// - name is the name of the volume
-	// - size is the size of the volume in GB
-	// - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 	CreateVolume(request model.VolumeRequest) (*model.Volume, error)
 	// GetVolume returns the volume identified by id
 	GetVolume(id string) (*model.Volume, error)
@@ -101,30 +110,6 @@ type Client struct {
 	ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error)
 	// DeleteVolumeAttachment deletes the volume attachment identifed by id
 	DeleteVolumeAttachment(serverID, id string) error
-
-	// CreateBucket creates an object bucket
-	CreateBucket(name string) error
-	// DeleteBucket deletes an object bucket
-	DeleteBucket(name string) error
-	// ListBuckets list object buckets
-	ListBuckets() ([]string, error)
-	// GetBucket returns info of the bucket
-	GetBucket(name string) (*model.BucketInfo, error)
-
-	// PutObject put an object into an object bucket
-	PutObject(bucket string, obj model.Object) error
-	// UpdateObjectMetadata update an object into object bucket
-	UpdateObjectMetadata(bucket string, obj model.Object) error
-	// GetObject get  object content from an object bucket
-	GetObject(bucket string, name string, ranges []model.Range) (*model.Object, error)
-	// GetObjectMetadata get  object metadata from an object bucket
-	GetObjectMetadata(bucket string, name string) (*model.Object, error)
-	// ListObjects list objects of a bucket
-	ListObjects(bucket string, filter model.ObjectFilter) ([]string, error)
-	// CopyObject copies an object
-	CopyObject(bucketSrc, objectSrc, objectDst string) error
-	// DeleteObject delete an object from a bucket
-	DeleteObject(bucket, object string) error
 
 	// GetAuthOpts returns authentification options as a Config
 	GetAuthOpts() (provider.Config, error)

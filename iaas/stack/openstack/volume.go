@@ -58,6 +58,10 @@ func toVolumeState(status string) VolumeState.Enum {
 }
 
 func (s *Stack) getVolumeType(speed VolumeSpeed.Enum) string {
+	if s == nil {
+		panic("Calling s.getVolumeType with s==nil!")
+	}
+
 	for t, s := range s.Cfg.VolumeSpeeds {
 		if s == speed {
 			return t
@@ -74,6 +78,10 @@ func (s *Stack) getVolumeType(speed VolumeSpeed.Enum) string {
 }
 
 func (s *Stack) getVolumeSpeed(vType string) VolumeSpeed.Enum {
+	if s == nil {
+		panic("Calling s.getVolumeSpeed with s==nil!")
+	}
+
 	speed, ok := s.Cfg.VolumeSpeeds[vType]
 	if ok {
 		return speed
@@ -86,9 +94,18 @@ func (s *Stack) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
+	log.Debugf("openstack.Stack.CreateVolume(%s) called", request.Name)
+	defer log.Debugf("openstack.Stack.CreateVolume(%s) done", request.Name)
+
+	if s == nil {
+		panic("Calling s.CreateVolume with s==nil!")
+	}
+
 	volume, err := client.GetVolume(request.Name)
 	if err != nil {
-		return nil, err
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return nil, err
+		}
 	}
 	if volume != nil {
 		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
@@ -115,16 +132,24 @@ func (s *Stack) CreateVolume(request model.VolumeRequest) (*model.Volume, error)
 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(id string) (*model.Volume, error) {
+	log.Debugf("openstack.Stack.GetVolume(%s) called", id)
+	defer log.Debugf("openstack.Stack.GetVolume(%s) done", id)
+
+	if s == nil {
+		panic("Calling s.GetVolume with s==nil!")
+	}
+
 	r := volumes.Get(client.Volume, id)
 	volume, err := r.Extract()
 	if err != nil {
+		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		switch err.(type) {
 		case gc.ErrDefault404:
-			return nil, nil
+			return nil, model.ResourceNotFoundError("volume", id)
 		}
-		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", ProviderErrorToString(err)))
 	}
+
 	av := model.Volume{
 		ID:    volume.ID,
 		Name:  volume.Name,
@@ -137,6 +162,13 @@ func (s *Stack) GetVolume(id string) (*model.Volume, error) {
 
 // ListVolumes returns the list of all volumes known on the current tenant
 func (s *Stack) ListVolumes() ([]model.Volume, error) {
+	log.Debug("openstack.Stack.ListVolumes() called")
+	defer log.Debug("openstack.Stack.ListVolumes() done")
+
+	if s == nil {
+		panic("Calling s.ListVolumes with s==nil!")
+	}
+
 	var vs []model.Volume
 	err := volumes.List(client.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumes.ExtractVolumes(page)
@@ -168,6 +200,13 @@ func (s *Stack) ListVolumes() ([]model.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(id string) error {
+	log.Debugf("openstack.Stack.DeleteVolume(%s) called", id)
+	defer log.Debugf("openstack.Stack.DeleteVolume(%s) done", id)
+
+	if s == nil {
+		panic("Calling s.DeleteVolume with s==nil!")
+	}
+
 	var (
 		err     error
 		timeout = 30 * time.Second
@@ -207,6 +246,12 @@ func (s *Stack) DeleteVolume(id string) error {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (s *Stack) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (string, error) {
+	log.Debugf("openstack.Stack.CreateVolumeAttachment(%s) called", request.Name)
+	defer log.Debugf("openstack.Stack.CreateVolumeAttachment(%s) done", request.Name)
+
+	if s == nil {
+		panic("Calling s.CreateVolumeAttachment with s==nil!")
+	}
 
 	// Creates the attachment
 	r := volumeattach.Create(client.Compute, request.HostID, volumeattach.CreateOpts{
@@ -229,6 +274,13 @@ func (s *Stack) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (s
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachment, error) {
+	log.Debugf("openstack.Stack.GetVolumeAttachment(%s) called", id)
+	defer log.Debugf("openstack.Stack.GetVolumeAttachment(%s) done", id)
+
+	if s == nil {
+		panic("Calling s.GetVolumeAttachment with s==nil!")
+	}
+
 	va, err := volumeattach.Get(s.Compute, serverID, id).Extract()
 	if err != nil {
 		log.Debugf("Error getting volume attachment: get call: %+v", err)
@@ -244,6 +296,13 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachmen
 
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error) {
+	log.Debugf("openstack.Stack.ListVolumeAttachments(%s) called", serverID)
+	defer log.Debugf("openstack.Stack.ListVolumeAttachments(%s) done", serverID)
+
+	if s == nil {
+		panic("Calling s.ListVolumeAttachments with s==nil!")
+	}
+
 	var vs []model.VolumeAttachment
 	err := volumeattach.List(client.Compute, serverID).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumeattach.ExtractVolumeAttachments(page)
@@ -271,6 +330,13 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment
 
 // DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
+	log.Debugf("openstack.Stack.DeleteVolumeAttachment(%s) called", serverID)
+	defer log.Debugf("openstack.Stack.DeleteVolumeAttachment(%s) done", serverID)
+
+	if s == nil {
+		panic("Calling s.DeleteVolumeAttachment with s==nil!")
+	}
+
 	r := volumeattach.Delete(client.Compute, serverID, vaID)
 	err := r.ExtractErr()
 	if err != nil {

@@ -18,12 +18,16 @@ package api
 
 import (
 	"github.com/CS-SI/SafeScale/iaas/model"
-	"github.com/CS-SI/SafeScale/iaas/provider"
-	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/HostState"
 )
 
 // Provider is the interface to cloud stack
 type Provider interface {
+	Build(map[string]interface{}) (Provider, error)
+
+	// ListAvailabilityZones lists the usable Availability Zones
+	ListAvailabilityZones(bool) (map[string]bool, error)
+
 	// ListImages lists available OS images
 	ListImages(bool) ([]model.Image, error)
 	// GetImage returns the Image referenced by id
@@ -75,8 +79,6 @@ type Provider interface {
 	StopHost(id string) error
 	// StartHost starts the host identified by id
 	StartHost(id string) error
-	// GetSSHConfig creates SSHConfig from host
-	//GetSSHConfig(param interface{}) (*system.SSHConfig, error)
 	// Reboot host
 	RebootHost(id string) error
 
