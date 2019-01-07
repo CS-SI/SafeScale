@@ -18,3 +18,7 @@ func Test_DockerNotGateway(t *testing.T) {
 func Test_DockerCompose(t *testing.T) {
 	integration_tests.DockerCompose(t, Providers.FLEXIBLEENGINE)
 }
+
+func Test_RemoteDesktop(t *testing.T) {
+	integration_tests.RemoteDesktop(t, Providers.FLEXIBLEENGINE)
+}
