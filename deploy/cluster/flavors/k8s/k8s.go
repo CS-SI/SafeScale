@@ -285,10 +285,10 @@ func Create(req core.Request) (*Cluster, error) {
 			AdminPassword:    cladmPassword,
 			NodesDef:         nodesDef,
 			DisabledFeatures: req.DisabledDefaultFeatures,
+			Service:          svc,
 		},
-		provider: svc,
-		manager:  &managerData{},
-		gateway:  gw,
+		manager: &managerData{},
+		gateway: gw,
 	}
 	err = instance.updateMetadata(nil)
 	if err != nil {

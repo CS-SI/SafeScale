@@ -260,12 +260,12 @@ var clusterCreateCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "complexity, C",
 			Value: "Small",
-			Usage: "Defines the sizing of the cluster: Small, Normal, Large (default: Small)",
+			Usage: "Defines the sizing of the cluster: Small, Normal, Large",
 		},
 		cli.StringFlag{
 			Name:  "flavor, F",
 			Value: "K8S",
-			Usage: "Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S (default: K8S)",
+			Usage: "Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S",
 		},
 		cli.BoolFlag{
 			Name:  "keep-on-failure, k",
@@ -274,7 +274,7 @@ var clusterCreateCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "cidr, N",
 			Value: "192.168.0.0/16",
-			Usage: "Defines the CIDR of the network to use with cluster (default: 192.168.0.0/16)",
+			Usage: "Defines the CIDR of the network to use with cluster",
 		},
 		cli.StringSliceFlag{
 			Name:  "disable",
