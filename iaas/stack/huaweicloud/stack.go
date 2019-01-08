@@ -19,25 +19,24 @@ package huaweicloud
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/providers/openstack"
-
-	openstack "github.com/CS-SI/SafeScale/iaas/stack/openstack"
-
 	// Gophercloud OpenStack API
 	gc "github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
+
+	"github.com/CS-SI/SafeScale/iaas/stack"
+	"github.com/CS-SI/SafeScale/iaas/stack/openstack"
 )
 
-// Stack is the implementation for huaweicloud following api.Stack
+// Stack is the implementation for huaweicloud cloud stack
 type Stack struct {
 	// Opts contains authentication options
-	AuthOpts *openstack.AuthenticationOptions
+	AuthOpts *stack.AuthenticationOptions
 	// CfgOpts ...
-	CfgOpts *Stack_openstack.ConfigurationOptions
-	// Identity contains service client of Identity openstack service
+	CfgOpts *stack.ConfigurationOptions
+	// Identity contains service client of openstack Identity service
 	Identity *gc.ServiceClient
 	// osclt is the openstack.Stack instance to use when fully openstack compliant
 	osclt *openstack.Stack
@@ -50,7 +49,7 @@ type Stack struct {
 }
 
 // New authenticates and return interface Stack
-func New(auth openstack.AuthenticationOptions, cfg openstack.ConfigurationOptions) (*Stack, error) {
+func New(auth stack.AuthenticationOptions, cfg stack.ConfigurationOptions) (*Stack, error) {
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
@@ -63,13 +62,13 @@ func New(auth openstack.AuthenticationOptions, cfg openstack.ConfigurationOption
 		DomainName:  auth.DomainName,
 	}
 
-	openStack, err := openstack.New(auth, cfg)
+	stack, err := openstack.New(auth, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	// Identity API
-	identity, err := gcos.NewIdentityV3(openStack.driver, gc.EndpointOpts{})
+	identity, err := gcos.NewIdentityV3(stack.Driver, gc.EndpointOpts{})
 	if err != nil {
 		return nil, fmt.Errorf("%s", openstack.ErrorToString(err))
 	}
@@ -81,36 +80,25 @@ func New(auth openstack.AuthenticationOptions, cfg openstack.ConfigurationOption
 	}
 	allPages, err := projects.List(identity, listOpts).AllPages()
 	if err != nil {
-		return nil, fmt.Errorf("failed to query project ID corresponding to region '%s': %s", opts.Region, openstack.ErrorToString(err))
+		return nil, fmt.Errorf("failed to query project ID corresponding to region '%s': %s", opts.Region, openstack.ProviderErrorToString(err))
 	}
 	allProjects, err := projects.ExtractProjects(allPages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load project ID corresponding to region '%s': %s", opts.Region, openstack.ErrorToString(err))
+		return nil, fmt.Errorf("failed to load project ID corresponding to region '%s': %s", opts.Region, openstack.ProviderErrorToString(err))
 	}
 	if len(allProjects) > 0 {
 		opts.ProjectID = allProjects[0].ID
 	} else {
-		return nil, fmt.Errorf("failed to found project ID corresponding to region '%s': %s", opts.Region, openstack.ErrorToString(err))
+		return nil, fmt.Errorf("failed to found project ID corresponding to region '%s': %s", opts.Region, openstack.ProviderErrorToString(err))
 	}
 
 	s := Stack{
-		AuthOpts: &openstack.AuthOptions{
-			IdentityEndpoint: auth.IdentityEndpoint,
-			Username:         auth.Username,
-			Password:         auth.Password,
-			DomainName:       auth.DomainName,
-			AllowReauth:      auth.AllowReauth,
-			Region:           auth.Region,
-		},
-		CfgOpts: &openstack.CfgOptions{
-			DNSList:             cfg.DNSList,
-			UseFloatingIP:       true,
-			UseLayer3Networking: cfg.UseLayer3Networking,
-			VolumeSpeeds:        cfg.VolumeSpeeds,
-		},
+		AuthOpts: &auth,
+		CfgOpts:  &cfg,
 		Identity: identity,
-		osclt:    openStack,
+		osclt:    stack,
 	}
+	s.CfgOpts.UseFloatingIP = true
 
 	// Initializes the VPC
 	err = s.initVPC()

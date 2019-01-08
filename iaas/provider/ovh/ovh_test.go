@@ -19,16 +19,16 @@ package ovh_test
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/providers"
-
-	"github.com/CS-SI/SafeScale/providers/tests"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/tests"
 )
 
 var tester *tests.ClientTester
@@ -39,7 +39,7 @@ func getClient() (*tests.ClientTester, error) {
 		if tenant_override := os.Getenv("TEST_OVH"); tenant_override != "" {
 			tenant_name = tenant_override
 		}
-		service, err := providers.GetService(tenant_name)
+		service, err := iaas.GetService(tenant_name)
 		if err != nil {
 			return nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name))
 		}

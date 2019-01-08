@@ -17,72 +17,95 @@
 package opentelekom
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/stack/huaweicloud"
-	"github.com/CS-SI/SafeScale/iaas/provider"
+	"fmt"
+
+	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/iaas/provider/api"
+	"github.com/CS-SI/SafeScale/iaas/stack"
+	"github.com/CS-SI/SafeScale/iaas/stack/huaweicloud"
 )
 
 const (
-	authURL string = "https://iam.%s.otc.t-systems.com"
+	identityEndpointTemplate string = "https://iam.%s.otc.t-systems.com"
 )
 
-// Client is the implementation of the flexibleengine driver regarding to the api.ClientAPI
-type OpenTelekom struct {
-	AuthOpts AuthenticationOptions
-	CfgOpts  ConfigurationOptions
-	stack    *huaweicloud.Stack
+// impl is the implementation of the OpenTelekom provider
+type impl struct {
+	*huaweicloud.Stack
 }
 
 // Build build a new Client from configuration parameter
-func (p *OpenTelekom) Build(params map[string]interface{}) (*OpenTelekom, error) {
-	Username, _ := params["Username"].(string)
-	Password, _ := params["Password"].(string)
-	DomainName, _ := params["DomainName"].(string)
-	ProjectID, _ := params["ProjectID"].(string)
-	VPCName, _ := params["VPCName"].(string)
-	VPCCIDR, _ := params["VPCCIDR"].(string)
-	Region, _ := params["Region"].(string)
-	IdentityEndpoint, _ := params["IdentityEndpoint"].(string)
-	if IdentityEndpoint == "" {
-		IdentityEndpoint = fmt.Sprintf(authUrl, Region)
+func (p *OpenTelekom) Build(params map[string]interface{}) (api.Provider, error) {
+	username, _ := params["Username"].(string)
+	password, _ := params["Password"].(string)
+	domainName, _ := params["DomainName"].(string)
+	projectID, _ := params["ProjectID"].(string)
+	vpcName, _ := params["VPCName"].(string)
+	vpcCIDR, _ := params["VPCCIDR"].(string)
+	region, _ := params["Region"].(string)
+	identityEndpoint, _ := params["IdentityEndpoint"].(string)
+	if identityEndpoint == "" {
+		identityEndpoint = fmt.Sprintf(identityEndpointTemplate, Region)
 	}
-	S3AccessKeyID, _ := params["S3AccessKeyID"].(string)
-	S3AccessKeyPassword, _ := params["S3AccessKeyPassword"].(string)
 
-	newP := OpenTelekom{
-		AuthOpts: AuthenticationOptions{
-			IdentityEndpoint:    IdentityEndpoint,
-			Username:            Username,
-			Password:            Password,
-			DomainName:          DomainName,
-			ProjectID:           ProjectID,
-			Region:              Region,
-			AllowReauth:         true,
-			VPCName:             VPCName,
-			VPCCIDR:             VPCCIDR,
-			IdentityEndpoint:    IdentityEndpoint,
-			S3AccessKeyID:       S3AccessKeyID,
-			S3AccessKeyPassword: S3AccessKeyPassword,
-		},
-		CfgOpts: ConfigurationOptions{
-			DNSList:             []string{"1.1.1.1"},
-			UseFloatingIP:       true,
-			UseLayer3Networking: false,
-			VolumeSpeeds: map[string]VolumeSpeed.Enum{
-				"SATA": VolumeSpeed.COLD,
-				"SAS":  VolumeSpeed.HDD,
-				"SSD":  VolumeSpeed.SSD,
-			},
-		},
+	authOptions := &stack.AuthenticationOptions{
+		IdentityEndpoint: identityEndpoint,
+		Username:         username,
+		Password:         password,
+		DomainName:       domainName,
+		ProjectID:        projectID,
+		Region:           region,
+		AllowReauth:      true,
+		VPCName:          vpcName,
+		VPCCIDR:          vpcCIDR,
 	}
-	newP.stack, err := huaweicloud.New(newP.authOptions, newP.cfgOptions)
+
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName("huaweicloud", region, domainName, projectID)
 	if err != nil {
 		return nil, err
 	}
-	return &newP, nil
+
+	cfgOptions := &stack.ConfigurationOptions{
+		DNSList:             []string{"1.1.1.1"},
+		UseFloatingIP:       true,
+		UseLayer3Networking: false,
+		VolumeSpeeds: map[string]VolumeSpeed.Enum{
+			"SATA": VolumeSpeed.COLD,
+			"SAS":  VolumeSpeed.HDD,
+			"SSD":  VolumeSpeed.SSD,
+		},
+		MetadataBucket: metadataBucketName,
+	}
+	stack, err := huaweicloud.New(authOptions, cfgOptions)
+	if err != nil {
+		return nil, err
+	}
+	return &impl{Stack: stack}, nil
+}
+
+// ListTemplates ...
+// Value of all has no impact on the result
+func (p *impl) ListTemplates(all bool) ([]model.HostTemplate, error) {
+	allTemplates, err := p.Stack.ListTemplates()
+	if err != nil {
+		return nil, err
+	}
+	return allTemplates, nil
+}
+
+// ListImages ...
+// Value of all has no impact on the result
+func (p *impl) ListImages(all bool) ([]model.HostImage, error) {
+	allImages, err := p.Stack.ListImages()
+	if err != nil {
+		return nil, err
+	}
+	return allImages, nil
 }
 
 // init registers the opentelekom provider
 func init() {
-	providers.Register("opentelekom", &OpenTelekom{})
+	iaas.Register("opentelekom", &impl{})
 }

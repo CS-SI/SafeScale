@@ -19,6 +19,7 @@ package api
 import (
 	"github.com/CS-SI/SafeScale/iaas/model"
 	"github.com/CS-SI/SafeScale/iaas/model/enums/HostState"
+	"github.com/CS-SI/SafeScale/iaas/provider"
 )
 
 // Provider is the interface to cloud stack
@@ -107,7 +108,7 @@ type Provider interface {
 	DeleteVolumeAttachment(serverID, id string) error
 
 	// GetAuthOpts returns authentification options as a Config
-	GetAuthOpts() (model.Config, error)
+	GetAuthOpts() (provider.Config, error)
 	// GetCfgOpts returns configuration options as a Config
-	GetCfgOpts() (model.Config, error)
+	GetCfgOpts() (provider.Config, error)
 }

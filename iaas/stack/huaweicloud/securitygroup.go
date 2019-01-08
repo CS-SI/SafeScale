@@ -48,7 +48,7 @@ func (s *Stack) createTCPRules(groupID string) error {
 		Protocol:       secrules.ProtocolTCP,
 		RemoteIPPrefix: "::/0",
 	}
-	_, err = secrules.Create(s.osclt.driver, ruleOpts).Extract()
+	_, err = secrules.Create(s.osclt.Driver, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func (s *Stack) createTCPRules(groupID string) error {
 		Protocol:       secrules.ProtocolTCP,
 		RemoteIPPrefix: "0.0.0.0/0",
 	}
-	_, err = secrules.Create(s.osclt.driver, ruleOpts).Extract()
+	_, err = secrules.Create(s.osclt.Network, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}

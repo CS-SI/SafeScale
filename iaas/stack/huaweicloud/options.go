@@ -16,56 +16,25 @@
 
 package huaweicloud
 
-import "github.com/CS-SI/SafeScale/providers/api"
-
-// AuthenticationOptions fields are the union of those recognized by each identity implementation and
-// provider.
-type AuthenticationOptions struct {
-	IdentityEndpoint string
-	Username         string
-	Password         string
-	DomainName       string
-	ProjectID        string
-
-	AllowReauth bool
-
-	// TokenID allows users to authenticate (possibly as another user) with an
-	// authentication token ID.
-	TokenID string
-
-	//Openstack region (data center) where the infrstructure will be created
-	Region string
-
-	//FloatingIPPool name of the floating IP pool
-	//Necessary only if UseFloatingIP is true
-	//FloatingIPPool string
-
-	// Name of the VPC (Virtual Private Cloud)
-	VPCName string
-	// CIDR if the VPC
-	VPCCIDR string
-
-	// Identifier for S3 object storage use
-	S3AccessKeyID string
-	// Password of the previous identifier
-	S3AccessKeyPassword string
-}
+import (
+	"github.com/CS-SI/SafeScale/iaas/provider"
+)
 
 // GetAuthOpts returns the auth options
-func (s *Stack) GetAuthOpts() (api.Config, error) {
+func (s *Stack) GetAuthOpts() (provider.Config, error) {
 	cfg := provider.ConfigMap{}
 
-	cfg.Set("DomainName", client.Opts.DomainName)
-	cfg.Set("Login", client.Opts.Username)
-	cfg.Set("Password", client.Opts.Password)
-	cfg.Set("AuthUrl", client.Opts.IdentityEndpoint)
-	cfg.Set("Region", client.Opts.Region)
-	cfg.Set("VPCName", client.Opts.VPCName)
+	cfg.Set("DomainName", s.AuthOpts.DomainName)
+	cfg.Set("Login", s.AuthOpts.Username)
+	cfg.Set("Password", s.AuthOpts.Password)
+	cfg.Set("AuthUrl", s.AuthOpts.IdentityEndpoint)
+	cfg.Set("Region", s.AuthOpts.Region)
+	cfg.Set("VPCName", s.AuthOpts.VPCName)
 
 	return cfg, nil
 }
 
 // GetCfgOpts return configuration parameters
-func (s *Stack) GetCfgOpts() (api.Config, error) {
+func (s *Stack) GetCfgOpts() (provider.Config, error) {
 	return s.osclt.GetCfgOpts()
 }

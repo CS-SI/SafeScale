@@ -27,7 +27,7 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/iaas/model"
-	"github.com/CS-SI/SafeScale/iaas/provider/api"
+	"github.com/CS-SI/SafeScale/iaas/stack"
 	"github.com/CS-SI/SafeScale/utils"
 )
 
@@ -62,15 +62,13 @@ var userdataTemplate *template.Template
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func Prepare(
-	provider api.Provider, request model.HostRequest, kp *model.KeyPair, cidr string,
+	options *stack.ConfigurationOptions, request model.HostRequest, kp *model.KeyPair, cidr string,
 ) ([]byte, error) {
 
 	// Generate password for user gpac
 	var (
 		gpacPassword              string
 		err                       error
-		anon                      interface{}
-		ok                        bool
 		autoHostNetworkInterfaces bool
 		useLayer3Networking       = true
 		dnsList                   []string
@@ -91,22 +89,10 @@ func Prepare(
 		ip = request.DefaultGateway.GetPrivateIP()
 	}
 
-	config, err := provider.GetCfgOpts()
-	if err != nil {
-		return nil, err
-	}
-	anon, ok = config.Get("AutoHostNetworkInterfaces")
-	if ok {
-		autoHostNetworkInterfaces = anon.(bool)
-	}
-	anon, ok = config.Get("UseLayer3Networking")
-	if ok {
-		useLayer3Networking = anon.(bool)
-	}
-	anon, ok = config.Get("DNSList")
-	if ok {
-		dnsList = anon.([]string)
-	} else {
+	autoHostNetworkInterfaces = options.AutoHostNetworkInterfaces
+	useLayer3Networking = options.UseLayer3Networking
+	dnsList = options.DNSList
+	if len(dnsList) <= 0 {
 		dnsList = []string{"1.1.1.1"}
 	}
 
@@ -136,7 +122,6 @@ func Prepare(
 		CIDR:       cidr,
 		GatewayIP:  ip,
 		Password:   gpacPassword,
-
 		//HostName:   request.Name,
 	}
 

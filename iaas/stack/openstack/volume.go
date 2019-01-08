@@ -29,9 +29,9 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/iaas/model"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
@@ -62,7 +62,7 @@ func (s *Stack) getVolumeType(speed VolumeSpeed.Enum) string {
 		panic("Calling s.getVolumeType with s==nil!")
 	}
 
-	for t, s := range s.Cfg.VolumeSpeeds {
+	for t, s := range s.CfgOpts.VolumeSpeeds {
 		if s == speed {
 			return t
 		}
@@ -82,7 +82,7 @@ func (s *Stack) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 		panic("Calling s.getVolumeSpeed with s==nil!")
 	}
 
-	speed, ok := s.Cfg.VolumeSpeeds[vType]
+	speed, ok := s.CfgOpts.VolumeSpeeds[vType]
 	if ok {
 		return speed
 	}
@@ -94,14 +94,14 @@ func (s *Stack) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
-	log.Debugf("openstack.Stack.CreateVolume(%s) called", request.Name)
-	defer log.Debugf("openstack.Stack.CreateVolume(%s) done", request.Name)
+	log.Debugf("iaas.stack.openstack.Stack::CreateVolume(%s) called", request.Name)
+	defer log.Debugf("iaas.stack.openstack.Stack::CreateVolume(%s) done", request.Name)
 
 	if s == nil {
 		panic("Calling s.CreateVolume with s==nil!")
 	}
 
-	volume, err := client.GetVolume(request.Name)
+	volume, err := s.GetVolume(request.Name)
 	if err != nil {
 		if _, ok := err.(model.ErrResourceNotFound); !ok {
 			return nil, err
@@ -111,10 +111,10 @@ func (s *Stack) CreateVolume(request model.VolumeRequest) (*model.Volume, error)
 		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
 	}
 
-	vol, err := volumes.Create(client.Volume, volumes.CreateOpts{
+	vol, err := volumes.Create(s.Volume, volumes.CreateOpts{
 		Name:       request.Name,
 		Size:       request.Size,
-		VolumeType: client.getVolumeType(request.Speed),
+		VolumeType: s.getVolumeType(request.Speed),
 	}).Extract()
 	if err != nil {
 		log.Debugf("Error creating volume: volume creation invocation: %+v", err)
@@ -124,7 +124,7 @@ func (s *Stack) CreateVolume(request model.VolumeRequest) (*model.Volume, error)
 		ID:    vol.ID,
 		Name:  vol.Name,
 		Size:  vol.Size,
-		Speed: client.getVolumeSpeed(vol.VolumeType),
+		Speed: s.getVolumeSpeed(vol.VolumeType),
 		State: toVolumeState(vol.Status),
 	}
 	return &v, nil
@@ -132,14 +132,14 @@ func (s *Stack) CreateVolume(request model.VolumeRequest) (*model.Volume, error)
 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(id string) (*model.Volume, error) {
-	log.Debugf("openstack.Stack.GetVolume(%s) called", id)
-	defer log.Debugf("openstack.Stack.GetVolume(%s) done", id)
+	log.Debugf("iaas.stack.openstack.Stack::GetVolume(%s) called", id)
+	defer log.Debugf("iaas.stack.openstack.Stack::GetVolume(%s) done", id)
 
 	if s == nil {
 		panic("Calling s.GetVolume with s==nil!")
 	}
 
-	r := volumes.Get(client.Volume, id)
+	r := volumes.Get(s.Volume, id)
 	volume, err := r.Extract()
 	if err != nil {
 		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
@@ -170,7 +170,7 @@ func (s *Stack) ListVolumes() ([]model.Volume, error) {
 	}
 
 	var vs []model.Volume
-	err := volumes.List(client.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+	err := volumes.List(s.Volume, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumes.ExtractVolumes(page)
 		if err != nil {
 			log.Errorf("Error listing volumes: volume extraction: %+v", err)
@@ -181,7 +181,7 @@ func (s *Stack) ListVolumes() ([]model.Volume, error) {
 				ID:    vol.ID,
 				Name:  vol.Name,
 				Size:  vol.Size,
-				Speed: client.getVolumeSpeed(vol.VolumeType),
+				Speed: s.getVolumeSpeed(vol.VolumeType),
 				State: toVolumeState(vol.Status),
 			}
 			vs = append(vs, av)
@@ -254,7 +254,7 @@ func (s *Stack) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (s
 	}
 
 	// Creates the attachment
-	r := volumeattach.Create(client.Compute, request.HostID, volumeattach.CreateOpts{
+	r := volumeattach.Create(s.Compute, request.HostID, volumeattach.CreateOpts{
 		VolumeID: request.VolumeID,
 	})
 	va, err := r.Extract()
@@ -304,7 +304,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment
 	}
 
 	var vs []model.VolumeAttachment
-	err := volumeattach.List(client.Compute, serverID).EachPage(func(page pagination.Page) (bool, error) {
+	err := volumeattach.List(s.Compute, serverID).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := volumeattach.ExtractVolumeAttachments(page)
 		if err != nil {
 			log.Debugf("Error listing volume attachment: extracting attachments: %+v", err)
@@ -337,7 +337,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 		panic("Calling s.DeleteVolumeAttachment with s==nil!")
 	}
 
-	r := volumeattach.Delete(client.Compute, serverID, vaID)
+	r := volumeattach.Delete(s.Compute, serverID, vaID)
 	err := r.ExtractErr()
 	if err != nil {
 		spew.Dump(r)

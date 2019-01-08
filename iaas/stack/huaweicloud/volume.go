@@ -19,20 +19,17 @@ package huaweicloud
 import (
 	"fmt"
 
-	gc "github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
-	v2_vol "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
-	"github.com/gophercloud/gophercloud/pagination"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/iaas/provider"
+	gc "github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
+	"github.com/gophercloud/gophercloud/pagination"
+
+	"github.com/CS-SI/SafeScale/iaas/model"
 	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/iaas/stack/openstack"
-
-	v2_vol "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 )
 
 // DeleteVolume deletes the volume identified by id
@@ -96,14 +93,15 @@ func (s *Stack) CreateVolume(request model.VolumeRequest) (*model.Volume, error)
 		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
 	}
 
-	opts := v2_vol.CreateOpts{
+	opts := volumes.CreateOpts{
 		Name:       request.Name,
 		Size:       request.Size,
 		VolumeType: s.getVolumeType(request.Speed),
 	}
 	vol, err := v2_vol.Create(s.osclt.Volume, opts).Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Error creating volume : %s", openstack.ProviderErrorToString(err))
+		log.Debugf("Error creating volume: volume creation invocation: %+v", err)
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume : %s", openstack.ProviderErrorToString(err)))
 	}
 	v := model.Volume{
 		ID:    vol.ID,
@@ -121,11 +119,11 @@ func (s *Stack) GetVolume(id string) (*model.Volume, error) {
 	r := volumes.Get(client.osclt.Volume, id)
 	volume, err := r.Extract()
 	if err != nil {
+		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		switch err.(type) {
 		case gc.ErrDefault404:
-			return nil, nil
+			return nil, model.ResourceNotFoundError("volume", "")
 		}
-		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", openstack.ProviderErrorToString(err)))
 	}
 
@@ -133,7 +131,7 @@ func (s *Stack) GetVolume(id string) (*model.Volume, error) {
 		ID:    volume.ID,
 		Name:  volume.Name,
 		Size:  volume.Size,
-		Speed: client.getVolumeSpeed(volume.VolumeType),
+		Speed: s.getVolumeSpeed(volume.VolumeType),
 		State: toVolumeState(volume.Status),
 	}
 	return &av, nil
@@ -153,7 +151,7 @@ func (s *Stack) ListVolumes() ([]model.Volume, error) {
 				ID:    vol.ID,
 				Name:  vol.Name,
 				Size:  vol.Size,
-				Speed: client.getVolumeSpeed(vol.VolumeType),
+				Speed: s.getVolumeSpeed(vol.VolumeType),
 				State: toVolumeState(vol.Status),
 			}
 			vs = append(vs, av)

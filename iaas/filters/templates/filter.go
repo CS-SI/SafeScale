@@ -17,7 +17,7 @@
 package templates
 
 import (
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/model"
 )
 
 // Filter ...

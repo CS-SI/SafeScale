@@ -36,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	providerapi "github.com/CS-SI/SafeScale/iaas/provider/api"
 	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/crypt"
 )
 
 // Client ...
@@ -43,6 +44,7 @@ type Client struct {
 	providerapi.Provider
 	objectstorage.Location
 	MetadataBucket objectstorage.Bucket
+	MetadataKey    *crypt.Key
 }
 
 // FromProvider contructs a api.Client instance from a providerapi.Provider

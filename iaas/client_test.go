@@ -20,18 +20,19 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/providers/cloudwatt"
-	"github.com/CS-SI/SafeScale/providers/flexibleengine"
-	"github.com/CS-SI/SafeScale/providers/opentelekom"
-	"github.com/CS-SI/SafeScale/providers/ovh"
-
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/iaas/provider"
+	//"github.com/CS-SI/SafeScale/iaas/provider/aws"
+	"github.com/CS-SI/SafeScale/iaas/provider/cloudferro"
+	"github.com/CS-SI/SafeScale/iaas/provider/cloudwatt"
+	"github.com/CS-SI/SafeScale/iaas/provider/flexibleengine"
+	"github.com/CS-SI/SafeScale/iaas/provider/opentelekom"
+	"github.com/CS-SI/SafeScale/iaas/provider/ovh"
 )
 
 func TestCompare(t *testing.T) {
-	s1 := providers.SimilarityScore("16.04", "ubuntu-xenial-16.04-amd64-server-20170329")
+	s1 := provider.SimilarityScore("16.04", "ubuntu-xenial-16.04-amd64-server-20170329")
 	fmt.Println(s1)
 }
 
@@ -45,19 +46,25 @@ func TestParameters(t *testing.T) {
 }
 
 func TestGetService(t *testing.T) {
-	providers.Register("ovh", &ovh.Client{})
-	providers.Register("cloudwatt", &cloudwatt.Client{})
-	providers.Register("flexibleEngine", &flexibleengine.Client{})
-	providers.Register("opentelekom", &opentelekom.Client{})
-	ovh, err := providers.GetService("TestOvh")
+	//	provider.Register("aws", &aws.Client{})
+	provider.Register("ovh", &ovh.Client{})
+	provider.Register("cloudferro", &cloudferro.Client{})
+	provider.Register("cloudwatt", &cloudwatt.Client{})
+	provider.Register("flexibleEngine", &flexibleengine.Client{})
+	provider.Register("opentelekom", &opentelekom.Client{})
+	ovh, err := provider.GetService("TestOvh")
 	require.Nil(t, err)
-	_, err = providers.GetService("TestCloudwatt")
+	_, err := provider.GetService("TestCloudferro")
 	require.Nil(t, err)
-	_, err = providers.GetService("TestFlexibleEngine")
+	// _, err := provider.GetService("TestAws")
+	// require.Nil(t, err)
+	_, err = provider.GetService("TestCloudwatt")
 	require.Nil(t, err)
-	_, err = providers.GetService("TestOpenTelekom")
+	_, err = provider.GetService("TestFlexibleEngine")
 	require.Nil(t, err)
-	imgs, err := ovh.ListImages(false)
+	_, err = provider.GetService("TestOpenTelekom")
+	require.Nil(t, err)
+	imgs, err := ovh.ListImages()
 	require.Nil(t, err)
 	require.True(t, len(imgs) > 3)
 	//_, err = providers.GetService("TestCloudwatt")
@@ -66,10 +73,10 @@ func TestGetService(t *testing.T) {
 func TestGetServiceErr(t *testing.T) {
 	createTenantFile()
 	defer deleteTenantFile()
-	providers.Register("ovh", &ovh.Client{})
-	providers.Register("cloudwatt", &cloudwatt.Client{})
-	_, err := providers.GetService("TestOhvehache")
+	provider.Register("ovh", &ovh.Client{})
+	provider.Register("cloudwatt", &cloudwatt.Client{})
+	_, err := provider.GetService("TestOhvehache")
 	require.Error(t, err)
-	_, err = providers.GetService("UnknownService")
+	_, err = provider.GetService("UnknownService")
 	require.Error(t, err)
 }
