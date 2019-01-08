@@ -441,7 +441,6 @@ func Create(req core.Request) (*Cluster, error) {
 cleanNodes:
 	if !req.KeepOnFailure {
 		broker.Host.Delete(instance.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
-
 		broker.Host.Delete(instance.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
 	}
 cleanMasters:
