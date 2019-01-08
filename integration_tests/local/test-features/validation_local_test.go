@@ -22,3 +22,7 @@ func Test_DockerCompose(t *testing.T) {
 func Test_RemoteDesktop(t *testing.T) {
 	integration_tests.RemoteDesktop(t, Providers.LOCAL)
 }
+
+func Test_ReverseProxy(t *testing.T) {
+	integration_tests.ReverseProxy(t, Providers.LOCAL)
+}
