@@ -19,72 +19,91 @@ package openstack
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/iaas/provider"
-	"github.com/CS-SI/SafeScale/iaas/provider/api"
-	"github.com/CS-SI/SafeScale/iaas/resource/enums/VolumeSpeed"
-
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/model"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/iaas/provider"
+	"github.com/CS-SI/SafeScale/iaas/provider/api"
+	"github.com/CS-SI/SafeScale/iaas/stack"
 	"github.com/CS-SI/SafeScale/iaas/stack/openstack"
 )
 
-// Openstack is the implementation of the openstack provider respecting api.Provider
-type Openstack struct {
-	Opts  *AuthOptions
-	Cfg   *CfgOptions
-	stack *openstack.Stack
+// impl is the implementation of the openstack provider respecting api.Provider
+type impl struct {
+	*openstack.Stack
 
 	SecurityGroup     *secgroups.SecurityGroup
-	ProviderNetworkID string
+	ExternalNetworkID string
 }
 
 // Build build a new Client from configuration parameter
-func (p *Openstack) Build(params map[string]interface{}) (api.Provider, error) {
-	IdentityEndpoint, _ := params["IdentityEndpoint"].(string)
-	Username, _ := params["Username"].(string)
-	Password, _ := params["Password"].(string)
-	TenantName, _ := params["TenantName"].(string)
-	Region, _ := params["Region"].(string)
-	FloatingIPPool, _ := params["FloatingIPPool"].(string)
-	newP := OpenStack{
-		AuthOpts: AuthOptions{
-			IdentityEndpoint: IdentityEndpoint,
-			Username:         Username,
-			Password:         Password,
-			TenantName:       TenantName,
-			Region:           Region,
-			FloatingIPPool:   FloatingIPPool,
-		},
-		CfgOpts: CfgOptions{
-			ProviderNetwork:           "public",
-			UseFloatingIP:             true,
-			UseLayer3Networking:       true,
-			AutoHostNetworkInterfaces: true,
-			VolumeSpeeds: map[string]VolumeSpeed.Enum{
-				"standard":   VolumeSpeed.COLD,
-				"performant": VolumeSpeed.HDD,
-			},
-			DNSList:    []string{"185.23.94.244", "185.23.94.244"},
-			S3Protocol: "swiftks",
-		},
+func (p *impl) Build(params map[string]interface{}) (api.Provider, error) {
+	identityEndpoint, _ := params["IdentityEndpoint"].(string)
+	username, _ := params["Username"].(string)
+	password, _ := params["Password"].(string)
+	tenantName, _ := params["TenantName"].(string)
+	region, _ := params["Region"].(string)
+	floatingIPPool, _ := params["FloatingIPPool"].(string)
+	providerNetwork, _ := params["ExternalNetwork"].(string)
+	if providerNetwork == "" {
+		providerNetwork = "public"
 	}
-	newP.stack, err = openstack.New(newP.AuthOpts, newP.CfgOpts)
+	defaultImage, _ := params["DefaultImage"].(string)
+	dnsServers, _ := params["DNSServers"].([]string)
+	if len(dnsServers) <= 0 {
+		dnsServers = []string{"8.8.8.8", "1.1.1.1"}
+	}
+
+	authOptions := &stack.AuthenticationOptions{
+		IdentityEndpoint: identityEndpoint,
+		Username:         username,
+		Password:         password,
+		TenantName:       tenantName,
+		Region:           region,
+		FloatingIPPool:   floatingIPPool,
+	}
+
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName("openstack", region, tenantName, "0")
 	if err != nil {
 		return nil, err
 	}
+
+	cfgOptions := &stack.ConfigurationOptions{
+		ProviderNetwork:           providerNetwork,
+		UseFloatingIP:             true,
+		UseLayer3Networking:       true,
+		AutoHostNetworkInterfaces: true,
+		VolumeSpeeds: map[string]VolumeSpeed.Enum{
+			"standard":   VolumeSpeed.COLD,
+			"performant": VolumeSpeed.HDD,
+		},
+		DNSList:        dnsServers,
+		DefaultImage:   defaultImage,
+		MetadataBucket: metadataBucketName,
+	}
+
+	var err error
+	stack, err := openstack.New(authOptions, cfgOptions)
+	if err != nil {
+		return nil, err
+	}
+	newP := &impl{Stack: stack}
 	err = newP.initDefaultSecurityGroup()
 	if err != nil {
 		return nil, err
 	}
-	return &newP, err
+	return newP, nil
 }
 
 // getDefaultSecurityGroup returns the default security group
-func (p *Openstack) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
+func (p *impl) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
 	var sgList []secgroups.SecurityGroup
 
-	err := secgroups.List(p.stack.Compute).EachPage(func(page pagination.Page) (bool, error) {
+	err := secgroups.List(p.Stack.Compute).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := secgroups.ExtractSecurityGroups(page)
 		if err != nil {
 			return false, err
@@ -107,7 +126,7 @@ func (p *Openstack) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error) 
 }
 
 // createTCPRules creates TCP rules to configure the default security group
-func (p *Openstack) createTCPRules(groupID string) error {
+func (p *impl) createTCPRules(groupID string) error {
 	// Open TCP Ports
 	ruleOpts := secgroups.CreateRuleOpts{
 		ParentGroupID: groupID,
@@ -117,7 +136,7 @@ func (p *Openstack) createTCPRules(groupID string) error {
 		CIDR:          "0.0.0.0/0",
 	}
 
-	_, err := secgroups.CreateRule(p.stack.Compute, ruleOpts).Extract()
+	_, err := secgroups.CreateRule(p.Stack.Compute, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -128,12 +147,12 @@ func (p *Openstack) createTCPRules(groupID string) error {
 		IPProtocol:    "TCP",
 		CIDR:          "::/0",
 	}
-	_, err = secgroups.CreateRule(p.stack.Compute, ruleOpts).Extract()
+	_, err = secgroups.CreateRule(p.Stack.Compute, ruleOpts).Extract()
 	return err
 }
 
 // createTCPRules creates UDP rules to configure the default security group
-func (p *Openstack) createUDPRules(groupID string) error {
+func (p *impl) createUDPRules(groupID string) error {
 	// Open UDP Ports
 	ruleOpts := secgroups.CreateRuleOpts{
 		ParentGroupID: groupID,
@@ -143,7 +162,7 @@ func (p *Openstack) createUDPRules(groupID string) error {
 		CIDR:          "0.0.0.0/0",
 	}
 
-	_, err := secgroups.CreateRule(p.stack.Compute, ruleOpts).Extract()
+	_, err := secgroups.CreateRule(p.Stack.Compute, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -154,12 +173,12 @@ func (p *Openstack) createUDPRules(groupID string) error {
 		IPProtocol:    "UDP",
 		CIDR:          "::/0",
 	}
-	_, err = secgroups.CreateRule(p.stack.Compute, ruleOpts).Extract()
+	_, err = secgroups.CreateRule(p.Stack.Compute, ruleOpts).Extract()
 	return err
 }
 
 // createICMPRules creates UDP rules to configure the default security group
-func (p *Openstack) createICMPRules(groupID string) error {
+func (p *impl) createICMPRules(groupID string) error {
 	// Open TCP Ports
 	ruleOpts := secgroups.CreateRuleOpts{
 		ParentGroupID: groupID,
@@ -169,7 +188,7 @@ func (p *Openstack) createICMPRules(groupID string) error {
 		CIDR:          "0.0.0.0/0",
 	}
 
-	_, err := secgroups.CreateRule(p.stack.Compute, ruleOpts).Extract()
+	_, err := secgroups.CreateRule(p.Stack.Compute, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
@@ -180,20 +199,20 @@ func (p *Openstack) createICMPRules(groupID string) error {
 		IPProtocol:    "ICMP",
 		CIDR:          "::/0",
 	}
-	_, err = secgroups.CreateRule(p.stack.Compute, ruleOpts).Extract()
+	_, err = secgroups.CreateRule(p.Stack.Compute, ruleOpts).Extract()
 	return err
 }
 
 // initDefaultSecurityGroup create an open Security Group
 // The default security group opens all TCP, UDP, ICMP ports
 // Security is managed individually on each host using a linux firewall
-func (p *Openstack) initDefaultSecurityGroup() error {
-	sg, err := client.getDefaultSecurityGroup()
+func (p *impl) initDefaultSecurityGroup() error {
+	sg, err := p.getDefaultSecurityGroup()
 	if err != nil {
 		return err
 	}
 	if sg != nil {
-		client.SecurityGroup = sg
+		p.SecurityGroup = sg
 		return nil
 	}
 	opts := secgroups.CreateOpts{
@@ -201,51 +220,74 @@ func (p *Openstack) initDefaultSecurityGroup() error {
 		Description: "Default security group",
 	}
 
-	group, err := secgroups.Create(client.Compute, opts).Extract()
+	group, err := secgroups.Create(p.Stack.Compute, opts).Extract()
 	if err != nil {
 		return err
 	}
-	err = client.createTCPRules(group.ID)
+	err = p.createTCPRules(group.ID)
 	if err != nil {
-		secgroups.Delete(client.Compute, group.ID)
+		secgroups.Delete(p.Stack.Compute, group.ID)
 		return err
 	}
 
-	err = client.createUDPRules(group.ID)
+	err = p.createUDPRules(group.ID)
 	if err != nil {
-		secgroups.Delete(client.Compute, group.ID)
+		secgroups.Delete(p.Stack.Compute, group.ID)
 		return err
 	}
-	err = client.createICMPRules(group.ID)
+	err = p.createICMPRules(group.ID)
 	if err != nil {
-		secgroups.Delete(client.Compute, group.ID)
+		secgroups.Delete(p.Stack.Compute, group.ID)
 		return err
 	}
-	client.SecurityGroup = group
+	p.SecurityGroup = group
 	return nil
 }
 
 // GetAuthOpts returns the auth options
-func (p *Openstack) GetAuthOpts() (provider.Config, error) {
+func (p *impl) GetAuthOpts() (provider.Config, error) {
 	cfg := provider.ConfigMap{}
 
-	cfg.Set("TenantName", p.AuthOpts.TenantName)
-	cfg.Set("Login", p.AuthOpts.Username)
-	cfg.Set("Password", p.AuthOpts.Password)
-	cfg.Set("AuthUrl", p.AuthOpts.IdentityEndpoint)
-	cfg.Set("Region", p.AuthOpts.Region)
+	cfg.Set("TenantName", p.Stack.AuthOpts.TenantName)
+	cfg.Set("Login", p.Stack.AuthOpts.Username)
+	cfg.Set("Password", p.Stack.AuthOpts.Password)
+	cfg.Set("AuthUrl", p.Stack.AuthOpts.IdentityEndpoint)
+	cfg.Set("Region", p.Stack.AuthOpts.Region)
 	return cfg, nil
 }
 
 // GetCfgOpts return configuration parameters
-func (p *Openstack) GetCfgOpts() (provider.Config, error) {
+func (p *impl) GetCfgOpts() (provider.Config, error) {
 	cfg := provider.ConfigMap{}
 
-	cfg.Set("DNSList", p.CfgOpts.DNSList)
-	cfg.Set("S3Protocol", p.CfgOpts.S3Protocol)
-	cfg.Set("AutoHostNetworkInterfaces", p.CfgOpts.AutoHostNetworkInterfaces)
-	cfg.Set("UseLayer3Networking", p.CfgOpts.UseLayer3Networking)
-	cfg.Set("MetadataBucket", p.CfgOpts.MetadataBucketName)
-
+	cfg.Set("DNSList", p.Stack.CfgOpts.DNSList)
+	cfg.Set("AutoHostNetworkInterfaces", p.Stack.CfgOpts.AutoHostNetworkInterfaces)
+	cfg.Set("UseLayer3Networking", p.Stack.CfgOpts.UseLayer3Networking)
+	cfg.Set("DefaultImage", p.Stack.CfgOpts.DefaultImage)
 	return cfg, nil
+}
+
+// ListTemplates ...
+// Value of all has no impact on the result
+func (p *impl) ListTemplates(all bool) ([]model.HostTemplate, error) {
+	allTemplates, err := p.Stack.ListTemplates()
+	if err != nil {
+		return nil, err
+	}
+	return allTemplates, nil
+}
+
+// ListImages ...
+// Value of all has no impact on the result
+func (p *impl) ListImages(all bool) ([]model.Image, error) {
+	allImages, err := p.Stack.ListImages()
+	if err != nil {
+		return nil, err
+	}
+	return allImages, nil
+}
+
+// init registers the openstack provider
+func init() {
+	iaas.Register("openstack", &impl{})
 }

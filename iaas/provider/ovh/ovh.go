@@ -17,13 +17,21 @@
 package ovh
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/provider/api"
+	"strings"
+
+	"github.com/CS-SI/SafeScale/iaas"
+	filters "github.com/CS-SI/SafeScale/iaas/filters/templates"
+	"github.com/CS-SI/SafeScale/iaas/model"
 	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/iaas/provider"
+	"github.com/CS-SI/SafeScale/iaas/provider/api"
+	"github.com/CS-SI/SafeScale/iaas/stack"
 	"github.com/CS-SI/SafeScale/iaas/stack/openstack"
 )
 
-//ProviderNetwork name of ovh external network
-const ProviderNetwork string = "Ext-Net"
+// externalNetwork name of ovh external network
+const externalNetwork string = "Ext-Net"
 
 type gpuCfg struct {
 	GPUNumber int
@@ -49,111 +57,123 @@ var gpuMap = map[string]gpuCfg{
 	},
 }
 
-/*AuthOptions fields are the union of those recognized by each identity implementation and
-provider.
-*/
-type AuthOptions struct {
-	// // Endpoint ovh end point (ovh-eu, ovh-ca ...)
-	// Endpoint string
-	// //Application or Project Name
-	// ApplicationName string
-	// Application Key or project ID
-	ApplicationKey string
-	// //Consumer key
-	// ConsumerKey string
-	// Openstack identifier
-	OpenstackID string
-	// OpenStack password
-	OpenstackPassword string
-	// Name of the data center (GRA3, BHS3 ...)
-	Region string
-	// Project Name
-	ProjectName string
+// impl is the implementation of the OVH provider
+type impl struct {
+	*openstack.Stack
+	ExternalNetworkID string
 }
 
-// func parseOpenRC(openrc string) (*openstack.AuthOptions, error) {
-// 	tokens := strings.Split(openrc, "export")
-// }
-
-//AuthenticatedClient returns an authenticated client
-func AuthenticatedClient(opts AuthOptions) (*Client, error) {
-	client := &Client{}
-	osclt, err := openstack.AuthenticatedClient(
-		openstack.AuthOptions{
-			IdentityEndpoint: "https://auth.cloud.ovh.net/v2.0",
-			//UserID:           opts.OpenstackID,
-			Username:    opts.OpenstackID,
-			Password:    opts.OpenstackPassword,
-			TenantID:    opts.ApplicationKey,
-			TenantName:  opts.ProjectName,
-			Region:      opts.Region,
-			AllowReauth: true,
-		},
-		openstack.CfgOptions{
-			ProviderNetwork:           ProviderNetwork,
-			UseFloatingIP:             false,
-			UseLayer3Networking:       false,
-			AutoHostNetworkInterfaces: false,
-			DNSList:                   []string{"213.186.33.99", "1.1.1.1"},
-			VolumeSpeeds: map[string]VolumeSpeed.Enum{
-				"classic":    VolumeSpeed.COLD,
-				"high-speed": VolumeSpeed.HDD,
-			},
-			MetadataBucketName: api.BuildMetadataBucketName(opts.ApplicationKey),
-		},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-	client.osclt = osclt
-
-	return client, nil
-
-}
-
-// Ovh is the implementation of the ovh driver
-type Ovh struct {
-	AuthOpts           AuthenticationOptions
-	MetadataBucketName string
-	stack              *openstack.Stack
-}
+var (
+	identityEndpoint = "https://auth.cloud.ovh.net/v2.0"
+	externalNetwork  = "Ext-Net"
+	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
+)
 
 // Build build a new instance of Ovh using configuration parameters
-func (p *Ovh) Build(params map[string]interface{}) (*api.Provider, error) {
-	ApplicationKey, _ := params["ApplicationKey"].(string)
-	OpenstackID, _ := params["OpenstackID"].(string)
-	OpenstackPassword, _ := params["OpenstackPassword"].(string)
-	Region, _ := params["Region"].(string)
-	ProjectName, _ := params["ProjectName"].(string)
+func (p *impl) Build(params map[string]interface{}) (api.Provider, error) {
+	identityParams, _ := params["identity"].(map[string]interface{})
+	computeParams, _ := params["compute"].(map[string]interface{})
+	networkParams, _ := params["network"].(map[string]interface{})
 
-	newP := Ovh{
-		AuthOpts: AuthenticationOptions{
-			ApplicationKey:    ApplicationKey,
-			OpenstackID:       OpenstackID,
-			OpenstackPassword: OpenstackPassword,
-			Region:            Region,
-			ProjectName:       ProjectName,
-		},
-		CfgOpts: {},
+	applicationKey, _ := identityParams["ApplicationKey"].(string)
+	openstackID, _ := identityParams["OpenstackID"].(string)
+	openstackPassword, _ := identityParams["OpenstackPassword"].(string)
+	region, _ := computeParams["Region"].(string)
+	projectName, _ := computeParams["ProjectName"].(string)
+
+	authOptions := &stack.AuthenticationOptions{
+		IdentityEndpoint: identityEndpoint,
+		Username:         openstackID,
+		Password:         openstackPassword,
+		TenantID:         applicationKey,
+		TenantName:       projectName,
+		Region:           region,
+		AllowReauth:      true,
 	}
-	newP.stack, err := ovh.New(newP.AuthOpts, newPCfgOpts)
+
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName("openstack", region, applicationKey, projectName)
 	if err != nil {
 		return nil, err
 	}
-	return &newP, nil
+
+	cfgOptions := &stack.ConfigurationOptions{
+		ProviderNetwork:           externalNetwork,
+		UseFloatingIP:             false,
+		UseLayer3Networking:       false,
+		AutoHostNetworkInterfaces: false,
+		DNSList:                   dnsServers,
+		VolumeSpeeds: map[string]VolumeSpeed.Enum{
+			"classic":    VolumeSpeed.COLD,
+			"high-speed": VolumeSpeed.HDD,
+		},
+		MetadataBucketName: metadataBucketName,
+	}
+
+	stack, err := openstack.New(authOptions, cfgOptions)
+	if err != nil {
+		return nil, err
+	}
+	return &impl{Stack: stack}, nil
 }
 
 // GetCfgOpts return configuration parameters
-func (p *Ovh) GetCfgOpts() (provider.Config, error) {
-	return p.stack.GetCfgOpts()
+func (p *impl) GetCfgOpts() (provider.Config, error) {
+	return p.Stack.GetCfgOpts()
 }
 
 // GetAuthOpts returns the auth options
-func (p *Ovh) GetAuthOpts() (provider.Config, error) {
-	return p.stack.GetAuthOpts()
+func (p *impl) GetAuthOpts() (provider.Config, error) {
+	return p.Stack.GetAuthOpts()
+}
+
+// GetTemplate overload OpenStack GetTemplate method to add GPU configuration
+func (p *impl) GetTemplate(id string) (*model.HostTemplate, error) {
+	tpl, err := p.Stack.GetTemplate(id)
+	if tpl != nil {
+		addGPUCfg(tpl)
+	}
+	return tpl, err
+}
+
+func addGPUCfg(tpl *model.HostTemplate) {
+	if cfg, ok := gpuMap[tpl.Name]; ok {
+		tpl.GPUNumber = cfg.GPUNumber
+		tpl.GPUType = cfg.GPUType
+	}
+}
+
+// ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
+func (p *impl) ListTemplates(all bool) ([]model.HostTemplate, error) {
+	allTemplates, err := p.Stack.ListTemplates()
+	if err != nil {
+		return nil, err
+	}
+	if all {
+		return allTemplates, nil
+	}
+
+	filter := filters.NewFilter(isWindowsTemplate).Not().And(filters.NewFilter(isFlexTemplate).Not())
+	return filters.FilterTemplates(allTemplates, filter), nil
+}
+
+func isWindowsTemplate(t model.HostTemplate) bool {
+	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
+}
+
+func isFlexTemplate(t model.HostTemplate) bool {
+	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
+}
+
+// CreateNetwork is overloaded to handle specific OVH situation
+func (p *impl) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
+	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
+	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
+	if len(req.DNSServers) == 0 {
+		req.DNSServers = []string{"0.0.0.0"}
+	}
+	return p.Stack.CreateNetwork(req)
 }
 
 func init() {
-	provider.Register("ovh", &Ovh{})
+	iaas.Register("ovh", &impl{})
 }

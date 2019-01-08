@@ -18,37 +18,37 @@ package ovh_test
 import (
 	"errors"
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/mocks"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/providers"
-
-	"github.com/CS-SI/SafeScale/providers/tests"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/model"
+	"github.com/CS-SI/SafeScale/iaas/provider/api"
+	"github.com/CS-SI/SafeScale/iaas/provider/tests"
+	"github.com/CS-SI/SafeScale/providers/mocks"
 )
 
 var mock_tester *tests.ClientTester
 var gmci *mocks.MockClientAPI
 
-func GetMockService(t *testing.T, tenant string) (*providers.Service, error) {
+func GetMockService(t *testing.T, tenant string) (*iaas.Client, error) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
 	if strings.Contains(tenant, "Ovh") {
 		mci := mocks.NewMockClientAPI(mockCtrl)
 
-		return &providers.Service{
-			ClientAPI: mci,
+		return &iaas.Client{
+			Provider: mci,
 		}, nil
-	} else {
-		return providers.GetService(tenant)
 	}
+	return iaas.GetService(tenant)
 }
 
 func getMockableClient(t *testing.T) (*tests.ClientTester, *mocks.MockClientAPI, error) {
@@ -76,8 +76,8 @@ func getMockableClient(t *testing.T) (*tests.ClientTester, *mocks.MockClientAPI,
 }
 
 // Helper function to test mock objects
-func GetHostTemplate(core int, ram int, disk int) api.HostTemplate {
-	return api.HostTemplate{
+func GetHostTemplate(core int, ram int, disk int) model.HostTemplate {
+	return model.HostTemplate{
 		HostSize: api.HostSize{
 			Cores:    core,
 			RAMSize:  float32(ram) / 1000.0,

@@ -24,7 +24,7 @@ import (
 )
 
 // HostDescription contains description information for the host
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostDescription struct {
@@ -32,6 +32,7 @@ type HostDescription struct {
 	Creator string    `json:"creator,omitempty"`  // contains information (forged) about the creator of a host
 	Updated time.Time `json:"modified,omitempty"` // tells the last time the host has been modified
 	Purpose string    `json:"purpose,omitempty"`  // contains a description of the use of a host
+	Tenant  string    `json:"tenant"`             // contains the tenant name used to create the host
 }
 
 // NewHostDescription ...

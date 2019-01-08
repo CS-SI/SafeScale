@@ -17,9 +17,11 @@
 package openstack
 
 import (
+	"encoding/json"
 	"fmt"
-	"reflect"
+	"strings"
 
+	"github.com/CS-SI/SafeScale/iaas/stack"
 	log "github.com/sirupsen/logrus"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -28,92 +30,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 )
 
-// Stack contains the needs to operate on stack OpenStack
-type Stack struct {
-	Compute *gc.ServiceClient
-	Network *gc.ServiceClient
-	Volume  *gc.ServiceClient
-
-	AuthOpts *AuthenticationOptions
-	CfgOpts  *ConfigurationOptions
-
-	SecurityGroup     *secgroups.SecurityGroup
-	ProviderNetworkID string
-
-	Driver *gc.ProviderClient
-}
-
-// New authenticates and returns a Stack pointer
-func New(auth AuthenticationOptions, cfg ConfigurationOptions) (*Stack, error) {
-	gcOpts := gc.AuthOptions{
-		IdentityEndpoint: auth.IdentityEndpoint,
-		Username:         auth.Username,
-		UserID:           auth.UserID,
-		Password:         auth.Password,
-		DomainID:         auth.DomainID,
-		DomainName:       auth.DomainName,
-		TenantID:         auth.TenantID,
-		TenantName:       auth.TenantName,
-		AllowReauth:      auth.AllowReauth,
-		TokenID:          auth.TokenID,
-	}
-
-	// Openstack client
-	driver, err := gcos.AuthenticatedClient(gcOpts)
-	if err != nil {
-		return nil, fmt.Errorf("%s", ErrorToString(err))
-	}
-
-	// Compute API
-	compute, err := gcos.NewComputeV2(driver, gc.EndpointOpts{
-		Region: auth.Region,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("%s", ErrorToString(err))
-	}
-
-	// Network API
-	network, err := gcos.NewNetworkV2(driver, gc.EndpointOpts{
-		Region: auth.Region,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
-	}
-
-	// Get Identity from network service
-	nID, err := networks.IDFromName(network, cfg.ProviderNetwork)
-	if err != nil {
-		return nil, fmt.Errorf("%s", ErrorToString(err))
-	}
-
-	// Volume API
-	volume, err := gcos.NewBlockStorageV1(driver, gc.EndpointOpts{
-		Region: auth.Region,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
-	}
-
-	s := stack{
-		AuthOpts:          &auth,
-		CfgOpts:           &cfg,
-		driver:            driver,
-		Compute:           compute,
-		Network:           network,
-		Volume:            volume,
-		ProviderNetworkID: nID,
-	}
-
-	err = s.initDefaultSecurityGroup()
-	if err != nil {
-		return nil, err
-	}
-
-	return &s, nil
-}
-
-// ErrorToString creates an error string from openstack api error
-func ErrorToString(err error) string {
+// ProviderErrorToString creates an error string from openstack api error
+func ProviderErrorToString(err error) string {
 	switch e := err.(type) {
 	case gc.ErrDefault401:
 		return fmt.Sprintf("code: 401, reason: %s", string(e.Body[:]))
@@ -132,7 +50,126 @@ func ErrorToString(err error) string {
 	case *gc.ErrUnexpectedResponseCode:
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body[:]))
 	default:
-		log.Printf("ProviderErrorToString(%s)\n", reflect.TypeOf(err))
+		// logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%+v)\n", err)
 		return e.Error()
 	}
+}
+
+// ParseNeutronError parses neutron json error and returns fields
+func ParseNeutronError(neutronError string) map[string]string {
+	startIdx := strings.Index(neutronError, "{\"NeutronError\":")
+	jsonError := strings.Trim(neutronError[startIdx:], " ")
+	unjsoned := map[string]map[string]interface{}{}
+	err := json.Unmarshal([]byte(jsonError), &unjsoned)
+	if err != nil {
+		log.Debugf(err.Error())
+		return nil
+	}
+	if content, ok := unjsoned["NeutronError"]; ok {
+		retval := map[string]string{
+			"message": "",
+			"type":    "",
+			"code":    "",
+			"detail":  "",
+		}
+		if field, ok := content["message"].(string); ok {
+			retval["message"] = field
+		}
+		if field, ok := content["type"].(string); ok {
+			retval["type"] = field
+		}
+		if field, ok := content["code"].(string); ok {
+			retval["code"] = field
+		}
+		if field, ok := content["detail"].(string); ok {
+			retval["detail"] = field
+		}
+
+		return retval
+	}
+	return nil
+}
+
+// Stack contains the needs to operate on stack OpenStack
+type Stack struct {
+	Compute *gc.ServiceClient
+	Network *gc.ServiceClient
+	Volume  *gc.ServiceClient
+
+	AuthOpts *stack.AuthenticationOptions
+	CfgOpts  *stack.ConfigurationOptions
+
+	SecurityGroup     *secgroups.SecurityGroup
+	ProviderNetworkID string
+
+	Driver *gc.ProviderClient
+}
+
+// New authenticates and returns a Stack pointer
+func New(auth *stack.AuthenticationOptions, cfg *stack.ConfigurationOptions) (*Stack, error) {
+	gcOpts := gc.AuthOptions{
+		IdentityEndpoint: auth.IdentityEndpoint,
+		Username:         auth.Username,
+		UserID:           auth.UserID,
+		Password:         auth.Password,
+		DomainID:         auth.DomainID,
+		DomainName:       auth.DomainName,
+		TenantID:         auth.TenantID,
+		TenantName:       auth.TenantName,
+		AllowReauth:      auth.AllowReauth,
+		TokenID:          auth.TokenID,
+	}
+
+	// Openstack client
+	driver, err := gcos.AuthenticatedClient(gcOpts)
+	if err != nil {
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+	}
+
+	// Compute API
+	compute, err := gcos.NewComputeV2(driver, gc.EndpointOpts{
+		Region: auth.Region,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+	}
+
+	// Network API
+	network, err := gcos.NewNetworkV2(driver, gc.EndpointOpts{
+		Region: auth.Region,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+	}
+
+	// Get Identity from network service
+	nID, err := networks.IDFromName(network, cfg.ProviderNetwork)
+	if err != nil {
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+	}
+
+	// Volume API
+	volume, err := gcos.NewBlockStorageV1(driver, gc.EndpointOpts{
+		Region: auth.Region,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%s", ProviderErrorToString(err))
+	}
+
+	s := Stack{
+		AuthOpts:          auth,
+		CfgOpts:           cfg,
+		Driver:            driver,
+		Compute:           compute,
+		Network:           network,
+		Volume:            volume,
+		ProviderNetworkID: nID,
+	}
+
+	err = s.initDefaultSecurityGroup()
+	if err != nil {
+		return nil, err
+	}
+
+	return &s, nil
 }

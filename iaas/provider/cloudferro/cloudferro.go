@@ -14,88 +14,101 @@
  * limitations under the License.
  */
 
-package cloudwatt
+package cloudferro
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/model"
-	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/iaas/provider"
 	"github.com/CS-SI/SafeScale/iaas/provider/api"
 	"github.com/CS-SI/SafeScale/iaas/stack"
+	"github.com/CS-SI/SafeScale/iaas/stack/huaweicloud"
 	"github.com/CS-SI/SafeScale/iaas/stack/openstack"
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 )
 
 var (
-	externalNetwork          = "public"
-	dnsServers               = []string{"185.23.94.244", "185.23.94.245"}
-	identityEndpointTemplate = "https://identity.%s.cloudwatt.com/v2.0"
+	cloudferroIdentityEndpoint = "https://cf2.cloudferro.com:5000/v3"
+	cloudferroDefaultImage     = "Ubuntu 18.04"
+	cloudferroDNSServers       = []string{"185.48.234.234", "185.48.234.238"}
 )
 
-// impl is the implementation of the Cloudwatt provider
+// impl is the implementation of the CloudFerro provider
 type impl struct {
-	*openstack.Stack
+	*huaweicloud.Stack
 }
 
 // Build build a new Client from configuration parameter
 func (p *impl) Build(params map[string]interface{}) (api.Provider, error) {
+	// tenantName, _ := params["name"].(string)
 
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
+	// network, _ := params["network"].(map[string]interface{})
 
 	username, _ := identity["Username"].(string)
 	password, _ := identity["Password"].(string)
-	tenantName, _ := compute["TenantName"].(string)
-	region, _ := compute["Region"].(string)
-	identityEndpoint := fmt.Sprintf(identityEndpointTemplate, region)
+	domainName, _ := identity["DomainName"].(string)
 
-	authOptions := &stack.AuthenticationOptions{
-		IdentityEndpoint: identityEndpoint,
-		Username:         username,
-		Password:         password,
-		TenantName:       tenantName,
-		Region:           region,
-		FloatingIPPool:   "public",
+	region, _ := compute["Region"].(string)
+	projectName, _ := compute["ProjectName"].(string)
+	// projectID, _ := compute["ProjectID"].(string)
+	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = cloudferroDefaultImage
 	}
 
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName("openstack", region, tenantName, "0")
+	authOptions = &stack.AuthenticationOptions{
+		IdentityEndpoint: cloudferroIdentityEndpoint,
+		Username:         username,
+		Password:         password,
+		DomainName:       domainName,
+		TenantName:       projectName,
+		Region:           region,
+		FloatingIPPool:   "external",
+		AllowReauth:      true,
+	}
+
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName("huaweicloud", region, domainName, projectName)
 	if err != nil {
 		return nil, err
 	}
 
-	cfgOptions := &stack.ConfigurationOptions{
-		ProviderNetwork:           externalNetwork,
+	cfgOptions = &stack.ConfigurationOptions{
+		ProviderNetwork:           "external",
 		UseFloatingIP:             true,
 		UseLayer3Networking:       true,
 		AutoHostNetworkInterfaces: true,
 		VolumeSpeeds: map[string]VolumeSpeed.Enum{
-			"standard":   VolumeSpeed.COLD,
-			"performant": VolumeSpeed.HDD,
+			"HDD": VolumeSpeed.HDD,
+			"SSD": VolumeSpeed.SSD,
 		},
-		DNSList:        dnsServers,
 		MetadataBucket: metadataBucketName,
+		DNSList:        cloudferroDNSServers,
+		DefaultImage:   defaultImage,
 	}
 
-	stack, err := openstack.New(authOptions, cfgOptions)
+	var err error
+	stack, err := openstack.New(authOptionss, cfgOptions)
 	if err != nil {
 		return nil, err
 	}
+
 	return &impl{Stack: stack}, nil
 }
 
-// GetCfgOpts return configuration parameters
-func (p *impl) GetCfgOpts() (provider.Config, error) {
-	cfg := provider.ConfigMap{}
+// // GetCfgOpts return configuration parameters
+// func (c *Client) GetCfgOpts() (model.Config, error) {
+// 	cfg := model.ConfigMap{}
 
-	cfg.Set("DNSList", p.Stack.CfgOpts.DNSList)
-	cfg.Set("AutoHostNetworkInterfaces", p.Stack.CfgOpts.AutoHostNetworkInterfaces)
-	cfg.Set("UseLayer3Networking", p.Stack.CfgOpts.UseLayer3Networking)
+// 	cfg.Set("DNSList", c.Cfg.DNSList)
+// 	// cfg.Set("ObjectStorageType", c.Cfg.ObjectStorageType)
+// 	cfg.Set("AutoHostNetworkInterfaces", c.Cfg.AutoHostNetworkInterfaces)
+// 	cfg.Set("UseLayer3Networking", c.Cfg.UseLayer3Networking)
+// 	cfg.Set("MetadataBucket", c.Cfg.MetadataBucketName)
 
-	return cfg, nil
-}
+// 	return cfg, nil
+// }
 
 // ListTemplates ...
 // Value of all has no impact on the result
@@ -118,5 +131,5 @@ func (p *impl) ListImages(all bool) ([]model.Image, error) {
 }
 
 func init() {
-	iaas.Register("cloudwatt", &impl{})
+	iaas.Register("cloudferro", &impl{})
 }

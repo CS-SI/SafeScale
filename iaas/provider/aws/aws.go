@@ -18,32 +18,72 @@ package aws
 
 //go:generate rice embed-go
 import (
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/model"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/iaas/provider/api"
+	"github.com/CS-SI/SafeScale/iaas/stack"
 	"github.com/CS-SI/SafeScale/iaas/stack/aws"
 )
 
-type Aws struct {
-	Opts  *aws.AuthOptions
-	Cfg   *aws.CfgOptions
-	stack *aws.Stack
+// impl is the implementation of AWS provider
+type impl struct {
+	*aws.Stack
 }
 
 // Build build a new Client from configuration parameter
 func (p *Aws) Build(params map[string]interface{}) (api.Provider, error) {
-	AccessKeyID, _ := params["AccessKeyID"].(string)
-	SecretAccessKey, _ := params["SecretAccessKey"].(string)
-	Region, _ := params["Region"].(string)
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
 
-	newP := Aws{
-		AuthOpts: aws.AuthOpts{
-			AccessKeyID:     AccessKeyID,
-			SecretAccessKey: SecretAccessKey,
-			Region:          Region,
-		},
+	accessKeyID, _ := identity["AccessKeyID"].(string)
+	secretAccessKey, _ := identity["SecretAccessKey"].(string)
+	region, _ := compute["Region"].(string)
+
+	authOptions = &stack.AuthenticationOptions{
+		AccessKeyID:     accessKeyID,
+		SecretAccessKey: secretAccessKey,
+		Region:          region,
 	}
-	newP.Stack, err = aws.New(newP.AuthOpts)
+
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName("aws", region, accessKeyID, "0")
 	if err != nil {
 		return nil, err
 	}
-	return newP, nil
+
+	cfgOptions = &stack.ConfigurationOptions{
+		MetadataBucket: metadataBucketName,
+		DefaultImage:   defaultImage,
+	}
+
+	stack, err := aws.New(authOptions, cfgOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return &impl{Stack: stack}, nil
+}
+
+// ListTemplates ...
+// Value of all has no impact on the result
+func (p *impl) ListTemplates(all bool) ([]model.HostTemplate, error) {
+	allTemplates, err := p.Stack.ListTemplates()
+	if err != nil {
+		return nil, err
+	}
+	return allTemplates, nil
+}
+
+// ListImages ...
+// Value of all has no impact on the result
+func (p *impl) ListImages(all bool) ([]model.Image, error) {
+	allImages, err := p.Stack.ListImages()
+	if err != nil {
+		return nil, err
+	}
+	return allImages, nil
+}
+
+func init() {
+	iaas.Register("aws", &impl{})
 }

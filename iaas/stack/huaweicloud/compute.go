@@ -49,7 +49,6 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/iaas/model/properties/v1"
 	"github.com/CS-SI/SafeScale/iaas/stack/openstack"
 	"github.com/CS-SI/SafeScale/iaas/userdata"
-	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
@@ -278,7 +277,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if request.DefaultGateway == nil && !request.PublicIP {
-		return nil, model.ResourceInvalidRequestError("host creation", "can't create a gateway without public IP")
+		return nil, model.ResourceInvalidRequestError("host creation", "can't create a host without network and without public access (would be unreachable)")
 	}
 
 	// Validating name of the host
@@ -311,8 +310,6 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 		})
 	}
 
-	// Prepare key pair
-	kp := request.KeyPair
 	// If no key pair is supplied create one
 	if request.KeyPair == nil {
 		id, err := uuid.NewV4()
@@ -321,7 +318,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 		}
 
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		request.KeyPair, err = client.CreateKeyPair(name)
+		request.KeyPair, err = s.CreateKeyPair(name)
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
 			log.Debugf(utils.TitleFirst(msg))
@@ -331,7 +328,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	userData, err := userdata.Prepare(client, request, request.KeyPair, defaultNetwork.CIDR)
+	userData, err := userdata.Prepare(s.CfgOpts, request, request.KeyPair, defaultNetwork.CIDR)
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		log.Debugf(utils.TitleFirst(msg))
@@ -339,7 +336,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}
 
 	// Determine system disk size based on vcpus count
-	template, err := client.GetTemplate(request.TemplateID)
+	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get image: %s", openstack.ProviderErrorToString(err))
 	}
@@ -356,6 +353,17 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 		diskSize = 400
 	}
 
+	// Select useable availability zone, the first one in the list
+	azList, err := s.ListAvailabilityZones(false)
+	if err != nil {
+		return nil, err
+	}
+	var az string
+	for az = range azList {
+		break
+	}
+	log.Debugf("Selected Availability Zone: '%s'", az)
+
 	// Defines boot disk
 	bootdiskOpts := blockDevice{
 		SourceType:          exbfv.SourceImage,
@@ -368,11 +376,12 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}
 	// Defines server
 	srvOpts := serverCreateOpts{
-		Name:           request.ResourceName,
-		SecurityGroups: []string{client.SecurityGroup.Name},
-		Networks:       nets,
-		FlavorRef:      request.TemplateID,
-		UserData:       userData,
+		Name:             request.ResourceName,
+		SecurityGroups:   []string{s.SecurityGroup.Name},
+		Networks:         nets,
+		FlavorRef:        request.TemplateID,
+		UserData:         userData,
+		AvailabilityZone: az,
 	}
 	// Defines host "Extension bootfromvolume" options
 	bdOpts := bootdiskCreateOptsExt{
@@ -383,7 +392,6 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to build query to create host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 	}
-	r := servers.CreateResult{}
 
 	// --- Initializes model.Host ---
 
@@ -403,6 +411,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}
 
 	// Adds Host property SizingV1
+	template.HostSize.DiskSize = diskSize // Makes sure the size of disk is correctly saved
 	err = host.Properties.Set(HostProperty.SizingV1, &propsv1.HostSizing{
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		Template:      request.TemplateID,
@@ -415,40 +424,49 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	// --- query provider for host creation ---
 
 	// Retry creation until success, for 10 minutes
-	var httpResp *http.Response
-	err = retry.WhileUnsuccessfulDelay5Seconds(
+	var (
+		httpResp *http.Response
+		r        servers.CreateResult
+	)
+
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			httpResp, r.Err = client.osclt.Compute.Post(client.osclt.Compute.ServiceURL("servers"), b, &r.Body, &gc.RequestOpts{
+			httpResp, r.Err = s.osclt.Compute.Post(s.osclt.Compute.ServiceURL("servers"), b, &r.Body, &gc.RequestOpts{
 				OkCodes: []int{200, 202},
 			})
 			server, err := r.Extract()
 			if err != nil {
 				if server != nil {
-					servers.Delete(client.osclt.Compute, server.ID)
+					servers.Delete(s.osclt.Compute, server.ID)
 				}
 				return fmt.Errorf("query to create host '%s' failed: %s (HTTP return code: %d)", request.ResourceName, openstack.ProviderErrorToString(err), httpResp.StatusCode)
-				// msg := fmt.Sprintf(msgFail, openstack.ProviderErrorToString(err))
-				// // TODO Gotcha !!
-				// log.Debugf(msg)
-				// return fmt.Errorf(msg)
 			}
 			host.ID = server.ID
 
+			defer func() {
+				if err != nil {
+					derr := servers.Delete(s.osclt.Compute, server.ID).ExtractErr()
+					if derr != nil {
+						log.Errorf("Failed to delete host '%s': %v", server.Name, derr)
+					}
+				}
+			}()
+
 			// Wait that host is ready, not just that the build is started
-			host, err = client.WaitHostReady(host, time.Minute*5)
+			host, err = s.WaitHostReady(host, time.Minute*5)
 			if err != nil {
-				servers.Delete(client.osclt.Compute, server.ID)
-				return fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
-				// msg := fmt.Sprintf(msgFail, openstack.ProviderErrorToString(err))
-				// // TODO Gotcha !!
-				// log.Debugf(msg)
-				// return fmt.Errorf(msg)
+				switch err.(type) {
+				case model.ErrResourceNotAvailable:
+					return fmt.Errorf("host '%s' is in ERROR state", request.ResourceName)
+				default:
+					return fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
+				}
 			}
 			return nil
 		},
 		10*time.Minute,
 	)
-	if err != nil {
+	if retryErr != nil {
 		return nil, err
 	}
 	if host == nil {
@@ -458,15 +476,15 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
-			derr := client.DeleteHost(host.ID)
+			derr := s.DeleteHost(host.ID)
 			if derr != nil {
-				log.Warnf("Error deleting host: %v", derr)
+				log.Warnf("Failed to delete host '%s': %v", host.Name, derr)
 			}
 		}
 	}()
 
 	if request.PublicIP {
-		fip, err := client.attachFloatingIP(host)
+		fip, err := s.attachFloatingIP(host)
 		if err != nil {
 			spew.Dump(err)
 			return nil, fmt.Errorf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
@@ -475,7 +493,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
 			if err != nil {
-				derr := client.DeleteFloatingIP(fip.ID)
+				derr := s.DeleteFloatingIP(fip.ID)
 				if derr != nil {
 					log.Errorf("Error deleting Floating IP: %v", derr)
 				}
@@ -499,7 +517,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 		}
 
 		if defaultGateway == nil && defaultNetwork.Name != model.SingleHostNetworkName {
-			err = client.enableHostRouterMode(host)
+			err = s.enableHostRouterMode(host)
 			if err != nil {
 				return nil, fmt.Errorf("error enabling gateway mode of host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
 			}
@@ -508,6 +526,11 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 
 	log.Infoln(msgSuccess)
 	return host, nil
+}
+
+// ResizeHost creates an host satisfying request
+func (s *Stack) ResizeHost(id string, request model.SizingRequirements) (*model.Host, error) {
+	return s.osclt.ResizeHost(id, request)
 }
 
 // validatehostName validates the name of an host based on known FlexibleEngine requirements
@@ -551,9 +574,10 @@ func (s *Stack) GetHost(hostParam interface{}) (*model.Host, error) {
 		panic("hostParam must be a string or a *model.Host!")
 	}
 
+	const timeout = time.Minute * 15
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			server, err = servers.Get(client.osclt.Compute, host.ID).Extract()
+			server, err = servers.Get(s.osclt.Compute, host.ID).Extract()
 			if err != nil {
 				switch err.(type) {
 				case gc.ErrDefault404:
@@ -576,13 +600,22 @@ func (s *Stack) GetHost(hostParam interface{}) (*model.Host, error) {
 			}
 			return fmt.Errorf("server not ready yet")
 		},
-		10*time.Second,
+		timeout,
 		1*time.Second,
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return nil, fmt.Errorf("failed to get host '%s' information after 10s: %v", host.ID, err)
+			msg := "failed to get host"
+			if host != nil {
+				msg += fmt.Sprintf(" '%s'", host.Name)
+			}
+			msg += fmt.Sprintf(" information after %v", timeout)
+			if err != nil {
+				msg += fmt.Sprintf(": %v", err)
+			}
+			return nil, fmt.Errorf(msg)
+		default:
 		}
 	}
 	if err != nil {
@@ -591,13 +624,13 @@ func (s *Stack) GetHost(hostParam interface{}) (*model.Host, error) {
 	if notFound {
 		return nil, model.ResourceNotFoundError("host", host.ID)
 	}
-	err = client.complementHost(host, server)
+	err = s.complementHost(host, server)
 	return host, err
 }
 
 // complementHost complements Host data with content of server parameter
 func (s *Stack) complementHost(host *model.Host, server *servers.Server) error {
-	networks, addresses, ipv4, ipv6, err := client.collectAddresses(host)
+	networks, addresses, ipv4, ipv6, err := s.collectAddresses(host)
 	if err != nil {
 		return err
 	}
@@ -625,17 +658,17 @@ func (s *Stack) complementHost(host *model.Host, server *servers.Server) error {
 		return err
 	}
 
-	// Updates Host Property propsv1.HostSizing
-	hostSizingV1 := propsv1.NewHostSizing()
-	err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
-	if err != nil {
-		return err
-	}
-	hostSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
-	err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
-	if err != nil {
-		return err
-	}
+	// // Updates Host Property propsv1.HostSizing
+	// hostSizingV1 := propsv1.NewHostSizing()
+	// err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
+	// if err != nil {
+	// 	return err
+	// }
+	// hostSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
+	// err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// Updates Host Property HostNetwork
 	hostNetworkV1 := propsv1.NewHostNetwork()
@@ -700,7 +733,7 @@ func (s *Stack) complementHost(host *model.Host, server *servers.Server) error {
 	// Updates network name and relationships if needed
 	for netid, netname := range hostNetworkV1.NetworksByID {
 		if netname == "" {
-			net, err := client.GetNetwork(netid)
+			net, err := s.GetNetwork(netid)
 			if err != nil {
 				log.Errorf("failed to get network '%s'", netid)
 				continue
@@ -725,7 +758,7 @@ func (s *Stack) collectAddresses(host *model.Host) ([]string, map[IPVersion.Enum
 		allInterfaces = []nics.Interface{}
 	)
 
-	pager := client.listInterfaces(host.ID)
+	pager := s.listInterfaces(host.ID)
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := nics.ExtractInterfaces(page)
 		if err != nil {
@@ -746,7 +779,7 @@ func (s *Stack) collectAddresses(host *model.Host) ([]string, map[IPVersion.Enum
 		for _, address := range item.FixedIPs {
 			fixedIP := address.IPAddress
 			ipv4 := net.ParseIP(fixedIP).To4() != nil
-			if item.NetID == client.osclt.Cfg.ProviderNetwork {
+			if item.NetID == s.CfgOpts.ProviderNetwork {
 				if ipv4 {
 					AcccessIPv4 = fixedIP
 				} else {
@@ -775,8 +808,8 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 }
 
 // ListHosts lists available hosts
-func (client *Client) ListHosts() ([]*model.Host, error) {
-	pager := servers.List(client.osclt.Compute, servers.ListOpts{})
+func (s *Stack) ListHosts() ([]*model.Host, error) {
+	pager := servers.List(s.osclt.Compute, servers.ListOpts{})
 	var hosts []*model.Host
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := servers.ExtractServers(page)
@@ -787,7 +820,7 @@ func (client *Client) ListHosts() ([]*model.Host, error) {
 		for _, srv := range list {
 			h := model.NewHost()
 			h.ID = srv.ID
-			err := client.complementHost(h, &srv)
+			err := s.complementHost(h, &srv)
 			if err != nil {
 				return false, err
 			}
@@ -802,23 +835,23 @@ func (client *Client) ListHosts() ([]*model.Host, error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (client *Client) DeleteHost(id string) error {
-	_, err := client.GetHost(id)
+func (s *Stack) DeleteHost(id string) error {
+	_, err := s.GetHost(id)
 	if err != nil {
 		return err
 	}
 
-	if client.osclt.Cfg.UseFloatingIP {
-		fip, err := client.getFloatingIPOfHost(id)
+	if s.CfgOpts.UseFloatingIP {
+		fip, err := s.getFloatingIPOfHost(id)
 		if err == nil {
 			if fip != nil {
-				err = floatingips.DisassociateInstance(client.osclt.Compute, id, floatingips.DisassociateOpts{
+				err = floatingips.DisassociateInstance(s.osclt.Compute, id, floatingips.DisassociateOpts{
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
 					return fmt.Errorf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
 				}
-				err = floatingips.Delete(client.osclt.Compute, fip.ID).ExtractErr()
+				err = floatingips.Delete(s.osclt.Compute, fip.ID).ExtractErr()
 				if err != nil {
 					return fmt.Errorf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
 				}
@@ -826,13 +859,12 @@ func (client *Client) DeleteHost(id string) error {
 		}
 	}
 
-	var err error
 	// Try to remove host for 3 minutes
 	outerRetryErr := retry.WhileUnsuccessful(
 		func() error {
 			resourcePresent := true
 			// 1st, send delete host order
-			err = servers.Delete(client.osclt.Compute, id).ExtractErr()
+			err = servers.Delete(s.osclt.Compute, id).ExtractErr()
 			if err != nil {
 				switch err.(type) {
 				case gc.ErrDefault404:
@@ -869,7 +901,7 @@ func (client *Client) DeleteHost(id string) error {
 				switch innerRetryErr.(type) {
 				case retry.ErrTimeout:
 					// retry deletion...
-					return fmt.Errorf("failed to acknowledge host '%s' deletion! %s", id, err.Error())
+					return fmt.Errorf("host '%s' not deleted after %v", id, 1*time.Minute)
 				default:
 					return innerRetryErr
 				}
@@ -892,7 +924,7 @@ func (client *Client) DeleteHost(id string) error {
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
 func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, error) {
-	pager := floatingips.List(client.osclt.Compute)
+	pager := floatingips.List(s.osclt.Compute)
 	var fips []floatingips.FloatingIP
 	err := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := floatingips.ExtractFloatingIPs(page)
@@ -927,11 +959,11 @@ func (s *Stack) attachFloatingIP(host *model.Host) (*FloatingIP, error) {
 		return nil, fmt.Errorf("failed to attach Floating IP on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
 
-	err = client.AssociateFloatingIP(host, fip.ID)
+	err = s.AssociateFloatingIP(host, fip.ID)
 	if err != nil {
-		nerr := client.DeleteFloatingIP(fip.ID)
-		if nerr != nil {
-			log.Warnf("Error deleting floating ip: %v", nerr)
+		derr := s.DeleteFloatingIP(fip.ID)
+		if derr != nil {
+			log.Warnf("Error deleting floating ip: %v", derr)
 		}
 		return nil, fmt.Errorf("failed to attach Floating IP to host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
@@ -941,7 +973,7 @@ func (s *Stack) attachFloatingIP(host *model.Host) (*FloatingIP, error) {
 
 // EnableHostRouterMode enables the host to act as a router/gateway.
 func (s *Stack) enableHostRouterMode(host *model.Host) error {
-	portID, err := client.getOpenstackPortID(host)
+	portID, err := s.getOpenstackPortID(host)
 	if err != nil {
 		return fmt.Errorf("failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
@@ -955,7 +987,7 @@ func (s *Stack) enableHostRouterMode(host *model.Host) error {
 		},
 	}
 	opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
-	_, err = ports.Update(client.osclt.Network, *portID, opts).Extract()
+	_, err = ports.Update(s.osclt.Network, *portID, opts).Extract()
 	if err != nil {
 		return fmt.Errorf("Failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
@@ -964,13 +996,16 @@ func (s *Stack) enableHostRouterMode(host *model.Host) error {
 
 // DisableHostRouterMode disables the host to act as a router/gateway.
 func (s *Stack) disableHostRouterMode(host *model.Host) error {
-	portID, err := client.getOpenstackPortID(host)
+	portID, err := s.getOpenstackPortID(host)
 	if err != nil {
 		return fmt.Errorf("Failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
+	if portID == nil {
+		return fmt.Errorf("Failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Name)
+	}
 
 	opts := ports.UpdateOpts{AllowedAddressPairs: nil}
-	_, err = ports.Update(client.osclt.Network, *portID, opts).Extract()
+	_, err = ports.Update(s.osclt.Network, *portID, opts).Extract()
 	if err != nil {
 		return fmt.Errorf("Failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
@@ -1014,16 +1049,17 @@ func (s *Stack) getOpenstackPortID(host *model.Host) (*string, error) {
 	if found {
 		return &nic.PortID, nil
 	}
-	return nil, nil
+	return nil, model.ResourceNotFoundError("Port ID", host.Name)
 }
 
-// toHostSize converts flavor attributes returned by OpenStack driver into model.Host
-func (s *Stack) toHostSize(flavor map[string]interface{}) model.HostSize {
+// toHostSize converts flavor attributes returned by OpenStack driver into model.HostProperty.v1.HostSize
+func (s *Stack) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
 		tpl, _ := s.GetTemplate(fid)
 		return tpl.HostSize
 	}
+	hostSize := propsv1.NewHostSize()
 	if _, ok := flavor["vcpus"]; ok {
 		hostSize.Cores = flavor["vcpus"].(int)
 		hostSize.DiskSize = flavor["disk"].(int)
@@ -1048,64 +1084,6 @@ func toHostState(status string) HostState.Enum {
 	}
 }
 
-// // convertAdresses converts adresses returned by the FlexibleEngine driver and arranges them by version in a map
-// func (client *Client) convertAdresses(addresses map[string]interface{}) map[IPVersion.Enum][]string {
-// 	addrs := make(map[IPVersion.Enum][]string)
-// 	for _, obj := range addresses {
-// 		for _, networkAddresses := range obj.([]interface{}) {
-// 			address := networkAddresses.(map[string]interface{})
-// 			version := address["version"].(float64)
-// 			fixedIP := address["addr"].(string)
-// 			switch version {
-// 			case 4:
-// 				addrs[IPVersion.IPv4] = append(addrs[IPVersion.IPv4], fixedIP)
-// 			case 6:
-// 				addrs[IPVersion.IPv6] = append(addrs[IPVersion.IPv4], fixedIP)
-// 			}
-// 		}
-// 	}
-// 	return addrs
-// }
-
-// // toHost converts a FlexibleEngine (almost OpenStack...) server into api host
-// func (client *Client) toHost(server *servers.Server) *model.Host {
-// 	//	adresses, ipv4, ipv6 := client.convertAdresses(server.Addresses)
-// 	adresses := client.convertAdresses(server.Addresses)
-
-// 	host := model.Host{
-// 		ID:         server.ID,
-// 		Name:       server.Name,
-// 		AccessIPv4: server.AccessIPv4,
-// 		AccessIPv6: server.AccessIPv6,
-// 		LastState:  toHostState(server.Status),
-// 	}
-
-// 	networkV1 := &model.HostExtensionNetworkV1{
-// 		PrivateIPsV4: adresses[IPVersion.IPv4],
-// 		PrivateIPsV6: adresses[IPVersion.IPv6],
-// 	}
-// 	err := host.Properties.Set(HostProperty.NetworkV1, networkV1)
-// 	if err != nil {
-// 		log.Errorf(err.Error())
-// 	}
-// 	sizingV1 := model.HostExtensionSizingV1{
-// 		AllocatedSize: client.toHostSize(server.Flavor),
-// 	}
-// 	err = host.Properties.Set(HostProperty.SizingV1, sizingV1)
-// 	if err != nil {
-// 		log.Errorf(err.Error())
-// 	}
-
-// 	if server.AccessIPv4 != "" {
-// 		host.AccessIPv4 = server.AccessIPv4
-// 	}
-// 	if server.AccessIPv6 == "" {
-// 		host.AccessIPv6 = server.AccessIPv6
-// 	}
-
-// 	return &host
-// }
-
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*model.KeyPair, error) {
 	return s.osclt.CreateKeyPair(name)
@@ -1126,6 +1104,11 @@ func (s *Stack) DeleteKeyPair(id string) error {
 	return s.osclt.DeleteKeyPair(id)
 }
 
+// ListAvailabilityZones lists the usable Availability Zones
+func (s *Stack) ListAvailabilityZones(all bool) (map[string]bool, error) {
+	return s.osclt.ListAvailabilityZones(all)
+}
+
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (*model.Image, error) {
 	return s.osclt.GetImage(id)
@@ -1141,7 +1124,7 @@ func isBMSImage(image model.Image) bool {
 
 // ListImages lists available OS images
 func (s *Stack) ListImages(all bool) ([]model.Image, error) {
-	images, err := s.osclt.ListImages(all)
+	images, err := s.osclt.ListImages()
 	if err != nil {
 		return nil, err
 	}
@@ -1151,7 +1134,6 @@ func (s *Stack) ListImages(all bool) ([]model.Image, error) {
 
 	imageFilter := filters.NewFilter(isWindowsImage).Not().And(filters.NewFilter(isBMSImage).Not())
 	return filters.FilterImages(images, imageFilter), nil
-
 }
 
 func addGPUCfg(tpl *model.HostTemplate) {
@@ -1162,8 +1144,8 @@ func addGPUCfg(tpl *model.HostTemplate) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
-	tpl, err := client.osclt.GetTemplate(id)
+func (s *Stack) GetTemplate(id string) (*model.HostTemplate, error) {
+	tpl, err := s.osclt.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
 	}
@@ -1172,8 +1154,8 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
-	allTemplates, err := client.osclt.ListTemplates(all)
+func (s *Stack) ListTemplates() ([]model.HostTemplate, error) {
+	allTemplates, err := s.osclt.ListTemplates()
 	if err != nil {
 		return nil, err
 	}
@@ -1197,7 +1179,7 @@ func (s *Stack) StartHost(id string) error {
 }
 
 // RebootHost ...
-func (client *Client) RebootHost(id string) error {
+func (s *Stack) RebootHost(id string) error {
 	return s.osclt.RebootHost(id)
 }
 
@@ -1205,24 +1187,20 @@ func (client *Client) RebootHost(id string) error {
 // hostParam can be an ID of host, or an instance of *model.Host; any other type will panic
 func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*model.Host, error) {
 	var (
-		host *model.Host
-		err  error
+		host        *model.Host
+		hostInError bool
+		err         error
 	)
-	switch hostParam.(type) {
-	case string:
-		host = model.NewHost()
-		host.ID = hostParam.(string)
-	case *model.Host:
-		host = hostParam.(*model.Host)
-	default:
-		panic("hostParam must be a string or a *model.Host!")
-	}
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			host, err = client.GetHost(host)
+			host, err = s.GetHost(hostParam)
 			if err != nil {
 				return err
+			}
+			if host.LastState == HostState.ERROR {
+				hostInError = true
+				return nil
 			}
 			if host.LastState != HostState.STARTED {
 				return fmt.Errorf("not in ready state (current state: %s)", host.LastState.String())
@@ -1235,9 +1213,23 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*mo
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return nil, fmt.Errorf("timeout waiting to get host '%s' information after %v", host.Name, timeout)
+			msg := "timeout waiting to get host"
+			if host != nil {
+				msg += fmt.Sprintf(" '%s'", host.Name)
+			}
+			msg += fmt.Sprintf("information after %v", timeout)
+			if err != nil {
+				msg += fmt.Sprintf(": %v", err)
+			}
+			return nil, fmt.Errorf(msg)
+		default:
+			return nil, retryErr
 		}
-		return nil, retryErr
 	}
+	// If hoste state is ERROR, returns the error
+	if hostInError {
+		return nil, model.ResourceNotAvailableError("host", "")
+	}
+
 	return host, err
 }

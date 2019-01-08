@@ -17,64 +17,12 @@
 package openstack
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/iaas/provider"
 )
 
-// AuthenticationOptions fields are the union of those recognized by each identity implementation and provider
-type AuthenticationOptions struct {
-	// IdentityEndpoint specifies the HTTP endpoint that is required to work with
-	// the Identity API of the appropriate version. While it's ultimately needed by
-	// all of the identity services, it will often be populated by a provider-level
-	// function.
-	IdentityEndpoint string
-
-	// Username is required if using Identity V2 API. Consult with your provider's
-	// control panel to discover your account's username. In Identity V3, either
-	// UserID or a combination of Username and DomainID or DomainName are needed.
-	Username, UserID string
-
-	// Exactly one of Password or APIKey is required for the Identity V2 and V3
-	// APIs. Consult with your provider's control panel to discover your account's
-	// preferred method of authentication.
-	Password, APIKey string
-
-	// At most one of DomainID and DomainName must be provided if using Username
-	// with Identity V3. Otherwise, either are optional.
-	DomainID, DomainName string
-
-	// The TenantID and TenantName fields are optional for the Identity V2 API.
-	// Some providers allow you to specify a TenantName instead of the TenantId.
-	// Some require both. Your provider's authentication policies will determine
-	// how these fields influence authentication.
-	TenantID, TenantName string
-
-	// AllowReauth should be set to true if you grant permission for Gophercloud to
-	// cache your credentials in memory, and to allow Gophercloud to attempt to
-	// re-authenticate automatically if/when your token expires.  If you set it to
-	// false, it will not cache these settings, but re-authentication will not be
-	// possible. This setting defaults to false.
-	//
-	// NOTE: The reauth function will try to re-authenticate endlessly if left unchecked.
-	// The way to limit the number of attempts is to provide a custom HTTP client to the provider client
-	// and provide a transport that implements the RoundTripper interface and stores the number of failed retries.
-	// For an example of this, see here: https://github.com/gophercloud/rack/blob/1.0.0/auth/clients.go#L311
-	AllowReauth bool
-
-	// TokenID allows users to authenticate (possibly as another user) with an
-	// authentication token ID.
-	TokenID string
-
-	//Openstack region (data center) where the infrstructure will be created
-	Region string
-
-	//FloatingIPPool name of the floating IP pool
-	//Necessary only if UseFloatingIP is true
-	FloatingIPPool string
-}
-
 // GetAuthOpts returns the auth options
-func (s *Stack) GetAuthOpts() (providers.Config, error) {
-	cfg := providers.ConfigMap{}
+func (s *Stack) GetAuthOpts() (provider.Config, error) {
+	cfg := provider.ConfigMap{}
 
 	cfg.Set("TenantName", s.AuthOpts.TenantName)
 	cfg.Set("Login", s.AuthOpts.Username)
@@ -84,38 +32,15 @@ func (s *Stack) GetAuthOpts() (providers.Config, error) {
 	return cfg, nil
 }
 
-// ConfigurationOptions are the stack configuration options
-type ConfigurationOptions struct {
-	// Name of the provider (external) network
-	ProviderNetwork string
-
-	// DNSList list of DNS
-	DNSList []string
-
-	// UseFloatingIP indicates if floating IP are used (optional)
-	UseFloatingIP bool
-
-	// UseLayer3Networking indicates if layer 3 networking features (router) can be used
-	// if UseFloatingIP is true UseLayer3Networking must be true
-	UseLayer3Networking bool
-
-	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
-	AutoHostNetworkInterfaces bool
-
-	// VolumeSpeeds map volume types with volume speeds
-	VolumeSpeeds map[string]VolumeSpeed.Enum
-
-}
-
 // GetCfgOpts return configuration parameters
-func (s *Stack) GetCfgOpts() (providers.Config, error) {
-	cfg := providers.ConfigMap{}
+func (s *Stack) GetCfgOpts() (provider.Config, error) {
+	cfg := provider.ConfigMap{}
 
 	cfg.Set("DNSList", s.CfgOpts.DNSList)
 
 	cfg.Set("AutoHostNetworkInterfaces", s.CfgOpts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", s.CfgOpts.UseLayer3Networking)
-	cfg.Set("ProviderNetwork", client.Cfg.ProviderNetwork)
+	cfg.Set("ProviderNetwork", s.CfgOpts.ProviderNetwork)
 
 	return cfg, nil
 }

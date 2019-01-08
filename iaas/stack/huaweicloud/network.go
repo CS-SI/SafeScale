@@ -17,20 +17,14 @@
 package huaweicloud
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/pengux/check"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/openstack"
-
-	"github.com/CS-SI/SafeScale/utils/retry"
-	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 
 	gc "github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
@@ -38,13 +32,17 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/pengux/check"
+	"github.com/CS-SI/SafeScale/iaas/model"
+	"github.com/CS-SI/SafeScale/iaas/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/iaas/stack/openstack"
+	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 )
 
 // VPCRequest defines a request to create a VPC
 type VPCRequest struct {
-	Name string
-	CIDR string
+	Name string `json:"name"`
+	CIDR string `json:"cidr"`
 }
 
 // VPC contains information about a VPC
@@ -100,6 +98,9 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 		OkCodes:      []int{200, 201},
 	}
 	_, err = s.osclt.Driver.Request("POST", url, &opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send a POST request to provider '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+	}	
 	vpc, err := resp.Extract()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
@@ -129,7 +130,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, error) {
 	var router *openstack.Router
 	found := false
-	routers, err := s.driver.ListRouters()
+	routers, err := s.osclt.ListRouters()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list routers: %s", openstack.ProviderErrorToString(err))
 	}
@@ -159,7 +160,7 @@ func (s *Stack) GetVPC(id string) (*VPC, error) {
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	_, err := s.osclt.Provider.Request("GET", url, &opts)
+	_, err := s.osclt.Driver.Request("GET", url, &opts)
 	r.Err = err
 	vpc, err := r.Extract()
 	if err != nil {
@@ -171,20 +172,24 @@ func (s *Stack) GetVPC(id string) (*VPC, error) {
 // ListVPCs lists all the VPC created
 func (s *Stack) ListVPCs() ([]VPC, error) {
 	var vpcList []VPC
-	return vpcList, fmt.Errorf("huaweicloud.Stack.ListVPCs() not yet implemented")
+	return vpcList, fmt.Errorf("iaas.stack.huaweicloud.Stack::ListVPCs() not yet implemented")
 }
 
 // DeleteVPC deletes a Network (ie a VPC in Huawei Cloud) identified by 'id'
 func (s *Stack) DeleteVPC(id string) error {
-	return fmt.Errorf("huaweicloud.Stack.DeleteVPC() not implemented yet")
+	return fmt.Errorf("iaas.stack.huaweicloud.Stack::DeleteVPC() not implemented yet")
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (s *Stack) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
-	log.Debugf("iaas/stack.huaweicloud.Stack.CreateNetwork(%s) called\n", req.Name)
-	subnet, err := client.findSubnetByName(req.Name)
-	if subnet == nil && err != nil {
-		return nil, err
+	log.Debugf("iaas.stack.huaweicloud.Stack::CreateNetwork(%s) called\n", req.Name)
+	defer log.Debugf("iaas.stack.huaweicloud.Stack::CreateNetwork(%s) done\n", req.Name)
+
+	subnet, err := s.findSubnetByName(req.Name)
+	if err != nil {
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return nil, err
+		}
 	}
 	if subnet != nil {
 		return nil, fmt.Errorf("network '%s' already exists", req.Name)
@@ -195,21 +200,30 @@ func (s *Stack) CreateNetwork(req model.NetworkRequest) (*model.Network, error) 
 	}
 
 	// Checks if CIDR is valid...
-	_, vpcnetDesc, _ := net.ParseCIDR(client.vpc.CIDR)
+	_, vpcnetDesc, _ := net.ParseCIDR(s.vpc.CIDR)
 	_, networkDesc, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error())
 	}
 	// .. and if CIDR is inside VPC's one
 	if !cidrIntersects(vpcnetDesc, networkDesc) {
-		return nil, fmt.Errorf("can't create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, client.vpc.CIDR)
+		return nil, fmt.Errorf("can't create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR)
 	}
 
 	// Creates the subnet
-	subnet, err = client.createSubnet(req.Name, req.CIDR)
+	subnet, err = s.createSubnet(req.Name, req.CIDR)
 	if err != nil {
 		return nil, fmt.Errorf("error creating network '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
+
+	defer func() {
+		if err != nil {
+			derr := s.deleteSubnet(subnet.ID)
+			if derr != nil {
+				log.Errorf("failed to delete subnet '%s': %v", subnet.Name, derr)
+			}
+		}
+	}()
 
 	network := model.NewNetwork()
 	network.ID = subnet.ID
@@ -250,7 +264,7 @@ func (s *Stack) GetNetworkByName(name string) (*model.Network, error) {
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
-	_, r.Err = client.osclt.Compute.Get(client.osclt.Network.ServiceURL("subnets?name="+name), &r.Body, &gc.RequestOpts{
+	_, r.Err = s.osclt.Compute.Get(s.osclt.Network.ServiceURL("subnets?name="+name), &r.Body, &gc.RequestOpts{
 		OkCodes: []int{200, 203},
 	})
 	if r.Err != nil {
@@ -260,14 +274,14 @@ func (s *Stack) GetNetworkByName(name string) (*model.Network, error) {
 	if found && len(subnets) > 0 {
 		entry := subnets[0].(map[string]interface{})
 		id := entry["id"].(string)
-		return client.GetNetwork(id)
+		return s.GetNetwork(id)
 	}
 	return nil, model.ResourceNotFoundError("network", name)
 }
 
 // GetNetwork returns the network identified by id
 func (s *Stack) GetNetwork(id string) (*model.Network, error) {
-	subnet, err := client.getSubnet(id)
+	subnet, err := s.getSubnet(id)
 	if err != nil {
 		spew.Dump(err)
 		if !strings.Contains(err.Error(), id) {
@@ -275,7 +289,7 @@ func (s *Stack) GetNetwork(id string) (*model.Network, error) {
 		}
 	}
 	if subnet == nil || subnet.ID == "" {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("subnet", id)
 	}
 
 	net := model.NewNetwork()
@@ -288,7 +302,7 @@ func (s *Stack) GetNetwork(id string) (*model.Network, error) {
 
 // ListNetworks lists networks
 func (s *Stack) ListNetworks() ([]*model.Network, error) {
-	subnetList, err := client.listSubnets()
+	subnetList, err := s.listSubnets()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get networks list: %s", openstack.ProviderErrorToString(err))
 	}
@@ -397,7 +411,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	gw := convertNumberToIPv4(n + 1)
 
-	dnsList := s.driver.CfgOpts.DNSList
+	dnsList := s.CfgOpts.DNSList
 	if len(dnsList) == 0 {
 		dnsList = []string{"1.1.1.1"}
 	}
@@ -434,7 +448,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 		JSONResponse: &respCreate.Body,
 		OkCodes:      []int{200, 201},
 	}
-	_, err = s.driver.Provider.Request("POST", url, &opts)
+	_, err = s.osclt.Driver.Request("POST", url, &opts)
 	if err != nil {
 		return nil, fmt.Errorf("error requesting Subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err))
 	}
@@ -450,7 +464,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			_, err = s.osclt.Provider.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts)
+			_, err = s.osclt.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts)
 			if err == nil {
 				subnet, err = respGet.Extract()
 				if err == nil && subnet.Status == "ACTIVE" {
@@ -504,7 +518,7 @@ func (s *Stack) getSubnet(id string) (*subnets.Subnet, error) {
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	_, err := s.osclt.Provider.Request("GET", url, &opts)
+	_, err := s.osclt.Driver.Request("GET", url, &opts)
 	r.Err = err
 	subnet, err := r.Extract()
 	if err != nil {
@@ -526,7 +540,7 @@ func (s *Stack) deleteSubnet(id string) error {
 	// So we retry subnet deletion until all hosts are really deleted and subnet can be deleted
 	err := retry.Action(
 		func() error {
-			r, _ := s.osclt.Provider.Request("DELETE", url, &opts)
+			r, _ := s.osclt.Driver.Request("DELETE", url, &opts)
 			if r.StatusCode == 204 || r.StatusCode == 404 {
 				return nil
 			}
@@ -573,7 +587,7 @@ func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
 		}
 	}
 	if !found {
-		return nil, nil
+		return nil, model.ResourceNotFoundError("subnet", name)
 	}
 	return &subnet, nil
 }
@@ -607,7 +621,7 @@ func (s *Stack) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
 		Networks:     []*model.Network{req.Network},
 		PublicIP:     true,
 	}
-	host, err := client.CreateHost(hostReq)
+	host, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceInvalidRequest:
@@ -620,6 +634,6 @@ func (s *Stack) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
 }
 
 // DeleteGateway deletes the gateway associated with network identified by ID
-func (client *Client) DeleteGateway(id string) error {
-	return client.DeleteHost(id)
+func (s *Stack) DeleteGateway(id string) error {
+	return s.DeleteHost(id)
 }

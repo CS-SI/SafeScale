@@ -28,9 +28,6 @@ import (
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
-
-	uuid "github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -43,20 +40,18 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"golang.org/x/crypto/ssh"
-
-	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/model"
 	"github.com/CS-SI/SafeScale/iaas/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/iaas/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/iaas/model/enums/IPVersion"
+	propsv1 "github.com/CS-SI/SafeScale/iaas/model/properties/v1"
 	"github.com/CS-SI/SafeScale/iaas/userdata"
-	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (client *Client) ListAvailabilityZones(all bool) (map[string]bool, error) {
+func (s *Stack) ListAvailabilityZones(all bool) (map[string]bool, error) {
 	log.Debug("openstack.Client.ListAvailabilityZones() called")
 	defer log.Debug("openstack.Client.ListAvailabilityZones() done")
 
@@ -406,7 +401,7 @@ func (s *Stack) GetHost(hostParam interface{}) (*model.Host, error) {
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			server, err = servers.Get(client.Compute, host.ID).Extract()
+			server, err = servers.Get(s.Compute, host.ID).Extract()
 			if err != nil {
 				switch err.(type) {
 				case gc.ErrDefault404:
@@ -444,7 +439,7 @@ func (s *Stack) GetHost(hostParam interface{}) (*model.Host, error) {
 	if notFound {
 		return nil, model.ResourceNotFoundError("host", host.ID)
 	}
-	err = client.complementHost(host, server)
+	err = s.complementHost(host, server)
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +472,7 @@ func (s *Stack) interpretAddresses(
 			address := networkAddresses.(map[string]interface{})
 			version := address["version"].(float64)
 			fixedIP := address["addr"].(string)
-			if n == client.Cfg.ProviderNetwork {
+			if n == s.CfgOpts.ProviderNetwork {
 				switch version {
 				case 4:
 					AcccessIPv4 = fixedIP
@@ -504,7 +499,7 @@ func (s *Stack) complementHost(host *model.Host, server *servers.Server) error {
 		panic("Calling method complementHost from nil!")
 	}
 
-	networks, addresses, ipv4, ipv6 := client.interpretAddresses(server.Addresses)
+	networks, addresses, ipv4, ipv6 := s.interpretAddresses(server.Addresses)
 
 	// Updates intrinsic data of host if needed
 	if host.ID == "" {
@@ -535,7 +530,7 @@ func (s *Stack) complementHost(host *model.Host, server *servers.Server) error {
 	if err != nil {
 		return err
 	}
-	hpSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
+	hpSizingV1.AllocatedSize = s.toHostSize(server.Flavor)
 	err = host.Properties.Set(HostProperty.SizingV1, hpSizingV1)
 	if err != nil {
 		return err
@@ -581,11 +576,11 @@ func (s *Stack) complementHost(host *model.Host, server *servers.Server) error {
 		// Parse networks and fill fields
 		for _, netname := range networks {
 			// Ignore ProviderNetwork
-			if client.Cfg.ProviderNetwork == netname {
+			if s.CfgOpts.ProviderNetwork == netname {
 				continue
 			}
 
-			net, err := client.GetNetworkByName(netname)
+			net, err := s.GetNetworkByName(netname)
 			if err != nil {
 				log.Debugf("Failed to get data for network '%s'", netname)
 				continue
@@ -611,14 +606,14 @@ func (s *Stack) complementHost(host *model.Host, server *servers.Server) error {
 	}
 
 	// Updates network name and relationships if needed
-	config, _ := client.GetCfgOpts()
+	config, _ := s.GetCfgOpts()
 	providerNetwork, ok := config.Get("ProviderNetwork")
 	if !ok {
 		providerNetwork = ""
 	}
 	for netid, netname := range hostNetworkV1.NetworksByID {
 		if netname == "" {
-			net, err := client.GetNetwork(netid)
+			net, err := s.GetNetwork(netid)
 			if err != nil {
 				switch err.(type) {
 				case model.ErrResourceNotFound:
@@ -654,7 +649,7 @@ func (s *Stack) GetHostByName(name string) (*model.Host, error) {
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
-	_, r.Err = client.Compute.Get(client.Compute.ServiceURL("servers?name="+name), &r.Body, &gc.RequestOpts{
+	_, r.Err = s.Compute.Get(s.Compute.ServiceURL("servers?name="+name), &r.Body, &gc.RequestOpts{
 		OkCodes: []int{200, 203},
 	})
 	if r.Err != nil {
@@ -668,7 +663,7 @@ func (s *Stack) GetHostByName(name string) (*model.Host, error) {
 				host := model.NewHost()
 				host.ID = entry["id"].(string)
 				host.Name = name
-				return client.GetHost(host)
+				return s.GetHost(host)
 			}
 		}
 	}
@@ -695,8 +690,6 @@ type userData struct {
 	// Password for the user gpac (for troubleshoot use, useable only in console)
 	Password string
 }
-
-
 
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
@@ -734,9 +727,9 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	var nets []servers.Network
 	// If floating IPs are not used and host is public
 	// then add provider network to host networks
-	if !client.Cfg.UseFloatingIP && request.PublicIP {
+	if !s.CfgOpts.UseFloatingIP && request.PublicIP {
 		nets = append(nets, servers.Network{
-			UUID: client.ProviderNetworkID,
+			UUID: s.ProviderNetworkID,
 		})
 	}
 	// Add private networks
@@ -756,7 +749,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 		}
 
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		request.KeyPair, err = client.CreateKeyPair(name)
+		request.KeyPair, err = s.CreateKeyPair(name)
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
 			log.Debugf(utils.TitleFirst(msg))
@@ -767,7 +760,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	userData, err := userdata.Prepare(client, request, request.KeyPair, defaultNetwork.CIDR)
+	userData, err := userdata.Prepare(s.CfgOpts, request, request.KeyPair, defaultNetwork.CIDR)
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		log.Debugf(utils.TitleFirst(msg))
@@ -775,7 +768,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}
 
 	// Determine system disk size based on vcpus count
-	template, err := client.GetTemplate(request.TemplateID)
+	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image: %s", ProviderErrorToString(err))
 	}
@@ -794,7 +787,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	// Sets provider parameters to create host
 	srvOpts := servers.CreateOpts{
 		Name:             request.ResourceName,
-		SecurityGroups:   []string{client.SecurityGroup.Name},
+		SecurityGroups:   []string{s.SecurityGroup.Name},
 		Networks:         nets,
 		FlavorRef:        request.TemplateID,
 		ImageRef:         request.ImageID,
@@ -831,19 +824,26 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 
 	// --- query provider for host creation ---
 
-	var host_tmp *model.Host
+	var hostTmp *model.Host
 
 	// Retry creation until success, for 10 minutes
-	var host *model.Host
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			server, err := servers.Create(client.Compute, keypairs.CreateOptsExt{
+			server, err := servers.Create(s.Compute, keypairs.CreateOptsExt{
 				CreateOptsBuilder: srvOpts,
 			}).Extract()
-			if err != nil {
+
+			// Starting from here, delete server if created and the anonymous function exits with error
+			defer func() {
 				if server != nil {
-					servers.Delete(client.Compute, server.ID)
+					derr := servers.Delete(s.Compute, server.ID).ExtractErr()
+					if derr != nil {
+						log.Debugf("%v", derr)
+					}
 				}
+			}()
+
+			if err != nil {
 				msg := ProviderErrorToString(err)
 				log.Warnf(msg)
 				return fmt.Errorf(msg)
@@ -851,9 +851,8 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 			host.ID = server.ID
 
 			// Wait that Host is ready, not just that the build is started
-			host_tmp, err = client.WaitHostReady(host, 5*time.Minute)
+			hostTmp, err = s.WaitHostReady(host, 5*time.Minute)
 			if err != nil {
-				servers.Delete(client.Compute, server.ID)
 				msg := ProviderErrorToString(err)
 				log.Warnf(msg)
 				return fmt.Errorf(msg)
@@ -867,17 +866,17 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 		log.Debugf("Error creating host: timeout: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
-	if host_tmp == nil {
+	if hostTmp != nil {
+		host = hostTmp
+	} else {
 		return nil, errors.New("unexpected problem creating host")
 	}
-
-	host = host_tmp
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
 			log.Infof("Cleanup, deleting host '%s'", host.Name)
-			derr := client.DeleteHost(host.ID)
+			derr := s.DeleteHost(host.ID)
 			if derr != nil {
 				log.Warnf("Error deleting host: %v", derr)
 			}
@@ -885,10 +884,10 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 	}()
 
 	// if Floating IP are used and public address is requested
-	if client.Cfg.UseFloatingIP && request.PublicIP {
+	if s.CfgOpts.UseFloatingIP && request.PublicIP {
 		// Create the floating IP
-		ip, err := floatingips.Create(client.Compute, floatingips.CreateOpts{
-			Pool: client.Opts.FloatingIPPool,
+		ip, err := floatingips.Create(s.Compute, floatingips.CreateOpts{
+			Pool: s.AuthOpts.FloatingIPPool,
 		}).Extract()
 		if err != nil {
 			log.Debugf("Error creating host: floating ip: %+v", err)
@@ -899,7 +898,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 		defer func() {
 			if err != nil {
 				log.Debugf("Cleanup, deleting floating ip '%s'", ip.ID)
-				derr := floatingips.Delete(client.Compute, ip.ID).ExtractErr()
+				derr := floatingips.Delete(s.Compute, ip.ID).ExtractErr()
 				if derr != nil {
 					log.Errorf("Error deleting Floating IP: %v", derr)
 				}
@@ -907,7 +906,7 @@ func (s *Stack) CreateHost(request model.HostRequest) (*model.Host, error) {
 		}()
 
 		// Associate floating IP to host
-		err = floatingips.AssociateInstance(client.Compute, host.ID, floatingips.AssociateOpts{
+		err = floatingips.AssociateInstance(s.Compute, host.ID, floatingips.AssociateOpts{
 			FloatingIP: ip.IP,
 		}).ExtractErr()
 		if err != nil {
@@ -1037,7 +1036,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*mo
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *model.Host; any other type will panic
-func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error) {
+func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 	log.Debug("openstack.Stack.GetHostState() called")
 	defer log.Debug("openstack.Stack.GetHostState() done")
 
@@ -1045,7 +1044,7 @@ func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error
 		panic("Calling s.GetHostState with s==nil!")
 	}
 
-	host, err := client.GetHost(hostParam)
+	host, err := s.GetHost(hostParam)
 	if err != nil {
 		return HostState.ERROR, err
 	}
@@ -1071,7 +1070,7 @@ func (s *Stack) ListHosts() ([]*model.Host, error) {
 
 		for _, srv := range list {
 			h := model.NewHost()
-			err := client.complementHost(h, &srv)
+			err := s.complementHost(h, &srv)
 			if err != nil {
 				return false, err
 			}
@@ -1146,18 +1145,18 @@ func (s *Stack) DeleteHost(id string) error {
 		panic("Calling s.DeleteHost with s==nil!")
 	}
 
-	if client.Cfg.UseFloatingIP {
-		fip, err := client.getFloatingIP(id)
+	if s.CfgOpts.UseFloatingIP {
+		fip, err := s.getFloatingIP(id)
 		if err == nil {
 			if fip != nil {
-				err = floatingips.DisassociateInstance(client.Compute, id, floatingips.DisassociateOpts{
+				err = floatingips.DisassociateInstance(s.Compute, id, floatingips.DisassociateOpts{
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
 					log.Debugf("Error deleting host: dissociate: %+v", err)
 					return errors.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
 				}
-				err = floatingips.Delete(client.Compute, fip.ID).ExtractErr()
+				err = floatingips.Delete(s.Compute, fip.ID).ExtractErr()
 				if err != nil {
 					log.Debugf("Error deleting host: delete floating ip: %+v", err)
 					return errors.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
@@ -1173,7 +1172,7 @@ func (s *Stack) DeleteHost(id string) error {
 		func() error {
 			resourcePresent := true
 			// 1st, send delete host order
-			err := servers.Delete(client.Compute, id).ExtractErr()
+			err := servers.Delete(s.Compute, id).ExtractErr()
 			if err != nil {
 				switch err.(type) {
 				case gc.ErrDefault404:
@@ -1189,7 +1188,7 @@ func (s *Stack) DeleteHost(id string) error {
 			// If check fails and error isn't 'resource not found', retry
 			innerRetryErr := retry.WhileUnsuccessfulDelay5Seconds(
 				func() error {
-					host, err := servers.Get(client.Compute, id).Extract()
+					host, err := servers.Get(s.Compute, id).Extract()
 					if err == nil {
 						if toHostState(host.Status) == HostState.ERROR {
 							return nil
@@ -1239,7 +1238,7 @@ func (s *Stack) StopHost(id string) error {
 		panic("Calling s.StopHost with s==nil!")
 	}
 
-	err := startstop.Stop(client.Compute, id).ExtractErr()
+	err := startstop.Stop(s.Compute, id).ExtractErr()
 	if err != nil {
 		log.Debugf("Error stopping host: stopping host: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("error stopping host : %s", ProviderErrorToString(err)))
@@ -1273,7 +1272,7 @@ func (s *Stack) StartHost(id string) error {
 		panic("Calling s.StartHost with s==nil!")
 	}
 
-	err := startstop.Start(client.Compute, id).ExtractErr()
+	err := startstop.Start(s.Compute, id).ExtractErr()
 	if err != nil {
 		log.Debugf("Error starting host: starting host: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error starting host : %s", ProviderErrorToString(err)))
@@ -1284,8 +1283,8 @@ func (s *Stack) StartHost(id string) error {
 
 // ResizeHost ...
 func (s *Stack) ResizeHost(id string, request model.SizingRequirements) (*model.Host, error) {
-	log.Debugf("openstack.Stack.ResizeHost(%s) called", id)
-	defer log.Debugf("openstack.Stack.ResizeHost(%s) done", id)
+	log.Debugf("openstack.Stack::ResizeHost(%s) called", id)
+	defer log.Debugf("openstack.Stack::ResizeHost(%s) done", id)
 
 	if s == nil {
 		panic("Calling s.ResizeHost with s==nil!")
@@ -1297,5 +1296,5 @@ func (s *Stack) ResizeHost(id string, request model.SizingRequirements) (*model.
 	// TODO RESIZE Call this
 	// servers.Resize()
 
-	return nil, errors.New("Not implemented yet !")
+	return nil, errors.New("Not implemented yet")
 }

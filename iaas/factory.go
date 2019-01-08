@@ -23,23 +23,22 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/iaas/api"
 	"github.com/CS-SI/SafeScale/iaas/model"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	providerapi "github.com/CS-SI/SafeScale/iaas/provider/api"
+	"github.com/CS-SI/SafeScale/iaas/provider/api"
 	"github.com/CS-SI/SafeScale/utils/crypt"
 )
 
 var (
 	// providers[clientName]client
-	providers = map[string]api.Client{}
+	providers = map[string]*Client{}
 	// tenants[tenantName]clientName
 	tenants = map[string]string{}
 )
 
 // Register a Client referenced by the provider name. Ex: "ovh", ovh.New()
 // This function shoud be called by the init function of each provider to be registered in SafeScale
-func Register(name string, provider providerapi.Provider) {
+func Register(name string, provider api.Provider) {
 	// if already registered, leave
 	if _, ok := providers[name]; ok {
 		return
@@ -53,9 +52,9 @@ func Tenants() (map[string]string, error) {
 	return tenants, err
 }
 
-// GetService return the service referenced by the given name.
+// GetClient return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func GetService(tenantName string) (api.Client, error) {
+func GetClient(tenantName string) (*Client, error) {
 	tenants, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
@@ -64,7 +63,7 @@ func GetService(tenantName string) (api.Client, error) {
 		tenantInCfg    = false
 		found          = false
 		name           string
-		client         providerapi.Client
+		client         *Client
 		clientProvider = "__not_found__"
 	)
 
@@ -80,10 +79,13 @@ func GetService(tenantName string) (api.Client, error) {
 		}
 
 		tenantInCfg = true
-		provider, found := tenant["client"].(string)
+		provider, found := tenant["provider"].(string)
 		if !found {
-			log.Error("Missing field 'client' in tenant")
-			continue
+			provider, found = tenant["client"].(string)
+			if !found {
+				log.Error("Missing field 'provider' in tenant")
+				continue
+			}
 		}
 
 		clientProvider = provider
@@ -105,7 +107,6 @@ func GetService(tenantName string) (api.Client, error) {
 		if !found {
 			log.Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		}
-		// Merge identity compute and network in single map
 		tenantClient := map[string]interface{}{
 			"identity": tenantIdentity,
 			"compute":  tenantCompute,
@@ -115,11 +116,11 @@ func GetService(tenantName string) (api.Client, error) {
 		_, tenantMetadataFound := tenant["metadata"]
 
 		// Initializes Provider
-		clientAPI, err := client.Build(tenantClient)
+		providerInstance, err := client.Build(tenantClient)
 		if err != nil {
 			return nil, fmt.Errorf("Error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
 		}
-		clientCfg, err := clientAPI.GetCfgOpts()
+		clientCfg, err := providerInstance.GetCfgOpts()
 		if err != nil {
 			return nil, err
 		}
@@ -181,9 +182,9 @@ func GetService(tenantName string) (api.Client, error) {
 		}
 
 		// Service is ready
-		return &Service{
-			ClientAPI:      clientAPI,
-			ObjectStorage:  objectStorageLocation,
+		return &Client{
+			Provider:       providerInstance,
+			Location:       objectStorageLocation,
 			MetadataBucket: metadataBucket,
 			MetadataKey:    metadataCryptKey,
 		}, nil

@@ -19,13 +19,14 @@ package openstack
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/iaas/stack/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
-// GetDefaultSecurityGroup returns the default security group
-func (s *Stack) GetDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
+const defaultSecurityGroup string = "30ad3142-a5ec-44b5-9560-618bde3de1ef"
+
+// getDefaultSecurityGroup returns the default security group
+func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
 	var sgList []secgroups.SecurityGroup
 
 	err := secgroups.List(s.Compute).EachPage(func(page pagination.Page) (bool, error) {
@@ -50,174 +51,81 @@ func (s *Stack) GetDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
 	return &sgList[0], nil
 }
 
-func (s *Stack) CreateIngressRule(groupdID string, protocol secrules.Protocol)
-
 // createTCPRules creates TCP rules to configure the default security group
 func (s *Stack) createTCPRules(groupID string) error {
-	// Inbound == ingress == coming from Outside
-	ruleOpts := secrules.CreateOpts{
-		Direction:      secrules.DirIngress,
-		PortRangeMin:   1,
-		PortRangeMax:   65535,
-		EtherType:      secrules.EtherType4,
-		SecGroupID:     groupID,
-		Protocol:       protocol,
-		RemoteIPPrefix: "0.0.0.0/0",
-	}
-	_, err := secrules.Create(s.osclt.Network, ruleOpts).Extract()
-	if err != nil {
-		return err
-	}
-	ruleOpts = secrules.CreateOpts{
-		Direction:      secrules.DirIngress,
-		PortRangeMin:   1,
-		PortRangeMax:   65535,
-		EtherType:      secrules.EtherType6,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolTCP,
-		RemoteIPPrefix: "::/0",
-	}
-	_, err = secrules.Create(s.osclt.driver, ruleOpts).Extract()
-	if err != nil {
-		return err
+	// Open TCP Ports
+	ruleOpts := secgroups.CreateRuleOpts{
+		ParentGroupID: groupID,
+		FromPort:      1,
+		ToPort:        65535,
+		IPProtocol:    "TCP",
+		CIDR:          "0.0.0.0/0",
 	}
 
-	// Outbound = egress == going to Outside
-	ruleOpts = secrules.CreateOpts{
-		Direction:      secrules.DirEgress,
-		PortRangeMin:   1,
-		PortRangeMax:   65535,
-		EtherType:      secrules.EtherType4,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolTCP,
-		RemoteIPPrefix: "0.0.0.0/0",
-	}
-	_, err = secrules.Create(s.osclt.driver, ruleOpts).Extract()
+	_, err := secgroups.CreateRule(s.Compute, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
-	ruleOpts = secrules.CreateOpts{
-		Direction:      secrules.DirEgress,
-		PortRangeMin:   1,
-		PortRangeMax:   65535,
-		EtherType:      secrules.EtherType6,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolTCP,
-		RemoteIPPrefix: "::/0",
+	ruleOpts = secgroups.CreateRuleOpts{
+		ParentGroupID: groupID,
+		FromPort:      1,
+		ToPort:        65535,
+		IPProtocol:    "TCP",
+		CIDR:          "::/0",
 	}
-	_, err = secrules.Create(s.osclt.Network, ruleOpts).Extract()
+	_, err = secgroups.CreateRule(s.Compute, ruleOpts).Extract()
 	return err
 }
 
 // createTCPRules creates UDP rules to configure the default security group
 func (s *Stack) createUDPRules(groupID string) error {
-	// Inbound == ingress == coming from Outside
-	ruleOpts := secrules.CreateOpts{
-		Direction:      secrules.DirIngress,
-		PortRangeMin:   1,
-		PortRangeMax:   65535,
-		EtherType:      secrules.EtherType4,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolUDP,
-		RemoteIPPrefix: "0.0.0.0/0",
-	}
-	_, err := secrules.Create(s.osclt.Network, ruleOpts).Extract()
-	if err != nil {
-		return err
-	}
-	ruleOpts = secrules.CreateOpts{
-		Direction:      secrules.DirIngress,
-		PortRangeMin:   1,
-		PortRangeMax:   65535,
-		EtherType:      secrules.EtherType6,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolUDP,
-		RemoteIPPrefix: "::/0",
-	}
-	_, err = secrules.Create(s.osclt.Network, ruleOpts).Extract()
-	if err != nil {
-		return err
+	// Open UDP Ports
+	ruleOpts := secgroups.CreateRuleOpts{
+		ParentGroupID: groupID,
+		FromPort:      1,
+		ToPort:        65535,
+		IPProtocol:    "UDP",
+		CIDR:          "0.0.0.0/0",
 	}
 
-	// Outbound = egress == going to Outside
-	ruleOpts = secrules.CreateOpts{
-		Direction:      secrules.DirEgress,
-		PortRangeMin:   1,
-		PortRangeMax:   65535,
-		EtherType:      secrules.EtherType4,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolUDP,
-		RemoteIPPrefix: "0.0.0.0/0",
-	}
-	_, err = secrules.Create(s.osclt.Network, ruleOpts).Extract()
+	_, err := secgroups.CreateRule(s.Compute, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
-	ruleOpts = secrules.CreateOpts{
-		Direction:      secrules.DirEgress,
-		PortRangeMin:   1,
-		PortRangeMax:   65535,
-		EtherType:      secrules.EtherType6,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolUDP,
-		RemoteIPPrefix: "::/0",
+	ruleOpts = secgroups.CreateRuleOpts{
+		ParentGroupID: groupID,
+		FromPort:      1,
+		ToPort:        65535,
+		IPProtocol:    "UDP",
+		CIDR:          "::/0",
 	}
-	_, err = secrules.Create(s.osclt.Network, ruleOpts).Extract()
+	_, err = secgroups.CreateRule(s.Compute, ruleOpts).Extract()
 	return err
 }
 
 // createICMPRules creates UDP rules to configure the default security group
 func (s *Stack) createICMPRules(groupID string) error {
-	// Inbound == ingress == coming from Outside
-	ruleOpts := secrules.CreateOpts{
-		Direction:      secrules.DirIngress,
-		EtherType:      secrules.EtherType4,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolICMP,
-		RemoteIPPrefix: "0.0.0.0/0",
-	}
-	_, err := secrules.Create(s.osclt.Network, ruleOpts).Extract()
-	if err != nil {
-		return err
-	}
-	ruleOpts = secrules.CreateOpts{
-		Direction: secrules.DirIngress,
-		//		PortRangeMin:   0,
-		//		PortRangeMax:   18,
-		EtherType:      secrules.EtherType6,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolICMP,
-		RemoteIPPrefix: "::/0",
-	}
-	_, err = secrules.Create(s.osclt.Network, ruleOpts).Extract()
-	if err != nil {
-		return err
+	// Open TCP Ports
+	ruleOpts := secgroups.CreateRuleOpts{
+		ParentGroupID: groupID,
+		FromPort:      -1,
+		ToPort:        -1,
+		IPProtocol:    "ICMP",
+		CIDR:          "0.0.0.0/0",
 	}
 
-	// Outbound = egress == going to Outside
-	ruleOpts = secrules.CreateOpts{
-		Direction: secrules.DirEgress,
-		//		PortRangeMin:   0,
-		//		PortRangeMax:   18,
-		EtherType:      secrules.EtherType4,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolICMP,
-		RemoteIPPrefix: "0.0.0.0/0",
-	}
-	_, err = secrules.Create(s.osclt.Network, ruleOpts).Extract()
+	_, err := secgroups.CreateRule(s.Compute, ruleOpts).Extract()
 	if err != nil {
 		return err
 	}
-	ruleOpts = secrules.CreateOpts{
-		Direction: secrules.DirEgress,
-		//		PortRangeMin:   0,
-		//		PortRangeMax:   18,
-		EtherType:      secrules.EtherType6,
-		SecGroupID:     groupID,
-		Protocol:       secrules.ProtocolICMP,
-		RemoteIPPrefix: "::/0",
+	ruleOpts = secgroups.CreateRuleOpts{
+		ParentGroupID: groupID,
+		FromPort:      -1,
+		ToPort:        -1,
+		IPProtocol:    "ICMP",
+		CIDR:          "::/0",
 	}
-	_, err = secrules.Create(s.osclt.Network, ruleOpts).Extract()
+	_, err = secgroups.CreateRule(s.Compute, ruleOpts).Extract()
 	return err
 }
 
@@ -225,8 +133,6 @@ func (s *Stack) createICMPRules(groupID string) error {
 // The default security group opens all TCP, UDP, ICMP ports
 // Security is managed individually on each host using a linux firewall
 func (s *Stack) initDefaultSecurityGroup() error {
-	s.defaultSecurityGroup = "sg-" + s.AuthOpts.VPCName
-
 	sg, err := s.getDefaultSecurityGroup()
 	if err != nil {
 		return err
@@ -236,25 +142,30 @@ func (s *Stack) initDefaultSecurityGroup() error {
 		return nil
 	}
 	opts := secgroups.CreateOpts{
-		Name:        s.defaultSecurityGroup,
-		Description: "Default security group for VPC " + s.AuthOpts.VPCName,
+		Name:        defaultSecurityGroup,
+		Description: "Default security group",
 	}
-	group, err := secgroups.Create(s.osclt.Network, opts).Extract()
+
+	group, err := secgroups.Create(s.Compute, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Failed to create Security Group '%s': %s", s.defaultSecurityGroup, openstack.ErrorToString(err))
+		return err
 	}
 	err = s.createTCPRules(group.ID)
-	if err == nil {
-		err = s.createUDPRules(group.ID)
-		if err == nil {
-			err = s.createICMPRules(group.ID)
-			if err == nil {
-				s.SecurityGroup = group
-				return nil
-			}
-		}
+	if err != nil {
+		secgroups.Delete(s.Compute, group.ID)
+		return err
 	}
-	// Error occured...
-	secgroups.Delete(s.osclt.Network, group.ID)
-	return err
+
+	err = s.createUDPRules(group.ID)
+	if err != nil {
+		secgroups.Delete(s.Compute, group.ID)
+		return err
+	}
+	err = s.createICMPRules(group.ID)
+	if err != nil {
+		secgroups.Delete(s.Compute, group.ID)
+		return err
+	}
+	s.SecurityGroup = group
+	return nil
 }
