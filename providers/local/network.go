@@ -222,9 +222,15 @@ func (client *Client) DeleteNetwork(ref string) error {
 		return err
 	}
 
-	err = libvirtNetwork.Destroy()
+	isActive, err := libvirtNetwork.IsActive()
 	if err != nil {
-		return fmt.Errorf("Failed to destroy network : %s", err.Error())
+		return fmt.Errorf("Failed to check if the network is active : %s", err.Error())
+	}
+	if isActive {
+		err = libvirtNetwork.Destroy()
+		if err != nil {
+			return fmt.Errorf("Failed to destroy network : %s", err.Error())
+		}
 	}
 
 	err = libvirtNetwork.Undefine()
