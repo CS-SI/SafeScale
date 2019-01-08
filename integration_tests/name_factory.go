@@ -1,6 +1,9 @@
 package integration_tests
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 //Names ...
 type Names struct {
@@ -9,15 +12,19 @@ type Names struct {
 	Shares   []string
 	Hosts    []string
 	Networks []string
+	Clusters []string
 }
 
-func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHosts int, nbNetworks int) Names {
+func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHosts int, nbNetworks int, nbClusters int) Names {
+	coreString = strings.ToLower(coreString)
+
 	names := Names{
 		Buckets:  []string{},
 		Volumes:  []string{},
 		Shares:   []string{},
 		Hosts:    []string{},
 		Networks: []string{},
+		Clusters: []string{},
 	}
 
 	for i := 1; i <= nbBukets; i++ {
@@ -35,12 +42,15 @@ func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHo
 	for i := 1; i <= nbNetworks; i++ {
 		names.Networks = append(names.Networks, fmt.Sprintf("%s_network_%d", coreString, i))
 	}
+	for i := 1; i <= nbClusters; i++ {
+		names.Clusters = append(names.Clusters, fmt.Sprintf("%s_cluster_%d", coreString, i))
+	}
 
 	return names
 }
 
 func (names *Names) TearDown() {
-	//TODO is this possible to supress a non empty bucket?
+	//TODO is it possible to supress a non empty bucket?
 	for _, bucketName := range names.Buckets {
 		_, _ = GetOutput(fmt.Sprintf("broker bucket delete %s", bucketName))
 	}
@@ -61,5 +71,8 @@ func (names *Names) TearDown() {
 	}
 	for _, networkName := range names.Networks {
 		_, _ = GetOutput(fmt.Sprintf("broker network delete %s", networkName))
+	}
+	for _, clusterName := range names.Clusters {
+		_, _ = GetOutput(fmt.Sprintf("yes | deploy cluster delete %s", clusterName))
 	}
 }

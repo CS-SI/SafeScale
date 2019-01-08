@@ -13,7 +13,7 @@ import (
 func Docker(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("Docker", 0, 0, 0, 0, 1)
+	names := GetNames("Docker", 0, 0, 0, 0, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -54,7 +54,7 @@ func Docker(t *testing.T, provider Providers.Enum) {
 func DockerNotGateway(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("DockerNotGateway", 0, 0, 0, 1, 1)
+	names := GetNames("DockerNotGateway", 0, 0, 0, 1, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -98,7 +98,7 @@ func DockerNotGateway(t *testing.T, provider Providers.Enum) {
 func DockerCompose(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("DockerCompose", 0, 0, 0, 0, 1)
+	names := GetNames("DockerCompose", 0, 0, 0, 0, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 

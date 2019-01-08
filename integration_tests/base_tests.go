@@ -81,7 +81,7 @@ func Setup(t *testing.T, provider Providers.Enum) {
 func Basic(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("BasicTest", 0, 1, 1, 2, 1)
+	names := GetNames("BasicTest", 0, 1, 1, 2, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -254,7 +254,7 @@ func Basic(t *testing.T, provider Providers.Enum) {
 func ReadyToSsh(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("ReadyToSSH", 0, 0, 0, 1, 1)
+	names := GetNames("ReadyToSSH", 0, 0, 0, 1, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -280,7 +280,7 @@ func ReadyToSsh(t *testing.T, provider Providers.Enum) {
 func ShareError(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("ShareError", 0, 1, 1, 1, 1)
+	names := GetNames("ShareError", 0, 1, 1, 1, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -362,7 +362,7 @@ func ShareError(t *testing.T, provider Providers.Enum) {
 func VolumeError(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("VolumeError", 0, 1, 1, 1, 1)
+	names := GetNames("VolumeError", 0, 1, 1, 1, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -407,7 +407,7 @@ func VolumeError(t *testing.T, provider Providers.Enum) {
 func StopStart(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("StopStart", 0, 1, 1, 1, 1)
+	names := GetNames("StopStart", 0, 1, 1, 1, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -458,7 +458,7 @@ func StopStart(t *testing.T, provider Providers.Enum) {
 func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("DeleteVolumeMounted", 0, 1, 1, 2, 1)
+	names := GetNames("DeleteVolumeMounted", 0, 1, 1, 2, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -564,7 +564,7 @@ func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
 func UntilShare(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("UntilShare", 0, 1, 1, 2, 1)
+	names := GetNames("UntilShare", 0, 1, 1, 2, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
@@ -613,7 +613,7 @@ func UntilShare(t *testing.T, provider Providers.Enum) {
 func UntilVolume(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
-	names := GetNames("UntilVolume", 0, 1, 1, 2, 1)
+	names := GetNames("UntilVolume", 0, 1, 1, 2, 1, 0)
 	names.TearDown()
 	defer names.TearDown()
 
