@@ -28,22 +28,22 @@ func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHo
 	}
 
 	for i := 1; i <= nbBukets; i++ {
-		names.Buckets = append(names.Buckets, fmt.Sprintf("%s_bucket_%d", coreString, i))
+		names.Buckets = append(names.Buckets, fmt.Sprintf("%s-bucket-%d", coreString, i))
 	}
 	for i := 1; i <= nbVolumes; i++ {
-		names.Volumes = append(names.Volumes, fmt.Sprintf("%s_volume_%d", coreString, i))
+		names.Volumes = append(names.Volumes, fmt.Sprintf("%s-volume-%d", coreString, i))
 	}
 	for i := 1; i <= nbShares; i++ {
-		names.Shares = append(names.Shares, fmt.Sprintf("%s_share_%d", coreString, i))
+		names.Shares = append(names.Shares, fmt.Sprintf("%s-share-%d", coreString, i))
 	}
 	for i := 1; i <= nbHosts; i++ {
-		names.Hosts = append(names.Hosts, fmt.Sprintf("%s_host_%d", coreString, i))
+		names.Hosts = append(names.Hosts, fmt.Sprintf("%s-host-%d", coreString, i))
 	}
 	for i := 1; i <= nbNetworks; i++ {
-		names.Networks = append(names.Networks, fmt.Sprintf("%s_network_%d", coreString, i))
+		names.Networks = append(names.Networks, fmt.Sprintf("%s-network-%d", coreString, i))
 	}
 	for i := 1; i <= nbClusters; i++ {
-		names.Clusters = append(names.Clusters, fmt.Sprintf("%s_cluster_%d", coreString, i))
+		names.Clusters = append(names.Clusters, fmt.Sprintf("%s-cluster-%d", coreString, i))
 	}
 
 	return names
