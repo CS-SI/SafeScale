@@ -86,10 +86,7 @@ func (client *Client) getVolumeSpeed(vType string) VolumeSpeed.Enum {
 // CreateVolume creates a block volume
 func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
 	volume, err := client.GetVolume(request.Name)
-	if err != nil {
-		return nil, err
-	}
-	if volume != nil {
+	if volume != nil && err == nil {
 		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
 	}
 
