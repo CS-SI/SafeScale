@@ -30,21 +30,26 @@ func ClusterSwarm(t *testing.T, provider Providers.Enum) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := GetOutput("deploy cluster create + --cidr 168.192.201.0/24 --disable remotedesktop --flavor SWARM " + names.Clusters[0])
-	fmt.Println("Out : ", out)
-	fmt.Println("Err : ", err)
+	outCreate, err := GetOutput("deploy cluster create + --cidr 168.192.201.0/24 --disable remotedesktop --flavor SWARM " + names.Clusters[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker ssh run " + names.Clusters[0] + " -c \"docker service create --name webtest --publish 8118:80 httpd\"")
+	out, err := GetOutput("broker ssh run " + names.Clusters[0] + "-master-1 -c \"docker service create --name webtest --publish 8118:80 httpd\"")
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker ssh run " + names.Clusters[0] + " -c \"docker service ls | grep webtest | grep httpd | grep 1/1\"")
+	out, err = GetOutput("broker ssh run " + names.Clusters[0] + "-master-1 -c \"docker service ls | grep webtest | grep httpd | grep 1/1\"")
 	require.Nil(t, err)
 
-	out, err = GetOutput("broker ssh run " + names.Clusters[0] + " -c \"curl 127.0.0.1:8118\"")
+	out, err = GetOutput("broker ssh run " + names.Clusters[0] + "-master-1 -c \"curl 127.0.0.1:8118\"")
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "It works!"))
 
-	out, err = GetOutput("deploy host check-feature " + names.Clusters[0] + " reverseproxy")
+	out, err = GetOutput("deploy host check-feature gw-net-" + names.Clusters[0] + " reverseproxy")
+	require.Nil(t, err)
+
+	out, err = GetOutput("deploy cluster inspect " + names.Clusters[0])
+	require.Nil(t, err)
+	require.Equal(t, outCreate, out)
+
+	out, err = GetOutput("deploy cluster delete --yes " + names.Clusters[0])
 	require.Nil(t, err)
 }
