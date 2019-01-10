@@ -8,7 +8,6 @@ import (
 )
 
 func Test_ClusterK8S(t *testing.T) {
-	//WIP
 	integration_tests.ClusterK8S(t, Providers.CLOUDFERRO)
 }
 
