@@ -173,7 +173,7 @@ feature:
                             [ -f /etc/kubernetes/.joined ] && exit 0
 
                             VERSION=$(sfRetry 5m 5 "curl -ksSL https://dl.k8s.io/release/stable.txt")
-                            [[ $VERSION =~ v[0-9]+\.[0-9]+\.[0-9]+ ]] || VERSION=v1.12.1
+                            [[ $VERSION =~ v[0-9]+\.[0-9]+\.[0-9]+ ]] || VERSION=v1.13.1
                             URL="https://storage.googleapis.com/kubernetes-release/release/${VERSION}/bin/linux/amd64"
                             sfDownload "$URL/kubeadm" kubeadm 5m 5 || exit 193
                             sfDownload "$URL/kubelet" kubelet 5m 5 || exit 194
@@ -281,8 +281,9 @@ feature:
 
                             cd /opt/safescale/k8s/config
 
-                            cat >kubeadm-k8s-cpx.config.template <<-EOF
-                            apiVersion: kubeadm.k8s.io/v1alpha2
+                            #untested api version !!
+                            cat >kubeadm-bootstrap.config.yaml <<-EOF
+                            apiVersion: kubeadm.k8s.io/v1alpha3
                             kind: MasterConfiguration
                             kubernetesVersion: $RELEASE
                             apiServerCertSANs:
@@ -296,24 +297,50 @@ feature:
                                         advertise-client-urls: "https://{{.HostIP}}:2379"
                                         listen-peer-urls: "https://{{.HostIP}}:2380"
                                         initial-advertise-peer-urls: "https://{{.HostIP}}:2380"
-                                        initial-cluster: "{{.Hostname}}=https://{{.HostIP}}:2380,{{.Hostname}}=https://{{.HostIP}}:2380"
-                                        initial-cluster-state: existing
+                                        initial-cluster: "{{.Hostname}}=https://{{.HostIP}}:2380"
                                     serverCertSANs:
                                         - {{.Hostname}}
                                         - {{.HostIP}}
                                     peerCertSANs:
                                         - {{.Hostname}}
                                         - {{.HostIP}}
+                            networking:
+                                podSubnet: "10.100.0.0/16"
+                            EOF
+
+                            cat >kubeadm-k8s-cpx.config.template <<-EOF
+                            apiVersion: kubeadm.k8s.io/v1alpha2
+                            kind: MasterConfiguration
+                            kubernetesVersion: $RELEASE
+                            apiServerCertSANs:
+                                - "{{.HostIP}}"
+                            api:
+                                controlPlaneEndpoint: "{{.HostIP}}:6443"
+                            etcd:
+                                local:
+                                    extraArgs:
+                                        listen-client-urls: "https://127.0.0.1:2379,https://##HOSTIP##:2379"
+                                        advertise-client-urls: "https://##HOSTIP##:2379"
+                                        listen-peer-urls: "https://##HOSTIP##:2380"
+                                        initial-advertise-peer-urls: "https://##HOSTIP##:2380"
+                                        initial-cluster: "{{.Hostname}}=https://{{.HostIP}}:2380,##HOSTNAME##=https://##HOSTIP##:2380"
+                                        initial-cluster-state: existing
+                                    serverCertSANs:
+                                        - ##HOSTNAME##
+                                        - ##HOSTIP##
+                                    peerCertSANs:
+                                        - ##HOSTNAME##
+                                        - ##HOSTIP##
                                 networking:
                                     podSubnet: "10.100.0.0/16"
                             EOF
 
                             cat >etcd-join.sh.template <<-'EOF'
                                 export KUBECONFIG=/etc/kubernetes/admin.conf
-                                kubectl exec -n kube-system etcd-{{.Hostname}} -- etcdctl --ca-file /etc/kubernetes/pki/etcd/ca.crt --cert-file /etc/kubernetes/pki/etcd/peer.crt --key-file /etc/kubernetes/pki/etcd/peer.key --endpoints=https://{{.HostIP}}:2379 member add {{.Hostname}} https://{{.HostIP}}:2380
+                                kubectl exec -n kube-system etcd-##HOSTNAME## -- etcdctl --ca-file /etc/kubernetes/pki/etcd/ca.crt --cert-file /etc/kubernetes/pki/etcd/peer.crt --key-file /etc/kubernetes/pki/etcd/peer.key --endpoints=https://{{.HostIP}}:2379 member add ##HOSTNAME## https://##HOSTIP##:2380
                             EOF
 
-                            sfRetry 5m 5 kubeadm config images pull && kubeadm init --pod-network-cidr=10.100.0.0/16 --ignore-preflight-errors all && echo "init done" || exit 193
+                            sfRetry 5m 5 kubeadm config images pull && kubeadm init --config kubeadm-bootstrap.config.yaml && echo "init done" || exit 193
                             touch /etc/kubernetes/.joined
 
                             cp /etc/kubernetes/pki/ca.crt ../ssl
@@ -331,7 +358,7 @@ feature:
                             for ip in {{range .MasterIPs}}{{.}} {{end}}; do
                                 [ "$ip" = "{{.HostIP}}" ] && continue
                                 sed -e "s:{{.HostIP}}:${ip}:g" /etc/kubernetes/admin.conf >/var/tmp/admin.conf
-                                sed -e "s:{{.HostIP}}:${ip}:g" kubeadm-k8s-cpx.config.yaml.template >/tmp/kubeadm-k8s-cpx.config.yaml
+                                sed -e "s:##HOSTIP##:${ip}:g" kubeadm-k8s-cpx.config.yaml.template >/tmp/kubeadm-k8s-cpx.config.yaml
                                 sfDropzonePush /tmp/admin.conf && \
                                 sfDropzonePush /tmp/kubeadm-k8s-cpx.config.yaml && \
                                 sfDropzonePush etcd-join.sh.template && \
