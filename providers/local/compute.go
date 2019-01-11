@@ -36,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
+	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -45,6 +46,9 @@ import (
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	uuid "github.com/satori/go.uuid"
 )
+
+// The createds hosts could be connected to the network with a bridge or a nat
+var bridgedVMs = false
 
 //-------------IMAGES---------------------------------------------------------------------------------------------------
 
@@ -697,7 +701,31 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	if publicIP {
 		infoPublisherFileName := client.Config.LibvirtStorage + "/" + resourceName + "_InfoPublisher.sh"
 
-		command := "ip route get 8.8.8.8 |awk -F\"src \" 'NR==1{split($2,a,\" \");print a[1]}'"
+		command := ""
+		if bridgedVMs {
+			command = "ip route get 8.8.8.8 |awk -F\"src \" 'NR==1{split($2,a,\" \");print a[1]}'"
+		} else {
+			networkDefault, err := client.GetNetwork("default")
+			if err != nil {
+				switch err.(type) {
+				case model.ErrResourceNotFound:
+					networkDefault, err = client.CreateNetwork(
+						model.NetworkRequest{
+							Name:      "default",
+							IPVersion: IPVersion.IPv4,
+							CIDR:      "192.168.150.0/24",
+						},
+					)
+					if err != nil {
+						return nil, fmt.Errorf("failure To create network default : %s ", err.Error())
+					}
+				default:
+					return nil, fmt.Errorf("failure To get network default : %s ", err.Error())
+				}
+			}
+
+			command = "ip route | grep " + networkDefault.CIDR + " |awk -F\"src \" 'NR==1{split($2,a,\" \");print a[1]}'"
+		}
 		cmd := exec.Command("bash", "-c", command)
 		cmdOutput := &bytes.Buffer{}
 		cmd.Stdout = cmdOutput
@@ -732,16 +760,21 @@ exit 0
 			return nil, fmt.Errorf("Failed to edit userdata file : %s", err.Error())
 		}
 
-		command = "ip route get 8.8.8.8 | awk -F\"dev \" 'NR==1{split($2,a,\" \");print a[1]}'"
-		cmd = exec.Command("bash", "-c", command)
-		cmdOutput = &bytes.Buffer{}
-		cmd.Stdout = cmdOutput
-		err = cmd.Run()
-		if err != nil {
-			return nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+		if bridgedVMs {
+			command = "ip route get 8.8.8.8 | awk -F\"dev \" 'NR==1{split($2,a,\" \");print a[1]}'"
+			cmd = exec.Command("bash", "-c", command)
+			cmdOutput = &bytes.Buffer{}
+			cmd.Stdout = cmdOutput
+			err = cmd.Run()
+			if err != nil {
+				return nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+			}
+			lanIf := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
+			networksCommandString += fmt.Sprintf(" --network type=direct,source=%s,source_mode=bridge", lanIf)
+		} else {
+			networksCommandString += fmt.Sprintf(" --network network=default")
 		}
-		lanIf := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
-		networksCommandString += fmt.Sprintf(" --network type=direct,source=%s,source_mode=bridge", lanIf)
+
 		firstbootCommandString += fmt.Sprintf(" --firstboot %s && rm %s", infoPublisherFileName, infoPublisherFileName)
 
 		vmInfoChannel = infoWaiter.Register(hostName)

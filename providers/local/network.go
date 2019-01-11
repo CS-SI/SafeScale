@@ -84,17 +84,25 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*model.Netwo
 	cidr := ""
 	if ipVersion == IPVersion.IPv4 {
 		netmaskBloc := strings.Split(networkDescription.IPs[0].Netmask, ".")
+		fmt.Println(networkDescription.IPs[0].Address)
+		ipBlocstring := strings.Split(networkDescription.IPs[0].Address, ".")
+		fmt.Println(ipBlocstring)
+		var ipBloc [4]int
 		netmaskInt := 0
 		for i := 0; i < 4; i++ {
 			value, err := strconv.Atoi(netmaskBloc[i])
+			ipBloc[i], err = strconv.Atoi(ipBlocstring[i])
 			if err != nil {
 				return nil, fmt.Errorf("Failed to convert x.x.x.x nemask to [0-32] netmask")
 			}
+			nbBits := 0
 			if value != 0 {
-				netmaskInt += int(math.Log2(float64(value)) + 1)
+				nbBits = int(math.Log2(float64(value)) + 1)
+				netmaskInt += nbBits
 			}
+			ipBloc[i] -= ipBloc[i] % int(math.Pow(2, float64(8-nbBits)))
 		}
-		cidr = fmt.Sprintf("%s/%d", networkDescription.IPs[0].Address, netmaskInt)
+		cidr = fmt.Sprintf("%d.%d.%d.%d/%d", ipBloc[0], ipBloc[1], ipBloc[2], ipBloc[3], netmaskInt)
 	} else {
 		cidr = networkDescription.IPv6
 	}
