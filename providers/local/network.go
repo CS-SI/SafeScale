@@ -84,9 +84,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*model.Netwo
 	cidr := ""
 	if ipVersion == IPVersion.IPv4 {
 		netmaskBloc := strings.Split(networkDescription.IPs[0].Netmask, ".")
-		fmt.Println(networkDescription.IPs[0].Address)
 		ipBlocstring := strings.Split(networkDescription.IPs[0].Address, ".")
-		fmt.Println(ipBlocstring)
 		var ipBloc [4]int
 		netmaskInt := 0
 		for i := 0; i < 4; i++ {
