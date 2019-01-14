@@ -304,8 +304,8 @@ feature:
                                     peerCertSANs:
                                         - {{.Hostname}}
                                         - {{.HostIP}}
-                            networking:
-                                podSubnet: "10.100.0.0/16"
+                                networking:
+                                    podSubnet: "10.100.0.0/16"
                             EOF
 
                             cat >kubeadm-k8s-cpx.config.template <<-EOF
