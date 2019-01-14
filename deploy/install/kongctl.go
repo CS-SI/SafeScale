@@ -23,14 +23,16 @@ import (
 	"strings"
 	"text/template"
 
+	log "github.com/sirupsen/logrus"
+
 	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	broker "github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/utils"
 )
 
 const (
-	curlGet  = "curl -kSsl -X GET --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"%%{http_code}\""
-	curlPost = "curl -kSsl -X POST --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
+	curlGet  = "curl -kSsl -X GET --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"\\n%%{http_code}\""
+	curlPost = "curl -kSsl -X POST --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"\\n%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
 )
 
 var kongProxyCheckedCache = utils.NewMapCache()
@@ -38,7 +40,7 @@ var kongProxyCheckedCache = utils.NewMapCache()
 // KongController allows to control Kong, installed on a host
 type KongController struct {
 	host   *pb.Host
-	broker brokerclient.Client
+	broker broker.Client
 }
 
 // NewKongController ...
@@ -75,7 +77,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 
 	return &KongController{
 		host:   host,
-		broker: brokerclient.New(),
+		broker: broker.New(),
 	}, nil
 }
 
@@ -142,6 +144,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 
 	_, err = k.post(ruleName, url, content, values)
 	if err != nil {
+		log.Debugf("")
 		return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
 	}
 	return nil
@@ -176,7 +179,7 @@ func (k *KongController) createUpstream(name string, v *Variables) error {
 func (k *KongController) get(name, url string) (map[string]interface{}, error) {
 	// Now apply the rule to Kong
 	cmd := fmt.Sprintf(curlGet, url)
-	retcode, stdout, _, err := brokerclient.New().Ssh.Run(k.host.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, stdout, _, err := broker.New().Ssh.Run(k.host.Name, cmd, broker.DefaultConnectionTimeout, broker.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -199,13 +202,17 @@ func (k *KongController) get(name, url string) (map[string]interface{}, error) {
 }
 
 func (k *KongController) post(name, url, data string, v *Variables) (map[string]interface{}, error) {
+	log.Debugf("deploy.install.kongctl.KongController::post() called")
+	defer log.Debugf("deploy.install.kongctl.KongController::post() ended")
+
 	// Now apply the rule to Kong
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, _, err := brokerclient.New().Ssh.Run(k.host.Name, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, stdout, stderr, err := broker.New().Ssh.Run(k.host.Name, cmd, broker.DefaultConnectionTimeout, broker.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
 	if retcode != 0 {
+		log.Debugf("submit of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, fmt.Errorf("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 	output := strings.Split(stdout, "\n")

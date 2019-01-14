@@ -62,7 +62,7 @@ feature:
                                         retries: 5
 
                                 kong-migration:
-                                    image: kong:latest
+                                    image: kong:1.0
                                     depends_on:
                                         kong-database:
                                             condition: service_healthy
@@ -70,7 +70,7 @@ feature:
                                         - KONG_DATABASE=postgres
                                         - KONG_PG_HOST=kong-database
                                     restart: always
-                                    command: kong migrations up
+                                    command: kong migrations bootstrap # up
 
                                 kong-proxy:
                                     image: kong:latest
