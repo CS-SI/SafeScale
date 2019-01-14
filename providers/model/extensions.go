@@ -19,7 +19,6 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 )
 
 // extensions ...
@@ -44,35 +43,45 @@ func (x *Extensions) Lookup(key string) bool {
 }
 
 // Get returns the value of extension identified by key
-// if returns nil: key not found
+// if returns nil, 'key' is not found and 'value' is unchanged
 func (x *Extensions) Get(key string, value interface{}) error {
 	if x == nil {
-		panic("Nil Extensions")
+		panic("Calling x.ForceGet() with x==nil!")
 	}
-
 	if x.extensions == nil {
-		panic("Nil Extensions.extensions")
+		panic("Extensions.extensions is nil!")
 	}
 
-	if jsoned, ok := x.extensions[key]; ok {
-		return json.Unmarshal([]byte(jsoned), value)
-	} else {
-		logrus.Debugf("Unable to unmarshal key '%s', not found", key)
+	err := x.ForceGet(key, value)
+	if err != nil {
+		if _, ok := err.(ErrResourceNotFound); !ok {
+			return err
+		}
 	}
-
 	return nil
 }
 
-func (x *Extensions) SafeGet(key string, value interface{}) error {
+// ForceGet is like Get, but returns error if key not found
+func (x *Extensions) ForceGet(key string, value interface{}) error {
+	if x == nil {
+		panic("Calling x.ForceGet() with x==nil!")
+	}
+	if x.extensions == nil {
+		panic("Extensions.extensions is nil!")
+	}
+
 	if jsoned, ok := x.extensions[key]; ok {
 		return json.Unmarshal([]byte(jsoned), value)
 	}
-
-	return fmt.Errorf("Unable to unmarshal key '%s', not found", key)
+	return ResourceNotFoundError("extension", fmt.Sprintf("key '%s' not found", key))
 }
 
 // Set adds/replaces the content of key 'key' with 'value'
 func (x *Extensions) Set(key string, value interface{}) error {
+	if x == nil {
+		panic("Calling x.Set() with x==nil!")
+	}
+
 	encoded, err := json.Marshal(value)
 	if err != nil {
 		return err
