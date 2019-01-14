@@ -37,6 +37,7 @@ sudo chmod 744 /boot/vmlinuz/`uname -r` || sudo chmod 744 /boot/vmlinuz-`uname -
 # Launch object storage (here a minio S3 storage with docker)
 sudo docker run -d -p 9000:9000 --name minio1 -e "MINIO_ACCESS_KEY=accessKey" -e "MINIO_SECRET_KEY=secretKey" -v /home/gpac/data:/data -v /mnt/config:/root/.minio minio/minio server /data
 
+# To create VMs bridged on the local network only (not needed for nated VMs)
 # Create a macvlan interface
 # Script creating the macvlan
 cat <<-'EOF' > ~/ssmacvlan.sh

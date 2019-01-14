@@ -468,6 +468,9 @@ func (client *Client) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.H
 							return fmt.Errorf("Failed to get network name : %s", err.Error())
 						}
 						if name == iface.Source.Network.Network {
+							if name == "default" {
+								return nil
+							}
 							dhcpLeases, err := network.GetDHCPLeases()
 							if err != nil {
 								return fmt.Errorf("Failed to get network dhcpLeases : %s", err.Error())
