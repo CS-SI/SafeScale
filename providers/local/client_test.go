@@ -1,3 +1,5 @@
+//+build libvirt
+
 /*
  * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
  *
@@ -22,9 +24,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/providers"
 	"github.com/stretchr/testify/require"
 
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/local"
 	"github.com/CS-SI/SafeScale/providers/tests"
 )

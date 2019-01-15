@@ -1,3 +1,5 @@
+//+build libvirt
+
 /*
  * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
  *
