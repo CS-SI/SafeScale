@@ -21,8 +21,8 @@ default: all
 vet:
 	@$(GO) vet ./...
 
-all: clean gensrc
-	@$(GO) build -race -o $(EXEC)
+all: clean gensrc 
+	@$(GO) build -race -o $(EXEC) $(BUILD_TAGS)
 	@$(GO) test -o $(EXEC-COVER) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
 
 clean:

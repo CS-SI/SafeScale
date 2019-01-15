@@ -92,6 +92,9 @@ INFO_STRING  = "[INFO]"
 ERROR_STRING = "[ERROR]"
 WARN_STRING  = "[WARNING]"
 
+BUILD_TAGS = ""
+export BUILD_TAGS
+
 all: begin ground getdevdeps ensure generate providers broker system deploy perform scanner utils vet err
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
@@ -99,6 +102,18 @@ common: begin ground getdevdeps ensure generate
 
 begin:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
+
+libvirt:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Libvirt driver enabled$(NO_COLOR)\n";
+	@command -v libvirtd --version >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) libvirt is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
+	@command -v kvm --version >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) kvm is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
+	@command -v grep -E '^flags.*(vmx|svm)' /proc/cpuinfo >/dev/null 2>&1 && \
+	if [ $$? -eq 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(OK_STRING) Hardware acceleration is available!\n"; \
+	else \
+		printf "%b" "$(WARN_COLOR)$(WARN_STRING) Hardware acceleration is NOT available!\n"; \
+	fi
+	$(eval BUILD_TAGS = "--tags=libvirt")
 
 with_git:
 	@command -v git >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) git is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
