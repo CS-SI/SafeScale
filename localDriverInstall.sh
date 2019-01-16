@@ -7,6 +7,7 @@ LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
 case $LINUX_KIND in
     debian|ubuntu)
         #linux 16.04/18.04 (need universe repository for virtinst & libguestfs-tools)
+        sudo add-apt-repository universe
         sudo apt install -y qemu-kvm libvirt-bin libvirt-dev virtinst libguestfs-tools
 		;;
 
