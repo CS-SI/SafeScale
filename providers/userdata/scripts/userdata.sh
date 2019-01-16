@@ -500,7 +500,7 @@ case $LINUX_KIND in
         systemctl kill --kill-who=all apt-daily.service &>/dev/null
         create_user
         {{- if .ConfIF }}
-        which netplan &>/dev/null && netplanconfigure_network_netplan 
+        which netplan &>/dev/null && configure_network_netplan 
         systemctl status networking &>/dev/null && configure_network_debian
         {{- end }}
         systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved
@@ -535,7 +535,8 @@ esac
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
+#insert_tag
+
 echo "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
 systemctl reboot
-sleep 100
 exit 0
