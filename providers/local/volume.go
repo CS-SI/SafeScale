@@ -22,6 +22,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"hash/fnv"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -83,6 +84,24 @@ func (client *Client) getStoragePoolByPath(path string) (*libvirt.StoragePool, e
 	}
 
 	return nil, fmt.Errorf("No matching storage pool found")
+}
+
+func (client *Client) CreatePoolIfUnexistant(path string) error {
+	_, err := client.getStoragePoolByPath(client.Config.LibvirtStorage)
+	if err != nil {
+		requestXML := `
+		<pool type="dir">
+			<name>` + filepath.Base(path) + `</name>
+			<target>
+		  		<path>` + path + `</path>
+			</target>
+		</pool>`
+		_, err = client.LibvirtService.StoragePoolCreateXML(requestXML, 0)
+		if err != nil {
+			return fmt.Errorf("Failed to create pool with path %s : %s", path, err.Error())
+		}
+	}
+	return nil
 }
 
 func (client *Client) getLibvirtVolume(ref string) (*libvirt.StorageVol, error) {

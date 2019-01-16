@@ -103,6 +103,11 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	clientAPI.Config.TemplatesJSONPath = templatesJSONPath
 	clientAPI.Config.LibvirtStorage = libvirtStorage
 
+	err = clientAPI.CreatePoolIfUnexistant(libvirtStorage)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to create StoragePool : %s", err.Error())
+	}
+
 	return clientAPI, nil
 }
 
