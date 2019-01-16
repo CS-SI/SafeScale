@@ -189,6 +189,16 @@ func (client *Client) GetNetwork(ref string) (*model.Network, error) {
 	if err != nil {
 		return nil, err
 	}
+	active, err := libvirtNetwork.IsActive()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to check if the network is active : %s", err.Error())
+	}
+	if !active {
+		err = libvirtNetwork.Create()
+		if err != nil {
+			return nil, fmt.Errorf("Failed to start network : %s", err.Error())
+		}
+	}
 
 	network, err := getNetworkFromLibvirtNetwork(libvirtNetwork)
 	if err != nil {
