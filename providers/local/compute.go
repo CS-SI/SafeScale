@@ -731,22 +731,14 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare user data content: %+v", err)
 	}
-	userdataFileName := client.Config.LibvirtStorage + "/" + resourceName + "_userdata.sh"
-	err = ioutil.WriteFile(userdataFileName, userData, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to write userData in %s_userdata.sh file : %s", resourceName, err.Error())
-	}
 
 	//----Commands----
 	var vmInfoChannel (chan VMInfo)
-	firstbootCommandString := ""
 	networksCommandString := ""
 	for _, network := range networks {
 		networksCommandString += fmt.Sprintf(" --network network=%s", network.Name)
 	}
 	if publicIP {
-		infoPublisherFileName := client.Config.LibvirtStorage + "/" + resourceName + "_InfoPublisher.sh"
-
 		command := ""
 		if bridgedVMs {
 			command = "ip route get 8.8.8.8 |awk -F\"src \" 'NR==1{split($2,a,\" \");print a[1]}'"
@@ -781,30 +773,14 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		}
 		ip := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 
-		f, err := os.OpenFile(infoPublisherFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to open userdata file : %s", err.Error())
-		}
-		defer func() {
-			if err := f.Close(); err != nil {
-				fmt.Printf("Failed to close the file %s : %s\n", infoPublisherFileName, err.Error())
-			}
-		}()
-
 		infoWaiter, err := GetInfoWaiter()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get info waiter : %s", err.Error())
 		}
 
-		_, err = f.WriteString(fmt.Sprintf(
-			`#!/bin/bash
+		userData = userdata.Append(userData, fmt.Sprintf(`
 LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
-echo -n "%s|$LANIP" > /dev/tcp/%s/%d
-exit 0
-`, hostName, ip, infoWaiter.port))
-		if err != nil {
-			return nil, fmt.Errorf("Failed to edit userdata file : %s", err.Error())
-		}
+echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 
 		if bridgedVMs {
 			command = "ip route get 8.8.8.8 | awk -F\"dev \" 'NR==1{split($2,a,\" \");print a[1]}'"
@@ -821,18 +797,21 @@ exit 0
 			networksCommandString += fmt.Sprintf(" --network network=default")
 		}
 
-		firstbootCommandString += fmt.Sprintf(" --firstboot %s && rm %s", infoPublisherFileName, infoPublisherFileName)
-
 		vmInfoChannel = infoWaiter.Register(hostName)
 	}
 
+	userdataFileName := client.Config.LibvirtStorage + "/" + resourceName + "_userdata.sh"
+	err = ioutil.WriteFile(userdataFileName, userData, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to write userData in %s_userdata.sh file : %s", resourceName, err.Error())
+	}
+
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
-	// The main partition of the disk image should be /dev/sda1
 	// TODO gpu is ignored
 	// TODO use libvirt-go functions not bash commands
 	commandSetup := fmt.Sprintf("IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"", imagePath, client.Config.LibvirtStorage, resourceName)
 	commandResize := fmt.Sprintf("cd $LIBVIRT_STORAGE && chmod 666 $IMAGE_PATH && truncate $VM_IMAGE -s %dG && virt-resize --expand %s $IMAGE_PATH $VM_IMAGE", template.DiskSize, imageDisk)
-	commandSysprep := fmt.Sprintf("virt-sysprep -a $VM_IMAGE --hostname %s --operations all,-ssh-hostkeys --firstboot %s %s && rm %s", hostName, userdataFileName, firstbootCommandString, userdataFileName)
+	commandSysprep := fmt.Sprintf("virt-sysprep -a $VM_IMAGE --hostname %s --operations defaults,-ssh-hostkeys --firstboot %s && rm %s", hostName, userdataFileName, userdataFileName)
 	commandVirtInstall := fmt.Sprintf("virt-install --noautoconsole	--name=%s --vcpus=%d --memory=%d --import --disk=$VM_IMAGE %s", resourceName, template.Cores, int(template.RAMSize*1024), networksCommandString)
 	command := strings.Join([]string{commandSetup, commandResize, commandSysprep, commandVirtInstall}, " && ")
 
