@@ -202,9 +202,6 @@ func (k *KongController) get(name, url string) (map[string]interface{}, error) {
 }
 
 func (k *KongController) post(name, url, data string, v *Variables) (map[string]interface{}, error) {
-	log.Debugf("deploy.install.kongctl.KongController::post() called")
-	defer log.Debugf("deploy.install.kongctl.KongController::post() ended")
-
 	// Now apply the rule to Kong
 	cmd := fmt.Sprintf(curlPost, url, data)
 	retcode, stdout, stderr, err := broker.New().Ssh.Run(k.host.Name, cmd, broker.DefaultConnectionTimeout, broker.DefaultExecutionTimeout)
