@@ -17,7 +17,6 @@
 
 ---
 feature:
-    name: mpich-build
     suitableFor:
         host: yes
         cluster: all

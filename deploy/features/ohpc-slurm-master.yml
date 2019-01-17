@@ -16,7 +16,6 @@
 
 ---
 feature:
-    name: OpenHPC Slurm Master
     suitableFor:
         host: no
         cluster: ohpc

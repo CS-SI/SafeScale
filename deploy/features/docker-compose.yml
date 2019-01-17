@@ -16,7 +16,6 @@
 
 ---
 feature:
-    name: Docker-Compose
     suitableFor:
         host: yes
         cluster: all

@@ -144,13 +144,10 @@ func NewFeature(name string) (*Feature, error) {
 			err = fmt.Errorf("failed to read the specification file of feature called '%s': %s", name, err.Error())
 		}
 	} else {
-		if !v.IsSet("feature.name") {
-			return nil, fmt.Errorf("syntax error in specification file: missing key 'name'")
-		}
 		if v.IsSet("feature") {
 			feature = &Feature{
 				fileName:    name + ".yml",
-				displayName: v.GetString("feature.name"),
+				displayName: name,
 				specs:       v,
 			}
 		}

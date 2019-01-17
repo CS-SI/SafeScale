@@ -14,14 +14,13 @@
 
 ---
 feature:
-    name: Helm
     requirements:
-        - Kubernetes
+        - kubernetes
     suitableFor:
         hosts: no
         clusters: k8s,dcos
     install:
-        dcos:
+        bash:
             check:
                 pace: bin
                 bin:
@@ -39,7 +38,7 @@ feature:
                     run: |
                         cd /var/tmp
                         wget -O get_helm.sh https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get && \
-                        bash ./get_helm.sh || exit $?
+                        bash ./get_helm.sh || exit 192
                         rm -f get_helm.sh
                         chmod a+rx helm && \
                         chown {{.Username}} helm && \

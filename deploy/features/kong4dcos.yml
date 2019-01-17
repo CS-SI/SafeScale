@@ -16,7 +16,6 @@
 
 ---
 feature:
-    name: Kong
     suitableFor:
         host: no
         cluster: dcos
