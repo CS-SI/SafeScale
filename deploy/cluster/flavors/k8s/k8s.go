@@ -45,7 +45,6 @@ import (
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
@@ -232,9 +231,13 @@ func Create(req core.Request) (*Cluster, error) {
 	)
 	broker := brokerclient.New()
 
-	svc, err := provideruse.GetProviderService()
+	tenant, err := broker.Tenant.Get(brokerclient.DefaultExecutionTimeout)
 	if err != nil {
-		goto cleanNetwork
+		return nil, err
+	}
+	svc, err := providers.GetService(tenant.Name)
+	if err != nil {
+		return nil, err
 	}
 
 	// Loads gateway metadata

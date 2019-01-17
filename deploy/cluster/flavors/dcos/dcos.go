@@ -30,6 +30,7 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/utils/template"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
@@ -51,7 +52,6 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 
 	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -260,9 +260,13 @@ func Create(req core.Request) (*Cluster, error) {
 	)
 	broker := brokerclient.New()
 
-	svc, err := provideruse.GetProviderService()
+	tenant, err := broker.Tenant.Get(brokerclient.DefaultExecutionTimeout)
 	if err != nil {
-		goto cleanNetwork
+		return nil, err
+	}
+	svc, err := providers.GetService(tenant.Name)
+	if err != nil {
+		return nil, err
 	}
 
 	// Loads gateway metadata
@@ -472,7 +476,11 @@ cleanNetwork:
 
 // Sanitize tries to rebuild manager struct based on what is available on ObjectStorage
 func Sanitize(data *metadata.Cluster) error {
-	svc, err := provideruse.GetProviderService()
+	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
+	svc, err := providers.GetService(tenant.Name)
 	if err != nil {
 		return err
 	}

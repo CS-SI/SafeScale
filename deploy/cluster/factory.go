@@ -33,13 +33,16 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/utils/provideruse"
 )
 
 // Get returns the Cluster instance corresponding to the cluster named 'name'
 // TODO: renamed to Inspect ?
 func Get(name string) (api.Cluster, error) {
-	svc, err := provideruse.GetProviderService()
+	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return nil, err
+	}
+	svc, err := providers.GetService(tenant.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +160,11 @@ func Delete(name string) error {
 
 // List lists the clusters already created
 func List() ([]api.Cluster, error) {
-	svc, err := provideruse.GetProviderService()
+	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return nil, err
+	}
+	svc, err := providers.GetService(tenant.Name)
 	if err != nil {
 		return nil, err
 	}

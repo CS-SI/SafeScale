@@ -28,9 +28,9 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
@@ -334,15 +334,18 @@ func setImplicitParameters(t Target, v Variables) {
 			v["Password"] = config.AdminPassword
 		}
 		if _, ok := v["CIDR"]; !ok {
-			svc, err := provideruse.GetProviderService()
+			tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
 			if err == nil {
-				mn, err := metadata.LoadNetwork(svc, config.NetworkID)
+				svc, err := providers.GetService(tenant.Name)
 				if err == nil {
-					n := mn.Get()
-					v["CIDR"] = n.CIDR
+					mn, err := metadata.LoadNetwork(svc, config.NetworkID)
+					if err == nil {
+						n := mn.Get()
+						v["CIDR"] = n.CIDR
+					}
+				} else {
+					fmt.Fprintf(os.Stderr, "failed to determine network CIDR")
 				}
-			} else {
-				fmt.Fprintf(os.Stderr, "failed to determine network CIDR")
 			}
 		}
 	} else {
@@ -366,13 +369,12 @@ func setImplicitParameters(t Target, v Variables) {
 }
 
 func gatewayFromHost(host *pb.Host) *pb.Host {
-	broker := brokerclient.New()
 	gwID := host.GetGatewayID()
 	// If host has no gateway, host is gateway
 	if gwID == "" {
 		return host
 	}
-	gw, err := broker.Host.Inspect(gwID, brokerclient.DefaultExecutionTimeout)
+	gw, err := brokerclient.New().Host.Inspect(gwID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil
 	}
