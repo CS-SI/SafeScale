@@ -30,6 +30,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -316,6 +317,28 @@ func (client *Client) DeleteKeyPair(id string) error {
 }
 
 //-------------HOST MANAGEMENT------------------------------------------------------------------------------------------
+func downloadImage(path string, downloadInfo map[string]interface{}) error {
+	switch downloadInfo["method"].(string) {
+	case "GoogleDrive":
+		command := fmt.Sprintf(`file_name="%s"
+file_id="%s"
+cookie_file="%s/cookie.txt"
+query=$(curl -c ${cookie_file} -s -L "https://drive.google.com/uc?export=download&id=${file_id}" | perl -nE'say/uc-download-link.*? href="(.*?)\">/' | sed -e 's/amp;//g' | sed -n 2p)
+url="https://drive.google.com$query"
+curl -b ${cookie_file} -L -o ${file_name} $url
+rm ${cookie_file}`, path, downloadInfo["id"].(string), filepath.Dir(path))
+		fmt.Println(command)
+		cmd := exec.Command("bash", "-c", command)
+		err := cmd.Run()
+		if err != nil {
+			return fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+		}
+	default:
+		return fmt.Errorf("download method %s not implemented", downloadInfo["method"].(string))
+	}
+	return nil
+}
+
 // getImagePathFromID retrieve the storage path of an image from this image ID
 func getImagePathFromID(client *Client, id string) (string, error) {
 	jsonFile, err := os.Open(client.Config.ImagesJSONPath)
@@ -341,14 +364,23 @@ func getImagePathFromID(client *Client, id string) (string, error) {
 	imagesJSON := result["images"].([]interface{})
 	for _, imageJSON := range imagesJSON {
 		if imageID, _ := imageJSON.(map[string]interface{})["imageID"]; imageID == id {
-			return imageJSON.(map[string]interface{})["imagePath"].(string), nil
+			path := imageJSON.(map[string]interface{})["imagePath"].(string)
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				err := downloadImage(path, imageJSON.(map[string]interface{})["download"].(map[string]interface{}))
+				if err != nil {
+					return "", fmt.Errorf("Failed to download image : %s", err.Error())
+				}
+			} else if err != nil {
+				return "", fmt.Errorf("Unable to check if the file %s exists or not : %s", filepath.Base(path), err.Error())
+			}
+			return path, nil
 		}
 	}
 
 	return "", fmt.Errorf("Image with id=%s not found", id)
 }
 
-// getImagePathFromID retrieve the disk with root partition of an image from this image ID
+// getDiskFromID retrieve the disk with root partition of an image from this image ID
 func getDiskFromID(client *Client, id string) (string, error) {
 	jsonFile, err := os.Open(client.Config.ImagesJSONPath)
 	if err != nil {

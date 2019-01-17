@@ -500,7 +500,7 @@ case $LINUX_KIND in
         systemctl kill --kill-who=all apt-daily.service &>/dev/null
         create_user
         {{- if .ConfIF }}
-        which netplan &>/dev/null && configure_network_netplan 
+        which netplan &>/dev/null && configure_network_netplan && sleep 5
         systemctl status networking &>/dev/null && configure_network_debian
         {{- end }}
         systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved
