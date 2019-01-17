@@ -14,7 +14,6 @@
 
 ---
 feature:
-    name: Spark in Kubernetes
     context:
         host: no
         cluster: dcos,boh

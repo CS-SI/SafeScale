@@ -14,7 +14,7 @@
 
 ---
 feature:
-    name: Apache Ignite
+    implements: ignite
     suitableFor:
         host: no
         cluster: all

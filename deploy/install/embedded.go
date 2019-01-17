@@ -29,6 +29,8 @@ import (
 
 //go:generate rice embed-go
 
+const featureFileExt = ".yml"
+
 var (
 	templateBox *rice.Box
 	emptyParams = map[string]interface{}{}
@@ -39,263 +41,291 @@ var (
 )
 
 // loadSpecFile returns the content of the spec file of the feature named 'name'
-func loadSpecFile(name string) (*viper.Viper, error) {
+func loadSpecFile(name string) (string, *viper.Viper, error) {
 	if templateBox == nil {
 		var err error
-		templateBox, err = rice.FindBox("features")
+		templateBox, err = rice.FindBox("../features")
 		if err != nil {
-			return nil, fmt.Errorf("failed to open embedded feature specification folder: %s", err.Error())
+			return "", nil, fmt.Errorf("failed to open embedded feature specification folder: %s", err.Error())
 		}
 	}
-	name += ".yml"
+	name += featureFileExt
 	tmplString, err := templateBox.String(name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read embedded feature speficication file '%s': %s", name, err.Error())
+		return "", nil, fmt.Errorf("failed to read embedded feature speficication file '%s': %s", name, err.Error())
 	}
 
 	v := viper.New()
 	v.SetConfigType("yaml")
 	err = v.ReadConfig(bytes.NewBuffer([]byte(tmplString)))
 	if err != nil {
-		return nil, fmt.Errorf("syntax error in feature specification file '%s': %s", name, err.Error())
+		return "", nil, fmt.Errorf("syntax error in feature specification file '%s': %s", name, err.Error())
 	}
 
 	// Validating content...
 	if !v.IsSet("feature") {
-		return nil, fmt.Errorf("feature specification file '%s' must begin with 'feature:'", name)
-	}
-	if !v.IsSet("feature.name") {
-		return nil, fmt.Errorf("syntax error in feature specification file '%s': missing 'name'", name)
-	}
-	if v.GetString("feature.name") == "" {
-		return nil, fmt.Errorf("syntax error in feature specification file '%s': name' can't be empty", name)
+		return "", nil, fmt.Errorf("feature specification file '%s' must begin with 'feature:'", name)
 	}
 	if !v.IsSet("feature.install") {
-		return nil, fmt.Errorf("syntax error in feature specification file '%s': missing 'install'", name)
+		return "", nil, fmt.Errorf("syntax error in feature specification file '%s': missing 'install'", name)
 	}
 	if len(v.GetStringMap("feature.install")) <= 0 {
-		return nil, fmt.Errorf("syntax error in feature specification file '%s': 'install' defines no method", name)
+		return "", nil, fmt.Errorf("syntax error in feature specification file '%s': 'install' defines no method", name)
 	}
-	return v, nil
+	return name, v, nil
 }
 
 // dockerFeature ...
 func dockerFeature() *Feature {
-	specs, err := loadSpecFile("docker")
+	name := "docker"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "docker",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // dockerComposeFeature ...
 func dockerComposeFeature() *Feature {
-	specs, err := loadSpecFile("docker-compose")
+	name := "docker-compose"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "docker-compose",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // nVidiaDockerFeature ...
 func nVidiaDockerFeature() *Feature {
-	specs, err := loadSpecFile("nvidiadocker")
+	name := "nvidiadocker"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "nvidiadocker",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // kubernetesFeature ...
 func kubernetesFeature() *Feature {
-	specs, err := loadSpecFile("kubernetes")
+	name := "kubernetes"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "kubernetes",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // nexusFeature ...
 func nexusFeature() *Feature {
-	specs, err := loadSpecFile("nexus")
+	name := "nexus3"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("name"),
-		fileName:    "nexus",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // elasticSearchFeature ...
 func elasticSearchFeature() *Feature {
-	specs, err := loadSpecFile("elasticsearch")
+	name := "elasticsearch"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "elasticsearch",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // helmFeature ...
 func helmFeature() *Feature {
-	specs, err := loadSpecFile("helm")
+	name := "helm"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "helm",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // sparkFeature ...
 func sparkFeature() *Feature {
-	specs, err := loadSpecFile("spark")
+	name := "spark"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "spark",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // reverseProxyFeature ...
 func reverseProxyFeature() *Feature {
-	specs, err := loadSpecFile("reverseproxy")
+	name := "reverseproxy"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "reverseproxy",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // remoteDesktopFeature ...
 func remoteDesktopFeature() *Feature {
-	specs, err := loadSpecFile("remotedesktop")
+	name := "remotedesktop"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "remotedesktop",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // mpichOsPkgFeature ...
 func mpichOsPkgFeature() *Feature {
-	specs, err := loadSpecFile("mpich-ospkg")
+	name := "mpich-ospkg"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "mpich-ospkg",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // mpichBuildFeature ...
 func mpichBuildFeature() *Feature {
-	specs, err := loadSpecFile("mpich-build")
+	name := "mpich-build"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "mpich-build",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // ohpcSlurmMasterFeature ...
 func ohpcSlurmMasterFeature() *Feature {
-	specs, err := loadSpecFile("ohpc-slurm-master")
+	name := "ohpc-slurm-master"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "ohpc-slurm-master",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // ohpcSlurmNodeFeature ...
 func ohpcSlurmNodeFeature() *Feature {
-	specs, err := loadSpecFile("ohpc-slurm-node")
+	name := "ohpc-slurm-node"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "ohpc-slurm-node",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // proxycacheServerFeature ...
 func proxycacheServerFeature() *Feature {
-	specs, err := loadSpecFile("proxycache-server")
+	name := "proxycache-server"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "proxycache-server",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // proxycacheClientFeature ...
 func proxycacheClientFeature() *Feature {
-	specs, err := loadSpecFile("proxycache-client")
+	name := "proxycache-client"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "proxycache-client",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // apacheIgniteFeature ...
 func apacheIgniteFeature() *Feature {
-	specs, err := loadSpecFile("apache-ignite")
+	name := "apache-ignite"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
-		fileName:    "apache-ignite",
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }

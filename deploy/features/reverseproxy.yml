@@ -16,7 +16,6 @@
 
 ---
 feature:
-    name: ReverseProxy
     suitableFor:
         host: yes
         cluster: no

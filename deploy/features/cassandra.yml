@@ -14,7 +14,7 @@
 
 ---
 feature:
-    name: Cassandra
+    implements: cassandra,kvstore
     suitableFor:
         host: no
         cluster: dcos

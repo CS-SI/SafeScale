@@ -16,7 +16,6 @@
 
 ---
 feature:
-    name: nVidia-Docker2
     suitableFor:
         host: yes
         cluster: all

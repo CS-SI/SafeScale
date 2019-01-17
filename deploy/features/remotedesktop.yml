@@ -14,7 +14,6 @@
 
 ---
 feature:
-    name: RemoteDesktop
     requirements:
         features:
             - docker
@@ -387,7 +386,7 @@ feature:
                             # Note: at the time writing, dash update fails so hold it for now
                             RUN apt-mark hold dash
                             RUN apt update -y \
-                            && apt install -y \
+                             && apt install -y \
                                     build-essential \
                                     gcc-6 \
                                     libcairo2-dev \
@@ -458,8 +457,8 @@ feature:
                             ADD supervisord.conf ./
 
                             RUN apt autoremove -y \
-                            && apt autoclean -y \
-                            && rm -rf /var/lib/apt/*
+                             && apt autoclean -y \
+                             && rm -rf /var/lib/apt/*
 
                             # Tomcat Guacamole
                             EXPOSE 8080

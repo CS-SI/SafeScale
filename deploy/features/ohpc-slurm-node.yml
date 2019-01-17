@@ -16,7 +16,6 @@
 
 ---
 feature:
-    name: OpenHPC Slurm Node
     suitableFor:
         host: yes
         cluster: ohpc

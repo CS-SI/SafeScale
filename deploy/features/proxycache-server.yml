@@ -16,7 +16,6 @@
 
 ---
 feature:
-    name: ProxyCache Server
     suitableFor:
         host: yes
         cluster: no

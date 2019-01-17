@@ -16,7 +16,6 @@
 
 ---
 feature:
-    name: Docker
     suitableFor:
         host: yes
         cluster: all
