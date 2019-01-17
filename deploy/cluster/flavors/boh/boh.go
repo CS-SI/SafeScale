@@ -34,6 +34,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster/core"
+	"github.com/CS-SI/SafeScale/providers"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
@@ -50,7 +51,6 @@ import (
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/template"
 )
@@ -227,8 +227,8 @@ func Create(req core.Request) (*Cluster, error) {
 			ImageID: "Ubuntu 16.04",
 		},
 	}
-	brokerclt := brokerclient.New()
-	network, err := brokerclt.Network.Create(def, brokerclient.DefaultExecutionTimeout)
+	broker := brokerclient.New()
+	network, err := broker.Network.Create(def, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		err = fmt.Errorf("Failed to create Network '%s': %s", networkName, err.Error())
 		return nil, err
@@ -238,14 +238,18 @@ func Create(req core.Request) (*Cluster, error) {
 	// Starting from here, delete network if exit with err and it's not requested to keep resources on failure
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			derr := brokerclt.Network.Delete([]string{network.ID}, brokerclient.DefaultExecutionTimeout)
+			derr := broker.Network.Delete([]string{network.ID}, brokerclient.DefaultExecutionTimeout)
 			if derr != nil {
 				log.Errorf("failed to delete network: %+v", derr)
 			}
 		}
 	}()
 
-	svc, err := provideruse.GetProviderService()
+	tenant, err := broker.Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return nil, err
+	}
+	svc, err := providers.GetService(tenant.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -417,9 +421,9 @@ func Create(req core.Request) (*Cluster, error) {
 
 cleanNodes:
 	if !req.KeepOnFailure {
-		brokerclt.Host.Delete(instance.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
-		brokerclt.Host.Delete(instance.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
-		brokerclt.Host.Delete(instance.manager.MasterIDs, brokerclient.DefaultExecutionTimeout)
+		broker.Host.Delete(instance.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
+		broker.Host.Delete(instance.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
+		broker.Host.Delete(instance.manager.MasterIDs, brokerclient.DefaultExecutionTimeout)
 	}
 	return nil, err
 }

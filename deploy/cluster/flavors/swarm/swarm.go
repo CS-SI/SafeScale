@@ -45,10 +45,10 @@ import (
 	flavortools "github.com/CS-SI/SafeScale/deploy/cluster/flavors/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 	"github.com/CS-SI/SafeScale/deploy/install"
+	"github.com/CS-SI/SafeScale/providers"
 	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/provideruse"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/template"
 )
@@ -237,9 +237,13 @@ func Create(req core.Request) (*Cluster, error) {
 	)
 	broker := brokerclient.New()
 
-	svc, err := provideruse.GetProviderService()
+	tenant, err := broker.Tenant.Get(brokerclient.DefaultExecutionTimeout)
 	if err != nil {
-		goto cleanNetwork
+		return nil, err
+	}
+	svc, err := providers.GetService(tenant.Name)
+	if err != nil {
+		return nil, err
 	}
 
 	// Loads gateway metadata
