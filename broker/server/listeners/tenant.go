@@ -69,6 +69,7 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*p
 	log.Infoln("Listeners: tenant get called")
 	defer log.Debugln("Listeners: tenant get done")
 
+	getCurrentTenant()
 	if currentTenant == nil {
 		log.Info("Can't get tenant: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't get tenant: no tenant set")
@@ -99,7 +100,7 @@ func getCurrentTenant() *Tenant {
 	return currentTenant
 }
 
-// Set the the tenant tu use for each command
+// Set the the tenant to use for each command
 func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
 	log.Infof("Listeners: tenant set '%s' called", in.Name)
 	defer log.Debugf("Listeners: tenant set '%s' done", in.Name)
