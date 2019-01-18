@@ -79,6 +79,7 @@ func GetInfoWaiter() (*VMInfoWaiterStruct, error) {
 		}
 		vmInfoWaiter.port = listener.Addr().(*net.TCPAddr).Port
 		vmInfoWaiter.listner = &listener
+		fmt.Println("InfoWaiter created on port %d", vmInfoWaiter.port)
 
 		go infoHandler()
 	}
@@ -116,7 +117,6 @@ func infoHandler() {
 			info := VMInfo{
 				publicIP: ip,
 			}
-			fmt.Println("Infos : ", info)
 			vmInfoWaiter.mutex.Lock()
 			channel, found := vmInfoWaiter.chansByName[hostName]
 			vmInfoWaiter.mutex.Unlock()

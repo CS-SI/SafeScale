@@ -14,8 +14,11 @@ case $LINUX_KIND in
     redhat|centos)
     #centos 7
         sudo yum install -y qemu-kvm libvirt virt-install libvirt-devel libguestfs-tools
-        systemctl enable libvirtd
-        systemctl start libvirtd
+        sudo systemctl enable libvirtd
+        sudo systemctl start libvirtd
+        #only for bridged vms
+        #sudo firewall-cmd --zone=public --permanent --add-port=1000-63553/tcp
+        #sudo firewall-cmd --reload
         ;;
 
     *)
