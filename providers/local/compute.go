@@ -543,9 +543,6 @@ func (client *Client) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.H
 							return fmt.Errorf("Failed to get network name : %s", err.Error())
 						}
 						if name == iface.Source.Network.Network {
-							if name == "default" {
-								return nil
-							}
 							dhcpLeases, err := network.GetDHCPLeases()
 							if err != nil {
 								return fmt.Errorf("Failed to get network dhcpLeases : %s", err.Error())
@@ -557,9 +554,19 @@ func (client *Client) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.H
 										return fmt.Errorf("Unknown Network %s", iface.Source.Network.Network)
 									}
 									if len(strings.Split(dhcpLease.IPaddr, ".")) == 4 {
-										hostNetwork.IPv4Addresses[net.ID] = dhcpLease.IPaddr
+										if name == "default" {
+											hostNetwork.PublicIPv4 = dhcpLease.IPaddr
+											return nil
+										} else {
+											hostNetwork.IPv4Addresses[net.ID] = dhcpLease.IPaddr
+										}
 									} else if len(strings.Split(dhcpLease.IPaddr, ":")) == 8 {
-										hostNetwork.IPv6Addresses[net.ID] = dhcpLease.IPaddr
+										if name == "default" {
+											hostNetwork.PublicIPv4 = dhcpLease.IPaddr
+											return nil
+										} else {
+											hostNetwork.IPv6Addresses[net.ID] = dhcpLease.IPaddr
+										}
 									} else {
 										return fmt.Errorf("Unknown adressType")
 									}
@@ -805,16 +812,16 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		}
 		ip := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 
-		infoWaiter, err := GetInfoWaiter()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get info waiter : %s", err.Error())
-		}
+		if bridgedVMs {
+			infoWaiter, err := GetInfoWaiter()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get info waiter : %s", err.Error())
+			}
 
-		userData = userdata.Append(userData, fmt.Sprintf(`
+			userData = userdata.Append(userData, fmt.Sprintf(`
 LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
 echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 
-		if bridgedVMs {
 			command = "ip route get 8.8.8.8 | awk -F\"dev \" 'NR==1{split($2,a,\" \");print a[1]}'"
 			cmd = exec.Command("bash", "-c", command)
 			cmdOutput = &bytes.Buffer{}
@@ -825,11 +832,11 @@ echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 			}
 			lanIf := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 			networksCommandString += fmt.Sprintf(" --network type=direct,source=%s,source_mode=bridge", lanIf)
+			vmInfoChannel = infoWaiter.Register(hostName)
 		} else {
 			networksCommandString += fmt.Sprintf(" --network network=default")
 		}
 
-		vmInfoChannel = infoWaiter.Register(hostName)
 	}
 
 	userdataFileName := client.Config.LibvirtStorage + "/" + resourceName + "_userdata.sh"
@@ -844,7 +851,7 @@ echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 	commandSetup := fmt.Sprintf("IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"", imagePath, client.Config.LibvirtStorage, resourceName)
 	commandResize := fmt.Sprintf("cd $LIBVIRT_STORAGE && chmod 666 $IMAGE_PATH && truncate $VM_IMAGE -s %dG && virt-resize --expand %s $IMAGE_PATH $VM_IMAGE", template.DiskSize, imageDisk)
 	commandSysprep := fmt.Sprintf("virt-sysprep -a $VM_IMAGE --hostname %s --operations defaults,-ssh-hostkeys --firstboot %s && rm %s", hostName, userdataFileName, userdataFileName)
-	commandVirtInstall := fmt.Sprintf("virt-install --noautoconsole	--name=%s --vcpus=%d --memory=%d --import --disk=$VM_IMAGE %s", resourceName, template.Cores, int(template.RAMSize*1024), networksCommandString)
+	commandVirtInstall := fmt.Sprintf("virt-install --connect \"%s\" --noautoconsole --name=%s --vcpus=%d --memory=%d --import --disk=$VM_IMAGE %s", client.Config.URI, resourceName, template.Cores, int(template.RAMSize*1024), networksCommandString)
 	command := strings.Join([]string{commandSetup, commandResize, commandSysprep, commandVirtInstall}, " && ")
 
 	cmd := exec.Command("bash", "-c", command)
@@ -865,10 +872,6 @@ echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 	}()
 
 	//----Generate model.Host----
-	var vmInfo VMInfo
-	if publicIP {
-		vmInfo = <-vmInfoChannel
-	}
 
 	domain, err := client.LibvirtService.LookupDomainByName(resourceName)
 	if err != nil {
@@ -887,8 +890,12 @@ echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 		return nil, fmt.Errorf("Failed to get the HostProperty.NetworkV1 : %s", err.Error())
 	}
 
-	if publicIP {
-		hostNetworkV1.PublicIPv4 = vmInfo.publicIP
+	if bridgedVMs {
+		var vmInfo VMInfo
+		if publicIP {
+			vmInfo = <-vmInfoChannel
+			hostNetworkV1.PublicIPv4 = vmInfo.publicIP
+		}
 	}
 
 	hostNetworkV1.DefaultNetworkID = request.Networks[0].ID

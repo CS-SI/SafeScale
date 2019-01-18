@@ -57,6 +57,8 @@ type CfgOptions struct {
 	TemplatesJSONPath string
 	// Local Path of the libvirt pool where all disks created by libvirt come from and are stored
 	LibvirtStorage string
+	// Connection identifier to the virtualisation device
+	URI string
 }
 
 // Build Create and initialize a ClientAPI
@@ -102,6 +104,7 @@ func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error
 	clientAPI.Config.ImagesJSONPath = imagesJSONPath
 	clientAPI.Config.TemplatesJSONPath = templatesJSONPath
 	clientAPI.Config.LibvirtStorage = libvirtStorage
+	clientAPI.Config.URI = uri
 
 	err = clientAPI.CreatePoolIfUnexistant(libvirtStorage)
 	if err != nil {
