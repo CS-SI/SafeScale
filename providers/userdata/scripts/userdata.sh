@@ -523,6 +523,7 @@ case $LINUX_KIND in
         configure_as_gateway
         {{- end }}
         {{- if .AddGateway }}
+        configure_dns_legacy
         configure_gateway_redhat
         {{- end }}
         ;;
