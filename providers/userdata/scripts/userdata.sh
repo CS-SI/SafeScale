@@ -499,32 +499,38 @@ case $LINUX_KIND in
         systemctl stop apt-daily.service &>/dev/null
         systemctl kill --kill-who=all apt-daily.service &>/dev/null
         create_user
+
         {{- if .ConfIF }}
-        which netplan &>/dev/null && configure_network_netplan && sleep 5
-        systemctl status networking &>/dev/null && configure_network_debian
-        {{- end }}
-        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved
-        systemctl status resolvconf &>/dev/null && configure_dns_resolvconf
-        {{- if .IsGateway }}
-        configure_as_gateway
+            which netplan &>/dev/null && configure_network_netplan && sleep 5
+            systemctl status networking &>/dev/null && configure_network_debian
         {{- end }}
 
+        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || \
+        systemctl status resolvconf &>/dev/null && configure_dns_resolvconf || \
+        configure_dns_legacy
+
+        {{- if .IsGateway }}
+            configure_as_gateway
+        {{- end }}
         {{- if .AddGateway }}
-        configure_gateway
+            configure_gateway
         {{- end }}
         ;;
 
     redhat|centos)
         create_user
+
         {{- if .ConfIF }}
-        configure_network_redhat
+            configure_network_redhat
         {{- end }}
-        {{- if .IsGateway }}
-        configure_as_gateway
-        {{- end }}
-        {{- if .AddGateway }}
+
         configure_dns_legacy
-        configure_gateway_redhat
+
+        {{- if .IsGateway }}
+            configure_as_gateway
+        {{- end }}
+        {{- if .AddGateway }}    
+            configure_gateway_redhat
         {{- end }}
         ;;
     *)

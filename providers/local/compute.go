@@ -327,7 +327,6 @@ query=$(curl -c ${cookie_file} -s -L "https://drive.google.com/uc?export=downloa
 url="https://drive.google.com$query"
 curl -b ${cookie_file} -L -o ${file_name} $url
 rm ${cookie_file}`, path, downloadInfo["id"].(string), filepath.Dir(path))
-		fmt.Println(command)
 		cmd := exec.Command("bash", "-c", command)
 		err := cmd.Run()
 		if err != nil {
