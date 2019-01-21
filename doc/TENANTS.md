@@ -54,7 +54,6 @@ Here is the JSON equivalent of the example TOML configuration file :
 
 Here is the YAML equivalent of the example TOML configuration file :
 
-
 When SafeScale commands are invoked, they search for a tenant configuration file in these folders, in that order :
 
 - ./ (current dir)
@@ -174,7 +173,6 @@ The valid keywords in this section are :
 > | ``Tenant`` | OPTIONAL, CLIENT, INHERIT |
 > | ``Type``| MANDATORY, INHERIT |
 > | ``Username`` | MANDATORY, INHERIT |
-
 ___
 
 ## Keywords in details
@@ -187,9 +185,8 @@ This field contains a string giving a name to the tenant
 
 It defines the "driver" to communicate with the provider. Valid values are:
 
-> | |
+> | Providers |
 > | --- |
-> | ``"local"`` |
 > | ``"cloudwatt"`` |
 > | ``"cloudferro"`` |
 > | ``"flexibleengine"`` |

@@ -82,7 +82,7 @@ If you wish to contribute you can [fork the project](https://help.github.com/for
 For bugs and feature requests, [please create an issue](../../issues/new).
 
 ## Build
-  [See Build file](doc/BUILDING.md)
+  [See Build file](doc/build/BUILDING.md)
 
 ## Usage
   [See Usage file](doc/USAGE.md)
