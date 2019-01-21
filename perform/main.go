@@ -28,11 +28,12 @@ import (
 
 	"github.com/CS-SI/SafeScale/perform/cmds"
 
+	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialise provider cloudferro
 	_ "github.com/CS-SI/SafeScale/providers/cloudwatt"      // Imported to initialise provider cloudwatt
 	_ "github.com/CS-SI/SafeScale/providers/flexibleengine" // Imported to initialise provider flexibleengine
+	_ "github.com/CS-SI/SafeScale/providers/local"          // Imported to initialise provider local
 	_ "github.com/CS-SI/SafeScale/providers/opentelekom"    // Imported to initialise provider opentelekom
 	_ "github.com/CS-SI/SafeScale/providers/ovh"            // Imported to initialise provider ovh
-	_ "github.com/CS-SI/SafeScale/providers/cloudferro"     // Imported to initialise provider cloudferro
 )
 
 func main() {

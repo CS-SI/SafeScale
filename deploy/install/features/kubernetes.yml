@@ -173,11 +173,13 @@ feature:
                             [ -f /etc/kubernetes/.joined ] && exit 0
 
                             VERSION=$(sfRetry 5m 5 "curl -ksSL https://dl.k8s.io/release/stable.txt")
-                            [[ $VERSION =~ v[0-9]+\.[0-9]+\.[0-9]+ ]] || VERSION=v1.12.1
+                            [[ $VERSION =~ v[0-9]+\.[0-9]+\.[0-9]+ ]] || VERSION=v1.13.1
                             URL="https://storage.googleapis.com/kubernetes-release/release/${VERSION}/bin/linux/amd64"
                             sfDownload "$URL/kubeadm" kubeadm 5m 5 || exit 193
                             sfDownload "$URL/kubelet" kubelet 5m 5 || exit 194
                             sfDownload "$URL/kubectl" kubectl 5m 5 || exit 195
+                            chmod 755 kubeadm kubelet kubectl
+                            mv kubeadm kubelet kubectl /usr/local/bin
 
                             cd /var/tmp
                             VERSION=v1.12.0
@@ -279,8 +281,9 @@ feature:
 
                             cd /opt/safescale/k8s/config
 
+                            #untested api version !!
                             cat >kubeadm-bootstrap.config.yaml <<-EOF
-                            apiVersion: kubeadm.k8s.io/v1alpha2
+                            apiVersion: kubeadm.k8s.io/v1alpha3
                             kind: MasterConfiguration
                             kubernetesVersion: $RELEASE
                             apiServerCertSANs:
@@ -301,8 +304,8 @@ feature:
                                     peerCertSANs:
                                         - {{.Hostname}}
                                         - {{.HostIP}}
-                            networking:
-                                podSubnet: "10.100.0.0/16"
+                                networking:
+                                    podSubnet: "10.100.0.0/16"
                             EOF
 
                             cat >kubeadm-k8s-cpx.config.template <<-EOF
@@ -337,8 +340,7 @@ feature:
                                 kubectl exec -n kube-system etcd-##HOSTNAME## -- etcdctl --ca-file /etc/kubernetes/pki/etcd/ca.crt --cert-file /etc/kubernetes/pki/etcd/peer.crt --key-file /etc/kubernetes/pki/etcd/peer.key --endpoints=https://{{.HostIP}}:2379 member add ##HOSTNAME## https://##HOSTIP##:2380
                             EOF
 
-                            sfRetry 5m 5 kubeadm config images pull && \
-                            kubeadm init --config kubeadm-bootstrap.config.yaml || exit 193
+                            sfRetry 5m 5 kubeadm config images pull && kubeadm init --config kubeadm-bootstrap.config.yaml && echo "init done" || exit 193
                             touch /etc/kubernetes/.joined
 
                             cp /etc/kubernetes/pki/ca.crt ../ssl

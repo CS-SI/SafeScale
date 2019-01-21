@@ -222,9 +222,9 @@ func (svc *Service) WaitHostState(hostID string, state HostState.Enum, timeout t
 func (svc *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*model.Volume, error) {
 	cout := make(chan int)
 	next := make(chan bool)
-	vc := make(chan *model.Volume)
+	hostc := make(chan *model.Volume)
 
-	go pollVolume(svc, volumeID, state, cout, next, vc)
+	go pollVolume(svc, volumeID, state, cout, next, hostc)
 	for {
 		select {
 		case res := <-cout:
@@ -234,7 +234,7 @@ func (svc *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 			}
 			if res == 1 {
 				//next <- false
-				return <-vc, nil
+				return <-hostc, nil
 			}
 			if res == 2 {
 				next <- true

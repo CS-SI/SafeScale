@@ -127,7 +127,7 @@ func (c *Cluster) CountNodes(public bool) uint {
 // Load loads the internals of an existing cluster from metadata
 func Load(data *metadata.Cluster) (*Cluster, error) {
 	if data == nil {
-		panic("data")
+		panic("data is nil")
 	}
 	core := data.Get()
 	core.Service = data.GetService()
@@ -441,7 +441,6 @@ func Create(req core.Request) (*Cluster, error) {
 cleanNodes:
 	if !req.KeepOnFailure {
 		broker.Host.Delete(instance.Core.PublicNodeIDs, brokerclient.DefaultExecutionTimeout)
-
 		broker.Host.Delete(instance.Core.PrivateNodeIDs, brokerclient.DefaultExecutionTimeout)
 	}
 cleanMasters:
@@ -1502,6 +1501,7 @@ func (c *Cluster) updateMetadata(updatefn func() error) error {
 		c.metadata = m
 
 		c.metadata.Acquire()
+		c.Reload()
 	} else {
 		c.metadata.Acquire()
 		c.Reload()

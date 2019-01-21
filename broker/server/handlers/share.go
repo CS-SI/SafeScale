@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/metadata"
@@ -174,7 +174,7 @@ func (svc *ShareHandler) Create(shareName, hostName, path string) (*propsv1.Host
 // Delete a share from host
 func (svc *ShareHandler) Delete(name string) error {
 	// Retrieve info about the share
-	server, share, _, err := svc.Inspect(name)
+	server, share, _, err := svc.ForceInspect(name)
 	if err != nil {
 		return throwErr(err)
 	}
@@ -390,7 +390,7 @@ func (svc *ShareHandler) Mount(shareName, hostName, path string) (*propsv1.HostR
 
 // Unmount a share from local directory of an host
 func (svc *ShareHandler) Unmount(shareName, hostName string) error {
-	server, _, _, err := svc.Inspect(shareName)
+	server, _, _, err := svc.ForceInspect(shareName)
 	if err != nil {
 		return throwErr(err)
 	}
@@ -412,7 +412,7 @@ func (svc *ShareHandler) Unmount(shareName, hostName string) error {
 		target = server
 	} else {
 		hostSvc := NewHostHandler(svc.provider)
-		target, err = hostSvc.Inspect(hostName)
+		target, err = hostSvc.ForceInspect(hostName)
 		if err != nil {
 			return throwErr(err)
 		}

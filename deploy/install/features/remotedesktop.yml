@@ -494,7 +494,7 @@ feature:
                             ###########################################################
                             # Starts remotedesktop container                          #
                             ###########################################################
-                            docker run --rm -d --hostname remotedesktop --name remotedesktop -p "9080:8080" -p "9009:8009" remotedesktop:latest
+                            docker run -d --hostname remotedesktop --name remotedesktop -p "9080:8080" -p "9009:8009" remotedesktop:latest
 
             remove:
                 pace: image

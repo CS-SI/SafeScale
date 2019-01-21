@@ -9,7 +9,7 @@ vet:
 	@$(GO) vet ./...
 
 brokerd: handlers main.go commands/*.go ../utils/*.go ../broker.pb.go
-	@$(GO) build -race -o $(EXEC)
+	@$(GO) build -race -o $(EXEC) $(BUILD_TAGS)
 
 handlers:
 	@(cd handlers && $(MAKE))

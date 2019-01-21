@@ -32,7 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
-	"github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 )
 
 //go:generate rice embed-go

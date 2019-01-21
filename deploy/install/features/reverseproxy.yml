@@ -56,7 +56,7 @@ feature:
                                         - /opt/safescale/data/reverseproxy/postgresql:/var/lib/postgresql/data
                                     restart: always
                                     healthcheck:
-                                        test: ["CMD", "pg_isready", "-U", "postgres"]
+                                        test: ["CMD", "pg_isready", "-U", "kong"]
                                         interval: 10s
                                         timeout: 5s
                                         retries: 5
@@ -98,6 +98,7 @@ feature:
                                         retries: 10
                             EOF
                             docker-compose -f /opt/safescale/run/reverseproxy.compose.yml -p reverseproxy up -d
+                            while ! docker ps --all | grep reverseproxy_kong-migration_1 | grep Exited; do sleep 5; done && sleep 5
                             iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
                             sfSaveIptablesRules
 

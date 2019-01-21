@@ -268,6 +268,7 @@ sfSaveIptablesRules() {
         debian|ubuntu) iptables-save >/etc/iptables/rules.v4 ;;
     esac
 }
+export -f sfSaveIptablesRules
 
 sfDetectFacts() {
     declare -gA FACTS
