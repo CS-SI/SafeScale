@@ -52,6 +52,9 @@ import (
 
 // The createds hosts could be connected to the network with a bridge or a nat
 // CAUTION the bridged VMs needs the default route to be a macVlan interface!
+// On centos the firewall bloks all ports by default so the vm will not be alble to send back usefull infos
+// sudo firewall-cmd --zone=public --permanent --add-port=1000-63553/tcp
+// sudo firewall-cmd --reload
 var bridgedVMs = false
 
 // # Create a macvlan interface :
