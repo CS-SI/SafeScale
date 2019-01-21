@@ -230,11 +230,6 @@ var hostCreate = cli.Command{
 		// },
 	},
 	Action: func(c *cli.Context) error {
-		// mapFeatureNames := map[string]string{
-		// 	"docker":         "docker",
-		// 	"docker-compose": "docker-compose",
-		// 	"nvidiadocker":   "nvidiadocker",
-		// }
 		if c.NArg() != 1 {
 			fmt.Println("Missing mandatory argument <Host_name>")
 			_ = cli.ShowSubcommandHelp(c)
@@ -259,43 +254,12 @@ var hostCreate = cli.Command{
 			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "creation of host", true).Error()))
 		}
 
-		// if c.IsSet("features") {
-		// 	features := strings.Split(c.String("features"), "|")
-		// 	for _, feature := range features {
-		// 		featureName := mapFeatureNames[feature]
-		// 		feature, err := install.NewFeature(featureName)
-		// 		if err != nil {
-		// 			log.Printf("Failed to instanciate feature '%s'\n", featureName)
-		// 			return err
-		// 		}
-		// 		target := install.NewHostTarget(resp)
-		// 		settings := install.Settings{}
-		// 		settings.SkipProxy = c.Bool("skip-proxy")
-		// 		results, err := feature.Add(target, install.Variables{}, install.Settings{})
-		// 		if err != nil {
-		// 			msg := fmt.Sprintf("Error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
-		// 			return cli.NewExitError(msg, int(ExitCode.RPC))
-		// 		}
-		// 		if !results.Successful() {
-		// 			msg := fmt.Sprintf("Failed to add feature '%s' on host '%s'", featureName, hostName)
-		// 			//Debug
-		// 			if true {
-		// 				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
-		// 			}
-		// 			return cli.NewExitError(msg, int(ExitCode.RPC))
-		// 		}
-
-		// 		fmt.Printf("Feature '%s' added successfully on host '%s'\n", featureName, hostName)
-		// 	}
-		// }
-
 		out, _ := json.Marshal(resp)
 		fmt.Println(string(out))
 
 		return nil
 	},
 }
-
 
 var hostResize = cli.Command{
 	Name:      "resize",

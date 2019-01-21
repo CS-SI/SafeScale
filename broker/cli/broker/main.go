@@ -17,10 +17,14 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"os/signal"
 	"sort"
+	"syscall"
 
+	"github.com/dlespiau/covertool/pkg/exit"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
@@ -28,7 +32,29 @@ import (
 	"github.com/CS-SI/SafeScale/broker/utils"
 )
 
+func cleanup() {
+	fmt.Println("\nBe carfull stoping broker will not stop the execution on brokerd!")
+}
+
 func main() {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for {
+			<-c
+			cleanup()
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Print("Do you want to stop broker ? [y]es [n]o: ")
+			text, err := reader.ReadString('\n')
+			if err != nil {
+				fmt.Println("Failed to read the imput : ", err.Error())
+				text = "y"
+			}
+			if text == "y" {
+				exit.Exit(1)
+			}
+		}
+	}()
 
 	app := cli.NewApp()
 	app.Name = "broker"
@@ -105,6 +131,7 @@ func main() {
 	sort.Sort(cli.CommandsByName(cmd.TemplateCmd.Subcommands))
 
 	sort.Sort(cli.CommandsByName(app.Commands))
+
 	err := app.Run(os.Args)
 	if err != nil {
 		fmt.Println(err)
