@@ -135,7 +135,7 @@ pathprepend $HOME/.local/bin
 EOF
 
     chown -R {{.User}}:{{.User}} /home/{{.User}}
-    echo done
+    echo "done"
 }
 
 # Don't request dns name servers from DHCP server
@@ -161,7 +161,7 @@ configure_network_debian() {
     configure_dhcp_client
 
     systemctl restart networking
-    echo done
+    echo "done"
 }
 
 # Configure network using netplan
@@ -190,7 +190,7 @@ EOF
 
     netplan apply
 
-    echo done
+    echo "done"
 }
 
 # Configure network for redhat-like distributions (rhel, centos, ...)
@@ -211,6 +211,15 @@ DEVICE=$IF
 BOOTPROTO=dhcp
 ONBOOT=yes
 EOF
+            {{- if .DNSServers }}
+                i=1
+                {{- range .DNSServers }}
+                    echo "DNS$i={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-$IF 
+                    i=$((i+1))
+                {{- end }}
+            {{- else }}
+                echo "DNS1=1.1.1.1"
+            {{- end }}
         fi
     done
     # Disable resolv.conf by dhcp
@@ -295,8 +304,7 @@ configure_as_gateway() {
     fw_i_accept -m conntrack --ctstate ESTABLISHED,RELATED
     fw_i_accept -p tcp --dport ssh
 
-    PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
-    PU_IF=$(netstat -ie | grep -B1 ${PU_IP} | head -n1 | awk '{print $1}')
+    PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null)
     PU_IF=${PU_IF%%:}
 
     for IF in $(ls /sys/class/net); do
@@ -333,7 +341,7 @@ configure_as_gateway() {
     mv /etc/ssh/sshd_config.new /etc/ssh/sshd_config
     systemctl restart ssh
 
-    echo done
+    echo "done"
 }
 
 configure_dns_legacy() {
@@ -353,7 +361,7 @@ EOF
 configure_dns_resolvconf() {
     echo "Configuring resolvconf..."
 
-    cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/base
+    cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/head
 {{- if .DNSServers }}
   {{- range .DNSServers }}
 nameserver {{ . }}
@@ -363,7 +371,8 @@ nameserver 1.1.1.1
 {{- end }}
 EOF
     #rm -f /etc/resolvconf/resolv.conf.d/tail
-    systemctl restart resolvconf
+    resolvconf -u
+    echo "done"
 }
 
 configure_dns_systemd_resolved() {
@@ -385,6 +394,7 @@ Cache=yes
 DNSStubListener=yes
 EOF
     systemctl restart systemd-resolved
+    echo "done"
 }
 
 configure_gateway() {
@@ -406,6 +416,8 @@ After=network.target
 
 [Service]
 ExecStart=/sbin/gateway
+Restart=on-failure
+StartLimitIntervalSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -498,29 +510,38 @@ case $LINUX_KIND in
         systemctl stop apt-daily.service &>/dev/null
         systemctl kill --kill-who=all apt-daily.service &>/dev/null
         create_user
+
         {{- if .ConfIF }}
-        systemctl status systemd-networkd &>/dev/null && configure_network_netplan || configure_network_debian
+            which netplan &>/dev/null && configure_network_netplan && sleep 5
+            systemctl status networking &>/dev/null && configure_network_debian
         {{- end }}
+
+        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || \
+        systemctl status resolvconf &>/dev/null && configure_dns_resolvconf || \
+        configure_dns_legacy
+
         {{- if .IsGateway }}
-        configure_as_gateway
+            configure_as_gateway
         {{- end }}
-        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_resolvconf
         {{- if .AddGateway }}
-        configure_gateway
+            configure_gateway
         {{- end }}
         ;;
 
     redhat|centos)
         create_user
+
         {{- if .ConfIF }}
-        configure_network_redhat
+            configure_network_redhat
         {{- end }}
+
+        configure_dns_legacy
+
         {{- if .IsGateway }}
-        configure_as_gateway
+            configure_as_gateway
         {{- end }}
-        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_legacy
-        {{- if .AddGateway }}
-        configure_gateway_redhat
+        {{- if .AddGateway }}    
+            configure_gateway_redhat
         {{- end }}
         ;;
     *)
@@ -531,6 +552,8 @@ esac
 
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
+
+#insert_tag
 
 echo "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
 systemctl reboot

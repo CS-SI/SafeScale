@@ -266,11 +266,13 @@ var clusterCreateCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "complexity, C",
-			Usage: "Defines the sizing of the cluster: Small, Normal, Large (default: Normal)",
+			Value: "Small",
+			Usage: "Defines the sizing of the cluster: Small, Normal, Large",
 		},
 		cli.StringFlag{
 			Name:  "flavor, F",
-			Usage: "Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S (default: K8S)",
+			Value: "K8S",
+			Usage: "Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S",
 		},
 		cli.BoolFlag{
 			Name:  "keep-on-failure, k",
@@ -278,7 +280,8 @@ var clusterCreateCommand = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "cidr, N",
-			Usage: "Defines the CIDR of the network to use with cluster (default: 192.168.0.0/16)",
+			Value: "192.168.0.0/16",
+			Usage: "Defines the CIDR of the network to use with cluster",
 		},
 		cli.StringSliceFlag{
 			Name:  "disable",
@@ -309,9 +312,6 @@ var clusterCreateCommand = cli.Command{
 		}
 
 		complexityStr := c.String("complexity")
-		if complexityStr == "" {
-			complexityStr = "Small"
-		}
 		complexity, err := Complexity.Parse(complexityStr)
 		if err != nil {
 			msg := fmt.Sprintf("Invalid option --complexity|-C: %s\n", err.Error())
@@ -319,9 +319,6 @@ var clusterCreateCommand = cli.Command{
 		}
 
 		flavorStr := c.String("flavor")
-		if flavorStr == "" {
-			flavorStr = "K8S"
-		}
 		flavor, err := Flavor.Parse(flavorStr)
 		if err != nil {
 			msg := fmt.Sprintf("Invalid option --flavor|-F: %s\n", err.Error())
@@ -331,9 +328,6 @@ var clusterCreateCommand = cli.Command{
 		keep := c.Bool("keep-on-failure")
 
 		cidr := c.String("cidr")
-		if cidr == "" {
-			cidr = "192.168.0.0/16"
-		}
 
 		disable := c.StringSlice("disable")
 		disableFeatures := map[string]struct{}{}

@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -46,7 +46,7 @@ type VolumeAPI interface {
 	Inspect(ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error)
 	List(all bool) ([]model.Volume, error)
 	Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error)
-	Attach(volume string, host string, path string, format string) error
+	Attach(volume string, host string, path string, format string, doNotFormat bool) error
 	Detach(volume string, host string) error
 }
 
@@ -210,7 +210,7 @@ func (svc *VolumeHandler) Create(name string, size int, speed VolumeSpeed.Enum) 
 }
 
 // Attach a volume to an host
-func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string) error {
+func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNotFormat bool) error {
 	// Get volume data
 	volume, err := svc.Get(volumeName)
 	if err != nil {
@@ -341,19 +341,6 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string) erro
 	// Recovers real device name from the system
 	deviceName := "/dev/" + newDisk.ToSlice()[0].(string)
 
-	// Saves volume information in property
-	hostVolumesV1.VolumesByID[volume.ID] = &propsv1.HostVolume{
-		AttachID: vaID,
-		Device:   deviceName,
-	}
-	hostVolumesV1.VolumesByName[volume.Name] = volume.ID
-	hostVolumesV1.VolumesByDevice[deviceName] = volume.ID
-	hostVolumesV1.DevicesByID[volume.ID] = deviceName
-	err = host.Properties.Set(HostProperty.VolumesV1, hostVolumesV1)
-	if err != nil {
-		return infraErrf(err, "can't attach volume")
-	}
-
 	// Create mount point
 	sshHandler := NewSSHHandler(svc.provider)
 	sshConfig, err := sshHandler.GetConfig(host.ID)
@@ -367,7 +354,7 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string) erro
 		err = infraErr(err)
 		return err
 	}
-	err = server.MountBlockDevice(deviceName, mountPoint, format)
+	volumeUUID, err := server.MountBlockDevice(deviceName, mountPoint, format, doNotFormat)
 	if err != nil {
 		err = infraErr(err)
 		return err
@@ -376,20 +363,33 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string) erro
 	// Starting from here, unmount block device if exiting with error
 	defer func() {
 		if err != nil {
-			derr := server.UnmountBlockDevice(deviceName)
+			derr := server.UnmountBlockDevice(volumeUUID)
 			if derr != nil {
 				log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 			}
 		}
 	}()
 
+	// Saves volume information in property
+	hostVolumesV1.VolumesByID[volume.ID] = &propsv1.HostVolume{
+		AttachID: vaID,
+		Device:   volumeUUID,
+	}
+	hostVolumesV1.VolumesByName[volume.Name] = volume.ID
+	hostVolumesV1.VolumesByDevice[volumeUUID] = volume.ID
+	hostVolumesV1.DevicesByID[volume.ID] = volumeUUID
+	err = host.Properties.Set(HostProperty.VolumesV1, hostVolumesV1)
+	if err != nil {
+		return infraErrf(err, "can't attach volume")
+	}
+
 	// Updates host properties
 	hostMountsV1.LocalMountsByPath[mountPoint] = &propsv1.HostLocalMount{
-		Device:     deviceName,
+		Device:     volumeUUID,
 		Path:       mountPoint,
 		FileSystem: "nfs",
 	}
-	hostMountsV1.LocalMountsByDevice[deviceName] = mountPoint
+	hostMountsV1.LocalMountsByDevice[volumeUUID] = mountPoint
 	err = host.Properties.Set(HostProperty.MountsV1, hostMountsV1)
 	if err != nil {
 		return infraErrf(err, "can't attach volume")
@@ -404,7 +404,7 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string) erro
 		return infraErrf(err, "can't attach volume")
 	}
 
-	log.Infof("Volume '%s' successfully attached to host '%s' as device '%s'", volume.Name, host.Name, deviceName)
+	log.Infof("Volume '%s' successfully attached to host '%s' as device '%s'", volume.Name, host.Name, volumeUUID)
 	return nil
 }
 

@@ -164,12 +164,12 @@ func GetService(tenantName string) (*Service, error) {
 			if found {
 				metadataBucket, err = metadataLocation.GetBucket(bucketName)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("Failed to get metadata bucket : %s", err)
 				}
 			} else {
 				metadataBucket, err = metadataLocation.CreateBucket(bucketName)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("Failed to create metadata bucket : %s", err)
 				}
 			}
 			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {

@@ -263,7 +263,6 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 	if err != nil {
 		return err
 	}
-
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
 			return sshCfg.Enter()

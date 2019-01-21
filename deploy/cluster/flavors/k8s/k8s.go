@@ -73,28 +73,21 @@ var (
 // managerData defines the data needed by DCOS we want to keep in Object Storage
 type managerData struct {
 	// MasterIDs is a slice of hostIDs of the master
-	MasterIDs []string
-
+	MasterIDs []string `json:"master_ids"`
 	// MasterIPs contains a list of IP of the master servers
-	MasterIPs []string
-
+	MasterIPs []string `json:"master_ips"`
 	// PublicNodeIPs contains a list of IP of the Public Agent nodes
-	PublicNodeIPs []string
-
+	PublicNodeIPs []string `json:"public_node_ips"`
 	// PrivateAvgentIPs contains a list of IP of the Private Agent Nodes
-	PrivateNodeIPs []string
-
+	PrivateNodeIPs []string `json:"private_node_ips"`
 	// StateCollectInterval in seconds
-	StateCollectInterval time.Duration
-
+	StateCollectInterval time.Duration `json:"state_collect_interval,omitempty"`
 	// PrivateLastIndex
-	MasterLastIndex int
-
+	MasterLastIndex int `json:"master_last_index"`
 	// PrivateLastIndex
-	PrivateLastIndex int
-
+	PrivateLastIndex int `json:"private_last_index"`
 	// PublicLastIndex
-	PublicLastIndex int
+	PublicLastIndex int `json:"public_last_index"`
 }
 
 // Cluster is the object describing a cluster based on DCOS
@@ -151,6 +144,10 @@ func (c *Cluster) reset() {
 		panic("failed to get cluster manager data!")
 	}
 	c.manager = manager
+
+	if c.Core.Extensions == nil {
+		c.Core.Extensions = &model.Extensions{}
+	}
 }
 
 // Reload reloads metadata of Cluster from ObjectStorage
@@ -285,15 +282,11 @@ func Create(req core.Request) (*Cluster, error) {
 			AdminPassword:    cladmPassword,
 			NodesDef:         nodesDef,
 			DisabledFeatures: req.DisabledDefaultFeatures,
+			Extensions:       &model.Extensions{},
+			Service:          svc,
 		},
-		provider: svc,
-		manager:  &managerData{},
-		gateway:  gw,
-	}
-	err = instance.updateMetadata(nil)
-	if err != nil {
-		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
-		goto cleanNetwork
+		manager: &managerData{},
+		gateway: gw,
 	}
 
 	err = instance.updateMetadata(func() error {
@@ -1366,21 +1359,31 @@ func (c *Cluster) updateMetadata(updatefn func() error) error {
 		}
 		m.Carry(c.Core)
 		c.metadata = m
+
 		c.metadata.Acquire()
+		c.Reload()
 	} else {
 		c.metadata.Acquire()
 		c.Reload()
 	}
+	defer c.metadata.Release()
+
 	if updatefn != nil {
 		err := updatefn()
 		if err != nil {
-			c.metadata.Release()
 			return err
 		}
 	}
-	err := c.metadata.Write()
-	c.metadata.Release()
-	return err
+
+	// Serialize manager data into appropriare c.Core.Extensions if needed
+	if c.manager != nil {
+		err := c.Core.Extensions.Set(Extension.FlavorV1, c.manager)
+		if err != nil {
+			return err
+		}
+	}
+
+	return c.metadata.Write()
 }
 
 // Delete destroys everything related to the infrastructure built for the cluster
