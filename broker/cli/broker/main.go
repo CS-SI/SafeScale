@@ -44,7 +44,7 @@ func main() {
 			<-c
 			cleanup()
 			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("Do you want to stop broker ? [y]es [n]o: ")
+			fmt.Print("Do you really want to stop broker ? [y]es [n]o: ")
 			text, err := reader.ReadString('\n')
 			if err != nil {
 				fmt.Println("Failed to read the imput : ", err.Error())

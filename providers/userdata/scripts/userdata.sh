@@ -212,13 +212,13 @@ BOOTPROTO=dhcp
 ONBOOT=yes
 EOF
             {{- if .DNSServers }}
-                i=1
-                {{- range .DNSServers }}
-                    echo "DNS$i={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-$IF 
-                    i=$((i+1))
-                {{- end }}
+            i=1
+            {{- range .DNSServers }}
+            echo "DNS$i={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-$IF 
+            i=$((i+1))
+            {{- end }}
             {{- else }}
-                echo "DNS1=1.1.1.1"
+            echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-$IF
             {{- end }}
         fi
     done
@@ -512,19 +512,19 @@ case $LINUX_KIND in
         create_user
 
         {{- if .ConfIF }}
-            which netplan &>/dev/null && configure_network_netplan && sleep 5
-            systemctl status networking &>/dev/null && configure_network_debian
+        which netplan &>/dev/null && configure_network_netplan && sleep 5  
+        systemctl status networking &>/dev/null && configure_network_debian 
         {{- end }}
 
         systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || \
-        systemctl status resolvconf &>/dev/null && configure_dns_resolvconf || \
+        systemctl status resolvconf &>/dev/null && configure_dns_resolvconf || \
         configure_dns_legacy
 
         {{- if .IsGateway }}
-            configure_as_gateway
+        configure_as_gateway
         {{- end }}
         {{- if .AddGateway }}
-            configure_gateway
+        configure_gateway
         {{- end }}
         ;;
 
@@ -532,16 +532,16 @@ case $LINUX_KIND in
         create_user
 
         {{- if .ConfIF }}
-            configure_network_redhat
+        configure_network_redhat
         {{- end }}
 
         configure_dns_legacy
 
         {{- if .IsGateway }}
-            configure_as_gateway
+        configure_as_gateway
         {{- end }}
-        {{- if .AddGateway }}    
-            configure_gateway_redhat
+        {{- if .AddGateway }}
+        configure_gateway_redhat
         {{- end }}
         ;;
     *)
@@ -550,6 +550,7 @@ case $LINUX_KIND in
         ;;
 esac
 
+touch /etc/cloud/cloud-init.disabled
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
