@@ -17,17 +17,17 @@ rm ./go1.10.3.linux-amd64.tar.gz
 ## Install Protoc 3.6.1
 ```
 PROTOCZIP=$(echo "protoc-3.6.1-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).zip")
-wget https://github.com/ls/protobuf/releases/download/v3.6.1/$PROTOCZIP
+wget https://github.com/google/protobuf/releases/download/v3.6.1/$PROTOCZIP
 sudo unzip -d /usr/local/include/protoc $PROTOCZIP
 sudo ln -s /usr/local/include/protoc/bin/protoc /usr/local/bin/
 rm -rf protoc
-unset $PROTOCZIP
+unset PROTOCZIP
 ```
 
 ## Prepare environment vars
 ```
 echo -e "\nexport GOPATH=~/go" >> ~/.bashrc
-echo -e "\nexport PATH=\$PATH:/usr/local/go/bin:/go/bin:~/go/bin" >> ~/.bashrc
+echo -e "\nexport PATH=/usr/local/go/bin:/go/bin:\$PATH:~/go/bin" >> ~/.bashrc
 source ~/.bashrc
 ```
 

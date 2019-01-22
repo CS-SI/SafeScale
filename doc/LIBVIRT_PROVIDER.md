@@ -12,15 +12,13 @@ As the libvirt dependency is huge, libvirt provider it's disabled by default and
 ```
 #install docker
 sudo apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common
-curl -fsSL https://download.docker.com/linux/debian/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
-sudo apt-get update -y
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
 sudo apt-get install -y docker-ce
 
 #install libvirt
 #universe repository is required (for virtinst & libguestfs-tools)
 sudo add-apt-repository universe
-sudo apt-get update
 sudo apt-get install -y qemu-kvm libvirt-bin libvirt-dev virtinst libguestfs-tools
 ```
 
@@ -31,13 +29,11 @@ sudo apt-get install -y qemu-kvm libvirt-bin libvirt-dev virtinst libguestfs-too
 sudo apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common
 curl -fsSL https://download.docker.com/linux/debian/gpg | sudo apt-key add -
 sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
-sudo apt-get update -y
 sudo apt-get install -y docker-ce
 
 #install libvirt
 #enable testing repository
-sudo echo -e "\ndeb http://http.us.debian.org/debian/ testing non-free contrib main" >> /etc/apt/sources.list
-sudo apt-get update
+sudo add-apt-repository "deb http://http.us.debian.org/debian/ testing non-free contrib main"
 sudo apt-get install -y pkg-config dnsmasq ebtables
 sudo apt-get install -y qemu-kvm libvirt-dev libvirt-clients libvirt-daemon-system virtinst libguestfs-tools
 ```
@@ -52,7 +48,7 @@ sudo systemctl enable docker
 sudo systemctl start docker
 
 #install libvirt
-#!! e2fsck is outdated (1.42) and will sometimes cause issues with virt-resize, e2fsck v=1.44 will fix it !!
+#!! e2fsck is outdated (1.42) and will sometimes cause issues with virt-resize, e2fsck v>=1.43 will fix it !!
 sudo yum install -y qemu-kvm libvirt virt-install libvirt-devel libguestfs-tools
 sudo systemctl enable libvirtd
 sudo systemctl start libvirtd
@@ -73,11 +69,13 @@ sudo chmod 744 /boot/vmlinuz-`uname -r`
 # Launch object storage (here a minio S3 storage with docker)
 MINIO_ACCESS_KEY="accessKey"
 MINIO_SECRET_KEY="secretKey"
-sudo docker run -d -p 9000:9000 --name minio1 -e "MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY" -e "MINIO_SECRET_KEY=$MINIO_SECRET_KEY" -v /home/gpac/data:/data -v /mnt/config:/root/.minio minio/minio server /data
+sudo docker run -d -p 9000:9000 --name minio1 -e "MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY" -e "MINIO_SECRET_KEY=$MINIO_SECRET_KEY" -v /data/minio/data:/data -v /data/minio/config:/root/.minio minio/minio server /data
 ```
 ### Build -
 
 ```
+cd ${GOPATH:-$HOME}/src/github.com/CS-SI/SafeScale
+
 #check that the dependencies are satisfied
 make libvirt
 
@@ -134,7 +132,7 @@ The Folder that will be used by libvirt to store disk images and block storages 
         uri                 = "qemu:///system"
         imagesJSONPath      = "/home/user/SafeScale/images.json"
         templatesJSONPath   = "/home/user/SafeScale/templates.json"
-        libvirtStorage      = "/home/user/SafeScale/LibvirtStorage/"
+        libvirtStorage      = "/home/user/SafeScale/LibvirtStorage"
 
     [tenants.network]
 
@@ -172,7 +170,7 @@ A List of images, each image is made up of :
                 "method"    : "GoogleDrive",
                 "id"        : "1AXBdfVxlDuiQlefEVGjWxKZi5imPO62g"
             },
-            "imagePath" : "/home/armand/Iso/debian8_diskimage.qcow2",
+            "imagePath" : "/home/user/SafeScale/debian8_diskimage.qcow2",
             "imageName" : "Debian 8",
             "imageID"   : "8891e5fc-b42b-49a0-b852-569cc1f1062d",
             "disk"      : "/dev/sda1"
@@ -182,7 +180,7 @@ A List of images, each image is made up of :
                 "method"    : "GoogleDrive",
                 "id"        : "1UbDc8Uip_z-V9UcYoJU8fQrQdokOuVSt"
             },
-            "imagePath" : "/home/armand/Iso/debian9_diskimage.qcow2",
+            "imagePath" : "/home/user/SafeScale/debian9_diskimage.qcow2",
             "imageName" : "Debian 9",
             "imageID"   : "8c411acd-78b8-45e1-affc-795189062b8e",
             "disk"      : "/dev/sda1"
@@ -192,7 +190,7 @@ A List of images, each image is made up of :
                 "method"    : "GoogleDrive",
                 "id"        : "1f4yJ3_yjevdtdW1_SF6tlgBnvoUgKInK"
             },
-            "imagePath" : "/home/armand/Iso/centos7_diskimage.qcow2",
+            "imagePath" : "/home/user/SafeScale/centos7_diskimage.qcow2",
             "imageName" : "Centos 7",
             "imageID"   : "1fa9ae7a-1b7f-48ff-8ced-06e884d9aabc",
             "disk"      : "/dev/sda2"
@@ -202,7 +200,7 @@ A List of images, each image is made up of :
                 "method"    : "GoogleDrive",
                 "id"        : "1wKr6Kf8LkRJnWKjzpUnWeAwp-FZFyJ3M"
             },
-            "imagePath" : "/home/armand/Iso/ubuntu1604_diskimage.qcow2",
+            "imagePath" : "/home/user/SafeScale/ubuntu1604_diskimage.qcow2",
             "imageName" : "Ubuntu 16.04",
             "imageID"   : "9c7e752d-43da-44f2-992e-3294b2326aa4",
             "disk"      : "/dev/sda1"
@@ -212,7 +210,7 @@ A List of images, each image is made up of :
                 "method"    : "GoogleDrive",
                 "id"        : "1dLSWe838nEt_tAwyvSRPbfEFDrE1i7r4"
             },
-            "imagePath" : "/home/armand/Iso/ubuntu1804_diskimage.qcow2",
+            "imagePath" : "/home/user/SafeScale/ubuntu1804_diskimage.qcow2",
             "imageName" : "Ubuntu 18.04",
             "imageID"   : "58390614-e8c1-442c-bbe8-5e8e7790a5aa",
             "disk"      : "/dev/sda2"
