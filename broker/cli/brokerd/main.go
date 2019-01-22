@@ -121,7 +121,7 @@ func work() {
 
 	log.Infof("Starting server, listening at port: %d, using metadata suffix: [%s]", brokerdPort, suffix)
 
-	lis, err := net.Listen("tcp", ":" + strconv.Itoa(brokerdPort))
+	lis, err := net.Listen("tcp", ":"+strconv.Itoa(brokerdPort))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

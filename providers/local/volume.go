@@ -78,7 +78,7 @@ func (client *Client) getStoragePoolByPath(path string) (*libvirt.StoragePool, e
 		storagePoolDescription := &libvirtxml.StoragePool{}
 		err = xml.Unmarshal([]byte(storagePoolXML), storagePoolDescription)
 
-		if storagePoolDescription.Target.Path == path {
+		if storagePoolDescription.Target.Path == strings.TrimRight(path, "/") {
 			return &storagePool, nil
 		}
 	}
