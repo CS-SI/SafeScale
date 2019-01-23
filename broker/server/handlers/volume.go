@@ -17,6 +17,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -41,13 +42,13 @@ import (
 
 // VolumeAPI defines API to manipulate hosts
 type VolumeAPI interface {
-	Delete(ref string) error
-	Get(ref string) (*model.Volume, error)
-	Inspect(ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error)
-	List(all bool) ([]model.Volume, error)
-	Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error)
-	Attach(volume string, host string, path string, format string, doNotFormat bool) error
-	Detach(volume string, host string) error
+	Delete(ctx context.Context, ref string) error
+	Get(ctx context.Context, ref string) (*model.Volume, error)
+	Inspect(ctx context.Context, ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error)
+	List(ctx context.Context, all bool) ([]model.Volume, error)
+	Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error)
+	Attach(ctx context.Context, volume string, host string, path string, format string, doNotFormat bool) error
+	Detach(ctx context.Context, volume string, host string) error
 }
 
 // VolumeHandler volume service
@@ -63,7 +64,7 @@ func NewVolumeHandler(api *providers.Service) VolumeAPI {
 }
 
 // List returns the network list
-func (svc *VolumeHandler) List(all bool) ([]model.Volume, error) {
+func (svc *VolumeHandler) List(ctx context.Context, all bool) ([]model.Volume, error) {
 	if all {
 		volumes, err := svc.provider.ListVolumes()
 		return volumes, infraErr(err)
@@ -84,7 +85,7 @@ func (svc *VolumeHandler) List(all bool) ([]model.Volume, error) {
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // Delete deletes volume referenced by ref
-func (svc *VolumeHandler) Delete(ref string) error {
+func (svc *VolumeHandler) Delete(ctx context.Context, ref string) error {
 	mv, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		switch err.(type) {
@@ -123,7 +124,7 @@ func (svc *VolumeHandler) Delete(ref string) error {
 }
 
 // Get returns the volume identified by ref, ref can be the name or the id
-func (svc *VolumeHandler) Get(ref string) (*model.Volume, error) {
+func (svc *VolumeHandler) Get(ctx context.Context, ref string) (*model.Volume, error) {
 	mv, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		err := infraErr(err)
@@ -137,8 +138,8 @@ func (svc *VolumeHandler) Get(ref string) (*model.Volume, error) {
 }
 
 // Inspect returns the volume identified by ref and its attachment (if any)
-func (svc *VolumeHandler) Inspect(ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error) {
-	volume, err := svc.Get(ref)
+func (svc *VolumeHandler) Inspect(ctx context.Context, ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error) {
+	volume, err := svc.Get(ctx, ref)
 	if err != nil {
 		err := infraErr(err)
 		return nil, nil, err
@@ -155,7 +156,7 @@ func (svc *VolumeHandler) Inspect(ref string) (*model.Volume, map[string]*propsv
 	err = volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
 	if err == nil && len(volumeAttachedV1.Hosts) > 0 {
 		for id := range volumeAttachedV1.Hosts {
-			host, err := hostSvc.Inspect(id)
+			host, err := hostSvc.Inspect(ctx, id)
 			if err != nil {
 				continue
 			}
@@ -182,7 +183,7 @@ func (svc *VolumeHandler) Inspect(ref string) (*model.Volume, map[string]*propsv
 }
 
 // Create a volume
-func (svc *VolumeHandler) Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error) {
+func (svc *VolumeHandler) Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error) {
 	volume, err := svc.provider.CreateVolume(model.VolumeRequest{
 		Name:  name,
 		Size:  size,
@@ -210,9 +211,9 @@ func (svc *VolumeHandler) Create(name string, size int, speed VolumeSpeed.Enum) 
 }
 
 // Attach a volume to an host
-func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNotFormat bool) error {
+func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) error {
 	// Get volume data
-	volume, err := svc.Get(volumeName)
+	volume, err := svc.Get(ctx, volumeName)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
@@ -235,7 +236,7 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNo
 
 	// Get Host data
 	hostSvc := NewHostHandler(svc.provider)
-	host, err := hostSvc.ForceInspect(hostName)
+	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
 		return throwErr(err)
 	}
@@ -284,7 +285,7 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNo
 	// Note: most providers are not able to tell the real device name the volume
 	//       will have on the host, so we have to use a way that can work everywhere
 	// Get list of disks before attachment
-	oldDiskSet, err := svc.listAttachedDevices(host)
+	oldDiskSet, err := svc.listAttachedDevices(ctx, host)
 	if err != nil {
 		err := logicErrf(err, "Failed to get list of connected disks")
 		return err
@@ -320,7 +321,7 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNo
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			// Get new of disk after attachment
-			newDiskSet, err := svc.listAttachedDevices(host)
+			newDiskSet, err := svc.listAttachedDevices(ctx, host)
 			if err != nil {
 				err := logicErrf(err, "failed to get list of connected disks")
 				return err
@@ -343,7 +344,7 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNo
 
 	// Create mount point
 	sshHandler := NewSSHHandler(svc.provider)
-	sshConfig, err := sshHandler.GetConfig(host.ID)
+	sshConfig, err := sshHandler.GetConfig(ctx, host.ID)
 	if err != nil {
 		err = infraErr(err)
 		return err
@@ -408,7 +409,7 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNo
 	return nil
 }
 
-func (svc *VolumeHandler) listAttachedDevices(host *model.Host) (mapset.Set, error) {
+func (svc *VolumeHandler) listAttachedDevices(ctx context.Context, host *model.Host) (mapset.Set, error) {
 	var (
 		retcode        int
 		stdout, stderr string
@@ -418,7 +419,7 @@ func (svc *VolumeHandler) listAttachedDevices(host *model.Host) (mapset.Set, err
 	sshHandler := NewSSHHandler(svc.provider)
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			retcode, stdout, stderr, err = sshHandler.Run(host.ID, cmd)
+			retcode, stdout, stderr, err = sshHandler.Run(ctx, host.ID, cmd)
 			if err != nil {
 				err = infraErr(err)
 				return err
@@ -445,9 +446,9 @@ func (svc *VolumeHandler) listAttachedDevices(host *model.Host) (mapset.Set, err
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (svc *VolumeHandler) Detach(volumeName, hostName string) error {
+func (svc *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) error {
 	// Load volume data
-	volume, err := svc.Get(volumeName)
+	volume, err := svc.Get(ctx, volumeName)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
@@ -459,7 +460,7 @@ func (svc *VolumeHandler) Detach(volumeName, hostName string) error {
 
 	// Load host data
 	hostSvc := NewHostHandler(svc.provider)
-	host, err := hostSvc.ForceInspect(hostName)
+	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
 		return throwErr(err)
 	}
@@ -525,7 +526,7 @@ func (svc *VolumeHandler) Detach(volumeName, hostName string) error {
 
 	// Unmount the Block Device ...
 	sshHandler := NewSSHHandler(svc.provider)
-	sshConfig, err := sshHandler.GetConfig(host.ID)
+	sshConfig, err := sshHandler.GetConfig(ctx, host.ID)
 	if err != nil {
 		err = logicErrf(err, "error getting ssh config")
 		return err

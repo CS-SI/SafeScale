@@ -17,11 +17,10 @@
 package client
 
 import (
-	"context"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-
+	"github.com/CS-SI/SafeScale/broker/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -36,7 +35,7 @@ func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	return service.List(ctx, &google_protobuf.Empty{})
 
@@ -47,7 +46,7 @@ func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	return service.Get(ctx, &google_protobuf.Empty{})
 }
@@ -57,7 +56,7 @@ func (t *tenant) Set(name string, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	_, err := service.Set(ctx, &pb.TenantName{Name: name})
 	return err

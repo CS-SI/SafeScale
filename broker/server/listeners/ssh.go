@@ -51,7 +51,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshRespon
 	}
 
 	handler := SSHHandler(tenant.Service)
-	retcode, stdout, stderr, err := handler.Run(in.GetHost().GetName(), in.GetCommand())
+	retcode, stdout, stderr, err := handler.Run(ctx, in.GetHost().GetName(), in.GetCommand())
 	if err != nil {
 		err = grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -73,7 +73,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshR
 	}
 
 	handler := SSHHandler(tenant.Service)
-	retcode, stdout, stderr, err := handler.Copy(in.GetSource(), in.GetDestination())
+	retcode, stdout, stderr, err := handler.Copy(ctx, in.GetSource(), in.GetDestination())
 	if err != nil {
 		return nil, err
 	}

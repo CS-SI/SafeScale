@@ -79,7 +79,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 
 	handler := HostHandler(tenant.Service)
 	ref := utils.GetReference(in)
-	err := handler.Start(ref)
+	err := handler.Start(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -101,7 +101,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_prot
 
 	handler := HostHandler(tenant.Service)
 	ref := utils.GetReference(in)
-	err := handler.Stop(ref)
+	err := handler.Stop(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -123,7 +123,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_pr
 
 	handler := HostHandler(tenant.Service)
 	ref := utils.GetReference(in)
-	err := handler.Reboot(ref)
+	err := handler.Reboot(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -144,7 +144,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 	}
 
 	handler := HostHandler(tenant.Service)
-	hosts, err := handler.List(in.GetAll())
+	hosts, err := handler.List(ctx, in.GetAll())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -170,7 +170,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	}
 
 	handler := HostHandler(tenant.Service)
-	host, err := handler.Create(
+	host, err := handler.Create(ctx,
 		in.GetName(),
 		in.GetNetwork(),
 		int(in.GetCPUNumber()),
@@ -187,9 +187,10 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	}
 	log.Infof("Host '%s' created", in.GetName())
 	return conv.ToPBHost(host), nil
+
 }
 
-// Create a new host
+// Resize ...
 func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
 	log.Infof("Listeners: host resize '%s' done", in.Name)
 	defer log.Debugf("Listeners: host resize '%s' done", in.Name)
@@ -201,7 +202,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	}
 
 	handler := HostHandler(tenant.Service)
-	host, err := handler.Resize(
+	host, err := handler.Resize(ctx,
 		in.GetName(),
 		int(in.GetCPUNumber()),
 		in.GetRAM(),
@@ -233,7 +234,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 	}
 
 	handler := HostHandler(tenant.Service)
-	host, err := handler.ForceInspect(ref)
+	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -257,7 +258,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host,
 	}
 
 	handler := HostHandler(tenant.Service)
-	host, err := handler.ForceInspect(ref)
+	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, fmt.Sprintf("can't inspect host: %v", err))
 	}
@@ -281,7 +282,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 	}
 
 	handler := HostHandler(tenant.Service)
-	err := handler.Delete(ref)
+	err := handler.Delete(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -306,7 +307,7 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig
 	}
 
 	handler := HostHandler(currentTenant.Service)
-	sshConfig, err := handler.SSH(ref)
+	sshConfig, err := handler.SSH(ctx, ref)
 	if err != nil {
 		return nil, err
 	}

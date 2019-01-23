@@ -17,6 +17,8 @@
 package handlers
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 )
@@ -27,9 +29,9 @@ import (
 
 // ImageAPI defines API to manipulate images
 type ImageAPI interface {
-	List(all bool) ([]model.Image, error)
-	Select(osfilter string) (*model.Image, error)
-	Filter(osfilter string) ([]model.Image, error)
+	List(ctx context.Context, all bool) ([]model.Image, error)
+	Select(ctx context.Context, osfilter string) (*model.Image, error)
+	Filter(ctx context.Context, osfilter string) ([]model.Image, error)
 }
 
 // NewImageHandler creates an host service
@@ -45,17 +47,17 @@ type ImageHandler struct {
 }
 
 // List returns the image list
-func (srv *ImageHandler) List(all bool) ([]model.Image, error) {
+func (srv *ImageHandler) List(ctx context.Context, all bool) ([]model.Image, error) {
 	images, err := srv.provider.ListImages(all)
 	return images, infraErr(err)
 }
 
 // Select selects the image that best fits osname
-func (srv *ImageHandler) Select(osname string) (*model.Image, error) {
+func (srv *ImageHandler) Select(ctx context.Context, osname string) (*model.Image, error) {
 	return nil, nil
 }
 
 // Filter filters the images that do not fit osname
-func (srv *ImageHandler) Filter(osname string) ([]model.Image, error) {
+func (srv *ImageHandler) Filter(ctx context.Context, osname string) ([]model.Image, error) {
 	return nil, nil
 }

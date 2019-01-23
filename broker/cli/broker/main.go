@@ -22,18 +22,28 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"strings"
 	"syscall"
 
-	"github.com/dlespiau/covertool/pkg/exit"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
-	"github.com/CS-SI/SafeScale/broker/utils"
 )
 
 func cleanup() {
 	fmt.Println("\nBe carfull stoping broker will not stop the execution on brokerd!")
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Do you really want to stop broker ? [y]es [n]o: ")
+	text, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("Failed to read the imput : ", err.Error())
+		text = "y"
+	}
+	if strings.TrimRight(text, "\n") == "y" {
+		utils.Cancel()
+	}
 }
 
 func main() {
@@ -43,16 +53,6 @@ func main() {
 		for {
 			<-c
 			cleanup()
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("Do you really want to stop broker ? [y]es [n]o: ")
-			text, err := reader.ReadString('\n')
-			if err != nil {
-				fmt.Println("Failed to read the imput : ", err.Error())
-				text = "y"
-			}
-			if text == "y" {
-				exit.Exit(1)
-			}
 		}
 	}()
 

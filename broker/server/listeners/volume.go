@@ -57,7 +57,7 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	volumes, err := handler.List(in.GetAll())
+	volumes, err := handler.List(ctx, in.GetAll())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -83,7 +83,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	volume, err := handler.Create(in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
+	volume, err := handler.Create(ctx, in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -103,7 +103,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Attach(in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
+	err := handler.Attach(ctx, in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -125,7 +125,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 
 	hostName := in.GetHost().GetName()
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Detach(volumeName, hostName)
+	err := handler.Detach(ctx, volumeName, hostName)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -150,7 +150,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Delete(ref)
+	err := handler.Delete(ctx, ref)
 	if err != nil {
 		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, fmt.Sprintf("can't delete volume '%s': %s", ref, err.Error()))
 	}
@@ -174,7 +174,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Vol
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	volume, mounts, err := handler.Inspect(ref)
+	volume, mounts, err := handler.Inspect(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}

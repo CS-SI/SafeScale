@@ -17,6 +17,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/user"
@@ -49,16 +50,16 @@ import (
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
-	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool, gpuNumber int, freq float32, force bool) (*model.Host, error)
-	List(all bool) ([]*model.Host, error)
-	ForceInspect(ref string) (*model.Host, error)
-	Inspect(ref string) (*model.Host, error)
-	Delete(ref string) error
-	SSH(ref string) (*system.SSHConfig, error)
-	Reboot(ref string) error
-	Resize(name string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*model.Host, error)
-	Start(ref string) error
-	Stop(ref string) error
+	Create(ctx context.Context, name string, net string, cpu int, ram float32, disk int, os string, public bool, gpuNumber int, freq float32, force bool) (*model.Host, error)
+	List(ctx context.Context, all bool) ([]*model.Host, error)
+	ForceInspect(ctx context.Context, ref string) (*model.Host, error)
+	Inspect(ctx context.Context, ref string) (*model.Host, error)
+	Delete(ctx context.Context, ref string) error
+	SSH(ctx context.Context, ref string) (*system.SSHConfig, error)
+	Reboot(ctx context.Context, ref string) error
+	Resize(ctx context.Context, name string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*model.Host, error)
+	Start(ctx context.Context, ref string) error
+	Stop(ctx context.Context, ref string) error
 }
 
 // HostHandler host service
@@ -74,7 +75,7 @@ func NewHostHandler(api *providers.Service) HostAPI {
 }
 
 // Start starts a host
-func (svc *HostHandler) Start(ref string) error {
+func (svc *HostHandler) Start(ctx context.Context, ref string) error {
 	log.Debugf("broker.server.handlers.HostHandler::Start(%s) called", ref)
 	defer log.Debugf("broker.server.handlers.HostHandler::Start(%s) done", ref)
 
@@ -95,7 +96,7 @@ func (svc *HostHandler) Start(ref string) error {
 }
 
 // Stop stops a host
-func (svc *HostHandler) Stop(ref string) error {
+func (svc *HostHandler) Stop(ctx context.Context, ref string) error {
 	log.Debugf("broker.server.handlers.HostHandler::Stop(%s) called", ref)
 	defer log.Debugf("broker.server.handlers.HostHandler::Stop(%s) done", ref)
 
@@ -116,7 +117,7 @@ func (svc *HostHandler) Stop(ref string) error {
 }
 
 // Reboot reboots a host
-func (svc *HostHandler) Reboot(ref string) error {
+func (svc *HostHandler) Reboot(ctx context.Context, ref string) error {
 	log.Debugf("broker.server.handlers.HostHandler::Reboot(%s) called", ref)
 	defer log.Debugf("broker.server.handlers.HostHandler::Reboot(%s) done", ref)
 
@@ -145,7 +146,7 @@ func (svc *HostHandler) Reboot(ref string) error {
 }
 
 // Resize ...
-func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*model.Host, error) {
+func (svc *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*model.Host, error) {
 	log.Debugf("broker.server.handlers.HostHandler::Resize(%s) called", ref)
 	defer log.Debugf("broker.server.handlers.HostHandler::Resize(%s) done", ref)
 
@@ -204,7 +205,7 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 
 // Create creates a host
 func (svc *HostHandler) Create(
-	name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32, force bool,
+	ctx context.Context, name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32, force bool,
 ) (*model.Host, error) {
 
 	log.Debugf("broker.server.handlers.HostHandler::Create('%s') called", name)
@@ -225,7 +226,7 @@ func (svc *HostHandler) Create(
 	var gw *model.Host
 	if len(net) != 0 {
 		networkHandler := NewNetworkHandler(svc.provider)
-		n, err := networkHandler.Inspect(net)
+		n, err := networkHandler.Inspect(ctx, net)
 		if err != nil {
 			switch err.(type) {
 			case model.ErrResourceNotFound:
@@ -314,7 +315,6 @@ func (svc *HostHandler) Create(
 			return nil, infraErrf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
 		}
 	}
-
 	defer func() {
 		if err != nil {
 			derr := svc.provider.DeleteHost(host.ID)
@@ -406,6 +406,18 @@ func (svc *HostHandler) Create(
 	if err != nil {
 		return nil, infraErrf(err, "Metadata creation failed")
 	}
+	defer func() {
+		if err != nil {
+			mh, derr := metadata.LoadHost(svc.provider, host.ID)
+			if derr != nil {
+				log.Errorf("Failed to load host metadata '%s': %v", host.Name, derr)
+			}
+			derr = mh.Delete()
+			if derr != nil {
+				log.Errorf("Failed to delete host metadata '%s': %v", host.Name, derr)
+			}
+		}
+	}()
 	log.Infof("Compute resource created: '%s'", host.Name)
 
 	networkHostsV1 := propsv1.NewNetworkHosts()
@@ -427,13 +439,35 @@ func (svc *HostHandler) Create(
 			log.Errorf(err.Error())
 		}
 	}
+	defer func() {
+		networkHostsV1 := propsv1.NewNetworkHosts()
+		for _, i := range networks {
+			if err != nil {
+				derr := i.Properties.Get(NetworkProperty.HostsV1, networkHostsV1)
+				if derr != nil {
+					log.Errorf(derr.Error())
+				}
+				delete(networkHostsV1.ByID, host.ID)
+				delete(networkHostsV1.ByName, host.Name)
+				derr = i.Properties.Set(NetworkProperty.HostsV1, networkHostsV1)
+				if derr != nil {
+					log.Errorf(derr.Error())
+				}
+
+				derr = metadata.SaveNetwork(svc.provider, i)
+				if derr != nil {
+					log.Errorf(derr.Error())
+				}
+			}
+		}
+	}()
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
 	log.Infof("Waiting start of SSH service on remote host '%s' ...", host.Name)
 	sshHandler := NewSSHHandler(svc.provider)
-	sshCfg, err := sshHandler.GetConfig(host.ID)
+	sshCfg, err := sshHandler.GetConfig(ctx, host.ID)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -458,6 +492,11 @@ func (svc *HostHandler) Create(
 	}
 	log.Infof("SSH service started on host '%s'.", host.Name)
 
+	err = brokerutils.TaskStatus(ctx)
+	if err != nil {
+		log.Warn("broker.server.handlers.HostHandler::Create(%s) canceld by broker", name)
+		return nil, err
+	}
 	return host, nil
 }
 
@@ -487,7 +526,7 @@ func (svc *HostHandler) getOrCreateDefaultNetwork() (*model.Network, error) {
 }
 
 // List returns the host list
-func (svc *HostHandler) List(all bool) ([]*model.Host, error) {
+func (svc *HostHandler) List(ctx context.Context, all bool) ([]*model.Host, error) {
 	log.Debugf("broker.server.handlers.HostHandler::List(%v) called", all)
 	defer log.Debugf("broker.server.handlers.HostHandler::List(%v) done", all)
 
@@ -509,11 +548,11 @@ func (svc *HostHandler) List(all bool) ([]*model.Host, error) {
 
 // ForceInspect ...
 // If not found, return (nil, err)
-func (svc *HostHandler) ForceInspect(ref string) (*model.Host, error) {
+func (svc *HostHandler) ForceInspect(ctx context.Context, ref string) (*model.Host, error) {
 	log.Debugf("broker.server.handlers.HostHandler::ForceInspect(%s) called", ref)
 	defer log.Debugf("broker.server.handlers.HostHandler::ForceInspect(%s) done", ref)
 
-	host, err := svc.Inspect(ref)
+	host, err := svc.Inspect(ctx, ref)
 	if err != nil {
 		return nil, infraErr(errors.Wrap(err, "failed to load host metadata"))
 	}
@@ -523,7 +562,7 @@ func (svc *HostHandler) ForceInspect(ref string) (*model.Host, error) {
 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
-func (svc *HostHandler) Inspect(ref string) (*model.Host, error) {
+func (svc *HostHandler) Inspect(ctx context.Context, ref string) (*model.Host, error) {
 	log.Debugf("broker.server.handlers.HostHandler::Inspect(%s) called", ref)
 	defer log.Debugf("broker.server.handlers.HostHandler::Inspect(%s) done", ref)
 
@@ -543,7 +582,7 @@ func (svc *HostHandler) Inspect(ref string) (*model.Host, error) {
 }
 
 // Delete deletes host referenced by ref
-func (svc *HostHandler) Delete(ref string) error {
+func (svc *HostHandler) Delete(ctx context.Context, ref string) error {
 	log.Debugf("broker.server.handlers.HostHandler::Delete(%s) called", ref)
 	defer log.Debugf("broker.server.handlers.HostHandler::Delete(%s) done", ref)
 
@@ -597,7 +636,7 @@ func (svc *HostHandler) Delete(ref string) error {
 	shareHandler := NewShareHandler(svc.provider)
 	for _, i := range hostMountsV1.RemoteMountsByPath {
 		// Gets share data
-		_, share, _, err := shareHandler.Inspect(i.ShareID)
+		_, share, _, err := shareHandler.Inspect(ctx, i.ShareID)
 		if err != nil {
 			return infraErr(err)
 		}
@@ -607,7 +646,7 @@ func (svc *HostHandler) Delete(ref string) error {
 		}
 
 		// Unmounts share from host
-		err = shareHandler.Unmount(share.Name, host.Name)
+		err = shareHandler.Unmount(ctx, share.Name, host.Name)
 		if err != nil {
 			return infraErr(err)
 		}
@@ -615,7 +654,7 @@ func (svc *HostHandler) Delete(ref string) error {
 
 	// if host has shares, delete them
 	for _, share := range hostSharesV1.ByID {
-		err = shareHandler.Delete(share.Name)
+		err = shareHandler.Delete(ctx, share.Name)
 		if err != nil {
 			return throwErr(err)
 		}
@@ -631,7 +670,7 @@ func (svc *HostHandler) Delete(ref string) error {
 	networkHostsV1 := propsv1.NewNetworkHosts()
 	netHandler := NewNetworkHandler(svc.provider)
 	for k := range hostNetworkV1.NetworksByID {
-		network, err := netHandler.Inspect(k)
+		network, err := netHandler.Inspect(ctx, k)
 		if err != nil {
 			log.Errorf(err.Error())
 		}
@@ -657,17 +696,17 @@ func (svc *HostHandler) Delete(ref string) error {
 }
 
 // SSH returns ssh parameters to access the host referenced by ref
-func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
+func (svc *HostHandler) SSH(ctx context.Context, ref string) (*system.SSHConfig, error) {
 	log.Debugf("broker.server.handlers.HostHandler::SSH(%s) called", ref)
 	defer log.Debugf("broker.server.handlers.HostHandler::SSH(%s) done", ref)
 
-	host, err := svc.Inspect(ref)
+	host, err := svc.Inspect(ctx, ref)
 	if err != nil {
 		return nil, logicErrf(err, fmt.Sprintf("can't access ssh parameters of host '%s': failed to query host", ref), nil)
 	}
 
 	sshHandler := NewSSHHandler(svc.provider)
-	sshConfig, err := sshHandler.GetConfig(host.ID)
+	sshConfig, err := sshHandler.GetConfig(ctx, host.ID)
 	if err != nil {
 		return nil, logicErr(err)
 	}

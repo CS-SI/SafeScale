@@ -17,10 +17,10 @@
 package client
 
 import (
-	"context"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/utils"
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -35,7 +35,7 @@ func (n *share) Create(def pb.ShareDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	_, err := service.Create(ctx, &def)
 	if err != nil {
@@ -49,7 +49,7 @@ func (n *share) Delete(name string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	_, err := service.Delete(ctx, &pb.Reference{Name: name})
 	if err != nil {
@@ -63,7 +63,7 @@ func (n *share) List(timeout time.Duration) (*pb.ShareList, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	list, err := service.List(ctx, &google_protobuf.Empty{})
 	if err != nil {
@@ -77,7 +77,7 @@ func (n *share) Mount(def pb.ShareMountDefinition, timeout time.Duration) error 
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	_, err := service.Mount(ctx, &def)
 	if err != nil {
@@ -91,7 +91,7 @@ func (n *share) Unmount(def pb.ShareMountDefinition, timeout time.Duration) erro
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	_, err := service.Unmount(ctx, &def)
 	if err != nil {
@@ -105,7 +105,7 @@ func (n *share) Inspect(name string, timeout time.Duration) (*pb.ShareMountList,
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	list, err := service.Inspect(ctx, &pb.Reference{Name: name})
 	if err != nil {

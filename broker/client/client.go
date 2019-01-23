@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	logr "github.com/sirupsen/logrus"
 	"github.com/pkg/errors"
+	logr "github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
