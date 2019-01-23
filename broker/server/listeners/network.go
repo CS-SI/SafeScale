@@ -57,7 +57,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	}
 
 	handler := NetworkHandler(tenant.Service)
-	network, err := handler.Create(
+	network, err := handler.Create(ctx,
 		in.GetName(),
 		in.GetCIDR(),
 		IPVersion.IPv4,
@@ -87,7 +87,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.N
 	}
 
 	handler := NetworkHandler(tenant.Service)
-	networks, err := handler.List(in.GetAll())
+	networks, err := handler.List(ctx, in.GetAll())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -118,7 +118,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 	}
 
 	handler := NetworkHandler(currentTenant.Service)
-	network, err := handler.Inspect(ref)
+	network, err := handler.Inspect(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -145,7 +145,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google
 	}
 
 	handler := NetworkHandler(currentTenant.Service)
-	err := handler.Delete(ref)
+	err := handler.Delete(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}

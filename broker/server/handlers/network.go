@@ -17,6 +17,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -42,10 +43,10 @@ import (
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*model.Network, error)
-	List(all bool) ([]*model.Network, error)
-	Inspect(ref string) (*model.Network, error)
-	Delete(ref string) error
+	Create(ctx context.Context, net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*model.Network, error)
+	List(ctx context.Context, all bool) ([]*model.Network, error)
+	Inspect(ctx context.Context, ref string) (*model.Network, error)
+	Delete(ctx context.Context, ref string) error
 }
 
 // NetworkHandler an implementation of NetworkAPI
@@ -63,7 +64,7 @@ func NewNetworkHandler(api *providers.Service) NetworkAPI {
 
 // Create creates a network
 func (svc *NetworkHandler) Create(
-	name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, theos string, gwname string,
+	ctx context.Context, name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, theos string, gwname string,
 ) (*model.Network, error) {
 
 	// Verify that the network doesn't exist first
@@ -226,7 +227,7 @@ func (svc *NetworkHandler) Create(
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
 	sshHandler := NewSSHHandler(svc.provider)
-	ssh, err := sshHandler.GetConfig(gw.ID)
+	ssh, err := sshHandler.GetConfig(ctx, gw.ID)
 	if err != nil {
 		//defer svc.provider.DeleteHost(gw.ID)
 		return nil, infraErrf(err, "Error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
@@ -262,7 +263,7 @@ func (svc *NetworkHandler) Create(
 }
 
 // List returns the network list
-func (svc *NetworkHandler) List(all bool) ([]*model.Network, error) {
+func (svc *NetworkHandler) List(ctx context.Context, all bool) ([]*model.Network, error) {
 	if all {
 		return svc.provider.ListNetworks()
 	}
@@ -284,7 +285,7 @@ func (svc *NetworkHandler) List(all bool) ([]*model.Network, error) {
 }
 
 // Inspect returns the network identified by ref, ref can be the name or the id
-func (svc *NetworkHandler) Inspect(ref string) (*model.Network, error) {
+func (svc *NetworkHandler) Inspect(ctx context.Context, ref string) (*model.Network, error) {
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
 		return nil, infraErrf(err, "failed to load metadata of network '%s'", ref)
@@ -293,7 +294,7 @@ func (svc *NetworkHandler) Inspect(ref string) (*model.Network, error) {
 }
 
 // Delete deletes network referenced by ref
-func (svc *NetworkHandler) Delete(ref string) error {
+func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
 		return infraErrf(err, "failed to load metadata of network '%s'", ref)

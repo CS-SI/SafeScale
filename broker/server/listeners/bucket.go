@@ -58,7 +58,7 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 	}
 
 	handler := BucketHandler(tenant.Service)
-	buckets, err := handler.List()
+	buckets, err := handler.List(ctx)
 	if err != nil {
 		tbr := errors.Wrap(err, "Can't list buckets")
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())
@@ -79,7 +79,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_pro
 	}
 
 	handler := BucketHandler(tenant.Service)
-	err := handler.Create(in.GetName())
+	err := handler.Create(ctx, in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "can't create bucket")
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())
@@ -100,7 +100,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_pro
 	}
 
 	handler := BucketHandler(tenant.Service)
-	err := handler.Delete(in.GetName())
+	err := handler.Delete(ctx, in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "can't delete bucket")
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())
@@ -121,7 +121,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.Bucket
 	}
 
 	handler := BucketHandler(tenant.Service)
-	resp, err := handler.Inspect(in.GetName())
+	resp, err := handler.Inspect(ctx, in.GetName())
 	if err != nil {
 		tbr := errors.Wrap(err, "can't inspect bucket")
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())
@@ -144,7 +144,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 	}
 
 	handler := BucketHandler(tenant.Service)
-	err := handler.Mount(in.GetBucket(), in.GetHost().GetName(), in.GetPath())
+	err := handler.Mount(ctx, in.GetBucket(), in.GetHost().GetName(), in.GetPath())
 	if err != nil {
 		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -163,7 +163,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 	}
 
 	handler := BucketHandler(tenant.Service)
-	err := handler.Unmount(in.GetBucket(), in.GetHost().GetName())
+	err := handler.Unmount(ctx, in.GetBucket(), in.GetHost().GetName())
 	if err != nil {
 		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, err.Error())
 	}

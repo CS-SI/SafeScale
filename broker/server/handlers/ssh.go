@@ -17,6 +17,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -44,9 +45,9 @@ const protocolSeparator = ":"
 // SSHAPI defines ssh management API
 type SSHAPI interface {
 	// Connect(name string) error
-	Run(hostname, cmd string) (int, string, string, error)
-	Copy(from string, to string) (int, string, string, error)
-	GetConfig(interface{}) (*system.SSHConfig, error)
+	Run(ctx context.Context, hostname, cmd string) (int, string, string, error)
+	Copy(ctx context.Context, from string, to string) (int, string, string, error)
+	GetConfig(context.Context, interface{}) (*system.SSHConfig, error)
 }
 
 // SSHHandler SSH service
@@ -62,7 +63,7 @@ func NewSSHHandler(api *providers.Service) *SSHHandler {
 }
 
 // GetConfig creates SSHConfig to connect to an host
-func (svc *SSHHandler) GetConfig(hostParam interface{}) (*system.SSHConfig, error) {
+func (svc *SSHHandler) GetConfig(ctx context.Context, hostParam interface{}) (*system.SSHConfig, error) {
 	var host *model.Host
 
 	switch hostParam.(type) {
@@ -91,7 +92,7 @@ func (svc *SSHHandler) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 	}
 	if hostNetworkV1.DefaultGatewayID != "" {
 		hostSvc := NewHostHandler(svc.provider)
-		gw, err := hostSvc.Inspect(hostNetworkV1.DefaultGatewayID)
+		gw, err := hostSvc.Inspect(ctx, hostNetworkV1.DefaultGatewayID)
 		if err != nil {
 			return nil, throwErr(err)
 		}
@@ -107,10 +108,10 @@ func (svc *SSHHandler) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
-func (svc *SSHHandler) WaitServerReady(hostParam interface{}, timeout time.Duration) error {
+func (svc *SSHHandler) WaitServerReady(ctx context.Context, hostParam interface{}, timeout time.Duration) error {
 	var err error
 	sshSvc := NewSSHHandler(svc.provider)
-	ssh, err := sshSvc.GetConfig(hostParam)
+	ssh, err := sshSvc.GetConfig(ctx, hostParam)
 	if err != nil {
 		return logicErrf(err, "Failed to read SSH config")
 	}
@@ -119,19 +120,19 @@ func (svc *SSHHandler) WaitServerReady(hostParam interface{}, timeout time.Durat
 }
 
 // Run tries to execute command 'cmd' on the host
-func (svc *SSHHandler) Run(hostName, cmd string) (int, string, string, error) {
+func (svc *SSHHandler) Run(ctx context.Context, hostName, cmd string) (int, string, string, error) {
 	var stdOut, stdErr string
 	var retCode int
 	var err error
 
 	hostSvc := NewHostHandler(svc.provider)
-	host, err := hostSvc.ForceInspect(hostName)
+	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
 		return 0, "", "", throwErr(err)
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := svc.GetConfig(host)
+	ssh, err := svc.GetConfig(ctx, host)
 	if err != nil {
 		return 0, "", "", infraErr(err)
 	}
@@ -201,7 +202,7 @@ func extractPath(in string) (string, error) {
 }
 
 // Copy copy file/directory
-func (svc *SSHHandler) Copy(from, to string) (int, string, string, error) {
+func (svc *SSHHandler) Copy(ctx context.Context, from, to string) (int, string, string, error) {
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -249,13 +250,13 @@ func (svc *SSHHandler) Copy(from, to string) (int, string, string, error) {
 	}
 
 	hostSvc := NewHostHandler(svc.provider)
-	host, err := hostSvc.ForceInspect(hostName)
+	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
 		return 0, "", "", throwErr(err)
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, err := svc.GetConfig(host.ID)
+	ssh, err := svc.GetConfig(ctx, host.ID)
 	if err != nil {
 		err = infraErr(err)
 		return 0, "", "", err

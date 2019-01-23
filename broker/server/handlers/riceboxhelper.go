@@ -18,10 +18,11 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"text/template"
 
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 )
 
 //go:generate rice embed-go
@@ -53,14 +54,14 @@ func getBoxContent(script string, data interface{}) (string, error) {
 }
 
 // Execute the given script (embeded in a rice-box) with the given data on the host identified by hostid
-func exec(script string, data interface{}, hostid string, provider *providers.Service) error {
+func exec(ctx context.Context, script string, data interface{}, hostid string, provider *providers.Service) error {
 	scriptCmd, err := getBoxContent(script, data)
 	if err != nil {
 		return infraErrf(err, "Unable to get the script string")
 	}
 	// retrieve ssh config to perform some commands
 	sshHandler := NewSSHHandler(provider)
-	ssh, err := sshHandler.GetConfig(hostid)
+	ssh, err := sshHandler.GetConfig(ctx, hostid)
 	if err != nil {
 		return infraErrf(err, "Unable to fetch the SSHConfig from the host")
 	}

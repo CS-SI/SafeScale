@@ -47,7 +47,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	}
 
 	handler := TemplateHandler(tenant.Service)
-	templates, err := handler.List(in.GetAll())
+	templates, err := handler.List(ctx, in.GetAll())
 	if err != nil {
 		return nil, err
 	}

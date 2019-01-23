@@ -17,12 +17,12 @@
 package client
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -38,7 +38,7 @@ func (c *bucket) List(timeout time.Duration) (*pb.BucketList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	return service.List(ctx, &google_protobuf.Empty{})
 }
@@ -48,7 +48,7 @@ func (c *bucket) Create(name string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	_, err := service.Create(ctx, &pb.Bucket{Name: name})
 	return err
@@ -59,7 +59,7 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	var (
 		wg   sync.WaitGroup
@@ -94,7 +94,7 @@ func (c *bucket) Inspect(name string, timeout time.Duration) (*pb.BucketMounting
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	return service.Inspect(ctx, &pb.Bucket{Name: name})
 }
@@ -104,7 +104,7 @@ func (c *bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dur
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	_, err := service.Mount(ctx, &pb.BucketMountingPoint{
 		Bucket: bucketName,
@@ -121,7 +121,7 @@ func (c *bucket) Unmount(bucketName, hostName string, timeout time.Duration) err
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewBucketServiceClient(c.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	_, err := service.Unmount(ctx, &pb.BucketMountingPoint{
 		Bucket: bucketName,

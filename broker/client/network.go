@@ -17,12 +17,12 @@
 package client
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
@@ -37,19 +37,20 @@ func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error)
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	return service.List(ctx, &pb.NWListRequest{
 		All: all,
 	})
 }
 
+// TODO concurent access if deleting multiple networks
 // Delete deletes several networks at the same time in goroutines
 func (n *network) Delete(names []string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	var (
 		wg   sync.WaitGroup
@@ -86,7 +87,7 @@ func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, erro
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	return service.Inspect(ctx, &pb.Reference{Name: name})
 
@@ -97,7 +98,7 @@ func (n *network) Create(def pb.NetworkDefinition, timeout time.Duration) (*pb.N
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetCancelContext()
 
 	return service.Create(ctx, &def)
 

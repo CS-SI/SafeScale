@@ -47,7 +47,7 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.
 	}
 
 	handler := ImageHandler(currentTenant.Service)
-	images, err := handler.List(in.GetAll())
+	images, err := handler.List(ctx, in.GetAll())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
