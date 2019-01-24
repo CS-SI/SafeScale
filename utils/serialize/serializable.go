@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package model
+package serialize
 
 import (
 	"encoding/json"
@@ -27,8 +27,8 @@ type Serializable interface {
 	Deserialize([]byte) error
 }
 
-// SerializeToJSON serializes Host instance into json.Marshal output
-func SerializeToJSON(data interface{}) ([]byte, error) {
+// ToJSON serializes data into JSON
+func ToJSON(data interface{}) ([]byte, error) {
 	jsoned, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -36,8 +36,8 @@ func SerializeToJSON(data interface{}) ([]byte, error) {
 	return jsoned, nil
 }
 
-// DeserializeFromJSON reads json code and reinstanciates an Host
-func DeserializeFromJSON(buf []byte, data interface{}) error {
+// FromJSON reads json code and restores data
+func FromJSON(buf []byte, data interface{}) error {
 	err := json.Unmarshal(buf, data)
 	return err
 }
