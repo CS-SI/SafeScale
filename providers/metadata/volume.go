@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 const (
@@ -51,7 +52,7 @@ func (mv *Volume) Carry(volume *model.Volume) *Volume {
 		panic("volume is nil!")
 	}
 	if volume.Properties == nil {
-		volume.Properties = model.NewExtensions()
+		volume.Properties = serialize.NewJSONProperties("resources")
 	}
 	mv.item.Carry(volume)
 	mv.name = &volume.Name
@@ -101,7 +102,7 @@ func (mv *Volume) Reload() error {
 // ReadByID reads the metadata of a volume identified by ID from Object Storage
 func (mv *Volume) ReadByID(id string) (bool, error) {
 	var volume model.Volume
-	found, err := mv.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
+	found, err := mv.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := (&volume).Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -122,7 +123,7 @@ func (mv *Volume) ReadByID(id string) (bool, error) {
 // ReadByName reads the metadata of a volume identified by name
 func (mv *Volume) ReadByName(name string) (bool, error) {
 	var volume model.Volume
-	found, err := mv.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
+	found, err := mv.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := (&volume).Deserialize(buf)
 		if err != nil {
 			return nil, err

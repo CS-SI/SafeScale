@@ -18,6 +18,9 @@ package propertiesv1
 
 import (
 	"time"
+
+	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeProperty"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // VolumeDescription contains additional information describing the volume, in V1
@@ -36,6 +39,23 @@ func NewVolumeDescription() *VolumeDescription {
 	return &VolumeDescription{}
 }
 
+// Content ... (serialize.Property interface)
+func (p *VolumeDescription) Content() interface{} {
+	return p
+}
+
+// Clone ... (serialize.Property interface)
+func (p *VolumeDescription) Clone() serialize.Property {
+	n := NewVolumeDescription()
+	*n = *p
+	return n
+}
+
+// Replace replaces content of property (serialize.Property interface)
+func (p *VolumeDescription) Replace(v interface{}) {
+	*p = *v.(*VolumeDescription)
+}
+
 // VolumeAttachments contains host ids where the volume is attached
 // !!!FROZEN!!!
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -50,4 +70,33 @@ func NewVolumeAttachments() *VolumeAttachments {
 	return &VolumeAttachments{
 		Hosts: map[string]string{},
 	}
+}
+
+// Reset resets the content of the property
+func (p *VolumeAttachments) Reset() {
+	*p = VolumeAttachments{
+		Hosts: map[string]string{},
+	}
+}
+
+// Content ... (serialize.Property interface)
+func (p *VolumeAttachments) Content() interface{} {
+	return p
+}
+
+// Clone ... (serialize.Property interface)
+func (p *VolumeAttachments) Clone() serialize.Property {
+	n := NewVolumeAttachments()
+	*n = *p
+	return n
+}
+
+// Replace replaces content of property (serialize.Property interface)
+func (p *VolumeAttachments) Replace(v interface{}) {
+	*p = *v.(*VolumeAttachments)
+}
+
+func init() {
+	serialize.PropertyTypeRegistry.Register("resources.volume", VolumeProperty.DescriptionV1, NewVolumeDescription())
+	serialize.PropertyTypeRegistry.Register("resources.volume", VolumeProperty.AttachedV1, NewVolumeAttachments())
 }

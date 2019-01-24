@@ -18,7 +18,6 @@ package k8s
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -46,6 +45,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 //go:generate rice embed-go
@@ -87,6 +87,23 @@ type managerData struct {
 	PrivateLastIndex int `json:"private_last_index"`
 	// PublicLastIndex
 	PublicLastIndex int `json:"public_last_index"`
+}
+
+// Content ... (serialize.Property interface)
+func (md *managerData) Content() interface{} {
+	return md
+}
+
+// Clone ... (serialize.Property interface)
+func (md *managerData) Clone() serialize.Property {
+	nmd := &managerData{}
+	*nmd = *md
+	return nmd
+}
+
+// Replace ... (serialize.Property interface)
+func (md *managerData) Replace(v interface{}) {
+	*md = *v.(*managerData)
 }
 
 // Cluster is the object describing a cluster based on DCOS
@@ -137,15 +154,12 @@ func Load(data *metadata.Cluster) (*Cluster, error) {
 }
 
 func (c *Cluster) reset() {
-	manager := &managerData{}
-	err := c.Core.Extensions.Get(Extension.FlavorV1, manager)
+	err := c.Core.Extensions.LockForRead(Extension.FlavorV1).ThenUse(func(v interface{}) error {
+		c.manager = v.(*managerData)
+		return nil
+	})
 	if err != nil {
 		panic("failed to get cluster manager data!")
-	}
-	c.manager = manager
-
-	if c.Core.Extensions == nil {
-		c.Core.Extensions = &model.Extensions{}
 	}
 }
 
@@ -285,8 +299,7 @@ func Create(req core.Request) (*Cluster, error) {
 			AdminPassword:    cladmPassword,
 			NodesDef:         nodesDef,
 			DisabledFeatures: req.DisabledDefaultFeatures,
-			Extensions:       &model.Extensions{},
-			Service:          svc,
+			Extensions:       serialize.NewJSONProperties("cluster.kubernetes"),
 		},
 		manager: &managerData{},
 		gateway: gw,
@@ -1437,6 +1450,6 @@ func (c *Cluster) Delete() error {
 }
 
 func init() {
-	gob.Register(Cluster{})
-	gob.Register(managerData{})
+	module := "clusters." + strings.ToLower(Flavor.K8S.String())
+	serialize.PropertyTypeRegistry.Register(module, Extension.FlavorV1, &managerData{})
 }

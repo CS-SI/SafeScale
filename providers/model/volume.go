@@ -19,6 +19,7 @@ package model
 import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // VolumeRequest represents a volume request
@@ -30,36 +31,38 @@ type VolumeRequest struct {
 
 // Volume represents a block volume
 type Volume struct {
-	ID    string           `json:"id,omitempty"`
-	Name  string           `json:"name,omitempty"`
-	Size  int              `json:"size,omitempty"`
-	Speed VolumeSpeed.Enum `json:"speed,omitempty"`
-	State VolumeState.Enum `json:"state,omitempty"`
-	// Properties contains optional supplemental information
-	Properties *Extensions `json:"extensions,omitempty"`
+	ID         string                    `json:"id,omitempty"`
+	Name       string                    `json:"name,omitempty"`
+	Size       int                       `json:"size,omitempty"`
+	Speed      VolumeSpeed.Enum          `json:"speed,omitempty"`
+	State      VolumeState.Enum          `json:"state,omitempty"`
+	Properties *serialize.JSONProperties `json:"properties,omitempty"`
 }
 
 // NewVolume ...
 func NewVolume() *Volume {
 	return &Volume{
-		Properties: NewExtensions(),
+		Properties: serialize.NewJSONProperties("resources.volume"),
 	}
 }
 
 // Serialize serializes Host instance into bytes (output json code)
 func (v *Volume) Serialize() ([]byte, error) {
-	return SerializeToJSON(v)
+	return serialize.ToJSON(v)
 }
 
 // Deserialize reads json code and restores an Host
 func (v *Volume) Deserialize(buf []byte) error {
-	err := DeserializeFromJSON(buf, v)
+	if v.Properties == nil {
+		v.Properties = serialize.NewJSONProperties("resources.volume")
+	} else {
+		v.Properties.SetModule("resources.volume")
+	}
+	err := serialize.FromJSON(buf, v)
 	if err != nil {
 		return err
 	}
-	if v.Properties == nil {
-		v.Properties = NewExtensions()
-	}
+
 	return nil
 }
 
@@ -80,13 +83,3 @@ type VolumeAttachment struct {
 	MountPoint string `json:"mountpoint,omitempty"`
 	Format     string `json:"format,omitempty"`
 }
-
-// // Serialize serializes Host instance into bytes (output json code)
-// func (va *VolumeAttachment) Serialize() ([]byte, error) {
-// 	return SerializeToJSON(va)
-// }
-
-// // Deserialize reads json code and restores a VolumeAttachment
-// func (va *VolumeAttachment) Deserialize(buf []byte) error {
-// 	return DeserializeFromJSON(buf, va)
-// }

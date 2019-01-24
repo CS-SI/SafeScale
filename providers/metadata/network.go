@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 const (
@@ -67,7 +68,7 @@ func (m *Network) Carry(network *model.Network) *Network {
 		panic("m.item is nil!")
 	}
 	if network.Properties == nil {
-		network.Properties = model.NewExtensions()
+		network.Properties = serialize.NewJSONProperties("resources")
 	}
 	m.item.Carry(network)
 	m.id = &network.ID
@@ -115,7 +116,7 @@ func (m *Network) ReadByID(id string) (bool, error) {
 	}
 
 	var network model.Network
-	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
+	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := (&network).Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -141,7 +142,7 @@ func (m *Network) ReadByName(name string) (bool, error) {
 	}
 
 	var network model.Network
-	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
+	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := (&network).Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -238,52 +239,51 @@ func (m *Network) Browse(callback func(*model.Network) error) error {
 // AttachHost links host ID to the network
 func (m *Network) AttachHost(host *model.Host) error {
 	network := m.Get()
-	networkHostsV1 := propsv1.NewNetworkHosts()
-	err := network.Properties.Get(NetworkProperty.HostsV1, networkHostsV1)
-	if err != nil {
-		return err
-	}
-	networkHostsV1.ByID[host.ID] = host.Name
-	networkHostsV1.ByName[host.Name] = host.ID
-	return network.Properties.Set(NetworkProperty.HostsV1, networkHostsV1)
+	return network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+		networkHostsV1 := v.(*propsv1.NetworkHosts)
+		networkHostsV1.ByID[host.ID] = host.Name
+		networkHostsV1.ByName[host.Name] = host.ID
+		return nil
+	})
 }
 
 // DetachHost unlinks host ID to network
 func (m *Network) DetachHost(hostID string) error {
 	network := m.Get()
-	networkHostsV1 := propsv1.NewNetworkHosts()
-	err := network.Properties.Get(NetworkProperty.HostsV1, networkHostsV1)
-	if err != nil {
+	err := network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+		networkHostsV1 := v.(*propsv1.NetworkHosts)
+		hostName, found := networkHostsV1.ByID[hostID]
+		if found {
+			delete(networkHostsV1.ByName, hostName)
+			delete(networkHostsV1.ByID, hostID)
+		}
 		return nil
+	})
+	if err != nil {
+		return err
 	}
-	hostName, found := networkHostsV1.ByID[hostID]
-	if found {
-		delete(networkHostsV1.ByName, hostName)
-		delete(networkHostsV1.ByID, hostID)
-	}
-	return network.Properties.Set(NetworkProperty.HostsV1, networkHostsV1)
+	return nil
 }
 
 // ListHosts returns the list of model.Host attached to the network (not including gateway)
 func (m *Network) ListHosts() ([]*model.Host, error) {
 	network := m.Get()
-	networkHostsV1 := propsv1.NewNetworkHosts()
-	err := network.Properties.Get(NetworkProperty.HostsV1, networkHostsV1)
-	if err != nil {
-		return nil, err
-	}
 	var list []*model.Host
-	for id := range networkHostsV1.ByID {
-		mh, err := LoadHost(m.item.GetService(), id)
-		if err != nil {
-			break
+	err := network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+		networkHostsV1 := v.(*propsv1.NetworkHosts)
+		for id := range networkHostsV1.ByID {
+			mh, err := LoadHost(m.item.GetService(), id)
+			if err != nil {
+				return err
+			}
+			if mh != nil {
+				list = append(list, mh.Get())
+			} else {
+				log.Warnf("Host metadata for '%s' not found!", id)
+			}
 		}
-		if mh != nil {
-			list = append(list, mh.Get())
-		} else {
-			log.Warnf("Host metadata for '%s' not found !", id)
-		}
-	}
+		return nil
+	})
 	if err != nil {
 		log.Errorf("Error listing hosts: %+v", err)
 	}

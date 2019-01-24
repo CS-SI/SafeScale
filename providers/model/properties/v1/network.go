@@ -18,6 +18,9 @@ package propertiesv1
 
 import (
 	"time"
+
+	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // NetworkDescription contains additional information describing the network, in V1
@@ -34,6 +37,23 @@ func NewNetworkDescription() *NetworkDescription {
 	return &NetworkDescription{}
 }
 
+// Content ... (serialize.Property interface)
+func (p *NetworkDescription) Content() interface{} {
+	return p
+}
+
+// Clone ... (serialize.Property interface)
+func (p *NetworkDescription) Clone() serialize.Property {
+	n := NewNetworkDescription()
+	*n = *p
+	return n
+}
+
+// Replace replaces content of property (serialize.Property interface)
+func (p *NetworkDescription) Replace(v interface{}) {
+	*p = *v.(*NetworkDescription)
+}
+
 // NetworkHosts contains information about hosts connected to the network
 type NetworkHosts struct {
 	ByID   map[string]string `json:"by_id"`   // list of host names, indexed by host id
@@ -46,4 +66,34 @@ func NewNetworkHosts() *NetworkHosts {
 		ByID:   map[string]string{},
 		ByName: map[string]string{},
 	}
+}
+
+// Reset resets the content of the property
+func (p *NetworkHosts) Reset() {
+	*p = NetworkHosts{
+		ByID:   map[string]string{},
+		ByName: map[string]string{},
+	}
+}
+
+// Content ... (serialize.Property interface)
+func (p *NetworkHosts) Content() interface{} {
+	return p
+}
+
+// Clone ... (serialize.Property interface)
+func (p *NetworkHosts) Clone() serialize.Property {
+	n := NewNetworkHosts()
+	*n = *p
+	return n
+}
+
+// Replace replaces content of property (serialize.Property interface)
+func (p *NetworkHosts) Replace(v interface{}) {
+	*p = *v.(*NetworkHosts)
+}
+
+func init() {
+	serialize.PropertyTypeRegistry.Register("resources.network", NetworkProperty.HostsV1, NewNetworkHosts())
+	serialize.PropertyTypeRegistry.Register("resources.network", NetworkProperty.DescriptionV1, NewNetworkDescription())
 }

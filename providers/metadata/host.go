@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 const (
@@ -53,7 +54,7 @@ func (mh *Host) Carry(host *model.Host) *Host {
 		panic("host is nil!")
 	}
 	if host.Properties == nil {
-		host.Properties = model.NewExtensions()
+		host.Properties = serialize.NewJSONProperties("resources")
 	}
 	mh.item.Carry(host)
 	mh.name = &host.Name
@@ -89,7 +90,7 @@ func (mh *Host) ReadByID(id string) (bool, error) {
 	}
 
 	var host model.Host
-	found, err := mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
+	found, err := mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		phost := &host
 		err := phost.Deserialize(buf)
 		if err != nil {
@@ -115,7 +116,7 @@ func (mh *Host) ReadByName(name string) (bool, error) {
 	}
 
 	var host model.Host
-	found, err := mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
+	found, err := mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		phost := &host
 		err := phost.Deserialize(buf)
 		if err != nil {
@@ -169,23 +170,25 @@ func SaveHost(svc *providers.Service, host *model.Host) error {
 	if err != nil {
 		return err
 	}
-	hostNetworkV1 := propsv1.NewHostNetwork()
-	err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
-	if err != nil {
-		return err
-	}
 	mn := NewNetwork(svc)
-	for netID := range hostNetworkV1.NetworksByID {
-		found, err := mn.ReadByID(netID)
-		if err != nil {
-			return err
-		}
-		if found {
-			err = mn.AttachHost(host)
+	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		hostNetworkV1 := v.(*propsv1.HostNetwork)
+		for netID := range hostNetworkV1.NetworksByID {
+			found, err := mn.ReadByID(netID)
 			if err != nil {
 				return err
 			}
+			if found {
+				err = mn.AttachHost(host)
+				if err != nil {
+					return err
+				}
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 	return nil
 }

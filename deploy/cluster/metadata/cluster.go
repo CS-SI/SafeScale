@@ -21,8 +21,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/deploy/cluster/core"
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 const (
@@ -84,7 +84,7 @@ func (m *Cluster) Read(name string) (bool, error) {
 			ptr = &target
 		}
 	}
-	found, err := m.item.Read(name, func(buf []byte) (model.Serializable, error) {
+	found, err := m.item.Read(name, func(buf []byte) (serialize.Serializable, error) {
 		err := ptr.Deserialize(buf)
 		if err != nil {
 			return nil, err

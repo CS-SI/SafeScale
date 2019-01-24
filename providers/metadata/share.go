@@ -18,8 +18,8 @@ package metadata
 
 import (
 	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 const (
@@ -50,12 +50,12 @@ type shareItem struct {
 
 // Serialize ...
 func (n *shareItem) Serialize() ([]byte, error) {
-	return model.SerializeToJSON(n)
+	return serialize.ToJSON(n)
 }
 
 // Deserialize ...
 func (n *shareItem) Deserialize(buf []byte) error {
-	return model.DeserializeFromJSON(buf, n)
+	return serialize.FromJSON(buf, n)
 }
 
 // Carry links an export instance to the Metadata instance
@@ -116,7 +116,7 @@ func (ms *Share) ReadByID(id string) (bool, error) {
 		panic("ms.item is nil!")
 	}
 	var si shareItem
-	found, err := ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (model.Serializable, error) {
+	found, err := ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := (&si).Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -139,7 +139,7 @@ func (ms *Share) ReadByName(name string) (bool, error) {
 		panic("ms.name is nil!")
 	}
 	var si shareItem
-	found, err := ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (model.Serializable, error) {
+	found, err := ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := (&si).Deserialize(buf)
 		if err != nil {
 			return nil, err

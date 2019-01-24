@@ -155,39 +155,40 @@ func ToPBShareMountList(hostName string, share *propsv1.HostShare, mounts map[st
 
 // ToPBHost convert an host from api to protocolbuffer format
 func ToPBHost(in *model.Host) *pb.Host {
-	hostNetworkV1 := propsv1.NewHostNetwork()
-	err := in.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+	var (
+		hostNetworkV1 *propsv1.HostNetwork
+		hostSizingV1  *propsv1.HostSizing
+		hostVolumesV1 *propsv1.HostVolumes
+		volumes       []string
+	)
+
+	err := in.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		hostNetworkV1 = v.(*propsv1.HostNetwork)
+		return in.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+			hostSizingV1 = v.(*propsv1.HostSizing)
+			return in.Properties.LockForRead(HostProperty.VolumesV1).ThenUse(func(v interface{}) error {
+				hostVolumesV1 = v.(*propsv1.HostVolumes)
+				for k := range hostVolumesV1.VolumesByName {
+					volumes = append(volumes, k)
+				}
+				return nil
+			})
+		})
+	})
 	if err != nil {
 		return nil
 	}
-	hostSizingV1 := propsv1.NewHostSizing()
-	err = in.Properties.Get(HostProperty.SizingV1, hostSizingV1)
-	if err != nil {
-		return nil
-	}
-
-	hostVolumesV1 := propsv1.NewHostVolumes()
-	err = in.Properties.Get(HostProperty.VolumesV1, hostVolumesV1)
-	if err != nil {
-		return nil
-	}
-
-	var volumes []string
-	for k, _ := range hostVolumesV1.VolumesByName {
-		volumes = append(volumes, k)
-	}
-
 	return &pb.Host{
-		CPU:        int32(hostSizingV1.AllocatedSize.Cores),
-		Disk:       int32(hostSizingV1.AllocatedSize.DiskSize),
-		GatewayID:  hostNetworkV1.DefaultGatewayID,
-		ID:         in.ID,
-		PublicIP:   in.GetPublicIP(),
-		PrivateIP:  in.GetPrivateIP(),
-		Name:       in.Name,
-		PrivateKey: in.PrivateKey,
-		RAM:        hostSizingV1.AllocatedSize.RAMSize,
-		State:      pb.HostState(in.LastState),
+		CPU:                 int32(hostSizingV1.AllocatedSize.Cores),
+		Disk:                int32(hostSizingV1.AllocatedSize.DiskSize),
+		GatewayID:           hostNetworkV1.DefaultGatewayID,
+		ID:                  in.ID,
+		PublicIP:            in.GetPublicIP(),
+		PrivateIP:           in.GetPrivateIP(),
+		Name:                in.Name,
+		PrivateKey:          in.PrivateKey,
+		RAM:                 hostSizingV1.AllocatedSize.RAMSize,
+		State:               pb.HostState(in.LastState),
 		AttachedVolumeNames: volumes,
 	}
 }

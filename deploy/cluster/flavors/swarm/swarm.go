@@ -22,11 +22,11 @@ package swarm
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	txttmpl "text/template"
 	"time"
 
@@ -50,6 +50,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 	"github.com/CS-SI/SafeScale/utils/template"
 )
 
@@ -76,7 +77,8 @@ var (
 		},
 	}
 
-	installCommonRequirementsContent *string
+	// installCommonRequirementsContent *string
+	installCommonRequirementsContent atomic.Value
 )
 
 // managerData defines the data used by the manager of cluster we want to keep in Object Storage
@@ -97,6 +99,23 @@ type managerData struct {
 	PrivateLastIndex int `json:"private_last_index"`
 	// PublicLastIndex
 	PublicLastIndex int `json:"public_last_index"`
+}
+
+// Content ... (serialize.Property interface)
+func (md *managerData) Content() interface{} {
+	return md
+}
+
+// Clone ... (serialize.Property interface)
+func (md *managerData) Clone() serialize.Property {
+	nmd := &managerData{}
+	*nmd = *md
+	return nmd
+}
+
+// Replace ... (serialize.Property interface)
+func (md *managerData) Replace(v interface{}) {
+	*md = *v.(*managerData)
 }
 
 // Cluster is the object describing a cluster
@@ -141,15 +160,18 @@ func Load(data *metadata.Cluster) (*Cluster, error) {
 }
 
 func (c *Cluster) reset() {
-	manager := &managerData{}
-	err := c.Core.Extensions.Get(Extension.FlavorV1, manager)
+	var manager *managerData
+	err := c.Core.Extensions.LockForRead(Extension.FlavorV1).ThenUse(func(v interface{}) error {
+		manager = v.(*managerData)
+		return nil
+	})
 	if err != nil {
 		panic(fmt.Sprintf("failed to get cluster manager data: %+v", err))
 	}
 	c.manager = manager
 
 	if c.Core.Extensions == nil {
-		c.Core.Extensions = &model.Extensions{}
+		c.Core.Extensions = serialize.NewJSONProperties("cluster.swarm")
 	}
 }
 
@@ -291,7 +313,7 @@ func Create(req core.Request) (*Cluster, error) {
 			AdminPassword:    cladmPassword,
 			NodesDef:         nodesDef,
 			DisabledFeatures: req.DisabledDefaultFeatures,
-			Extensions:       &model.Extensions{},
+			Extensions:       serialize.NewJSONProperties("cluster.swarm"),
 			Service:          svc,
 		},
 		manager: &managerData{},
@@ -1026,7 +1048,8 @@ func getSWARMTemplateBox() (*rice.Box, error) {
 // getInstallCommonRequirements returns the string corresponding to the script swarm_install_requirements.sh
 // which installs common features (docker in particular)
 func (c *Cluster) getInstallCommonRequirements() (*string, error) {
-	if installCommonRequirementsContent == nil {
+	anon := installCommonRequirementsContent.Load()
+	if anon == nil {
 		// find the rice.Box
 		b, err := getSWARMTemplateBox()
 		if err != nil {
@@ -1055,9 +1078,10 @@ func (c *Cluster) getInstallCommonRequirements() (*string, error) {
 			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
 		}
 		result := dataBuffer.String()
-		installCommonRequirementsContent = &result
+		installCommonRequirementsContent.Store(&result)
+		anon = installCommonRequirementsContent.Load()
 	}
-	return installCommonRequirementsContent, nil
+	return anon.(*string), nil
 }
 
 // buildHostname builds a unique hostname in the cluster
@@ -1524,7 +1548,10 @@ func (c *Cluster) updateMetadata(updatefn func() error) error {
 
 	// Serialize manager data into appropriare c.Core.Extensions if needed
 	if c.manager != nil {
-		err := c.Core.Extensions.Set(Extension.FlavorV1, c.manager)
+		err := c.Core.Extensions.LockForWrite(Extension.FlavorV1).ThenUse(func(v interface{}) error {
+			c.manager = v.(*managerData)
+			return nil
+		})
 		if err != nil {
 			return err
 		}
@@ -1580,6 +1607,6 @@ func (c *Cluster) Delete() error {
 }
 
 func init() {
-	gob.Register(Cluster{})
-	gob.Register(managerData{})
+	module := "clusters." + strings.ToLower(Flavor.SWARM.String())
+	serialize.PropertyTypeRegistry.Register(module, Extension.FlavorV1, &managerData{})
 }

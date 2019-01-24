@@ -84,24 +84,27 @@ func (svc *SSHHandler) GetConfig(hostParam interface{}) (*system.SSHConfig, erro
 		Host:       host.GetAccessIP(),
 		User:       model.DefaultUser,
 	}
-	hostNetworkV1 := propsv1.NewHostNetwork()
-	err := host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+
+	err := host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		hostNetworkV1 := v.(*propsv1.HostNetwork)
+		if hostNetworkV1.DefaultGatewayID != "" {
+			hostSvc := NewHostHandler(svc.provider)
+			gw, err := hostSvc.Inspect(hostNetworkV1.DefaultGatewayID)
+			if err != nil {
+				return throwErr(err)
+			}
+			GatewayConfig := system.SSHConfig{
+				PrivateKey: gw.PrivateKey,
+				Port:       22,
+				Host:       gw.GetAccessIP(),
+				User:       model.DefaultUser,
+			}
+			sshConfig.GatewayConfig = &GatewayConfig
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, infraErr(err)
-	}
-	if hostNetworkV1.DefaultGatewayID != "" {
-		hostSvc := NewHostHandler(svc.provider)
-		gw, err := hostSvc.Inspect(hostNetworkV1.DefaultGatewayID)
-		if err != nil {
-			return nil, throwErr(err)
-		}
-		GatewayConfig := system.SSHConfig{
-			PrivateKey: gw.PrivateKey,
-			Port:       22,
-			Host:       gw.GetAccessIP(),
-			User:       model.DefaultUser,
-		}
-		sshConfig.GatewayConfig = &GatewayConfig
+		return nil, err
 	}
 	return &sshConfig, nil
 }
