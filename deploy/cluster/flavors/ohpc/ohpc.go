@@ -22,7 +22,6 @@ package ohpc
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -55,6 +54,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 	"github.com/CS-SI/SafeScale/utils/template"
 )
 
@@ -110,6 +110,23 @@ type managerData struct {
 	PublicLastIndex int
 }
 
+// Content ... (serialize.Property interface)
+func (md *managerData) Content() interface{} {
+	return md
+}
+
+// Clone ... (serialize.Property interface)
+func (md *managerData) Clone() serialize.Property {
+	nmd := &managerData{}
+	*nmd = *md
+	return nmd
+}
+
+// Replace ... (serialize.Property interface)
+func (md *managerData) Replace(v interface{}) {
+	*md = *v.(*managerData)
+}
+
 // Cluster is the object describing a cluster
 type Cluster struct {
 	// Core cluster data
@@ -147,8 +164,11 @@ func Load(data *metadata.Cluster) (clusterapi.Cluster, error) {
 }
 
 func (c *Cluster) reset() {
-	manager := &managerData{}
-	err := c.Core.Extensions.Get(Extension.FlavorV1, manager)
+	var manager *managerData
+	err := c.Core.Extensions.LockForRead(Extension.FlavorV1).ThenUse(func(v interface{}) error {
+		manager = v.(*managerData)
+		return nil
+	})
 	if err != nil {
 		panic(fmt.Sprintf("failed to get cluster manager data: %+v", err))
 	}
@@ -319,7 +339,11 @@ func Create(req core.Request) (*Cluster, error) {
 	err = instance.updateMetadata(func() error {
 		instance.Core.GatewayIP = gw.GetPrivateIP()
 		instance.Core.PublicIP = gw.GetAccessIP()
-		return instance.Core.Extensions.Set(Extension.FlavorV1, instance.manager)
+		return instance.Core.Extensions.LockForWrite(Extension.FlavorV1).ThenUse(func(v interface{}) error {
+			manager := v.(*managerData)
+			*manager = *instance.manager
+			return nil
+		})
 	})
 	if err != nil {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
@@ -1327,6 +1351,6 @@ func (c *Cluster) Delete() error {
 }
 
 func init() {
-	gob.Register(Cluster{})
-	gob.Register(managerData{})
+	module := "clusters." + strings.ToLower(Flavor.OHPC.String())
+	serialize.PropertyTypeRegistry.Register(module, Extension.FlavorV1, &managerData{})
 }

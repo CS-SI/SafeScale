@@ -18,6 +18,7 @@ package model
 
 import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // GatewayRequest to create a Gateway into a network
@@ -47,34 +48,37 @@ type NetworkRequest struct {
 
 // Network representes a virtual network
 type Network struct {
-	ID         string         `json:"id,omitempty"`         // ID for the network (from provider)
-	Name       string         `json:"name,omitempty"`       // Name of the network
-	CIDR       string         `json:"mask,omitempty"`       // network in CIDR notation
-	GatewayID  string         `json:"gateway_id,omitempty"` // contains the id of the host acting as gateway for the network
-	IPVersion  IPVersion.Enum `json:"ip_version,omitempty"` // IPVersion is IPv4 or IPv6 (see IPVersion)
-	Properties *Extensions    `json:"properties,omitempty"` // contains optional supplemental information
+	ID         string                    `json:"id,omitempty"`         // ID for the network (from provider)
+	Name       string                    `json:"name,omitempty"`       // Name of the network
+	CIDR       string                    `json:"mask,omitempty"`       // network in CIDR notation
+	GatewayID  string                    `json:"gateway_id,omitempty"` // contains the id of the host acting as gateway for the network
+	IPVersion  IPVersion.Enum            `json:"ip_version,omitempty"` // IPVersion is IPv4 or IPv6 (see IPVersion)
+	Properties *serialize.JSONProperties `json:"properties,omitempty"` // contains optional supplemental information
 }
 
 // NewNetwork ...
 func NewNetwork() *Network {
 	return &Network{
-		Properties: NewExtensions(),
+		Properties: serialize.NewJSONProperties("resources.network"),
 	}
 }
 
 // Serialize serializes Host instance into bytes (output json code)
 func (n *Network) Serialize() ([]byte, error) {
-	return SerializeToJSON(n)
+	return serialize.ToJSON(n)
 }
 
 // Deserialize reads json code and reinstanciates an Host
 func (n *Network) Deserialize(buf []byte) error {
-	err := DeserializeFromJSON(buf, n)
+	if n.Properties == nil {
+		n.Properties = serialize.NewJSONProperties("resources.network")
+	} else {
+		n.Properties.SetModule("resources.network")
+	}
+	err := serialize.FromJSON(buf, n)
 	if err != nil {
 		return err
 	}
-	if n.Properties == nil {
-		n.Properties = NewExtensions()
-	}
+
 	return nil
 }

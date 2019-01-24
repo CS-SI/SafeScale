@@ -18,6 +18,9 @@ package propertiesv1
 
 import (
 	"time"
+
+	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // HostDescription contains description information for the host
@@ -31,9 +34,31 @@ type HostDescription struct {
 	Purpose string    `json:"purpose,omitempty"`  // contains a description of the use of a host
 }
 
-// NewHostDescription returns a blank HostDescription
+// NewHostDescription ...
 func NewHostDescription() *HostDescription {
 	return &HostDescription{}
+}
+
+// Reset returns a blank HostDescription
+func (p *HostDescription) Reset() {
+	*p = HostDescription{}
+}
+
+// Content ... (serialize.Property interface)
+func (p *HostDescription) Content() interface{} {
+	return p
+}
+
+// Clone ... (serialize.Property interface)
+func (p *HostDescription) Clone() serialize.Property {
+	n := NewHostDescription()
+	*n = *p
+	return n
+}
+
+// Replace replaces content of property (serialize.Property interface)
+func (p *HostDescription) Replace(v interface{}) {
+	*p = *v.(*HostDescription)
 }
 
 // HostNetwork contains network information related to Host
@@ -53,7 +78,7 @@ type HostNetwork struct {
 	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network ID) allocated to the host
 }
 
-// NewHostNetwork retuns a blank HostNetwork
+// NewHostNetwork ...
 func NewHostNetwork() *HostNetwork {
 	return &HostNetwork{
 		NetworksByID:   map[string]string{},
@@ -61,6 +86,33 @@ func NewHostNetwork() *HostNetwork {
 		IPv4Addresses:  map[string]string{},
 		IPv6Addresses:  map[string]string{},
 	}
+}
+
+// Reset resets the content of the property
+func (p *HostNetwork) Reset() {
+	*p = HostNetwork{
+		NetworksByID:   map[string]string{},
+		NetworksByName: map[string]string{},
+		IPv4Addresses:  map[string]string{},
+		IPv6Addresses:  map[string]string{},
+	}
+}
+
+// Content ... (serialize.Property interface)
+func (p *HostNetwork) Content() interface{} {
+	return p
+}
+
+// Clone ... (serialize.Property interface)
+func (p *HostNetwork) Clone() serialize.Property {
+	n := NewHostNetwork()
+	*n = *p
+	return n
+}
+
+// Replace replaces content of property (serialize.Property interface)
+func (p *HostNetwork) Replace(v interface{}) {
+	*p = *v.(*HostNetwork)
 }
 
 // HostSize represent sizing elements of an host
@@ -81,6 +133,11 @@ func NewHostSize() *HostSize {
 	return &HostSize{}
 }
 
+// Reset ...
+func (p *HostSize) Reset() {
+	*p = HostSize{}
+}
+
 // HostTemplate represents an host template
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -94,6 +151,13 @@ type HostTemplate struct {
 // NewHostTemplate ...
 func NewHostTemplate() *HostTemplate {
 	return &HostTemplate{
+		HostSize: NewHostSize(),
+	}
+}
+
+// Reset ...
+func (p *HostTemplate) Reset() {
+	*p = HostTemplate{
 		HostSize: NewHostSize(),
 	}
 }
@@ -116,6 +180,31 @@ func NewHostSizing() *HostSizing {
 	}
 }
 
+// Reset ...
+func (p *HostSizing) Reset() {
+	*p = HostSizing{
+		RequestedSize: NewHostSize(),
+		AllocatedSize: NewHostSize(),
+	}
+}
+
+// Content ... (serialize.Property interface)
+func (p *HostSizing) Content() interface{} {
+	return p
+}
+
+// Clone ... (serialize.Property interface)
+func (p *HostSizing) Clone() serialize.Property {
+	n := NewHostSizing()
+	*n = *p
+	return n
+}
+
+// Replace replaces content of property (serialize.Property interface)
+func (p *HostSizing) Replace(v interface{}) {
+	*p = *v.(*HostSizing)
+}
+
 // HostSystem contains information about the operating system
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -132,6 +221,11 @@ func NewHostSystem() *HostSystem {
 	return &HostSystem{}
 }
 
+// Reset ...
+func (p *HostSystem) Reset() {
+	*p = HostSystem{}
+}
+
 // HostVolume contains information about attached volume
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -144,6 +238,11 @@ type HostVolume struct {
 // NewHostVolume ...
 func NewHostVolume() *HostVolume {
 	return &HostVolume{}
+}
+
+// Reset ...
+func (p *HostVolume) Reset() {
+	*p = HostVolume{}
 }
 
 // HostVolumes contains information about attached volumes
@@ -167,6 +266,33 @@ func NewHostVolumes() *HostVolumes {
 	}
 }
 
+// Reset ...
+func (p *HostVolumes) Reset() {
+	*p = HostVolumes{
+		VolumesByID:     map[string]*HostVolume{},
+		VolumesByName:   map[string]string{},
+		VolumesByDevice: map[string]string{},
+		DevicesByID:     map[string]string{},
+	}
+}
+
+// Content ... (serialize.Property interface)
+func (p *HostVolumes) Content() interface{} {
+	return p
+}
+
+// Clone ... (serialize.Property interface)
+func (p *HostVolumes) Clone() serialize.Property {
+	n := NewHostVolumes()
+	*n = *p
+	return n
+}
+
+// Replace replaces content of property (serialize.Property interface)
+func (p *HostVolumes) Replace(v interface{}) {
+	*p = *v.(*HostVolumes)
+}
+
 // HostLocalMount stores information about a device (as an attached volume) mount
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -181,6 +307,11 @@ type HostLocalMount struct {
 // NewHostLocalMount ...
 func NewHostLocalMount() *HostLocalMount {
 	return &HostLocalMount{}
+}
+
+// Reset ...
+func (p *HostLocalMount) Reset() {
+	*p = HostLocalMount{}
 }
 
 // HostRemoteMount stores information about a remote filesystem mount
@@ -198,6 +329,11 @@ type HostRemoteMount struct {
 // NewHostRemoteMount ...
 func NewHostRemoteMount() *HostRemoteMount {
 	return &HostRemoteMount{}
+}
+
+// Reset ...
+func (p *HostRemoteMount) Reset() {
+	*p = HostRemoteMount{}
 }
 
 // HostMounts contains information about mounts on the host
@@ -221,6 +357,34 @@ func NewHostMounts() *HostMounts {
 		RemoteMountsByExport:  map[string]string{},
 		RemoteMountsByPath:    map[string]*HostRemoteMount{},
 	}
+}
+
+// Reset ...
+func (p *HostMounts) Reset() {
+	*p = HostMounts{
+		LocalMountsByDevice:   map[string]string{},
+		LocalMountsByPath:     map[string]*HostLocalMount{},
+		RemoteMountsByShareID: map[string]string{},
+		RemoteMountsByExport:  map[string]string{},
+		RemoteMountsByPath:    map[string]*HostRemoteMount{},
+	}
+}
+
+// Content ...  (serialize.Property interface)
+func (p *HostMounts) Content() interface{} {
+	return p
+}
+
+// Clone ...  (serialize.Property interface)
+func (p *HostMounts) Clone() serialize.Property {
+	n := NewHostMounts()
+	*n = *p
+	return n
+}
+
+// Replace replaces content of property (serialize.Property interface)
+func (p *HostMounts) Replace(v interface{}) {
+	*p = *v.(*HostMounts)
 }
 
 // HostShare describes a filesystem exported from the host
@@ -247,6 +411,14 @@ func NewHostShare() *HostShare {
 	}
 }
 
+// Reset resets an HostShare
+func (p *HostShare) Reset() {
+	*p = HostShare{
+		ClientsByID:   map[string]string{},
+		ClientsByName: map[string]string{},
+	}
+}
+
 // HostShares contains information about the shares of the host
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -262,6 +434,31 @@ func NewHostShares() *HostShares {
 		ByID:   map[string]*HostShare{},
 		ByName: map[string]string{},
 	}
+}
+
+// Reset ...
+func (p *HostShares) Reset() {
+	*p = HostShares{
+		ByID:   map[string]*HostShare{},
+		ByName: map[string]string{},
+	}
+}
+
+// Content ...
+func (p *HostShares) Content() interface{} {
+	return p
+}
+
+// Clone ...
+func (p *HostShares) Clone() serialize.Property {
+	n := NewHostShares()
+	*n = *p
+	return n
+}
+
+// Replace replaces content of property
+func (p *HostShares) Replace(v interface{}) {
+	*p = *v.(*HostShares)
 }
 
 // HostInstalledFeature ...
@@ -282,6 +479,14 @@ func NewHostInstalledFeature() *HostInstalledFeature {
 	}
 }
 
+// Reset resets the content of the property
+func (p *HostInstalledFeature) Reset() {
+	*p = HostInstalledFeature{
+		RequiredBy: []string{},
+		Requires:   []string{},
+	}
+}
+
 // HostFeatures ...
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -295,4 +500,20 @@ func NewHostFeatures() *HostFeatures {
 	return &HostFeatures{
 		Installed: map[string]*HostInstalledFeature{},
 	}
+}
+
+// Reset resets the content of the property
+func (p *HostFeatures) Reset() {
+	*p = HostFeatures{
+		Installed: map[string]*HostInstalledFeature{},
+	}
+}
+
+func init() {
+	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.DescriptionV1, NewHostDescription())
+	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.NetworkV1, NewHostNetwork())
+	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.SizingV1, NewHostSizing())
+	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.SharesV1, NewHostShares())
+	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.VolumesV1, NewHostVolumes())
+	serialize.PropertyTypeRegistry.Register("resources.host", HostProperty.MountsV1, NewHostMounts())
 }

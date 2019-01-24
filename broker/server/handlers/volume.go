@@ -97,20 +97,20 @@ func (svc *VolumeHandler) Delete(ref string) error {
 	}
 	volume := mv.Get()
 
-	volumeAttachmentsV1 := propsv1.NewVolumeAttachments()
-	err = volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachmentsV1)
-	if err != nil {
-		err := infraErr(err)
-		return err
-	}
-
-	nbAttach := len(volumeAttachmentsV1.Hosts)
-	if nbAttach > 0 {
-		var list []string
-		for _, v := range volumeAttachmentsV1.Hosts {
-			list = append(list, v)
+	err = volume.Properties.LockForRead(VolumeProperty.AttachedV1).ThenUse(func(v interface{}) error {
+		volumeAttachmentsV1 := v.(*propsv1.VolumeAttachments)
+		nbAttach := len(volumeAttachmentsV1.Hosts)
+		if nbAttach > 0 {
+			var list []string
+			for _, v := range volumeAttachmentsV1.Hosts {
+				list = append(list, v)
+			}
+			return logicErr(fmt.Errorf("still attached to %d host%s: %s", nbAttach, utils.Plural(nbAttach), strings.Join(list, ", ")))
 		}
-		return logicErr(fmt.Errorf("still attached to %d host%s: %s", nbAttach, utils.Plural(nbAttach), strings.Join(list, ", ")))
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	err = svc.provider.DeleteVolume(volume.ID)
@@ -151,32 +151,41 @@ func (svc *VolumeHandler) Inspect(ref string) (*model.Volume, map[string]*propsv
 	mounts := map[string]*propsv1.HostLocalMount{}
 	hostSvc := NewHostHandler(svc.provider)
 
-	volumeAttachedV1 := propsv1.NewVolumeAttachments()
-	err = volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
-	if err == nil && len(volumeAttachedV1.Hosts) > 0 {
-		for id := range volumeAttachedV1.Hosts {
-			host, err := hostSvc.Inspect(id)
-			if err != nil {
-				continue
-			}
-			hostVolumesV1 := propsv1.NewHostVolumes()
-			err = host.Properties.Get(HostProperty.VolumesV1, hostVolumesV1)
-			if err != nil {
-				continue
-			}
-			hostMountsV1 := propsv1.NewHostMounts()
-			err = host.Properties.Get(HostProperty.MountsV1, hostMountsV1)
-			if err != nil {
-				continue
-			}
-			if volumeAttachment, found := hostVolumesV1.VolumesByID[volume.ID]; found {
-				if mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[volumeAttachment.Device]]; ok {
-					mounts[host.Name] = mount
-				} else {
-					mounts[host.Name] = propsv1.NewHostLocalMount()
+	err = volume.Properties.LockForRead(VolumeProperty.AttachedV1).ThenUse(func(v interface{}) error {
+		volumeAttachedV1 := v.(*propsv1.VolumeAttachments)
+		if len(volumeAttachedV1.Hosts) > 0 {
+			for id := range volumeAttachedV1.Hosts {
+				host, err := hostSvc.Inspect(id)
+				if err != nil {
+					continue
+				}
+				err = host.Properties.LockForRead(HostProperty.VolumesV1).ThenUse(func(v interface{}) error {
+					hostVolumesV1 := v.(*propsv1.HostVolumes)
+					if volumeAttachment, found := hostVolumesV1.VolumesByID[volume.ID]; found {
+						err = host.Properties.LockForRead(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+							hostMountsV1 := v.(*propsv1.HostMounts)
+							if mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[volumeAttachment.Device]]; ok {
+								mounts[host.Name] = mount
+							} else {
+								mounts[host.Name] = propsv1.NewHostLocalMount()
+							}
+							return nil
+						})
+						if err != nil {
+							return err
+						}
+					}
+					return nil
+				})
+				if err != nil {
+					continue
 				}
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
 	}
 	return volume, mounts, nil
 }
@@ -222,17 +231,6 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNo
 		}
 	}
 
-	volumeAttachedV1 := propsv1.NewVolumeAttachments()
-	err = volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
-	if err != nil {
-		return infraErrf(err, "can't attach volume")
-	}
-
-	mountPoint := path
-	if path == model.DefaultVolumeMountPoint {
-		mountPoint = model.DefaultVolumeMountPoint + volume.Name
-	}
-
 	// Get Host data
 	hostSvc := NewHostHandler(svc.provider)
 	host, err := hostSvc.ForceInspect(hostName)
@@ -240,157 +238,156 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNo
 		return throwErr(err)
 	}
 
-	// For now, allows only one attachment...
-	if len(volumeAttachedV1.Hosts) > 0 {
-		for id := range volumeAttachedV1.Hosts {
-			if id != host.ID {
-				return model.ResourceNotAvailableError("volume", volumeName)
+	var deviceName string
+
+	err = volume.Properties.LockForWrite(VolumeProperty.AttachedV1).ThenUse(func(v interface{}) error {
+		volumeAttachedV1 := v.(*propsv1.VolumeAttachments)
+
+		mountPoint := path
+		if path == model.DefaultVolumeMountPoint {
+			mountPoint = model.DefaultVolumeMountPoint + volume.Name
+		}
+
+		// For now, allows only one attachment...
+		if len(volumeAttachedV1.Hosts) > 0 {
+			for id := range volumeAttachedV1.Hosts {
+				if id != host.ID {
+					return model.ResourceNotAvailableError("volume", volumeName)
+				}
+				break
 			}
-			break
 		}
-	}
 
-	hostVolumesV1 := propsv1.NewHostVolumes()
-	err = host.Properties.Get(HostProperty.VolumesV1, hostVolumesV1)
-	if err != nil {
-		return infraErrf(err, "can't attach volume")
-	}
-	hostMountsV1 := propsv1.NewHostMounts()
-	err = host.Properties.Get(HostProperty.MountsV1, hostMountsV1)
-	if err != nil {
-		return infraErrf(err, "can't attach volume")
-	}
-	// Check if the volume is already mounted elsewhere
-	if device, found := hostVolumesV1.DevicesByID[volume.ID]; found {
-		path := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]].Path
-		if path != mountPoint {
-			return logicErr(fmt.Errorf("volume '%s' is already attached in '%s:%s'", volume.Name, host.Name, path))
-		}
-		return nil
-	}
+		return host.Properties.LockForWrite(HostProperty.VolumesV1).ThenUse(func(v interface{}) error {
+			hostVolumesV1 := v.(*propsv1.HostVolumes)
+			return host.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+				hostMountsV1 := v.(*propsv1.HostMounts)
+				// Check if the volume is already mounted elsewhere
+				if device, found := hostVolumesV1.DevicesByID[volume.ID]; found {
+					path := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]].Path
+					if path != mountPoint {
+						return logicErr(fmt.Errorf("volume '%s' is already attached in '%s:%s'", volume.Name, host.Name, path))
+					}
+					return nil
+				}
 
-	// Check if there is no other device mounted in the path (or in subpath)
-	for _, i := range hostMountsV1.LocalMountsByPath {
-		if strings.Index(i.Path, mountPoint) == 0 {
-			return logicErr(fmt.Errorf("Can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volume.Name, host.Name, mountPoint, host.Name, i.Path))
-		}
-	}
-	for _, i := range hostMountsV1.RemoteMountsByPath {
-		if strings.Index(i.Path, mountPoint) == 0 {
-			return logicErr(fmt.Errorf("Can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volume.Name, host.Name, mountPoint, host.Name, i.Path))
-		}
-	}
+				// Check if there is no other device mounted in the path (or in subpath)
+				for _, i := range hostMountsV1.LocalMountsByPath {
+					if strings.Index(i.Path, mountPoint) == 0 {
+						return logicErr(fmt.Errorf("Can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volume.Name, host.Name, mountPoint, host.Name, i.Path))
+					}
+				}
+				for _, i := range hostMountsV1.RemoteMountsByPath {
+					if strings.Index(i.Path, mountPoint) == 0 {
+						return logicErr(fmt.Errorf("Can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volume.Name, host.Name, mountPoint, host.Name, i.Path))
+					}
+				}
 
-	// Note: most providers are not able to tell the real device name the volume
-	//       will have on the host, so we have to use a way that can work everywhere
-	// Get list of disks before attachment
-	oldDiskSet, err := svc.listAttachedDevices(host)
-	if err != nil {
-		err := logicErrf(err, "Failed to get list of connected disks")
-		return err
-	}
-	vaID, err := svc.provider.CreateVolumeAttachment(model.VolumeAttachmentRequest{
-		Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
-		HostID:   host.ID,
-		VolumeID: volume.ID,
+				// Note: most providers are not able to tell the real device name the volume
+				//       will have on the host, so we have to use a way that can work everywhere
+				// Get list of disks before attachment
+				oldDiskSet, err := svc.listAttachedDevices(host)
+				if err != nil {
+					err := logicErrf(err, "Failed to get list of connected disks")
+					return err
+				}
+				vaID, err := svc.provider.CreateVolumeAttachment(model.VolumeAttachmentRequest{
+					Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
+					HostID:   host.ID,
+					VolumeID: volume.ID,
+				})
+				if err != nil {
+					return infraErrf(err, "can't attach volume '%s'", volumeName)
+				}
+
+				// Starting from here, remove volume attachment if exit with error
+				defer func() {
+					if err != nil {
+						derr := svc.provider.DeleteVolumeAttachment(host.ID, vaID)
+						if derr != nil {
+							log.Errorf("failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+						}
+					}
+				}()
+
+				// Updates volume properties
+				volumeAttachedV1.Hosts[host.ID] = host.Name
+
+				// Retries to acknowledge the volume is really attached to host
+				var newDisk mapset.Set
+				retryErr := retry.WhileUnsuccessfulDelay1Second(
+					func() error {
+						// Get new of disk after attachment
+						newDiskSet, err := svc.listAttachedDevices(host)
+						if err != nil {
+							err := logicErrf(err, "failed to get list of connected disks")
+							return err
+						}
+						// Isolate the new device
+						newDisk = newDiskSet.Difference(oldDiskSet)
+						if newDisk.Cardinality() == 0 {
+							return logicErr(fmt.Errorf("disk not yet attached, retrying"))
+						}
+						return nil
+					},
+					2*time.Minute,
+				)
+				if retryErr != nil {
+					return logicErr(fmt.Errorf("failed to confirm the disk attachment after %s", 2*time.Minute))
+				}
+
+				// Recovers real device name from the system
+				deviceName = "/dev/" + newDisk.ToSlice()[0].(string)
+
+				// Saves volume information in property
+				hostVolumesV1.VolumesByID[volume.ID] = &propsv1.HostVolume{
+					AttachID: vaID,
+					Device:   deviceName,
+				}
+				hostVolumesV1.VolumesByName[volume.Name] = volume.ID
+				hostVolumesV1.VolumesByDevice[deviceName] = volume.ID
+				hostVolumesV1.DevicesByID[volume.ID] = deviceName
+
+				// Create mount point
+				sshHandler := NewSSHHandler(svc.provider)
+				sshConfig, err := sshHandler.GetConfig(host.ID)
+				if err != nil {
+					err = infraErr(err)
+					return err
+				}
+
+				server, err := nfs.NewServer(sshConfig)
+				if err != nil {
+					return infraErr(err)
+				}
+				err = server.MountBlockDevice(deviceName, mountPoint, format)
+				if err != nil {
+					err = infraErr(err)
+					return err
+				}
+
+				// Starting from here, unmount block device if exiting with error
+				defer func() {
+					if err != nil {
+						derr := server.UnmountBlockDevice(deviceName)
+						if derr != nil {
+							log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
+						}
+					}
+				}()
+
+				// Updates host properties
+				hostMountsV1.LocalMountsByPath[mountPoint] = &propsv1.HostLocalMount{
+					Device:     deviceName,
+					Path:       mountPoint,
+					FileSystem: "nfs",
+				}
+				hostMountsV1.LocalMountsByDevice[deviceName] = mountPoint
+
+				return nil
+			})
+		})
 	})
-	if err != nil {
-		return infraErrf(err, "can't attach volume '%s'", volumeName)
-	}
-
-	// Starting from here, remove volume attachment if exit with error
-	defer func() {
-		if err != nil {
-			derr := svc.provider.DeleteVolumeAttachment(host.ID, vaID)
-			if derr != nil {
-				log.Errorf("failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
-			}
-		}
-	}()
-
-	// Updates volume properties
-	volumeAttachedV1.Hosts[host.ID] = host.Name
-	err = volume.Properties.Set(VolumeProperty.AttachedV1, volumeAttachedV1)
-	if err != nil {
-		return infraErrf(err, "can't attach volume")
-	}
-
-	// Retries to acknowledge the volume is really attached to host
-	var newDisk mapset.Set
-	retryErr := retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			// Get new of disk after attachment
-			newDiskSet, err := svc.listAttachedDevices(host)
-			if err != nil {
-				err := logicErrf(err, "failed to get list of connected disks")
-				return err
-			}
-			// Isolate the new device
-			newDisk = newDiskSet.Difference(oldDiskSet)
-			if newDisk.Cardinality() == 0 {
-				return logicErr(fmt.Errorf("disk not yet attached, retrying"))
-			}
-			return nil
-		},
-		2*time.Minute,
-	)
-	if retryErr != nil {
-		return logicErr(fmt.Errorf("failed to confirm the disk attachment after %s", 2*time.Minute))
-	}
-
-	// Recovers real device name from the system
-	deviceName := "/dev/" + newDisk.ToSlice()[0].(string)
-
-	// Create mount point
-	sshHandler := NewSSHHandler(svc.provider)
-	sshConfig, err := sshHandler.GetConfig(host.ID)
-	if err != nil {
-		err = infraErr(err)
-		return err
-	}
-
-	server, err := nfs.NewServer(sshConfig)
-	if err != nil {
-		err = infraErr(err)
-		return err
-	}
-	volumeUUID, err := server.MountBlockDevice(deviceName, mountPoint, format, doNotFormat)
-	if err != nil {
-		err = infraErr(err)
-		return err
-	}
-
-	// Starting from here, unmount block device if exiting with error
-	defer func() {
-		if err != nil {
-			derr := server.UnmountBlockDevice(volumeUUID)
-			if derr != nil {
-				log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
-			}
-		}
-	}()
-
-	// Saves volume information in property
-	hostVolumesV1.VolumesByID[volume.ID] = &propsv1.HostVolume{
-		AttachID: vaID,
-		Device:   volumeUUID,
-	}
-	hostVolumesV1.VolumesByName[volume.Name] = volume.ID
-	hostVolumesV1.VolumesByDevice[volumeUUID] = volume.ID
-	hostVolumesV1.DevicesByID[volume.ID] = volumeUUID
-	err = host.Properties.Set(HostProperty.VolumesV1, hostVolumesV1)
-	if err != nil {
-		return infraErrf(err, "can't attach volume")
-	}
-
-	// Updates host properties
-	hostMountsV1.LocalMountsByPath[mountPoint] = &propsv1.HostLocalMount{
-		Device:     volumeUUID,
-		Path:       mountPoint,
-		FileSystem: "nfs",
-	}
-	hostMountsV1.LocalMountsByDevice[volumeUUID] = mountPoint
-	err = host.Properties.Set(HostProperty.MountsV1, hostMountsV1)
 	if err != nil {
 		return infraErrf(err, "can't attach volume")
 	}
@@ -465,128 +462,109 @@ func (svc *VolumeHandler) Detach(volumeName, hostName string) error {
 	}
 
 	// Obtain volume attachment ID
-	hostVolumesV1 := propsv1.NewHostVolumes()
-	err = host.Properties.Get(HostProperty.VolumesV1, hostVolumesV1)
-	if err != nil {
-		err = infraErr(err)
-		return err
-	}
+	err = host.Properties.LockForWrite(HostProperty.VolumesV1).ThenUse(func(v interface{}) error {
+		hostVolumesV1 := v.(*propsv1.HostVolumes)
 
-	// Check the volume is effectively attached
-	attachment, found := hostVolumesV1.VolumesByID[volume.ID]
-	if !found {
-		return logicErr(fmt.Errorf("Can't detach volume '%s': not attached to host '%s'", volumeName, host.Name))
-	}
-
-	// Obtain mounts information
-	hostMountsV1 := propsv1.NewHostMounts()
-	err = host.Properties.Get(HostProperty.MountsV1, hostMountsV1)
-	if err != nil {
-		err = infraErr(err)
-		return err
-	}
-
-	device := attachment.Device
-	path := hostMountsV1.LocalMountsByDevice[device]
-	mount := hostMountsV1.LocalMountsByPath[path]
-	if mount == nil {
-		return logicErr(errors.Wrap(fmt.Errorf("metadata inconsistency: no mount corresponding to volume attachment"), ""))
-	}
-
-	// Check if volume has other mount(s) inside it
-	for p, i := range hostMountsV1.LocalMountsByPath {
-		if i.Device == device {
-			continue
+		// Check the volume is effectively attached
+		attachment, found := hostVolumesV1.VolumesByID[volume.ID]
+		if !found {
+			return logicErr(fmt.Errorf("Can't detach volume '%s': not attached to host '%s'", volumeName, host.Name))
 		}
-		if strings.Index(p, mount.Path) == 0 {
-			return logicErr(fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
-				volume.Name, host.Name, mount.Path, host.Name, p))
-		}
-	}
-	for p := range hostMountsV1.RemoteMountsByPath {
-		if strings.Index(p, mount.Path) == 0 {
-			return logicErr(fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
-				volume.Name, host.Name, mount.Path, host.Name, p))
-		}
-	}
 
-	// Check if volume (or a subdir in volume) is shared
-	hostSharesV1 := propsv1.NewHostShares()
-	err = host.Properties.Get(HostProperty.SharesV1, hostSharesV1)
-	if err != nil {
-		return infraErrf(err, "failed to check if volume is shared")
-	}
-	for _, v := range hostSharesV1.ByID {
-		if strings.Index(v.Path, mount.Path) == 0 {
-			return logicErr(fmt.Errorf("can't detach volume '%s' from '%s:%s', '%s:%s' is shared",
-				volume.Name, host.Name, mount.Path, host.Name, v.Path))
-		}
-	}
+		// Obtain mounts information
+		return host.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+			hostMountsV1 := v.(*propsv1.HostMounts)
+			device := attachment.Device
+			path := hostMountsV1.LocalMountsByDevice[device]
+			mount := hostMountsV1.LocalMountsByPath[path]
+			if mount == nil {
+				return logicErr(errors.Wrap(fmt.Errorf("metadata inconsistency: no mount corresponding to volume attachment"), ""))
+			}
 
-	// Unmount the Block Device ...
-	sshHandler := NewSSHHandler(svc.provider)
-	sshConfig, err := sshHandler.GetConfig(host.ID)
-	if err != nil {
-		err = logicErrf(err, "error getting ssh config")
-		return err
-	}
-	nfsServer, err := nfs.NewServer(sshConfig)
-	if err != nil {
-		err = logicErrf(err, "error creating nfs service")
-		return err
-	}
-	err = nfsServer.UnmountBlockDevice(attachment.Device)
-	if err != nil {
-		err = logicErrf(err, "error unmounting block device")
-		return err
-	}
+			// Check if volume has other mount(s) inside it
+			for p, i := range hostMountsV1.LocalMountsByPath {
+				if i.Device == device {
+					continue
+				}
+				if strings.Index(p, mount.Path) == 0 {
+					return logicErr(fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'",
+						volume.Name, host.Name, mount.Path, host.Name, p))
+				}
+			}
+			for p := range hostMountsV1.RemoteMountsByPath {
+				if strings.Index(p, mount.Path) == 0 {
+					return logicErr(fmt.Errorf("can't detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'",
+						volume.Name, host.Name, mount.Path, host.Name, p))
+				}
+			}
 
-	// ... then detach volume
-	err = svc.provider.DeleteVolumeAttachment(host.ID, attachment.AttachID)
-	if err != nil {
-		err = infraErr(err)
-		return err
-	}
+			// Check if volume (or a subdir in volume) is shared
+			return host.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+				hostSharesV1 := v.(*propsv1.HostShares)
 
-	// Updates host property propsv1.VolumesV1
-	delete(hostVolumesV1.VolumesByID, volume.ID)
-	delete(hostVolumesV1.VolumesByName, volume.Name)
-	delete(hostVolumesV1.VolumesByDevice, attachment.Device)
-	delete(hostVolumesV1.DevicesByID, volume.ID)
-	err = host.Properties.Set(HostProperty.VolumesV1, hostVolumesV1)
-	if err != nil {
-		err = infraErr(err)
-		return err
-	}
+				for _, v := range hostSharesV1.ByID {
+					if strings.Index(v.Path, mount.Path) == 0 {
+						return logicErr(fmt.Errorf("can't detach volume '%s' from '%s:%s', '%s:%s' is shared",
+							volume.Name, host.Name, mount.Path, host.Name, v.Path))
+					}
+				}
 
-	// Updates host property propsv1.MountsV1
-	delete(hostMountsV1.LocalMountsByDevice, mount.Device)
-	delete(hostMountsV1.LocalMountsByPath, mount.Path)
-	err = host.Properties.Set(HostProperty.MountsV1, hostMountsV1)
-	if err != nil {
-		err = infraErr(err)
-		return err
-	}
+				// Unmount the Block Device ...
+				sshHandler := NewSSHHandler(svc.provider)
+				sshConfig, err := sshHandler.GetConfig(host.ID)
+				if err != nil {
+					err = logicErrf(err, "error getting ssh config")
+					return err
+				}
+				nfsServer, err := nfs.NewServer(sshConfig)
+				if err != nil {
+					err = logicErrf(err, "error creating nfs service")
+					return err
+				}
+				err = nfsServer.UnmountBlockDevice(attachment.Device)
+				if err != nil {
+					err = logicErrf(err, "error unmounting block device")
+					return err
+				}
 
-	// Updates volume property propsv1.VolumeAttachments
-	volumeAttachedV1 := propsv1.NewVolumeAttachments()
-	err = volume.Properties.Get(VolumeProperty.AttachedV1, volumeAttachedV1)
+				// ... then detach volume
+				err = svc.provider.DeleteVolumeAttachment(host.ID, attachment.AttachID)
+				if err != nil {
+					err = infraErr(err)
+					return err
+				}
+
+				// Updates host property propsv1.VolumesV1
+				delete(hostVolumesV1.VolumesByID, volume.ID)
+				delete(hostVolumesV1.VolumesByName, volume.Name)
+				delete(hostVolumesV1.VolumesByDevice, attachment.Device)
+				delete(hostVolumesV1.DevicesByID, volume.ID)
+
+				// Updates host property propsv1.MountsV1
+				delete(hostMountsV1.LocalMountsByDevice, mount.Device)
+				delete(hostMountsV1.LocalMountsByPath, mount.Path)
+
+				// Updates volume property propsv1.VolumeAttachments
+				return volume.Properties.LockForWrite(VolumeProperty.AttachedV1).ThenUse(func(v interface{}) error {
+					volumeAttachedV1 := v.(*propsv1.VolumeAttachments)
+					delete(volumeAttachedV1.Hosts, host.ID)
+					return nil
+				})
+			})
+		})
+	})
 	if err != nil {
-		err = infraErr(err)
-		return err
-	}
-	delete(volumeAttachedV1.Hosts, host.ID)
-	err = volume.Properties.Set(VolumeProperty.AttachedV1, volumeAttachedV1)
-	if err != nil {
-		err = infraErr(err)
 		return err
 	}
 
 	// Updates metadata
 	err = metadata.SaveHost(svc.provider, host)
 	if err != nil {
-		err = infraErr(err)
-		return err
+		return infraErr(err)
 	}
-	return metadata.SaveVolume(svc.provider, volume)
+	err = metadata.SaveVolume(svc.provider, volume)
+	if err != nil {
+		return infraErr(err)
+	}
+	return nil
 }

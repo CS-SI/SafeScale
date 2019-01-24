@@ -17,12 +17,16 @@
 package core
 
 import (
+	"fmt"
+	"strings"
+
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // Cluster contains the bare minimum information about a cluster
@@ -59,26 +63,36 @@ type Cluster struct {
 	// DisabledFeatures keeps track of features normally automatically added with cluster creation,
 	// but explicitely disabled; if a disabled feature is added, must be removed from this property
 	DisabledFeatures map[string]struct{} `json:"disabled_features"`
+	// Extensions contains additional info about the cluster
+	Extensions *serialize.JSONProperties `json:"extensions,omitempty"`
 	// Service contains the provider service to use
 	Service *providers.Service `json:"-"`
-	// Extensions contains additional info about the cluster
-	Extensions *model.Extensions `json:"extensions,omitempty"`
 }
 
-// Serialize ...
+// Serialize converts cluster data to JSON
 func (c *Cluster) Serialize() ([]byte, error) {
-	return model.SerializeToJSON(c)
+	return serialize.ToJSON(c)
 }
 
-// Deserialize reads json code and reinstanciates an Host
+// Deserialize reads json code and reinstanciates cluster
 func (c *Cluster) Deserialize(buf []byte) error {
-	err := model.DeserializeFromJSON(buf, c)
+	var parsed map[string]interface{}
+	err := serialize.FromJSON(buf, &parsed)
 	if err != nil {
 		return err
 	}
 	if c.Extensions == nil {
-		c.Extensions = model.NewExtensions()
+		field, found := parsed["flavor"].(float64)
+		if !found {
+			return fmt.Errorf("invalid JSON content in metadata: missing 'flavor' field")
+		}
+		c.Extensions = serialize.NewJSONProperties("clusters." + strings.ToLower(Flavor.Enum(int(field)).String()))
 	}
+	err = serialize.FromJSON(buf, c)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

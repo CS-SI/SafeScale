@@ -375,13 +375,11 @@ func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, erro
 	}()
 
 	// Updates Host Property propsv1.HostSizing
-	hostSizingV1 := propsv1.NewHostSizing()
-	err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
-	}
-	hostSizingV1.Template = req.TemplateID
-	err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
+	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		hostSizingV1 := v.(*propsv1.HostSizing)
+		hostSizingV1.Template = req.TemplateID
+		return nil
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
 	}

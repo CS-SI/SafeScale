@@ -144,7 +144,7 @@ func TestMock_ListImages_Mock(t *testing.T) {
 	require.Nil(t, err)
 
 	if amok != nil {
-		amok.EXPECT().ListImages(false).Return([]model.Image{{ID: "I1", Name: "Ubuntu"},{ID: "I2", Name: "Debian"}}, nil).AnyTimes()
+		amok.EXPECT().ListImages(false).Return([]model.Image{{ID: "I1", Name: "Ubuntu"}, {ID: "I2", Name: "Debian"}}, nil).AnyTimes()
 	}
 
 	cli.ListImages(t)
@@ -161,7 +161,7 @@ func TestMock_ListHostTemplates_Mock(t *testing.T) {
 		ht.Cores = 1
 
 		amok.EXPECT().ListTemplates(false).Return([]model.HostTemplate{model.HostTemplate{HostTemplate: ht}}, nil).AnyTimes()
-		amok.EXPECT().ListImages(false).Return([]model.Image{{ID: "I1", Name: "Ubuntu"},{ID: "I2", Name: "Debian"}}, nil).AnyTimes()
+		amok.EXPECT().ListImages(false).Return([]model.Image{{ID: "I1", Name: "Ubuntu"}, {ID: "I2", Name: "Debian"}}, nil).AnyTimes()
 	}
 
 	cli.ListHostTemplates(t)
@@ -179,7 +179,7 @@ func TestMock_CreateKeyPair_Mock(t *testing.T) {
 	require.Nil(t, err)
 
 	if amok != nil {
-		amok.EXPECT().CreateKeyPair("kp").Return(&model.KeyPair{ID:"1", Name:"2", PublicKey:"3", PrivateKey:"4"}, nil)
+		amok.EXPECT().CreateKeyPair("kp").Return(&model.KeyPair{ID: "1", Name: "2", PublicKey: "3", PrivateKey: "4"}, nil)
 		amok.EXPECT().DeleteKeyPair("1").Return(nil)
 	}
 

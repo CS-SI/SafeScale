@@ -66,6 +66,9 @@ func (svc *NetworkHandler) Create(
 	name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, theos string, gwname string,
 ) (*model.Network, error) {
 
+	log.Debugf(">>> broker.server.handlers.NetworkHandler::Create()")
+	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Create()")
+
 	// Verify that the network doesn't exist first
 	_, err := svc.provider.GetNetworkByName(name)
 	if err != nil {
@@ -185,17 +188,15 @@ func (svc *NetworkHandler) Create(
 	}
 
 	// Updates requested sizing in gateway property propsv1.HostSizing
-	gwSizingV1 := propsv1.NewHostSizing()
-	err = gw.Properties.Get(HostProperty.SizingV1, gwSizingV1)
-	if err != nil {
-		return nil, infraErrf(err, "Error creating network")
-	}
-	gwSizingV1.RequestedSize = &propsv1.HostSize{
-		Cores:    cpu,
-		RAMSize:  ram,
-		DiskSize: disk,
-	}
-	err = gw.Properties.Set(HostProperty.SizingV1, gwSizingV1)
+	err = gw.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		gwSizingV1 := v.(*propsv1.HostSizing)
+		gwSizingV1.RequestedSize = &propsv1.HostSize{
+			Cores:    cpu,
+			RAMSize:  ram,
+			DiskSize: disk,
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, infraErrf(err, "Error creating network")
 	}
@@ -263,6 +264,9 @@ func (svc *NetworkHandler) Create(
 
 // List returns the network list
 func (svc *NetworkHandler) List(all bool) ([]*model.Network, error) {
+	log.Debugf(">>> broker.server.handlers.NetworkHandler::List(%v)", all)
+	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::List(%v)", all)
+
 	if all {
 		return svc.provider.ListNetworks()
 	}
@@ -285,6 +289,9 @@ func (svc *NetworkHandler) List(all bool) ([]*model.Network, error) {
 
 // Inspect returns the network identified by ref, ref can be the name or the id
 func (svc *NetworkHandler) Inspect(ref string) (*model.Network, error) {
+	log.Debugf(">>> broker.server.handlers.NetworkHandler::Inspect(%s)", ref)
+	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Inspect(%s)", ref)
+
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
 		return nil, infraErrf(err, "failed to load metadata of network '%s'", ref)
@@ -294,21 +301,29 @@ func (svc *NetworkHandler) Inspect(ref string) (*model.Network, error) {
 
 // Delete deletes network referenced by ref
 func (svc *NetworkHandler) Delete(ref string) error {
+	log.Debugf(">>> broker.server.handlers.NetworkHandler::Delete(%s)", ref)
+	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Delete(%s)", ref)
+
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
-		return infraErrf(err, "failed to load metadata of network '%s'", ref)
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return infraErrf(err, "failed to load metadata of network '%s'", ref)
+		}
+		return err
 	}
 	network := mn.Get()
 	gwID := network.GatewayID
 
 	// Check if hosts are still attached to network according to metadata
-	networkHostsV1 := propsv1.NewNetworkHosts()
-	err = network.Properties.Get(NetworkProperty.HostsV1, networkHostsV1)
+	err = network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+		networkHostsV1 := v.(*propsv1.NetworkHosts)
+		if len(networkHostsV1.ByID) > 0 {
+			return logicErr(fmt.Errorf("can't delete network '%s': at least one host is still attached to it", ref))
+		}
+		return nil
+	})
 	if err != nil {
 		return infraErr(err)
-	}
-	if len(networkHostsV1.ByID) > 0 {
-		return logicErr(fmt.Errorf("can't delete network '%s': at least one host is still attached to it", ref))
 	}
 
 	// 1st delete gateway
@@ -321,7 +336,6 @@ func (svc *NetworkHandler) Delete(ref string) error {
 		err = svc.provider.DeleteGateway(gwID)
 		// allow no gateway, but log it
 		if err != nil {
-			spew.Dump(err)
 			log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
 		}
 		err = mh.Delete()

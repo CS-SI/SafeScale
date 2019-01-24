@@ -98,18 +98,21 @@ func (svc *ShareHandler) Create(shareName, hostName, path string) (*propsv1.Host
 	}
 
 	// Check if the path to share isn't a remote mount or contains a remote mount
-	serverMountsV1 := propsv1.NewHostMounts()
-	err = server.Properties.Get(HostProperty.MountsV1, serverMountsV1)
-	if err != nil {
-		return nil, infraErr(err)
-	}
-	if _, found := serverMountsV1.RemoteMountsByPath[path]; found {
-		return nil, logicErr(fmt.Errorf("path to export '%s' is a mounted share", sharePath))
-	}
-	for k := range serverMountsV1.RemoteMountsByPath {
-		if strings.Index(sharePath, k) == 0 {
-			return nil, logicErr(fmt.Errorf("export path '%s' contains a share mounted in '%s'", sharePath, k))
+	err = server.Properties.LockForRead(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+		serverMountsV1 := v.(*propsv1.HostMounts)
+		if _, found := serverMountsV1.RemoteMountsByPath[path]; found {
+			return logicErr(fmt.Errorf("path to export '%s' is a mounted share", sharePath))
 		}
+		for k := range serverMountsV1.RemoteMountsByPath {
+			if strings.Index(sharePath, k) == 0 {
+				return logicErr(fmt.Errorf("export path '%s' contains a share mounted in '%s'", sharePath, k))
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Installs NFS Server software if needed
@@ -122,41 +125,50 @@ func (svc *ShareHandler) Create(shareName, hostName, path string) (*propsv1.Host
 	if err != nil {
 		return nil, infraErr(err)
 	}
-	serverSharesV1 := propsv1.NewHostShares()
-	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
-	if err != nil {
-		return nil, infraErr(err)
-	}
-	if len(serverSharesV1.ByID) == 0 {
-		// Host doesn't have shares yet, so install NFS
-		err = nfsServer.Install()
-		if err != nil {
-			return nil, infraErr(err)
+
+	err = server.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+		serverSharesV1 := v.(*propsv1.HostShares)
+		if len(serverSharesV1.ByID) == 0 {
+			// Host doesn't have shares yet, so install NFS
+			err = nfsServer.Install()
+			if err != nil {
+				return infraErr(err)
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
+
 	err = nfsServer.AddShare(sharePath, "")
 	if err != nil {
 		return nil, infraErr(err)
 	}
 
-	// Create share struct
-	share := propsv1.NewHostShare()
-	share.Name = shareName
-	shareID, err := uuid.NewV4()
-	if err != nil {
-		return nil, logicErrf(err, "Error creating UUID for share")
-	}
-	share.ID = shareID.String()
-	share.Path = sharePath
-	share.Type = "nfs"
-
-	serverSharesV1.ByID[share.ID] = share
-	serverSharesV1.ByName[share.Name] = share.ID
+	var share *propsv1.HostShare
 
 	// Updates Host Property propsv1.HostShares
-	err = server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
+	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+		serverSharesV1 := v.(*propsv1.HostShares)
+
+		share = propsv1.NewHostShare()
+		share.Name = shareName
+		shareID, err := uuid.NewV4()
+		if err != nil {
+			return logicErrf(err, "Error creating UUID for share")
+		}
+		share.ID = shareID.String()
+		share.Path = sharePath
+		share.Type = "nfs"
+
+		serverSharesV1.ByID[share.ID] = share
+		serverSharesV1.ByName[share.Name] = share.ID
+
+		return nil
+	})
 	if err != nil {
-		return nil, infraErr(err)
+		return nil, err
 	}
 
 	err = metadata.SaveHost(svc.provider, server)
@@ -185,40 +197,37 @@ func (svc *ShareHandler) Delete(name string) error {
 		return throwErrf("Delete share: unable to found share of host '%s'", name)
 	}
 
-	serverSharesV1 := propsv1.NewHostShares()
-	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
-	if err != nil {
-		return infraErr(err)
-	}
-
-	if len(share.ClientsByName) > 0 {
-		var list []string
-		for k := range share.ClientsByName {
-			list = append(list, k)
+	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+		serverSharesV1 := v.(*propsv1.HostShares)
+		if len(share.ClientsByName) > 0 {
+			var list []string
+			for k := range share.ClientsByName {
+				list = append(list, k)
+			}
+			return logicErr(fmt.Errorf("host%s still using it: %s", utils.Plural(len(list)), strings.Join(list, ",")))
 		}
-		return logicErr(fmt.Errorf("host%s still using it: %s", utils.Plural(len(list)), strings.Join(list, ",")))
-	}
 
-	sshHandler := NewSSHHandler(svc.provider)
-	sshConfig, err := sshHandler.GetConfig(server.ID)
-	if err != nil {
-		return infraErr(err)
-	}
+		sshHandler := NewSSHHandler(svc.provider)
+		sshConfig, err := sshHandler.GetConfig(server.ID)
+		if err != nil {
+			return infraErr(err)
+		}
 
-	nfsServer, err := nfs.NewServer(sshConfig)
-	if err != nil {
-		return infraErr(err)
-	}
-	err = nfsServer.RemoveShare(share.Path)
-	if err != nil {
-		return infraErr(err)
-	}
+		nfsServer, err := nfs.NewServer(sshConfig)
+		if err != nil {
+			return infraErr(err)
+		}
+		err = nfsServer.RemoveShare(share.Path)
+		if err != nil {
+			return infraErr(err)
+		}
 
-	delete(serverSharesV1.ByID, share.ID)
-	delete(serverSharesV1.ByName, share.Name)
-	err = server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
+		delete(serverSharesV1.ByID, share.ID)
+		delete(serverSharesV1.ByName, share.Name)
+		return nil
+	})
 	if err != nil {
-		return infraErr(err)
+		return err
 	}
 
 	// Save server metadata
@@ -228,8 +237,8 @@ func (svc *ShareHandler) Delete(name string) error {
 	}
 
 	// Remove share metadata
-	remErr := metadata.RemoveShare(svc.provider, server.ID, server.Name, share.ID, share.Name)
-	return infraErr(remErr)
+	err = metadata.RemoveShare(svc.provider, server.ID, server.Name, share.ID, share.Name)
+	return infraErr(err)
 }
 
 // List return the list of all shares from all servers
@@ -258,13 +267,14 @@ func (svc *ShareHandler) List() (map[string]map[string]*propsv1.HostShare, error
 			return nil, infraErr(err)
 		}
 
-		hostSharesV1 := propsv1.NewHostShares()
-		err = host.Properties.Get(HostProperty.SharesV1, hostSharesV1)
+		err = host.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+			hostSharesV1 := v.(*propsv1.HostShares)
+			shares[serverID] = hostSharesV1.ByID
+			return nil
+		})
 		if err != nil {
 			return nil, infraErr(err)
 		}
-
-		shares[serverID] = hostSharesV1.ByID
 	}
 	return shares, nil
 }
@@ -302,77 +312,88 @@ func (svc *ShareHandler) Mount(shareName, hostName, path string) (*propsv1.HostR
 
 	// Check if share is already mounted
 	// Check if there is already volume mounted in the path (or in subpath)
-	targetMountsV1 := propsv1.NewHostMounts()
-	err = target.Properties.Get(HostProperty.MountsV1, targetMountsV1)
-	if err != nil {
-		return nil, infraErr(err)
-	}
-	if s, ok := targetMountsV1.RemoteMountsByShareID[share.ID]; ok {
-		return nil, logicErr(fmt.Errorf("already mounted in '%s:%s'", target.Name, targetMountsV1.RemoteMountsByPath[s].Path))
-	}
-	for _, i := range targetMountsV1.LocalMountsByPath {
-		if i.Path == path {
-			// Can't mount a share in place of a volume (by convention, nothing technically preventing it)
-			return nil, logicErr(fmt.Errorf("there is already a volume in path '%s:%s'", target.Name, path))
+	err = target.Properties.LockForRead(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+		targetMountsV1 := v.(*propsv1.HostMounts)
+		if s, ok := targetMountsV1.RemoteMountsByShareID[share.ID]; ok {
+			return logicErr(fmt.Errorf("already mounted in '%s:%s'", target.Name, targetMountsV1.RemoteMountsByPath[s].Path))
 		}
-	}
-	for _, i := range targetMountsV1.RemoteMountsByPath {
-		if strings.Index(path, i.Path) == 0 {
-			// Can't mount a share inside another share (at least by convention, if not technically)
-			return nil, logicErr(fmt.Errorf("there is already a share mounted in '%s:%s'", target.Name, i.Path))
+		for _, i := range targetMountsV1.LocalMountsByPath {
+			if i.Path == path {
+				// Can't mount a share in place of a volume (by convention, nothing technically preventing it)
+				return logicErr(fmt.Errorf("there is already a volume in path '%s:%s'", target.Name, path))
+			}
 		}
-	}
+		for _, i := range targetMountsV1.RemoteMountsByPath {
+			if strings.Index(path, i.Path) == 0 {
+				// Can't mount a share inside another share (at least by convention, if not technically)
+				return logicErr(fmt.Errorf("there is already a share mounted in '%s:%s'", target.Name, i.Path))
+			}
+		}
 
-	// Mount the share on host
-	serverSharesV1 := propsv1.NewHostShares()
-	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
+		return nil
+	})
 	if err != nil {
-		return nil, infraErr(err)
-	}
-	_, found := serverSharesV1.ByID[serverSharesV1.ByName[shareName]]
-	if !found {
-		return nil, logicErr(fmt.Errorf("failed to find metadata about share '%s'", shareName))
-	}
-	shareID := serverSharesV1.ByName[shareName]
-	sshHandler := NewSSHHandler(svc.provider)
-	sshConfig, err := sshHandler.GetConfig(target)
-	if err != nil {
-		return nil, infraErr(err)
-	}
-
-	nfsClient, err := nfs.NewNFSClient(sshConfig)
-	if err != nil {
-		err = infraErr(err)
 		return nil, err
 	}
-	err = nfsClient.Install()
+
+	export := server.GetAccessIP() + ":" + share.Path
+
+	// Mount the share on host
+	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+		serverSharesV1 := v.(*propsv1.HostShares)
+		_, found := serverSharesV1.ByID[serverSharesV1.ByName[shareName]]
+		if !found {
+			return logicErr(fmt.Errorf("failed to find metadata about share '%s'", shareName))
+		}
+		shareID := serverSharesV1.ByName[shareName]
+		sshHandler := NewSSHHandler(svc.provider)
+		sshConfig, err := sshHandler.GetConfig(target)
+		if err != nil {
+			return infraErr(err)
+		}
+
+		nfsClient, err := nfs.NewNFSClient(sshConfig)
+		if err != nil {
+			err = infraErr(err)
+			return err
+		}
+		err = nfsClient.Install()
+		if err != nil {
+			return infraErr(err)
+		}
+
+		err = nfsClient.Mount(export, mountPath)
+		if err != nil {
+			return infraErr(err)
+		}
+
+		serverSharesV1.ByID[shareID].ClientsByName[target.Name] = target.ID
+		serverSharesV1.ByID[shareID].ClientsByID[target.ID] = target.Name
+		return nil
+	})
 	if err != nil {
-		return nil, infraErr(err)
+		return nil, err
 	}
 
-	err = nfsClient.Mount(server.GetAccessIP(), share.Path, mountPath)
+	var mount *propsv1.HostRemoteMount
+	err = target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+		targetMountsV1 := v.(*propsv1.HostMounts)
+		// Make sure the HostMounts is correctly init if there are no mount yet
+		if !target.Properties.Lookup(HostProperty.MountsV1) {
+			targetMountsV1.Reset()
+		}
+		mount = propsv1.NewHostRemoteMount()
+		mount.ShareID = share.ID
+		mount.Export = export
+		mount.Path = mountPath
+		mount.FileSystem = "nfs"
+		targetMountsV1.RemoteMountsByPath[mount.Path] = mount
+		targetMountsV1.RemoteMountsByShareID[mount.ShareID] = mount.Path
+		targetMountsV1.RemoteMountsByExport[mount.Export] = mount.Path
+		return nil
+	})
 	if err != nil {
-		return nil, infraErr(err)
-	}
-
-	serverSharesV1.ByID[shareID].ClientsByName[target.Name] = target.ID
-	serverSharesV1.ByID[shareID].ClientsByID[target.ID] = target.Name
-	err = server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
-	if err != nil {
-		return nil, infraErr(err)
-	}
-
-	mount := propsv1.NewHostRemoteMount()
-	mount.ShareID = share.ID
-	mount.Export = server.GetAccessIP() + ":" + share.Path
-	mount.Path = mountPath
-	mount.FileSystem = "nfs"
-	targetMountsV1.RemoteMountsByPath[mount.Path] = mount
-	targetMountsV1.RemoteMountsByShareID[mount.ShareID] = mount.Path
-	targetMountsV1.RemoteMountsByExport[mount.Export] = mount.Path
-	err = target.Properties.Set(HostProperty.MountsV1, targetMountsV1)
-	if err != nil {
-		return nil, infraErr(err)
+		return nil, err
 	}
 
 	err = metadata.SaveHost(svc.provider, server)
@@ -395,17 +416,21 @@ func (svc *ShareHandler) Unmount(shareName, hostName string) error {
 		return throwErr(err)
 	}
 
-	serverSharesV1 := propsv1.NewHostShares()
-	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
+	var shareID string
+	err = server.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+		serverSharesV1 := v.(*propsv1.HostShares)
+		var found bool
+		shareID, found = serverSharesV1.ByName[shareName]
+		if !found {
+			return logicErr(fmt.Errorf("failed to find data about share '%s'", shareName))
+		}
+		// share := serverSharesV1.ByID[shareID]
+		// remotePath := server.GetAccessIP() + ":" + share.Path
+		return nil
+	})
 	if err != nil {
-		return infraErr(err)
+		return err
 	}
-	shareID, found := serverSharesV1.ByName[shareName]
-	if !found {
-		return logicErr(fmt.Errorf("failed to find data about share '%s'", shareName))
-	}
-	// share := serverSharesV1.ByID[shareID]
-	// remotePath := server.GetAccessIP() + ":" + share.Path
 
 	var target *model.Host
 	if server.Name == hostName || server.ID == hostName {
@@ -418,45 +443,46 @@ func (svc *ShareHandler) Unmount(shareName, hostName string) error {
 		}
 	}
 
-	targetMountsV1 := propsv1.NewHostMounts()
-	err = target.Properties.Get(HostProperty.MountsV1, targetMountsV1)
-	if err != nil {
-		return infraErr(err)
-	}
-	mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
-	if !found {
-		return logicErr(fmt.Errorf("not mounted on host '%s'", target.Name))
-	}
+	err = target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+		targetMountsV1 := v.(*propsv1.HostMounts)
+		mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
+		if !found {
+			return logicErr(fmt.Errorf("not mounted on host '%s'", target.Name))
+		}
 
-	// Unmount share from client
-	sshHandler := NewSSHHandler(svc.provider)
-	sshConfig, err := sshHandler.GetConfig(target.ID)
-	if err != nil {
-		return infraErr(err)
-	}
-	nfsClient, err := nfs.NewNFSClient(sshConfig)
-	if err != nil {
-		return infraErr(err)
-	}
-	err = nfsClient.Unmount(server.GetAccessIP(), mount.Path)
-	if err != nil {
-		return infraErr(err)
-	}
+		// Unmount share from client
+		sshHandler := NewSSHHandler(svc.provider)
+		sshConfig, err := sshHandler.GetConfig(target.ID)
+		if err != nil {
+			return infraErr(err)
+		}
+		nfsClient, err := nfs.NewNFSClient(sshConfig)
+		if err != nil {
+			return infraErr(err)
+		}
+		err = nfsClient.Unmount(mount.Export)
+		if err != nil {
+			return infraErr(err)
+		}
 
-	// Remove mount from mount list
-	delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
-	delete(targetMountsV1.RemoteMountsByPath, mount.Path)
-	err = target.Properties.Set(HostProperty.MountsV1, targetMountsV1)
+		// Remove mount from mount list
+		delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
+		delete(targetMountsV1.RemoteMountsByPath, mount.Path)
+		return nil
+	})
 	if err != nil {
-		return infraErr(err)
+		return err
 	}
 
 	// Remove host from client lists of the share
-	delete(serverSharesV1.ByID[shareID].ClientsByName, target.Name)
-	delete(serverSharesV1.ByID[shareID].ClientsByID, target.ID)
-	err = server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
+	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+		serverSharesV1 := v.(*propsv1.HostShares)
+		delete(serverSharesV1.ByID[shareID].ClientsByName, target.Name)
+		delete(serverSharesV1.ByID[shareID].ClientsByID, target.ID)
+		return nil
+	})
 	if err != nil {
-		return infraErr(err)
+		return err
 	}
 
 	// Saves metadata
@@ -502,24 +528,30 @@ func (svc *ShareHandler) Inspect(shareName string) (*model.Host, *propsv1.HostSh
 	if err != nil {
 		return nil, nil, nil, throwErr(err)
 	}
-	serverSharesV1 := propsv1.NewHostShares()
-	err = server.Properties.Get(HostProperty.SharesV1, serverSharesV1)
-	if err != nil {
-		return nil, nil, nil, infraErr(err)
-	}
 
-	shareID, found := serverSharesV1.ByName[shareName]
-	if !found {
-		shareID = shareName
-		_, found = serverSharesV1.ByID[shareID]
+	var (
+		shareID string
+		share   *propsv1.HostShare
+	)
+	err = server.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+		serverSharesV1 := v.(*propsv1.HostShares)
+		var found bool
+		shareID, found = serverSharesV1.ByName[shareName]
+		if !found {
+			shareID = shareName
+			_, found = serverSharesV1.ByID[shareID]
+		}
+		if !found {
+			return infraErr(model.ResourceNotFoundError("share", fmt.Sprintf("no share named '%s'", shareName)))
+		}
+		share = serverSharesV1.ByID[shareID]
+		return nil
+	})
+	if err != nil {
+		return nil, nil, nil, err
 	}
-	if !found {
-		return nil, nil, nil, infraErr(err)
-	}
-	share := serverSharesV1.ByID[shareID]
 
 	mounts := map[string]*propsv1.HostRemoteMount{}
-	clientMountsV1 := propsv1.NewHostMounts()
 	for k := range share.ClientsByName {
 		client, err := hostSvc.Inspect(k)
 		if err != nil {
@@ -527,22 +559,24 @@ func (svc *ShareHandler) Inspect(shareName string) (*model.Host, *propsv1.HostSh
 			continue
 		}
 
-		err = client.Properties.Get(HostProperty.MountsV1, clientMountsV1)
+		err = client.Properties.LockForRead(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+			clientMountsV1 := v.(*propsv1.HostMounts)
+			mountPath, ok := clientMountsV1.RemoteMountsByShareID[shareID]
+			if ok {
+				mount := clientMountsV1.RemoteMountsByPath[mountPath]
+				mounts[client.Name] = &propsv1.HostRemoteMount{
+					Path:       mount.Path,
+					FileSystem: mount.FileSystem,
+				}
+			}
+			return nil
+		})
 		if err != nil {
 			log.Errorln(err.Error())
 			continue
 		}
-		mountPath, ok := clientMountsV1.RemoteMountsByShareID[shareID]
-		if !ok {
-			continue
-		}
-		mount := clientMountsV1.RemoteMountsByPath[mountPath]
-		mounts[client.Name] = &propsv1.HostRemoteMount{
-			Path:       mount.Path,
-			FileSystem: mount.FileSystem,
-		}
 	}
-	return server, serverSharesV1.ByID[shareID], mounts, nil
+	return server, share, mounts, nil
 }
 
 func (svc *ShareHandler) findShare(shareName string) (string, error) {

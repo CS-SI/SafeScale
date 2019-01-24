@@ -173,21 +173,23 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 		return nil, infraErr(err)
 	}
 
-	nhs := propsv1.NewHostSizing()
-	err = host.Properties.ForceGet(HostProperty.SizingV1, nhs)
-	if err != nil {
-		return nil, infraErrf(err, "Unable to parse host metadata '%s", ref)
-	}
-
-	descent := false
-	descent = descent || (hostSizeRequest.MinCores < nhs.RequestedSize.Cores)
-	descent = descent || (hostSizeRequest.MinRAMSize < nhs.RequestedSize.RAMSize)
-	descent = descent || (hostSizeRequest.MinGPU < nhs.RequestedSize.GPUNumber)
-	descent = descent || (hostSizeRequest.MinFreq < nhs.RequestedSize.CPUFreq)
-	descent = descent || (hostSizeRequest.MinDiskSize < nhs.RequestedSize.DiskSize)
-
-	if descent {
-		log.Warn("Asking for less resources..., ain't gonna happen :(")
+	if host.Properties.Lookup(HostProperty.SizingV1) {
+		descent := false
+		err = host.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+			nhs := v.(*propsv1.HostSizing)
+			descent = descent || (hostSizeRequest.MinCores < nhs.RequestedSize.Cores)
+			descent = descent || (hostSizeRequest.MinRAMSize < nhs.RequestedSize.RAMSize)
+			descent = descent || (hostSizeRequest.MinGPU < nhs.RequestedSize.GPUNumber)
+			descent = descent || (hostSizeRequest.MinFreq < nhs.RequestedSize.CPUFreq)
+			descent = descent || (hostSizeRequest.MinDiskSize < nhs.RequestedSize.DiskSize)
+			return nil
+		})
+		if err != nil {
+			return nil, infraErrf(err, "Unable to parse host metadata '%s", ref)
+		}
+		if descent {
+			log.Warn("Asking for less resources..., ain't gonna happen :(")
+		}
 	}
 
 	newHost, err := svc.provider.ResizeHost(id, hostSizeRequest)
@@ -325,31 +327,29 @@ func (svc *HostHandler) Create(
 	}()
 
 	// Updates property propsv1.HostSizing
-	hostSizingV1 := propsv1.NewHostSizing()
 	if host == nil {
 		return nil, throwErrf("unexpected error creating host instance: host is nil !")
 	}
 	if host.Properties == nil {
 		return nil, throwErrf("error populating host properties: host.Properties is nil !")
 	}
-	err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
+
+	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		hostSizingV1 := v.(*propsv1.HostSizing)
+		hostSizingV1.Template = hostRequest.TemplateID
+		hostSizingV1.RequestedSize = &propsv1.HostSize{
+			Cores:     cpu,
+			RAMSize:   ram,
+			DiskSize:  disk,
+			GPUNumber: gpuNumber,
+			CPUFreq:   freq,
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, infraErr(err)
 	}
 	// TODO OPP Unsafe
-
-	hostSizingV1.Template = hostRequest.TemplateID
-	hostSizingV1.RequestedSize = &propsv1.HostSize{
-		Cores:     cpu,
-		RAMSize:   ram,
-		DiskSize:  disk,
-		GPUNumber: gpuNumber,
-		CPUFreq:   freq,
-	}
-	err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
-	if err != nil {
-		return nil, infraErr(err)
-	}
 
 	// Sets host extension DescriptionV1
 	creator := ""
@@ -365,40 +365,48 @@ func (svc *HostHandler) Create(
 	} else {
 		creator = "unknown@" + hostname
 	}
-	err = host.Properties.Set(string(HostProperty.DescriptionV1), &propsv1.HostDescription{
-		Created: time.Now(),
-		Creator: creator,
+	err = host.Properties.LockForWrite(HostProperty.DescriptionV1).ThenUse(func(v interface{}) error {
+		hostDescriptionV1 := v.(*propsv1.HostDescription)
+		hostDescriptionV1.Created = time.Now()
+		hostDescriptionV1.Creator = creator
+		return nil
 	})
+	if err != nil {
+		return nil, infraErr(err)
+	}
 
 	// Updates host property propsv1.HostNetwork
-	hostNetworkV1 := propsv1.NewHostNetwork()
-	err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
-	if err != nil {
-		return nil, infraErr(err)
-	}
-	defaultNetworkID := hostNetworkV1.DefaultNetworkID // set earlier by svc.provider.CreateHost()
-	gatewayID := ""
-	if !public {
-		if len(networks) > 0 {
-			mgw, err := metadata.LoadGateway(svc.provider, defaultNetworkID)
-			if err == nil {
-				gatewayID = mgw.Get().ID
+	var (
+		defaultNetworkID string
+		gatewayID        string
+	)
+	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		hostNetworkV1 := v.(*propsv1.HostNetwork)
+		defaultNetworkID = hostNetworkV1.DefaultNetworkID // set earlier by svc.provider.CreateHost()
+		if !public {
+			if len(networks) > 0 {
+				mgw, err := metadata.LoadGateway(svc.provider, defaultNetworkID)
+				if err == nil {
+					gatewayID = mgw.Get().ID
+				}
 			}
 		}
-	}
-	hostNetworkV1.DefaultGatewayID = gatewayID
-	err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
+		hostNetworkV1.DefaultGatewayID = gatewayID
+
+		if net != "" {
+			mn, err := metadata.LoadNetwork(svc.provider, net)
+			if err != nil {
+				return err
+			}
+			network := mn.Get()
+			hostNetworkV1.NetworksByID[network.ID] = network.Name
+			hostNetworkV1.NetworksByName[network.Name] = network.ID
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, infraErr(err)
-	}
-	if net != "" {
-		mn, err := metadata.LoadNetwork(svc.provider, net)
-		if err != nil {
-			return nil, infraErr(err)
-		}
-		network := mn.Get()
-		hostNetworkV1.NetworksByID[network.ID] = network.Name
-		hostNetworkV1.NetworksByName[network.Name] = network.ID
 	}
 
 	// Updates metadata
@@ -408,20 +416,17 @@ func (svc *HostHandler) Create(
 	}
 	log.Infof("Compute resource created: '%s'", host.Name)
 
-	networkHostsV1 := propsv1.NewNetworkHosts()
 	for _, i := range networks {
-		err = i.Properties.Get(NetworkProperty.HostsV1, networkHostsV1)
+		err = i.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+			networkHostsV1 := v.(*propsv1.NetworkHosts)
+			networkHostsV1.ByName[host.Name] = host.ID
+			networkHostsV1.ByID[host.ID] = host.Name
+			return nil
+		})
 		if err != nil {
 			log.Errorf(err.Error())
 			continue
 		}
-		networkHostsV1.ByName[host.Name] = host.ID
-		networkHostsV1.ByID[host.ID] = host.Name
-		err = i.Properties.Set(NetworkProperty.HostsV1, networkHostsV1)
-		if err != nil {
-			log.Errorf(err.Error())
-		}
-
 		err = metadata.SaveNetwork(svc.provider, i)
 		if err != nil {
 			log.Errorf(err.Error())
@@ -544,8 +549,8 @@ func (svc *HostHandler) Inspect(ref string) (*model.Host, error) {
 
 // Delete deletes host referenced by ref
 func (svc *HostHandler) Delete(ref string) error {
-	log.Debugf("broker.server.handlers.HostHandler::Delete(%s) called", ref)
-	defer log.Debugf("broker.server.handlers.HostHandler::Delete(%s) done", ref)
+	log.Debugf(">>> broker.server.handlers.HostHandler::Delete(%s)", ref)
+	defer log.Debugf("<<< broker.server.handlers.HostHandler::Delete(%s)", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -556,99 +561,119 @@ func (svc *HostHandler) Delete(ref string) error {
 	}
 
 	host := mh.Get()
-	// Don't remove a host having shares
-	hostSharesV1 := propsv1.NewHostShares()
-	err = host.Properties.Get(HostProperty.SharesV1, hostSharesV1)
+	// Don't remove a host having shares that are currently remotely mounted
+	var shares map[string]*propsv1.HostShare
+	err = host.Properties.LockForRead(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+		shares = v.(*propsv1.HostShares).ByID
+		for _, share := range shares {
+			count := len(share.ClientsByID)
+			if count > 0 {
+				count = len(shares)
+				return logicErr(fmt.Errorf("can't delete host, exports %d share%s where at least one is used", count, utils.Plural(count)))
+			}
+		}
+		return nil
+	})
 	if err != nil {
-		return logicErrf(err, "can't delete host '%s'", ref)
-	}
-	nShares := len(hostSharesV1.ByID)
-	if nShares > 0 {
-		return logicErr(fmt.Errorf("can't delete host, exports %d share%s", nShares, utils.Plural(nShares)))
+		return err
 	}
 
 	// Don't remove a host with volumes attached
-	hostVolumesV1 := propsv1.NewHostVolumes()
-	err = host.Properties.Get(HostProperty.VolumesV1, hostVolumesV1)
+	err = host.Properties.LockForRead(HostProperty.VolumesV1).ThenUse(func(v interface{}) error {
+		nAttached := len(v.(*propsv1.HostVolumes).VolumesByID)
+		if nAttached > 0 {
+			return logicErr(fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached)))
+		}
+		return nil
+	})
 	if err != nil {
-		return logicErr(err)
-	}
-	nAttached := len(hostVolumesV1.VolumesByID)
-	if nAttached > 0 {
-		return logicErr(fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached)))
+		return err
 	}
 
 	// Don't remove a host that is a gateway
-	hostNetworkV1 := propsv1.NewHostNetwork()
-	err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		if v.(*propsv1.HostNetwork).IsGateway {
+			return logicErr(fmt.Errorf("can't delete host, it's a gateway that can only be deleted through its network"))
+		}
+		return nil
+	})
 	if err != nil {
-		return logicErr(err)
-	}
-	if hostNetworkV1.IsGateway {
-		return logicErr(fmt.Errorf("can't delete host, it's a gateway that can't be deleted but with its network"))
+		return err
 	}
 
 	// If host mounted shares, unmounts them before anything else
-	hostMountsV1 := propsv1.NewHostMounts()
-	err = host.Properties.Get(HostProperty.MountsV1, hostMountsV1)
-	if err != nil {
-		return logicErr(err)
-	}
 	shareHandler := NewShareHandler(svc.provider)
-	for _, i := range hostMountsV1.RemoteMountsByPath {
-		// Gets share data
-		_, share, _, err := shareHandler.Inspect(i.ShareID)
-		if err != nil {
-			return infraErr(err)
+	var mounts []*propsv1.HostShare
+	err = host.Properties.LockForRead(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+		hostMountsV1 := v.(*propsv1.HostMounts)
+		for _, i := range hostMountsV1.RemoteMountsByPath {
+			// Gets share data
+			_, share, _, err := shareHandler.Inspect(i.ShareID)
+			if err != nil {
+				return infraErr(err)
+			}
+			if share == nil {
+				return model.ResourceNotFoundError("share", i.ShareID)
+			}
+			mounts = append(mounts, share)
 		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
-		if share == nil {
-			return model.ResourceNotFoundError("share", i.ShareID)
-		}
-
-		// Unmounts share from host
+	// Unmounts tier shares mounted on host (done outside the previous host.Properties.Reading() section, because
+	// Unmount() have to lock for write, and won't succeed while host.Properties.Reading() is running,
+	// leading to a deadlock)
+	for _, share := range mounts {
 		err = shareHandler.Unmount(share.Name, host.Name)
 		if err != nil {
 			return infraErr(err)
 		}
 	}
 
-	// if host has shares, delete them
-	for _, share := range hostSharesV1.ByID {
+	// if host exports shares, delete them
+	for _, share := range shares {
 		err = shareHandler.Delete(share.Name)
 		if err != nil {
 			return throwErr(err)
 		}
 	}
 
+	// Update networks property prosv1.NetworkHosts to remove the reference to the host
+	netHandler := NewNetworkHandler(svc.provider)
+	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		hostNetworkV1 := v.(*propsv1.HostNetwork)
+		for k := range hostNetworkV1.NetworksByID {
+			network, err := netHandler.Inspect(k)
+			if err != nil {
+				log.Errorf(err.Error())
+			}
+			err = network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
+				networkHostsV1 := v.(*propsv1.NetworkHosts)
+				delete(networkHostsV1.ByID, host.ID)
+				delete(networkHostsV1.ByName, host.Name)
+				return nil
+			})
+			if err != nil {
+				log.Errorf(err.Error())
+			}
+			err = metadata.SaveNetwork(svc.provider, network)
+			if err != nil {
+				log.Errorf(err.Error())
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
 	// Conditions are met, delete host
 	err = svc.provider.DeleteHost(host.ID)
 	if err != nil {
 		return infraErrf(err, "can't delete host")
-	}
-
-	// Update networks property prosv1.NetworkHosts to remove the reference to the host
-	networkHostsV1 := propsv1.NewNetworkHosts()
-	netHandler := NewNetworkHandler(svc.provider)
-	for k := range hostNetworkV1.NetworksByID {
-		network, err := netHandler.Inspect(k)
-		if err != nil {
-			log.Errorf(err.Error())
-		}
-		err = network.Properties.Get(NetworkProperty.HostsV1, networkHostsV1)
-		if err != nil {
-			log.Errorf(err.Error())
-		}
-		delete(networkHostsV1.ByID, host.ID)
-		delete(networkHostsV1.ByName, host.Name)
-		err = network.Properties.Set(NetworkProperty.HostsV1, networkHostsV1)
-		if err != nil {
-			log.Errorf(err.Error())
-		}
-		err = metadata.SaveNetwork(svc.provider, network)
-		if err != nil {
-			log.Errorf(err.Error())
-		}
 	}
 
 	// Finally, delete metadata of host
@@ -658,8 +683,8 @@ func (svc *HostHandler) Delete(ref string) error {
 
 // SSH returns ssh parameters to access the host referenced by ref
 func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
-	log.Debugf("broker.server.handlers.HostHandler::SSH(%s) called", ref)
-	defer log.Debugf("broker.server.handlers.HostHandler::SSH(%s) done", ref)
+	log.Debugf(">>> broker.server.handlers.HostHandler::SSH(%s)", ref)
+	defer log.Debugf("<<< broker.server.handlers.HostHandler::SSH(%s)", ref)
 
 	host, err := svc.Inspect(ref)
 	if err != nil {

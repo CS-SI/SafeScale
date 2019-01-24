@@ -293,13 +293,15 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	defaultGatewayID := ""
 	defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
-		hostNetworkV1 := propsv1.NewHostNetwork()
-		err := defaultGateway.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+		err := defaultGateway.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+			hostNetworkV1 := v.(*propsv1.HostNetwork)
+			defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
+			defaultGatewayID = defaultGateway.ID
+			return nil
+		})
 		if err != nil {
 			return nil, err
 		}
-		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
-		defaultGatewayID = defaultGateway.ID
 	}
 
 	var nets []servers.Network
@@ -398,24 +400,26 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	host := model.NewHost()
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 
-	hostNetworkV1 := propsv1.NewHostNetwork()
-	hostNetworkV1.IsGateway = isGateway
-	hostNetworkV1.DefaultNetworkID = defaultNetworkID
-	hostNetworkV1.DefaultGatewayID = defaultGatewayID
-	hostNetworkV1.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
-
-	// Updates Host property NetworkV1
-	err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
+	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		hostNetworkV1 := v.(*propsv1.HostNetwork)
+		hostNetworkV1.IsGateway = isGateway
+		hostNetworkV1.DefaultNetworkID = defaultNetworkID
+		hostNetworkV1.DefaultGatewayID = defaultGatewayID
+		hostNetworkV1.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	// Adds Host property SizingV1
 	template.HostSize.DiskSize = diskSize // Makes sure the size of disk is correctly saved
-	err = host.Properties.Set(HostProperty.SizingV1, &propsv1.HostSizing{
+	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		hostSizingV1 := v.(*propsv1.HostSizing)
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
-		Template:      request.TemplateID,
-		AllocatedSize: template.HostSize,
+		hostSizingV1.Template = request.TemplateID
+		hostSizingV1.AllocatedSize = template.HostSize
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -500,18 +504,16 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 			}
 		}()
 
-		err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
-		if err != nil {
-			return nil, err
-		}
-		if IPVersion.IPv4.Is(fip.PublicIPAddress) {
-			hostNetworkV1.PublicIPv4 = fip.PublicIPAddress
-		} else if IPVersion.IPv6.Is(fip.PublicIPAddress) {
-			hostNetworkV1.PublicIPv6 = fip.PublicIPAddress
-		}
-
 		// Updates Host property NetworkV1 in host instance
-		err = host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
+		err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+			hostNetworkV1 := v.(*propsv1.HostNetwork)
+			if IPVersion.IPv4.Is(fip.PublicIPAddress) {
+				hostNetworkV1.PublicIPv4 = fip.PublicIPAddress
+			} else if IPVersion.IPv6.Is(fip.PublicIPAddress) {
+				hostNetworkV1.PublicIPv6 = fip.PublicIPAddress
+			}
+			return nil
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -646,104 +648,87 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 	host.LastState = toHostState(server.Status)
 
 	// Updates Host Property propsv1.HostDescription
-	hostDescriptionV1 := propsv1.NewHostDescription()
-	err = host.Properties.Get(HostProperty.DescriptionV1, hostDescriptionV1)
+	err = host.Properties.LockForWrite(HostProperty.DescriptionV1).ThenUse(func(v interface{}) error {
+		hostDescriptionV1 := v.(*propsv1.HostDescription)
+		hostDescriptionV1.Created = server.Created
+		hostDescriptionV1.Updated = server.Updated
+		return nil
+	})
 	if err != nil {
 		return err
 	}
-	hostDescriptionV1.Created = server.Created
-	hostDescriptionV1.Updated = server.Updated
-	err = host.Properties.Set(HostProperty.DescriptionV1, hostDescriptionV1)
-	if err != nil {
-		return err
-	}
-
-	// // Updates Host Property propsv1.HostSizing
-	// hostSizingV1 := propsv1.NewHostSizing()
-	// err = host.Properties.Get(HostProperty.SizingV1, hostSizingV1)
-	// if err != nil {
-	// 	return err
-	// }
-	// hostSizingV1.AllocatedSize = client.toHostSize(server.Flavor)
-	// err = host.Properties.Set(HostProperty.SizingV1, hostSizingV1)
-	// if err != nil {
-	// 	return err
-	// }
 
 	// Updates Host Property HostNetwork
-	hostNetworkV1 := propsv1.NewHostNetwork()
-	err = host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
-	if err != nil {
-		return nil
-	}
-	if hostNetworkV1.PublicIPv4 == "" {
-		hostNetworkV1.PublicIPv4 = ipv4
-	}
-	if hostNetworkV1.PublicIPv6 == "" {
-		hostNetworkV1.PublicIPv6 = ipv6
-	}
+	return host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		hostNetworkV1 := v.(*propsv1.HostNetwork)
+		if hostNetworkV1.PublicIPv4 == "" {
+			hostNetworkV1.PublicIPv4 = ipv4
+		}
+		if hostNetworkV1.PublicIPv6 == "" {
+			hostNetworkV1.PublicIPv6 = ipv6
+		}
 
-	if len(hostNetworkV1.NetworksByID) > 0 {
-		ipv4Addresses := map[string]string{}
-		ipv6Addresses := map[string]string{}
+		if len(hostNetworkV1.NetworksByID) > 0 {
+			ipv4Addresses := map[string]string{}
+			ipv6Addresses := map[string]string{}
+			for netid, netname := range hostNetworkV1.NetworksByID {
+				if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
+					ipv4Addresses[netid] = ip
+				} else if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
+					ipv4Addresses[netid] = ip
+				} else {
+					ipv4Addresses[netid] = ""
+				}
+
+				if ip, ok := addresses[IPVersion.IPv6][netid]; ok {
+					ipv6Addresses[netid] = ip
+				} else if ip, ok := addresses[IPVersion.IPv6][netname]; ok {
+					ipv6Addresses[netid] = ip
+				} else {
+					ipv6Addresses[netid] = ""
+				}
+			}
+			hostNetworkV1.IPv4Addresses = ipv4Addresses
+			hostNetworkV1.IPv6Addresses = ipv6Addresses
+		} else {
+			networksByID := map[string]string{}
+			ipv4Addresses := map[string]string{}
+			ipv6Addresses := map[string]string{}
+			for _, netid := range networks {
+				networksByID[netid] = ""
+
+				if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
+					ipv4Addresses[netid] = ip
+				} else {
+					ipv4Addresses[netid] = ""
+				}
+
+				if ip, ok := addresses[IPVersion.IPv6][netid]; ok {
+					ipv6Addresses[netid] = ip
+				} else {
+					ipv6Addresses[netid] = ""
+				}
+			}
+			hostNetworkV1.NetworksByID = networksByID
+			// IPvxAddresses are here indexed by names... At least we have them...
+			hostNetworkV1.IPv4Addresses = ipv4Addresses
+			hostNetworkV1.IPv6Addresses = ipv6Addresses
+		}
+
+		// Updates network name and relationships if needed
 		for netid, netname := range hostNetworkV1.NetworksByID {
-			if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
-				ipv4Addresses[netid] = ip
-			} else if ip, ok := addresses[IPVersion.IPv4][netname]; ok {
-				ipv4Addresses[netid] = ip
-			} else {
-				ipv4Addresses[netid] = ""
-			}
-
-			if ip, ok := addresses[IPVersion.IPv6][netid]; ok {
-				ipv6Addresses[netid] = ip
-			} else if ip, ok := addresses[IPVersion.IPv6][netname]; ok {
-				ipv6Addresses[netid] = ip
-			} else {
-				ipv6Addresses[netid] = ""
+			if netname == "" {
+				net, err := client.GetNetwork(netid)
+				if err != nil {
+					log.Errorf("failed to get network '%s'", netid)
+					continue
+				}
+				hostNetworkV1.NetworksByID[netid] = net.Name
+				hostNetworkV1.NetworksByName[net.Name] = netid
 			}
 		}
-		hostNetworkV1.IPv4Addresses = ipv4Addresses
-		hostNetworkV1.IPv6Addresses = ipv6Addresses
-	} else {
-		networksByID := map[string]string{}
-		ipv4Addresses := map[string]string{}
-		ipv6Addresses := map[string]string{}
-		for _, netid := range networks {
-			networksByID[netid] = ""
-
-			if ip, ok := addresses[IPVersion.IPv4][netid]; ok {
-				ipv4Addresses[netid] = ip
-			} else {
-				ipv4Addresses[netid] = ""
-			}
-
-			if ip, ok := addresses[IPVersion.IPv6][netid]; ok {
-				ipv6Addresses[netid] = ip
-			} else {
-				ipv6Addresses[netid] = ""
-			}
-		}
-		hostNetworkV1.NetworksByID = networksByID
-		// IPvxAddresses are here indexed by names... At least we have them...
-		hostNetworkV1.IPv4Addresses = ipv4Addresses
-		hostNetworkV1.IPv6Addresses = ipv6Addresses
-	}
-
-	// Updates network name and relationships if needed
-	for netid, netname := range hostNetworkV1.NetworksByID {
-		if netname == "" {
-			net, err := client.GetNetwork(netid)
-			if err != nil {
-				log.Errorf("failed to get network '%s'", netid)
-				continue
-			}
-			hostNetworkV1.NetworksByID[netid] = net.Name
-			hostNetworkV1.NetworksByName[net.Name] = netid
-		}
-	}
-
-	return host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1)
+		return nil
+	})
 }
 
 // collectAddresses converts adresses returned by the OpenStack driver

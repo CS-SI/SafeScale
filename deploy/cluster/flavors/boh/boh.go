@@ -22,7 +22,6 @@ package boh
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -52,6 +51,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 	"github.com/CS-SI/SafeScale/utils/template"
 )
 
@@ -105,6 +105,23 @@ type managerData struct {
 	PublicLastIndex int
 }
 
+// Content ... (serialize.Property interface)
+func (md *managerData) Content() interface{} {
+	return md
+}
+
+// Clone ... (serialize.Property interface)
+func (md *managerData) Clone() serialize.Property {
+	nmd := &managerData{}
+	*nmd = *md
+	return nmd
+}
+
+// Replace ... (serialize.Property interface)
+func (md *managerData) Replace(v interface{}) {
+	*md = *v.(*managerData)
+}
+
 // Cluster is the object describing a cluster
 type Cluster struct {
 	// Core cluster data
@@ -143,11 +160,11 @@ func Load(data *metadata.Cluster) (*Cluster, error) {
 }
 
 func (c *Cluster) reset() {
-	if c.manager == nil {
-		c.manager = &managerData{}
-	}
-	manager := &managerData{}
-	err := c.Core.Extensions.Get(Extension.FlavorV1, manager)
+	var manager *managerData
+	err := c.Core.Extensions.LockForRead(Extension.FlavorV1).ThenUse(func(v interface{}) error {
+		manager = v.(*managerData)
+		return nil
+	})
 	if err != nil {
 		panic("failed to get cluster manager data!")
 	}
@@ -296,7 +313,11 @@ func Create(req core.Request) (*Cluster, error) {
 		},
 		manager: &managerData{},
 	}
-	err = instance.Core.Extensions.Set(Extension.FlavorV1, instance.manager)
+	err = instance.Core.Extensions.LockForWrite(Extension.FlavorV1).ThenUse(func(v interface{}) error {
+		manager := v.(*managerData)
+		*manager = *instance.manager
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -1274,6 +1295,6 @@ func (c *Cluster) Delete() error {
 }
 
 func init() {
-	gob.Register(Cluster{})
-	gob.Register(managerData{})
+	module := "clusters." + strings.ToLower(Flavor.BOH.String())
+	serialize.PropertyTypeRegistry.Register(module, Extension.FlavorV1, &managerData{})
 }

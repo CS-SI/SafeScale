@@ -18,7 +18,6 @@ package dcos
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -31,6 +30,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 	"github.com/CS-SI/SafeScale/utils/template"
 
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
@@ -129,6 +129,23 @@ type managerData struct {
 	PublicLastIndex int
 }
 
+// Content ... (serialize.Property interface)
+func (md *managerData) Content() interface{} {
+	return md
+}
+
+// Clone ... (serialize.Property interface)
+func (md *managerData) Clone() serialize.Property {
+	nmd := &managerData{}
+	*nmd = *md
+	return nmd
+}
+
+// Replace ... (serialize.Property interface)
+func (md *managerData) Replace(v interface{}) {
+	*md = *v.(*managerData)
+}
+
 // Cluster is the object describing a cluster based on DCOS
 type Cluster struct {
 	// Core cluster data; serialized in ObjectStorage
@@ -168,12 +185,13 @@ func Load(data *metadata.Cluster) (clusterapi.Cluster, error) {
 }
 
 func (c *Cluster) reset() {
-	manager := &managerData{}
-	err := c.Core.Extensions.Get(Extension.FlavorV1, manager)
+	err := c.Core.Extensions.LockForRead(Extension.FlavorV1).ThenUse(func(v interface{}) error {
+		c.manager = v.(*managerData)
+		return nil
+	})
 	if err != nil {
 		panic("failed to get cluster manager data!")
 	}
-	c.manager = manager
 }
 
 // Reload reloads metadata of Cluster from ObjectStorage
@@ -216,6 +234,8 @@ func Create(req core.Request) (*Cluster, error) {
 		}
 	}
 
+	broker := brokerclient.New()
+
 	// Creates network
 	log.Printf("Creating Network 'net-%s'", req.Name)
 	req.Name = strings.ToLower(req.Name)
@@ -230,7 +250,7 @@ func Create(req core.Request) (*Cluster, error) {
 			ImageID: centos,
 		},
 	}
-	network, err := brokerclient.New().Network.Create(def, brokerclient.DefaultExecutionTimeout)
+	network, err := broker.Network.Create(def, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		err = fmt.Errorf("failed to create Network '%s': %s", networkName, err.Error())
 		return nil, err
@@ -258,7 +278,6 @@ func Create(req core.Request) (*Cluster, error) {
 		results                       install.Results
 		hpNetworkV1                   = propsv1.NewHostNetwork()
 	)
-	broker := brokerclient.New()
 
 	tenant, err := broker.Tenant.Get(brokerclient.DefaultExecutionTimeout)
 	if err != nil {
@@ -284,7 +303,7 @@ func Create(req core.Request) (*Cluster, error) {
 	}
 	gw = m.Get()
 
-	err = brokerclient.New().Ssh.WaitReady(gw.ID, brokerclient.DefaultExecutionTimeout)
+	err = broker.Ssh.WaitReady(gw.ID, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		err = brokerclient.DecorateError(err, "wait for gateway ssh service to be ready", false)
 		goto cleanNetwork
@@ -333,6 +352,7 @@ func Create(req core.Request) (*Cluster, error) {
 			NodesDef:         nodesDef,
 			DisabledFeatures: req.DisabledDefaultFeatures,
 			Service:          svc,
+			Extensions:       serialize.NewJSONProperties("cluster.dcos"),
 		},
 		manager: &managerData{},
 	}
@@ -341,19 +361,21 @@ func Create(req core.Request) (*Cluster, error) {
 		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
 		goto cleanNetwork
 	}
-	err = gw.Properties.Get(HostProperty.NetworkV1, hpNetworkV1)
-	if err != nil {
-		goto cleanNetwork
-	}
-	err = instance.updateMetadata(func() error {
-		// Saves gateway information in cluster metadata
-		instance.Core.PublicIP = gw.GetAccessIP()
-		instance.manager.BootstrapID = gw.ID
-		instance.manager.BootstrapIP = hpNetworkV1.IPv4Addresses[hpNetworkV1.DefaultNetworkID]
+	err = gw.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		gatewayNetworkV1 := v.(*propsv1.HostNetwork)
+		err = instance.updateMetadata(func() error {
+			// Saves gateway information in cluster metadata
+			instance.Core.PublicIP = gw.GetAccessIP()
+			instance.manager.BootstrapID = gw.ID
+			instance.manager.BootstrapIP = hpNetworkV1.IPv4Addresses[gatewayNetworkV1.DefaultNetworkID]
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
+		}
 		return nil
 	})
 	if err != nil {
-		err = fmt.Errorf("failed to create cluster '%s': %s", req.Name, err.Error())
 		goto cleanNetwork
 	}
 
@@ -519,26 +541,26 @@ func Sanitize(data *metadata.Cluster) error {
 		masterIPs := []string{}
 		privateNodeIPs := []string{}
 		publicNodeIPs := []string{}
-		hostNetworkV1 := propsv1.NewHostNetwork()
-		defaultNetworkIP := hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
-		for _, h := range hosts {
-			err = h.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
-			if err != nil {
-				return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
+		defaultNetworkIP := ""
+		err = gw.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+			hostNetworkV1 := v.(*propsv1.HostNetwork)
+			defaultNetworkIP = hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
+			for _, h := range hosts {
+				if strings.HasPrefix(h.Name, instance.Core.Name+"-master-") {
+					masterIDs = append(masterIDs, h.ID)
+					masterIPs = append(masterIPs, defaultNetworkIP)
+				} else if strings.HasPrefix(h.Name, instance.Core.Name+"-node-") {
+					privateNodeIPs = append(privateNodeIPs, defaultNetworkIP)
+				} else if strings.HasPrefix(h.Name, instance.Core.Name+"-pubnode-") {
+					publicNodeIPs = append(privateNodeIPs, defaultNetworkIP)
+				}
 			}
-			if strings.HasPrefix(h.Name, instance.Core.Name+"-master-") {
-				masterIDs = append(masterIDs, h.ID)
-				masterIPs = append(masterIPs, defaultNetworkIP)
-			} else if strings.HasPrefix(h.Name, instance.Core.Name+"-node-") {
-				privateNodeIPs = append(privateNodeIPs, defaultNetworkIP)
-			} else if strings.HasPrefix(h.Name, instance.Core.Name+"-pubnode-") {
-				publicNodeIPs = append(privateNodeIPs, defaultNetworkIP)
-			}
-		}
-		err = gw.Properties.Get(HostProperty.NetworkV1, hostNetworkV1)
+			return nil
+		})
 		if err != nil {
 			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
 		}
+
 		newManager := &managerData{
 			BootstrapID:      gw.ID,
 			BootstrapIP:      defaultNetworkIP,
@@ -1735,7 +1757,10 @@ func (c *Cluster) updateMetadata(updatefn func() error) error {
 	}
 
 	// Make sure manager data is serialized in appropriate Core extension
-	err := c.Core.Extensions.Set(Extension.FlavorV1, c.manager)
+	err := c.Core.Extensions.LockForWrite(Extension.FlavorV1).ThenUse(func(v interface{}) error {
+		c.manager = v.(*managerData)
+		return nil
+	})
 	if err != nil {
 		return err
 	}
@@ -1792,6 +1817,6 @@ func (c *Cluster) Delete() error {
 }
 
 func init() {
-	gob.Register(Cluster{})
-	gob.Register(managerData{})
+	module := "clusters." + strings.ToLower(Flavor.DCOS.String())
+	serialize.PropertyTypeRegistry.Register(module, Extension.FlavorV1, &managerData{})
 }

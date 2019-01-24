@@ -21,19 +21,19 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // Item is an entry in the ObjectStorage
 type Item struct {
-	payload model.Serializable
+	payload serialize.Serializable
 	folder  *Folder
 	lock    sync.Mutex
 }
 
 // ItemDecoderCallback ...
-type ItemDecoderCallback func([]byte) (model.Serializable, error)
+type ItemDecoderCallback func([]byte) (serialize.Serializable, error)
 
 // NewItem creates a new item with 'name' and in 'path'
 func NewItem(svc *providers.Service, path string) *Item {
@@ -64,7 +64,7 @@ func (i *Item) GetPath() string {
 }
 
 // Carry links metadata with cluster struct
-func (i *Item) Carry(data model.Serializable) *Item {
+func (i *Item) Carry(data serialize.Serializable) *Item {
 	i.payload = data
 	return i
 }
@@ -107,7 +107,7 @@ func (i *Item) Delete(name string) error {
 
 // ReadFrom reads metadata of item from Object Storage in a subfolder
 func (i *Item) ReadFrom(path string, name string, callback ItemDecoderCallback) (bool, error) {
-	var data model.Serializable
+	var data serialize.Serializable
 	found, err := i.folder.Read(path, name, func(buf []byte) error {
 		var err error
 		data, err = callback(buf)
