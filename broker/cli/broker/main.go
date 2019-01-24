@@ -33,7 +33,7 @@ import (
 )
 
 func cleanup() {
-	fmt.Println("\nBe carfull stoping broker will not stop the execution on brokerd!")
+	fmt.Println("\nBe carfull stoping broker will not stop the execution on brokerd! (but will remove created devices after they finish creation : WIP)")
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Do you really want to stop broker ? [y]es [n]o: ")
 	text, err := reader.ReadString('\n')
@@ -43,6 +43,7 @@ func cleanup() {
 	}
 	if strings.TrimRight(text, "\n") == "y" {
 		utils.Cancel()
+		os.Exit(1)
 	}
 }
 
@@ -134,6 +135,6 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error Running App : " + err.Error())
 	}
 }

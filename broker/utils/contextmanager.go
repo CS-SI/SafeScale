@@ -20,17 +20,28 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	uuid "github.com/satori/go.uuid"
+	"google.golang.org/grpc/metadata"
 )
 
-var grpcCancelContext context.Context
-var grpcCancelFunc func()
+var client_CancelContext context.Context
+var client_CancelFunc func()
+var client_RPCUUID uuid.UUID
+
+//--------------------- CLIENT ---------------------------------
 
 // GetCancelContext ...
 func GetCancelContext() context.Context {
-	if grpcCancelContext == nil {
-		grpcCancelContext, grpcCancelFunc = context.WithCancel(context.Background())
+	if client_CancelContext == nil {
+		client_RPCUUID, err := uuid.NewV4()
+		if err != nil {
+			panic("Failed to generate client_RPCUUID")
+		}
+		client_CancelContext, client_CancelFunc = context.WithCancel(context.Background())
+		client_CancelContext = metadata.AppendToOutgoingContext(client_CancelContext, "UUID", client_RPCUUID.String())
 	}
-	return grpcCancelContext
+	return client_CancelContext
 }
 
 // GetTimeoutContext return a context for grpc commands
@@ -41,8 +52,12 @@ func GetTimeoutContext(timeout time.Duration) (context.Context, context.CancelFu
 
 // Cancel ...
 func Cancel() {
-	grpcCancelFunc()
+	if client_CancelContext != nil {
+		client_CancelFunc()
+	}
 }
+
+//--------------------- SERVER ---------------------------------
 
 // TaskStatus ...
 func TaskStatus(ctx context.Context) error {

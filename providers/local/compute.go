@@ -294,7 +294,7 @@ func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
 	priKey := string(priKeyPem)
 	uuid, err := uuid.NewV4()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to génerate uuid key : %s", err.Error())
+		return nil, fmt.Errorf("Failed to generate uuid key : %s", err.Error())
 	}
 	return &model.KeyPair{
 		ID:         uuid.String(),
