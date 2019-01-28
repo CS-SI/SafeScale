@@ -363,6 +363,8 @@ func Create(req core.Request) (*Cluster, error) {
 		mastersStatus = <-mastersChannel
 	}
 
+	nodesStatus = <-nodesChannel
+
 	// Step 5: Starts nodes configuration, if all masters and nodes
 	// have been created and gateway has been configured with success
 	if gatewayStatus == nil && mastersStatus == nil && nodesStatus == nil {
