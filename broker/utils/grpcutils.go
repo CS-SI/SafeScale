@@ -36,6 +36,7 @@ const (
 	TimeoutCtxHost = 5 * time.Minute
 )
 
+// GetTimeoutCtxDefault ...
 func GetTimeoutCtxDefault() time.Duration {
 	sshDefaultTimeout := int(TimeoutCtxDefault.Minutes())
 
@@ -49,6 +50,7 @@ func GetTimeoutCtxDefault() time.Duration {
 	return time.Duration(sshDefaultTimeout) * time.Minute
 }
 
+// GetTimeoutCtxHost ...
 func GetTimeoutCtxHost() time.Duration {
 	sshDefaultTimeout := int(TimeoutCtxHost.Minutes())
 
