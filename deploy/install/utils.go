@@ -28,8 +28,6 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
@@ -321,32 +319,21 @@ func setImplicitParameters(t Target, v Variables) {
 	hT, cT, nT := determineContext(t)
 	if cT != nil {
 		cluster := cT.cluster
-		config := cluster.GetConfig()
-		v["ClusterName"] = cluster.GetName()
-		v["ClusterComplexity"] = strings.ToLower(config.Complexity.String())
-		v["ClusterFlavor"] = strings.ToLower(config.Flavor.String())
-		v["GatewayIP"] = config.GatewayIP
-		v["PublicIP"] = config.PublicIP
+		identity := cluster.GetIdentity()
+		v["ClusterName"] = identity.Name
+		v["ClusterComplexity"] = strings.ToLower(identity.Complexity.String())
+		v["ClusterFlavor"] = strings.ToLower(identity.Flavor.String())
+		networkCfg := cluster.GetNetworkConfig()
+		v["GatewayIP"] = networkCfg.GatewayIP
+		v["PublicIP"] = networkCfg.PublicIP
 		v["MasterIDs"] = cluster.ListMasterIDs()
 		v["MasterIPs"] = cluster.ListMasterIPs()
 		if _, ok := v["Username"]; !ok {
 			v["Username"] = "cladm"
-			v["Password"] = config.AdminPassword
+			v["Password"] = identity.AdminPassword
 		}
 		if _, ok := v["CIDR"]; !ok {
-			tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
-			if err == nil {
-				svc, err := providers.GetService(tenant.Name)
-				if err == nil {
-					mn, err := metadata.LoadNetwork(svc, config.NetworkID)
-					if err == nil {
-						n := mn.Get()
-						v["CIDR"] = n.CIDR
-					}
-				} else {
-					fmt.Fprintf(os.Stderr, "failed to determine network CIDR")
-				}
-			}
+			v["CIDR"] = networkCfg.CIDR
 		}
 	} else {
 		var host *pb.Host

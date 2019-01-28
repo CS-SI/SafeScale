@@ -18,10 +18,11 @@ package install
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/model"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/providers/model"
 
 	log "github.com/sirupsen/logrus"
 
@@ -444,7 +445,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 				ok      bool
 				content interface{}
 			)
-			complexity := strings.ToLower(w.cluster.GetConfig().Complexity.String())
+			complexity := strings.ToLower(w.cluster.GetIdentity().Complexity.String())
 			for k, anon := range options {
 				avails[strings.ToLower(k)] = anon
 			}
@@ -524,20 +525,20 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 // 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommanded)
 func (w *worker) validateContextForCluster() error {
-	config := w.cluster.GetConfig()
-	clusterFlavor := config.Flavor
+	clusterFlavor := w.cluster.GetIdentity().Flavor
+
 	yamlKey := "feature.suitableFor.cluster"
 	if w.feature.specs.IsSet(yamlKey) {
 		flavors := strings.Split(w.feature.specs.GetString(yamlKey), ",")
 		for _, k := range flavors {
 			k = strings.ToLower(k)
-			str, err := Flavor.Parse(k)
-			if (err == nil && clusterFlavor == str) || (err != nil && k == "all") {
+			e, err := Flavor.Parse(k)
+			if (err == nil && clusterFlavor == e) || (err != nil && k == "all") {
 				return nil
 			}
 		}
 	}
-	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of cluster", w.feature.DisplayName(), config.Flavor.String())
+	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of cluster", w.feature.DisplayName(), clusterFlavor.String())
 	return fmt.Errorf(msg)
 }
 
@@ -561,7 +562,7 @@ func (w *worker) validateContextForHost() error {
 }
 
 func (w *worker) validateClusterSizing() error {
-	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(w.cluster.GetConfig().Flavor.String())
+	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(w.cluster.GetIdentity().Flavor.String())
 	if !w.feature.specs.IsSet(yamlKey) {
 		return nil
 	}
