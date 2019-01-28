@@ -14,12 +14,12 @@
 * limitations under the License.
  */
 
-package metadata
+package controller
 
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster/core"
+	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 	"github.com/CS-SI/SafeScale/utils/serialize"
@@ -30,36 +30,39 @@ const (
 	clusterFolderName = "clusters"
 )
 
-// Cluster is the cluster definition stored in ObjectStorage
-type Cluster struct {
+// Metadata is the cluster definition stored in ObjectStorage
+type Metadata struct {
 	item *metadata.Item
 	name string
 }
 
-// NewCluster creates a new Cluster metadata
-func NewCluster(svc *providers.Service) (*Cluster, error) {
-	return &Cluster{
+// NewMetadata creates a new Cluster Controller metadata
+func NewMetadata(svc *providers.Service) (*Metadata, error) {
+	return &Metadata{
 		item: metadata.NewItem(svc, clusterFolderName),
 	}, nil
 }
 
 // GetService returns the service used by metadata
-func (m *Cluster) GetService() *providers.Service {
+func (m *Metadata) GetService() *providers.Service {
 	return m.item.GetService()
 }
 
 // Carry links metadata with cluster struct
-func (m *Cluster) Carry(cluster *core.Cluster) *Cluster {
+func (m *Metadata) Carry(cluster *Controller) *Metadata {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
+	if cluster == nil {
+		panic("cluster is nil!")
+	}
 	m.item.Carry(cluster)
-	m.name = cluster.GetName()
+	m.name = cluster.GetIdentity().Name
 	return m
 }
 
 // Delete removes a cluster metadata
-func (m *Cluster) Delete() error {
+func (m *Metadata) Delete() error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
@@ -67,21 +70,20 @@ func (m *Cluster) Delete() error {
 }
 
 // Read reads metadata of cluster named 'name' from Object Storage
-func (m *Cluster) Read(name string) (bool, error) {
+func (m *Metadata) Read(name string) (bool, error) {
 	var (
-		target core.Cluster
-		ptr    *core.Cluster
-		ok     bool
+		ptr *Controller
+		ok  bool
 	)
 	// If m.item is already carrying data, overwrites it
-	// Otherwise, allocates new memory
+	// Otherwise, allocates new one
 	anon := m.item.Get()
 	if anon == nil {
-		ptr = &target
+		ptr = &Controller{}
 	} else {
-		ptr, ok = anon.(*core.Cluster)
+		ptr, ok = anon.(*Controller)
 		if !ok {
-			ptr = &target
+			ptr = &Controller{}
 		}
 	}
 	found, err := m.item.Read(name, func(buf []byte) (serialize.Serializable, error) {
@@ -97,18 +99,18 @@ func (m *Cluster) Read(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.name = ptr.GetName()
+	m.name = ptr.GetIdentity().Name
 	return true, nil
 }
 
 // Write saves the content of m to the Object Storage
-func (m *Cluster) Write() error {
+func (m *Metadata) Write() error {
 	return m.item.Write(m.name)
 }
 
 // Reload reloads the metadata from ObjectStorage
 // It's a good idea to do that just after a Acquire() to be sure to have the latest data
-func (m *Cluster) Reload() error {
+func (m *Metadata) Reload() error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
@@ -123,39 +125,39 @@ func (m *Cluster) Reload() error {
 }
 
 // Get returns the content of the metadata
-func (m *Cluster) Get() *core.Cluster {
+func (m *Metadata) Get() api.Cluster {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	if p, ok := m.item.Get().(*core.Cluster); ok {
+	if p, ok := m.item.Get().(api.Cluster); ok {
 		return p
 	}
 	panic("invalid cluster content in metadata")
 }
 
 // Browse walks through cluster folder and executes a callback for each entry
-func (m *Cluster) Browse(callback func(*Cluster) error) error {
+func (m *Metadata) Browse(callback func(api.Cluster) error) error {
 	return m.item.Browse(func(buf []byte) error {
-		cc := core.Cluster{}
+		cc := Controller{}
 		err := (&cc).Deserialize(buf)
 		if err != nil {
 			return err
 		}
-		cm, err := NewCluster(m.GetService())
+		cm, err := NewMetadata(m.GetService())
 		if err != nil {
 			return err
 		}
 		cm.Carry(&cc)
-		return callback(cm)
+		return callback(&cc)
 	})
 }
 
 // Acquire waits until the write lock is available, then locks the metadata
-func (m *Cluster) Acquire() {
+func (m *Metadata) Acquire() {
 	m.item.Acquire()
 }
 
 // Release unlocks the metadata
-func (m *Cluster) Release() {
+func (m *Metadata) Release() {
 	m.item.Release()
 }

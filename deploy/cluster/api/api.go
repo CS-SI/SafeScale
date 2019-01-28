@@ -18,24 +18,33 @@ package api
 
 import (
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/deploy/cluster/core"
+	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/deploy/cluster/identity"
+	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 //go:generate mockgen -destination=../mocks/mock_cluster.go -package=mocks github.com/CS-SI/SafeScale/deploy/cluster/api Cluster
 
 // Cluster is an interface of methods associated to Cluster-like structs
 type Cluster interface {
-	// GetName returns the name of the cluster
-	GetName() string
+	// GetService ...
+	GetService() *providers.Service
+	// GetIdentity returns the identity of the cluster (name, flavor, complexity)
+	GetIdentity() identity.Identity
+	// GetNetworkConfig returns network configuration of the cluster
+	GetNetworkConfig() clusterpropsv1.Network
+	// GetExtensions returns the extension of the cluster
+	GetExtensions() *serialize.JSONProperties
+
 	// Start starts the cluster
 	Start() error
 	// Stop stops the cluster
 	Stop() error
 	// GetState returns the current state of the cluster
 	GetState() (ClusterState.Enum, error)
-	// GetNetworkID returns the ID of the network used by the cluster
-	GetNetworkID() string
 	// AddNode adds a node
 	AddNode(bool, *pb.HostDefinition) (string, error)
 	// AddNodes adds several nodes
@@ -64,6 +73,11 @@ type Cluster interface {
 	CountNodes(bool) uint
 	// Delete allows to destroy infrastructure of cluster
 	Delete() error
-	// GetConfig ...
-	GetConfig() core.Cluster
+
+	// BuildHostName ...
+	BuildHostname(string, NodeType.Enum) (string, error)
+	// UpdateMetadata ...
+	UpdateMetadata(func() error) error
+	// DeleteMetadata ...
+	DeleteMetadata() error
 }

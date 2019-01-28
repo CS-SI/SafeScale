@@ -19,12 +19,18 @@ package Extension
 const (
 	// DescriptionV1 contains optional additional info describing cluster (purpose, ...)
 	DescriptionV1 = "1"
-	// DefaultNodeV1 contains additional info about default node (sizing, ...)
-	DefaultNodeV1 = "2"
-	// FlavorV1 contains optional additional info used by the cluster manager software
-	FlavorV1 = "3"
+	// DefaultsV1 contains additional info about default settings (node sizing, default image, ...)
+	DefaultsV1 = "2"
+	// CompositeV1 contains optional additional info about the composite build of the cluster (multi-tenant)
+	CompositeV1 = "3"
 	// FeaturesV1 contains optional additional info describing installed features on cluster
 	FeaturesV1 = "4"
 	// NasV1 contains optional additional info describing Nases and shared folders on cluster
 	NasV1 = "5"
+	// NodesV1 contains optional additional info describing Nodes inside the cluster
+	NodesV1 = "6"
+	// StateV1 contains optional additional info describing cluster state
+	StateV1 = "7"
+	// NetworkV1 contains optional additional info about network of the cluster
+	NetworkV1 = "8"
 )
