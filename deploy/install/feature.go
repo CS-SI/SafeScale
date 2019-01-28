@@ -381,7 +381,7 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 				msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
 			}
 			if clusterInstance != nil {
-				msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetName())
+				msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetIdentity().Name)
 			}
 			log.Printf("%s %s...\n", msgHead, msgTail)
 		}

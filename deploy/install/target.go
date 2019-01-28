@@ -120,7 +120,7 @@ func NewClusterTarget(cluster clusterapi.Cluster) Target {
 		index   uint8
 		methods = map[uint8]Method.Enum{}
 	)
-	if cluster.GetConfig().Flavor == Flavor.DCOS {
+	if cluster.GetIdentity().Flavor == Flavor.DCOS {
 		index++
 		methods[index] = Method.DCOS
 	}
@@ -139,7 +139,7 @@ func (t *ClusterTarget) Type() string {
 
 // Name returns the name of the cluster
 func (t *ClusterTarget) Name() string {
-	return t.cluster.GetName()
+	return t.cluster.GetIdentity().Name
 }
 
 // Methods returns a list of packaging managers useable on the target

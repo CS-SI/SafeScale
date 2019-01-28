@@ -33,7 +33,7 @@ func (i *dcosInstaller) Check(c *Feature, t Target, v Variables, s Settings) (Re
 	}
 
 	// Replaces variables in normalized script
-	//v["DomainName"] = cluster.GetConfig().DomainName
+	//v["DomainName"] = cluster.GetDomainName().DomainName
 	//	v["dcos"] = dcosCli
 	//	v["kubectl"] = kubectlCli
 	v["options"] = ""
@@ -54,7 +54,7 @@ func (i *dcosInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Resu
 	}
 
 	// Replaces variables in normalized script
-	//v["DomainName"] = cluster.GetConfig().DomainName
+	//v["DomainName"] = cluster.GetDomainName().DomainName
 	//v["dcos"] = dcosCli
 	//v["kubectl"] = kubectlCli
 	v["options"] = ""
@@ -81,7 +81,7 @@ func (i *dcosInstaller) Remove(c *Feature, t Target, v Variables, s Settings) (R
 	}
 
 	// Replaces variables in normalized script
-	//v["DomainName"] = cluster.GetConfig().DomainName
+	//v["DomainName"] = cluster.GetDomainName().DomainName
 	//	v["dcos"] = dcosCli
 	//	v["kubectl"] = kubectlCli
 	v["options"] = ""
