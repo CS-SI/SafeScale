@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package core
+package controller
 
 import (
 	pb "github.com/CS-SI/SafeScale/broker"

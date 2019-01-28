@@ -23,14 +23,12 @@ import (
 
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/core"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/k8s"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/swarm"
-	"github.com/CS-SI/SafeScale/deploy/cluster/metadata"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 )
