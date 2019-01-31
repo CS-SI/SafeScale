@@ -27,6 +27,8 @@ import (
 	"strconv"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
 	libvirt "github.com/libvirt/libvirt-go"
@@ -120,6 +122,9 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*model.Netwo
 
 // CreateNetwork creates a network named name
 func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
+	log.Debug("local.Client.CreateNetwork() called")
+	defer log.Debug("local.Client.CreateNetwork() done")
+
 	name := req.Name
 	ipVersion := req.IPVersion
 	cidr := req.CIDR
@@ -135,6 +140,12 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	}
 
 	libvirtNetwork, err := getNetworkFromRef(name, client.LibvirtService)
+	if err != nil {
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
+			return nil, err
+		}
+	}
+
 	if libvirtNetwork != nil {
 		return nil, fmt.Errorf("Network %s already exists", name)
 	}
@@ -160,8 +171,11 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 	}
 	defer func(*libvirt.Network) {
 		if err != nil {
-			if err := libvirtNetwork.Destroy(); err != nil {
-				fmt.Printf("Failed to destroy network %s : %s\n", name, err.Error())
+			if err := libvirtNetwork.Undefine(); err != nil {
+				fmt.Printf("Failed undefining network %s : %s\n", name, err.Error())
+				if err := libvirtNetwork.Destroy(); err != nil {
+					fmt.Printf("Failed to destroy network %s : %s\n", name, err.Error())
+				}
 			}
 		}
 	}(libvirtNetwork)
@@ -185,6 +199,9 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 
 // GetNetwork returns the network identified by ref (id or name)
 func (client *Client) GetNetwork(ref string) (*model.Network, error) {
+	log.Debug("local.Client.GetNetwork() called")
+	defer log.Debug("local.Client.GetNetwork() done")
+
 	libvirtNetwork, err := getNetworkFromRef(ref, client.LibvirtService)
 	if err != nil {
 		return nil, err
@@ -210,11 +227,16 @@ func (client *Client) GetNetwork(ref string) (*model.Network, error) {
 
 // GetNetworkByName returns the network identified by ref (id or name)
 func (client *Client) GetNetworkByName(ref string) (*model.Network, error) {
+	log.Debug("local.Client.GetNetworkByName() called")
+	defer log.Debug("local.Client.GetNetworkByName() done")
 	return client.GetNetwork(ref)
 }
 
 // ListNetworks lists available networks
 func (client *Client) ListNetworks() ([]*model.Network, error) {
+	log.Debug("local.Client.ListNetworks() called")
+	defer log.Debug("local.Client.ListNetworks() done")
+
 	var networks []*model.Network
 
 	libvirtNetworks, err := client.LibvirtService.ListAllNetworks(3)
@@ -235,6 +257,9 @@ func (client *Client) ListNetworks() ([]*model.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (client *Client) DeleteNetwork(ref string) error {
+	log.Debug("local.Client.DeleteNetwork() called")
+	defer log.Debug("local.Client.DeleteNetwork() done")
+
 	libvirtNetwork, err := getNetworkFromRef(ref, client.LibvirtService)
 	if err != nil {
 		return err
@@ -261,6 +286,9 @@ func (client *Client) DeleteNetwork(ref string) error {
 
 // CreateGateway creates a public Gateway for a private network
 func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
+	log.Debug("local.Client.CreateGateway() called")
+	defer log.Debug("local.Client.CreateGateway() done")
+
 	network := req.Network
 	templateID := req.TemplateID
 	imageID := req.ImageID
@@ -290,7 +318,7 @@ func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, erro
 
 	host, err := client.CreateHost(hostReq)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create geateway host : %s", err.Error())
+		return nil, fmt.Errorf("Failed to create gateway host : %s", err.Error())
 	}
 
 	return host, nil
@@ -298,5 +326,8 @@ func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, erro
 
 // DeleteGateway delete the public gateway referenced by ref (id or name)
 func (client *Client) DeleteGateway(ref string) error {
+	log.Debug("local.Client.DeleteGateway() called")
+	defer log.Debug("local.Client.DeleteGateway() done")
+
 	return client.DeleteHost(ref)
 }
