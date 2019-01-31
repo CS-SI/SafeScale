@@ -65,7 +65,7 @@ type CfgOptions struct {
 func (client *Client) Build(params map[string]interface{}) (api.ClientAPI, error) {
 	clientAPI := &Client{
 		Config: &CfgOptions{
-			ProviderNetwork:           "default", //at least for qemu / KVM
+			ProviderNetwork:           "safescale", //at least for qemu / KVM
 			AutoHostNetworkInterfaces: false,
 			UseLayer3Networking:       false,
 		},
@@ -134,5 +134,6 @@ func (client *Client) GetCfgOpts() (model.Config, error) {
 }
 
 func init() {
+	// log.Debug("Registering local provider")
 	providers.Register("local", &Client{})
 }
