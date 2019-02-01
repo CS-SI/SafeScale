@@ -19,6 +19,7 @@ package main
 // TODO NOTICE Side-effects imports here
 import (
 	"os"
+	"runtime"
 	"sort"
 	"time"
 
@@ -36,6 +37,8 @@ import (
 )
 
 func main() {
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	app := cli.NewApp()
 	app.Name = "deploy"

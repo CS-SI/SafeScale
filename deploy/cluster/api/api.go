@@ -20,9 +20,9 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/deploy/cluster/identity"
 	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -36,8 +36,8 @@ type Cluster interface {
 	GetIdentity() identity.Identity
 	// GetNetworkConfig returns network configuration of the cluster
 	GetNetworkConfig() clusterpropsv1.Network
-	// GetExtensions returns the extension of the cluster
-	GetExtensions() *serialize.JSONProperties
+	// GetProperties returns the extension of the cluster
+	GetProperties() *serialize.JSONProperties
 
 	// Start starts the cluster
 	Start() error
@@ -46,9 +46,9 @@ type Cluster interface {
 	// GetState returns the current state of the cluster
 	GetState() (ClusterState.Enum, error)
 	// AddNode adds a node
-	AddNode(bool, *pb.HostDefinition) (string, error)
+	AddNode(bool, *model.HostDefinition) (string, error)
 	// AddNodes adds several nodes
-	AddNodes(int, bool, *pb.HostDefinition) ([]string, error)
+	AddNodes(int, bool, *model.HostDefinition) ([]string, error)
 	// DeleteLastNode deletes a node
 	DeleteLastNode(bool, string) error
 	// DeleteSpecificNode deletes a node identified by its ID
@@ -71,13 +71,7 @@ type Cluster interface {
 	GetNode(string) (*pb.Host, error)
 	// CountNodes counts the nodes of the cluster
 	CountNodes(bool) uint
+
 	// Delete allows to destroy infrastructure of cluster
 	Delete() error
-
-	// BuildHostName ...
-	BuildHostname(string, NodeType.Enum) (string, error)
-	// UpdateMetadata ...
-	UpdateMetadata(func() error) error
-	// DeleteMetadata ...
-	DeleteMetadata() error
 }

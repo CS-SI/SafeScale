@@ -18,7 +18,6 @@ package controller
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -26,11 +25,11 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api"
+	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/deploy/cluster/identity"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
@@ -40,92 +39,86 @@ import (
 
 // Controller contains the information about a cluster
 type Controller struct {
-	identity.Identity `json:"identity"`
-	Extensions        *serialize.JSONProperties `json:"extensions,omitempty"` // Extensions contains additional info about the cluster
+	identity.Identity
+	Properties *serialize.JSONProperties `json:"properties,omitempty"` // Properties contains additional info about the cluster
 
 	blueprint *Blueprint
 	metadata  *Metadata
 	service   *providers.Service
+
+	lastStateCollection time.Time
 }
 
 // NewController ...
 func NewController(svc *providers.Service) *Controller {
 	return &Controller{
 		service:    svc,
-		Extensions: serialize.NewJSONProperties("clusters"),
+		Properties: serialize.NewJSONProperties("clusters"),
 	}
+}
+
+// Restore restores full ability of a Cluster controller by binding with appropriate Blueprint
+func (c *Controller) Restore(b *Blueprint) error {
+	if c == nil {
+		panic("Calling c.Restore with c==nil!")
+	}
+	if b == nil {
+		panic("b is nil!")
+	}
+
+	c.blueprint = b
+	return nil
+}
+
+// Create creates the necessary infrastructure of the Cluster
+func (c *Controller) Create(req Request, b *Blueprint) error {
+	if b == nil {
+		panic("Calling c.Create with c==nil!")
+	}
+
+	c.blueprint = b
+	return c.blueprint.Construct(req)
 }
 
 // GetService returns the service from the provider
 func (c *Controller) GetService() *providers.Service {
+	if c == nil {
+		panic("Calling c.GetService() with c==nil!")
+	}
+
 	return c.service
 }
 
 // GetIdentity returns the core data of a cluster
 func (c *Controller) GetIdentity() identity.Identity {
+	if c == nil {
+		panic("Calling c.GetIdentity() with c==nil!")
+	}
 	return c.Identity
 }
 
 // GetNetworkConfig returns the network configuration of the cluster
 func (c *Controller) GetNetworkConfig() (config clusterpropsv1.Network) {
-	c.Extensions.LockForRead(Extension.NetworkV1).ThenUse(func(v interface{}) error {
+	if c == nil {
+		panic("Calling c.GetNetworkConfig() with c==nil!")
+	}
+
+	c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
 		config = *(v.(*clusterpropsv1.Network))
 		return nil
 	})
 	return config
 }
 
-// GetExtensions returns the extensions of the cluster
-func (c *Controller) GetExtensions() *serialize.JSONProperties {
-	return c.Extensions
-}
-
-// BuildHostname builds a unique hostname in the swarmCluster
-func (c *Controller) BuildHostname(core string, nodeType NodeType.Enum) (string, error) {
-	var (
-		index    int
-		coreName string
-	)
-
-	switch nodeType {
-	case NodeType.PublicNode:
-		coreName = "pub" + core
-	case NodeType.PrivateNode:
-		coreName = core
-	case NodeType.Master:
-		coreName = core
-	default:
-		return "", fmt.Errorf("Invalid Node Type '%v'", nodeType)
-	}
-
-	// Locks for write the manager extension...
-	outerErr := c.Extensions.LockForWrite(Extension.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
-		return c.UpdateMetadata(func() error {
-			switch nodeType {
-			case NodeType.PublicNode:
-				nodesV1.PublicLastIndex++
-				index = nodesV1.PublicLastIndex
-			case NodeType.PrivateNode:
-				nodesV1.PrivateLastIndex++
-				index = nodesV1.PrivateLastIndex
-			case NodeType.Master:
-				nodesV1.MasterLastIndex++
-				index = nodesV1.MasterLastIndex
-			}
-			return nil
-		})
-	})
-	if outerErr != nil {
-		return "", outerErr
-	}
-	return c.Name + "-" + coreName + "-" + strconv.Itoa(index), nil
+// GetProperties returns the properties of the cluster
+func (c *Controller) GetProperties() *serialize.JSONProperties {
+	return c.Properties
 }
 
 // CountNodes returns the number of public or private nodes in the cluster
 func (c *Controller) CountNodes(public bool) uint {
 	var count uint
-	err := c.Extensions.LockForRead(Extension.NodesV1).ThenUse(func(v interface{}) error {
+	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		if public {
 			count = uint(len(v.(*clusterpropsv1.Nodes).PublicNodes))
 		} else {
@@ -142,9 +135,9 @@ func (c *Controller) CountNodes(public bool) uint {
 // ListMasterIDs lists the IDs of the master nodes in the Cluster
 func (c *Controller) ListMasterIDs() []string {
 	var list []string
-	err := c.Extensions.LockForRead(Extension.NodesV1).ThenUse(func(v interface{}) error {
+	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes).Masters
-		for k, v := range nodesV1 {
+		for _, v := range nodesV1 {
 			list = append(list, v.ID)
 		}
 		return nil
@@ -158,9 +151,9 @@ func (c *Controller) ListMasterIDs() []string {
 // ListMasterIPs lists the IP addresses of the master nodes in the Cluster
 func (c *Controller) ListMasterIPs() []string {
 	var list []string
-	err := c.Extensions.LockForRead(Extension.NodesV1).ThenUse(func(v interface{}) error {
+	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes).Masters
-		for k, v := range nodesV1 {
+		for _, v := range nodesV1 {
 			list = append(list, v.PrivateIP)
 		}
 		return nil
@@ -174,14 +167,14 @@ func (c *Controller) ListMasterIPs() []string {
 // ListNodeIDs lists the IDs of the nodes in the Cluster
 func (c *Controller) ListNodeIDs(public bool) []string {
 	var list []string
-	err := c.Extensions.LockForRead(Extension.NodesV1).ThenUse(func(v interface{}) error {
+	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		var nodesV1 []*clusterpropsv1.Node
 		if public {
 			nodesV1 = v.(*clusterpropsv1.Nodes).PublicNodes
 		} else {
 			nodesV1 = v.(*clusterpropsv1.Nodes).PrivateNodes
 		}
-		for k, v := range nodesV1 {
+		for _, v := range nodesV1 {
 			list = append(list, v.ID)
 		}
 		return nil
@@ -196,14 +189,14 @@ func (c *Controller) ListNodeIDs(public bool) []string {
 // ListNodeIPs lists the IP addresses of the nodes in the Cluster
 func (c *Controller) ListNodeIPs(public bool) []string {
 	var list []string
-	err := c.Extensions.LockForRead(Extension.NodesV1).ThenUse(func(v interface{}) error {
+	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		var nodesV1 []*clusterpropsv1.Node
 		if public {
 			nodesV1 = v.(*clusterpropsv1.Nodes).PublicNodes
 		} else {
 			nodesV1 = v.(*clusterpropsv1.Nodes).PrivateNodes
 		}
-		for k, v := range nodesV1 {
+		for _, v := range nodesV1 {
 			list = append(list, v.PrivateIP)
 		}
 		return nil
@@ -217,7 +210,7 @@ func (c *Controller) ListNodeIPs(public bool) []string {
 // GetNode returns a node based on its ID
 func (c *Controller) GetNode(hostID string) (*pb.Host, error) {
 	found := false
-	err := c.Extensions.LockForRead(Extension.NodesV1).ThenUse(func(v interface{}) error {
+	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
 		found, _ := contains(nodesV1.PublicNodes, hostID)
 		if !found {
@@ -237,7 +230,7 @@ func (c *Controller) GetNode(hostID string) (*pb.Host, error) {
 // SearchNode tells if an host ID corresponds to a node of the Cluster
 func (c *Controller) SearchNode(hostID string, public bool) bool {
 	found := false
-	err := c.Extensions.LockForRead(Extension.NodesV1).ThenUse(func(v interface{}) error {
+	c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
 		if public {
 			found, _ = contains(nodesV1.PublicNodes, hostID)
@@ -304,7 +297,7 @@ func (c *Controller) FindAvailableNode(public bool) (string, error) {
 	return hostID, nil
 }
 
-// UpdateMetadata writes swarmCluster config in Object Storage
+// UpdateMetadata writes Cluster config in Object Storage
 func (c *Controller) UpdateMetadata(updatefn func() error) error {
 	if c.metadata == nil {
 		m, err := NewMetadata(c.GetService())
@@ -313,13 +306,23 @@ func (c *Controller) UpdateMetadata(updatefn func() error) error {
 		}
 		m.Carry(c)
 		c.metadata = m
-
+		log.Debugf("UpdateMetadata(): acquiring lock...")
 		c.metadata.Acquire()
+		log.Debugf("UpdateMetadata(): lock acquired...")
 	} else {
+		log.Debugf("UpdateMetadata(): acquiring lock...")
 		c.metadata.Acquire()
-		c.Reload()
+		log.Debugf("UpdateMetadata(): lock acquired...")
+		err := c.metadata.Reload()
+		if err != nil {
+			return err
+		}
+		*c = *(c.metadata.Get())
 	}
-	defer c.metadata.Release()
+	defer func() {
+		c.metadata.Release()
+		log.Debugf("UpdateMetadata(): lock released.")
+	}()
 
 	if updatefn != nil {
 		err := updatefn()
@@ -367,14 +370,14 @@ func (c *Controller) Deserialize(buf []byte) error {
 	// if err != nil {
 	// 	return err
 	// }
-	// if c.Extensions == nil {
+	// if c.Properties == nil {
 	// 	field, found := parsed["flavor"].(float64)
 	// 	if !found {
 	// 		return fmt.Errorf("invalid JSON content in metadata: missing 'flavor' field")
 	// 	}
-	// 	c.Extensions = serialize.NewJSONProperties("clusters." + strings.ToLower(Flavor.Enum(int(field)).String()))
+	// 	c.Properties = serialize.NewJSONProperties("clusters." + strings.ToLower(Flavor.Enum(int(field)).String()))
 	// }
-	// err = c.Extensions.LockForWrite(Extension.FlavorV1).ThenUse(func(v interface{}) error {
+	// err = c.Properties.LockForWrite(Property.FlavorV1).ThenUse(func(v interface{}) error {
 	// 	return serialize.FromJSON(buf, c)
 	// })
 	// if err != nil {
@@ -386,7 +389,7 @@ func (c *Controller) Deserialize(buf []byte) error {
 }
 
 // AddNode adds one node
-func (c *Controller) AddNode(public bool, req *pb.HostDefinition) (string, error) {
+func (c *Controller) AddNode(public bool, req *model.HostDefinition) (string, error) {
 	hosts, err := c.AddNodes(1, public, req)
 	if err != nil {
 		return "", err
@@ -395,25 +398,27 @@ func (c *Controller) AddNode(public bool, req *pb.HostDefinition) (string, error
 }
 
 // AddNodes adds <count> nodes
-func (c *Controller) AddNodes(count int, public bool, req *pb.HostDefinition) ([]string, error) {
-	var hostDef model.HostSize
-	c.GetExtensions().LockForRead(Extension.DefaultsV1).ThenUse(func(v interface{}) error {
-		hostDef = v.(*clusterpropsv1.Defaults).NodeSizing
+func (c *Controller) AddNodes(count int, public bool, req *model.HostDefinition) ([]string, error) {
+	var (
+		nodeDef   model.HostDefinition
+		hostImage string
+	)
+	err := c.Properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
+		defaultsV1 := v.(*clusterpropsv1.Defaults)
+		nodeDef = defaultsV1.NodeSizing
+		hostImage = defaultsV1.Image
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
 	if req != nil {
-		if req.CPUNumber > 0 {
-			hostDef.CPUNumber = req.CPUNumber
-		}
-		if req.RAM > 0.0 {
-			hostDef.RAM = req.RAM
-		}
-		if req.Disk > 0 {
-			hostDef.Disk = req.Disk
-		}
-		if req.ImageID != "" {
-			hostDef.ImageID = req.ImageID
-		}
+		nodeDef = complementHostDefinition(req, nodeDef)
+	}
+	pbNodeDef := pbutils.ToPBHostDefinition(&nodeDef)
+	if nodeDef.ImageID == "" {
+		pbNodeDef.ImageID = hostImage
 	}
 
 	var nodeType NodeType.Enum
@@ -422,11 +427,15 @@ func (c *Controller) AddNodes(count int, public bool, req *pb.HostDefinition) ([
 	} else {
 		nodeType = NodeType.PrivateNode
 	}
+	pbNodeDef.Public = public
+	pbNodeDef.Network = c.GetNetworkConfig().NetworkID
 
-	var hosts []string
-	var errors []string
-	var dones []chan error
-	var results []chan string
+	var (
+		hosts   []string
+		errors  []string
+		dones   []chan error
+		results []chan string
+	)
 	timeout := brokerclient.DefaultExecutionTimeout + time.Duration(count)*time.Minute
 	for i := 0; i < count; i++ {
 		r := make(chan string)
@@ -434,7 +443,7 @@ func (c *Controller) AddNodes(count int, public bool, req *pb.HostDefinition) ([
 		d := make(chan error)
 		dones = append(dones, d)
 		// go c.asyncCreateNode(i+1, nodeType, hostDef, timeout, r, d)
-		go asyncCreateNode(c, c.blueprint, i+1, nodeType, hostDef, timeout, r, d)
+		go c.blueprint.asyncCreateNode(i+1, nodeType, *pbNodeDef, timeout, r, d)
 	}
 	for i := range dones {
 		hostName := <-results[i]
@@ -455,7 +464,7 @@ func (c *Controller) AddNodes(count int, public bool, req *pb.HostDefinition) ([
 	}
 
 	// Now configure new nodes
-	err := c.blueprint.ConfigureNodesFromList(public, hosts)
+	err = c.blueprint.configureNodesFromList(public, hosts)
 	if err != nil {
 		brokerHost.Delete(hosts, brokerclient.DefaultExecutionTimeout)
 		return nil, err
@@ -470,7 +479,7 @@ func (c *Controller) GetState() (ClusterState.Enum, error) {
 		collectInterval time.Duration
 		state           ClusterState.Enum
 	)
-	err := c.Extensions.LockForRead(Extension.StateV1).ThenUse(func(v interface{}) error {
+	err := c.Properties.LockForRead(Property.StateV1).ThenUse(func(v interface{}) error {
 		stateV1 := v.(*clusterpropsv1.State)
 		collectInterval = stateV1.StateCollectInterval
 		state = stateV1.State
@@ -486,15 +495,21 @@ func (c *Controller) GetState() (ClusterState.Enum, error) {
 }
 
 // ForceGetState returns the current state of the Cluster
-// Does nothing currently...
-// !!! FIX IT !!!
+// Uses the "actor" GetState from Blueprint
 func (c *Controller) ForceGetState() (ClusterState.Enum, error) {
-	var state ClusterState.Enum
-	err := c.UpdateMetadata(func() error {
-		return c.GetExtensions().LockForWrite(Extension.StateV1).ThenUse(func(v interface{}) error {
+	if c == nil {
+		panic("Calling c.ForceGetState with c==nil!")
+	}
+
+	state, err := c.blueprint.GetState()
+	if err != nil {
+		return ClusterState.Unknown, err
+	}
+
+	err = c.UpdateMetadata(func() error {
+		return c.Properties.LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
 			stateV1 := v.(*clusterpropsv1.State)
-			stateV1.State = ClusterState.Nominal
-			state = stateV1.State
+			stateV1.State = state
 			c.lastStateCollection = time.Now()
 			return nil
 		})
@@ -504,8 +519,11 @@ func (c *Controller) ForceGetState() (ClusterState.Enum, error) {
 
 // DeleteLastNode deletes the last Agent node added
 func (c *Controller) DeleteLastNode(public bool, selectedMaster string) error {
+	if c == nil {
+		panic("Calling c.DeleteLastNode with c==nil!")
+	}
 	var (
-		node *Node
+		node *clusterpropsv1.Node
 		err  error
 	)
 
@@ -516,39 +534,47 @@ func (c *Controller) DeleteLastNode(public bool, selectedMaster string) error {
 		}
 	}
 
-	err = c.Cluster.Extensions.LockForWrite(Extension.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
-		if public {
-			node = nodesV1.PublicNodes[len(nodesV1.PublicNodes)-1]
-		} else {
-			node = nodesV1.PrivateNodes[len(nodesV1.PrivateNodes)-1]
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	// err = c.deleteSwarmWorker(hostID, selectedMaster)
-	err = c.blueprint.UnconfigureNode(c, hostID, selectedMaster)
-	if err != nil {
-		return err
-	}
-
-	return c.UpdateMetadata(func() error {
-		return c.GetExtensions().LockForWrite(Extension.NodesV1).ThenUse(func(v interface{}) error {
+	err = c.UpdateMetadata(func() error {
+		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+			nodesV1 := v.(*clusterpropsv1.Nodes)
 			if public {
-				delete(nodesV1.PublicNodes, node)
+				node = nodesV1.PublicNodes[len(nodesV1.PublicNodes)-1]
+				nodesV1.PublicNodes = nodesV1.PublicNodes[:len(nodesV1.PublicNodes)-1]
 			} else {
-				delete(nodesV1.PrivateNodes, node)
+				node = nodesV1.PrivateNodes[len(nodesV1.PrivateNodes)-1]
+				nodesV1.PrivateNodes = nodesV1.PrivateNodes[:len(nodesV1.PrivateNodes)-1]
 			}
 			return nil
 		})
 	})
+	if err != nil {
+		return err
+	}
+
+	err = c.blueprint.unconfigureNode(node.ID, selectedMaster)
+	if err != nil {
+		// If error occurs, must add back the node previously removed...
+		return c.UpdateMetadata(func() error {
+			return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+				nodesV1 := v.(*clusterpropsv1.Nodes)
+				if public {
+					nodesV1.PublicNodes = append(nodesV1.PublicNodes, node)
+				} else {
+					nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
+				}
+				return nil
+			})
+		})
+	}
+
+	return nil
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
 func (c *Controller) DeleteSpecificNode(hostID string, selectedMaster string) error {
+	if c == nil {
+		panic("Calling c.DeleteSpecificNode with c==nil!")
+	}
 	if hostID == "" {
 		panic("hostID is empty!")
 	}
@@ -556,14 +582,15 @@ func (c *Controller) DeleteSpecificNode(hostID string, selectedMaster string) er
 	var (
 		foundInPublic  bool
 		foundInPrivate bool
+		idx            int
 		err            error
 	)
 
-	err = c.Cluster.Extensions.LockForRead(Extension.NodesV1).ThenUse(func(v interface{}) error {
+	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
-		foundInPublic, idx := contains(nodesV1.PublicNodeIDs, hostID)
+		foundInPublic, idx = contains(nodesV1.PublicNodes, hostID)
 		if !foundInPublic {
-			foundInPrivate, idx = contains(nodesV1.PrivateNodeIDs, hostID)
+			foundInPrivate, idx = contains(nodesV1.PrivateNodes, hostID)
 		}
 		return nil
 	})
@@ -571,7 +598,7 @@ func (c *Controller) DeleteSpecificNode(hostID string, selectedMaster string) er
 		return err
 	}
 	if !foundInPublic && !foundInPrivate {
-		return fmt.Errorf("host '%s' isn't a registered Node of the Cluster '%s'", hostID, c.Core.Name)
+		return fmt.Errorf("host '%s' isn't a registered Node of the Cluster '%s'", hostID, c.Identity.Name)
 	}
 
 	if selectedMaster == "" {
@@ -581,41 +608,41 @@ func (c *Controller) DeleteSpecificNode(hostID string, selectedMaster string) er
 		}
 	}
 
-	err = c.blueprint.UnconfigureNode(c, hostID, selectedMaster)
+	err = c.blueprint.unconfigureNode(hostID, selectedMaster)
 	if err != nil {
 		return err
 	}
 
 	return c.UpdateMetadata(func() error {
-		return c.GetExtensions().LockForWrite(Extension.NodesV1).ThenUse(func(v interface{}) error {
+		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
 			if !foundInPublic {
-				foundInPrivate, idx = contains(nodesV1.PrivateNodeIDs, hostID)
+				foundInPrivate, idx = contains(nodesV1.PrivateNodes, hostID)
 			}
 			if foundInPublic {
-				_, idx := contains(nodesV1.PublicNodeIDs, hostID)
-				delete(nodesV1.PublicNodeIDs, hostID)
-				nodesV1.PublicNodeIPs = append(nodesV1.PublicNodeIDs[:idx], nodesV1.PublicNodeIDs[idx+1:]...)
+				_, idx = contains(nodesV1.PublicNodes, hostID)
+				nodesV1.PublicNodes = append(nodesV1.PublicNodes[:idx], nodesV1.PublicNodes[idx+1:]...)
 			} else {
-				_, idx := contains(nodesV1.PrivateNodeIDs, hostID)
-				delete(nodesV1.PrivateNodeIDs, hostID)
-				nodesV1.PrivateNodeIPs = append(nodesV1.PrivateNodeIDs[:idx], nodesV1.PrivateNodeIDs[idx+1:]...)
+				_, idx = contains(nodesV1.PrivateNodes, hostID)
+				nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:idx], nodesV1.PrivateNodes[idx+1:]...)
 			}
 			return nil
 		})
-		return nil
 	})
 }
 
-// Delete destroys everything related to the infrastructure built for the swarmCluster
+// Delete destroys everything related to the infrastructure built for the Cluster
 func (c *Controller) Delete() error {
+	if c == nil {
+		panic("Calling c.Delete with c==nil!")
+	}
 	if c.metadata == nil {
-		return fmt.Errorf("no metadata found for this swarmCluster")
+		return fmt.Errorf("no metadata found for this cluster")
 	}
 
 	// Updates metadata
 	err := c.UpdateMetadata(func() error {
-		return c.Cluster.Extensions.LockForWrite(Extension.StateV1).ThenUse(func(v interface{}) error {
+		return c.Properties.LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
 			v.(*clusterpropsv1.State).State = ClusterState.Removed
 			return nil
 		})
@@ -645,7 +672,7 @@ func (c *Controller) Delete() error {
 	}
 
 	// Deletes the network and gateway
-	err = c.GetExtensions().LockForRead(Extension.NetworkV1).ThenUse(func(v interface{}) error {
+	err = c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
 		return broker.Network.Delete([]string{v.(*clusterpropsv1.Network).NetworkID}, brokerclient.DefaultExecutionTimeout)
 	})
 	if err != nil {
@@ -658,53 +685,126 @@ func (c *Controller) Delete() error {
 		return nil
 	}
 	c.service = nil
-	c.Cluster = nil
+	c.metadata = nil
 	return nil
 }
 
-// Stop stops the swarmCluster is its current state is compatible
+// Stop stops the Cluster is its current state is compatible
 func (c *Controller) Stop() error {
+	if c == nil {
+		panic("Calling c.Stop with c==nil!")
+	}
+
 	state, _ := c.ForceGetState()
 	if state == ClusterState.Nominal || state == ClusterState.Degraded {
 		return c.Stop()
 	}
 	if state != ClusterState.Stopped {
-		return fmt.Errorf("failed to stop swarmCluster because of it's current state: %s", state.String())
+		return fmt.Errorf("failed to stop Cluster because of it's current state: %s", state.String())
 	}
 	return nil
 }
 
 // Start starts the Cluster
 func (c *Controller) Start() error {
+	if c == nil {
+		panic("Calling c.Start with c==nil!")
+	}
+
 	state, err := c.ForceGetState()
 	if err != nil {
 		return err
 	}
 	if state == ClusterState.Stopped {
 		return c.UpdateMetadata(func() error {
-			return c.GetExtensions().LockForWrite(Extension.StateV1).ThenUse(func(v interface{}) error {
+			return c.Properties.LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
 				v.(*clusterpropsv1.State).State = ClusterState.Nominal
 				return nil
 			})
 		})
 	}
 	if state != ClusterState.Nominal && state != ClusterState.Degraded {
-		return fmt.Errorf("failed to start swarmCluster because of it's current state: %s", state.String())
+		return fmt.Errorf("failed to start Cluster because of it's current state: %s", state.String())
 	}
 	return nil
 }
 
-// Create creates the necessary infrastructure of Cluster
-func (c *Controller) Create(req Request) (api.Cluster, error) {
-	return c.blueprint.Create(req)
-}
+// // sanitize tries to rebuild manager struct based on what is available on ObjectStorage
+// func (c *Controller) Sanitize(data *Metadata) error {
 
-// Reload reloads metadata of Cluster from ObjectStorage
-func (c *Controller) Reload() error {
-	err := c.metadata.Reload()
-	if err != nil {
-		return err
-	}
-	*c = *(c.metadata.Get())
-	return nil
-}
+// 	core := data.Get()
+// 	instance := &Cluster{
+// 		Core:     core,
+// 		metadata: data,
+// 	}
+// 	instance.reset()
+
+// 	if instance.manager == nil {
+// 		var mgw *providermetadata.Gateway
+// 		mgw, err := providermetadata.LoadGateway(svc, instance.Core.NetworkID)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		gw := mgw.Get()
+// 		hm := providermetadata.NewHost(svc)
+// 		hosts := []*model.Host{}
+// 		err = hm.Browse(func(h *model.Host) error {
+// 			if strings.HasPrefix(h.Name, instance.Core.Name+"-") {
+// 				hosts = append(hosts, h)
+// 			}
+// 			return nil
+// 		})
+// 		if err != nil {
+// 			return err
+// 		}
+// 		if len(hosts) == 0 {
+// 			return fmt.Errorf("failed to find hosts belonging to cluster")
+// 		}
+
+// 		// We have hosts, fill the manager
+// 		masterIDs := []string{}
+// 		masterIPs := []string{}
+// 		privateNodeIPs := []string{}
+// 		publicNodeIPs := []string{}
+// 		defaultNetworkIP := ""
+// 		err = gw.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+// 			hostNetworkV1 := v.(*propsv1.HostNetwork)
+// 			defaultNetworkIP = hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
+// 			for _, h := range hosts {
+// 				if strings.HasPrefix(h.Name, instance.Core.Name+"-master-") {
+// 					masterIDs = append(masterIDs, h.ID)
+// 					masterIPs = append(masterIPs, defaultNetworkIP)
+// 				} else if strings.HasPrefix(h.Name, instance.Core.Name+"-node-") {
+// 					privateNodeIPs = append(privateNodeIPs, defaultNetworkIP)
+// 				} else if strings.HasPrefix(h.Name, instance.Core.Name+"-pubnode-") {
+// 					publicNodeIPs = append(privateNodeIPs, defaultNetworkIP)
+// 				}
+// 			}
+// 			return nil
+// 		})
+// 		if err != nil {
+// 			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
+// 		}
+
+// 		newManager := &managerData{
+// 			BootstrapID:      gw.ID,
+// 			BootstrapIP:      defaultNetworkIP,
+// 			MasterIDs:        masterIDs,
+// 			MasterIPs:        masterIPs,
+// 			PrivateNodeIPs:   privateNodeIPs,
+// 			PublicNodeIPs:    publicNodeIPs,
+// 			MasterLastIndex:  len(masterIDs),
+// 			PrivateLastIndex: len(privateNodeIPs),
+// 			PublicLastIndex:  len(publicNodeIPs),
+// 		}
+// 		log.Debugf("updating metadata...\n")
+// 		err = instance.updateMetadata(func() error {
+// 			instance.manager = newManager
+// 			return nil
+// 		})
+// 		if err != nil {
+// 			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
+// 		}
+// 	}
+// 	return nil
+// }

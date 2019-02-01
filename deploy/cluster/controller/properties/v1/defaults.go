@@ -17,15 +17,19 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // Defaults ...
 type Defaults struct {
+	// GatewaySizing keeps the default node definition
+	GatewaySizing model.HostDefinition `json:"gateway_sizing"`
+	// MasterSizing keeps the default node definition
+	MasterSizing model.HostDefinition `json:"master_sizing"`
 	// NodeSizing keeps the default node definition
-	NodeSizing model.HostSize `json:"node_sizing"`
+	NodeSizing model.HostDefinition `json:"node_sizing"`
 	// Image keeps the default Linux image to use
 	Image string `json:"image"`
 }
@@ -48,5 +52,5 @@ func (n *Defaults) Replace(v interface{}) {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Extension.DefaultsV1, &Defaults{})
+	serialize.PropertyTypeRegistry.Register("clusters", Property.DefaultsV1, &Defaults{})
 }

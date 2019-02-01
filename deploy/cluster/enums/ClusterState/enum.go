@@ -24,20 +24,22 @@ type Enum int
 
 const (
 	_ Enum = iota
-	//Nominal the cluster is started and fully operational
+	// Nominal the cluster is started and fully operational
 	Nominal
-	//Degraded the cluster is running but some key components are failing (typically a master)
+	// Degraded the cluster is running but some key components are failing (typically a master)
 	Degraded
-	//Stopped the cluster is stopped
+	// Stopped the cluster is stopped
 	Stopped
-	//Initializing the cluster is initializing
+	// Initializing the cluster is initializing
 	Initializing
-	//Created the cluster is ready to be initialized
+	// Created the cluster is ready to be initialized
 	Created
-	//Creating the cluster is currently created
+	// Creating the cluster is currently created
 	Creating
-	//Error when an error occured on gathering cluster state
+	// Error when an error occured on gathering cluster state
 	Error
-	//Removed tells the struct still exist but the underlying cluster has been totally wiped out
+	// Removed tells the struct still exist but the underlying cluster has been totally wiped out
 	Removed
+	// Unknown ...
+	Unknown
 )

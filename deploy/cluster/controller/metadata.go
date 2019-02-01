@@ -19,7 +19,6 @@ package controller
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 	"github.com/CS-SI/SafeScale/utils/serialize"
@@ -79,7 +78,7 @@ func (m *Metadata) Read(name string) (bool, error) {
 	// Otherwise, allocates new one
 	anon := m.item.Get()
 	if anon == nil {
-		ptr = &Controller{}
+		ptr = NewController(m.GetService())
 	} else {
 		ptr, ok = anon.(*Controller)
 		if !ok {
@@ -125,21 +124,23 @@ func (m *Metadata) Reload() error {
 }
 
 // Get returns the content of the metadata
-func (m *Metadata) Get() api.Cluster {
+func (m *Metadata) Get() *Controller {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	if p, ok := m.item.Get().(api.Cluster); ok {
+	if p, ok := m.item.Get().(*Controller); ok {
+		p.service = m.GetService()
+		p.metadata = m
 		return p
 	}
 	panic("invalid cluster content in metadata")
 }
 
 // Browse walks through cluster folder and executes a callback for each entry
-func (m *Metadata) Browse(callback func(api.Cluster) error) error {
+func (m *Metadata) Browse(callback func(*Controller) error) error {
 	return m.item.Browse(func(buf []byte) error {
-		cc := Controller{}
-		err := (&cc).Deserialize(buf)
+		cc := NewController(m.GetService())
+		err := cc.Deserialize(buf)
 		if err != nil {
 			return err
 		}
@@ -147,8 +148,8 @@ func (m *Metadata) Browse(callback func(api.Cluster) error) error {
 		if err != nil {
 			return err
 		}
-		cm.Carry(&cc)
-		return callback(&cc)
+		cm.Carry(cc)
+		return callback(cc)
 	})
 }
 

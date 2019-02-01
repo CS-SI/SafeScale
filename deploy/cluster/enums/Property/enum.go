@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package Extension
+package Property
 
 const (
 	// DescriptionV1 contains optional additional info describing cluster (purpose, ...)

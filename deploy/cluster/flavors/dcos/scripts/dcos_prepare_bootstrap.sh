@@ -89,7 +89,7 @@ sfAsyncStart DKB 10m bash -c download_kubectl_bin
 sfAsyncStart DNI 10m bash -c download_nginx_image
 
 # Install requirements for DCOS environment
-{{ .InstallCommonRequirements }}
+{{ .GlobalSystemRequirements }}
 
 # Awaits download of DCOS configuration generator
 echo "Waiting for download_dcos_config_generator..."

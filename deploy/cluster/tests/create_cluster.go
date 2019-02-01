@@ -21,12 +21,11 @@ import (
 	"log"
 	"runtime"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster/core"
+	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/providers/model"
 
-	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/deploy/cluster"
 )
 
@@ -39,7 +38,7 @@ func Run() {
 	if err != nil {
 		if _, ok := err.(model.ErrResourceNotFound); ok {
 			log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
-			instance, err = cluster.Create(core.Request{
+			instance, err = cluster.Create(controller.Request{
 				Name:       clusterName,
 				Complexity: Complexity.Small,
 				//Complexity: Complexity.Normal,
@@ -65,10 +64,10 @@ func Run() {
 	fmt.Printf("Cluster state: %s\n", state.String())
 
 	// Creates a Private Agent Node
-	_, err = instance.AddNode(false, &pb.HostDefinition{
-		CPUNumber: 2,
-		RAM:       8.0,
-		Disk:      60,
+	_, err = instance.AddNode(false, &model.HostDefinition{
+		Cores:    2,
+		RAMSize:  7.0,
+		DiskSize: 60,
 	})
 	if err != nil {
 		fmt.Printf("Failed to create Private Agent Node: %s\n", err.Error())

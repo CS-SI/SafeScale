@@ -17,13 +17,14 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // Network ...
 type Network struct {
 	NetworkID string `json:"network_id"` // contains the ID of the network
+	GatewayID string `json:"gateway_id"`
 	GatewayIP string `json:"gateway_ip"` // contains the private IP address of the gateway
 	PublicIP  string `json:"public_ip"`  // contains the IP address to reach the cluster (== PublicIP of gateway)
 	CIDR      string `json:"cidr"`       // the network CIDR
@@ -47,5 +48,5 @@ func (s *Network) Replace(v interface{}) {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Extension.NetworkV1, &Network{})
+	serialize.PropertyTypeRegistry.Register("clusters", Property.NetworkV1, &Network{})
 }
