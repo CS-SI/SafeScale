@@ -33,7 +33,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
-	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/system"
@@ -300,15 +299,11 @@ func (c *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 			}
 
 			tpl := model.HostTemplate{
-				HostTemplate: &propsv1.HostTemplate{
-					ID:   price.Product.Attributes.InstanceType,
-					Name: price.Product.Attributes.InstanceType,
-					HostSize: &propsv1.HostSize{
-						Cores:    cores,
-						DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
-						RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
-					},
-				},
+				ID:       price.Product.Attributes.InstanceType,
+				Name:     price.Product.Attributes.InstanceType,
+				Cores:    cores,
+				DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
+				RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
 			}
 			return &tpl, nil
 		}
@@ -411,15 +406,11 @@ func (c *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 					}
 
 					tpl := model.HostTemplate{
-						HostTemplate: &propsv1.HostTemplate{
-							ID:   price.Product.Attributes.InstanceType,
-							Name: price.Product.Attributes.InstanceType,
-							HostSize: &propsv1.HostSize{
-								Cores:    cores,
-								DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
-								RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
-							},
-						},
+						ID:       price.Product.Attributes.InstanceType,
+						Name:     price.Product.Attributes.InstanceType,
+						Cores:    cores,
+						DiskSize: int(parseStorage(price.Product.Attributes.Storage)),
+						RAMSize:  float32(parseMemory(price.Product.Attributes.Memory)),
 					}
 					tpls = append(tpls, tpl)
 				}

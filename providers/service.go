@@ -335,7 +335,8 @@ func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force
 		sizing.MinCores, safeutils.Plural(sizing.MinCores), sizing.MinRAMSize, sizing.MinDiskSize)
 
 	for _, template := range templates {
-		if template.Cores >= sizing.MinCores && (template.DiskSize == 0 || template.DiskSize >= sizing.MinDiskSize) && template.RAMSize >= sizing.MinRAMSize {
+		if template.Cores >= sizing.MinCores &&
+			(template.DiskSize == 0 || template.DiskSize >= sizing.MinDiskSize) && template.RAMSize >= sizing.MinRAMSize {
 			if _, ok := scannerTemplates[template.ID]; ok || !askedForSpecificScannerInfo {
 				selectedTpls = append(selectedTpls, template)
 			}

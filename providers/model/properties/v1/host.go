@@ -134,8 +134,8 @@ func NewHostSize() *HostSize {
 }
 
 // Reset ...
-func (p *HostSize) Reset() {
-	*p = HostSize{}
+func (hs *HostSize) Reset() {
+	*hs = HostSize{}
 }
 
 // HostTemplate represents an host template
@@ -143,23 +143,24 @@ func (p *HostSize) Reset() {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostTemplate struct {
-	*HostSize `json:"host_size,omitempty"`
-	ID        string `json:"id,omitempty"`
-	Name      string `json:"name,omitempty"`
+	Cores     int     `json:"cores,omitempty"`
+	RAMSize   float32 `json:"ram_size,omitempty"`
+	DiskSize  int     `json:"disk_size,omitempty"`
+	GPUNumber int     `json:"gpu_number,omitempty"`
+	GPUType   string  `json:"gpu_type,omitempty"`
+	CPUFreq   float32 `json:"cpu_freq,omitempty"`
+	ID        string  `json:"id,omitempty"`
+	Name      string  `json:"name,omitempty"`
 }
 
 // NewHostTemplate ...
 func NewHostTemplate() *HostTemplate {
-	return &HostTemplate{
-		HostSize: NewHostSize(),
-	}
+	return &HostTemplate{}
 }
 
 // Reset ...
 func (p *HostTemplate) Reset() {
-	*p = HostTemplate{
-		HostSize: NewHostSize(),
-	}
+	*p = HostTemplate{}
 }
 
 // HostSizing contains sizing information about the host

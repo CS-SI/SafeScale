@@ -35,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	converters "github.com/CS-SI/SafeScale/providers/model/properties"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/openstack"
 	"github.com/CS-SI/SafeScale/providers/userdata"
@@ -345,11 +346,11 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 
 	// Determines appropriate disk size
 	var diskSize int
-	if template.HostSize.DiskSize > 0 {
-		diskSize = template.HostSize.DiskSize
-	} else if template.HostSize.Cores < 16 {
+	if template.DiskSize > 0 {
+		diskSize = template.DiskSize
+	} else if template.Cores < 16 {
 		diskSize = 100
-	} else if template.HostSize.Cores < 32 {
+	} else if template.Cores < 32 {
 		diskSize = 200
 	} else {
 		diskSize = 400
@@ -413,12 +414,12 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	}
 
 	// Adds Host property SizingV1
-	template.HostSize.DiskSize = diskSize // Makes sure the size of disk is correctly saved
+	template.DiskSize = diskSize // Makes sure the size of disk is correctly saved
 	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		hostSizingV1.Template = request.TemplateID
-		hostSizingV1.AllocatedSize = template.HostSize
+		hostSizingV1.AllocatedSize = converters.ModelHostTemplateToPropertyHostSize(template)
 		return nil
 	})
 	if err != nil {
@@ -1041,7 +1042,7 @@ func (client *Client) toHostSize(flavor map[string]interface{}) *propsv1.HostSiz
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
 		tpl, _ := client.GetTemplate(fid)
-		return tpl.HostSize
+		return converters.ModelHostTemplateToPropertyHostSize(tpl)
 	}
 	hostSize := propsv1.NewHostSize()
 	if _, ok := flavor["vcpus"]; ok {

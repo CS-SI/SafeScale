@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/mocks"
 	"github.com/CS-SI/SafeScale/providers/model"
-	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/tests"
 )
 
@@ -79,15 +78,11 @@ func getMockableClient(t *testing.T) (*tests.ClientTester, *mocks.MockClientAPI,
 // Helper function to test mock objects
 func GetHostTemplate(core int, ram int, disk int) model.HostTemplate {
 	return model.HostTemplate{
-		HostTemplate: &propsv1.HostTemplate{
-			HostSize: &propsv1.HostSize{
-				Cores:    core,
-				RAMSize:  float32(ram) / 1000.0,
-				DiskSize: disk,
-			},
-			ID:   "",
-			Name: "",
-		},
+		Cores:    core,
+		RAMSize:  float32(ram) / 1000.0,
+		DiskSize: disk,
+		ID:       "",
+		Name:     "",
 	}
 }
 
@@ -155,12 +150,13 @@ func TestMock_ListHostTemplates_Mock(t *testing.T) {
 	require.Nil(t, err)
 
 	if amok != nil {
-		ht := propsv1.NewHostTemplate()
-		ht.ID = "ID1"
-		ht.Name = "TemplateUbuntu"
-		ht.Cores = 1
+		ht := &model.HostTemplate{
+			ID:    "ID1",
+			Name:  "TemplateUbuntu",
+			Cores: 1,
+		}
 
-		amok.EXPECT().ListTemplates(false).Return([]model.HostTemplate{model.HostTemplate{HostTemplate: ht}}, nil).AnyTimes()
+		amok.EXPECT().ListTemplates(false).Return([]*model.HostTemplate{ht}, nil).AnyTimes()
 		amok.EXPECT().ListImages(false).Return([]model.Image{{ID: "I1", Name: "Ubuntu"}, {ID: "I2", Name: "Debian"}}, nil).AnyTimes()
 	}
 
