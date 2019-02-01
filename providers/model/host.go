@@ -40,6 +40,7 @@ type SizingRequirements struct {
 	MinFreq     float32 `json:"min_freq,omitempty"`
 }
 
+// StoredCPUInfo ...
 type StoredCPUInfo struct {
 	Id           string `bow:"key"`
 	TenantName   string `json:"tenant_name,omitempty"`
@@ -94,14 +95,29 @@ type HostRequest struct {
 	KeyPair *KeyPair
 }
 
-// HostSize ...
-type HostSize struct {
-	*propsv1.HostSize
+// HostDefinition ...
+type HostDefinition struct {
+	Cores     int     `json:"cores,omitempty"`
+	RAMSize   float32 `json:"ram_size,omitempty"`
+	DiskSize  int     `json:"disk_size,omitempty"`
+	GPUNumber int     `json:"gpu_number,omitempty"`
+	GPUType   string  `json:"gpu_type,omitempty"`
+	CPUFreq   float32 `json:"cpu_freq,omitempty"`
+	ImageID   string  `json:"image_id,omitempty"`
+	//TODO: implement the handling of this field (will need to introduce provider capabilities to know if a specific provider allows this kind of host)
+	Replaceable bool `json:"replaceable,omitempty"` // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
 }
 
 // HostTemplate ...
 type HostTemplate struct {
-	*propsv1.HostTemplate
+	Cores     int     `json:"cores,omitempty"`
+	RAMSize   float32 `json:"ram_size,omitempty"`
+	DiskSize  int     `json:"disk_size,omitempty"`
+	GPUNumber int     `json:"gpu_number,omitempty"`
+	GPUType   string  `json:"gpu_type,omitempty"`
+	CPUFreq   float32 `json:"cpu_freq,omitempty"`
+	ID        string  `json:"id,omitempty"`
+	Name      string  `json:"name,omitempty"`
 }
 
 // Host contains the information about a host

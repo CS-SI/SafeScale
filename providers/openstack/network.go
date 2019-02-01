@@ -69,8 +69,8 @@ type Subnet struct {
 
 // CreateNetwork creates a network named name
 func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, error) {
-	log.Debugf("providers.openstack.Client.CreateNetwork(%s) called", req.Name)
-	defer log.Debugf("providers.openstack.Client.CreateNetwork(%s) done", req.Name)
+	log.Debugf(">>> providers.openstack.Client::CreateNetwork(%s)", req.Name)
+	defer log.Debugf("<<< providers.openstack.Client::CreateNetwork(%s)", req.Name)
 
 	if client == nil {
 		panic("No client set")
@@ -143,8 +143,8 @@ func (client *Client) CreateNetwork(req model.NetworkRequest) (*model.Network, e
 
 // GetNetworkByName ...
 func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
-	log.Debugf("openstack.Client.GetNetworkByName(%s) called", name)
-	defer log.Debugf("openstack.Client.GetNetworkByName(%s) done", name)
+	log.Debugf(">>> providers.openstack.Client::GetNetworkByName(%s)", name)
+	defer log.Debugf("<<< providers.openstack.Client::GetNetworkByName(%s)", name)
 
 	if name == "" {
 		panic("name is empty!")
@@ -173,8 +173,8 @@ func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
 
 // GetNetwork returns the network identified by id
 func (client *Client) GetNetwork(id string) (*model.Network, error) {
-	log.Debugf("openstack.Client.GetNetwork(%s) called", id)
-	defer log.Debugf("openstack.Client.GetNetwork(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::GetNetwork(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client::GetNetwork(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -231,8 +231,8 @@ func (client *Client) GetNetwork(id string) (*model.Network, error) {
 
 // ListNetworks lists available networks
 func (client *Client) ListNetworks() ([]*model.Network, error) {
-	log.Debug("openstack.Client.ListNetworks() called")
-	defer log.Debug("openstack.Client.ListNetworks() done")
+	log.Debug(">>> providers.openstack.Client::ListNetworks()")
+	defer log.Debug("<<< providers.openstack.Client.ListNetworks()")
 
 	if client == nil {
 		panic("No client set")
@@ -284,8 +284,8 @@ func (client *Client) ListNetworks() ([]*model.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (client *Client) DeleteNetwork(id string) error {
-	log.Debugf("providers.openstack.Client.DeleteNetwork(%s) called", id)
-	defer log.Debugf("providers.openstack.Client.DeleteNetwork(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::DeleteNetwork(%s) called", id)
+	defer log.Debugf("<<< providers.openstack.Client::DeleteNetwork(%s) done", id)
 
 	if client == nil {
 		panic("No client set")
@@ -335,8 +335,8 @@ func (client *Client) DeleteNetwork(id string) error {
 
 // CreateGateway creates a public Gateway for a private network
 func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, error) {
-	log.Debug("openstack.Client.CreateGateway() called")
-	defer log.Debug("openstack.Client.CreateGateway() done")
+	log.Debug(">>> providers.openstack.Client::CreateGateway()")
+	defer log.Debug("<<< providers.openstack.Client::CreateGateway()")
 
 	if client == nil {
 		panic("No client set")
@@ -388,8 +388,8 @@ func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, erro
 
 // DeleteGateway delete the public gateway of a private network
 func (client *Client) DeleteGateway(id string) error {
-	log.Debugf("openstack.Client.DeleteGateway(%s) called", id)
-	defer log.Debugf("openstack.Client.DeleteGateway(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::DeleteGateway(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client::DeleteGateway(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -579,8 +579,8 @@ func (client *Client) listSubnets(netID string) ([]Subnet, error) {
 
 // deleteSubnet deletes the sub network identified by id
 func (client *Client) deleteSubnet(id string) error {
-	log.Debugf("providers.openstack.deleteSubnet(%s) called", id)
-	defer log.Debugf("providers.openstack.deleteSubnet(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::deleteSubnet(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client::deleteSubnet(%s)", id)
 
 	if client == nil {
 		panic("No client set")

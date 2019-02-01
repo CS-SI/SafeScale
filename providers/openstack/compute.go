@@ -44,6 +44,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	converters "github.com/CS-SI/SafeScale/providers/model/properties"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/userdata"
 	"github.com/CS-SI/SafeScale/utils"
@@ -80,8 +81,8 @@ func (client *Client) ListAvailabilityZones(all bool) (map[string]bool, error) {
 
 // ListImages lists available OS images
 func (client *Client) ListImages(all bool) ([]model.Image, error) {
-	log.Debug("openstack.Client.ListImages() called")
-	defer log.Debug("openstack.Client.ListImages() done")
+	log.Debug(">>> providers.openstack.Client::ListImages()")
+	defer log.Debug("<<< providers.openstack.Client::ListImages()")
 
 	if client == nil {
 		panic("No client set")
@@ -120,8 +121,8 @@ func (client *Client) ListImages(all bool) ([]model.Image, error) {
 
 // GetImage returns the Image referenced by id
 func (client *Client) GetImage(id string) (*model.Image, error) {
-	log.Debugf("openstack.Client.GetImage(%s) called", id)
-	defer log.Debugf("openstack.Client.GetImage(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::GetImage(%s)", id)
+	defer log.Debugf("<<< providers.openstack::Client.GetImage(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -137,8 +138,8 @@ func (client *Client) GetImage(id string) (*model.Image, error) {
 
 // GetTemplate returns the Template referenced by id
 func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
-	log.Debugf("openstack.Client.GetTemplate(%s) called", id)
-	defer log.Debugf("openstack.Client.GetTemplate(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::GetTemplate(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client::GetTemplate(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -159,23 +160,19 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 		return nil, errors.Wrap(err, fmt.Sprintf("error getting template: %s", ProviderErrorToString(err)))
 	}
 	return &model.HostTemplate{
-		HostTemplate: &propsv1.HostTemplate{
-			HostSize: &propsv1.HostSize{
-				Cores:    flv.VCPUs,
-				RAMSize:  float32(flv.RAM) / 1000.0,
-				DiskSize: flv.Disk,
-			},
-			ID:   flv.ID,
-			Name: flv.Name,
-		},
+		Cores:    flv.VCPUs,
+		RAMSize:  float32(flv.RAM) / 1000.0,
+		DiskSize: flv.Disk,
+		ID:       flv.ID,
+		Name:     flv.Name,
 	}, nil
 }
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
-	log.Debugf("openstack.Client.ListTemplates() called")
-	defer log.Debugf("openstack.Client.ListTemplates() done")
+	log.Debugf(">>> providers.openstack.Client::ListTemplates() called")
+	defer log.Debugf("<<< providers.openstack.Client::ListTemplates() done")
 
 	if client == nil {
 		panic("No client set")
@@ -198,15 +195,11 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 		for _, flv := range flavorList {
 
 			flvList = append(flvList, model.HostTemplate{
-				HostTemplate: &propsv1.HostTemplate{
-					HostSize: &propsv1.HostSize{
-						Cores:    flv.VCPUs,
-						RAMSize:  float32(flv.RAM) / 1000.0,
-						DiskSize: flv.Disk,
-					},
-					ID:   flv.ID,
-					Name: flv.Name,
-				},
+				Cores:    flv.VCPUs,
+				RAMSize:  float32(flv.RAM) / 1000.0,
+				DiskSize: flv.Disk,
+				ID:       flv.ID,
+				Name:     flv.Name,
 			})
 
 		}
@@ -224,8 +217,8 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 
 // CreateKeyPair creates and import a key pair
 func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
-	log.Debugf("openstack.Client.CreateKeyPair(%s) called", name)
-	defer log.Debugf("openstack.Client.CreateKeyPair(%s) done", name)
+	log.Debugf(">>> providers.openstack.Client::CreateKeyPair(%s)", name)
+	defer log.Debugf("<<< providers.openstack.Client::CreateKeyPair(%s)", name)
 
 	if client == nil {
 		panic("No client set")
@@ -255,8 +248,8 @@ func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (client *Client) GetKeyPair(id string) (*model.KeyPair, error) {
-	log.Debugf("openstack.Client.GetKeyPair(%s) called", id)
-	defer log.Debugf("openstack.Client.GetKeyPair(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client.GetKeyPair(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client.GetKeyPair(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -277,8 +270,8 @@ func (client *Client) GetKeyPair(id string) (*model.KeyPair, error) {
 
 // ListKeyPairs lists available key pairs
 func (client *Client) ListKeyPairs() ([]model.KeyPair, error) {
-	log.Debug("openstack.Client.ListKeyPairs() called")
-	defer log.Debug("openstack.Client.ListKeyPairs() done")
+	log.Debug(">>> providers.openstack.Client::ListKeyPairs()")
+	defer log.Debug("<<< providers.openstack.Client::ListKeyPairs()")
 
 	if client == nil {
 		panic("No client set")
@@ -319,8 +312,8 @@ func (client *Client) ListKeyPairs() ([]model.KeyPair, error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (client *Client) DeleteKeyPair(id string) error {
-	log.Debugf("openstack.Client.DeleteKeyPair(%s) called", id)
-	defer log.Debugf("openstack.Client.DeleteKeyPair(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client.DeleteKeyPair(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client.DeleteKeyPair(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -340,15 +333,16 @@ func (client *Client) toHostSize(flavor map[string]interface{}) *propsv1.HostSiz
 		panic("No client set")
 	}
 
+	hostSize := propsv1.NewHostSize()
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
 		tpl, err := client.GetTemplate(fid)
 		if err == nil {
-			return tpl.HostSize
+			hostSize.Cores = tpl.Cores
+			hostSize.DiskSize = tpl.DiskSize
+			hostSize.RAMSize = tpl.RAMSize
 		}
-	}
-	hostSize := propsv1.NewHostSize()
-	if _, ok := flavor["vcpus"]; ok {
+	} else if _, ok := flavor["vcpus"]; ok {
 		hostSize.Cores = flavor["vcpus"].(int)
 		hostSize.DiskSize = flavor["disk"].(int)
 		hostSize.RAMSize = flavor["ram"].(float32) / 1000.0
@@ -374,8 +368,8 @@ func toHostState(status string) HostState.Enum {
 
 // GetHost updates the data inside host with the data from provider
 func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
-	log.Debug("openstack.Client.GetHost() called")
-	defer log.Debug("openstack.Client.GetHost() done")
+	log.Debug(">>> providers.openstack.Client::GetHost()")
+	defer log.Debug("<<< providers.openstack.Client::GetHost()")
 
 	if client == nil {
 		panic("No client set")
@@ -632,8 +626,8 @@ func (client *Client) complementHost(host *model.Host, server *servers.Server) e
 
 // GetHostByName returns the host using the name passed as parameter
 func (client *Client) GetHostByName(name string) (*model.Host, error) {
-	log.Debugf("openstack.Client.GetHostByName(%s) called", name)
-	defer log.Debugf("openstack.Client.GetHostByName(%s) done", name)
+	log.Debugf(">>> providers.openstack.Client::GetHostByName(%s)", name)
+	defer log.Debugf("<<< providers.openstack.Client::GetHostByName(%s)", name)
 
 	if client == nil {
 		panic("No client set")
@@ -689,8 +683,8 @@ type userData struct {
 
 // CreateHost creates an host satisfying request
 func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
-	log.Debugf("openstack.Client.CreateHost(%s) called", request.ResourceName)
-	defer log.Debugf("openstack.Client.CreateHost(%s) done", request.ResourceName)
+	log.Debugf(">>> providers.openstack.Client::CreateHost(%s)", request.ResourceName)
+	defer log.Debugf("<<< providers.openstack.Client::CreateHost(%s)", request.ResourceName)
 
 	if client == nil {
 		panic("No client set")
@@ -815,7 +809,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 		hostSizingV1.Template = request.TemplateID
-		hostSizingV1.AllocatedSize = template.HostSize
+		hostSizingV1.AllocatedSize = converters.ModelHostTemplateToPropertyHostSize(template)
 		return nil
 	})
 	if err != nil {
@@ -974,8 +968,8 @@ func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *model.Host; any other type will panic
 func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error) {
-	log.Debug("openstack.Client.GetHostState() called")
-	defer log.Debug("openstack.Client.GetHostState() done")
+	log.Debug(">>> providers.openstack.Client::GetHostState()")
+	defer log.Debug("<<< providers.openstack.Client::GetHostState()")
 
 	if client == nil {
 		panic("No client set")
@@ -990,8 +984,8 @@ func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error
 
 // ListHosts lists all hosts
 func (client *Client) ListHosts() ([]*model.Host, error) {
-	log.Debug("openstack.Client.ListHosts() called")
-	defer log.Debug("openstack.Client.ListHosts() done")
+	log.Debug(">>> providers.openstack.Client::ListHosts()")
+	defer log.Debug("<<< providers.openstack.Client::ListHosts()")
 
 	if client == nil {
 		panic("No client set")
@@ -1061,8 +1055,8 @@ func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, err
 
 // DeleteHost deletes the host identified by id
 func (client *Client) DeleteHost(id string) error {
-	log.Debugf("openstack.Client.DeleteHost(%s) called", id)
-	defer log.Debugf("openstack.Client.DeleteHost(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::DeleteHost(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client::DeleteHost(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -1154,8 +1148,8 @@ func (client *Client) DeleteHost(id string) error {
 
 // StopHost stops the host identified by id
 func (client *Client) StopHost(id string) error {
-	log.Debugf("openstack.Client.StopHost(%s) called", id)
-	defer log.Debugf("openstack.Client.StopHost(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::StopHost(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client::StopHost(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -1171,8 +1165,8 @@ func (client *Client) StopHost(id string) error {
 
 // RebootHost reboots inconditionnaly the host identified by id
 func (client *Client) RebootHost(id string) error {
-	log.Debugf("openstack.Client.Reboot(%s) called", id)
-	defer log.Debugf("openstack.Client.Reboot(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::Reboot(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client::Reboot(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -1189,8 +1183,8 @@ func (client *Client) RebootHost(id string) error {
 
 // StartHost starts the host identified by id
 func (client *Client) StartHost(id string) error {
-	log.Debugf("openstack.Client.StartHost(%s) called", id)
-	defer log.Debugf("openstack.Client.StartHost(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::StartHost(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client::StartHost(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -1205,9 +1199,10 @@ func (client *Client) StartHost(id string) error {
 	return nil
 }
 
+// ResizeHost ...
 func (client *Client) ResizeHost(id string, request model.SizingRequirements) (*model.Host, error) {
-	log.Debugf("openstack.Client.ResizeHost(%s) called", id)
-	defer log.Debugf("openstack.Client.ResizeHost(%s) done", id)
+	log.Debugf(">>> providers.openstack.Client::ResizeHost(%s)", id)
+	defer log.Debugf("<<< providers.openstack.Client::ResizeHost(%s)", id)
 
 	if client == nil {
 		panic("No client set")
@@ -1219,5 +1214,5 @@ func (client *Client) ResizeHost(id string, request model.SizingRequirements) (*
 	// TODO RESIZE Call this
 	// servers.Resize()
 
-	return nil, errors.New("Not implemented yet !")
+	return nil, errors.New("not implemented yet !")
 }
