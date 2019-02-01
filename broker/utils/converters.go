@@ -193,6 +193,28 @@ func ToPBHost(in *model.Host) *pb.Host {
 	}
 }
 
+// ToPBHostDefinition ...
+func ToPBHostDefinition(in *model.HostDefinition) *pb.HostDefinition {
+	return &pb.HostDefinition{
+		CPUNumber: int32(in.Cores),
+		RAM:       in.RAMSize,
+		Disk:      int32(in.DiskSize),
+		GPUNumber: int32(in.GPUNumber),
+		Freq:      in.CPUFreq,
+		ImageID:   in.ImageID,
+	}
+}
+
+// ToPBGatewayDefinition ...
+func ToPBGatewayDefinition(in *model.HostDefinition) *pb.GatewayDefinition {
+	return &pb.GatewayDefinition{
+		CPU:     int32(in.Cores),
+		RAM:     in.RAMSize,
+		Disk:    int32(in.DiskSize),
+		ImageID: in.ImageID,
+	}
+}
+
 // ToHostStatus ...
 func ToHostStatus(in *model.Host) *pb.HostStatus {
 	return &pb.HostStatus{
