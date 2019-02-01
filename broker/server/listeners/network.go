@@ -50,6 +50,11 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	log.Infof("Listeners: network create '%s' called", in.Name)
 	defer log.Debugf("Listeners: network create '%s' done", in.Name)
 
+	if err := utils.ProcessRegister(ctx, "Create network "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't create network: no tenant set")
@@ -80,6 +85,11 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.N
 	log.Infof("Listeners: network list called")
 	defer log.Debugf("Listeners: network list done")
 
+	if err := utils.ProcessRegister(ctx, "List networks"); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list network: no tenant set")
@@ -105,6 +115,11 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.N
 func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
 	log.Infof("Listeners: network inspect '%s' called'", in.Name)
 	defer log.Debugf("broker.server.listeners.NetworkListener.Inspect(%s) done'", in.Name)
+
+	if err := utils.ProcessRegister(ctx, "Inspect network "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -132,6 +147,11 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 // Delete a network
 func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Delete Network called for network '%s'", in.GetName())
+
+	if err := utils.ProcessRegister(ctx, "Delete network "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {

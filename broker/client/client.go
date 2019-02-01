@@ -35,15 +35,16 @@ import (
 
 // Session units the different resources proposed by brokerd as broker client
 type Session struct {
-	Bucket   *bucket
-	Host     *host
-	Share    *share
-	Network  *network
-	Ssh      *ssh
-	Tenant   *tenant
-	Volume   *volume
-	Template *template
-	Image    *image
+	Bucket         *bucket
+	Host           *host
+	Share          *share
+	Network        *network
+	Ssh            *ssh
+	Tenant         *tenant
+	Volume         *volume
+	Template       *template
+	Image          *image
+	ProcessManager *processManager
 
 	brokerdHost string
 	brokerdPort int
@@ -86,6 +87,7 @@ func New() Client {
 	s.Volume = &volume{session: s}
 	s.Template = &template{session: s}
 	s.Image = &image{session: s}
+	s.ProcessManager = &processManager{session: s}
 	return s
 }
 

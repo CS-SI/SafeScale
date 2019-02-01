@@ -28,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
 
 	"github.com/pkg/errors"
-	grpcmetadata "google.golang.org/grpc/metadata"
 
 	log "github.com/sirupsen/logrus"
 
@@ -208,14 +207,6 @@ func (svc *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram flo
 func (svc *HostHandler) Create(
 	ctx context.Context, name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32, force bool,
 ) (*model.Host, error) {
-
-	md, ok := grpcmetadata.FromIncomingContext(ctx)
-	if !ok {
-		fmt.Println("lol rekt")
-	} else {
-		fmt.Println(md)
-	}
-
 	log.Debugf("broker.server.handlers.HostHandler::Create('%s') called", name)
 	defer log.Debugf("broker.server.handlers.HostHandler::Create('%s') done", name)
 
@@ -500,9 +491,6 @@ func (svc *HostHandler) Create(
 	}
 	log.Infof("SSH service started on host '%s'.", host.Name)
 
-	if err := brokerutils.TaskStatus(ctx); err != nil {
-		return nil, err
-	}
 	return host, nil
 }
 

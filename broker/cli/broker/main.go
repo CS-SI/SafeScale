@@ -25,6 +25,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/broker/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -33,17 +34,16 @@ import (
 )
 
 func cleanup() {
-	fmt.Println("\nBe carfull stoping broker will not stop the execution on brokerd! (but will remove created devices after they finish creation : WIP)")
+	fmt.Println("\nBe carfull stoping broker will not stop the execution on brokerd!")
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Do you really want to stop broker ? [y]es [n]o: ")
+	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
 	text, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("Failed to read the imput : ", err.Error())
 		text = "y"
 	}
 	if strings.TrimRight(text, "\n") == "y" {
-		utils.Cancel()
-		os.Exit(1)
+		client.New().ProcessManager.Stop(utils.GetUUID(), client.DefaultExecutionTimeout)
 	}
 }
 

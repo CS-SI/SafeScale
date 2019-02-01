@@ -24,40 +24,29 @@ import (
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
-// tenant is the part of broker client handling tenants
-type tenant struct {
-	// session is not used currently
+// bucket is the part of the broker client handling buckets
+type processManager struct {
+	// session is not used currently.
 	session *Session
 }
 
 // List ...
-func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
-	t.session.Connect()
-	defer t.session.Disconnect()
-	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := utils.GetContext(true)
+func (c *processManager) List(timeout time.Duration) (*pb.ProcessList, error) {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := pb.NewProcessManagerServiceClient(c.session.connection)
+	ctx := utils.GetContext(false)
 
 	return service.List(ctx, &google_protobuf.Empty{})
-
 }
 
-// Get ...
-func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
-	t.session.Connect()
-	defer t.session.Disconnect()
-	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := utils.GetContext(true)
+// Stop ...
+func (c *processManager) Stop(uuid string, timeout time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := pb.NewProcessManagerServiceClient(c.session.connection)
+	ctx := utils.GetContext(false)
 
-	return service.Get(ctx, &google_protobuf.Empty{})
-}
-
-// Set ...
-func (t *tenant) Set(name string, timeout time.Duration) error {
-	t.session.Connect()
-	defer t.session.Disconnect()
-	service := pb.NewTenantServiceClient(t.session.connection)
-	ctx := utils.GetContext(true)
-
-	_, err := service.Set(ctx, &pb.TenantName{Name: name})
+	_, err := service.Stop(ctx, &pb.ProcessDefinition{UUID: uuid})
 	return err
 }

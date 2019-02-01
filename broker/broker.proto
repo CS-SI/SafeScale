@@ -351,3 +351,18 @@ service ShareService{
     rpc Unmount(ShareMountDefinition) returns (google.protobuf.Empty){}
     rpc Inspect(Reference) returns (ShareMountList){}
 }
+
+
+message ProcessDefinition{
+    string UUID = 1;
+    string Info = 2;
+}
+
+message ProcessList{
+    repeated ProcessDefinition List = 1;
+}
+
+service ProcessManagerService{
+    rpc Stop(ProcessDefinition) returns (google.protobuf.Empty){}
+    rpc List(google.protobuf.Empty) returns (ProcessList){}
+}

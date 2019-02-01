@@ -137,6 +137,7 @@ func work() {
 	pb.RegisterShareServiceServer(s, &listeners.ShareListener{})
 	pb.RegisterImageServiceServer(s, &listeners.ImageListener{})
 	pb.RegisterTemplateServiceServer(s, &listeners.TemplateListener{})
+	pb.RegisterProcessManagerServiceServer(s, &listeners.ProcessManagerListener{})
 
 	// log.Println("Initializing service factory")
 	// commands.InitServiceFactory()

@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/providers"
 )
 
@@ -48,6 +49,11 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 	log.Infoln("Listeners: tenant list called")
 	defer log.Debugln("Listeners: tenant list done")
 
+	if err := utils.ProcessRegister(ctx, "Tenants List"); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenants, err := providers.Tenants()
 	if err != nil {
 		return nil, err
@@ -68,6 +74,11 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
 	log.Infoln("Listeners: tenant get called")
 	defer log.Debugln("Listeners: tenant get done")
+
+	if err := utils.ProcessRegister(ctx, "Tenant Get"); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	if currentTenant == nil {
 		log.Info("Can't get tenant: no tenant set")
@@ -103,6 +114,11 @@ func getCurrentTenant() *Tenant {
 func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
 	log.Infof("Listeners: tenant set '%s' called", in.Name)
 	defer log.Debugf("Listeners: tenant set '%s' done", in.Name)
+
+	if err := utils.ProcessRegister(ctx, "Tenant Set "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return &google_protobuf.Empty{}, nil
