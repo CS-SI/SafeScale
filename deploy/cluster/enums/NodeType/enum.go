@@ -22,12 +22,12 @@ package NodeType
 type Enum int
 
 const (
-	//Bootstrap to represent a bootstrap node
-	Bootstrap Enum = iota
-	//Master to represent a master node
+	// Gateway to represent a gateway node
+	Gateway Enum = iota
+	// Master to represent a master node
 	Master
-	//PrivateNode to represent a private agent
+	// PrivateNode to represent a private agent
 	PrivateNode
-	//PublicNode to represent a public agent
+	// PublicNode to represent a public agent
 	PublicNode
 )

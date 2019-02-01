@@ -26,7 +26,7 @@ exec 2>&1
 {{ .reserved_BashLibrary }}
 
 # Installs and configures everything needed on any node
-{{ .InstallCommonRequirements }}
+{{ .GlobalSystemRequirements }}
 
 echo "Master installed successfully."
 exit 0

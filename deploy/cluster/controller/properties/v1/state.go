@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -50,5 +50,5 @@ func (s *State) Replace(v interface{}) {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Extension.StateV1, &State{})
+	serialize.PropertyTypeRegistry.Register("clusters", Property.StateV1, &State{})
 }

@@ -17,7 +17,7 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -25,6 +25,12 @@ import (
 type Composite struct {
 	// Array of tenants hosting a multu-tenant cluster (multi starting from 1)
 	Tenants []string `json:"tenants"`
+}
+
+func newComposite() *Composite {
+	return &Composite{
+		Tenants: []string{},
+	}
 }
 
 // Content ... (serialize.Property interface)
@@ -45,5 +51,5 @@ func (n *Composite) Replace(v interface{}) {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Extension.CompositeV1, &Composite{})
+	serialize.PropertyTypeRegistry.Register("clusters", Property.CompositeV1, newComposite())
 }

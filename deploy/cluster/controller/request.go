@@ -17,9 +17,9 @@
 package controller
 
 import (
-	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/providers/model"
 )
 
 // Request defines what kind of Cluster is wanted
@@ -39,7 +39,7 @@ type Request struct {
 	// KeepOnFailure is set to True to keep resources on cluster creation failure
 	KeepOnFailure bool
 	// NodesDef count
-	NodesDef *pb.HostDefinition
+	NodesDef *model.HostDefinition
 	// DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
 	DisabledDefaultFeatures map[string]struct{}
 }

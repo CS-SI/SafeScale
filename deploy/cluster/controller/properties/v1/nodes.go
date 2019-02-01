@@ -17,7 +17,7 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -38,6 +38,14 @@ type Nodes struct {
 	PublicLastIndex  int     `json:"public_last_index"`       // PublicLastIndex
 }
 
+func newNodes() *Nodes {
+	return &Nodes{
+		Masters:      []*Node{},
+		PublicNodes:  []*Node{},
+		PrivateNodes: []*Node{},
+	}
+}
+
 // Content ... (serialize.Property interface)
 func (n *Nodes) Content() interface{} {
 	return n
@@ -56,5 +64,5 @@ func (n *Nodes) Replace(v interface{}) {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Extension.NodesV1, &Nodes{})
+	serialize.PropertyTypeRegistry.Register("clusters", Property.NodesV1, newNodes())
 }

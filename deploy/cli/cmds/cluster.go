@@ -23,18 +23,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
+
 	"github.com/CS-SI/SafeScale/providers/model"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli"
 
-	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/deploy/cluster"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/core"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
+	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
+	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/install"
@@ -125,24 +126,22 @@ var clusterListCommand = cli.Command{
 		if err != nil {
 			return clitools.ExitOnRPC(fmt.Sprintf("Failed to get cluster list: %v", err))
 		}
-		jsoned, err := json.Marshal(list)
-		if err != nil {
-			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
-		}
-		var toFormat []interface{}
-		err = json.Unmarshal(jsoned, &toFormat)
-		if err != nil {
-			return clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("Failed to interpret list: %s", err.Error()))
-		}
+
 		var formatted []interface{}
-		for _, value := range toFormat {
-			core := value.(map[string]interface{})["Core"]
-			formatted = append(formatted, formatClusterConfig(core))
+		for _, value := range list {
+			c := value.(api.Cluster)
+			converted, err := convertToMap(c)
+			if err != nil {
+				return clitools.ExitOnErrorWithMessage(ExitCode.Run,
+					fmt.Sprintf("failed to extract data about cluster '%s'", c.GetIdentity().Name))
+			}
+			formatted = append(formatted, formatClusterConfig(converted))
 		}
-		jsoned, err = json.Marshal(formatted)
+		jsoned, err := json.Marshal(formatted)
 		if err != nil {
 			fmt.Printf("%v\n", err)
-			return clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("Failed to convert list to json: %s", err.Error()))
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run,
+				fmt.Sprintf("Failed to convert list to json: %s", err.Error()))
 		}
 		fmt.Println(string(jsoned))
 		return nil
@@ -152,20 +151,9 @@ var clusterListCommand = cli.Command{
 // formatClusterConfig...
 func formatClusterConfig(value interface{}) map[string]interface{} {
 	core := value.(map[string]interface{})
-	e := Flavor.Enum(int(core["flavor"].(float64)))
-	core["flavor_label"] = e.String()
-
-	c := Complexity.Enum(int(core["complexity"].(float64)))
-	core["complexity_label"] = c.String()
-
-	s := ClusterState.Enum(int(core["state"].(float64)))
-	core["state_label"] = s.String()
 
 	if !Debug {
-		delete(core, "infos")
-		delete(core, "extensions")
-		delete(core, "private_node_ids")
-		delete(core, "public_node_ids")
+		delete(core, "defaults")
 		delete(core, "keypair")
 	}
 
@@ -199,7 +187,7 @@ var clusterInspectCommand = cli.Command{
 
 // outputClusterConfig displays cluster configuration after filtering and completing some fields
 func outputClusterConfig() error {
-	toFormat, err := convertStructToMap(clusterInstance.GetConfig())
+	toFormat, err := convertToMap(clusterInstance)
 	if err != nil {
 		return err
 	}
@@ -213,47 +201,106 @@ func outputClusterConfig() error {
 	return nil
 }
 
-// convertStructToMap converts a struct to its equivalent in map[string]interface{},
+// convertToMap converts clusterInstance to its equivalent in map[string]interface{},
 // with fields converted to string and used as keys
-func convertStructToMap(src interface{}) (map[string]interface{}, error) {
-	jsoned, err := json.Marshal(src)
-	if err != nil {
-		return map[string]interface{}{}, err
-	}
-	var toFormat map[string]interface{}
-	err = json.Unmarshal(jsoned, &toFormat)
-	if err != nil {
-		return map[string]interface{}{}, err
+func convertToMap(c api.Cluster) (map[string]interface{}, error) {
+	identity := c.GetIdentity()
+
+	result := map[string]interface{}{
+		"name":             identity.Name,
+		"flavor":           identity.Flavor,
+		"flavor_label":     identity.Flavor.String(),
+		"complexity":       identity.Complexity,
+		"complexity_label": identity.Complexity.String(),
+		"admin_login":      "cladm",
+		"admin_password":   identity.AdminPassword,
+		"keypair":          identity.Keypair,
 	}
 
-	// Add information not directly in cluster GetConfig()
-	feature, err := install.NewFeature("remotedesktop")
-	found := false
-	if err == nil {
-		target := install.NewClusterTarget(clusterInstance)
-		var results install.Results
-		results, err := feature.Check(target, install.Variables{}, install.Settings{})
-		found = err == nil && results.Successful()
-		if found {
-			brkclt := brokerclient.New().Host
-			remoteDesktops := []string{}
-			gwPublicIP := clusterInstance.GetConfig().PublicIP
-			for _, id := range clusterInstance.ListMasterIDs() {
-				host, err := brkclt.Inspect(id, brokerclient.DefaultExecutionTimeout)
-				if err != nil {
-					return nil, err
-				}
-				remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s/", gwPublicIP, host.Name))
-			}
-			toFormat["remote_desktop"] = remoteDesktops
+	properties := c.GetProperties()
+	err := properties.LockForRead(Property.CompositeV1).ThenUse(func(v interface{}) error {
+		result["tenant"] = v.(*clusterpropsv1.Composite).Tenants[0]
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	netCfg := c.GetNetworkConfig()
+	result["network_id"] = netCfg.NetworkID
+	result["cidr"] = netCfg.CIDR
+	result["gateway_ip"] = netCfg.GatewayIP
+	result["public_ip"] = netCfg.PublicIP
+
+	err = properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
+		defaultsV1 := v.(*clusterpropsv1.Defaults)
+		result["defaults"] = map[string]interface{}{
+			"image":  defaultsV1.Image,
+			"master": defaultsV1.MasterSizing,
+			"node":   defaultsV1.NodeSizing,
 		}
-	}
-	if !found {
-		toFormat["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'deploy cluster %s feature remotedesktop add'.", clusterName)
-	}
-	toFormat["admin_login"] = "cladm"
+		return nil
+	})
 
-	return toFormat, nil
+	err = properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
+		nodesV1 := v.(*clusterpropsv1.Nodes)
+		result["nodes"] = map[string]interface{}{
+			"masters":       nodesV1.Masters,
+			"private_nodes": nodesV1.PrivateNodes,
+			"public_nodes":  nodesV1.PublicNodes,
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = properties.LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+		result["features"] = v.(*clusterpropsv1.Features)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = properties.LockForRead(Property.StateV1).ThenUse(func(v interface{}) error {
+		state := v.(*clusterpropsv1.State).State
+		result["last_state"] = state
+		result["last_state_label"] = state.String()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// // Add information not directly in cluster GetConfig()
+	// // TODO: add and use feature metadata
+	// feature, err := install.NewFeature("remotedesktop")
+	// found := false
+	// if err == nil {
+	// 	target := install.NewClusterTarget(clusterInstance)
+	// 	var results install.Results
+	// 	results, err := feature.Check(target, install.Variables{}, install.Settings{})
+	// 	found = err == nil && results.Successful()
+	// 	if found {
+	// 		brkclt := brokerclient.New().Host
+	// 		remoteDesktops := []string{}
+	// 		gwPublicIP := clusterInstance.GetNetworkConfig().PublicIP
+	// 		for _, id := range clusterInstance.ListMasterIDs() {
+	// 			host, err := brkclt.Inspect(id, brokerclient.DefaultExecutionTimeout)
+	// 			if err != nil {
+	// 				return nil, err
+	// 			}
+	// 			remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s/", gwPublicIP, host.Name))
+	// 		}
+	// 		toFormat["remote_desktop"] = remoteDesktops
+	// 	}
+	// }
+	// if !found {
+	// 	toFormat["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'deploy cluster %s feature remotedesktop add'.", clusterName)
+	// }
+	// toFormat["admin_login"] = "cladm"
+
+	return result, nil
 }
 
 // clusterCreateCmd handles 'deploy cluster <clustername> create'
@@ -345,16 +392,16 @@ var clusterCreateCommand = cli.Command{
 		ram := float32(c.Float64("ram"))
 		disk := int32(c.Uint("disk"))
 
-		var nodesDef *pb.HostDefinition
+		var nodesDef *model.HostDefinition
 		if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
-			nodesDef = &pb.HostDefinition{
-				CPUNumber: cpu,
-				RAM:       ram,
-				Disk:      disk,
-				ImageID:   los,
+			nodesDef = &model.HostDefinition{
+				Cores:    int(cpu),
+				RAMSize:  ram,
+				DiskSize: int(disk),
+				ImageID:  los,
 			}
 		}
-		clusterInstance, err = cluster.Create(core.Request{
+		clusterInstance, err = cluster.Create(controller.Request{
 			Name:                    clusterName,
 			Complexity:              complexity,
 			CIDR:                    cidr,
@@ -371,14 +418,13 @@ var clusterCreateCommand = cli.Command{
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 		}
 
-		toFormat, err := convertStructToMap(clusterInstance.GetConfig())
+		toFormat, err := convertToMap(clusterInstance)
 		if err != nil {
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		formatted := formatClusterConfig(toFormat)
 		if !Debug {
-			delete(formatted, "PrivateNodeIDs")
-			delete(formatted, "PublicNodeIDs")
+			delete(formatted, "defaults")
 		}
 		jsoned, err := json.Marshal(formatted)
 		if err != nil {
@@ -613,13 +659,13 @@ var clusterExpandCommand = cli.Command{
 		_ = c.Bool("gpu")
 
 		// err := createNodes(clusterName, public, count, los, cpu, ram, disk)
-		var nodeRequest *pb.HostDefinition
+		var nodeRequest *model.HostDefinition
 		if los != "" || cpu > 0 || ram > 0.0 || disk > 0 {
-			nodeRequest = &pb.HostDefinition{
-				CPUNumber: cpu,
-				RAM:       ram,
-				Disk:      disk,
-				ImageID:   los,
+			nodeRequest = &model.HostDefinition{
+				Cores:    int(cpu),
+				RAMSize:  ram,
+				DiskSize: int(disk),
+				ImageID:  los,
 			}
 		}
 		hosts, err := clusterInstance.AddNodes(count, public, nodeRequest)
@@ -740,9 +786,9 @@ var clusterDcosCommand = cli.Command{
 			return err
 		}
 
-		config := clusterInstance.GetConfig()
-		if config.Flavor != Flavor.DCOS {
-			msg := fmt.Sprintf("Can't call dcos on this cluster, its flavor isn't DCOS (%s).\n", config.Flavor.String())
+		identity := clusterInstance.GetIdentity()
+		if identity.Flavor != Flavor.DCOS {
+			msg := fmt.Sprintf("Can't call dcos on this cluster, its flavor isn't DCOS (%s).\n", identity.Flavor.String())
 			return clitools.ExitOnErrorWithMessage(ExitCode.NotApplicable, msg)
 		}
 		args := c.Args().Tail()
@@ -803,7 +849,7 @@ var clusterRunCommand = cli.Command{
 func executeCommand(command string) error {
 	masters := clusterInstance.ListMasterIDs()
 	if len(masters) <= 0 {
-		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetName())
+		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetIdentity().Name)
 		return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 	}
 	brokerssh := brokerclient.New().Ssh

@@ -17,7 +17,7 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Extension"
+	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -28,6 +28,13 @@ type Features struct {
 	// Disabled keeps track of features normally automatically added with cluster creation,
 	// but explicitely disabled; if a disabled feature is added, must be removed from this property
 	Disabled map[string]struct{} `json:"disabled"`
+}
+
+func newFeatures() *Features {
+	return &Features{
+		Installed: map[string]string{},
+		Disabled:  map[string]struct{}{},
+	}
 }
 
 // Content ... (serialize.Property interface)
@@ -48,5 +55,5 @@ func (n *Features) Replace(v interface{}) {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", Extension.DefaultsV1, &Features{})
+	serialize.PropertyTypeRegistry.Register("clusters", Property.FeaturesV1, newFeatures())
 }

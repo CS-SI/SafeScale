@@ -33,3 +33,13 @@ type Identity struct {
 	// is used to connect via Guacamole, but can't be used with SSH
 	AdminPassword string `json:"admin_password"`
 }
+
+// // MarshalJSON implements json.Marshaller
+// func (i *Identity) MarshalJSON() ([]byte, error) {
+// 	return serialize.ToJSON(i)
+// }
+
+// // UnmarshalJSON implement json.Unmarshaller
+// func (i *Identity) UnmarshalJSON(b []byte) error {
+// 	return serialize.FromJSON(b, i)
+// }

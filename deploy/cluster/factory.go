@@ -23,6 +23,7 @@ import (
 
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/dcos"
@@ -34,7 +35,7 @@ import (
 )
 
 // Get returns the Cluster instance corresponding to the cluster named 'name'
-// TODO: renamed to Inspect ?
+// TODO: rename to Inspect ?
 func Get(name string) (api.Cluster, error) {
 	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
 	if err != nil {
@@ -45,7 +46,7 @@ func Get(name string) (api.Cluster, error) {
 		return nil, err
 	}
 
-	m, err := metadata.NewCluster(svc)
+	m, err := controller.NewMetadata(svc)
 	if err != nil {
 		return nil, err
 	}
@@ -56,43 +57,83 @@ func Get(name string) (api.Cluster, error) {
 	if !found {
 		return nil, model.ResourceNotFoundError("cluster", name)
 	}
+	controller := m.Get()
+	err = setBlueprint(controller)
+	if err != nil {
+		return nil, err
+	}
+	return controller, nil
+}
 
-	var instance api.Cluster
-	clusterCore := m.Get()
-	switch clusterCore.Flavor {
+// Load ...
+func Load(name string) (api.Cluster, error) {
+	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return nil, err
+	}
+	svc, err := providers.GetService(tenant.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := controller.NewMetadata(svc)
+	if err != nil {
+		return nil, err
+	}
+	found, err := m.Read(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
+	}
+	if !found {
+		return nil, model.ResourceNotFoundError("cluster", name)
+	}
+	controller := m.Get()
+	err = setBlueprint(controller)
+	if err != nil {
+		return nil, err
+	}
+	return controller, nil
+}
+
+func setBlueprint(controller *controller.Controller) error {
+	flavor := controller.GetIdentity().Flavor
+	switch flavor {
 	case Flavor.DCOS:
-		instance, err = dcos.Load(m)
+		err := controller.Restore(dcos.Blueprint(controller))
 		if err != nil {
-			return nil, err
-		}
-	case Flavor.K8S:
-		instance, err = k8s.Load(m)
-		if err != nil {
-			return nil, err
+			return err
 		}
 	case Flavor.BOH:
-		instance, err = boh.Load(m)
+		err := controller.Restore(boh.Blueprint(controller))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	case Flavor.OHPC:
-		instance, err = ohpc.Load(m)
+		err := controller.Restore(ohpc.Blueprint(controller))
 		if err != nil {
-			return nil, err
+			return err
+		}
+	case Flavor.K8S:
+		err := controller.Restore(k8s.Blueprint(controller))
+		if err != nil {
+			return err
 		}
 	case Flavor.SWARM:
-		instance, err = swarm.Load(m)
+		err := controller.Restore(swarm.Blueprint(controller))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	default:
-		return nil, fmt.Errorf("cluster Flavor '%s' not yet implemented", clusterCore.Flavor.String())
+		return fmt.Errorf("cluster Flavor '%s' not yet implemented", flavor.String())
 	}
-	return instance, nil
+	return nil
 }
 
 // Create creates a cluster following the parameters of the request
-func Create(req core.Request) (api.Cluster, error) {
+func Create(req controller.Request) (api.Cluster, error) {
+	log.Debugf(">>> deploy.cluster.factory::Create()")
+	defer log.Debugf("<<< deploy.cluster.factory::Create()")
+
 	// Validates parameters
 	if req.Name == "" {
 		panic("req.Name is empty!")
@@ -101,39 +142,42 @@ func Create(req core.Request) (api.Cluster, error) {
 		panic("req.CIDR is empty!")
 	}
 
-	var instance api.Cluster
-
 	log.Printf("Creating infrastructure for cluster '%s'", req.Name)
 
-	tenant, err := brokerclient.New().Tenant.Get(0)
+	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return nil, err
+	}
+	svc, err := providers.GetService(tenant.Name)
 	if err != nil {
 		return nil, err
 	}
 
+	controller := controller.NewController(svc)
 	req.Tenant = tenant.Name
 	switch req.Flavor {
 	case Flavor.DCOS:
-		instance, err = dcos.Create(req)
+		err = controller.Create(req, dcos.Blueprint(controller))
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.BOH:
-		instance, err = boh.Create(req)
+		err = controller.Create(req, boh.Blueprint(controller))
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.OHPC:
-		instance, err = ohpc.Create(req)
+		err = controller.Create(req, ohpc.Blueprint(controller))
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.K8S:
-		instance, err = k8s.Create(req)
+		err = controller.Create(req, k8s.Blueprint(controller))
 		if err != nil {
 			return nil, err
 		}
 	case Flavor.SWARM:
-		instance, err = swarm.Create(req)
+		err = controller.Create(req, swarm.Blueprint(controller))
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +186,7 @@ func Create(req core.Request) (api.Cluster, error) {
 	}
 
 	log.Printf("Cluster '%s' created and initialized successfully", req.Name)
-	return instance, nil
+	return controller, nil
 }
 
 // Delete deletes the infrastructure of the cluster named 'name'
@@ -168,67 +212,36 @@ func List() ([]api.Cluster, error) {
 	}
 
 	var clusterList []api.Cluster
-	m, err := metadata.NewCluster(svc)
+	m, err := controller.NewMetadata(svc)
 	if err != nil {
 		return clusterList, err
 	}
-	var instance api.Cluster
-	err = m.Browse(func(cm *metadata.Cluster) error {
-		cluster := cm.Get()
-		switch cluster.Flavor {
-		case Flavor.BOH:
-			instance, err = boh.Load(cm)
-			if err != nil {
-				return err
-			}
-		case Flavor.DCOS:
-			instance, err = dcos.Load(cm)
-			if err != nil {
-				return err
-			}
-		case Flavor.K8S:
-			instance, err = k8s.Load(cm)
-			if err != nil {
-				return err
-			}
-		case Flavor.OHPC:
-			instance, err = ohpc.Load(cm)
-			if err != nil {
-				return err
-			}
-		case Flavor.SWARM:
-			instance, err = swarm.Load(cm)
-			if err != nil {
-				return err
-			}
-		}
-
-		clusterList = append(clusterList, instance)
+	err = m.Browse(func(controller *controller.Controller) error {
+		clusterList = append(clusterList, controller)
 		return nil
 	})
 	return clusterList, err
 }
 
-// Sanitize ...
-func Sanitize(svc *providers.Service, name string) error {
-	m, err := metadata.NewCluster(svc)
-	if err != nil {
-		return err
-	}
-	found, err := m.Read(name)
-	if err != nil {
-		return fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
-	}
-	if !found {
-		return fmt.Errorf("cluster '%s' not found", name)
-	}
-
-	clusterCore := m.Get()
-	clusterCore.Service = svc
-	switch clusterCore.Flavor {
-	case Flavor.DCOS:
-		return dcos.Sanitize(m)
-	default:
-		return fmt.Errorf("Sanitization of cluster Flavor '%s' not available", clusterCore.Flavor.String())
-	}
-}
+// // Sanitize ...
+// func Sanitize(svc *providers.Service, name string) error {
+// m, err := controller.NewMetadata(svc)
+// if err != nil {
+// return err
+// }
+// found, err := m.Read(name)
+// if err != nil {
+// return fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
+// }
+// if !found {
+// return fmt.Errorf("cluster '%s' not found", name)
+// }
+//
+// controller := m.Get()
+// switch controller.GetIdentity().Flavor {
+// case Flavor.DCOS:
+// return dcos.Sanitize(m)
+// default:
+// return fmt.Errorf("Sanitization of cluster Flavor '%s' not available", clusterCore.Flavor.String())
+// }
+// }
