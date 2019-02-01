@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -152,6 +153,8 @@ func work() {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	app := cli.NewApp()
 	app.Name = "brokerd"
 	app.Usage = "brokerd [OPTIONS]"

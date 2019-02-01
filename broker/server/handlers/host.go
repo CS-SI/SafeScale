@@ -75,8 +75,8 @@ func NewHostHandler(api *providers.Service) HostAPI {
 
 // Start starts a host
 func (svc *HostHandler) Start(ref string) error {
-	log.Debugf("broker.server.handlers.HostHandler::Start(%s) called", ref)
-	defer log.Debugf("broker.server.handlers.HostHandler::Start(%s) done", ref)
+	log.Debugf(">>> broker.server.handlers.HostHandler::Start(%s)", ref)
+	defer log.Debugf("<<< broker.server.handlers.HostHandler::Start(%s)", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -96,8 +96,8 @@ func (svc *HostHandler) Start(ref string) error {
 
 // Stop stops a host
 func (svc *HostHandler) Stop(ref string) error {
-	log.Debugf("broker.server.handlers.HostHandler::Stop(%s) called", ref)
-	defer log.Debugf("broker.server.handlers.HostHandler::Stop(%s) done", ref)
+	log.Debugf(">>> broker.server.handlers.HostHandler::Stop(%s)", ref)
+	defer log.Debugf("<<< broker.server.handlers.HostHandler::Stop(%s)", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -117,8 +117,8 @@ func (svc *HostHandler) Stop(ref string) error {
 
 // Reboot reboots a host
 func (svc *HostHandler) Reboot(ref string) error {
-	log.Debugf("broker.server.handlers.HostHandler::Reboot(%s) called", ref)
-	defer log.Debugf("broker.server.handlers.HostHandler::Reboot(%s) done", ref)
+	log.Debugf(">>> broker.server.handlers.HostHandler::Reboot(%s)", ref)
+	defer log.Debugf("<<< broker.server.handlers.HostHandler::Reboot(%s)", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -146,8 +146,8 @@ func (svc *HostHandler) Reboot(ref string) error {
 
 // Resize ...
 func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*model.Host, error) {
-	log.Debugf("broker.server.handlers.HostHandler::Resize(%s) called", ref)
-	defer log.Debugf("broker.server.handlers.HostHandler::Resize(%s) done", ref)
+	log.Debugf(">>> broker.server.handlers.HostHandler::Resize(%s)", ref)
+	defer log.Debugf("<<< broker.server.handlers.HostHandler::Resize(%s)", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -209,8 +209,8 @@ func (svc *HostHandler) Create(
 	name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32, force bool,
 ) (*model.Host, error) {
 
-	log.Debugf("broker.server.handlers.HostHandler::Create('%s') called", name)
-	defer log.Debugf("broker.server.handlers.HostHandler::Create('%s') done", name)
+	log.Debugf(">>> broker.server.handlers.host.go:HostHandler::Create(%s)", name)
+	defer log.Debugf("<<< broker.server.handlers.hostHostHandler::Create(%s)", name)
 
 	host, err := svc.provider.GetHostByName(name)
 	if err != nil {
@@ -493,8 +493,8 @@ func (svc *HostHandler) getOrCreateDefaultNetwork() (*model.Network, error) {
 
 // List returns the host list
 func (svc *HostHandler) List(all bool) ([]*model.Host, error) {
-	log.Debugf("broker.server.handlers.HostHandler::List(%v) called", all)
-	defer log.Debugf("broker.server.handlers.HostHandler::List(%v) done", all)
+	log.Debugf("<<< broker.server.handlers.HostHandler::List(%v)", all)
+	defer log.Debugf(">>> broker.server.handlers.HostHandler::List(%v)", all)
 
 	if all {
 		return svc.provider.ListHosts()
@@ -515,8 +515,8 @@ func (svc *HostHandler) List(all bool) ([]*model.Host, error) {
 // ForceInspect ...
 // If not found, return (nil, err)
 func (svc *HostHandler) ForceInspect(ref string) (*model.Host, error) {
-	log.Debugf("broker.server.handlers.HostHandler::ForceInspect(%s) called", ref)
-	defer log.Debugf("broker.server.handlers.HostHandler::ForceInspect(%s) done", ref)
+	log.Debugf(">>> broker.server.handlers.HostHandler::ForceInspect(%s)", ref)
+	defer log.Debugf("<<< broker.server.handlers.HostHandler::ForceInspect(%s)", ref)
 
 	host, err := svc.Inspect(ref)
 	if err != nil {
@@ -529,8 +529,8 @@ func (svc *HostHandler) ForceInspect(ref string) (*model.Host, error) {
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
 func (svc *HostHandler) Inspect(ref string) (*model.Host, error) {
-	log.Debugf("broker.server.handlers.HostHandler::Inspect(%s) called", ref)
-	defer log.Debugf("broker.server.handlers.HostHandler::Inspect(%s) done", ref)
+	log.Debugf(">>> broker.server.handlers.HostHandler::Inspect(%s)", ref)
+	defer log.Debugf("<<< broker.server.handlers.HostHandler::Inspect(%s)", ref)
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
@@ -649,6 +649,7 @@ func (svc *HostHandler) Delete(ref string) error {
 			network, err := netHandler.Inspect(k)
 			if err != nil {
 				log.Errorf(err.Error())
+				continue
 			}
 			err = network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 				networkHostsV1 := v.(*propsv1.NetworkHosts)
@@ -688,7 +689,7 @@ func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
 
 	host, err := svc.Inspect(ref)
 	if err != nil {
-		return nil, logicErrf(err, fmt.Sprintf("can't access ssh parameters of host '%s': failed to query host", ref), nil)
+		return nil, logicErrf(err, fmt.Sprintf("can't access ssh parameters of host '%s': failed to query host", ref), "")
 	}
 
 	sshHandler := NewSSHHandler(svc.provider)
