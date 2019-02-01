@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"runtime"
 	"os/signal"
 	"sort"
 	"syscall"
@@ -37,6 +38,7 @@ func cleanup() {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {

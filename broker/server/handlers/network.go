@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -34,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
 	"github.com/CS-SI/SafeScale/providers/openstack"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers NetworkAPI
@@ -142,7 +144,7 @@ func (svc *NetworkHandler) Create(
 	}
 	img, err := svc.provider.SearchImage(theos)
 	if err != nil {
-		err := infraErrf(err, "Error creating network: Error searching image")
+		err := infraErrf(err, "Error creating network: Error searching image '%s'", theos)
 		return nil, err
 	}
 
@@ -317,8 +319,18 @@ func (svc *NetworkHandler) Delete(ref string) error {
 	// Check if hosts are still attached to network according to metadata
 	err = network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
-		if len(networkHostsV1.ByID) > 0 {
-			return logicErr(fmt.Errorf("can't delete network '%s': at least one host is still attached to it", ref))
+		hostsLen := len(networkHostsV1.ByName)
+		if hostsLen > 0 {
+			list := make([]string, 0, hostsLen)
+			for k := range networkHostsV1.ByName {
+				list = append(list, k)
+			}
+			verb := "are"
+			if hostsLen == 1 {
+				verb = "is"
+			}
+			return logicErr(fmt.Errorf("can't delete network '%s': %d host%s %s still attached to it: %s",
+				network.Name, hostsLen, utils.Plural(hostsLen), verb, strings.Join(list, ", ")))
 		}
 		return nil
 	})

@@ -242,8 +242,9 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 
 // Inspect an host
 func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host, error) {
-	log.Infof("Listeners: host inspect '%s' called", in.Name)
-	defer log.Debugf("Listeners: host inspect '%s' done", in.Name)
+	log.Infof("Receiving 'host inspect %s'", in.Name)
+	log.Debugf(">>> broker.server.listeners.HostListener::Inspect(%s)", in.Name)
+	defer log.Debugf("<<< broker.server.listeners.HostListener::Inspect(%s)", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -266,8 +267,9 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host,
 
 // Delete an host
 func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Infof("Listeners: host delete '%s' called", in.Name)
-	defer log.Debugf("Listeners: host delete '%s' done", in.Name)
+	log.Infof("Receiving 'host delete %s'", in.Name)
+	log.Debugf(">>> broker.server.listeners.HostListener::Delete(%s)", in.Name)
+	defer log.Debugf("<<< broker.server.Listeners.HostListener::Delete(%s)", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -291,8 +293,8 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 
 // SSH returns ssh parameters to access an host
 func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
-	log.Debugf("HostListener.SSH(%s) called", in.Name)
-	defer log.Debugf("HostListener.SSH(%s) called", in.Name)
+	log.Debugf(">>> broker.server.listeners.HostListener::SSH(%s)", in.Name)
+	defer log.Debugf("<<< broker.server.listeners.HostListener::SSH(%s)", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
