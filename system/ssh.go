@@ -546,6 +546,9 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 // WaitServerReady waits until the SSH server is ready
 // the 'timeout' parameter is in minutes
 func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
+	if ssh.Host == "" {
+		panic("SSHConfig.Host is empty!")
+	}
 	log.Debugf("Provisioning server, Waiting for SSH, timeout of %d minutes", int(timeout.Minutes()))
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
@@ -582,15 +585,15 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		retcode, stdout, stderr, logErr := logCmd.Run()
 		if logErr == nil {
 			if retcode == 0 {
-				return fmt.Errorf("Provisioning server, server '%s' is not ready yet: %s - log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)
+				return fmt.Errorf("provisioning server, server '%s' is not ready yet: %s - log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)
 			}
 			if len(stdout) > 0 {
-				log.Error(fmt.Errorf("Captured output: %s", stdout))
+				log.Error(fmt.Errorf("captured output: %s", stdout))
 			}
-			return fmt.Errorf("Provisioning server, server '%s' is not ready yet: %s - error reading user_data.log: %s", ssh.Host, originalErr.Error(), stderr)
+			return fmt.Errorf("provisioning server, server '%s' is not ready yet: %s - error reading user_data.log: %s", ssh.Host, originalErr.Error(), stderr)
 		}
 
-		return fmt.Errorf("Provisioning server, server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
+		return fmt.Errorf("provisioning server, server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
 	}
 	return nil
 }

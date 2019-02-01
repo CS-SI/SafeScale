@@ -24,7 +24,8 @@ import (
 
 // Client defines the structure of a Client object
 type Client struct {
-	SshConfig *system.SSHConfig
+	// SshConfig contains ssh connection configuration
+	SSHConfig *system.SSHConfig
 }
 
 // NewNFSClient creates a new NFS client isntance
@@ -34,34 +35,32 @@ func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
 	}
 
 	client := &Client{
-		SshConfig: sshconfig,
+		SSHConfig: sshconfig,
 	}
 	return client, nil
 }
 
 // Install installs NFS client on remote host
 func (c *Client) Install() error {
-	retcode, stdout, stderr, err := executeScript(*c.SshConfig, "nfs_client_install.sh", map[string]interface{}{})
+	retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install NFS client")
 }
 
 // Mount defines a mount of a remote share and mount it
-func (c *Client) Mount(host string, share string, mountPoint string) error {
+func (c *Client) Mount(export string, mountPoint string) error {
 	data := map[string]interface{}{
-		"Host":       host,
-		"Share":      share,
+		"Export":     export,
 		"MountPoint": mountPoint,
 	}
-	retcode, stdout, stderr, err := executeScript(*c.SshConfig, "nfs_client_share_mount.sh", data)
+	retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_share_mount.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount remote NFS share")
 }
 
 // Unmount a nfs share from NFS server
-func (c *Client) Unmount(host string, share string) error {
+func (c *Client) Unmount(export string) error {
 	data := map[string]interface{}{
-		"Host":  host,
-		"Share": share,
+		"Export": export,
 	}
-	retcode, stdout, stderr, err := executeScript(*c.SshConfig, "nfs_client_share_unmount.sh", data)
+	retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_share_unmount.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unmount remote NFS share")
 }
