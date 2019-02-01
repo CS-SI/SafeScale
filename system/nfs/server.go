@@ -24,7 +24,7 @@ import (
 
 // Server structure
 type Server struct {
-	SshConfig *system.SSHConfig
+	SSHConfig *system.SSHConfig
 }
 
 // NewServer instanciates a new nfs.Server struct
@@ -34,19 +34,19 @@ func NewServer(sshconfig *system.SSHConfig) (*Server, error) {
 	}
 
 	server := Server{
-		SshConfig: sshconfig,
+		SSHConfig: sshconfig,
 	}
 	return &server, nil
 }
 
 // GetHost returns the hostname or IP address of the nfs.Server
 func (s *Server) GetHost() string {
-	return s.SshConfig.Host
+	return s.SSHConfig.Host
 }
 
 // Install installs and configure NFS service on the remote host
 func (s *Server) Install() error {
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "nfs_server_install.sh", map[string]interface{}{})
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install nfs server")
 }
 
@@ -58,9 +58,8 @@ func (s *Server) MountBlockDevice(device, mountPoint, format string, doNotFormat
 		"FileSystem":  format,
 		"DoNotFormat": doNotFormat,
 	}
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "block_device_mount.sh", data)
-	err = handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
-	return stdout, err
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "block_device_mount.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
 }
 
 // UnmountBlockDevice unmounts a local block device on the remote system
@@ -68,7 +67,7 @@ func (s *Server) UnmountBlockDevice(device string) error {
 	data := map[string]interface{}{
 		"Device": device,
 	}
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "block_device_unmount.sh", data)
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "block_device_unmount.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount block device")
 }
 
@@ -78,7 +77,7 @@ func (s *Server) AddShare(path string, acl string) error {
 		"Path":         path,
 		"AccessRights": acl,
 	}
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "nfs_server_path_export.sh", data)
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "nfs_server_path_export.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }
 
@@ -87,6 +86,6 @@ func (s *Server) RemoveShare(path string) error {
 	data := map[string]interface{}{
 		"Path": path,
 	}
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "nfs_server_path_unexport.sh", data)
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
 }
