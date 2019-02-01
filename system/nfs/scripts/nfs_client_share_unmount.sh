@@ -26,14 +26,14 @@ function print_error {
 }
 trap print_error ERR
 
-function dns_fallback {
-    grep nameserver /etc/resolv.conf && return 0
-    echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
-    sudo cp /tmp/resolv.conf /etc/resolv.conf
-    return 0
-}
+# function dns_fallback {
+#     grep nameserver /etc/resolv.conf && return 0
+#     echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
+#     sudo cp /tmp/resolv.conf /etc/resolv.conf
+#     return 0
+# }
 
-dns_fallback
+# dns_fallback
 
-umount -fl {{.Host}}:{{.Share}}
-sed -i '\#^{{.Host}}:{{.Share}}#d' /etc/fstab
+umount -fl {{.Export}}
+sed -i '\#^{{.Export}}#d' /etc/fstab
