@@ -139,10 +139,10 @@ feature:
 
                             # Xfce Desktop configurations
                             # to update, from a Desktop configured as wanted:
-                            # tar --exclude .config/g* -Jcvf remotedesktop_conf.tar.xz .config
-                            # base64 remotedesktop_conf.tar.xz >remotedesktop_conf.tar.xz.encoded
+                            # tar --exclude .config/g* -Jcvf xfce_conf.tar.xz .config
+                            # base64 xfce_conf.tar.xz >xfce_conf.tar.xz.encoded
                             # Then copy between HEREDOCs the content of the .encoded file
-                            cat >/var/tmp/xfce_front.encoded <<'EOF'
+                            cat >/var/tmp/xfce_conf.encoded <<'EOF'
                             /Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4O//FW9dABcYyecMYYgb8tkd/QwXnBEBYq7o9K5cz3Dw
                             IsSonUkO6IaHvO+YS5nNHN2/lJlax4FCiWhkmwiAJRTWbQy6nFQuCNTNR5RdGaujqV44zxFE5CBR
                             FiN6bl2NP2uZ5T48K9Q83bcLDuMSi1aQGYaj9hyFQp0aO1Emt7tMgDStsEebG1Wm2YSx0d8STDbe
@@ -248,10 +248,10 @@ feature:
                             chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 195
 
                             systemctl daemon-reload && \
-                            systemctl enable vncserver@:0.service && \
-                            systemctl enable vncconfig@:0.service && \
-                            systemctl restart vncserver@:0.service && \
-                            systemctl restart vncconfig@:0.service || exit 196
+                            systemctl enable vncserver\@:0.service && \
+                            systemctl enable vncconfig\@:0.service && \
+                            systemctl restart vncserver\@:0.service && \
+                            systemctl restart vncconfig\@:0.service || exit 196
 
                     deps:
                         targets:
