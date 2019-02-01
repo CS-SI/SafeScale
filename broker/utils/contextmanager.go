@@ -18,53 +18,51 @@ package utils
 
 import (
 	"context"
-	"fmt"
+	"sync"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc/metadata"
 )
 
-var client_CancelContext context.Context
-var client_CancelFunc func()
 var client_RPCUUID uuid.UUID
+var uuid_set bool
+var mutex_contextmanager sync.Mutex
 
 //--------------------- CLIENT ---------------------------------
 
-// GetCancelContext ...
-func GetCancelContext() context.Context {
-	if client_CancelContext == nil {
-		client_RPCUUID, err := uuid.NewV4()
+// GetContext ...
+func GetContext(storeUUID bool) context.Context {
+	client_Context := context.Background()
+	if storeUUID {
+		client_Context = metadata.AppendToOutgoingContext(client_Context, "UUID", GetUUID())
+	} else {
+		uuid, err := uuid.NewV4()
 		if err != nil {
-			panic("Failed to generate client_RPCUUID")
+			panic("Failed to generate uuid")
 		}
-		client_CancelContext, client_CancelFunc = context.WithCancel(context.Background())
-		client_CancelContext = metadata.AppendToOutgoingContext(client_CancelContext, "UUID", client_RPCUUID.String())
+		client_Context = metadata.AppendToOutgoingContext(client_Context, "UUID", uuid.String())
 	}
-	return client_CancelContext
+	return client_Context
 }
 
 // GetTimeoutContext return a context for grpc commands
 func GetTimeoutContext(timeout time.Duration) (context.Context, context.CancelFunc) {
 	// Contact the server and print out its response.
-	return context.WithTimeout(GetCancelContext(), timeout)
+	return context.WithTimeout(GetContext(true), timeout)
 }
 
-// Cancel ...
-func Cancel() {
-	if client_CancelContext != nil {
-		client_CancelFunc()
+//GetUUID ...
+func GetUUID() string {
+	mutex_contextmanager.Lock()
+	defer mutex_contextmanager.Unlock()
+	if !uuid_set {
+		uuid, err := uuid.NewV4()
+		if err != nil {
+			panic("Failed to generate client_RPCUUID")
+		}
+		uuid_set = true
+		client_RPCUUID = uuid
 	}
-}
-
-//--------------------- SERVER ---------------------------------
-
-// TaskStatus ...
-func TaskStatus(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("Task canceled by broker")
-	default:
-		return nil
-	}
+	return client_RPCUUID.String()
 }

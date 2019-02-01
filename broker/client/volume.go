@@ -38,7 +38,7 @@ func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 
 	return service.List(ctx, &pb.VolumeListRequest{All: all})
 
@@ -49,7 +49,7 @@ func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, er
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 
 	return service.Inspect(ctx, &pb.Reference{Name: name})
 
@@ -60,7 +60,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 
 	var (
 		wg   sync.WaitGroup
@@ -97,7 +97,7 @@ func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Vol
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 
 	return service.Create(ctx, &def)
 
@@ -108,7 +108,7 @@ func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 
 	_, err := service.Attach(ctx, &def)
 	return err
@@ -120,7 +120,7 @@ func (v *volume) Detach(volumeName string, hostName string, timeout time.Duratio
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 
 	_, err := service.Detach(ctx, &pb.VolumeDetachment{
 		Volume: &pb.Reference{Name: volumeName},

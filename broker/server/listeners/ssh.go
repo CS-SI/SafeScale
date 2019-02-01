@@ -27,6 +27,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/server/handlers"
+	"github.com/CS-SI/SafeScale/broker/utils"
 )
 
 // SSHHandler exists to ease integration tests
@@ -43,6 +44,11 @@ type SSHListener struct{}
 // Run executes an ssh command an an host
 func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
 	log.Infof("Listeners: ssh run '%s' -c '%s'", in.Host, in.Command)
+
+	if err := utils.ProcessRegister(ctx, "SSH Run "+in.GetCommand()+" on host "+in.GetHost().GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -65,6 +71,11 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshRespon
 // Copy copy file from/to an host
 func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshResponse, error) {
 	log.Printf("Ssh copy called '%s', '%s'", in.Source, in.Destination)
+
+	if err := utils.ProcessRegister(ctx, "SSH Copy "+in.GetSource()+" to "+in.GetDestination()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {

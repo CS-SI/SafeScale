@@ -18,9 +18,11 @@ package listeners
 
 import (
 	"context"
+	"fmt"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/server/handlers"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 
 	log "github.com/sirupsen/logrus"
@@ -39,6 +41,11 @@ type TemplateListener struct{}
 // List available templates
 func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
 	log.Printf("Template List called")
+
+	if err := utils.ProcessRegister(ctx, "Teplates List"); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {

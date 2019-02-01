@@ -246,7 +246,7 @@ func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.
 	// defer conn.Close()
 	s.session.Connect()
 	defer s.session.Disconnect()
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 	service := pb.NewHostServiceClient(s.session.connection)
 
 	sshConfig, err := service.SSH(ctx, &pb.Reference{Name: name})

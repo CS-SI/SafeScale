@@ -37,7 +37,7 @@ func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error)
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 
 	return service.List(ctx, &pb.NWListRequest{
 		All: all,
@@ -50,7 +50,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 
 	var (
 		wg   sync.WaitGroup
@@ -87,7 +87,7 @@ func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, erro
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 
 	return service.Inspect(ctx, &pb.Reference{Name: name})
 
@@ -98,7 +98,7 @@ func (n *network) Create(def pb.NetworkDefinition, timeout time.Duration) (*pb.N
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx := utils.GetCancelContext()
+	ctx := utils.GetContext(true)
 
 	return service.Create(ctx, &def)
 
