@@ -17,8 +17,6 @@
 package metadata
 
 import (
-	"sync"
-
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
@@ -29,7 +27,7 @@ import (
 type Item struct {
 	payload serialize.Serializable
 	folder  *Folder
-	lock    sync.Mutex
+	lock    chan struct{}
 }
 
 // ItemDecoderCallback ...
@@ -40,6 +38,7 @@ func NewItem(svc *providers.Service, path string) *Item {
 	return &Item{
 		folder:  NewFolder(svc, path),
 		payload: nil,
+		lock:    make(chan struct{}, 1),
 	}
 }
 
@@ -130,6 +129,12 @@ func (i *Item) Read(name string, callback ItemDecoderCallback) (bool, error) {
 
 // WriteInto saves the content of Item in a subfolder to the Object Storage
 func (i *Item) WriteInto(path string, name string) error {
+	if i == nil {
+		panic("i is nil!")
+	}
+	if i.payload == nil {
+		panic("i.payload is nil!")
+	}
 	data, err := i.payload.Serialize()
 	if err != nil {
 		return err
@@ -163,12 +168,12 @@ func (i *Item) Browse(callback func([]byte) error) error {
 	})
 }
 
-// Acquire waits until the write lock is available, then locks the metadata
+// Acquire waits until the lock is available, then locks the metadata
 func (i *Item) Acquire() {
-	i.lock.Lock()
+	i.lock <- struct{}{}
 }
 
 // Release unlocks the metadata
 func (i *Item) Release() {
-	i.lock.Unlock()
+	<-i.lock
 }
