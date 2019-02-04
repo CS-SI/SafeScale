@@ -45,7 +45,9 @@ type SSHListener struct{}
 func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
 	log.Infof("Listeners: ssh run '%s' -c '%s'", in.Host, in.Command)
 
-	if err := utils.ProcessRegister(ctx, "SSH Run "+in.GetCommand()+" on host "+in.GetHost().GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "SSH Run "+in.GetCommand()+" on host "+in.GetHost().GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -72,7 +74,9 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshRespon
 func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshResponse, error) {
 	log.Printf("Ssh copy called '%s', '%s'", in.Source, in.Destination)
 
-	if err := utils.ProcessRegister(ctx, "SSH Copy "+in.GetSource()+" to "+in.GetDestination()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "SSH Copy "+in.GetSource()+" to "+in.GetDestination()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)

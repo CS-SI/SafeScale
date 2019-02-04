@@ -27,23 +27,15 @@ import (
 
 var client_RPCUUID uuid.UUID
 var uuid_set bool
-var mutex_contextmanager sync.Mutex
+var mutex_contextManager sync.Mutex
 
 //--------------------- CLIENT ---------------------------------
 
 // GetContext ...
 func GetContext(storeUUID bool) context.Context {
-	client_Context := context.Background()
-	if storeUUID {
-		client_Context = metadata.AppendToOutgoingContext(client_Context, "UUID", GetUUID())
-	} else {
-		uuid, err := uuid.NewV4()
-		if err != nil {
-			panic("Failed to generate uuid")
-		}
-		client_Context = metadata.AppendToOutgoingContext(client_Context, "UUID", uuid.String())
-	}
-	return client_Context
+	clientContext := context.Background()
+	clientContext = metadata.AppendToOutgoingContext(clientContext, "UUID", generateUUID(storeUUID))
+	return clientContext
 }
 
 // GetTimeoutContext return a context for grpc commands
@@ -54,15 +46,22 @@ func GetTimeoutContext(timeout time.Duration) (context.Context, context.CancelFu
 
 //GetUUID ...
 func GetUUID() string {
-	mutex_contextmanager.Lock()
-	defer mutex_contextmanager.Unlock()
-	if !uuid_set {
-		uuid, err := uuid.NewV4()
-		if err != nil {
-			panic("Failed to generate client_RPCUUID")
-		}
+	mutex_contextManager.Lock()
+	defer mutex_contextManager.Unlock()
+	return client_RPCUUID.String()
+}
+
+// generateUUID ...
+func generateUUID(store bool) string {
+	mutex_contextManager.Lock()
+	defer mutex_contextManager.Unlock()
+	uuid, err := uuid.NewV4()
+	if err != nil {
+		panic("Failed to generate UUID")
+	}
+	if store {
 		uuid_set = true
 		client_RPCUUID = uuid
 	}
-	return client_RPCUUID.String()
+	return uuid.String()
 }

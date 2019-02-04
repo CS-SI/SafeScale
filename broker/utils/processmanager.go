@@ -29,13 +29,18 @@ type processInfo struct {
 	commandName string
 	launchTime  time.Time
 	context     context.Context
+	cancelFunc  func()
+}
+
+func (pi *processInfo) toString() string {
+	return fmt.Sprintf("Task : %s\nCreation time : %s", pi.commandName, pi.launchTime.String())
 }
 
 var processMap map[string](processInfo)
 var mutex_processManager sync.Mutex
 
 // ProcessRegister ...
-func ProcessRegister(ctx context.Context, command string) error {
+func ProcessRegister(ctx context.Context, cancelFunc func(), command string) error {
 	if processMap == nil {
 		processMap = map[string](processInfo){}
 	}
@@ -48,9 +53,26 @@ func ProcessRegister(ctx context.Context, command string) error {
 		commandName: command,
 		launchTime:  time.Now(),
 		context:     ctx,
+		cancelFunc:  cancelFunc,
 	}
 	mutex_processManager.Unlock()
 	return nil
+}
+
+// ProcessCancelUUID ...
+func ProcessCancelUUID(uuid string) {
+	mutex_processManager.Lock()
+	defer mutex_processManager.Unlock()
+	if info, found := processMap[uuid]; found {
+		info.cancelFunc()
+	}
+}
+
+// ProcessDeregisterUUID ...
+func ProcessDeregisterUUID(uuid string) {
+	mutex_processManager.Lock()
+	defer mutex_processManager.Unlock()
+	delete(processMap, uuid)
 }
 
 // ProcessDeregister ...
@@ -59,23 +81,14 @@ func ProcessDeregister(ctx context.Context) {
 	if !ok {
 		panic("no uuid in metadatas")
 	}
-	mutex_processManager.Lock()
-	delete(processMap, md.Get("uuid")[0])
-	mutex_processManager.Unlock()
-}
-
-// ProcessDeregisterUUID ...
-func ProcessDeregisterUUID(uuid string) {
-	mutex_processManager.Lock()
-	delete(processMap, uuid)
-	mutex_processManager.Unlock()
+	ProcessDeregisterUUID(md.Get("uuid")[0])
 }
 
 // ProcessList ...
 func ProcessList() map[string]string {
 	listMap := map[string]string{}
 	for uuid, info := range processMap {
-		listMap[uuid] = fmt.Sprintf("Task : %s\nCreation time : %s", info.commandName, info.launchTime.String())
+		listMap[uuid] = info.toString()
 	}
 	return listMap
 }

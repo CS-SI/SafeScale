@@ -139,6 +139,14 @@ func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path s
 	if err != nil {
 		return nil, infraErr(err)
 	}
+	defer func() {
+		if err != nil {
+			err2 := nfsServer.RemoveShare(sharePath)
+			if err2 != nil {
+				log.Warn("Failed to RemoveShare")
+			}
+		}
+	}()
 
 	// Create share struct
 	share := propsv1.NewHostShare()
@@ -164,9 +172,39 @@ func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path s
 	if err != nil {
 		return nil, logicErrf(err, "Error saving server metadata")
 	}
+	defer func() {
+		if err != nil {
+			delete(serverSharesV1.ByID, share.ID)
+			delete(serverSharesV1.ByName, share.Name)
+			err2 := server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
+			if err2 != nil {
+				log.Warnf("Failed to set shares metadata of host %s", hostName)
+			}
+			err2 = metadata.SaveHost(svc.provider, server)
+			if err2 != nil {
+				log.Warnf("Failed to save metadata of host %s", hostName)
+			}
+		}
+	}()
 	err = metadata.SaveShare(svc.provider, server.ID, server.Name, share.ID, share.Name)
 	if err != nil {
 		return nil, infraErr(err)
+	}
+	defer func() {
+		if err != nil {
+			err2 := metadata.RemoveShare(svc.provider, server.ID, server.Name, share.ID, share.Name)
+			if err2 != nil {
+				log.Warnf("Failed to delete metadata of share %s", share.Name)
+			}
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		log.Warnf("Share creation canceled by broker")
+		err = fmt.Errorf("Share creation canceld by broker")
+		return nil, err
+	default:
 	}
 
 	return share, nil
@@ -355,6 +393,11 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 	if err != nil {
 		return nil, infraErr(err)
 	}
+	defer func() {
+		if err != nil {
+			nfsClient.Unmount(server.GetAccessIP(), share.Path)
+		}
+	}()
 
 	serverSharesV1.ByID[shareID].ClientsByName[target.Name] = target.ID
 	serverSharesV1.ByID[shareID].ClientsByID[target.ID] = target.Name
@@ -380,18 +423,55 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 	if err != nil {
 		return nil, infraErr(err)
 	}
+	defer func() {
+		if err != nil {
+			delete(serverSharesV1.ByID[shareID].ClientsByName, target.Name)
+			delete(serverSharesV1.ByID[shareID].ClientsByID, target.ID)
+			err2 := server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
+			if err2 != nil {
+				log.Warnf("Failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
+			}
+			err = metadata.SaveHost(svc.provider, server)
+			if err != nil {
+				log.Warnf("Failed to save host %s metadatas", server.Name)
+			}
+		}
+	}()
 	if target != server {
 		err = metadata.SaveHost(svc.provider, target)
 		if err != nil {
 			return nil, infraErr(err)
 		}
 	}
+	defer func() {
+		if err != nil {
+			delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
+			delete(targetMountsV1.RemoteMountsByPath, mount.Path)
+			err = target.Properties.Set(HostProperty.MountsV1, targetMountsV1)
+			if err != nil {
+				log.Warnf("Failed to remove mounted share %s from host %s metadatas", shareName, hostName)
+			}
+			err = metadata.SaveHost(svc.provider, target)
+			if err != nil {
+				log.Warnf("Failed to save host %s metadatas", hostName)
+			}
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		log.Warnf("Share mount canceled by broker")
+		err = fmt.Errorf("Share mount canceld by broker")
+		return nil, err
+	default:
+	}
+
 	return mount, nil
 }
 
 // Unmount a share from local directory of an host
 func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) error {
-	server, _, _, err := svc.ForceInspect(ctx, shareName)
+	server, share, _, err := svc.ForceInspect(ctx, shareName)
 	if err != nil {
 		return throwErr(err)
 	}
@@ -439,7 +519,7 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 	if err != nil {
 		return infraErr(err)
 	}
-	err = nfsClient.Unmount(server.GetAccessIP(), mount.Path)
+	err = nfsClient.Unmount(server.GetAccessIP(), share.Path)
 	if err != nil {
 		return infraErr(err)
 	}

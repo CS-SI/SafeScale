@@ -39,7 +39,9 @@ type ProcessManagerListener struct{}
 func (s *ProcessManagerListener) Stop(ctx context.Context, in *pb.ProcessDefinition) (*google_protobuf.Empty, error) {
 	log.Printf("Stop process called")
 
-	if err := utils.ProcessRegister(ctx, "Stop process "+in.UUID); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Stop process "+in.UUID); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -60,7 +62,9 @@ func (s *ProcessManagerListener) Stop(ctx context.Context, in *pb.ProcessDefinit
 func (s *ProcessManagerListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.ProcessList, error) {
 	log.Printf("List process called")
 
-	if err := utils.ProcessRegister(ctx, "List Processes"); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "List Processes"); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
