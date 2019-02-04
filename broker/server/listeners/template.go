@@ -42,7 +42,9 @@ type TemplateListener struct{}
 func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
 	log.Printf("Template List called")
 
-	if err := utils.ProcessRegister(ctx, "Teplates List"); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Teplates List"); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)

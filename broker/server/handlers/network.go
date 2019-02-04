@@ -259,6 +259,14 @@ func (svc *NetworkHandler) Create(
 		return nil, infraErrf(err, "Error creating network: Error saving network metadata")
 	}
 
+	select {
+	case <-ctx.Done():
+		log.Warnf("Network creation canceled by broker")
+		err = fmt.Errorf("Network creation canceld by broker")
+		return nil, err
+	default:
+	}
+
 	return network, nil
 }
 

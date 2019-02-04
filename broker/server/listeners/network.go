@@ -50,7 +50,9 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	log.Infof("Listeners: network create '%s' called", in.Name)
 	defer log.Debugf("Listeners: network create '%s' done", in.Name)
 
-	if err := utils.ProcessRegister(ctx, "Create network "+in.GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Create network "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -85,7 +87,9 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.N
 	log.Infof("Listeners: network list called")
 	defer log.Debugf("Listeners: network list done")
 
-	if err := utils.ProcessRegister(ctx, "List networks"); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "List networks"); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -116,7 +120,9 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 	log.Infof("Listeners: network inspect '%s' called'", in.Name)
 	defer log.Debugf("broker.server.listeners.NetworkListener.Inspect(%s) done'", in.Name)
 
-	if err := utils.ProcessRegister(ctx, "Inspect network "+in.GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Inspect network "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -148,7 +154,9 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Delete Network called for network '%s'", in.GetName())
 
-	if err := utils.ProcessRegister(ctx, "Delete network "+in.GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Delete network "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)

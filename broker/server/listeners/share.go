@@ -51,7 +51,9 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb
 	log.Infof("Listeners: share create '%v'", in)
 	defer log.Debugf("Listeners: share create '%v' done", in)
 
-	if err := utils.ProcessRegister(ctx, "Create share "+in.GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Create share "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -78,7 +80,9 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 	log.Infof("Listeners: share delete '%s' called", shareName)
 	defer log.Debugf("Listeners: share delete '%s' done", shareName)
 
-	if err := utils.ProcessRegister(ctx, "Delete share "+in.GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Delete share "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -112,7 +116,9 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (*p
 	log.Infof("Listeners: share list '%v' called", in)
 	defer log.Debugf("Listeners: share list '%v' done", in)
 
-	if err := utils.ProcessRegister(ctx, "List shares "); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "List shares "); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -145,7 +151,9 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	log.Infof("Listeners: share mount '%v' called", in)
 	defer log.Debugf("Listeners: share mount '%v' called", in)
 
-	if err := utils.ProcessRegister(ctx, "Mount share "+in.GetShare().GetName()+" on host "+in.GetHost().GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Mount share "+in.GetShare().GetName()+" on host "+in.GetHost().GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -172,7 +180,9 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	log.Infof("Listeners: share unmount '%v' called", in)
 	defer log.Debugf("Listeners: share unmount '%v' called", in)
 
-	if err := utils.ProcessRegister(ctx, "Mount share "+in.GetShare().GetName()+" off host "+in.GetHost().GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Mount share "+in.GetShare().GetName()+" off host "+in.GetHost().GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -200,7 +210,9 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Shar
 	log.Infof("Listeners: share inspect '%s' called", shareName)
 	defer log.Debugf("Listeners: share inspect '%s' done", shareName)
 
-	if err := utils.ProcessRegister(ctx, "Inspect share "+in.GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Inspect share "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)

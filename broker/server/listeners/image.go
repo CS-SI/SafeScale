@@ -42,7 +42,9 @@ type ImageListener struct{}
 func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.ImageList, error) {
 	log.Printf("List images called")
 
-	if err := utils.ProcessRegister(ctx, "List Images"); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "List Images"); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)

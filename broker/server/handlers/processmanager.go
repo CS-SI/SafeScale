@@ -48,5 +48,5 @@ func (svc *ProcessManagerHandler) List(ctx context.Context) (map[string]string, 
 
 // Stop stop the designed Process
 func (svc *ProcessManagerHandler) Stop(ctx context.Context, uuid string) {
-	utils.ProcessDeregisterUUID(uuid)
+	utils.ProcessCancelUUID(uuid)
 }

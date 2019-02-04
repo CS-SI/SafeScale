@@ -491,6 +491,14 @@ func (svc *HostHandler) Create(
 	}
 	log.Infof("SSH service started on host '%s'.", host.Name)
 
+	select {
+	case <-ctx.Done():
+		log.Warnf("Host creation canceled by broker")
+		err = fmt.Errorf("Host creation canceld by broker")
+		return nil, err
+	default:
+	}
+
 	return host, nil
 }
 

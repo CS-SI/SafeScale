@@ -53,7 +53,9 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 	log.Infof("%s list called", logListenerBase)
 	defer log.Debugf("%s list done", logListenerBase)
 
-	if err := utils.ProcessRegister(ctx, "Bucket List"); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket List"); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -79,7 +81,9 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_pro
 	log.Infof("%s create '%s' called", logListenerBase, in.Name)
 	defer log.Debugf("%s create '%s' done", logListenerBase, in.Name)
 
-	if err := utils.ProcessRegister(ctx, "Bucket Create : "+in.GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Create : "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -105,7 +109,9 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_pro
 	log.Infof("%s delete '%s' called", logListenerBase, in.Name)
 	defer log.Debugf("%s delete '%s' done", logListenerBase, in.Name)
 
-	if err := utils.ProcessRegister(ctx, "Bucket Delete : "+in.GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Delete : "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -131,7 +137,9 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.Bucket
 	log.Infof("%s inspect '%s' called", logListenerBase, in.Name)
 	defer log.Debugf("%s inspect '%s' called", logListenerBase, in.Name)
 
-	if err := utils.ProcessRegister(ctx, "Bucket Inspect : "+in.GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Inspect : "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -159,7 +167,9 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 	log.Infof("%s mount '%v' called", logListenerBase, in)
 	defer log.Debugf("%s mount '%v' called", logListenerBase, in)
 
-	if err := utils.ProcessRegister(ctx, "Bucket Mount : "+in.GetBucket()+" on "+in.GetHost().GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Mount : "+in.GetBucket()+" on "+in.GetHost().GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -183,7 +193,9 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 	log.Infof("%s umount '%v' called", logListenerBase, in)
 	defer log.Debugf("%s umount '%v' done", logListenerBase, in)
 
-	if err := utils.ProcessRegister(ctx, "Bucket Unount : "+in.GetBucket()+" off "+in.GetHost().GetName()); err != nil {
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Unount : "+in.GetBucket()+" off "+in.GetHost().GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)

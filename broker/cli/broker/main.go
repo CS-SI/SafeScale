@@ -34,7 +34,7 @@ import (
 )
 
 func cleanup() {
-	fmt.Println("\nBe carfull stoping broker will not stop the execution on brokerd!")
+	fmt.Println("\nBe carfull stopping broker will not stop the execution on brokerd, but will reverse it's effects once done!")
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
 	text, err := reader.ReadString('\n')
