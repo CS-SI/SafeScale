@@ -652,7 +652,6 @@ func (client *Client) getHostAndDomainFromRef(ref string) (*model.Host, *libvirt
 			return nil, nil, fmt.Errorf(fmt.Sprintf("Failed to fetch domain from ref : %s", err.Error()))
 		}
 	}
-
 	host, err := client.getHostFromDomain(domain)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to get host from domain : %s", err.Error())
