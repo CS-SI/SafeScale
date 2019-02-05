@@ -562,11 +562,6 @@ func (svc *VolumeHandler) Detach(ctx context.Context, volumeName, hostName strin
 		return logicErr(fmt.Errorf("Can't detach volume '%s': not attached to host '%s'", volumeName, host.Name))
 	}
 
-	volumeAttachment, err := svc.provider.GetVolumeAttachment(host.ID, attachment.AttachID)
-	if err != nil {
-		return logicErr(fmt.Errorf("Can't find volume '%s' attachment to host '%s'", volumeName, host.Name))
-	}
-
 	// Obtain mounts information
 	hostMountsV1 := propsv1.NewHostMounts()
 	err = host.Properties.Get(HostProperty.MountsV1, hostMountsV1)
@@ -686,8 +681,8 @@ func (svc *VolumeHandler) Detach(ctx context.Context, volumeName, hostName strin
 	select {
 	case <-ctx.Done():
 		log.Warnf("Volume detachment canceled by broker")
-		//Currently extension is not stored in
-		err = svc.Attach(context.Background(), volumeName, hostName, mount.Path, volumeAttachment.Format, true)
+		//Currently format is not registerd anywhere so we use ext4 the most common format
+		err = svc.Attach(context.Background(), volumeName, hostName, mount.Path, "ext4", true)
 		if err != nil {
 			return fmt.Errorf("Failed to stop volume detachment")
 		}

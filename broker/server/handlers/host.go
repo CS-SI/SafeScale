@@ -691,10 +691,34 @@ func (svc *HostHandler) Delete(ctx context.Context, ref string) error {
 			log.Errorf(err.Error())
 		}
 	}
+	err = mh.Delete()
+	if err != nil {
+		return infraErr(err)
+	}
 
-	// Finally, delete metadata of host
-	trydelete := mh.Delete()
-	return infraErr(trydelete)
+	// select {
+	// case <-ctx.Done():
+	// 	log.Warnf("Host delete canceled by broker")
+	// 	hostSizing := propsv1.NewHostSizing()
+	// 	host.Properties.Get(HostProperty.SizingV1, hostSizing)
+	// 	//host's os name is not stored in metadatas so we used ubuntu 16.04 by default
+	// 	netID := ""
+	// 	for _, netID = range hostNetworkV1.NetworksByName {
+	// 		break
+	// 	}
+	// 	hostBis, err := svc.Create(context.Background(), host.Name, netID, hostSizing.AllocatedSize.Cores, hostSizing.AllocatedSize.RAMSize, hostSizing.AllocatedSize.DiskSize, "ubuntu 16.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, hostSizing.AllocatedSize.GPUNumber, hostSizing.AllocatedSize.CPUFreq, true)
+	// 	if err != nil {
+	// 		return fmt.Errorf("Failed to stop host deletion")
+	// 	}
+	// 	buf, err := hostBis.Serialize()
+	// 	if err != nil {
+	// 		return fmt.Errorf("Deleted Hist recreated by broker")
+	// 	}
+	// 	return fmt.Errorf("Deleted Host recreated by broker : %s", buf)
+	// default:
+	// }
+
+	return nil
 }
 
 // SSH returns ssh parameters to access the host referenced by ref

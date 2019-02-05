@@ -267,8 +267,23 @@ func (svc *ShareHandler) Delete(ctx context.Context, name string) error {
 	}
 
 	// Remove share metadata
-	remErr := metadata.RemoveShare(svc.provider, server.ID, server.Name, share.ID, share.Name)
-	return infraErr(remErr)
+	err = metadata.RemoveShare(svc.provider, server.ID, server.Name, share.ID, share.Name)
+	if err != nil {
+		return infraErr(err)
+	}
+
+	select {
+	case <-ctx.Done():
+		log.Warnf("Share delete canceled by broker")
+		_, err = svc.Create(context.Background(), share.Name, server.Name, share.Path)
+		if err != nil {
+			return fmt.Errorf("Failed to stop Share deletion")
+		}
+		return fmt.Errorf("Share deletion canceld by broker")
+	default:
+	}
+
+	return nil
 }
 
 // List return the list of all shares from all servers
@@ -550,6 +565,17 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 		if err != nil {
 			return infraErr(err)
 		}
+	}
+
+	select {
+	case <-ctx.Done():
+		log.Warnf("Share unmount canceled by broker")
+		_, err = svc.Mount(context.Background(), shareName, hostName, mount.Path)
+		if err != nil {
+			return fmt.Errorf("Failed to stop Share unmounting")
+		}
+		return fmt.Errorf("Share unmounting canceld by broker")
+	default:
 	}
 
 	return nil
