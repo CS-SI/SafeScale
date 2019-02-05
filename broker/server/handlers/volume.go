@@ -114,9 +114,15 @@ func (svc *VolumeHandler) Delete(ctx context.Context, ref string) error {
 		return logicErr(fmt.Errorf("still attached to %d host%s: %s", nbAttach, utils.Plural(nbAttach), strings.Join(list, ", ")))
 	}
 
+	var deleteMatadataOnly bool
 	err = svc.provider.DeleteVolume(volume.ID)
 	if err != nil {
-		return infraErr(err)
+		switch err.(type) {
+		case model.ErrResourceNotFound:
+			deleteMatadataOnly = true
+		default:
+			return infraErrf(err, "can't delete volume")
+		}
 	}
 
 	err = mv.Delete()
@@ -124,6 +130,10 @@ func (svc *VolumeHandler) Delete(ctx context.Context, ref string) error {
 		return infraErr(err)
 	}
 	time.Sleep(5 * time.Second)
+
+	if deleteMatadataOnly {
+		return fmt.Errorf("Unable to find the volume even if it is described by metadatas\nInchoerent metadatas have been supressed")
+	}
 
 	select {
 	case <-ctx.Done():

@@ -124,7 +124,7 @@ func (client *Client) getLibvirtVolume(ref string) (*libvirt.StorageVol, error) 
 		}
 	}
 
-	return nil, fmt.Errorf("No volume with identifier %s found", ref)
+	return nil, model.ResourceNotFoundError("volume", ref)
 }
 
 func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*model.Volume, error) {
@@ -269,7 +269,7 @@ func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, 
 func (client *Client) GetVolume(ref string) (*model.Volume, error) {
 	libvirtVolume, err := client.getLibvirtVolume(ref)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get the libvirt.Volume from ref : %s", err.Error())
+		return nil, err
 	}
 
 	volume, err := getVolumeFromLibvirtVolume(libvirtVolume)
@@ -307,7 +307,7 @@ func (client *Client) ListVolumes() ([]model.Volume, error) {
 func (client *Client) DeleteVolume(ref string) error {
 	libvirtVolume, err := client.getLibvirtVolume(ref)
 	if err != nil {
-		return fmt.Errorf("Failed to get the libvirt.Volume from ref : %s", err.Error())
+		return err
 	}
 
 	err = libvirtVolume.Delete(0)
@@ -336,7 +336,7 @@ func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentReque
 
 	libvirtVolume, err := client.getLibvirtVolume(request.VolumeID)
 	if err != nil {
-		return "", fmt.Errorf("Failed to get the libvirt.Volume from ref : %s", err.Error())
+		return "", err
 	}
 	volumeXML, err := libvirtVolume.GetXMLDesc(0)
 	if err != nil {
@@ -384,7 +384,7 @@ func (client *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAtt
 
 	libvirtVolume, err := client.getLibvirtVolume(strings.Split(id, "-")[0])
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get the libvirt.Volume from ref : %s", err.Error())
+		return nil, err
 	}
 
 	attachment, err := getAttachmentFromVolumeAndDomain(libvirtVolume, domain)
@@ -404,7 +404,7 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 
 	libvirtVolume, err := client.getLibvirtVolume(strings.Split(id, "-")[0])
 	if err != nil {
-		return fmt.Errorf("Failed to get the libvirt.Volume from ref : %s", err.Error())
+		return err
 	}
 
 	domainXML, err := domain.GetXMLDesc(0)
