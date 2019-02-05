@@ -321,11 +321,13 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	}
 
 	// 1st delete gateway
+	var metadataHost *model.Host
 	if gwID != "" {
 		mh, err := metadata.LoadHost(svc.provider, gwID)
 		if err != nil {
 			return infraErr(err)
 		}
+		metadataHost = mh.Get()
 
 		err = svc.provider.DeleteGateway(gwID)
 		// allow no gateway, but log it
@@ -345,6 +347,28 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 		return infraErr(err)
 	}
 
-	delErr := mn.Delete()
-	return infraErr(delErr)
+	err = mn.Delete()
+	if err != nil {
+		return infraErr(err)
+	}
+
+	select {
+	case <-ctx.Done():
+		log.Warnf("Network delete canceled by broker")
+		hostSizing := propsv1.NewHostSizing()
+		metadataHost.Properties.Get(HostProperty.SizingV1, hostSizing)
+		//os name of the gw is not stored in metadatas so we used ubuntu 16.04 by default
+		networkBis, err := svc.Create(context.Background(), network.Name, network.CIDR, network.IPVersion, hostSizing.AllocatedSize.Cores, hostSizing.AllocatedSize.RAMSize, hostSizing.AllocatedSize.DiskSize, "Ubuntu 16.04", metadataHost.Name)
+		if err != nil {
+			return fmt.Errorf("Failed to stop network deletion")
+		}
+		buf, err := networkBis.Serialize()
+		if err != nil {
+			return fmt.Errorf("Deleted Network recreated by broker")
+		}
+		return fmt.Errorf("Deleted Network recreated by broker : %s", buf)
+	default:
+	}
+
+	return nil
 }
