@@ -703,7 +703,7 @@ func (svc *HostHandler) Delete(ctx context.Context, ref string) error {
 	}
 
 	if deleteMatadataOnly {
-		return fmt.Errorf("Unable to find the host even if it is described by metadata\nInchoerent metadatas have been supressed")
+		return fmt.Errorf("Unable to find the host even if it is described by metadatas\nInchoerent metadatas have been supressed")
 	}
 
 	// select {
