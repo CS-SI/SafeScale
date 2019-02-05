@@ -342,14 +342,24 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	}
 
 	// 2nd delete network, with no tolerance
+	var deleteMatadataOnly bool
 	err = svc.provider.DeleteNetwork(network.ID)
 	if err != nil {
-		return infraErr(err)
+		switch err.(type) {
+		case model.ErrResourceNotFound:
+			deleteMatadataOnly = true
+		default:
+			return infraErrf(err, "can't delete network")
+		}
 	}
 
 	err = mn.Delete()
 	if err != nil {
 		return infraErr(err)
+	}
+
+	if deleteMatadataOnly {
+		return fmt.Errorf("Unable to find the network even if it is described by metadatas\nInchoerent metadatas have been supressed")
 	}
 
 	select {
