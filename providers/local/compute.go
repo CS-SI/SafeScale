@@ -970,7 +970,7 @@ func (client *Client) GetHostByName(name string) (*model.Host, error) {
 func (client *Client) DeleteHost(id string) error {
 	_, domain, err := client.getHostAndDomainFromRef(id)
 	if err != nil {
-		return fmt.Errorf("getHostAndDomainFromRef failed : %s", err.Error())
+		return err
 	}
 
 	volumes, err := getVolumesFromDomain(domain, client.LibvirtService)

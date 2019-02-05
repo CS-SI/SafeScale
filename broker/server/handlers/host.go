@@ -663,9 +663,15 @@ func (svc *HostHandler) Delete(ctx context.Context, ref string) error {
 	}
 
 	// Conditions are met, delete host
+	var deleteMatadataOnly bool
 	err = svc.provider.DeleteHost(host.ID)
 	if err != nil {
-		return infraErrf(err, "can't delete host")
+		switch err.(type) {
+		case model.ErrResourceNotFound:
+			deleteMatadataOnly = true
+		default:
+			return infraErrf(err, "can't delete host")
+		}
 	}
 
 	// Update networks property prosv1.NetworkHosts to remove the reference to the host
@@ -694,6 +700,10 @@ func (svc *HostHandler) Delete(ctx context.Context, ref string) error {
 	err = mh.Delete()
 	if err != nil {
 		return infraErr(err)
+	}
+
+	if deleteMatadataOnly {
+		return fmt.Errorf("Unable to find the host even if it is described by metadata\nInchoerent metadatas have been supressed")
 	}
 
 	// select {
