@@ -290,6 +290,8 @@ func (svc *HostHandler) Create(
 		}
 		msg += ")"
 		log.Infof(msg)
+	} else {
+		return nil, infraErrf(err, "Failed to find template matching your requirements")
 	}
 
 	img, err := svc.provider.SearchImage(los)
