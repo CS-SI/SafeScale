@@ -106,7 +106,11 @@ EOF
     chmod 0700 /home/{{.User}}/.ssh
     chmod -R 0600 /home/{{.User}}/.ssh/*
 
-    touch /home/{{.User}}/.hushlogin
+    for i in /home/{{.User}}/.hushlogin /home/{{.User}}/.skip; do
+        touch $i
+        chown root:{{.User}} $i
+        chmod ug+r-wx,o-rwx $i
+    done
 
     cat >>/home/gpac/.bashrc <<-'EOF'
 pathremove() {
@@ -164,25 +168,36 @@ configure_network_debian() {
     echo "done"
 }
 
+# search for network device names
+network_names() {
+    echo $(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
+}
+
 # Configure network using netplan
 configure_network_netplan() {
     echo "Configuring network (netplan-based)..."
 
     mv -f /etc/netplan /etc/netplan.orig
     mkdir -p /etc/netplan
-    cat <<-'EOF' >/etc/netplan/50-cloud-init.yaml
+    NICS=$(network_names)
+    fname=/etc/netplan/50-cloud-init.yaml
+    cat <<-'EOF' >$fname
 network:
   version: 2
   renderer: networkd
   ethernets:
-    ens3:
-      dhcp4: true
-    ens4:
-      dhcp4: true
-{{- if .GatewayIP }}
-      gateway4: {{.GatewayIP}}
-{{- end }}
 EOF
+    for i in $NICS; do
+        cat <<-EOF >>$fname
+    $i:
+      dhcp4: true
+EOF
+    done
+{{- if .GatewayIP }}
+    cat <<-'EOF' >>$fname
+      gateway4: {{.GatewayIP}}
+EOF
+{{- end }}
 
     netplan generate
 
@@ -496,13 +511,7 @@ install_packages() {
      esac
 }
 
-disable_sudo_requiretty() {
-    sed -i -e 's/^Defaults[[:space:]]+requiretty$/Defaults !requiretty/g' /etc/sudoers
-}
-
 # ---- Main
-
-#disable_sudo_requiretty
 
 case $LINUX_KIND in
     debian|ubuntu)
@@ -553,9 +562,8 @@ esac
 touch /etc/cloud/cloud-init.disabled
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
+mkdir -p /var/lib/cloud/instance/warnings && touch /var/lib/cloud/instance/warnings/.skip
 
-#insert_tag
-
-echo "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
+echo -n "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
 systemctl reboot
 exit 0
