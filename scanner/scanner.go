@@ -255,7 +255,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		return err
 	}
 
-	img, err := serviceProvider.SearchImage("Ubuntu 16.04")
+	img, err := serviceProvider.SearchImage("Ubuntu 18.04")
 	if err != nil {
 		log.Warnf("No image here...")
 		return err

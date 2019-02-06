@@ -61,7 +61,7 @@ func (tester *ClientTester) ListImages(t *testing.T) {
 		assert.NotEqual(t, i.ID, "")
 		assert.NotEqual(t, i.Name, "")
 	}
-	imgs, err := tester.Service.FilterImages("ubuntu 16.04")
+	imgs, err := tester.Service.FilterImages("ubuntu 18.04")
 	for _, img := range imgs {
 		fmt.Println(">>", img.Name)
 	}
@@ -173,7 +173,7 @@ func (tester *ClientTester) CreateNetwork(t *testing.T, name string, withGW bool
 		MinDiskSize: 0,
 	}, false)
 	require.Nil(t, err)
-	img, err := tester.Service.SearchImage("Ubuntu 16.04")
+	img, err := tester.Service.SearchImage("Ubuntu 18.04")
 	require.Nil(t, err)
 	keypair, err := tester.Service.CreateKeyPair("kp_" + network.Name)
 	require.Nil(t, err)
@@ -204,7 +204,7 @@ func (tester *ClientTester) CreateHost(t *testing.T, name string, network *model
 		MinDiskSize: 10,
 	}, false)
 	assert.Nil(t, err)
-	img, err := tester.Service.SearchImage("Ubuntu 16.04")
+	img, err := tester.Service.SearchImage("Ubuntu 18.04")
 	assert.Nil(t, err)
 	gw, _ := tester.Service.GetHost(network.GatewayID)
 	hostRequest := model.HostRequest{
@@ -226,7 +226,7 @@ func (tester *ClientTester) CreateGW(t *testing.T, network *model.Network) error
 		MinDiskSize: 10,
 	}, false)
 	assert.Nil(t, err)
-	img, err := tester.Service.SearchImage("Ubuntu 16.04")
+	img, err := tester.Service.SearchImage("Ubuntu 18.04")
 	assert.Nil(t, err)
 	gwRequest := model.GatewayRequest{
 		ImageID:    img.ID,
