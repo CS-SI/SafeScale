@@ -101,13 +101,13 @@ func (mv *Volume) Reload() error {
 
 // ReadByID reads the metadata of a volume identified by ID from Object Storage
 func (mv *Volume) ReadByID(id string) (bool, error) {
-	var volume model.Volume
+	volume := model.NewVolume()
 	found, err := mv.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
-		err := (&volume).Deserialize(buf)
+		err := volume.Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &volume, nil
+		return volume, nil
 	})
 	if err != nil {
 		return false, err
@@ -116,19 +116,19 @@ func (mv *Volume) ReadByID(id string) (bool, error) {
 		return false, nil
 	}
 
-	mv.Carry(&volume)
+	mv.Carry(volume)
 	return true, nil
 }
 
 // ReadByName reads the metadata of a volume identified by name
 func (mv *Volume) ReadByName(name string) (bool, error) {
-	var volume model.Volume
+	volume := model.NewVolume()
 	found, err := mv.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
-		err := (&volume).Deserialize(buf)
+		err := volume.Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &volume, nil
+		return volume, nil
 	})
 	if err != nil {
 		return false, err
@@ -137,7 +137,7 @@ func (mv *Volume) ReadByName(name string) (bool, error) {
 		return false, nil
 	}
 
-	mv.Carry(&volume)
+	mv.Carry(volume)
 	return true, nil
 }
 
@@ -160,12 +160,12 @@ func (mv *Volume) Delete() error {
 // Browse walks through volume folder and executes a callback for each entries
 func (mv *Volume) Browse(callback func(*model.Volume) error) error {
 	return mv.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
-		volume := model.Volume{}
-		err := (&volume).Deserialize(buf)
+		volume := model.NewVolume()
+		err := volume.Deserialize(buf)
 		if err != nil {
 			return err
 		}
-		return callback(&volume)
+		return callback(volume)
 	})
 }
 

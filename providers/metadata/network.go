@@ -115,13 +115,13 @@ func (m *Network) ReadByID(id string) (bool, error) {
 		panic("m.item is nil!")
 	}
 
-	var network model.Network
+	network := model.NewNetwork()
 	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
-		err := (&network).Deserialize(buf)
+		err := network.Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &network, nil
+		return network, nil
 	})
 	if err != nil {
 		return false, err
@@ -129,8 +129,8 @@ func (m *Network) ReadByID(id string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.id = &network.ID
-	m.name = &network.Name
+	m.id = &(network.ID)
+	m.name = &(network.Name)
 	// m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+id, "/"))
 	return true, nil
 }
@@ -141,13 +141,13 @@ func (m *Network) ReadByName(name string) (bool, error) {
 		panic("m.item is nil!")
 	}
 
-	var network model.Network
+	network := model.NewNetwork()
 	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
-		err := (&network).Deserialize(buf)
+		err := network.Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return &network, nil
+		return network, nil
 	})
 	if err != nil {
 		return false, err
@@ -155,8 +155,8 @@ func (m *Network) ReadByName(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	m.name = &network.Name
-	m.id = &network.ID
+	m.name = &(network.Name)
+	m.id = &(network.ID)
 	//	m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+*m.id, "/"))
 	return true, nil
 }
