@@ -89,14 +89,13 @@ func (mh *Host) ReadByID(id string) (bool, error) {
 		panic("m.item is nil!")
 	}
 
-	var host model.Host
+	host := model.NewHost()
 	found, err := mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
-		phost := &host
-		err := phost.Deserialize(buf)
+		err := host.Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return phost, nil
+		return host, nil
 	})
 	if err != nil {
 		return false, err
@@ -104,8 +103,8 @@ func (mh *Host) ReadByID(id string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	mh.id = &host.ID
-	mh.name = &host.Name
+	mh.id = &(host.ID)
+	mh.name = &(host.Name)
 	return true, nil
 }
 
@@ -115,14 +114,13 @@ func (mh *Host) ReadByName(name string) (bool, error) {
 		panic("m.item is nil!")
 	}
 
-	var host model.Host
+	host := model.NewHost()
 	found, err := mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
-		phost := &host
-		err := phost.Deserialize(buf)
+		err := host.Deserialize(buf)
 		if err != nil {
 			return nil, err
 		}
-		return phost, nil
+		return host, nil
 	})
 	if err != nil {
 		return false, err
@@ -130,8 +128,8 @@ func (mh *Host) ReadByName(name string) (bool, error) {
 	if !found {
 		return false, nil
 	}
-	mh.name = &host.Name
-	mh.id = &host.ID
+	mh.name = &(host.Name)
+	mh.id = &(host.ID)
 	return true, nil
 }
 
