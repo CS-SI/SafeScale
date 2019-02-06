@@ -65,10 +65,10 @@ type AuthOptions struct {
 	// CIDR if the VPC
 	VPCCIDR string
 
-	// Identifier for S3 object storage use
-	S3AccessKeyID string
-	// Password of the previous identifier
-	S3AccessKeyPassword string
+	// // Identifier for S3 object storage use
+	// S3AccessKeyID string
+	// // Password of the previous identifier
+	// S3AccessKeyPassword string
 }
 
 const (

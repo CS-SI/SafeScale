@@ -53,11 +53,11 @@ import (
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (client *Client) ListAvailabilityZones(all bool) (map[string]bool, error) {
-	log.Debug("openstack.Client.ListAvailabilityZones() called")
-	defer log.Debug("openstack.Client.ListAvailabilityZones() done")
+	log.Debug(">>> providers.openstack.Client::ListAvailabilityZones()")
+	defer log.Debug("<<< providers.openstack::Client.ListAvailabilityZones()")
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.ListAvailabilityZones() with client==nil!")
 	}
 
 	allPages, err := az.List(client.Compute).AllPages()
@@ -85,7 +85,7 @@ func (client *Client) ListImages(all bool) ([]model.Image, error) {
 	defer log.Debug("<<< providers.openstack.Client::ListImages()")
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.ListImages() with client==nil!")
 	}
 
 	opts := images.ListOpts{}
@@ -125,7 +125,7 @@ func (client *Client) GetImage(id string) (*model.Image, error) {
 	defer log.Debugf("<<< providers.openstack::Client.GetImage(%s)", id)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.GetImage() with client==nil!")
 	}
 
 	img, err := images.Get(client.Compute, id).Extract()
@@ -142,7 +142,7 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 	defer log.Debugf("<<< providers.openstack.Client::GetTemplate(%s)", id)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.GetTemplate() with client==nil!")
 	}
 
 	// Try 10 seconds to get template
@@ -175,7 +175,7 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 	defer log.Debugf("<<< providers.openstack.Client::ListTemplates() done")
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.ListTemplates() with client==nil!")
 	}
 
 	opts := flavors.ListOpts{}
@@ -221,7 +221,7 @@ func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
 	defer log.Debugf("<<< providers.openstack.Client::CreateKeyPair(%s)", name)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.CreateKeyPair() with client==nil!")
 	}
 
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
@@ -252,7 +252,7 @@ func (client *Client) GetKeyPair(id string) (*model.KeyPair, error) {
 	defer log.Debugf("<<< providers.openstack.Client.GetKeyPair(%s)", id)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.GetKeyPair() with client==nil!")
 	}
 
 	kp, err := keypairs.Get(client.Compute, id).Extract()
@@ -274,7 +274,7 @@ func (client *Client) ListKeyPairs() ([]model.KeyPair, error) {
 	defer log.Debug("<<< providers.openstack.Client::ListKeyPairs()")
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.ListKeyPairs() with client==nil!")
 	}
 
 	// Retrieve a pager (i.e. a paginated collection)
@@ -316,7 +316,7 @@ func (client *Client) DeleteKeyPair(id string) error {
 	defer log.Debugf("<<< providers.openstack.Client.DeleteKeyPair(%s)", id)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.DeleteKeyPair() with client==nil!")
 	}
 
 	err := keypairs.Delete(client.Compute, id).ExtractErr()
@@ -330,7 +330,7 @@ func (client *Client) DeleteKeyPair(id string) error {
 // toHostSize converts flavor attributes returned by OpenStack driver into model.Host
 func (client *Client) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.toHostSize() with client==nil!")
 	}
 
 	hostSize := propsv1.NewHostSize()
@@ -372,7 +372,7 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 	defer log.Debug("<<< providers.openstack.Client::GetHost()")
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.GetHost() with client==nil!")
 	}
 
 	var (
@@ -448,7 +448,7 @@ func (client *Client) interpretAddresses(
 	addresses map[string]interface{},
 ) ([]string, map[IPVersion.Enum]map[string]string, string, string) {
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.interpretAdresses() with client==nil!")
 	}
 
 	var (
@@ -490,7 +490,7 @@ func (client *Client) interpretAddresses(
 // complementHost complements Host data with content of server parameter
 func (client *Client) complementHost(host *model.Host, server *servers.Server) error {
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.complementHost() with client==nil!")
 	}
 
 	networks, addresses, ipv4, ipv6 := client.interpretAddresses(server.Addresses)
@@ -630,7 +630,7 @@ func (client *Client) GetHostByName(name string) (*model.Host, error) {
 	defer log.Debugf("<<< providers.openstack.Client::GetHostByName(%s)", name)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.GetHostByName() with client==nil!")
 	}
 
 	if name == "" {
@@ -687,7 +687,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	defer log.Debugf("<<< providers.openstack.Client::CreateHost(%s)", request.ResourceName)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.CreateHost() with client==nil!")
 	}
 
 	msgFail := "Failed to create Host resource: %s"
@@ -924,7 +924,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 // hostParam can be an ID of host, or an instance of *model.Host; any other type will panic
 func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration) (*model.Host, error) {
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.WaitHostReady() with client==nil!")
 	}
 
 	var (
@@ -940,6 +940,8 @@ func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration
 	default:
 		panic("hostParam must be a string or a *model.Host!")
 	}
+	log.Debugf(">>> providers.openstack.Client::WaitHostReady(%s)", host.ID)
+	defer log.Debugf("<<< providers.openstack.Client::WaitHostReady(%s)", host.ID)
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -972,7 +974,7 @@ func (client *Client) GetHostState(hostParam interface{}) (HostState.Enum, error
 	defer log.Debug("<<< providers.openstack.Client::GetHostState()")
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.GetHostState() with client==nil!")
 	}
 
 	host, err := client.GetHost(hostParam)
@@ -988,7 +990,7 @@ func (client *Client) ListHosts() ([]*model.Host, error) {
 	defer log.Debug("<<< providers.openstack.Client::ListHosts()")
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.ListHosts() with client==nil!")
 	}
 
 	pager := servers.List(client.Compute, servers.ListOpts{})
@@ -1022,7 +1024,7 @@ func (client *Client) ListHosts() ([]*model.Host, error) {
 // By convention only one floating IP is allocated to an host
 func (client *Client) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.getFloatingIP() with client==nil!")
 	}
 
 	pager := floatingips.List(client.Compute)
@@ -1059,7 +1061,7 @@ func (client *Client) DeleteHost(id string) error {
 	defer log.Debugf("<<< providers.openstack.Client::DeleteHost(%s)", id)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.DeleteHost() with client==nil!")
 	}
 
 	if client.Cfg.UseFloatingIP {
@@ -1152,7 +1154,7 @@ func (client *Client) StopHost(id string) error {
 	defer log.Debugf("<<< providers.openstack.Client::StopHost(%s)", id)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.StopHost() with client==nil!")
 	}
 
 	err := startstop.Stop(client.Compute, id).ExtractErr()
@@ -1169,7 +1171,7 @@ func (client *Client) RebootHost(id string) error {
 	defer log.Debugf("<<< providers.openstack.Client::Reboot(%s)", id)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.RebootHost() with client==nil!")
 	}
 
 	err := servers.Reboot(client.Compute, id, servers.RebootOpts{Type: "HARD"}).ExtractErr()
@@ -1187,7 +1189,7 @@ func (client *Client) StartHost(id string) error {
 	defer log.Debugf("<<< providers.openstack.Client::StartHost(%s)", id)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.StartHost() with client==nil!")
 	}
 
 	err := startstop.Start(client.Compute, id).ExtractErr()
@@ -1205,7 +1207,7 @@ func (client *Client) ResizeHost(id string, request model.SizingRequirements) (*
 	defer log.Debugf("<<< providers.openstack.Client::ResizeHost(%s)", id)
 
 	if client == nil {
-		panic("No client set")
+		panic("Calling client.ResizeHost() with client==nil!")
 	}
 
 	// TODO RESIZE Implement Resize Host HERE

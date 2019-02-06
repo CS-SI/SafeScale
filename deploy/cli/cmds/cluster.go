@@ -44,10 +44,6 @@ import (
 	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
 )
 
-const (
-	ubuntu1604 = "Ubuntu 16.04"
-)
-
 var (
 	clusterName string
 	// clusterServiceName *string
@@ -596,7 +592,7 @@ var clusterExpandCommand = cli.Command{
 	//   --public,-p                  Allocates public IP address(es) to node(s)`,
 	// 			`
 	// host options:
-	//   --os <operating system> (default: Ubuntu 16.04)
+	//   --os <operating system> (default: Ubuntu 18.04)
 	//   --cpu <number of cpus> (default: 4)
 	//   --ram <ram size) (default: 15 GB)
 	//   --disk <disk size> (default: 100 GB)`,

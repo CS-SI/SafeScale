@@ -54,8 +54,8 @@ func Tenants() (map[string]string, error) {
 // GetService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
 func GetService(tenantName string) (*Service, error) {
-	log.Debugf(">>> providers.factory::GetService(%s)", tenantName)
-	defer log.Debugf("<<< providers.factory::GetService(%s)", tenantName)
+	log.Debugf(">>> providers.factory.GetService(%s)", tenantName)
+	defer log.Debugf("<<< providers.factory.GetService(%s)", tenantName)
 
 	tenants, err := getTenantsFromCfg()
 	if err != nil {

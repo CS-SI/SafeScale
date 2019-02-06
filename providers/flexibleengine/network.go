@@ -273,8 +273,14 @@ func (client *Client) GetNetworkByName(name string) (*model.Network, error) {
 	}
 	subnets, found := r.Body.(map[string]interface{})["subnets"].([]interface{})
 	if found && len(subnets) > 0 {
-		entry := subnets[0].(map[string]interface{})
-		id := entry["id"].(string)
+		var (
+			entry map[string]interface{}
+			id    string
+		)
+		for _, s := range subnets {
+			entry = s.(map[string]interface{})
+			id = entry["id"].(string)
+		}
 		return client.GetNetwork(id)
 	}
 	return nil, model.ResourceNotFoundError("network", name)
@@ -614,6 +620,10 @@ func (client *Client) CreateGateway(req model.GatewayRequest) (*model.Host, erro
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
 	}
+
+	log.Debugf(">>> providers.flexibleengine.Client::CreateGateway(%s)", gwname)
+	defer log.Debugf("<<< providers.flexibleengine.Client::CreateGateway(%s)", gwname)
+
 	hostReq := model.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,

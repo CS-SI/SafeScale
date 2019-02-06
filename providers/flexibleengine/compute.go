@@ -30,7 +30,7 @@ import (
 
 	"github.com/pengux/check"
 
-	filters "github.com/CS-SI/SafeScale/providers/filters/images"
+	imagefilters "github.com/CS-SI/SafeScale/providers/filters/images"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
@@ -274,6 +274,9 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 
 // CreateHost creates a new host
 func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error) {
+	log.Debugf(">>> providers.flexibleengine.Client::CreateHost(%s)", request.ResourceName)
+	defer log.Debugf("<<< providers.flexibleengine.Client::CreateHost(%s)", request.ResourceName)
+
 	//msgFail := "Failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
@@ -441,21 +444,13 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 			})
 			server, err := r.Extract()
 			if err != nil {
-				if server != nil {
+				if server != nil && httpResp.StatusCode != 400 {
 					servers.Delete(client.osclt.Compute, server.ID)
 				}
-				return fmt.Errorf("query to create host '%s' failed: %s (HTTP return code: %d)", request.ResourceName, openstack.ProviderErrorToString(err), httpResp.StatusCode)
+				return fmt.Errorf("query to create host '%s' failed: %s (HTTP return code: %d)",
+					request.ResourceName, openstack.ProviderErrorToString(err), httpResp.StatusCode)
 			}
 			host.ID = server.ID
-
-			defer func() {
-				if err != nil {
-					derr := servers.Delete(client.osclt.Compute, server.ID).ExtractErr()
-					if derr != nil {
-						log.Errorf("Failed to delete host '%s': %v", server.Name, derr)
-					}
-				}
-			}()
 
 			// Wait that host is ready, not just that the build is started
 			host, err = client.WaitHostReady(host, time.Minute*5)
@@ -472,24 +467,27 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		10*time.Minute,
 	)
 	if retryErr != nil {
+		err = retryErr
 		return nil, err
 	}
 	if host == nil {
-		return nil, errors.New("unexpected problem creating host")
+		err = errors.New("unexpected problem creating host")
+		return nil, err
 	}
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if err != nil {
-			derr := client.DeleteHost(host.ID)
+			derr := servers.Delete(client.osclt.Compute, host.ID).ExtractErr()
 			if derr != nil {
-				log.Warnf("Failed to delete host '%s': %v", host.Name, derr)
+				log.Errorf("Failed to delete host '%s': %v", host.Name, derr)
 			}
 		}
 	}()
 
 	if request.PublicIP {
-		fip, err := client.attachFloatingIP(host)
+		var fip *FloatingIP
+		fip, err = client.attachFloatingIP(host)
 		if err != nil {
 			spew.Dump(err)
 			return nil, fmt.Errorf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err))
@@ -958,12 +956,27 @@ func (client *Client) attachFloatingIP(host *model.Host) (*FloatingIP, error) {
 
 // EnableHostRouterMode enables the host to act as a router/gateway.
 func (client *Client) enableHostRouterMode(host *model.Host) error {
-	portID, err := client.getOpenstackPortID(host)
-	if err != nil {
-		return fmt.Errorf("failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
-	}
-	if portID == nil {
-		return fmt.Errorf("failed to enable Router Mode on host '%s': failed to find OpenStack port", host.Name)
+	var (
+		portID *string
+		err    error
+	)
+
+	// Sometimes, getOpenstackPortID doesn't find network interface, so let's retry in case it's a bad timing issue
+	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
+		func() error {
+			portID, err = client.getOpenstackPortID(host)
+			if err != nil {
+				return fmt.Errorf("%s", openstack.ProviderErrorToString(err))
+			}
+			if portID == nil {
+				return fmt.Errorf("failed to find OpenStack port")
+			}
+			return nil
+		},
+		30*time.Second,
+	)
+	if retryErr != nil {
+		return fmt.Errorf("failed to enable Router Mode on host '%s': %v", host.Name, retryErr)
 	}
 
 	pairs := []ports.AddressPair{
@@ -1034,7 +1047,7 @@ func (client *Client) getOpenstackPortID(host *model.Host) (*string, error) {
 	if found {
 		return &nic.PortID, nil
 	}
-	return nil, model.ResourceNotFoundError("Port ID", host.Name)
+	return nil, model.ResourceNotFoundError("Port ID corresponding to host", host.Name)
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into api.Host
@@ -1117,9 +1130,8 @@ func (client *Client) ListImages(all bool) ([]model.Image, error) {
 		return images, nil
 	}
 
-	imageFilter := filters.NewFilter(isWindowsImage).Not().And(filters.NewFilter(isBMSImage).Not())
-	return filters.FilterImages(images, imageFilter), nil
-
+	imageFilter := imagefilters.NewFilter(isWindowsImage).Not().And(imagefilters.NewFilter(isBMSImage).Not())
+	return imagefilters.FilterImages(images, imageFilter), nil
 }
 
 func addGPUCfg(tpl *model.HostTemplate) {
@@ -1138,6 +1150,10 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 	return tpl, err
 }
 
+// func isBlacklistedTemplate(tpl model.HostTemplate) bool {
+// 	return strings.HasPrefix(strings.ToUpper(tpl.Name), "t2.")
+// }
+
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
@@ -1145,11 +1161,15 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var tpls []model.HostTemplate
 	for _, tpl := range allTemplates {
 		addGPUCfg(&tpl)
 		tpls = append(tpls, tpl)
 	}
+
+	// templateFilter := templatefilters.NewFilter(isBlacklistedTemplate).Not()
+	// return templatefilters.FilterTemplates(tpls, templateFilter), nil
 
 	return tpls, nil
 }
