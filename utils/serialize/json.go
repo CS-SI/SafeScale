@@ -22,13 +22,16 @@ import (
 
 // jsonProperty contains data and a RWMutex to handle sync
 type jsonProperty struct {
-	Data        interface{}
-	lock        sync.RWMutex
+	Data interface{}
+	sync.RWMutex
 	module, key string
 }
 
 // MarshalJSON (json.Marshaller interface)
 func (jp *jsonProperty) MarshalJSON() ([]byte, error) {
+	jp.Lock()
+	defer jp.Unlock()
+
 	jsoned, err := ToJSON(jp.Data)
 	if err != nil {
 		return nil, err
@@ -81,10 +84,10 @@ func (sp *SyncedJSONProperty) unlock() {
 	if sp == nil {
 		panic("Calling sp.unlock() with sp==nil!")
 	}
-	if sp.readLock {
-		sp.jsonProperty.lock.RUnlock()
+	if !sp.readLock {
+		sp.jsonProperty.Unlock()
 	} else {
-		sp.jsonProperty.lock.Unlock()
+		sp.jsonProperty.RUnlock()
 	}
 }
 
@@ -95,7 +98,7 @@ type jsonProperties map[string]*jsonProperty
 type JSONProperties struct {
 	Properties jsonProperties
 	// This lock is used to make sure addition or removal of keys in JSonProperties won't collide in go routines
-	lock   sync.RWMutex
+	sync.Mutex
 	module string
 }
 
@@ -112,8 +115,9 @@ func NewJSONProperties(module string) *JSONProperties {
 
 // Lookup tells if a key is present in JSonProperties
 func (x *JSONProperties) Lookup(key string) bool {
-	x.lock.RLock()
-	defer x.lock.RUnlock()
+	x.Lock()
+	defer x.Unlock()
+
 	_, ok := x.Properties[key]
 	return ok
 }
@@ -136,8 +140,8 @@ func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
 		panic("key is empty!")
 	}
 
-	x.lock.RLock()
-	defer x.lock.RUnlock()
+	x.Lock()
+	defer x.Unlock()
 
 	var (
 		item  *jsonProperty
@@ -152,7 +156,7 @@ func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
 		}
 		x.Properties[key] = item
 	}
-	item.lock.RLock()
+	item.RLock()
 	return &SyncedJSONProperty{jsonProperty: item, readLock: true}
 }
 
@@ -173,8 +177,9 @@ func (x *JSONProperties) LockForWrite(key string) *SyncedJSONProperty {
 	if key == "" {
 		panic("key is empty!")
 	}
-	x.lock.Lock()
-	defer x.lock.Unlock()
+
+	x.Lock()
+	defer x.Unlock()
 
 	var (
 		item  *jsonProperty
@@ -189,26 +194,37 @@ func (x *JSONProperties) LockForWrite(key string) *SyncedJSONProperty {
 		}
 		x.Properties[key] = item
 	}
-	item.lock.Lock()
+	item.Lock()
 	return &SyncedJSONProperty{jsonProperty: item, readLock: false}
 }
 
 // SetModule allows to change the module of the JSONProperties (used to "contextualize" Property Types)
 func (x *JSONProperties) SetModule(module string) {
-	if x.module != "" {
-		panic("x.SetModule() can't be called if x.module is already set!")
+	if module != "" && x.module == module {
+		return
 	}
+	if x.module != "" {
+		panic("x.SetModule() can't be changed if x.module is already set!")
+	}
+	if module == "" {
+		panic("module is empty!")
+	}
+	x.Lock()
+	defer x.Unlock()
+
 	if x.module == "" {
 		x.module = module
 	}
 }
 
 // MarshalJSON implements json.Marshaller
+// Note: DO NOT LOCK property here, deadlock risk
 func (x *JSONProperties) MarshalJSON() ([]byte, error) {
 	return ToJSON(&(x.Properties))
 }
 
 // UnmarshalJSON implement json.Unmarshaller
+// Note: DO NOT LOCK property here, deadlock risk
 func (x *JSONProperties) UnmarshalJSON(b []byte) error {
 	// Decode JSON data
 	unjsoned := map[string]string{}
