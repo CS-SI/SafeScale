@@ -233,7 +233,7 @@ func (svc *HostHandler) Create(
 			case model.ErrResourceNotFound:
 				return nil, infraErr(err)
 			default:
-				return nil, infraErrf(err, "Failed to get network resource data: '%s'.", net)
+				return nil, infraErrf(err, "Failed to get network resource data: '%s'", net)
 			}
 		}
 		if n == nil {
@@ -256,15 +256,6 @@ func (svc *HostHandler) Create(
 		networks = append(networks, net)
 	}
 
-	msg := fmt.Sprintf("Requested template satisfying: %d core%s", cpu, utils.Plural(cpu))
-	if freq > 0 {
-		msg += fmt.Sprintf(" at %.01f GHz", freq)
-	}
-	msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", ram, disk)
-	if gpuNumber > 0 {
-		msg += fmt.Sprintf(", %d GPU%s", gpuNumber, utils.Plural(gpuNumber))
-	}
-	log.Infof(msg)
 	templates, err := svc.provider.SelectTemplatesBySize(
 		model.SizingRequirements{
 			MinCores:    cpu,
@@ -279,7 +270,7 @@ func (svc *HostHandler) Create(
 	var template model.HostTemplate
 	if len(templates) > 0 {
 		template = templates[0]
-		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, cpu, utils.Plural(cpu))
+		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores))
 		if template.CPUFreq > 0 {
 			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
 		}
@@ -292,6 +283,9 @@ func (svc *HostHandler) Create(
 		}
 		msg += ")"
 		log.Infof(msg)
+	} else {
+		log.Errorf("failed to find template corresponding to requested resources")
+		return nil, logicErrf(err, "failed to find template corresponding to requested resources")
 	}
 
 	img, err := svc.provider.SearchImage(los)

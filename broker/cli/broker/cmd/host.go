@@ -202,7 +202,7 @@ var hostCreate = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "os",
-			Value: "Ubuntu 16.04",
+			Value: "Ubuntu 18.04",
 			Usage: "Image name for the host",
 		},
 		cli.BoolFlag{

@@ -37,7 +37,7 @@ import (
 // NetworkHandler ...
 var NetworkHandler = handlers.NewNetworkHandler
 
-// broker network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
+// broker network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)
 // broker network list
 // broker network delete net1
 // broker network inspect net1

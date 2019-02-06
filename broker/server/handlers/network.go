@@ -95,7 +95,7 @@ func (svc *NetworkHandler) Create(
 		return nil, err
 	}
 
-	// Starting from here, delete network if exiting with err
+	// Starting from here, delete network if exiting with error
 	defer func() {
 		if err != nil {
 			derr := svc.provider.DeleteNetwork(network.ID)
@@ -112,6 +112,7 @@ func (svc *NetworkHandler) Create(
 		return nil, infraErr(err)
 	}
 
+	// Starting from here, delete network metadata if exits with error
 	defer func() {
 		if err != nil {
 			mn, derr := metadata.LoadNetwork(svc.provider, network.ID)
@@ -131,6 +132,8 @@ func (svc *NetworkHandler) Create(
 	log.Debugf("Creating compute resource '%s' ...", gwname)
 
 	// Create a gateway
+
+	var template model.HostTemplate
 	tpls, err := svc.provider.SelectTemplatesBySize(model.SizingRequirements{
 		MinCores:    cpu,
 		MinRAMSize:  ram,
@@ -139,7 +142,22 @@ func (svc *NetworkHandler) Create(
 	if err != nil {
 		return nil, infraErrf(err, "Error creating network: Error selecting template")
 	}
-	if len(tpls) < 1 {
+	if len(tpls) > 0 {
+		template = tpls[0]
+		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores))
+		if template.CPUFreq > 0 {
+			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+		}
+		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+		if template.GPUNumber > 0 {
+			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
+			if template.GPUType != "" {
+				msg += fmt.Sprintf(" %s", template.GPUType)
+			}
+		}
+		msg += ")"
+		log.Infof(msg)
+	} else {
 		return nil, logicErr(fmt.Errorf("Error creating network: No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
 	}
 	img, err := svc.provider.SearchImage(theos)
@@ -158,12 +176,12 @@ func (svc *NetworkHandler) Create(
 		ImageID:    img.ID,
 		Network:    network,
 		KeyPair:    keypair,
-		TemplateID: tpls[0].ID,
+		TemplateID: template.ID,
 		Name:       gwname,
 		CIDR:       network.CIDR,
 	}
 
-	log.Infof("Requesting the creation of a gateway '%s' with image '%s'", gwname, img.Name)
+	log.Infof("Requesting the creation of a gateway '%s' using template '%s' with image '%s'", gwname, template.Name, img.Name)
 	gw, err := svc.provider.CreateGateway(gwRequest)
 	if err != nil {
 		//defer svc.provider.DeleteNetwork(network.ID)
@@ -296,6 +314,9 @@ func (svc *NetworkHandler) Inspect(ref string) (*model.Network, error) {
 
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
+		if _, ok := err.(model.ErrResourceNotFound); ok {
+			return nil, err
+		}
 		return nil, infraErrf(err, "failed to load metadata of network '%s'", ref)
 	}
 	return mn.Get(), infraErr(err)
