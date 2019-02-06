@@ -23,12 +23,14 @@ package swarm
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
+	log "github.com/sirupsen/logrus"
 
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
@@ -139,7 +141,8 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 			if err != nil || retcode != 0 {
 				return fmt.Errorf("failed to generate token to join swarm as manager: %s", stderr)
 			}
-			joinCmd = fmt.Sprintf("docker swarm join --token %s %s -q", token, hostID)
+			token = strings.Trim(token, "\n")
+			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, hostID)
 		} else {
 			retcode, _, stderr, err := broker.Ssh.Run(hostID, joinCmd,
 				brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
@@ -163,7 +166,8 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
 	}
-	joinCmd = fmt.Sprintf("docker swarm join --token %s %s -q", token, master.PrivateIP)
+	token = strings.Trim(token, "\n")
+	joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, master.PrivateIP)
 
 	// Join private node in Docker Swarm as workers
 	for _, hostID := range c.ListNodeIDs(false) {
