@@ -200,9 +200,7 @@ EOF
 {{- end }}
 
     netplan generate
-
     configure_dhcp_client
-
     netplan apply
 
     echo "done"
@@ -393,6 +391,11 @@ EOF
 configure_dns_systemd_resolved() {
     echo "Configuring systemd-resolved..."
 
+{{- if not .GatewayIP }}
+    rm -f /etc/resolv.conf
+    ln -s /run/systemd/resolve/resolv.conf /etc
+{{- end }}
+
     cat <<-'EOF' >/etc/systemd/resolved.conf
 [Resolve]
 {{- if .DNSServers }}
@@ -511,7 +514,16 @@ install_packages() {
      esac
 }
 
+# Disable cloud-init automatic network configuration to be sure our configuration won't be replaced
+disable_cloudinit_network_autoconf() {
+    fname=/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    mkdir -p $(dirname $fname)
+    echo "network: {config: disabled}" >$fname
+}
+
 # ---- Main
+
+disable_cloudinit_network_autoconf
 
 case $LINUX_KIND in
     debian|ubuntu)
