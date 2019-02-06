@@ -223,7 +223,9 @@ func writeChunk(
 	buf := make([]byte, nBytesToRead)
 	nBytesRead, err := source.Read(buf)
 	if err == io.EOF {
-		return err
+		msg := fmt.Sprintf("failed to read data from source to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
+		log.Errorf(msg)
+		return fmt.Errorf(msg)
 	}
 	r := bytes.NewReader(buf)
 	objectNamePart := objectName + strconv.Itoa(chunkIndex)

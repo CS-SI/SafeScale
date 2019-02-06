@@ -268,6 +268,16 @@ func pollVolume(client api.ClientAPI, volumeID string, state VolumeState.Enum, c
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
 func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force bool) ([]model.HostTemplate, error) {
+	msg := fmt.Sprintf("Requesting host template satisfying: %d core%s", sizing.MinCores, safeutils.Plural(sizing.MinCores))
+	if sizing.MinFreq > 0 {
+		msg += fmt.Sprintf(" at %.01f GHz", sizing.MinFreq)
+	}
+	msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", sizing.MinRAMSize, sizing.MinDiskSize)
+	if sizing.MinGPU > 0 {
+		msg += fmt.Sprintf(", %d GPU%s", sizing.MinGPU, safeutils.Plural(sizing.MinGPU))
+	}
+	log.Infof(msg)
+
 	templates, err := svc.ListTemplates(false)
 	var selectedTpls []model.HostTemplate
 	scannerTemplates := map[string]bool{}
@@ -331,8 +341,8 @@ func (svc *Service) SelectTemplatesBySize(sizing model.SizingRequirements, force
 		}
 	}
 
-	log.Debugf("Looking for host template with: %d core%s, %.01f GB RAM, and %d GB Disk",
-		sizing.MinCores, safeutils.Plural(sizing.MinCores), sizing.MinRAMSize, sizing.MinDiskSize)
+	// log.Debugf("Looking for host template with: %d core%s, %.01f GB RAM, and %d GB Disk",
+	// 	sizing.MinCores, safeutils.Plural(sizing.MinCores), sizing.MinRAMSize, sizing.MinDiskSize)
 
 	for _, template := range templates {
 		if template.Cores >= sizing.MinCores &&

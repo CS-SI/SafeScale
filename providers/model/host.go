@@ -191,9 +191,6 @@ func (h *Host) Deserialize(buf []byte) error {
 	if h.Properties == nil {
 		h.Properties = serialize.NewJSONProperties("resources.host")
 	}
-	// } else {
-	// 	h.Properties.SetModule("resources.host")
-	// }
 	err := serialize.FromJSON(buf, h)
 	if err != nil {
 		return err
