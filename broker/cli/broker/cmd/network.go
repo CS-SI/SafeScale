@@ -136,7 +136,7 @@ var networkCreate = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "os",
-			Value: "Ubuntu 16.04",
+			Value: "Ubuntu 18.04",
 			Usage: "Image name for the gateway",
 		},
 		cli.StringFlag{
