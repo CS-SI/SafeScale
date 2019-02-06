@@ -27,7 +27,7 @@ exec 2>&1
 {{ .reserved_BashLibrary }}
 
 # Installs and configures everything needed on any node
-{{ .GlobalSystemRequirements }}
+{{ .reserved_CommonRequirements }}
 
 echo "Node installed successfully."
 exit 0

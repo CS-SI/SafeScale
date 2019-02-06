@@ -306,23 +306,16 @@ func (c *Controller) UpdateMetadata(updatefn func() error) error {
 		}
 		m.Carry(c)
 		c.metadata = m
-		log.Debugf("UpdateMetadata(): acquiring lock...")
 		c.metadata.Acquire()
-		log.Debugf("UpdateMetadata(): lock acquired...")
 	} else {
-		log.Debugf("UpdateMetadata(): acquiring lock...")
 		c.metadata.Acquire()
-		log.Debugf("UpdateMetadata(): lock acquired...")
 		err := c.metadata.Reload()
 		if err != nil {
 			return err
 		}
 		*c = *(c.metadata.Get())
 	}
-	defer func() {
-		c.metadata.Release()
-		log.Debugf("UpdateMetadata(): lock released.")
-	}()
+	defer c.metadata.Release()
 
 	if updatefn != nil {
 		err := updatefn()
@@ -330,8 +323,6 @@ func (c *Controller) UpdateMetadata(updatefn func() error) error {
 			return err
 		}
 	}
-
-	// Write metadata
 	return c.metadata.Write()
 }
 

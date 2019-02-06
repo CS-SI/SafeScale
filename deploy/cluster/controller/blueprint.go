@@ -33,7 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/deploy/install"
@@ -104,7 +103,7 @@ func NewBlueprint(c *Controller, Actors BlueprintActors) *Blueprint {
 // Construct ...
 func (b *Blueprint) Construct(req Request) error {
 	var err error
-	log.Infof("Constructing cluster '%s'...", b.Cluster.Name)
+	log.Infof("Constructing cluster '%s'...", req.Name)
 	defer func() {
 		if err == nil {
 			log.Infof("Cluster '%s' constructed successfully", req.Name)
@@ -243,7 +242,7 @@ func (b *Blueprint) Construct(req Request) error {
 
 	// Saving Cluster metadata, with status 'Creating'
 	b.Cluster.Identity.Name = req.Name
-	b.Cluster.Identity.Flavor = Flavor.SWARM
+	b.Cluster.Identity.Flavor = req.Flavor
 	b.Cluster.Identity.Complexity = req.Complexity
 	b.Cluster.Identity.Keypair = kp
 	b.Cluster.Identity.AdminPassword = cladmPassword
@@ -313,6 +312,7 @@ func (b *Blueprint) Construct(req Request) error {
 		publicNodesStatus  error
 	)
 
+	log.Debugf("UpdateMetadata #1...")
 	err = b.Cluster.UpdateMetadata(func() error {
 		// Step 1: starts gateway installation and masters and nodes creation
 		gatewayCh = make(chan error)
@@ -333,6 +333,7 @@ func (b *Blueprint) Construct(req Request) error {
 		return nil
 	})
 	if err != nil {
+		log.Debugf("UpdateMetadata #1: err=%v", err)
 		return err
 	}
 
@@ -346,6 +347,7 @@ func (b *Blueprint) Construct(req Request) error {
 		}
 	}()
 
+	log.Debugf("UpdateMetadata #2...")
 	err = b.Cluster.UpdateMetadata(func() error {
 		// Step 4: starts gateway configuration, if masters have been created successfully
 		if gatewayStatus == nil && mastersStatus == nil {
@@ -366,6 +368,7 @@ func (b *Blueprint) Construct(req Request) error {
 		return nil
 	})
 	if err != nil {
+		log.Debugf("UpdateMetadata #2: err=%v", err)
 		return err
 	}
 
@@ -384,6 +387,7 @@ func (b *Blueprint) Construct(req Request) error {
 		}
 	}()
 
+	log.Debugf("UpdateMetadata #3...")
 	err = b.Cluster.UpdateMetadata(func() error {
 		// Step 6: Starts nodes configuration, if all masters and nodes
 		// have been created and gateway has been configured with success
@@ -406,6 +410,7 @@ func (b *Blueprint) Construct(req Request) error {
 		return nil
 	})
 	if err != nil {
+		log.Debugf("UpdateMetadata #3: err=%v", err)
 		return err
 	}
 	if gatewayStatus != nil {
@@ -555,8 +560,20 @@ func (b *Blueprint) unconfigureMaster(hostID string) error {
 
 // configureCluster ...
 func (b *Blueprint) configureCluster() error {
+	log.Debugf(">>> deploy.cluster.controller.Blueprint::configureCluster()")
+	defer log.Debugf("<<< deploy.cluster.controller.Blueprint::configureCluster()")
+
+	var err error
+
+	log.Infof("[cluster %s] configuring cluster...", b.Cluster.Name)
+	defer func() {
+		if err == nil {
+			log.Infof("[cluster %s] configuration successful.", b.Cluster.Name)
+		}
+	}()
+
 	// Installs remotedesktop feature on all masters
-	err := b.installRemoteDesktop()
+	err = b.installRemoteDesktop()
 	if err != nil {
 		return err
 	}
@@ -565,6 +582,7 @@ func (b *Blueprint) configureCluster() error {
 	if b.Actors.ConfigureCluster != nil {
 		return b.Actors.ConfigureCluster(b.Cluster, b)
 	}
+
 	// Not finding a callback isn't an error, so return nil in this case
 	return nil
 }
@@ -703,7 +721,7 @@ func (b *Blueprint) installNodeRequirements(nodeType NodeType.Enum, pbHost *pb.H
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
 	identity := b.Cluster.GetIdentity()
-	params["GlobalSystemRequirements"] = globalSystemRequirements
+	params["reserved_CommonRequirements"] = globalSystemRequirements
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
 	params["MasterIPs"] = b.Cluster.ListMasterIPs()
@@ -999,7 +1017,7 @@ func (b *Blueprint) asyncConfigureMasters(done chan error) {
 // asyncConfigureMaster configures master
 func (b *Blueprint) asyncConfigureMaster(index int, pbHost *pb.Host, done chan error) {
 	log.Debugf(">>> deploy.cluster.controller.Blueprint::asyncConfigureMaster(%d, %s)", index, pbHost.Name)
-	defer log.Debugf(">>> deploy.cluster.controller.Blueprint::asyncConfigureMaster(%d)", index, pbHost.Name)
+	defer log.Debugf("<<< deploy.cluster.controller.Blueprint::asyncConfigureMaster(%d, %s)", index, pbHost.Name)
 
 	hostLabel := fmt.Sprintf("master #%d (%s)", index, pbHost.Name)
 	log.Debugf("[%s] starting configuration...\n", hostLabel)
@@ -1067,7 +1085,7 @@ func (b *Blueprint) asyncCreateNodes(count int, public bool, def pb.HostDefiniti
 		return
 	}
 
-	log.Debugf("[cluster %s] %s %s node%s creation successful.", clusterName, count, nodeTypeStr, utils.Plural(count))
+	log.Debugf("[cluster %s] %d %s node%s creation successful.", clusterName, count, nodeTypeStr, utils.Plural(count))
 	done <- nil
 }
 
@@ -1168,7 +1186,7 @@ func (b *Blueprint) asyncCreateNode(
 		return
 	}
 
-	log.Debugf("[%s (%s)] host resource creationd successful.", hostLabel, pbHost.Name)
+	log.Debugf("[%s] host resource creation successful.", hostLabel)
 	result <- ""
 	done <- nil
 }
