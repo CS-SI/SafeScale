@@ -250,8 +250,8 @@ feature:
                             systemctl daemon-reload && \
                             systemctl enable vncserver\@:0.service && \
                             systemctl enable vncconfig\@:0.service && \
-                            systemctl restart vncserver\@:0.service && \
-                            systemctl restart vncconfig\@:0.service || exit 196
+                            systemctl restart vncserver\@:0.service || exit 196
+                            systemctl restart vncconfig\@:0.service || exit 197
 
                     deps:
                         targets:
