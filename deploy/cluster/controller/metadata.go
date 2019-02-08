@@ -18,10 +18,14 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -69,7 +73,7 @@ func (m *Metadata) Delete() error {
 }
 
 // Read reads metadata of cluster named 'name' from Object Storage
-func (m *Metadata) Read(name string) (bool, error) {
+func (m *Metadata) Read(name string) error {
 	var (
 		ptr *Controller
 		ok  bool
@@ -85,7 +89,7 @@ func (m *Metadata) Read(name string) (bool, error) {
 			ptr = &Controller{}
 		}
 	}
-	found, err := m.item.Read(name, func(buf []byte) (serialize.Serializable, error) {
+	err := m.item.Read(name, func(buf []byte) (serialize.Serializable, error) {
 		err := ptr.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -93,13 +97,11 @@ func (m *Metadata) Read(name string) (bool, error) {
 		return ptr, nil
 	})
 	if err != nil {
-		return false, err
+		return err
 	}
-	if !found {
-		return false, nil
-	}
+
 	m.name = ptr.GetIdentity().Name
-	return true, nil
+	return nil
 }
 
 // Write saves the content of m to the Object Storage
@@ -113,12 +115,28 @@ func (m *Metadata) Reload() error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	found, err := m.Read(m.name)
+	var innerErr error
+	err := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			innerErr = m.Read(m.name)
+			if innerErr != nil {
+				if _, ok := innerErr.(utils.ErrNotFound); ok {
+					return innerErr
+				}
+			}
+			return nil
+		},
+		10*time.Second,
+	)
 	if err != nil {
+		if _, ok := err.(retry.ErrTimeout); ok {
+			log.Debugf("timeout reading metadata of cluster '%s'", m.name)
+			return utils.NotFoundError(fmt.Sprintf("failed to reload metadata of cluster '%s'", m.name))
+		}
 		return err
 	}
-	if !found {
-		return fmt.Errorf("metadata of cluster '%s' vanished", m.name)
+	if innerErr != nil {
+		return innerErr
 	}
 	return nil
 }

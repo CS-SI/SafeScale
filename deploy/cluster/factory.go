@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/swarm"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 // Get returns the Cluster instance corresponding to the cluster named 'name'
@@ -50,12 +51,12 @@ func Get(name string) (api.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	found, err := m.Read(name)
+	err = m.Read(name)
 	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return nil, model.ResourceNotFoundError("cluster", name)
+		}
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
-	}
-	if !found {
-		return nil, model.ResourceNotFoundError("cluster", name)
 	}
 	controller := m.Get()
 	err = setBlueprint(controller)
@@ -80,12 +81,12 @@ func Load(name string) (api.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	found, err := m.Read(name)
+	err = m.Read(name)
 	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return nil, err
+		}
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
-	}
-	if !found {
-		return nil, model.ResourceNotFoundError("cluster", name)
 	}
 	controller := m.Get()
 	err = setBlueprint(controller)

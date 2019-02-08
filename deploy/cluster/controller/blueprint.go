@@ -83,6 +83,10 @@ type BlueprintActors struct {
 	UnconfigureNode             func(c api.Cluster, b *Blueprint, hostID string, selectedMasterID string) error
 	ConfigureCluster            func(c api.Cluster, b *Blueprint) error
 	UnconfigureCluster          func(c api.Cluster, b *Blueprint) error
+	JoinMasterToCluster         func(c api.Cluster, b *Blueprint, phHost *pb.Host) error
+	JoinNodeToCluster           func(c api.Cluster, b *Blueprint, phHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr string) error
+	LeaveMasterFromCluster      func(c api.Cluster, b *Blueprint, phHost *pb.Host) error
+	LeaveNodeFromCluster        func(c api.Cluster, b *Blueprint, phHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr, selectedMaster string) error
 	GetState                    func(c api.Cluster) (ClusterState.Enum, error)
 }
 
@@ -202,7 +206,6 @@ func (b *Blueprint) Construct(req Request) error {
 		kpName string
 		gw     *model.Host
 		m      *providermetadata.Gateway
-		ok     bool
 	)
 
 	tenant, err := broker.Tenant.Get(brokerclient.DefaultExecutionTimeout)
@@ -219,12 +222,14 @@ func (b *Blueprint) Construct(req Request) error {
 	if err != nil {
 		return err
 	}
-	ok, err = m.Read()
+	err = m.Read()
 	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			if !ok {
+				return fmt.Errorf("[cluster %s] failed to load gateway metadata", req.Name)
+			}
+		}
 		return err
-	}
-	if !ok {
-		return fmt.Errorf("[cluster %s] failed to load gateway metadata", req.Name)
 	}
 	gw = m.Get()
 
@@ -312,30 +317,22 @@ func (b *Blueprint) Construct(req Request) error {
 		publicNodesStatus  error
 	)
 
-	log.Debugf("UpdateMetadata #1...")
-	err = b.Cluster.UpdateMetadata(func() error {
-		// Step 1: starts gateway installation and masters and nodes creation
-		gatewayCh = make(chan error)
-		go b.asyncInstallGateway(pbutils.ToPBHost(gw), gatewayCh)
+	// Step 1: starts gateway installation and masters and nodes creation
+	gatewayCh = make(chan error)
+	go b.asyncInstallGateway(pbutils.ToPBHost(gw), gatewayCh)
 
-		mastersCh = make(chan error)
-		go b.asyncCreateMasters(masterCount, pbMasterDef, mastersCh)
+	mastersCh = make(chan error)
+	go b.asyncCreateMasters(masterCount, pbMasterDef, mastersCh)
 
-		privateNodesCh = make(chan error)
-		go b.asyncCreateNodes(privateNodeCount, false, pbNodeDef, privateNodesCh)
+	privateNodesCh = make(chan error)
+	go b.asyncCreateNodes(privateNodeCount, false, pbNodeDef, privateNodesCh)
 
-		publicNodesCh = make(chan error)
-		go b.asyncCreateNodes(publicNodeCount, true, pbNodeDef, publicNodesCh)
+	publicNodesCh = make(chan error)
+	go b.asyncCreateNodes(publicNodeCount, true, pbNodeDef, publicNodesCh)
 
-		// Step 2: awaits master creations and gateway installation finish
-		gatewayStatus = <-gatewayCh
-		mastersStatus = <-mastersCh
-		return nil
-	})
-	if err != nil {
-		log.Debugf("UpdateMetadata #1: err=%v", err)
-		return err
-	}
+	// Step 2: awaits master creations and gateway installation finish
+	gatewayStatus = <-gatewayCh
+	mastersStatus = <-mastersCh
 
 	// Starting from here, delete masters if exiting with error and req.KeepOnFailure is not true
 	defer func() {
@@ -347,30 +344,21 @@ func (b *Blueprint) Construct(req Request) error {
 		}
 	}()
 
-	log.Debugf("UpdateMetadata #2...")
-	err = b.Cluster.UpdateMetadata(func() error {
-		// Step 4: starts gateway configuration, if masters have been created successfully
-		if gatewayStatus == nil && mastersStatus == nil {
-			gatewayCh = make(chan error)
-			go func() { b.asyncConfigureGateway(pbutils.ToPBHost(gw), gatewayCh) }()
-			gatewayStatus = <-gatewayCh
-		}
-
-		// Step 5: configure masters
-		if gatewayStatus == nil && mastersStatus == nil {
-			mastersCh = make(chan error)
-			go func() { b.asyncConfigureMasters(mastersCh) }()
-			mastersStatus = <-mastersCh
-		}
-
-		privateNodesStatus = <-privateNodesCh
-		publicNodesStatus = <-publicNodesCh
-		return nil
-	})
-	if err != nil {
-		log.Debugf("UpdateMetadata #2: err=%v", err)
-		return err
+	if gatewayStatus == nil && mastersStatus == nil {
+		gatewayCh = make(chan error)
+		go func() { b.asyncConfigureGateway(pbutils.ToPBHost(gw), gatewayCh) }()
+		gatewayStatus = <-gatewayCh
 	}
+
+	// Step 5: configure masters
+	if gatewayStatus == nil && mastersStatus == nil {
+		mastersCh = make(chan error)
+		go b.asyncConfigureMasters(mastersCh)
+		mastersStatus = <-mastersCh
+	}
+
+	privateNodesStatus = <-privateNodesCh
+	publicNodesStatus = <-publicNodesCh
 
 	// Starting from here, delete nodes on failure if exits with error and req.KeepOnFailure is false
 	defer func() {
@@ -387,32 +375,25 @@ func (b *Blueprint) Construct(req Request) error {
 		}
 	}()
 
-	log.Debugf("UpdateMetadata #3...")
-	err = b.Cluster.UpdateMetadata(func() error {
-		// Step 6: Starts nodes configuration, if all masters and nodes
-		// have been created and gateway has been configured with success
-		if gatewayStatus == nil && mastersStatus == nil {
-			if privateNodesStatus == nil {
-				privateNodesCh = make(chan error)
-				go b.asyncConfigureNodes(false, privateNodesCh)
-			}
-			if publicNodesStatus == nil {
-				publicNodesCh = make(chan error)
-				go b.asyncConfigureNodes(true, publicNodesCh)
-			}
-			if privateNodesStatus == nil {
-				privateNodesStatus = <-privateNodesCh
-			}
-			if publicNodesStatus == nil {
-				publicNodesStatus = <-publicNodesCh
-			}
+	// Step 6: Starts nodes configuration, if all masters and nodes
+	// have been created and gateway has been configured with success
+	if gatewayStatus == nil && mastersStatus == nil {
+		if privateNodesStatus == nil {
+			privateNodesCh = make(chan error)
+			go b.asyncConfigureNodes(false, privateNodesCh)
 		}
-		return nil
-	})
-	if err != nil {
-		log.Debugf("UpdateMetadata #3: err=%v", err)
-		return err
+		if publicNodesStatus == nil {
+			publicNodesCh = make(chan error)
+			go b.asyncConfigureNodes(true, publicNodesCh)
+		}
+		if privateNodesStatus == nil {
+			privateNodesStatus = <-privateNodesCh
+		}
+		if publicNodesStatus == nil {
+			publicNodesStatus = <-publicNodesCh
+		}
 	}
+
 	if gatewayStatus != nil {
 		err = gatewayStatus // value of err may trigger defer calls, don't change anything here
 		return err
@@ -430,17 +411,16 @@ func (b *Blueprint) Construct(req Request) error {
 		return err
 	}
 
-	return b.Cluster.UpdateMetadata(func() error {
-		// At the end, configure cluster as a whole
-		err := b.configureCluster()
-		if err != nil {
-			return err
-		}
+	// At the end, configure cluster as a whole
+	err = b.configureCluster()
+	if err != nil {
+		return err
+	}
 
+	return b.Cluster.UpdateMetadata(func() error {
 		// Cluster created and configured successfully
 		return b.Cluster.GetProperties().LockForWrite(Property.StateV1).ThenUse(func(v interface{}) error {
-			stateV1 := v.(*clusterpropsv1.State)
-			stateV1.State = ClusterState.Created
+			v.(*clusterpropsv1.State).State = ClusterState.Created
 			return nil
 		})
 	})
@@ -681,6 +661,105 @@ func (b *Blueprint) configureNodesFromList(public bool, hosts []string) error {
 	if len(errors) > 0 {
 		return fmt.Errorf(strings.Join(errors, "\n"))
 	}
+	return nil
+}
+
+// joinNodesFromList ...
+func (b *Blueprint) joinNodesFromList(public bool, hosts []string) error {
+	if b.Actors.JoinNodeToCluster == nil {
+		return nil
+	}
+
+	var (
+		nodeType    NodeType.Enum
+		nodeTypeStr string
+	)
+	if public {
+		nodeType = NodeType.PrivateNode
+		nodeTypeStr = "public"
+	} else {
+		nodeType = NodeType.PublicNode
+		nodeTypeStr = "private"
+	}
+
+	log.Debugf("Joining %s Nodes to cluster...", nodeTypeStr)
+
+	brokerHost := brokerclient.New().Host
+	// Joins to cluster is done sequentially, experience shows too many join at the same time
+	// may fail (depending of the cluster Flavor)
+	for _, hostID := range hosts {
+		pbHost, err := brokerHost.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		if err != nil {
+			return err
+		}
+		err = b.Actors.JoinNodeToCluster(b.Cluster, b, pbHost, nodeType, nodeTypeStr)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// leaveMastersFromList ...
+func (b *Blueprint) leaveMastersFromList(public bool, hosts []string) error {
+	if b.Actors.LeaveMasterFromCluster == nil {
+		return nil
+	}
+
+	log.Debugf("Making Mastersleaving cluster...")
+
+	brokerHost := brokerclient.New().Host
+	// Joins to cluster is done sequentially, experience shows too many join at the same time
+	// may fail (depending of the cluster Flavor)
+	for _, hostID := range hosts {
+		pbHost, err := brokerHost.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		if err != nil {
+			return err
+		}
+		err = b.Actors.LeaveMasterFromCluster(b.Cluster, b, pbHost)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// leaveNodesFromList ...
+func (b *Blueprint) leaveNodesFromList(hosts []string, public bool, selectedMasterID string) error {
+	if b.Actors.LeaveNodeFromCluster == nil {
+		return nil
+	}
+
+	var (
+		nodeType    NodeType.Enum
+		nodeTypeStr string
+	)
+	if public {
+		nodeType = NodeType.PrivateNode
+		nodeTypeStr = "public"
+	} else {
+		nodeType = NodeType.PublicNode
+		nodeTypeStr = "private"
+	}
+
+	log.Debugf("Making %s Nodes leaving cluster...", nodeTypeStr)
+
+	brokerHost := brokerclient.New().Host
+	// Joins to cluster is done sequentially, experience shows too many join at the same time
+	// may fail (depending of the cluster Flavor)
+	for _, hostID := range hosts {
+		pbHost, err := brokerHost.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		if err != nil {
+			return err
+		}
+		err = b.Actors.LeaveNodeFromCluster(b.Cluster, b, pbHost, nodeType, nodeTypeStr, selectedMasterID)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -930,24 +1009,35 @@ func (b *Blueprint) asyncCreateMaster(index int, def pb.HostDefinition, timeout 
 	pbHost, err := brokerHost.Create(def, timeout)
 	if err != nil {
 		err = brokerclient.DecorateError(err, "creation of host resource", false)
-		log.Errorf("[%s] host resource creation failed: %s\n", hostLabel, err.Error())
+		log.Errorf("[%s] host resource creation failed: %s", hostLabel, err.Error())
 		done <- fmt.Errorf("failed to create '%s': %s", hostLabel, err.Error())
 		return
 	}
 	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, pbHost.Name)
 	log.Debugf("[%s] host resource creation successful", hostLabel)
 
-	// Locks for write the Flavor extension...
-	err = b.Cluster.GetProperties().LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
-		// Update swarmCluster definition in Object Storage
-		node := &clusterpropsv1.Node{
-			ID:        pbHost.ID,
-			PrivateIP: pbHost.PrivateIP,
-			PublicIP:  pbHost.GetPublicIP(),
+	defer func() {
+		if err != nil {
+			derr := brokerHost.Delete([]string{pbHost.ID}, timeout)
+			if derr != nil {
+				log.Errorf("failed to delete master after failure")
+			}
 		}
-		nodesV1.Masters = append(nodesV1.Masters, node)
-		return nil
+	}()
+
+	// Locks for write the Flavor extension...
+	err = b.Cluster.UpdateMetadata(func() error {
+		return b.Cluster.GetProperties().LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+			nodesV1 := v.(*clusterpropsv1.Nodes)
+			// Update swarmCluster definition in Object Storage
+			node := &clusterpropsv1.Node{
+				ID:        pbHost.ID,
+				PrivateIP: pbHost.PrivateIP,
+				PublicIP:  pbHost.GetPublicIP(),
+			}
+			nodesV1.Masters = append(nodesV1.Masters, node)
+			return nil
+		})
 	})
 	if err != nil {
 		log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
@@ -968,7 +1058,7 @@ func (b *Blueprint) asyncCreateMaster(index int, def pb.HostDefinition, timeout 
 		return
 	}
 
-	log.Debugf("[%s] creation successful.", hostLabel)
+	log.Debugf("[%s] host rsource creation successful.", hostLabel)
 	done <- nil
 }
 
@@ -1136,41 +1226,45 @@ func (b *Blueprint) asyncCreateNode(
 	hostLabel = fmt.Sprintf("%s node #%d (%s)", nodeTypeStr, index, pbHost.Name)
 	log.Debugf("[%s] host resource creation successful.", hostLabel)
 
-	// Locks for write the NodesV1 extension...
-	err = b.Cluster.GetProperties().LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
-		// Registers the new Agent in the swarmCluster struct
-		node := &clusterpropsv1.Node{
-			ID:        pbHost.ID,
-			PrivateIP: pbHost.PrivateIP,
-			PublicIP:  pbHost.GetPublicIP(),
-		}
-		if nodeType == NodeType.PublicNode {
-			nodesV1.PublicNodes = append(nodesV1.PublicNodes, node)
-		} else {
-			nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
-		}
-		return nil
-	})
-	if err != nil {
-		// Removes the ID we just added to the Cluster struct
-		innerErr := b.Cluster.GetProperties().LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+	var node *clusterpropsv1.Node
+	err = b.Cluster.UpdateMetadata(func() error {
+		// Locks for write the NodesV1 extension...
+		return b.Cluster.GetProperties().LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
+			// Registers the new Agent in the swarmCluster struct
+			node = &clusterpropsv1.Node{
+				ID:        pbHost.ID,
+				PrivateIP: pbHost.PrivateIP,
+				PublicIP:  pbHost.GetPublicIP(),
+			}
 			if nodeType == NodeType.PublicNode {
-				nodesV1.PublicNodes = nodesV1.PublicNodes[:len(nodesV1.PublicNodes)-1]
+				nodesV1.PublicNodes = append(nodesV1.PublicNodes, node)
 			} else {
-				nodesV1.PrivateNodes = nodesV1.PrivateNodes[:len(nodesV1.PrivateNodes)-1]
+				nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
 			}
 			return nil
 		})
-		if innerErr != nil {
-			log.Errorf("failed to removed node from cluster properties")
+	})
+	if err != nil {
+		derr := brokerHost.Delete([]string{pbHost.ID}, 10*time.Minute)
+		if derr != nil {
+			log.Errorf("failed to delete node after failure")
 		}
 		log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
 		result <- ""
 		done <- fmt.Errorf("failed to create node: %s", err.Error())
 		return
 	}
+
+	// Starting from here, delete node from cluster if exiting with error
+	defer func() {
+		if err != nil {
+			derr := b.Cluster.deleteNode(node, 1, publicIP, "")
+			if derr != nil {
+				log.Errorf("failed to delete node after failure")
+			}
+		}
+	}()
 
 	err = b.installProxyCacheClient(pbHost, hostLabel)
 	if err != nil {
@@ -1187,7 +1281,7 @@ func (b *Blueprint) asyncCreateNode(
 	}
 
 	log.Debugf("[%s] host resource creation successful.", hostLabel)
-	result <- ""
+	result <- pbHost.Name
 	done <- nil
 }
 
@@ -1331,7 +1425,7 @@ func (b *Blueprint) installProxyCacheClient(pbHost *pb.Host, hostLabel string) e
 		return nil
 	})
 	if err != nil {
-		log.Errorf("[%s] installation failed:%v", hostLabel, err)
+		log.Errorf("[%s] installation failed: %v", hostLabel, err)
 		return err
 	}
 	//ENDVPL
@@ -1370,16 +1464,20 @@ func (b *Blueprint) installProxyCacheClient(pbHost *pb.Host, hostLabel string) e
 
 // install proxycache-server feature if not disabled
 func (b *Blueprint) installProxyCacheServer(pbHost *pb.Host, hostLabel string) error {
+
 	//VPL: For now, always disable addition of feature proxycache-client
-	err := b.Cluster.GetProperties().LockForWrite(Property.FeaturesV1).ThenUse(func(v interface{}) error {
-		v.(*clusterpropsv1.Features).Disabled["proxycache"] = struct{}{}
-		return nil
+	err := b.Cluster.UpdateMetadata(func() error {
+		return b.Cluster.GetProperties().LockForWrite(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+			v.(*clusterpropsv1.Features).Disabled["proxycache"] = struct{}{}
+			return nil
+		})
 	})
 	if err != nil {
-		log.Errorf("[%s] installation failed:%v", hostLabel, err)
+		log.Errorf("[%s] installation failed: %v", hostLabel, err)
 		return err
 	}
 	//ENDVPL
+
 	disabled := false
 	err = b.Cluster.GetProperties().LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
 		_, disabled = v.(*clusterpropsv1.Features).Disabled["proxycache"]
