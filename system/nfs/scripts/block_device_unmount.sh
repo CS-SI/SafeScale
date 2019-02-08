@@ -25,5 +25,5 @@ function print_error {
 }
 trap print_error ERR
 
-umount -l -f "/dev/disk/by-uuid/{{.Device}}" && \
-sed -i '\:{{.Device}}:d' /etc/fstab
+umount -l -f "/dev/disk/by-uuid/{{.UUID}}" && \
+sed -i '\:{{.UUID}}:d' /etc/fstab
