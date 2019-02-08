@@ -17,9 +17,15 @@
 package metadata
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -111,12 +117,12 @@ func (ms *Share) Write() error {
 }
 
 // ReadByID reads the metadata of an export identified by ID from Object Storage
-func (ms *Share) ReadByID(id string) (bool, error) {
+func (ms *Share) ReadByID(id string) error {
 	if ms.item == nil {
 		panic("ms.item is nil!")
 	}
 	var si shareItem
-	found, err := ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
+	err := ms.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := (&si).Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -124,22 +130,19 @@ func (ms *Share) ReadByID(id string) (bool, error) {
 		return &si, nil
 	})
 	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
+		return err
 	}
 	ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName)
-	return true, nil
+	return nil
 }
 
 // ReadByName reads the metadata of a nas identified by name
-func (ms *Share) ReadByName(name string) (bool, error) {
+func (ms *Share) ReadByName(name string) error {
 	if ms.item == nil {
 		panic("ms.name is nil!")
 	}
 	var si shareItem
-	found, err := ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
+	err := ms.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := (&si).Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -147,13 +150,10 @@ func (ms *Share) ReadByName(name string) (bool, error) {
 		return &si, nil
 	})
 	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
+		return err
 	}
 	ms.Carry(si.HostID, si.HostName, si.ShareID, si.ShareName)
-	return true, nil
+	return nil
 }
 
 // Delete updates the metadata corresponding to the share
@@ -252,20 +252,40 @@ func RemoveShare(svc *providers.Service, hostID, hostName, shareID, shareName st
 }
 
 // LoadShare returns the name of the host owing the share 'ref', read from Object Storage
+// logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
+//        In case of any other error, abort the retry to propagate the error
+//        If retry times out, return errNotFound
 func LoadShare(svc *providers.Service, ref string) (string, error) {
 	ms := NewShare(svc)
-	found, err := ms.ReadByID(ref)
+	var innerErr error
+	err := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			innerErr = ms.ReadByID(ref)
+			if innerErr != nil {
+				if _, ok := innerErr.(utils.ErrNotFound); ok {
+					innerErr = ms.ReadByName(ref)
+					if innerErr != nil {
+						if _, ok := innerErr.(utils.ErrNotFound); ok {
+							return innerErr
+						}
+					}
+				}
+			}
+			return nil
+		},
+		10*time.Second,
+	)
+	// If retry timed out, log it and return error ErrNotFound
 	if err != nil {
+		if _, ok := err.(retry.ErrTimeout); ok {
+			log.Debugf("timeout reading metadata of share '%s'", ref)
+			return "", utils.NotFoundError(fmt.Sprintf("failed to load metadata of share '%s'", ref))
+		}
 		return "", err
 	}
-	if !found {
-		found, err := ms.ReadByName(ref)
-		if err != nil {
-			return "", err
-		}
-		if !found {
-			return "", nil
-		}
+	// Returns the error different than ErrNotFound to caller
+	if innerErr != nil {
+		return "", innerErr
 	}
 	return ms.Get(), nil
 }

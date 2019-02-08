@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -25,7 +26,9 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -99,24 +102,24 @@ func (m *Network) Write() error {
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (m *Network) Reload() error {
-	found, err := m.ReadByID(*m.id)
+	err := m.ReadByID(*m.id)
 	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return utils.NotFoundError(fmt.Sprintf("the metadata of Network '%s' vanished", *m.name))
+		}
 		return err
-	}
-	if !found {
-		return fmt.Errorf("the metadata of Network '%s' vanished", *m.name)
 	}
 	return nil
 }
 
 // ReadByID reads the metadata of a network identified by ID from Object Storage
-func (m *Network) ReadByID(id string) (bool, error) {
+func (m *Network) ReadByID(id string) error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
 
 	network := model.NewNetwork()
-	found, err := m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
+	err := m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := network.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -124,25 +127,22 @@ func (m *Network) ReadByID(id string) (bool, error) {
 		return network, nil
 	})
 	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
+		return err
 	}
 	m.id = &(network.ID)
 	m.name = &(network.Name)
 	// m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+id, "/"))
-	return true, nil
+	return nil
 }
 
 // ReadByName reads the metadata of a network identified by name
-func (m *Network) ReadByName(name string) (bool, error) {
+func (m *Network) ReadByName(name string) error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
 
 	network := model.NewNetwork()
-	found, err := m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
+	err := m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := network.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -150,15 +150,12 @@ func (m *Network) ReadByName(name string) (bool, error) {
 		return network, nil
 	})
 	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
+		return err
 	}
 	m.name = &(network.Name)
 	m.id = &(network.ID)
 	//	m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+*m.id, "/"))
-	return true, nil
+	return nil
 }
 
 // Delete deletes the metadata corresponding to the network
@@ -310,48 +307,40 @@ func RemoveNetwork(svc *providers.Service, net *model.Network) error {
 	return NewNetwork(svc).Carry(net).Delete()
 }
 
-// LoadNetworkByID gets the Network definition from Object Storage
-func LoadNetworkByID(svc *providers.Service, networkID string) (*Network, error) {
-	m := NewNetwork(svc)
-	found, err := m.ReadByID(networkID)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, model.ResourceNotFoundError("network", networkID)
-	}
-	return m, nil
-}
-
-// LoadNetworkByName gets the Network definition from Object Storage
-func LoadNetworkByName(svc *providers.Service, networkname string) (*Network, error) {
-	m := NewNetwork(svc)
-	found, err := m.ReadByName(networkname)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, model.ResourceNotFoundError("network", networkname)
-	}
-	return m, nil
-}
-
 // LoadNetwork gets the Network definition from Object Storage
+// logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
+//        In case of any other error, abort the retry to propagate the error
+//        If retry times out, return errNotFound
 func LoadNetwork(svc *providers.Service, ref string) (*Network, error) {
-	m, err := LoadNetworkByID(svc, ref)
-	if err != nil {
-		if _, ok := err.(model.ErrResourceNotFound); !ok {
-			return nil, err
-		}
-	} else {
-		return m, nil
+	mn := NewNetwork(svc)
+	var innerErr error
+	err := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			innerErr = mn.ReadByID(ref)
+			if innerErr != nil {
+				if _, ok := innerErr.(utils.ErrNotFound); ok {
+					innerErr = mn.ReadByName(ref)
+					if innerErr != nil {
+						if _, ok := innerErr.(utils.ErrNotFound); ok {
+							return innerErr
+						}
+					}
+				}
+			}
+			return nil
+		},
+		10*time.Second,
+	)
+	// If retry timed out, log it and return error ErrNotFound
+	if _, ok := err.(retry.ErrTimeout); ok {
+		log.Debugf("timeout reading metadata of network '%s'", ref)
+		return nil, utils.NotFoundError(fmt.Sprintf("failed to load metadata of network '%s'", ref))
 	}
-
-	m, err = LoadNetworkByName(svc, ref)
-	if err != nil {
-		return nil, err
+	// Returns the error different than ErrNotFound to caller
+	if innerErr != nil {
+		return nil, innerErr
 	}
-	return m, nil
+	return mn, nil
 }
 
 // Gateway links Object Storage folder and Network
@@ -364,12 +353,12 @@ type Gateway struct {
 // NewGateway creates an instance of metadata.Gateway
 func NewGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 	network := NewNetwork(svc)
-	found, err := network.ReadByID(networkID)
+	err := network.ReadByID(networkID)
 	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return nil, utils.NotFoundError("failed to find metadata of network using gateway")
+		}
 		return nil, err
-	}
-	if !found {
-		return nil, fmt.Errorf("failed to find metadata of network using gateway")
 	}
 	return &Gateway{
 		host:      NewHost(svc),
@@ -405,33 +394,29 @@ func (mg *Gateway) Write() error {
 }
 
 // Read reads the metadata of a gateway of a network identified by ID from Object Storage
-func (mg *Gateway) Read() (bool, error) {
+func (mg *Gateway) Read() error {
 	if mg.network == nil {
 		panic("mg.network is nil!")
 	}
 	err := mg.network.Reload()
 	if err != nil {
-		return false, err
+		return err
 	}
-	found := false
-	found, err = mg.host.ReadByID(mg.network.Get().GatewayID)
+	err = mg.host.ReadByID(mg.network.Get().GatewayID)
 	if err != nil {
-		return false, err
+		return err
 	}
-	if !found {
-		return false, nil
-	}
-	return true, nil
+	return nil
 }
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (mg *Gateway) Reload() error {
-	found, err := mg.Read()
+	err := mg.Read()
 	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return utils.NotFoundError(fmt.Sprintf("metadata about the gateway of network '%s' doesn't exist anymore", mg.networkID))
+		}
 		return err
-	}
-	if !found {
-		return fmt.Errorf("metadata about the gateway of network '%s' doesn't exist anymore", mg.networkID)
 	}
 	return nil
 }
@@ -469,12 +454,27 @@ func LoadGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	found, err := mg.Read()
+	var innerErr error
+	err = retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			innerErr = mg.Read()
+			if innerErr != nil {
+				if _, ok := innerErr.(utils.ErrNotFound); ok {
+					return innerErr
+				}
+			}
+			return nil
+		},
+		10*time.Second,
+	)
 	if err != nil {
+		if _, ok := err.(retry.ErrTimeout); ok {
+			return nil, utils.NotFoundError(fmt.Sprintf("failed to load metadata of gateway for network '%s'", networkID))
+		}
 		return nil, err
 	}
-	if !found {
-		return nil, model.ResourceNotFoundError("gateway", networkID)
+	if innerErr != nil {
+		return nil, innerErr
 	}
 	return mg, nil
 }
@@ -488,9 +488,12 @@ func SaveGateway(svc *providers.Service, host *model.Host, networkID string) err
 
 	// Update network
 	mn := NewNetwork(svc)
-	ok, err := mn.ReadByID(networkID)
-	if !ok || err != nil {
-		return fmt.Errorf("metadata about the network '%s' doesn't exist anymore", networkID)
+	err = mn.ReadByID(networkID)
+	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return utils.NotFoundError(fmt.Sprintf("metadata about the network '%s' doesn't exist anymore", networkID))
+		}
+		return err
 	}
 	mn.Get().GatewayID = host.ID
 	err = mn.Write()
