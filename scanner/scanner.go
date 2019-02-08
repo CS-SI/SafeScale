@@ -357,7 +357,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 					log.Warnf("Error deleting host '%s'", host.ID)
 				}
 
-				md, err := metadata.LoadHostByID(serviceProvider, host.ID)
+				md, err := metadata.LoadHost(serviceProvider, host.ID)
 				if err != nil {
 					log.Warnf("Error loading host metadata of '%s'", hostName)
 				} else {
