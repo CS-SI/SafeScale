@@ -480,7 +480,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 		}
 
 		templateCommand, err := normalizeScript(Variables{
-			"reserved_Name":    w.feature.BaseFilename(),
+			"reserved_Name":    w.feature.DisplayName(),
 			"reserved_Content": runContent,
 			"reserved_Action":  strings.ToLower(w.action.String()),
 			"reserved_Step":    k,

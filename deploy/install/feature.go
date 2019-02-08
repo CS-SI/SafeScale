@@ -182,9 +182,9 @@ func (f *Feature) DisplayName() string {
 	return f.displayName
 }
 
-// BaseFilename returns the name of the feature specification file without '.yml'
-func (f *Feature) BaseFilename() string {
-	return f.fileName
+// Filename returns the name of the feature
+func (f *Feature) Filename() string {
+	return f.displayName
 }
 
 // DisplayFilename returns the full file name, with [embedded] added at the end if the
@@ -192,7 +192,7 @@ func (f *Feature) BaseFilename() string {
 func (f *Feature) DisplayFilename() string {
 	filename := f.fileName
 	if f.embedded {
-		filename += ".yml [embedded]"
+		filename += " [embedded]"
 	}
 	return filename
 }
