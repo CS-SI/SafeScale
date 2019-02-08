@@ -388,7 +388,7 @@ feature:
                             RUN apt update -y \
                              && apt install -y \
                                     build-essential \
-                                    gcc-6 \
+                                    gcc \
                                     libcairo2-dev \
                                     libjpeg62-turbo \
                                     libossp-uuid-dev \
@@ -403,7 +403,7 @@ feature:
                             WORKDIR /usr/local/src
                             ADD guacamole.tgz /usr/local/src/
                             RUN cd guacamole-server-* \
-                             && CC=gcc-6 ./configure --prefix=/usr --with-init-dir=/etc/init.d  \
+                             && ./configure --prefix=/usr --with-init-dir=/etc/init.d  \
                              && make -j3 \
                              && make DESTDIR=/usr/local/dist install
 
@@ -481,7 +481,7 @@ feature:
                         run: |
                             # Guacd need sshd to authorize password authentication...
                             cat >>/etc/ssh/sshd_config <<-'EOF'
-                            # Allow Password Authentication from {{.Username}} user for guacd to work
+                            # Allow Password Authentication from user {{.Username}} for guacd to work
                             Match User {{.Username}} Address 172.17.0.0/16
                                 PasswordAuthentication yes
                             EOF
