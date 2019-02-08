@@ -34,10 +34,10 @@ import (
 
 const (
 	featureScriptTemplateContent = `
-rm -f /var/tmp/{{.reserved_Name}}.feature.{{.reserved_Action}}_{{.reserved_Step}}.log
+rm -f /var/tmp/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 1<&-
 exec 2<&-
-exec 1<>/var/tmp/{{.reserved_Name}}.feature.{{.reserved_Action}}_{{.reserved_Step}}.log
+exec 1<>/var/tmp/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}

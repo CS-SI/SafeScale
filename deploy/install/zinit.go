@@ -46,7 +46,7 @@ func init() {
 	}
 
 	for _, item := range allEmbedded {
-		allEmbeddedMap[item.BaseFilename()] = item
+		// allEmbeddedMap[item.BaseFilename()] = item
 		allEmbeddedMap[item.DisplayName()] = item
 		installers := item.specs.GetStringMap("feature.install")
 		for k := range installers {
@@ -57,12 +57,12 @@ func init() {
 			}
 			if _, found := availableEmbeddedMap[method]; !found {
 				availableEmbeddedMap[method] = map[string]*Feature{
-					item.DisplayName():  item,
-					item.BaseFilename(): item,
+					item.DisplayName(): item,
+					// item.BaseFilename(): item,
 				}
 			} else {
 				availableEmbeddedMap[method][item.DisplayName()] = item
-				availableEmbeddedMap[method][item.BaseFilename()] = item
+				// availableEmbeddedMap[method][item.BaseFilename()] = item
 			}
 		}
 	}
