@@ -114,7 +114,6 @@ func (client *Client) ListImages(all bool) ([]model.Image, error) {
 			log.Debugf("Error listing images: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error listing images: %s", ProviderErrorToString(err)))
 		}
-		// log.Debugf("Image list empty !")
 	}
 	return imgList, nil
 }
@@ -954,7 +953,7 @@ func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration
 			}
 			return nil
 		},
-		2*time.Second,
+		5*time.Second,
 		timeout,
 	)
 	if retryErr != nil {
