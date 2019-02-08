@@ -218,7 +218,7 @@ func (svc *NetworkHandler) Create(
 		return nil
 	})
 	if err != nil {
-		return nil, infraErrf(err, "Error creating network")
+		return nil, infraErrf(err, "error creating network")
 	}
 
 	// Writes Gateway metadata
@@ -250,7 +250,7 @@ func (svc *NetworkHandler) Create(
 	ssh, err := sshHandler.GetConfig(gw.ID)
 	if err != nil {
 		//defer svc.provider.DeleteHost(gw.ID)
-		return nil, infraErrf(err, "Error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
+		return nil, infraErrf(err, "error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
 	}
 
 	sshDefaultTimeout := int(brokerutils.GetTimeoutCtxHost().Minutes())
@@ -267,7 +267,7 @@ func (svc *NetworkHandler) Create(
 	err = ssh.WaitServerReady(time.Duration(sshDefaultTimeout) * time.Minute)
 	// err = ssh.WaitServerReady(time.Second * 3)
 	if err != nil {
-		return nil, logicErrf(err, "Error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
+		return nil, logicErrf(err, "error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
 	}
 	log.Infof("SSH service of gateway '%s' started.", gw.Name)
 
@@ -276,7 +276,7 @@ func (svc *NetworkHandler) Create(
 	//	err = metadata.SaveNetwork(svc.provider, rv)
 	err = metadata.SaveNetwork(svc.provider, network)
 	if err != nil {
-		return nil, infraErrf(err, "Error creating network: Error saving network metadata")
+		return nil, infraErrf(err, "error creating network: Error saving network metadata")
 	}
 
 	return network, nil
@@ -314,12 +314,9 @@ func (svc *NetworkHandler) Inspect(ref string) (*model.Network, error) {
 
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
-		if _, ok := err.(model.ErrResourceNotFound); ok {
-			return nil, err
-		}
-		return nil, infraErrf(err, "failed to load metadata of network '%s'", ref)
+		return nil, err
 	}
-	return mn.Get(), infraErr(err)
+	return mn.Get(), nil
 }
 
 // Delete deletes network referenced by ref
