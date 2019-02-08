@@ -33,8 +33,10 @@ if [ -z "$UUID" ]; then
     UUID=$(mkfs -F -t {{.FileSystem}} "{{.Device}}" | grep "Filesystem UUID:" | rev | cut -d' ' -f1 | rev) >/dev/null
 fi
 
-mkdir -p "{{.MountPoint}}" >/dev/null && \
 echo "/dev/disk/by-uuid/$UUID {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
-mount {{.Device}} {{.MountPoint}} >/dev/null && \
+mkdir -p "{{.MountPoint}}" >/dev/null && \
+mount {{.MountPoint}} >/dev/null && \
 chmod a+rwx "{{.MountPoint}}" >/dev/null && \
-echo -n $UUID
+echo -n $UUID && exit 0
+
+exit 1
