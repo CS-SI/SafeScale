@@ -549,7 +549,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 	if ssh.Host == "" {
 		panic("SSHConfig.Host is empty!")
 	}
-	log.Debugf("Provisioning server, Waiting for SSH, timeout of %d minutes", int(timeout.Minutes()))
+	log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			cmd, err := ssh.Command("sudo cat /var/tmp/user_data.done")
@@ -563,14 +563,13 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 			}
 			if retcode != 0 {
 				if retcode == 255 {
-					log.Debugf("Provisioning server, Ssh NOT ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
-					return fmt.Errorf("Ssh not ready: error code: 255")
+					log.Debugf("Remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
+					return fmt.Errorf("remote SSH not ready: error code: 255")
 				}
-				log.Debugf("Provisioning server, Ssh NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
-				return fmt.Errorf("Ssh not ready: error code: %s", stderr)
-			} else {
-				log.Debugf("Provisioning server, Ssh ready: command finished with content: [%s]", stdout)
+				log.Debugf("Remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
+				return fmt.Errorf("remote SSH not ready: error code: %s", stderr)
 			}
+			log.Debugf("Remote SSH ready: command finished with result: [%s]", stdout)
 			return nil
 		},
 		timeout,
@@ -585,15 +584,15 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		retcode, stdout, stderr, logErr := logCmd.Run()
 		if logErr == nil {
 			if retcode == 0 {
-				return fmt.Errorf("provisioning server, server '%s' is not ready yet: %s - log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)
+				return fmt.Errorf("server '%s' is not ready yet: %s - log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)
 			}
 			if len(stdout) > 0 {
 				log.Error(fmt.Errorf("captured output: %s", stdout))
 			}
-			return fmt.Errorf("provisioning server, server '%s' is not ready yet: %s - error reading user_data.log: %s", ssh.Host, originalErr.Error(), stderr)
+			return fmt.Errorf("server '%s' is not ready yet: %s - error reading user_data.log: %s", ssh.Host, originalErr.Error(), stderr)
 		}
 
-		return fmt.Errorf("provisioning server, server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
+		return fmt.Errorf("server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
 	}
 	return nil
 }
@@ -602,17 +601,17 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, string, string, error) {
 	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
-		return 0, "", "", fmt.Errorf("Unable to create tunnels : %s", err.Error())
+		return 0, "", "", fmt.Errorf("unable to create tunnels : %s", err.Error())
 	}
 
 	identityfile, err := CreateTempFileFromString(sshConfig.PrivateKey, 0400)
 	if err != nil {
-		return 0, "", "", fmt.Errorf("Unable to create temporary key file: %s", err.Error())
+		return 0, "", "", fmt.Errorf("unable to create temporary key file: %s", err.Error())
 	}
 
 	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}{{.LocalPath}} {{.User}}@{{.Host}}:{{.RemotePath}}{{else}}{{.User}}@{{.Host}}:{{.RemotePath}} {{.LocalPath}}{{end}}")
 	if err != nil {
-		return 0, "", "", fmt.Errorf("Error parsing command template: %s", err.Error())
+		return 0, "", "", fmt.Errorf("error parsing command template: %s", err.Error())
 	}
 
 	var copyCommand bytes.Buffer
@@ -635,7 +634,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		LocalPath:    localPath,
 		IsUpload:     isUpload,
 	}); err != nil {
-		return 0, "", "", fmt.Errorf("Error executing template: %s", err.Error())
+		return 0, "", "", fmt.Errorf("error executing template: %s", err.Error())
 	}
 
 	sshCmdString := copyCommand.String()
@@ -659,7 +658,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 				log.Warnf("Error closing ssh tunnel: %v", nerr)
 			}
 		}
-		return fmt.Errorf("Unable to create command : %s", err.Error())
+		return fmt.Errorf("unable to create command : %s", err.Error())
 	}
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
 	if err != nil {
@@ -675,7 +674,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 				log.Warnf("Error removing file %v", nerr)
 			}
 		}
-		return fmt.Errorf("Unable to create command : %s", err.Error())
+		return fmt.Errorf("unable to create command : %s", err.Error())
 	}
 	bash, err := exec.LookPath("bash")
 	if err != nil {
@@ -691,7 +690,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 				log.Warnf("Error removing file %v", nerr)
 			}
 		}
-		return fmt.Errorf("Unable to create command : %s", err.Error())
+		return fmt.Errorf("unable to create command : %s", err.Error())
 	}
 	var args []string
 	if cmdString == "" {
@@ -717,7 +716,7 @@ func (ssh *SSHConfig) Enter() error {
 				log.Warnf("Error closing ssh tunnel: %v", nerr)
 			}
 		}
-		return fmt.Errorf("Unable to create command : %s", err.Error())
+		return fmt.Errorf("unable to create command : %s", err.Error())
 	}
 
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, "", false)
@@ -734,7 +733,7 @@ func (ssh *SSHConfig) Enter() error {
 				log.Warnf("Error removing file %v", nerr)
 			}
 		}
-		return fmt.Errorf("Unable to create command : %s", err.Error())
+		return fmt.Errorf("unable to create command : %s", err.Error())
 	}
 
 	bash, err := exec.LookPath("bash")
@@ -751,7 +750,7 @@ func (ssh *SSHConfig) Enter() error {
 				log.Warnf("Error removing file %v", nerr)
 			}
 		}
-		return fmt.Errorf("Unable to create command : %s", err.Error())
+		return fmt.Errorf("unable to create command : %s", err.Error())
 	}
 
 	proc := exec.Command(bash, "-c", sshCmdString)
@@ -774,11 +773,11 @@ func (ssh *SSHConfig) Enter() error {
 func (ssh *SSHConfig) CommandContext(ctx context.Context, cmdString string) (*SSHCommand, error) {
 	tunnels, sshConfig, err := ssh.CreateTunnels()
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
+		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
 	sshCmdString, keyFile, err := createSSHCmd(sshConfig, cmdString, false)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
+		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
 
 	cmd := exec.CommandContext(ctx, "bash", "-c", sshCmdString)
