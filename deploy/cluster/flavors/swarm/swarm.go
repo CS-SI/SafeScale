@@ -30,8 +30,9 @@ import (
 	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
-	log "github.com/sirupsen/logrus"
+	// log "github.com/sirupsen/logrus"
 
+	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
@@ -67,6 +68,8 @@ func Blueprint(c *controller.Controller) *controller.Blueprint {
 		DefaultImage:                defaultImage,
 		UnconfigureNode:             unconfigureNode,
 		ConfigureCluster:            configureCluster,
+		JoinNodeToCluster:           joinNode,
+		JoinMasterToCluster:         joinMaster,
 		GetTemplateBox:              getTemplateBox,
 		GetGlobalSystemRequirements: getGlobalSystemRequirements,
 		GetNodeInstallationScript:   getNodeInstallationScript,
@@ -152,22 +155,11 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 		}
 	}
 
-	// Obtain token to join Docker Swarm as workers
-	masterID, err := c.FindAvailableMaster()
+	// build command to join Docker Swarm as workers
+	joinCmd, err := getSwarmJoinCommand(c, true)
 	if err != nil {
-		return fmt.Errorf("failed to join workers to Docker Swarm: %v", err)
+		return err
 	}
-	master, err := broker.Host.Inspect(masterID, brokerclient.DefaultExecutionTimeout)
-	if err != nil {
-		return fmt.Errorf("failed to get metadata of master: %s", err.Error())
-	}
-	retcode, token, stderr, err := broker.Ssh.Run(masterID, "docker swarm join-token worker -q",
-		brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
-	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
-	}
-	token = strings.Trim(token, "\n")
-	joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, master.PrivateIP)
 
 	// Join private node in Docker Swarm as workers
 	for _, hostID := range c.ListNodeIDs(false) {
@@ -195,6 +187,64 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 	}
 
 	return nil
+}
+
+// joinMaster is the code to use to join a new master to the cluster
+func joinMaster(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host) error {
+	brokerSsh := brokerclient.New().Ssh
+
+	joinCmd, err := getSwarmJoinCommand(c, false)
+	if err != nil {
+		return err
+	}
+	retcode, _, stderr, err := brokerSsh.Run(pbHost.ID, joinCmd,
+		brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	if err != nil || retcode != 0 {
+		return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", pbHost.Name, stderr)
+	}
+
+	return nil
+}
+
+// joinNode is the code to use join a new node to the cluster
+func joinNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr string) error {
+	brokerSsh := brokerclient.New().Ssh
+
+	joinCmd, err := getSwarmJoinCommand(c, true)
+	if err != nil {
+		return err
+	}
+	retcode, _, stderr, err := brokerSsh.Run(pbHost.ID, joinCmd,
+		brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	if err != nil || retcode != 0 {
+		return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", pbHost.Name, stderr)
+	}
+	return nil
+}
+
+// getSwarmToken obtains token to join Docker Swarm as workers
+func getSwarmJoinCommand(c api.Cluster, worker bool) (string, error) {
+	masterID, err := c.FindAvailableMaster()
+	if err != nil {
+		return "", fmt.Errorf("failed to join workers to Docker Swarm: %v", err)
+	}
+	broker := brokerclient.New()
+	master, err := broker.Host.Inspect(masterID, brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return "", fmt.Errorf("failed to get metadata of master: %s", err.Error())
+	}
+	memberType := "manager"
+	if worker {
+		memberType = "worker"
+	}
+	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
+	retcode, token, stderr, err := broker.Ssh.Run(masterID, tokenCmd,
+		brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	if err != nil || retcode != 0 {
+		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
+	}
+	token = strings.Trim(token, "\n")
+	return fmt.Sprintf("docker swarm join --token %s %s", token, master.PrivateIP), nil
 }
 
 // getTemplateBox
