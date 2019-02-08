@@ -70,7 +70,7 @@ var sshRun = cli.Command{
 		}
 		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), client.DefaultConnectionTimeout, timeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "ssh run", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error()))
 		}
 
 		fmt.Println(stdout)
@@ -113,7 +113,7 @@ var sshCopy = cli.Command{
 		}
 		_, _, _, err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), client.DefaultConnectionTimeout, timeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "ssh copy", true).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error()))
 		}
 		fmt.Printf("Copy of '%s' to '%s' done\n", c.Args().Get(0), c.Args().Get(1))
 		return nil
@@ -132,7 +132,7 @@ var sshConnect = cli.Command{
 		}
 		err := client.New().Ssh.Connect(c.Args().Get(0), 0)
 		if err != nil {
-			err = clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "ssh connect", false).Error()))
+			err = clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh connect", false).Error()))
 		}
 		return err
 	},

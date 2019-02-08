@@ -48,7 +48,7 @@ var templateList = cli.Command{
 	Action: func(c *cli.Context) error {
 		templates, err := client.New().Template.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "list of templates", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of templates", false).Error()))
 		}
 		out, _ := json.Marshal(templates.GetTemplates())
 		fmt.Println(string(out))

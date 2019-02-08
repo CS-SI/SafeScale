@@ -57,7 +57,7 @@ var volumeList = cli.Command{
 	Action: func(c *cli.Context) error {
 		volumes, err := client.New().Volume.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "list of volumes", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of volumes", false).Error()))
 		}
 		var out []byte
 		if len(volumes.Volumes) == 0 {
@@ -83,7 +83,7 @@ var volumeInspect = cli.Command{
 		}
 		volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "inspection of volume", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of volume", false).Error()))
 		}
 
 		out, _ := json.Marshal(toDisplaybleVolumeInfo(volumeInfo))
@@ -110,7 +110,7 @@ var volumeDelete = cli.Command{
 
 		err := client.New().Volume.Delete(volumeList, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "deletion of volume", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of volume", false).Error()))
 		}
 
 		return nil
@@ -154,7 +154,7 @@ var volumeCreate = cli.Command{
 
 		volume, err := client.New().Volume.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "creation of volume", true).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of volume", true).Error()))
 		}
 		out, _ := json.Marshal(toDisplaybleVolume(volume))
 		fmt.Println(string(out))
@@ -197,7 +197,7 @@ var volumeAttach = cli.Command{
 		}
 		err := client.New().Volume.Attach(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "attach of volume", true).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "attach of volume", true).Error()))
 		}
 		fmt.Printf("Volume '%s' attached to host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 		return nil
@@ -216,7 +216,7 @@ var volumeDetach = cli.Command{
 		}
 		err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "unattach of volume", true).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unattach of volume", true).Error()))
 		}
 
 		fmt.Printf("Volume '%s' detached from host '%s'\n", c.Args().Get(0), c.Args().Get(1))

@@ -103,7 +103,7 @@ var shareDelete = cli.Command{
 			defer wg.Done()
 			err := client.New().Share.Delete(aname, client.DefaultExecutionTimeout)
 			if err != nil {
-				fmt.Println(clitools.TitleFirst(err.Error()))
+				fmt.Println(clitools.Capitalize(err.Error()))
 				errs++
 			} else {
 				fmt.Printf("Share '%s' successfully deleted.\n", aname)

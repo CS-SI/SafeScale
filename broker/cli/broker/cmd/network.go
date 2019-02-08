@@ -52,7 +52,7 @@ var networkList = cli.Command{
 	Action: func(c *cli.Context) error {
 		networks, err := client.New().Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "list of networks", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of networks", false).Error()))
 		}
 		out, _ := json.Marshal(networks.GetNetworks())
 		fmt.Println(string(out))
@@ -79,7 +79,7 @@ var networkDelete = cli.Command{
 
 		err := client.New().Network.Delete(networkList, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "deletion of network", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error()))
 		}
 
 		return nil
@@ -99,7 +99,7 @@ var networkInspect = cli.Command{
 		}
 		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "inspection of network", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network", false).Error()))
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))
@@ -165,7 +165,7 @@ var networkCreate = cli.Command{
 		}
 		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "creation of network", true).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error()))
 		}
 		out, _ := json.Marshal(network)
 		fmt.Println(string(out))

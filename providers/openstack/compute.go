@@ -735,7 +735,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		id, err := uuid.NewV4()
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-			log.Debugf(utils.TitleFirst(msg))
+			log.Debugf(utils.Capitalize(msg))
 			return nil, fmt.Errorf(msg)
 		}
 
@@ -743,7 +743,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		request.KeyPair, err = client.CreateKeyPair(name)
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			log.Debugf(utils.TitleFirst(msg))
+			log.Debugf(utils.Capitalize(msg))
 			return nil, fmt.Errorf(msg)
 		}
 	}
@@ -754,7 +754,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	userData, err := userdata.Prepare(client, request, request.KeyPair, defaultNetwork.CIDR)
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
-		log.Debugf(utils.TitleFirst(msg))
+		log.Debugf(utils.Capitalize(msg))
 		return nil, fmt.Errorf(msg)
 	}
 

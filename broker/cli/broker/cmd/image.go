@@ -48,7 +48,7 @@ var imageList = cli.Command{
 	Action: func(c *cli.Context) error {
 		images, err := client.New().Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "list of images", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of images", false).Error()))
 		}
 		out, _ := json.Marshal(images.GetImages())
 		fmt.Println(string(out))
