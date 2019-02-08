@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/crypt"
 )
 
@@ -127,27 +128,32 @@ func (f *Folder) Delete(path string, name string) error {
 // returns false, err if an error occured
 // returns true, nil if the object has been found
 // The callback function has to know how to decode it and where to store the result
-func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) (bool, error) {
+func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) error {
 	found, err := f.Search(path, name)
 	if err != nil {
-		return false, err
+		return utils.NotFoundError(fmt.Sprintf("failed to search for '%s/%s' in Metadata Storage: %v", path, name, err))
 	}
-	if found {
-		var buffer bytes.Buffer
-		_, err := f.service.MetadataBucket.ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
+	if !found {
+		return utils.NotFoundError(fmt.Sprintf("failed to find for '%s/%s' in Metadata Storage: %v", path, name, err))
+	}
+
+	var buffer bytes.Buffer
+	_, err = f.service.MetadataBucket.ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
+	if err != nil {
+		return utils.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
+	}
+	data := buffer.Bytes()
+	if f.crypt {
+		data, err = crypt.Decrypt(data, f.cryptKey)
 		if err != nil {
-			return false, err
+			return utils.NotFoundError(fmt.Sprintf("failed to decrypt metadata '%s/%s': %v", path, name, err))
 		}
-		data := buffer.Bytes()
-		if f.crypt {
-			data, err = crypt.Decrypt(data, f.cryptKey)
-			if err != nil {
-				return false, err
-			}
-		}
-		return true, callback(data)
 	}
-	return false, nil
+	err = callback(data)
+	if err != nil {
+		return utils.NotFoundError(fmt.Sprintf("failed to decode metadata '%s/%s': %v", path, name, err))
+	}
+	return nil
 }
 
 // Write writes the content in Object Storage

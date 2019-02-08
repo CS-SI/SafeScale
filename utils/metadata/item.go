@@ -105,25 +105,22 @@ func (i *Item) Delete(name string) error {
 }
 
 // ReadFrom reads metadata of item from Object Storage in a subfolder
-func (i *Item) ReadFrom(path string, name string, callback ItemDecoderCallback) (bool, error) {
+func (i *Item) ReadFrom(path string, name string, callback ItemDecoderCallback) error {
 	var data serialize.Serializable
-	found, err := i.folder.Read(path, name, func(buf []byte) error {
+	err := i.folder.Read(path, name, func(buf []byte) error {
 		var err error
 		data, err = callback(buf)
 		return err
 	})
 	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
+		return err
 	}
 	i.payload = data
-	return true, nil
+	return nil
 }
 
 // Read read metadata of item from Object Storage (in current folder)
-func (i *Item) Read(name string, callback ItemDecoderCallback) (bool, error) {
+func (i *Item) Read(name string, callback ItemDecoderCallback) error {
 	return i.ReadFrom(".", name, callback)
 }
 
