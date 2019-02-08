@@ -63,7 +63,7 @@ func NewSSHHandler(api *providers.Service) *SSHHandler {
 
 // GetConfig creates SSHConfig to connect to an host
 func (svc *SSHHandler) GetConfig(hostParam interface{}) (*system.SSHConfig, error) {
-	var host *model.Host
+	host := model.NewHost()
 
 	switch hostParam.(type) {
 	case string:

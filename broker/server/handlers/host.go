@@ -233,11 +233,11 @@ func (svc *HostHandler) Create(
 			case model.ErrResourceNotFound:
 				return nil, infraErr(err)
 			default:
-				return nil, infraErrf(err, "Failed to get network resource data: '%s'", net)
+				return nil, infraErrf(err, "failed to get network resource data: '%s'", net)
 			}
 		}
 		if n == nil {
-			return nil, logicErr(fmt.Errorf("Failed to find network '%s'", net))
+			return nil, logicErr(fmt.Errorf("failed to find network '%s'", net))
 		}
 		networks = append(networks, n)
 		mgw, err := metadata.LoadHost(svc.provider, n.GatewayID)
@@ -288,10 +288,19 @@ func (svc *HostHandler) Create(
 		return nil, logicErrf(err, "failed to find template corresponding to requested resources")
 	}
 
-	img, err := svc.provider.SearchImage(los)
+	var img *model.Image
+	err = retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			var innerErr error
+			img, innerErr = svc.provider.SearchImage(los)
+			return innerErr
+		},
+		10*time.Second,
+	)
 	if err != nil {
-		return nil, infraErr(errors.Wrap(err, "Failed to find image to use on compute resource."))
+		return nil, infraErrf(err, "failed to find image to use on compute resource")
 	}
+
 	hostRequest := model.HostRequest{
 		ImageID:        img.ID,
 		ResourceName:   name,
@@ -438,7 +447,6 @@ func (svc *HostHandler) Create(
 	}
 
 	sshDefaultTimeout := int(brokerutils.GetTimeoutCtxHost().Minutes())
-
 	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
 		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
 		if err == nil {
@@ -681,13 +689,14 @@ func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
 	log.Debugf(">>> broker.server.handlers.HostHandler::SSH(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.HostHandler::SSH(%s)", ref)
 
-	host, err := svc.Inspect(ref)
-	if err != nil {
-		return nil, logicErrf(err, fmt.Sprintf("can't access ssh parameters of host '%s': failed to query host", ref), "")
-	}
+	// host, err := svc.Inspect(ref)
+	// if err != nil {
+	// 	return nil, logicErrf(err, fmt.Sprintf("can't access ssh parameters of host '%s': failed to query host", ref), "")
+	// }
 
 	sshHandler := NewSSHHandler(svc.provider)
-	sshConfig, err := sshHandler.GetConfig(host.ID)
+	// sshConfig, err := sshHandler.GetConfig(host.ID)
+	sshConfig, err := sshHandler.GetConfig(ref)
 	if err != nil {
 		return nil, logicErr(err)
 	}
