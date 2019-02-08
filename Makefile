@@ -54,7 +54,7 @@ endif
 EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd/brokerd broker/cli/brokerd/brokerd-cover deploy/cli/deploy deploy/cli/deploy-cover perform/perform perform/perform-cover scanner/scanner
 
 # List of packages
-PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
+PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/)
 # List of packages to test (nor deploy neither providers are ready for prime time :( )
 TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /deploy | grep -v /providers/aws | grep -v /iaas/)
 
