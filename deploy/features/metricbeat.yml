@@ -16,12 +16,12 @@
 
 ---
 feature:
-    name: MetricBeat
     suitableFor:
         host: yes
         cluster: all
     parameters:
-        - LogstashSocket
+        - KibanaSocket
+        - ElasticsearchSocket
     install:
         bash:
             check:
@@ -36,7 +36,7 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    systemctl status filebeat.service
+                                    systemctl status metricbeat.service
                                     ;;
                                 centos|rhel)
                                     echo "TODO"
@@ -65,8 +65,8 @@ feature:
                                     sfWaitForApt && apt-get install -y apt-transport-https
                                     grep "deb https://artifacts.elastic.co/packages/6.x/apt stable main" /etc/apt/sources.list.d/elastic-6.x.list >/dev/null 2>&1 || \
                                     echo "deb https://artifacts.elastic.co/packages/6.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-6.x.list
-                                    sfWaitForApt && apt-get update 
-                                    sfWaitForApt && apt-get install -y filebeat
+                                    sfWaitForApt && apt-get update
+                                    sfWaitForApt && apt-get install -y metricbeat
                                     ;;
                                 centos|rhel)
                                     echo "TODO"
@@ -86,51 +86,60 @@ feature:
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            HOSTNAME=$(hostname)
-                            IFS='-' read -ra hostname_parts <<< ${HOSTNAME}
-                            function join_by { local IFS="$1"; shift; echo "$*"; }
+                            mkdir -p /etc/metricbeat
+                            cat >/etc/metricbeat/metricbeat.yml << 'EOF'
+                            #-------------------------------- Autodiscovery -------------------------------
+                            metricbeat.autodiscover:
+                              providers:
+                              - type: docker
+                                hints.enabled: true
+                            #------------------------------- System Module -------------------------------
+                            metricbeat.modules:
+                            - module: system
+                              metricsets: ["cpu", "load", "memory", "network", "process", "process_summary", "core", "diskio", "socket"]
+                              processes: ['.*']
+                              process.include_top_n:
+                                by_cpu: 5
+                                by_memory: 5
+                              period: 10s
+                              cpu.metrics:  ["percentages"]
+                              core.metrics: ["percentages"]
 
-                            CLUSTER_NAME=$(join_by - ${hostname_parts[@]:1:${#hostname_parts[@]}-3})
-                            case "${hostname_parts[-2]}" in
-                                master)                              
-                                    DOCKER_NAME="master-${hostname_parts[-1]}"
-                                    ;;
-                                node)
-                                    DOCKER_NAME="worker-${hostname_parts[-1]}"
-                                    ;;
-                                *)
-                                    CLUSTER_NAME="???"
-                                    DOCKER_NAME="???"
-                                    ;;
-                            esac
+                            - module: system
+                              period: 1m
+                              metricsets:
+                                - filesystem
+                                - fsstat
+                              processors:
+                              - drop_event.when.regexp:
+                                  system.filesystem.mount_point: '^/(sys|cgroup|proc|dev|etc|host|lib)($|/)'
 
-                            mkdir -p /etc/filebeat
-                            cat >/etc/filebeat/filebeat.yml << 'EOF'
-                            filebeat.inputs:
-                              - type: log
-                                paths:
-                                  - /democo3d/local/logs/spark3d.log
+                            - module: system
+                              period: 15m
+                              metricsets:
+                                - uptime
+                            #------------------------------- Docker Module -------------------------------
+                            - module: docker
+                              metricsets: ["container", "cpu", "diskio", "healthcheck", "info", "memory", "network", "image"]
+                              hosts: ["unix:///var/run/docker.sock"]
+                              period: 10s
+                            #------------------------------- Processors -------------------------------
+                            processors:
+                            - add_docker_metadata: ~
+                            - add_locale: ~
 
-                            output.logstash:
-                              hosts: ["{{.LogstashSocket}}"]
-
-                            fields:
-                              cluster_name: ${CLUSTER_NAME}
-                              docker_name: ${DOCKER_NAME}
-                              hostname: ${HOSTNAME}
-
-                            tags: ["democo3d"]
-
-                            logging.to_files: true
-                            logging.files:
-                              path: /var/log/filebeat
-                              name: filebeat.log
-                            logging.selectors: ["*"]
-                            logging.to_syslog: false
+                            #-------------------------- Elasticsearch output ------------------------------
+                            output.elasticsearch:
+                              hosts: ["http://{{.ElasticsearchSocket}}"]
+                            xpack.monitoring:
+                              enabled: true
+                              elasticsearch:
+                            #============================== Dashboards =====================================
+                            setup.dashboards:
+                              enabled: true
+                            setup.kibana:
+                              host: "http://{{.KibanaSocket}}"
                             EOF
-                            sed -i -e "s/\${CLUSTER_NAME}/$CLUSTER_NAME/g" /etc/filebeat/filebeat.yml
-                            sed -i -e "s/\${DOCKER_NAME}/$DOCKER_NAME/g" /etc/filebeat/filebeat.yml
-                            sed -i -e "s/\${HOSTNAME}/$HOSTNAME/g" /etc/filebeat/filebeat.yml
 
                             exit 0
 
@@ -142,13 +151,13 @@ feature:
                             publicNodes: all
                         run: |
                             systemctl daemon-reload
-                            systemctl start filebeat || exit 196
+                            systemctl start metricbeat || exit 196
                             exit 0
 
             remove:
-                pace: filebeat
+                pace: metricbeat
                 steps:
-                    filebeat:
+                    metricbeat:
                         targets:
                             hosts: yes
                             masters: all
@@ -157,11 +166,10 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    systemctl stop filebeat
-                                    systemctl disable filebeats
-                                    sfWaitForApt && apt remove -y filebeat
-                                    sfWaitForApt && apt purge -y filebeat
-                                    rm -r /etc/systemd/system/filebeat.service.d/
+                                    systemctl stop metricbeat
+                                    systemctl disable metricbeat
+                                    sfWaitForApt && apt remove -y metricbeat
+                                    sfWaitForApt && apt purge -y metricbeat
                                     ;;
                                 centos|rhel)
                                     echo "TODO"
@@ -175,12 +183,12 @@ feature:
 
     service:
         start: |
-            systemctl start filebeat
+            systemctl start metricbeat
 
         stop: |
-            systemctl stop filebeat
+            systemctl stop metricbeat
 
         state: |
-            systemctl status filebeat
+            systemctl status metricbeat
 
 ...
