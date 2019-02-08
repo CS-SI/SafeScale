@@ -17,7 +17,9 @@
 package metadata
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -25,7 +27,9 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -84,13 +88,13 @@ func (mh *Host) Write() error {
 }
 
 // ReadByID reads the metadata of a network identified by ID from Object Storage
-func (mh *Host) ReadByID(id string) (bool, error) {
+func (mh *Host) ReadByID(id string) error {
 	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
 	host := model.NewHost()
-	found, err := mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
+	err := mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := host.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -98,24 +102,21 @@ func (mh *Host) ReadByID(id string) (bool, error) {
 		return host, nil
 	})
 	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
+		return err
 	}
 	mh.id = &(host.ID)
 	mh.name = &(host.Name)
-	return true, nil
+	return nil
 }
 
 // ReadByName reads the metadata of a network identified by name
-func (mh *Host) ReadByName(name string) (bool, error) {
+func (mh *Host) ReadByName(name string) error {
 	if mh.item == nil {
 		panic("m.item is nil!")
 	}
 
 	host := model.NewHost()
-	found, err := mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
+	err := mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := host.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -123,14 +124,11 @@ func (mh *Host) ReadByName(name string) (bool, error) {
 		return host, nil
 	})
 	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
+		return err
 	}
 	mh.name = &(host.Name)
 	mh.id = &(host.ID)
-	return true, nil
+	return nil
 }
 
 // Delete updates the metadata corresponding to the network
@@ -172,15 +170,9 @@ func SaveHost(svc *providers.Service, host *model.Host) error {
 	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		for netID := range hostNetworkV1.NetworksByID {
-			found, err := mn.ReadByID(netID)
+			err := mn.ReadByID(netID)
 			if err != nil {
 				return err
-			}
-			if found {
-				err = mn.AttachHost(host)
-				if err != nil {
-					return err
-				}
 			}
 		}
 		return nil
@@ -216,50 +208,49 @@ func RemoveHost(svc *providers.Service, host *model.Host) error {
 	return mh.Carry(host).Delete()
 }
 
-// LoadHostByID gets the host definition from Object Storage
-func LoadHostByID(svc *providers.Service, hostID string) (*Host, error) {
-	mh := NewHost(svc)
-	found, err := mh.ReadByID(hostID)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, model.ResourceNotFoundError("host", hostID)
-	}
-	return mh, nil
-}
-
-// LoadHostByName gets the Network definition from Object Storage
-func LoadHostByName(svc *providers.Service, hostName string) (*Host, error) {
-	mh := NewHost(svc)
-	found, err := mh.ReadByName(hostName)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, model.ResourceNotFoundError("host", hostName)
-	}
-	return mh, nil
-}
-
 // LoadHost gets the host definition from Object Storage
+// logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
+//        In case of any other error, abort the retry to propagate the error
+//        If retry times out, return errNotFound
 func LoadHost(svc *providers.Service, ref string) (*Host, error) {
 	// We first try looking for host by ID from metadata
-	mh, err := LoadHostByID(svc, ref)
+	mh := NewHost(svc)
+	var innerErr error
+	err := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			innerErr = mh.ReadByID(ref)
+			if innerErr != nil {
+				if _, ok := innerErr.(utils.ErrNotFound); ok {
+					innerErr = mh.ReadByName(ref)
+					if innerErr != nil {
+						if _, ok := innerErr.(utils.ErrNotFound); ok {
+							log.Debugf("LoadHost(): %v", innerErr)
+							log.Debugf("LoadHost(): retrying in 1 second")
+							return innerErr
+						}
+					}
+				}
+			}
+			if mh.Get().GetAccessIP() == "" {
+				log.Warnf("Host metadata inconsistent, AccessIP is empty. Retrying")
+				return fmt.Errorf("host metadata inconsistent, AccessIP is empty")
+			}
+			return nil
+		},
+		10*time.Second,
+	)
+	// If retry timed out, log it and return error ErrNotFound
 	if err != nil {
-		if _, ok := err.(model.ErrResourceNotFound); !ok {
-			return nil, err
+		if _, ok := err.(retry.ErrTimeout); ok {
+			log.Debugf("timeout reading metadata of host '%s'", ref)
+			return nil, utils.NotFoundError(fmt.Sprintf("failed to load metadata of host '%s'", ref))
 		}
-	} else {
-		return mh, nil
-	}
-
-	// If not found, we try looking for host by name from metadata
-	mh, err = LoadHostByName(svc, ref)
-	if err != nil {
 		return nil, err
 	}
-
+	// Returns the error different than ErrNotFound to caller
+	if innerErr != nil {
+		return nil, innerErr
+	}
 	return mh, nil
 }
 

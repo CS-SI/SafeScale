@@ -18,11 +18,15 @@ package metadata
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
+	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -89,20 +93,20 @@ func (mv *Volume) Reload() error {
 	if mv.item == nil {
 		panic("mv.item is nil!")
 	}
-	found, err := mv.ReadByID(*mv.id)
+	err := mv.ReadByID(*mv.id)
 	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return utils.NotFoundError(fmt.Sprintf("metadata of volume '%s' vanished", *mv.name))
+		}
 		return err
-	}
-	if !found {
-		return fmt.Errorf("metadata of volume '%s' vanished", *mv.name)
 	}
 	return nil
 }
 
 // ReadByID reads the metadata of a volume identified by ID from Object Storage
-func (mv *Volume) ReadByID(id string) (bool, error) {
+func (mv *Volume) ReadByID(id string) error {
 	volume := model.NewVolume()
-	found, err := mv.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
+	err := mv.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := volume.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -110,20 +114,17 @@ func (mv *Volume) ReadByID(id string) (bool, error) {
 		return volume, nil
 	})
 	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
+		return err
 	}
 
 	mv.Carry(volume)
-	return true, nil
+	return nil
 }
 
 // ReadByName reads the metadata of a volume identified by name
-func (mv *Volume) ReadByName(name string) (bool, error) {
+func (mv *Volume) ReadByName(name string) error {
 	volume := model.NewVolume()
-	found, err := mv.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
+	err := mv.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := volume.Deserialize(buf)
 		if err != nil {
 			return nil, err
@@ -131,14 +132,11 @@ func (mv *Volume) ReadByName(name string) (bool, error) {
 		return volume, nil
 	})
 	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
+		return err
 	}
 
 	mv.Carry(volume)
-	return true, nil
+	return nil
 }
 
 // Delete delete the metadata corresponding to the volume
@@ -260,22 +258,41 @@ func RemoveVolume(svc *providers.Service, volumeID string) error {
 }
 
 // LoadVolume gets the Volume definition from Object Storage
+// logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
+//        In case of any other error, abort the retry to propagate the error
+//        If retry times out, return errNotFound
 func LoadVolume(svc *providers.Service, ref string) (*Volume, error) {
-	m := NewVolume(svc)
-	found, err := m.ReadByID(ref)
+	mv := NewVolume(svc)
+	var innerErr error
+	err := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			innerErr = mv.ReadByID(ref)
+			if innerErr != nil {
+				if _, ok := innerErr.(utils.ErrNotFound); ok {
+					innerErr = mv.ReadByName(ref)
+					if innerErr != nil {
+						if _, ok := innerErr.(utils.ErrNotFound); ok {
+							return innerErr
+						}
+					}
+				}
+			}
+			return nil
+		},
+		10*time.Second,
+	)
 	if err != nil {
+		if _, ok := err.(retry.ErrTimeout); ok {
+			log.Debugf("timeout reading metadata of volume '%s'", ref)
+			return nil, utils.NotFoundError(fmt.Sprintf("failed to load metadata of volume '%s'", ref))
+		}
 		return nil, err
 	}
-	if !found {
-		found, err = m.ReadByName(ref)
-		if err != nil {
-			return nil, err
-		}
+	// Returns the error different than ErrNotFound to caller
+	if innerErr != nil {
+		return nil, innerErr
 	}
-	if !found {
-		return nil, model.ResourceNotFoundError("volume", ref)
-	}
-	return m, nil
+	return mv, nil
 }
 
 // // VolumeAttachment links Object Storage folder and VolumeAttachments
