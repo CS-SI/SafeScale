@@ -302,7 +302,7 @@ func (client *Client) DeleteNetwork(id string) error {
 	sns, err := client.listSubnets(id)
 	if err != nil {
 		msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
-		log.Debugf(utils.TitleFirst(msg))
+		log.Debugf(utils.Capitalize(msg))
 		return fmt.Errorf(msg)
 	}
 	for _, sn := range sns {
@@ -313,7 +313,7 @@ func (client *Client) DeleteNetwork(id string) error {
 				return err
 			default:
 				msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
-				log.Debugf(utils.TitleFirst(msg))
+				log.Debugf(utils.Capitalize(msg))
 				return fmt.Errorf(msg)
 			}
 		}
@@ -325,7 +325,7 @@ func (client *Client) DeleteNetwork(id string) error {
 			return err
 		default:
 			msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
-			log.Debugf(utils.TitleFirst(msg))
+			log.Debugf(utils.Capitalize(msg))
 			return fmt.Errorf(msg)
 		}
 	}
@@ -597,12 +597,12 @@ func (client *Client) deleteSubnet(id string) error {
 	if router != nil {
 		if err := client.removeSubnetFromRouter(router.ID, id); err != nil {
 			msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
-			log.Debug(utils.TitleFirst(msg))
+			log.Debug(utils.Capitalize(msg))
 			return fmt.Errorf(msg)
 		}
 		if err := client.deleteRouter(router.ID); err != nil {
 			msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
-			log.Debug(utils.TitleFirst(msg))
+			log.Debug(utils.Capitalize(msg))
 			return fmt.Errorf(msg)
 		}
 	}
@@ -619,14 +619,14 @@ func (client *Client) deleteSubnet(id string) error {
 					switch neutronError["type"] {
 					case "SubnetInUse":
 						msg := fmt.Sprintf("hosts or services are still attached")
-						log.Warnf(utils.TitleFirst(msg))
+						log.Warnf(utils.Capitalize(msg))
 						return model.ResourceNotAvailableError("subnet", id)
 					default:
 						log.Debugf("NeutronError: type = %s", neutronError["type"])
 					}
 				default:
 					msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
-					log.Errorf(utils.TitleFirst(msg))
+					log.Errorf(utils.Capitalize(msg))
 					return fmt.Errorf(msg)
 				}
 			}

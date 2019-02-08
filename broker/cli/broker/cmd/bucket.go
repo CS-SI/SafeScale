@@ -49,7 +49,7 @@ var bucketList = cli.Command{
 	Action: func(c *cli.Context) error {
 		resp, err := client.New().Bucket.List(0)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "list of buckets", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of buckets", false).Error()))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -71,7 +71,7 @@ var bucketCreate = cli.Command{
 		}
 		err := client.New().Bucket.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "creation of bucket", true).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of bucket", true).Error()))
 		}
 		return nil
 	},
@@ -114,7 +114,7 @@ var bucketInspect = cli.Command{
 		}
 		resp, err := client.New().Bucket.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "inspection of bucket", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of bucket", false).Error()))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -142,7 +142,7 @@ var bucketMount = cli.Command{
 		}
 		err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "mount of bucket", true).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "mount of bucket", true).Error()))
 		}
 		fmt.Printf("Bucket '%s' mounted on '%s' on host '%s'\n", c.Args().Get(0), c.String("path"), c.Args().Get(1))
 		return nil
@@ -162,7 +162,7 @@ var bucketUnmount = cli.Command{
 		}
 		err := client.New().Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "unmount of bucket", true).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unmount of bucket", true).Error()))
 		}
 		fmt.Printf("Bucket '%s' unmounted from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
 		return nil

@@ -59,7 +59,7 @@ var hostStart = cli.Command{
 		hostRef := c.Args().First()
 		err := client.New().Host.Start(hostRef, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "start of host", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "start of host", false).Error()))
 		}
 		fmt.Printf("Host '%s' successfully started.\n", hostRef)
 		return nil
@@ -79,7 +79,7 @@ var hostStop = cli.Command{
 		hostRef := c.Args().First()
 		err := client.New().Host.Stop(hostRef, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "stop of host", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "stop of host", false).Error()))
 		}
 
 		fmt.Printf("Host '%s' successfully stopped.\n", hostRef)
@@ -100,7 +100,7 @@ var hostReboot = cli.Command{
 		hostRef := c.Args().First()
 		err := client.New().Host.Reboot(hostRef, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "reboot of host", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "reboot of host", false).Error()))
 		}
 
 		fmt.Printf("Host '%s' successfully rebooted.\n", hostRef)
@@ -120,7 +120,7 @@ var hostList = cli.Command{
 	Action: func(c *cli.Context) error {
 		hosts, err := client.New().Host.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "list of hosts", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error()))
 		}
 		out, _ := json.Marshal(hosts.GetHosts())
 		fmt.Println(string(out))
@@ -142,7 +142,7 @@ var hostInspect = cli.Command{
 		}
 		resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "inspection of host", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of host", false).Error()))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -164,7 +164,7 @@ var hostStatus = cli.Command{
 		}
 		resp, err := client.New().Host.Status(c.Args().First(), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "status of host", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "status of host", false).Error()))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -251,7 +251,7 @@ var hostCreate = cli.Command{
 		}
 		resp, err := client.New().Host.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "creation of host", true).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error()))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -317,7 +317,7 @@ var hostResize = cli.Command{
 		}
 		resp, err := client.New().Host.Resize(def, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "creation of host", true).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error()))
 		}
 
 		out, _ := json.Marshal(resp)
@@ -345,7 +345,7 @@ var hostDelete = cli.Command{
 
 		err := client.New().Host.Delete(hostList, client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "deletion of host", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of host", false).Error()))
 		}
 
 		return nil
@@ -364,7 +364,7 @@ var hostSsh = cli.Command{
 		}
 		resp, err := client.New().Host.SSHConfig(c.Args().First())
 		if err != nil {
-			return clitools.ExitOnRPC(utils.TitleFirst(client.DecorateError(err, "ssh config of host", false).Error()))
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh config of host", false).Error()))
 		}
 		out, _ := json.Marshal(resp)
 		fmt.Println(string(out))

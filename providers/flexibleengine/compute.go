@@ -327,7 +327,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		request.KeyPair, err = client.CreateKeyPair(name)
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			log.Debugf(utils.TitleFirst(msg))
+			log.Debugf(utils.Capitalize(msg))
 		}
 	}
 
@@ -337,7 +337,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 	userData, err := userdata.Prepare(client, request, request.KeyPair, defaultNetwork.CIDR)
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
-		log.Debugf(utils.TitleFirst(msg))
+		log.Debugf(utils.Capitalize(msg))
 		return nil, fmt.Errorf(msg)
 	}
 
@@ -578,7 +578,8 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 	const timeout = time.Minute * 15
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			server, err = servers.Get(client.osclt.Compute, host.ID).Extract()
+			result := servers.Get(client.osclt.Compute, host.ID)
+			server, err := result.Extract()
 			if err != nil {
 				switch err.(type) {
 				case gc.ErrDefault404:
@@ -592,7 +593,7 @@ func (client *Client) GetHost(hostParam interface{}) (*model.Host, error) {
 					return err
 				}
 				// Any other error stops the retry
-				err = fmt.Errorf("Error getting host '%s': %s", host.ID, openstack.ProviderErrorToString(err))
+				err = fmt.Errorf("rrror getting host '%s': %s", host.ID, openstack.ProviderErrorToString(err))
 				return nil
 			}
 			if server.Status != "ERROR" && server.Status != "CREATING" {
@@ -1213,7 +1214,7 @@ func (client *Client) WaitHostReady(hostParam interface{}, timeout time.Duration
 			}
 			return nil
 		},
-		2*time.Second,
+		5*time.Second,
 		timeout,
 	)
 	if retryErr != nil {
