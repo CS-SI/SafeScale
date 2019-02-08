@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/identity"
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
@@ -390,6 +391,9 @@ func (c *Controller) AddNode(public bool, req *model.HostDefinition) (string, er
 
 // AddNodes adds <count> nodes
 func (c *Controller) AddNodes(count int, public bool, req *model.HostDefinition) ([]string, error) {
+	log.Debugf(">>> deploy.cluster.controller.Controller::AddNodes(%d, %v)", count, public)
+	defer log.Debugf("<<< deploy.cluster.controller.Controller::AddNodes(%d, %v)", count, public)
+
 	var (
 		nodeDef   model.HostDefinition
 		hostImage string
@@ -412,11 +416,16 @@ func (c *Controller) AddNodes(count int, public bool, req *model.HostDefinition)
 		pbNodeDef.ImageID = hostImage
 	}
 
-	var nodeType NodeType.Enum
+	var (
+		nodeType    NodeType.Enum
+		nodeTypeStr string
+	)
 	if public {
 		nodeType = NodeType.PublicNode
+		nodeTypeStr = "public"
 	} else {
 		nodeType = NodeType.PrivateNode
+		nodeTypeStr = "private"
 	}
 	pbNodeDef.Public = public
 	pbNodeDef.Network = c.GetNetworkConfig().NetworkID
@@ -428,12 +437,12 @@ func (c *Controller) AddNodes(count int, public bool, req *model.HostDefinition)
 		results []chan string
 	)
 	timeout := brokerclient.DefaultExecutionTimeout + time.Duration(count)*time.Minute
+
 	for i := 0; i < count; i++ {
 		r := make(chan string)
 		results = append(results, r)
 		d := make(chan error)
 		dones = append(dones, d)
-		// go c.asyncCreateNode(i+1, nodeType, hostDef, timeout, r, d)
 		go c.blueprint.asyncCreateNode(i+1, nodeType, *pbNodeDef, timeout, r, d)
 	}
 	for i := range dones {
@@ -447,19 +456,36 @@ func (c *Controller) AddNodes(count int, public bool, req *model.HostDefinition)
 		}
 	}
 	brokerHost := brokerclient.New().Host
-	if len(errors) > 0 {
-		if len(hosts) > 0 {
-			brokerHost.Delete(hosts, brokerclient.DefaultExecutionTimeout)
+
+	// Starting from here, delete nodes if exiting with error
+	defer func() {
+		if err != nil {
+			if len(hosts) > 0 {
+				derr := brokerHost.Delete(hosts, brokerclient.DefaultExecutionTimeout)
+				if derr != nil {
+					log.Errorf("failed to delete nodes after failure to expand cluster")
+				}
+			}
 		}
-		return nil, fmt.Errorf("errors occured on node addition: %s", strings.Join(errors, "\n"))
+	}()
+
+	if len(errors) > 0 {
+		err = fmt.Errorf("errors occured on %s node%s addition: %s", nodeTypeStr, utils.Plural(len(errors)), strings.Join(errors, "\n"))
+		return nil, err
 	}
 
 	// Now configure new nodes
 	err = c.blueprint.configureNodesFromList(public, hosts)
 	if err != nil {
-		brokerHost.Delete(hosts, brokerclient.DefaultExecutionTimeout)
 		return nil, err
 	}
+
+	// At last join nodes to cluster
+	err = c.blueprint.joinNodesFromList(public, hosts)
+	if err != nil {
+		return nil, err
+	}
+
 	return hosts, nil
 }
 
@@ -516,7 +542,24 @@ func (c *Controller) DeleteLastNode(public bool, selectedMaster string) error {
 	var (
 		node *clusterpropsv1.Node
 		err  error
+		idx  int
 	)
+
+	// Removed reference of the node from cluster metadata
+	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
+		nodesV1 := v.(*clusterpropsv1.Nodes)
+		if public {
+			idx = len(nodesV1.PublicNodes) - 1
+			node = nodesV1.PublicNodes[idx]
+		} else {
+			idx = len(nodesV1.PrivateNodes) - 1
+			node = nodesV1.PrivateNodes[idx]
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
 
 	if selectedMaster == "" {
 		selectedMaster, err = c.FindAvailableMaster()
@@ -525,40 +568,7 @@ func (c *Controller) DeleteLastNode(public bool, selectedMaster string) error {
 		}
 	}
 
-	err = c.UpdateMetadata(func() error {
-		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-			nodesV1 := v.(*clusterpropsv1.Nodes)
-			if public {
-				node = nodesV1.PublicNodes[len(nodesV1.PublicNodes)-1]
-				nodesV1.PublicNodes = nodesV1.PublicNodes[:len(nodesV1.PublicNodes)-1]
-			} else {
-				node = nodesV1.PrivateNodes[len(nodesV1.PrivateNodes)-1]
-				nodesV1.PrivateNodes = nodesV1.PrivateNodes[:len(nodesV1.PrivateNodes)-1]
-			}
-			return nil
-		})
-	})
-	if err != nil {
-		return err
-	}
-
-	err = c.blueprint.unconfigureNode(node.ID, selectedMaster)
-	if err != nil {
-		// If error occurs, must add back the node previously removed...
-		return c.UpdateMetadata(func() error {
-			return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-				nodesV1 := v.(*clusterpropsv1.Nodes)
-				if public {
-					nodesV1.PublicNodes = append(nodesV1.PublicNodes, node)
-				} else {
-					nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
-				}
-				return nil
-			})
-		})
-	}
-
-	return nil
+	return c.deleteNode(node, idx, public, selectedMaster)
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
@@ -571,25 +581,24 @@ func (c *Controller) DeleteSpecificNode(hostID string, selectedMaster string) er
 	}
 
 	var (
-		foundInPublic  bool
-		foundInPrivate bool
-		idx            int
-		err            error
+		foundInPublic bool
+		idx           int
+		node          *clusterpropsv1.Node
 	)
 
-	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
+	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
 		foundInPublic, idx = contains(nodesV1.PublicNodes, hostID)
-		if !foundInPublic {
-			foundInPrivate, idx = contains(nodesV1.PrivateNodes, hostID)
+		if foundInPublic {
+			node = nodesV1.PublicNodes[idx]
+		} else {
+			_, idx = contains(nodesV1.PrivateNodes, hostID)
+			node = nodesV1.PrivateNodes[idx]
 		}
 		return nil
 	})
 	if err != nil {
 		return err
-	}
-	if !foundInPublic && !foundInPrivate {
-		return fmt.Errorf("host '%s' isn't a registered Node of the Cluster '%s'", hostID, c.Identity.Name)
 	}
 
 	if selectedMaster == "" {
@@ -599,27 +608,75 @@ func (c *Controller) DeleteSpecificNode(hostID string, selectedMaster string) er
 		}
 	}
 
-	err = c.blueprint.unconfigureNode(hostID, selectedMaster)
-	if err != nil {
-		return err
+	return c.deleteNode(node, idx, foundInPublic, selectedMaster)
+}
+
+// deleteNode deletes the node specified by its ID
+func (c *Controller) deleteNode(node *clusterpropsv1.Node, index int, public bool, selectedMaster string) error {
+	if c == nil {
+		panic("Calling c.DeleteSpecificNode with c==nil!")
+	}
+	if node == nil {
+		panic("node is nil!")
 	}
 
-	return c.UpdateMetadata(func() error {
+	// Removes node from cluster metadata
+	err := c.UpdateMetadata(func() error {
 		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
-			if !foundInPublic {
-				foundInPrivate, idx = contains(nodesV1.PrivateNodes, hostID)
-			}
-			if foundInPublic {
-				_, idx = contains(nodesV1.PublicNodes, hostID)
-				nodesV1.PublicNodes = append(nodesV1.PublicNodes[:idx], nodesV1.PublicNodes[idx+1:]...)
+			if public {
+				nodesV1.PublicNodes = append(nodesV1.PublicNodes[:index], nodesV1.PublicNodes[index+1:]...)
 			} else {
-				_, idx = contains(nodesV1.PrivateNodes, hostID)
-				nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:idx], nodesV1.PrivateNodes[idx+1:]...)
+				nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:index], nodesV1.PrivateNodes[index+1:]...)
 			}
 			return nil
 		})
 	})
+	if err != nil {
+		return err
+	}
+
+	// Starting from here, restore node in cluster metadata if exiting with error
+	defer func() {
+		if err != nil {
+			derr := c.UpdateMetadata(func() error {
+				return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+					nodesV1 := v.(*clusterpropsv1.Nodes)
+					if public {
+						nodesV1.PublicNodes = append(nodesV1.PublicNodes, node)
+					} else {
+						nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
+					}
+					return nil
+				})
+			})
+			if derr != nil {
+				log.Errorf("failed to restore node ownership in cluster")
+			}
+		}
+	}()
+
+	// Leave node from cluster (ie leave Docker swarm), if selectedMaster isn't empty
+	if selectedMaster != "" {
+		err = c.blueprint.leaveNodesFromList([]string{node.ID}, public, selectedMaster)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Unconfigure node
+	err = c.blueprint.unconfigureNode(node.ID, selectedMaster)
+	if err != nil {
+		return err
+	}
+
+	// Finally delete host
+	err = brokerclient.New().Host.Delete([]string{node.ID}, 10*time.Minute)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Delete destroys everything related to the infrastructure built for the Cluster
