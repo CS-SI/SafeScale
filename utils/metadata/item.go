@@ -20,6 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/api"
 	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -87,13 +88,13 @@ func (i *Item) DeleteFrom(path string, name string) error {
 		path = "."
 	}
 
-	if there, err := i.folder.Search(path, name); err != nil || !there {
-		if err != nil {
-			return err
-		}
-		if !there {
+	err := i.folder.Search(path, name)
+	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			// If entry not found, consider a success
 			return nil
 		}
+		return err
 	}
 
 	return i.folder.Delete(path, name)
