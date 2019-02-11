@@ -51,9 +51,9 @@ func (s *Server) Install() error {
 }
 
 // MountBlockDevice mounts a block device in the remote system
-func (s *Server) MountBlockDevice(volumeUUID, mountPoint, format string, doNotFormat bool) (string, error) {
+func (s *Server) MountBlockDevice(deviceName, mountPoint, format string, doNotFormat bool) (string, error) {
 	data := map[string]interface{}{
-		"UUID":        volumeUUID,
+		"Device":      deviceName,
 		"MountPoint":  mountPoint,
 		"FileSystem":  format,
 		"DoNotFormat": doNotFormat,
