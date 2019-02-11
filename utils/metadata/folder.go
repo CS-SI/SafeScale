@@ -95,23 +95,22 @@ func (f *Folder) absolutePath(path ...string) string {
 }
 
 // Search tells if the object named 'name' is inside the ObjectStorage folder
-func (f *Folder) Search(path string, name string) (bool, error) {
+func (f *Folder) Search(path string, name string) error {
 	absPath := strings.Trim(f.absolutePath(path), "/")
 	list, err := f.service.MetadataBucket.List(absPath, objectstorage.NoPrefix)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if absPath != "" {
 		absPath += "/"
 	}
-	found := false
+	fullPath := absPath + name
 	for _, item := range list {
-		if item == absPath+name {
-			found = true
-			break
+		if item == fullPath {
+			return nil
 		}
 	}
-	return found, nil
+	return utils.NotFoundError(fmt.Sprintf("failed to find '%s'", fullPath))
 }
 
 // Delete removes metadata passed as parameter
@@ -129,12 +128,12 @@ func (f *Folder) Delete(path string, name string) error {
 // returns true, nil if the object has been found
 // The callback function has to know how to decode it and where to store the result
 func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) error {
-	found, err := f.Search(path, name)
+	err := f.Search(path, name)
 	if err != nil {
-		return utils.NotFoundError(fmt.Sprintf("failed to search for '%s/%s' in Metadata Storage: %v", path, name, err))
-	}
-	if !found {
-		return utils.NotFoundError(fmt.Sprintf("failed to find for '%s/%s' in Metadata Storage: %v", path, name, err))
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return err
+		}
+		return fmt.Errorf("failed to search in Metadata Storage: %v", err)
 	}
 
 	var buffer bytes.Buffer
