@@ -26,12 +26,10 @@ function print_error {
 trap print_error ERR
 
 UUID=""
-{{- if .DoNotFormat }}
-UUID=$(blkid | grep "{{.Device}}" | grep {{.FileSystem}} | cut -d'"' -f2)
+{{- if not .DoNotFormat }}
+mkfs -F -t {{.FileSystem}} "{{.Device}}" >/dev/null
 {{- end }}
-if [ -z "$UUID" ]; then
-    UUID=$(mkfs -F -t {{.FileSystem}} "{{.Device}}" | grep "Filesystem UUID:" | rev | cut -d' ' -f1 | rev) >/dev/null
-fi
+eval $(blkid | grep "{{.Device}}" | grep {{.FileSystem}} | cut -d: -f2-)
 
 echo "/dev/disk/by-uuid/$UUID {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
 mkdir -p "{{.MountPoint}}" >/dev/null && \
