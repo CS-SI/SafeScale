@@ -753,7 +753,7 @@ func (client *Client) addSubnetToRouter(routerID string, subnetID string) error 
 	return nil
 }
 
-// removeSubnetFromRouter detachesa subnet from router interface
+// removeSubnetFromRouter detaches a subnet from router interface
 func (client *Client) removeSubnetFromRouter(routerID string, subnetID string) error {
 	if client == nil {
 		panic("No client set")

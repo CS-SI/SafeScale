@@ -75,9 +75,7 @@ func (svc *ShareHandler) Create(shareName, hostName, path string) (*propsv1.Host
 	// Check if a share already exists with the same name
 	server, _, _, err := svc.Inspect(shareName)
 	if err != nil {
-		switch err.(type) {
-		case model.ErrResourceNotFound:
-		default:
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
 			return nil, infraErr(err)
 		}
 	}
@@ -202,9 +200,9 @@ func (svc *ShareHandler) Delete(name string) error {
 		if len(share.ClientsByName) > 0 {
 			var list []string
 			for k := range share.ClientsByName {
-				list = append(list, k)
+				list = append(list, "'"+k+"'")
 			}
-			return logicErr(fmt.Errorf("host%s still using it: %s", utils.Plural(len(list)), strings.Join(list, ",")))
+			return logicErr(fmt.Errorf("still used by: %s", strings.Join(list, ",")))
 		}
 
 		sshHandler := NewSSHHandler(svc.provider)
@@ -517,10 +515,13 @@ func (svc *ShareHandler) ForceInspect(shareName string) (*model.Host, *propsv1.H
 func (svc *ShareHandler) Inspect(shareName string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
 	hostName, err := metadata.LoadShare(svc.provider, shareName)
 	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return nil, nil, nil, model.ResourceNotFoundError("share", shareName)
+		}
 		return nil, nil, nil, infraErr(errors.Wrap(err, "error loading share metadata"))
 	}
 	if hostName == "" {
-		return nil, nil, nil, model.ResourceNotFoundError("host", hostName)
+		return nil, nil, nil, infraErr(errors.Wrap(err, fmt.Sprintf("failed to find host sharing '%s'", shareName)))
 	}
 
 	hostSvc := NewHostHandler(svc.provider)

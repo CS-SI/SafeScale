@@ -34,20 +34,24 @@ func newComposite() *Composite {
 }
 
 // Content ... (serialize.Property interface)
-func (n *Composite) Content() interface{} {
-	return n
+func (c *Composite) Content() interface{} {
+	return c
 }
 
 // Clone ... (serialize.Property interface)
-func (n *Composite) Clone() serialize.Property {
-	nn := &Composite{}
-	*nn = *n
-	return nn
+func (c *Composite) Clone() serialize.Property {
+	cn := newComposite()
+	if serialize.CloneValue(c, cn) != nil {
+		panic("failed to clone 'Composite'")
+	}
+	return cn
 }
 
 // Replace ... (serialize.Property interface)
-func (n *Composite) Replace(v interface{}) {
-	*n = *(v.(*Composite))
+func (c *Composite) Replace(v interface{}) {
+	if serialize.CloneValue(v, c) != nil {
+		panic("failed to replace 'Composite'")
+	}
 }
 
 func init() {

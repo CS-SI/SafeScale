@@ -268,7 +268,11 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNo
 				hostMountsV1 := v.(*propsv1.HostMounts)
 				// Check if the volume is already mounted elsewhere
 				if device, found := hostVolumesV1.DevicesByID[volume.ID]; found {
-					path := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]].Path
+					mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]]
+					if !ok {
+						return logicErr(fmt.Errorf("metadata inconsistency for volume '%s' attached to host '%s'", volume.Name, host.Name))
+					}
+					path := mount.Path
 					if path != mountPoint {
 						return logicErr(fmt.Errorf("volume '%s' is already attached in '%s:%s'", volume.Name, host.Name, path))
 					}
@@ -373,7 +377,7 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNo
 				// Starting from here, unmount block device if exiting with error
 				defer func() {
 					if err != nil {
-						derr := server.UnmountBlockDevice(deviceName)
+						derr := server.UnmountBlockDevice(volumeUUID)
 						if derr != nil {
 							log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 						}
@@ -382,11 +386,11 @@ func (svc *VolumeHandler) Attach(volumeName, hostName, path, format string, doNo
 
 				// Updates host properties
 				hostMountsV1.LocalMountsByPath[mountPoint] = &propsv1.HostLocalMount{
-					Device:     deviceName,
+					Device:     volumeUUID,
 					Path:       mountPoint,
 					FileSystem: "nfs",
 				}
-				hostMountsV1.LocalMountsByDevice[deviceName] = mountPoint
+				hostMountsV1.LocalMountsByDevice[volumeUUID] = mountPoint
 
 				return nil
 			})

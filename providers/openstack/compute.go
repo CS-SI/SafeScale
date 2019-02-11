@@ -817,8 +817,6 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 
 	// --- query provider for host creation ---
 
-	var hostTmp *model.Host
-
 	log.Debugf("requesting host resource creation...")
 	// Retry creation until success, for 10 minutes
 	err = retry.WhileUnsuccessfulDelay5Seconds(
@@ -837,7 +835,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 			host.ID = server.ID
 
 			// Wait that Host is ready, not just that the build is started
-			hostTmp, err = client.WaitHostReady(host, 5*time.Minute)
+			host, err = client.WaitHostReady(host, 5*time.Minute)
 			if err != nil {
 				servers.Delete(client.Compute, server.ID)
 				msg := ProviderErrorToString(err)
@@ -852,11 +850,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 		log.Debugf("Error creating host: timeout: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
-	if hostTmp == nil {
-		return nil, errors.New("unexpected problem creating host")
-	}
 	log.Debugf("host resource created.")
-	host = hostTmp
 
 	// Starting from here, delete host if exiting with error
 	defer func() {

@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
@@ -53,14 +55,20 @@ func (n *Nodes) Content() interface{} {
 
 // Clone ... (serialize.Property interface)
 func (n *Nodes) Clone() serialize.Property {
-	nn := &Nodes{}
-	*nn = *n
+	nn := newNodes()
+	err := serialize.CloneValue(n, nn)
+	if err != nil {
+		panic(fmt.Sprintf("failed to clone 'Nodes': %v", err))
+	}
 	return nn
 }
 
 // Replace ... (serialize.Property interface)
 func (n *Nodes) Replace(v interface{}) {
-	*n = *(v.(*Nodes))
+	err := serialize.CloneValue(v, n)
+	if err != nil {
+		panic(fmt.Sprintf("failed to replace 'Nodes': %v", err))
+	}
 }
 
 func init() {

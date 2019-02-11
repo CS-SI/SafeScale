@@ -26,8 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
 	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
 
-	"github.com/pkg/errors"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/broker/client"
@@ -214,9 +212,7 @@ func (svc *HostHandler) Create(
 
 	host, err := svc.provider.GetHostByName(name)
 	if err != nil {
-		switch err.(type) {
-		case model.ErrResourceNotFound:
-		default:
+		if _, ok := err.(model.ErrResourceNotFound); !ok {
 			return nil, infraErrf(err, "failure creating host: failed to check if host resource name '%s' is already used: %v", name, err)
 		}
 	} else {
@@ -229,12 +225,10 @@ func (svc *HostHandler) Create(
 		networkHandler := NewNetworkHandler(svc.provider)
 		n, err := networkHandler.Inspect(net)
 		if err != nil {
-			switch err.(type) {
-			case model.ErrResourceNotFound:
+			if _, ok := err.(model.ErrResourceNotFound); ok {
 				return nil, infraErr(err)
-			default:
-				return nil, infraErrf(err, "failed to get network resource data: '%s'", net)
 			}
+			return nil, infraErrf(err, "failed to get network resource data: '%s'", net)
 		}
 		if n == nil {
 			return nil, logicErr(fmt.Errorf("failed to find network '%s'", net))
@@ -312,12 +306,10 @@ func (svc *HostHandler) Create(
 
 	host, err = svc.provider.CreateHost(hostRequest)
 	if err != nil {
-		switch err.(type) {
-		case model.ErrResourceInvalidRequest:
+		if _, ok := err.(model.ErrResourceInvalidRequest); ok {
 			return nil, infraErr(err)
-		default:
-			return nil, infraErrf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
 		}
+		return nil, infraErrf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
 	}
 
 	defer func() {
@@ -412,13 +404,53 @@ func (svc *HostHandler) Create(
 		return nil, infraErr(err)
 	}
 
-	// Updates metadata
-	err = metadata.NewHost(svc.provider).Carry(host).Write()
+	// Updates host metadata
+	mh := metadata.NewHost(svc.provider)
+	err = mh.Carry(host).Write()
 	if err != nil {
 		return nil, infraErrf(err, "Metadata creation failed")
 	}
 	log.Infof("Compute resource created: '%s'", host.Name)
 
+	// Starting from here, remove metadata if exiting with error
+	defer func() {
+		if err != nil {
+			derr := mh.Delete()
+			if derr != nil {
+				log.Errorf("failed to remove host metadata after host creation failure")
+			}
+		}
+	}()
+
+	// A host claimed ready by a Cloud provider is not necessarily ready
+	// to be used until ssh service is up and running. So we wait for it before
+	// claiming host is created
+	log.Infof("Waiting start of SSH service on remote host '%s' ...", host.Name)
+	sshHandler := NewSSHHandler(svc.provider)
+	sshCfg, err := sshHandler.GetConfig(host.ID)
+	if err != nil {
+		return nil, infraErr(err)
+	}
+	sshDefaultTimeout := int(brokerutils.GetTimeoutCtxHost().Minutes())
+	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
+		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
+		if err == nil {
+			log.Debugf("Using custom timeout of %d minutes", num)
+			sshDefaultTimeout = num
+		}
+	}
+	// TODO configurable timeout here
+	err = sshCfg.WaitServerReady(time.Duration(sshDefaultTimeout) * time.Minute)
+	if err != nil {
+		return nil, infraErr(err)
+	}
+	if client.IsTimeout(err) {
+		return nil, infraErrf(err, "Timeout creating a host")
+	}
+
+	log.Infof("SSH service started on host '%s'.", host.Name)
+
+	// Updates host link with networks
 	for _, i := range networks {
 		err = i.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 			networkHostsV1 := v.(*propsv1.NetworkHosts)
@@ -435,35 +467,8 @@ func (svc *HostHandler) Create(
 			log.Errorf(err.Error())
 		}
 	}
-
-	// A host claimed ready by a Cloud provider is not necessarily ready
-	// to be used until ssh service is up and running. So we wait for it before
-	// claiming host is created
-	log.Infof("Waiting start of SSH service on remote host '%s' ...", host.Name)
-	sshHandler := NewSSHHandler(svc.provider)
-	sshCfg, err := sshHandler.GetConfig(host.ID)
-	if err != nil {
-		return nil, infraErr(err)
-	}
-
-	sshDefaultTimeout := int(brokerutils.GetTimeoutCtxHost().Minutes())
-	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
-		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
-		if err == nil {
-			log.Debugf("Using custom timeout of %d minutes", num)
-			sshDefaultTimeout = num
-		}
-	}
-
-	// TODO configurable timeout here
-	err = sshCfg.WaitServerReady(time.Duration(sshDefaultTimeout) * time.Minute)
-	if err != nil {
-		return nil, infraErr(err)
-	}
-	if client.IsTimeout(err) {
-		return nil, infraErrf(err, "Timeout creating a host")
-	}
-	log.Infof("SSH service started on host '%s'.", host.Name)
+	// Don't want to remove host if network metadata fails...
+	err = nil
 
 	return host, nil
 }
@@ -522,7 +527,7 @@ func (svc *HostHandler) ForceInspect(ref string) (*model.Host, error) {
 
 	host, err := svc.Inspect(ref)
 	if err != nil {
-		return nil, infraErr(errors.Wrap(err, "failed to load host metadata"))
+		return nil, throwErr(err)
 	}
 
 	return host, nil
@@ -536,11 +541,12 @@ func (svc *HostHandler) Inspect(ref string) (*model.Host, error) {
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
-		return nil, throwErr(errors.Wrap(err, "failed to load host metadata"))
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return nil, model.ResourceNotFoundError("host", ref)
+		}
+		return nil, throwErr(err)
 	}
-	if mh == nil {
-		return nil, model.ResourceNotFoundError("host", ref)
-	}
+
 	host := mh.Get()
 	host, err = svc.provider.GetHost(host)
 	if err != nil {

@@ -17,6 +17,8 @@
 package propertiesv1
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
@@ -30,21 +32,31 @@ type Network struct {
 	CIDR      string `json:"cidr"`       // the network CIDR
 }
 
+func newNetwork() *Network {
+	return &Network{}
+}
+
 // Content ... (serialize.Property interface)
-func (s *Network) Content() interface{} {
-	return s
+func (n *Network) Content() interface{} {
+	return n
 }
 
 // Clone ... (serialize.Property interface)
-func (s *Network) Clone() serialize.Property {
-	ns := &Network{}
-	*ns = *s
-	return ns
+func (n *Network) Clone() serialize.Property {
+	nn := newNetwork()
+	err := serialize.CloneValue(n, nn)
+	if err != nil {
+		panic(fmt.Sprintf("failed to clone 'Network': %v", err))
+	}
+	return nn
 }
 
 // Replace ... (serialize.Property interface)
-func (s *Network) Replace(v interface{}) {
-	*s = *(v.(*Network))
+func (n *Network) Replace(v interface{}) {
+	err := serialize.CloneValue(v, n)
+	if err != nil {
+		panic(fmt.Sprintf("failed to replace 'Network': %v", err))
+	}
 }
 
 func init() {

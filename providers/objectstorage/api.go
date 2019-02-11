@@ -19,6 +19,8 @@ package objectstorage
 import (
 	"io"
 	"time"
+
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 const (
@@ -115,8 +117,8 @@ type ObjectMetadata map[string]interface{}
 // Clone creates a copy of ObjectMetadata
 func (om ObjectMetadata) Clone() ObjectMetadata {
 	cloned := ObjectMetadata{}
-	for k, v := range om {
-		cloned[k] = v
+	if serialize.CloneValue(&om, &cloned) != nil {
+		panic("failed to clone 'ObjectMetadata'")
 	}
 	return cloned
 }
