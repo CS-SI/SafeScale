@@ -231,10 +231,13 @@ func LoadHost(svc *providers.Service, ref string) (*Host, error) {
 					}
 				}
 			}
-			if mh.Get().GetAccessIP() == "" {
-				log.Warnf("Host metadata inconsistent, AccessIP is empty. Retrying")
-				return fmt.Errorf("host metadata inconsistent, AccessIP is empty")
-			}
+			// // In case of inconsistency in Object Storage (had happened in the past...)
+			// host := mh.Get()
+			// ip := host.GetAccessIP()
+			// if ip == "" {
+			// 	log.Warnf("Host metadata inconsistent, AccessIP is empty. Retrying")
+			// 	return fmt.Errorf("host metadata inconsistent, AccessIP is empty")
+			// }
 			return nil
 		},
 		10*time.Second,

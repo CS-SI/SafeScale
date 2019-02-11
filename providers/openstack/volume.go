@@ -142,11 +142,10 @@ func (client *Client) GetVolume(id string) (*model.Volume, error) {
 	r := volumes.Get(client.Volume, id)
 	volume, err := r.Extract()
 	if err != nil {
-		log.Debugf("Error getting volume: getting volume invocation: %+v", err)
-		switch err.(type) {
-		case gc.ErrDefault404:
+		if _, ok := err.(gc.ErrDefault404); ok {
 			return nil, model.ResourceNotFoundError("volume", id)
 		}
+		log.Debugf("Error getting volume: volume query failed: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting volume: %s", ProviderErrorToString(err)))
 	}
 
@@ -340,7 +339,6 @@ func (client *Client) DeleteVolumeAttachment(serverID, vaID string) error {
 	r := volumeattach.Delete(client.Compute, serverID, vaID)
 	err := r.ExtractErr()
 	if err != nil {
-		spew.Dump(r)
 		log.Debugf("Error deleting volume attachment: deleting attachments: %+v", err)
 		return errors.Wrap(err, fmt.Sprintf("Error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)))
 	}

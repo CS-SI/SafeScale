@@ -720,9 +720,20 @@ func (c *Controller) Delete() error {
 	}
 
 	// Deletes the network and gateway
+	networkID := ""
 	err = c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
-		return broker.Network.Delete([]string{v.(*clusterpropsv1.Network).NetworkID}, brokerclient.DefaultExecutionTimeout)
+		networkID = v.(*clusterpropsv1.Network).NetworkID
+		return nil
 	})
+	if err != nil {
+		return err
+	}
+	err = retry.WhileUnsuccessfulDelay5SecondsTimeout(
+		func() error {
+			return broker.Network.Delete([]string{networkID}, brokerclient.DefaultExecutionTimeout)
+		},
+		3*time.Minute,
+	)
 	if err != nil {
 		return err
 	}

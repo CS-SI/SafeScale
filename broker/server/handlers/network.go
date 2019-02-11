@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 
 	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
@@ -100,7 +99,6 @@ func (svc *NetworkHandler) Create(
 		if err != nil {
 			derr := svc.provider.DeleteNetwork(network.ID)
 			if derr != nil {
-				spew.Dump(derr)
 				log.Errorf("Failed to delete network: %+v", derr)
 			}
 		}
@@ -194,7 +192,6 @@ func (svc *NetworkHandler) Create(
 			log.Warnf("Cleaning up, deleting gateway '%s'", gw.Name)
 			derr := svc.provider.DeleteHost(gw.ID)
 			if derr != nil {
-				spew.Dump(derr)
 				log.Errorf("failed to delete gateway '%s': %v", gw.Name, derr)
 			}
 			log.Infof("Gateway '%s' deleted", gw.Name)

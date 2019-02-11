@@ -17,6 +17,7 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
@@ -32,6 +33,10 @@ type State struct {
 	StateCollectInterval time.Duration `json:"state_collect_interval,omitempty"`
 }
 
+func newState() *State {
+	return &State{}
+}
+
 // Content ... (serialize.Property interface)
 func (s *State) Content() interface{} {
 	return s
@@ -39,14 +44,20 @@ func (s *State) Content() interface{} {
 
 // Clone ... (serialize.Property interface)
 func (s *State) Clone() serialize.Property {
-	ns := &State{}
-	*ns = *s
-	return ns
+	sn := newState()
+	err := serialize.CloneValue(s, sn)
+	if err != nil {
+		panic(fmt.Sprintf("failed to clone 'State': %v", err))
+	}
+	return sn
 }
 
 // Replace ... (serialize.Property interface)
 func (s *State) Replace(v interface{}) {
-	*s = *(v.(*State))
+	err := serialize.CloneValue(v, s)
+	if err != nil {
+		panic(fmt.Sprintf("failed to replace 'State': %v", err))
+	}
 }
 
 func init() {

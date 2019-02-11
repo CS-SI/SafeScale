@@ -51,14 +51,18 @@ func (p *HostDescription) Content() interface{} {
 
 // Clone ... (serialize.Property interface)
 func (p *HostDescription) Clone() serialize.Property {
-	n := NewHostDescription()
-	*n = *p
-	return n
+	pn := NewHostDescription()
+	if serialize.CloneValue(p, pn) != nil {
+		panic(fmt.Sprintf("failed to clone 'HostDescription': %v", err))
+	}
+	return pn
 }
 
 // Replace replaces content of property (serialize.Property interface)
 func (p *HostDescription) Replace(v interface{}) {
-	*p = *v.(*HostDescription)
+	if serialize.CloneValue(v, p) != nil {
+		panic(fmt.Sprintf("failed to replace 'HostDescription': %v", err))
+	}
 }
 
 // HostNetwork contains network information related to Host
@@ -105,14 +109,18 @@ func (p *HostNetwork) Content() interface{} {
 
 // Clone ... (serialize.Property interface)
 func (p *HostNetwork) Clone() serialize.Property {
-	n := NewHostNetwork()
-	*n = *p
-	return n
+	pn := NewHostNetwork()
+	if serialize.CloneValue(p, pn) != nil {
+		panic(fmt.Sprintf("failed to clone 'HostNetwork': %v", err))
+	}
+	return pn
 }
 
 // Replace replaces content of property (serialize.Property interface)
 func (p *HostNetwork) Replace(v interface{}) {
-	*p = *v.(*HostNetwork)
+	if serialize.CloneValue(v, p) != nil {
+		panic(fmt.Sprintf("failed to replace 'HostNetwork': %v", err))
+	}
 }
 
 // HostSize represent sizing elements of an host
@@ -196,14 +204,18 @@ func (p *HostSizing) Content() interface{} {
 
 // Clone ... (serialize.Property interface)
 func (p *HostSizing) Clone() serialize.Property {
-	n := NewHostSizing()
-	*n = *p
-	return n
+	pn := NewHostSizing()
+	if serialize.CloneValue(p, pn) != nil {
+		panic(fmt.Sprintf("failed to clone 'HostSizing': %v", err))
+	}
+	return pn
 }
 
 // Replace replaces content of property (serialize.Property interface)
 func (p *HostSizing) Replace(v interface{}) {
-	*p = *v.(*HostSizing)
+	if serialize.CloneValue(v, p) != nil {
+		panic(fmt.Sprintf("failed to replace 'HostSizing': %v", err))
+	}
 }
 
 // HostSystem contains information about the operating system
@@ -284,14 +296,18 @@ func (p *HostVolumes) Content() interface{} {
 
 // Clone ... (serialize.Property interface)
 func (p *HostVolumes) Clone() serialize.Property {
-	n := NewHostVolumes()
-	*n = *p
-	return n
+	pn := NewHostVolumes()
+	if serialize.CloneValue(p, pn) != nil {
+		panic(fmt.Sprintf("failed to clone 'HostVolumes': %v", err))
+	}
+	return pn
 }
 
 // Replace replaces content of property (serialize.Property interface)
 func (p *HostVolumes) Replace(v interface{}) {
-	*p = *v.(*HostVolumes)
+	if serialize.CloneValue(v, p) != nil {
+		panic(fmt.Sprintf("failed to replace 'HostVolumes': %v", err))
+	}
 }
 
 // HostLocalMount stores information about a device (as an attached volume) mount
@@ -378,14 +394,18 @@ func (p *HostMounts) Content() interface{} {
 
 // Clone ...  (serialize.Property interface)
 func (p *HostMounts) Clone() serialize.Property {
-	n := NewHostMounts()
-	*n = *p
-	return n
+	pn := NewHostMounts()
+	if serialize.CloneValue(p, pn) != nil {
+		panic(fmt.Sprintf("failed to clone 'HostMounts': %v", err))
+	}
+	return pn
 }
 
 // Replace replaces content of property (serialize.Property interface)
 func (p *HostMounts) Replace(v interface{}) {
-	*p = *v.(*HostMounts)
+	if serialize.CloneValue(v, p) != nil {
+		panic(fmt.Sprintf("failed to replace 'HostMounts': %v", err))
+	}
 }
 
 // HostShare describes a filesystem exported from the host
@@ -452,14 +472,18 @@ func (p *HostShares) Content() interface{} {
 
 // Clone ...
 func (p *HostShares) Clone() serialize.Property {
-	n := NewHostShares()
-	*n = *p
-	return n
+	pn := NewHostShares()
+	if serialize.CloneValue(p, pn) != nil {
+		panic(fmt.Sprintf("failed to clone 'HostShares': %v", err))
+	}
+	return pn
 }
 
 // Replace replaces content of property
 func (p *HostShares) Replace(v interface{}) {
-	*p = *v.(*HostShares)
+	if serialize.CloneValue(v, p) != nil {
+		panic(fmt.Sprintf("failed to replace 'HostShares': %v", err))
+	}
 }
 
 // HostInstalledFeature ...
