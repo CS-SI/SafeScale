@@ -206,6 +206,10 @@ var shareMount = cli.Command{
 			Value: model.DefaultShareMountPath,
 			Usage: "Path to be mounted",
 		},
+		cli.BoolFlag{
+			Name:  "ac",
+			Usage: "Disable chache coherence to improve performences",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
@@ -217,10 +221,11 @@ var shareMount = cli.Command{
 		hostName := c.Args().Get(1)
 		path := c.String("path")
 		def := pb.ShareMountDefinition{
-			Host:  &pb.Reference{Name: hostName},
-			Share: &pb.Reference{Name: shareName},
-			Path:  path,
-			Type:  "nfs",
+			Host:      &pb.Reference{Name: hostName},
+			Share:     &pb.Reference{Name: shareName},
+			Path:      path,
+			Type:      "nfs",
+			WithCache: c.Bool("ac"),
 		}
 		err := client.New().Share.Mount(def, client.DefaultExecutionTimeout)
 		if err != nil {

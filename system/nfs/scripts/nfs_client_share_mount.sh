@@ -36,5 +36,5 @@ function dns_fallback {
 dns_fallback
 
 mkdir -p "{{.MountPoint}}" && \
-mount -o noac "{{.Host}}:{{.Share}}" "{{.MountPoint}}" && \
-echo "{{.Host}}:{{.Share}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,noac 0   0" >>/etc/fstab
+mount -o {{ .cacheOption }} "{{.Host}}:{{.Share}}" "{{.MountPoint}}" && \
+echo "{{.Host}}:{{.Share}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,{{ .cacheOption }} 0   0" >>/etc/fstab
