@@ -52,27 +52,45 @@ func (s *Server) Install() error {
 }
 
 // AddShare configures a local path to be exported by NFS
-func (s *Server) AddShare(path string, acl string) error {
+func (s *Server) AddShare(path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) error {
 	share, err := NewShare(s, path)
 	if err != nil {
 		return fmt.Errorf("Failed to create the share : %s", err.Error())
 	}
-	share.AddAcl(ExportAcl{
+
+	acl := ExportAcl{
 		Host:          "*",
 		SecurityModes: []SecurityFlavor.Enum{},
 		Options: ExportOptions{
-			ReadOnly:       false,
-			NoRootSquash:   true,
-			Secure:         false,
-			Async:          false,
-			NoHide:         false,
-			CrossMount:     false,
-			NoSubtreeCheck: true,
+			ReadOnly:       readOnly,
+			NoRootSquash:   !rootSquash,
+			Secure:         secure,
+			Async:          async,
+			NoHide:         noHide,
+			CrossMount:     crossMount,
+			NoSubtreeCheck: !subtreeCheck,
 			SetFSID:        false,
 			AnonUID:        0,
 			AnonGID:        0,
 		},
-	})
+	}
+
+	for _, securityMode := range secutityModes {
+		switch securityMode {
+		case "sys":
+			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Sys)
+		case "kbr5":
+			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5)
+		case "kbr5i":
+			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5i)
+		case "kbr5p":
+			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5p)
+		default:
+			return fmt.Errorf("Can't add the share, %s is not a valid security mode", securityMode)
+		}
+	}
+
+	share.AddAcl(acl)
 
 	return share.Add()
 }

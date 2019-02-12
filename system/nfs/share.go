@@ -83,8 +83,11 @@ func (s *Share) Add() error {
 		acl := a.Host + "("
 		if len(a.SecurityModes) > 0 {
 			acl += "sec="
-			for _, item := range a.SecurityModes {
+			for i, item := range a.SecurityModes {
 				acl += item.String()
+				if i != 0 {
+					acl += ","
+				}
 			}
 		} else {
 			acl += "sec=sys"

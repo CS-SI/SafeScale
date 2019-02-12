@@ -42,7 +42,7 @@ import (
 
 // ShareAPI defines API to manipulate Shares
 type ShareAPI interface {
-	Create(ctx context.Context, name, host, path string) (*propsv1.HostShare, error)
+	Create(ctx context.Context, shareName, hostName, path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) (*propsv1.HostShare, error)
 	ForceInspect(ctx context.Context, name string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
 	Inspect(ctx context.Context, name string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
 	Delete(ctx context.Context, name string) error
@@ -72,7 +72,7 @@ func sanitize(in string) (string, error) {
 }
 
 // Create a share on host
-func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path string) (*propsv1.HostShare, error) {
+func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) (*propsv1.HostShare, error) {
 	// Check if a share already exists with the same name
 	server, _, _, err := svc.Inspect(ctx, shareName)
 	if err != nil {
@@ -135,7 +135,7 @@ func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path s
 			return nil, infraErr(err)
 		}
 	}
-	err = nfsServer.AddShare(sharePath, "")
+	err = nfsServer.AddShare(sharePath, secutityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -275,7 +275,7 @@ func (svc *ShareHandler) Delete(ctx context.Context, name string) error {
 	select {
 	case <-ctx.Done():
 		log.Warnf("Share delete canceled by broker")
-		_, err = svc.Create(context.Background(), share.Name, server.Name, share.Path)
+		_, err = svc.Create(context.Background(), share.Name, server.Name, share.Path, []string{}, false, false, false, false, false, false, false)
 		if err != nil {
 			return fmt.Errorf("Failed to stop Share deletion")
 		}
