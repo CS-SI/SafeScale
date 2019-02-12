@@ -47,7 +47,7 @@ type ShareAPI interface {
 	Inspect(ctx context.Context, name string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
 	Delete(ctx context.Context, name string) error
 	List(ctx context.Context) (map[string]map[string]*propsv1.HostShare, error)
-	Mount(ctx context.Context, name, host, path string) (*propsv1.HostRemoteMount, error)
+	Mount(ctx context.Context, name, host, path string, withCache bool) (*propsv1.HostRemoteMount, error)
 	Unmount(ctx context.Context, name, host string) error
 }
 
@@ -324,7 +324,7 @@ func (svc *ShareHandler) List(ctx context.Context) (map[string]map[string]*props
 }
 
 // Mount a share on a local directory of an host
-func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path string) (*propsv1.HostRemoteMount, error) {
+func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path string, withCache bool) (*propsv1.HostRemoteMount, error) {
 	// Retrieve info about the share
 	server, share, _, err := svc.Inspect(ctx, shareName)
 	if err != nil {
@@ -404,7 +404,7 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 		return nil, infraErr(err)
 	}
 
-	err = nfsClient.Mount(server.GetAccessIP(), share.Path, mountPath)
+	err = nfsClient.Mount(server.GetAccessIP(), share.Path, mountPath, withCache)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -570,7 +570,7 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 	select {
 	case <-ctx.Done():
 		log.Warnf("Share unmount canceled by broker")
-		_, err = svc.Mount(context.Background(), shareName, hostName, mount.Path)
+		_, err = svc.Mount(context.Background(), shareName, hostName, mount.Path, false)
 		if err != nil {
 			return fmt.Errorf("Failed to stop Share unmounting")
 		}

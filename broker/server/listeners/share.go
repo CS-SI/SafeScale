@@ -167,7 +167,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	shareName := in.GetShare().GetName()
 
 	handler := ShareHandler(tenant.Service)
-	mount, err := handler.Mount(ctx, shareName, in.GetHost().GetName(), in.GetPath())
+	mount, err := handler.Mount(ctx, shareName, in.GetHost().GetName(), in.GetPath(), in.GetWithCache())
 	if err != nil {
 		tbr := errors.Wrap(err, fmt.Sprintf("Can't mount share '%s'", shareName))
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())

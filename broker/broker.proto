@@ -347,6 +347,7 @@ message ShareMountDefinition{
     string Path = 3;
     string Type = 4;
     string Options = 5;
+    bool WithCache = 6;
 }
 
 message ShareMountList{

@@ -46,11 +46,12 @@ func (c *Client) Install() error {
 }
 
 // Mount defines a mount of a remote share and mount it
-func (c *Client) Mount(host string, share string, mountPoint string) error {
+func (c *Client) Mount(host string, share string, mountPoint string, withCache bool) error {
 	data := map[string]interface{}{
-		"Host":       host,
-		"Share":      share,
-		"MountPoint": mountPoint,
+		"Host":        host,
+		"Share":       share,
+		"MountPoint":  mountPoint,
+		"cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
 	}
 	retcode, stdout, stderr, err := executeScript(*c.SshConfig, "nfs_client_share_mount.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount remote NFS share")
