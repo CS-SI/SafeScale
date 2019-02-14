@@ -40,24 +40,19 @@ func NewVolumeDescription() *VolumeDescription {
 }
 
 // Content ... (serialize.Property interface)
-func (p *VolumeDescription) Content() interface{} {
-	return p
+func (vd *VolumeDescription) Content() interface{} {
+	return vd
 }
 
 // Clone ... (serialize.Property interface)
-func (p *VolumeDescription) Clone() serialize.Property {
-	pn := NewVolumeDescription()
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to clone 'VolumeDescription': %v", err))
-	}
-	return pn
+func (vd *VolumeDescription) Clone() serialize.Property {
+	return NewVolumeDescription().Replace(vd)
 }
 
-// Replace replaces content of property (serialize.Property interface)
-func (p *VolumeDescription) Replace(v interface{}) {
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to replace 'VolumeDescription': %v", err))
-	}
+// Replace ... (serialize.Property interface)
+func (vd *VolumeDescription) Replace(p serialize.Property) serialize.Property {
+	*vd = *p.(*VolumeDescription)
+	return vd
 }
 
 // VolumeAttachments contains host ids where the volume is attached
@@ -77,31 +72,31 @@ func NewVolumeAttachments() *VolumeAttachments {
 }
 
 // Reset resets the content of the property
-func (p *VolumeAttachments) Reset() {
-	*p = VolumeAttachments{
+func (va *VolumeAttachments) Reset() {
+	*va = VolumeAttachments{
 		Hosts: map[string]string{},
 	}
 }
 
 // Content ... (serialize.Property interface)
-func (p *VolumeAttachments) Content() interface{} {
-	return p
+func (va *VolumeAttachments) Content() interface{} {
+	return va
 }
 
 // Clone ... (serialize.Property interface)
-func (p *VolumeAttachments) Clone() serialize.Property {
-	pn := NewVolumeAttachments()
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to clone 'VolumeAttachments': %v", err))
-	}
-	return pn
+func (va *VolumeAttachments) Clone() serialize.Property {
+	return NewVolumeAttachments().Replace(va)
 }
 
-// Replace replaces content of property (serialize.Property interface)
-func (p *VolumeAttachments) Replace(v interface{}) {
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to replace 'VolumeAttachments': %v", err))
+// Replace ... (serialize.Property interface)
+func (va *VolumeAttachments) Replace(p serialize.Property) serialize.Property {
+	src := p.(*VolumeAttachments)
+	*va = *src
+	va.Hosts = make(map[string]string, len(src.Hosts))
+	for k, v := range src.Hosts {
+		va.Hosts[k] = v
 	}
+	return va
 }
 
 func init() {
