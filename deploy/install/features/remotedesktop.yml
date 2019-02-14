@@ -140,10 +140,10 @@ feature:
 
                             # Xfce Desktop configurations
                             # to update, from a Desktop configured as wanted:
-                            # tar --exclude .config/g* -Jcvf remotedesktop_conf.tar.xz .config
-                            # base64 remotedesktop_conf.tar.xz >remotedesktop_conf.tar.xz.encoded
+                            # tar --exclude .config/g* -Jcvf xfce_conf.tar.xz .config
+                            # base64 xfce_conf.tar.xz >xfce_conf.tar.xz.encoded
                             # Then copy between HEREDOCs the content of the .encoded file
-                            cat >/var/tmp/xfce_front.encoded <<'EOF'
+                            cat >/var/tmp/xfce_conf.encoded <<'EOF'
                             /Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4O//FW9dABcYyecMYYgb8tkd/QwXnBEBYq7o9K5cz3Dw
                             IsSonUkO6IaHvO+YS5nNHN2/lJlax4FCiWhkmwiAJRTWbQy6nFQuCNTNR5RdGaujqV44zxFE5CBR
                             FiN6bl2NP2uZ5T48K9Q83bcLDuMSi1aQGYaj9hyFQp0aO1Emt7tMgDStsEebG1Wm2YSx0d8STDbe
@@ -243,16 +243,15 @@ feature:
                             6DxAL5QxcUg11XgF202lp4xtaGE6Ztp54kOJl0q2WnF0147fJuLhKZ6xH4C3AAAAnOC4P8r+AxMA
                             AYsrgOADAIsbpW6xxGf7AgAAAAAEWVo=
                             EOF
-                            sed -i -e "s/^[[:space:]]\+//g" /var/tmp/xfce_front.encoded
-                            cat /var/tmp/xfce_front.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
-                            rm -f /var/tmp/xfce_front.encoded
+                            cat /var/tmp/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
+                            rm -f /var/tmp/xfce_conf.encoded
                             chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 195
 
                             systemctl daemon-reload && \
-                            systemctl enable vncserver@:0.service && \
-                            systemctl enable vncconfig@:0.service && \
-                            systemctl restart vncserver@:0.service && \
-                            systemctl restart vncconfig@:0.service || exit 196
+                            systemctl enable vncserver\@:0.service && \
+                            systemctl enable vncconfig\@:0.service && \
+                            systemctl restart vncserver\@:0.service || exit 196
+                            systemctl restart vncconfig\@:0.service || exit 197
 
                     deps:
                         targets:
@@ -309,7 +308,6 @@ feature:
                             autorestart=true
                             stopsignal=QUIT
                             EOF
-                            sed -i -e "s/^[[:space:]]\+//g" supervisord.conf
 
                             cat >logback.xml <<-'EOF'
                             <configuration>
@@ -387,9 +385,9 @@ feature:
                             # Note: at the time writing, dash update fails so hold it for now
                             RUN apt-mark hold dash
                             RUN apt update -y \
-                            && apt install -y \
+                             && apt install -y \
                                     build-essential \
-                                    gcc-6 \
+                                    gcc \
                                     libcairo2-dev \
                                     libjpeg62-turbo \
                                     libossp-uuid-dev \
@@ -404,7 +402,7 @@ feature:
                             WORKDIR /usr/local/src
                             ADD guacamole.tgz /usr/local/src/
                             RUN cd guacamole-server-* \
-                             && CC=gcc-6 ./configure --prefix=/usr --with-init-dir=/etc/init.d  \
+                             && ./configure --prefix=/usr --with-init-dir=/etc/init.d  \
                              && make -j3 \
                              && make DESTDIR=/usr/local/dist install
 
@@ -458,8 +456,8 @@ feature:
                             ADD supervisord.conf ./
 
                             RUN apt autoremove -y \
-                            && apt autoclean -y \
-                            && rm -rf /var/lib/apt/*
+                             && apt autoclean -y \
+                             && rm -rf /var/lib/apt/*
 
                             # Tomcat Guacamole
                             EXPOSE 8080
@@ -482,7 +480,7 @@ feature:
                         run: |
                             # Guacd need sshd to authorize password authentication...
                             cat >>/etc/ssh/sshd_config <<-'EOF'
-                            # Allow Password Authentication from {{.Username}} user for guacd to work
+                            # Allow Password Authentication from user {{.Username}} for guacd to work
                             Match User {{.Username}} Address 172.17.0.0/16
                                 PasswordAuthentication yes
                             EOF
@@ -496,7 +494,7 @@ feature:
                             ###########################################################
                             # Starts remotedesktop container                          #
                             ###########################################################
-                            docker run -d --hostname remotedesktop --name remotedesktop -p "9080:8080" -p "9009:8009" remotedesktop:latest
+                            docker run --rm -d --hostname remotedesktop --name remotedesktop -p "9080:8080" -p "9009:8009" remotedesktop:latest
 
             remove:
                 pace: image
