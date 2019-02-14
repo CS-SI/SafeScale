@@ -38,24 +38,19 @@ func NewNetworkDescription() *NetworkDescription {
 }
 
 // Content ... (serialize.Property interface)
-func (p *NetworkDescription) Content() interface{} {
-	return p
+func (nd *NetworkDescription) Content() interface{} {
+	return nd
 }
 
 // Clone ... (serialize.Property interface)
-func (p *NetworkDescription) Clone() serialize.Property {
-	pn := NewNetworkDescription()
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to clone 'NetworkDescription': %v", err))
-	}
-	return pn
+func (nd *NetworkDescription) Clone() serialize.Property {
+	return NewNetworkDescription().Replace(nd)
 }
 
-// Replace replaces content of property (serialize.Property interface)
-func (p *NetworkDescription) Replace(v interface{}) {
-	if serialize.CloneValue(v, p) != nil {
-		panic(fmt.Sprintf("failed to replace 'NetworkDescription': %v", err))
-	}
+// Replace ... (serialize.Property interface)
+func (nd *NetworkDescription) Replace(p serialize.Property) serialize.Property {
+	*nd = *p.(*NetworkDescription)
+	return nd
 }
 
 // NetworkHosts contains information about hosts connected to the network
@@ -73,32 +68,35 @@ func NewNetworkHosts() *NetworkHosts {
 }
 
 // Reset resets the content of the property
-func (p *NetworkHosts) Reset() {
-	*p = NetworkHosts{
+func (nh *NetworkHosts) Reset() {
+	*nh = NetworkHosts{
 		ByID:   map[string]string{},
 		ByName: map[string]string{},
 	}
 }
 
 // Content ... (serialize.Property interface)
-func (p *NetworkHosts) Content() interface{} {
-	return p
+func (nh *NetworkHosts) Content() interface{} {
+	return nh
 }
 
 // Clone ... (serialize.Property interface)
-func (p *NetworkHosts) Clone() serialize.Property {
-	pn := NewNetworkHosts()
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to clone 'NetworkHosts': %v", err))
-	}
-	return pn
+func (nh *NetworkHosts) Clone() serialize.Property {
+	return NewNetworkHosts().Replace(nh)
 }
 
-// Replace replaces content of property (serialize.Property interface)
-func (p *NetworkHosts) Replace(v interface{}) {
-	if serialize.CloneValue(v, p) != nil {
-		panic(fmt.Sprintf("failed to replace 'NetworkHosts': %v", err))
+// Replace ... (serialize.Property interface)
+func (nh *NetworkHosts) Replace(p serialize.Property) serialize.Property {
+	src := p.(*NetworkHosts)
+	nh.ByID = make(map[string]string, len(src.ByID))
+	for k, v := range src.ByID {
+		nh.ByID[k] = v
 	}
+	nh.ByName = make(map[string]string, len(src.ByName))
+	for k, v := range src.ByName {
+		nh.ByName[k] = v
+	}
+	return nh
 }
 
 func init() {

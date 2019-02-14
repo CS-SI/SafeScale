@@ -40,29 +40,24 @@ func NewHostDescription() *HostDescription {
 }
 
 // Reset returns a blank HostDescription
-func (p *HostDescription) Reset() {
-	*p = HostDescription{}
+func (hd *HostDescription) Reset() {
+	*hd = HostDescription{}
 }
 
 // Content ... (serialize.Property interface)
-func (p *HostDescription) Content() interface{} {
-	return p
+func (hd *HostDescription) Content() interface{} {
+	return hd
 }
 
 // Clone ... (serialize.Property interface)
-func (p *HostDescription) Clone() serialize.Property {
-	pn := NewHostDescription()
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to clone 'HostDescription': %v", err))
-	}
-	return pn
+func (hd *HostDescription) Clone() serialize.Property {
+	return NewHostDescription().Replace(hd)
 }
 
-// Replace replaces content of property (serialize.Property interface)
-func (p *HostDescription) Replace(v interface{}) {
-	if serialize.CloneValue(v, p) != nil {
-		panic(fmt.Sprintf("failed to replace 'HostDescription': %v", err))
-	}
+// Replace ... (serialize.Property interface)
+func (hd *HostDescription) Replace(p serialize.Property) serialize.Property {
+	*hd = *p.(*HostDescription)
+	return hd
 }
 
 // HostNetwork contains network information related to Host
@@ -93,8 +88,8 @@ func NewHostNetwork() *HostNetwork {
 }
 
 // Reset resets the content of the property
-func (p *HostNetwork) Reset() {
-	*p = HostNetwork{
+func (hn *HostNetwork) Reset() {
+	*hn = HostNetwork{
 		NetworksByID:   map[string]string{},
 		NetworksByName: map[string]string{},
 		IPv4Addresses:  map[string]string{},
@@ -103,24 +98,36 @@ func (p *HostNetwork) Reset() {
 }
 
 // Content ... (serialize.Property interface)
-func (p *HostNetwork) Content() interface{} {
-	return p
+func (hn *HostNetwork) Content() interface{} {
+	return hn
 }
 
 // Clone ... (serialize.Property interface)
-func (p *HostNetwork) Clone() serialize.Property {
-	pn := NewHostNetwork()
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to clone 'HostNetwork': %v", err))
-	}
-	return pn
+func (hn *HostNetwork) Clone() serialize.Property {
+	return NewHostNetwork().Replace(hn)
 }
 
-// Replace replaces content of property (serialize.Property interface)
-func (p *HostNetwork) Replace(v interface{}) {
-	if serialize.CloneValue(v, p) != nil {
-		panic(fmt.Sprintf("failed to replace 'HostNetwork': %v", err))
+// Replace ... (serialize.Property interface)
+func (hn *HostNetwork) Replace(p serialize.Property) serialize.Property {
+	src := p.(*HostNetwork)
+	*hn = *src
+	hn.NetworksByID = make(map[string]string, len(src.NetworksByID))
+	hn.NetworksByName = make(map[string]string, len(src.NetworksByName))
+	hn.IPv4Addresses = make(map[string]string, len(src.IPv4Addresses))
+	hn.IPv6Addresses = make(map[string]string, len(src.IPv6Addresses))
+	for k, v := range src.NetworksByID {
+		hn.NetworksByID[k] = v
 	}
+	for k, v := range src.NetworksByName {
+		hn.NetworksByName[k] = v
+	}
+	for k, v := range src.IPv4Addresses {
+		hn.IPv4Addresses[k] = v
+	}
+	for k, v := range src.IPv6Addresses {
+		hn.IPv6Addresses[k] = v
+	}
+	return hn
 }
 
 // HostSize represent sizing elements of an host
@@ -190,32 +197,32 @@ func NewHostSizing() *HostSizing {
 }
 
 // Reset ...
-func (p *HostSizing) Reset() {
-	*p = HostSizing{
+func (hs *HostSizing) Reset() {
+	*hs = HostSizing{
 		RequestedSize: NewHostSize(),
 		AllocatedSize: NewHostSize(),
 	}
 }
 
 // Content ... (serialize.Property interface)
-func (p *HostSizing) Content() interface{} {
-	return p
+func (hs *HostSizing) Content() interface{} {
+	return hs
 }
 
 // Clone ... (serialize.Property interface)
-func (p *HostSizing) Clone() serialize.Property {
-	pn := NewHostSizing()
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to clone 'HostSizing': %v", err))
-	}
-	return pn
+func (hs *HostSizing) Clone() serialize.Property {
+	return NewHostSizing().Replace(hs)
 }
 
-// Replace replaces content of property (serialize.Property interface)
-func (p *HostSizing) Replace(v interface{}) {
-	if serialize.CloneValue(v, p) != nil {
-		panic(fmt.Sprintf("failed to replace 'HostSizing': %v", err))
-	}
+// Replace ... (serialize.Property interface)
+func (hs *HostSizing) Replace(p serialize.Property) serialize.Property {
+	src := p.(*HostSizing)
+	hs.RequestedSize = NewHostSize()
+	*hs.RequestedSize = *src.RequestedSize
+	hs.AllocatedSize = NewHostSize()
+	*hs.AllocatedSize = *src.AllocatedSize
+	hs.Template = src.Template
+	return hs
 }
 
 // HostSystem contains information about the operating system
@@ -280,8 +287,8 @@ func NewHostVolumes() *HostVolumes {
 }
 
 // Reset ...
-func (p *HostVolumes) Reset() {
-	*p = HostVolumes{
+func (hv *HostVolumes) Reset() {
+	*hv = HostVolumes{
 		VolumesByID:     map[string]*HostVolume{},
 		VolumesByName:   map[string]string{},
 		VolumesByDevice: map[string]string{},
@@ -290,24 +297,35 @@ func (p *HostVolumes) Reset() {
 }
 
 // Content ... (serialize.Property interface)
-func (p *HostVolumes) Content() interface{} {
-	return p
+func (hv *HostVolumes) Content() interface{} {
+	return hv
 }
 
 // Clone ... (serialize.Property interface)
-func (p *HostVolumes) Clone() serialize.Property {
-	pn := NewHostVolumes()
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to clone 'HostVolumes': %v", err))
-	}
-	return pn
+func (hv *HostVolumes) Clone() serialize.Property {
+	return NewHostVolumes().Replace(hv)
 }
 
-// Replace replaces content of property (serialize.Property interface)
-func (p *HostVolumes) Replace(v interface{}) {
-	if serialize.CloneValue(v, p) != nil {
-		panic(fmt.Sprintf("failed to replace 'HostVolumes': %v", err))
+// Replace ... (serialize.Property interface)
+func (hv *HostVolumes) Replace(p serialize.Property) serialize.Property {
+	src := p.(*HostVolumes)
+	hv.VolumesByID = make(map[string]*HostVolume, len(src.VolumesByID))
+	for k, v := range src.VolumesByID {
+		hv.VolumesByID[k] = v
 	}
+	hv.VolumesByName = make(map[string]string, len(src.VolumesByName))
+	for k, v := range src.VolumesByName {
+		hv.VolumesByName[k] = v
+	}
+	hv.VolumesByDevice = make(map[string]string, len(src.VolumesByDevice))
+	for k, v := range src.VolumesByDevice {
+		hv.VolumesByDevice[k] = v
+	}
+	hv.DevicesByID = make(map[string]string, len(src.DevicesByID))
+	for k, v := range src.DevicesByID {
+		hv.DevicesByID[k] = v
+	}
+	return hv
 }
 
 // HostLocalMount stores information about a device (as an attached volume) mount
@@ -377,8 +395,8 @@ func NewHostMounts() *HostMounts {
 }
 
 // Reset ...
-func (p *HostMounts) Reset() {
-	*p = HostMounts{
+func (hm *HostMounts) Reset() {
+	*hm = HostMounts{
 		LocalMountsByDevice:   map[string]string{},
 		LocalMountsByPath:     map[string]*HostLocalMount{},
 		RemoteMountsByShareID: map[string]string{},
@@ -388,24 +406,39 @@ func (p *HostMounts) Reset() {
 }
 
 // Content ...  (serialize.Property interface)
-func (p *HostMounts) Content() interface{} {
-	return p
+func (hm *HostMounts) Content() interface{} {
+	return hm
 }
 
 // Clone ...  (serialize.Property interface)
-func (p *HostMounts) Clone() serialize.Property {
-	pn := NewHostMounts()
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to clone 'HostMounts': %v", err))
-	}
-	return pn
+func (hm *HostMounts) Clone() serialize.Property {
+	return NewHostMounts().Replace(hm)
 }
 
-// Replace replaces content of property (serialize.Property interface)
-func (p *HostMounts) Replace(v interface{}) {
-	if serialize.CloneValue(v, p) != nil {
-		panic(fmt.Sprintf("failed to replace 'HostMounts': %v", err))
+// Replace ...  (serialize.Property interface)
+func (hm *HostMounts) Replace(p serialize.Property) serialize.Property {
+	src := p.(*HostMounts)
+	hm.LocalMountsByDevice = make(map[string]string, len(src.LocalMountsByDevice))
+	for k, v := range src.LocalMountsByDevice {
+		hm.LocalMountsByDevice[k] = v
 	}
+	hm.LocalMountsByPath = make(map[string]*HostLocalMount, len(src.LocalMountsByPath))
+	for k, v := range src.LocalMountsByPath {
+		hm.LocalMountsByPath[k] = v
+	}
+	hm.RemoteMountsByShareID = make(map[string]string, len(src.RemoteMountsByShareID))
+	for k, v := range src.RemoteMountsByShareID {
+		hm.RemoteMountsByShareID[k] = v
+	}
+	hm.RemoteMountsByExport = make(map[string]string, len(src.RemoteMountsByExport))
+	for k, v := range src.RemoteMountsByExport {
+		hm.RemoteMountsByExport[k] = v
+	}
+	hm.RemoteMountsByPath = make(map[string]*HostRemoteMount, len(src.LocalMountsByDevice))
+	for k, v := range src.RemoteMountsByPath {
+		hm.RemoteMountsByPath[k] = v
+	}
+	return hm
 }
 
 // HostShare describes a filesystem exported from the host
@@ -458,32 +491,35 @@ func NewHostShares() *HostShares {
 }
 
 // Reset ...
-func (p *HostShares) Reset() {
-	*p = HostShares{
+func (hs *HostShares) Reset() {
+	*hs = HostShares{
 		ByID:   map[string]*HostShare{},
 		ByName: map[string]string{},
 	}
 }
 
 // Content ...
-func (p *HostShares) Content() interface{} {
-	return p
+func (hs *HostShares) Content() interface{} {
+	return hs
 }
 
 // Clone ...
-func (p *HostShares) Clone() serialize.Property {
-	pn := NewHostShares()
-	if serialize.CloneValue(p, pn) != nil {
-		panic(fmt.Sprintf("failed to clone 'HostShares': %v", err))
-	}
-	return pn
+func (hs *HostShares) Clone() serialize.Property {
+	return NewHostShares().Replace(hs)
 }
 
-// Replace replaces content of property
-func (p *HostShares) Replace(v interface{}) {
-	if serialize.CloneValue(v, p) != nil {
-		panic(fmt.Sprintf("failed to replace 'HostShares': %v", err))
+// Replace ...
+func (hs *HostShares) Replace(p serialize.Property) serialize.Property {
+	src := p.(*HostShares)
+	hs.ByID = make(map[string]*HostShare, len(src.ByID))
+	for k, v := range src.ByID {
+		hs.ByID[k] = v
 	}
+	hs.ByName = make(map[string]string, len(src.ByName))
+	for k, v := range src.ByName {
+		hs.ByName[k] = v
+	}
+	return hs
 }
 
 // HostInstalledFeature ...
