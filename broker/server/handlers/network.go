@@ -105,7 +105,7 @@ func (svc *NetworkHandler) Create(
 	}()
 
 	log.Debugf("Saving network metadata '%s' ...", network.Name)
-	err = metadata.SaveNetwork(svc.provider, network)
+	mn, err := metadata.SaveNetwork(svc.provider, network)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -113,10 +113,7 @@ func (svc *NetworkHandler) Create(
 	// Starting from here, delete network metadata if exits with error
 	defer func() {
 		if err != nil {
-			mn, derr := metadata.LoadNetwork(svc.provider, network.ID)
-			if derr == nil {
-				derr = mn.Delete()
-			}
+			derr := mn.Delete()
 			if derr != nil {
 				log.Errorf("Failed to delete network metadata: %+v", derr)
 			}
@@ -189,7 +186,7 @@ func (svc *NetworkHandler) Create(
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
 		if err != nil {
-			log.Warnf("Cleaning up, deleting gateway '%s'", gw.Name)
+			log.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", gw.Name)
 			derr := svc.provider.DeleteHost(gw.ID)
 			if derr != nil {
 				log.Errorf("failed to delete gateway '%s': %v", gw.Name, derr)
@@ -219,30 +216,26 @@ func (svc *NetworkHandler) Create(
 	}
 
 	// Writes Gateway metadata
-	err = metadata.SaveGateway(svc.provider, gw, network.ID)
+	mg, err := metadata.SaveGateway(svc.provider, gw, network.ID)
 	if err != nil {
 		return nil, infraErrf(err, "failed to create gateway: failed to save metadata: %s", err.Error())
 	}
 
+	// Starting from here, delete network metadata if exits with error
 	defer func() {
 		if err != nil {
-			mh, derr := metadata.LoadHost(svc.provider, gw.ID)
+			log.Warnf("Cleaning up on failure, deleting gateway '%s' metadata", gw.Name)
+			derr := mg.Delete()
 			if derr != nil {
-				log.Error(derr)
-			} else {
-				delerr := mh.Delete()
-				if delerr != nil {
-					log.Errorf("Failed to delete gateway metadata: %+v", derr)
-				}
+				log.Errorf("Failed to delete gateway '%s' metadata: %+v", gw.Name, derr)
 			}
 		}
 	}()
 
-	log.Infof("Waiting until gateway '%s' is available through SSH ...", gwname)
-
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
+	log.Infof("Waiting until gateway '%s' is available through SSH ...", gwname)
 	sshHandler := NewSSHHandler(svc.provider)
 	ssh, err := sshHandler.GetConfig(gw.ID)
 	if err != nil {
@@ -251,7 +244,6 @@ func (svc *NetworkHandler) Create(
 	}
 
 	sshDefaultTimeout := int(brokerutils.GetTimeoutCtxHost().Minutes())
-
 	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
 		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
 		if err == nil {
@@ -267,14 +259,6 @@ func (svc *NetworkHandler) Create(
 		return nil, logicErrf(err, "error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
 	}
 	log.Infof("SSH service of gateway '%s' started.", gw.Name)
-
-	network.GatewayID = gw.ID
-
-	//	err = metadata.SaveNetwork(svc.provider, rv)
-	err = metadata.SaveNetwork(svc.provider, network)
-	if err != nil {
-		return nil, infraErrf(err, "error creating network: Error saving network metadata")
-	}
 
 	return network, nil
 }
@@ -332,6 +316,7 @@ func (svc *NetworkHandler) Delete(ref string) error {
 	gwID := network.GatewayID
 
 	// Check if hosts are still attached to network according to metadata
+	var errorMsg string
 	err = network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
 		hostsLen := len(networkHostsV1.ByName)
@@ -344,12 +329,16 @@ func (svc *NetworkHandler) Delete(ref string) error {
 			if hostsLen == 1 {
 				verb = "is"
 			}
-			return logicErr(fmt.Errorf("can't delete network '%s': %d host%s %s still attached to it: %s",
-				network.Name, hostsLen, utils.Plural(hostsLen), verb, strings.Join(list, ", ")))
+			errorMsg = fmt.Sprintf("can't delete network '%s': %d host%s %s still attached to it: %s",
+				network.Name, hostsLen, utils.Plural(hostsLen), verb, strings.Join(list, ", "))
+			return model.ResourceNotAvailableError("network", network.Name)
 		}
 		return nil
 	})
 	if err != nil {
+		if _, ok := err.(model.ErrResourceNotAvailable); ok {
+			return logicErr(fmt.Errorf(errorMsg))
+		}
 		return infraErr(err)
 	}
 

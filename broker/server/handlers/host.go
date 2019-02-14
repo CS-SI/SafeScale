@@ -462,7 +462,7 @@ func (svc *HostHandler) Create(
 			log.Errorf(err.Error())
 			continue
 		}
-		err = metadata.SaveNetwork(svc.provider, i)
+		_, err = metadata.SaveNetwork(svc.provider, i)
 		if err != nil {
 			log.Errorf(err.Error())
 		}
@@ -562,10 +562,10 @@ func (svc *HostHandler) Delete(ref string) error {
 
 	mh, err := metadata.LoadHost(svc.provider, ref)
 	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return model.ResourceNotFoundError("host", ref)
+		}
 		return infraErrf(err, "can't delete host '%s'", ref)
-	}
-	if mh == nil {
-		return logicErr(model.ResourceNotFoundError("host", ref))
 	}
 
 	host := mh.Get()
@@ -668,7 +668,7 @@ func (svc *HostHandler) Delete(ref string) error {
 			if err != nil {
 				log.Errorf(err.Error())
 			}
-			err = metadata.SaveNetwork(svc.provider, network)
+			_, err = metadata.SaveNetwork(svc.provider, network)
 			if err != nil {
 				log.Errorf(err.Error())
 			}
