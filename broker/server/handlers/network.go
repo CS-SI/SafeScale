@@ -366,7 +366,10 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	case <-ctx.Done():
 		log.Warnf("Network delete canceled by broker")
 		hostSizing := propsv1.NewHostSizing()
-		metadataHost.Properties.Get(HostProperty.SizingV1, hostSizing)
+		err := metadataHost.Properties.Get(HostProperty.SizingV1, hostSizing)
+		if err != nil {
+			return fmt.Errorf("Failed to get gateway sizingV1")
+		}
 		//os name of the gw is not stored in metadatas so we used ubuntu 16.04 by default
 		networkBis, err := svc.Create(context.Background(), network.Name, network.CIDR, network.IPVersion, hostSizing.AllocatedSize.Cores, hostSizing.AllocatedSize.RAMSize, hostSizing.AllocatedSize.DiskSize, "Ubuntu 16.04", metadataHost.Name)
 		if err != nil {
