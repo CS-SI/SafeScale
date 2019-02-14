@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -119,7 +120,7 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 
 	var (
 		wg   sync.WaitGroup
-		errs int
+		errs int32
 	)
 
 	hostDeleter := func(aname string) {
@@ -127,7 +128,7 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
 		if err != nil {
 			fmt.Printf("%v\n", DecorateError(err, "deletion of host", true))
-			errs++
+			atomic.AddInt32(&errs, 1)
 		} else {
 			fmt.Printf("Host '%s' deleted\n", aname)
 		}
@@ -157,6 +158,9 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 	ctx := context.Background()
 
 	pbSSHCfg, err := service.SSH(ctx, &pb.Reference{Name: name})
+	if err != nil {
+		return nil, err
+	}
 	sshCfg := conv.ToSystemSshConfig(pbSSHCfg)
 	if err == nil {
 		nerr := sshCfgCache.Set(name, sshCfg)

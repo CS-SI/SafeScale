@@ -613,8 +613,7 @@ func (client *Client) deleteSubnet(id string) error {
 			r := subnets.Delete(client.Network, id)
 			err = r.ExtractErr()
 			if err != nil {
-				switch err.(type) {
-				case gc.ErrUnexpectedResponseCode:
+				if _, ok := err.(gc.ErrUnexpectedResponseCode); ok {
 					neutronError := ParseNeutronError(err.Error())
 					switch neutronError["type"] {
 					case "SubnetInUse":
@@ -624,7 +623,7 @@ func (client *Client) deleteSubnet(id string) error {
 					default:
 						log.Debugf("NeutronError: type = %s", neutronError["type"])
 					}
-				default:
+				} else {
 					msg := fmt.Sprintf("failed to delete subnet '%s': %s", id, ProviderErrorToString(err))
 					log.Errorf(utils.Capitalize(msg))
 					return fmt.Errorf(msg)

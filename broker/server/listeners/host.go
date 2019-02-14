@@ -189,7 +189,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	return conv.ToPBHost(host), nil
 }
 
-// Create a new host
+// Resize an host
 func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
 	log.Infof("Listeners: host resize '%s' done", in.Name)
 	defer log.Debugf("Listeners: host resize '%s' done", in.Name)

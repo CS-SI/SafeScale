@@ -135,7 +135,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google
 
 	ref := utils.GetReference(in)
 	if ref == "" {
-		return nil, fmt.Errorf("Can't delete network: neither name nor id given as reference")
+		return nil, fmt.Errorf("can't delete network: neither name nor id given as reference")
 	}
 
 	tenant := GetCurrentTenant()

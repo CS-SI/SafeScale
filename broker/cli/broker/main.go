@@ -20,8 +20,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"runtime"
 	"os/signal"
+	"runtime"
 	"sort"
 	"syscall"
 
@@ -34,7 +34,7 @@ import (
 )
 
 func cleanup() {
-	fmt.Println("\nBe carfull stoping broker will not stop the execution on brokerd!")
+	fmt.Println("\nBe careful stopping broker will not stop the execution on brokerd!")
 }
 
 func main() {
