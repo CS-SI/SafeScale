@@ -211,17 +211,13 @@ func (client *Client) ListTemplates(all bool) ([]model.HostTemplate, error) {
 	templates := []model.HostTemplate{}
 	for _, templateJSON := range templatesJSON {
 		template := model.HostTemplate{
-			HostTemplate: &propsv1.HostTemplate{
-				HostSize: &propsv1.HostSize{
-					Cores:     int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
-					RAMSize:   float32(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["ramSize"].(float64)),
-					DiskSize:  int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["diskSize"].(float64)),
-					GPUNumber: int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuNumber"].(float64)),
-					GPUType:   templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuType"].(string),
-				},
-				ID:   templateJSON.(map[string]interface{})["templateID"].(string),
-				Name: templateJSON.(map[string]interface{})["templateName"].(string),
-			},
+			Cores:     int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
+			RAMSize:   float32(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["ramSize"].(float64)),
+			DiskSize:  int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["diskSize"].(float64)),
+			GPUNumber: int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuNumber"].(float64)),
+			GPUType:   templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuType"].(string),
+			ID:        templateJSON.(map[string]interface{})["templateID"].(string),
+			Name:      templateJSON.(map[string]interface{})["templateName"].(string),
 		}
 		templates = append(templates, template)
 	}
@@ -255,17 +251,13 @@ func (client *Client) GetTemplate(id string) (*model.HostTemplate, error) {
 	for _, templateJSON := range templatesJSON {
 		if templateID, _ := templateJSON.(map[string]interface{})["templateID"]; templateID == id {
 			return &model.HostTemplate{
-				HostTemplate: &propsv1.HostTemplate{
-					HostSize: &propsv1.HostSize{
-						Cores:     int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
-						RAMSize:   float32(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["ramSize"].(float64)),
-						DiskSize:  int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["diskSize"].(float64)),
-						GPUNumber: int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuNumber"].(float64)),
-						GPUType:   templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuType"].(string),
-					},
-					ID:   templateJSON.(map[string]interface{})["templateID"].(string),
-					Name: templateJSON.(map[string]interface{})["templateName"].(string),
-				},
+				Cores:     int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["coresNumber"].(float64)),
+				RAMSize:   float32(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["ramSize"].(float64)),
+				DiskSize:  int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["diskSize"].(float64)),
+				GPUNumber: int(templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuNumber"].(float64)),
+				GPUType:   templateJSON.(map[string]interface{})["templateSpecs"].(map[string]interface{})["gpuType"].(string),
+				ID:        templateJSON.(map[string]interface{})["templateID"].(string),
+				Name:      templateJSON.(map[string]interface{})["templateName"].(string),
 			}, nil
 		}
 	}
@@ -611,18 +603,6 @@ func (client *Client) getHostFromDomain(domain *libvirt.Domain) (*model.Host, er
 	if err != nil {
 		return nil, fmt.Errorf(fmt.Sprintf("Failed to fetch state from domain : %s", err.Error()))
 	}
-	hostDescriptionV1, err := getDescriptionV1FromDomain(domain, client.LibvirtService)
-	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed to get domain description : %s", err.Error()))
-	}
-	hostSizingV1, err := getSizingV1FromDomain(domain, client.LibvirtService)
-	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed to get domain sizing : %s", err.Error()))
-	}
-	hostNetworkV1, err := client.getNetworkV1FromDomain(domain)
-	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed to get domain networks: %s", err.Error()))
-	}
 
 	host := model.NewHost()
 
@@ -630,14 +610,41 @@ func (client *Client) getHostFromDomain(domain *libvirt.Domain) (*model.Host, er
 	host.Name = name
 	host.PrivateKey = "Impossible to fetch them from the domain, the private key is unknown by the domain"
 	host.LastState = stateConvert(state)
-	if err := host.Properties.Set(HostProperty.DescriptionV1, hostDescriptionV1); err != nil {
-		return nil, fmt.Errorf("Failed to set HostProperty.DescriptionV1 : %s", err.Error())
+
+	err = host.Properties.LockForWrite(HostProperty.DescriptionV1).ThenUse(func(v interface{}) error {
+		hostDescriptionV1, err := getDescriptionV1FromDomain(domain, client.LibvirtService)
+		if err != nil {
+			return fmt.Errorf(fmt.Sprintf("Failed to get domain description : %s", err.Error()))
+		}
+		v.(*propsv1.HostDescription).Replace(hostDescriptionV1)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Failed to update HostProperty.DescriptionV1 : %s", err.Error())
 	}
-	if err := host.Properties.Set(HostProperty.SizingV1, hostSizingV1); err != nil {
-		return nil, fmt.Errorf("Failed to set HostProperty.SizingV1 : %s", err.Error())
+
+	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		hostSizingV1, err := getSizingV1FromDomain(domain, client.LibvirtService)
+		if err != nil {
+			return fmt.Errorf(fmt.Sprintf("Failed to get domain sizing : %s", err.Error()))
+		}
+		v.(*propsv1.HostSizing).Replace(hostSizingV1)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Failed to update HostProperty.SizingV1 : %s", err.Error())
 	}
-	if err := host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1); err != nil {
-		return nil, fmt.Errorf("Failed to set HostProperty.NetworkV1 : %s", err.Error())
+
+	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		hostNetworkV1, err := client.getNetworkV1FromDomain(domain)
+		if err != nil {
+			return fmt.Errorf(fmt.Sprintf("Failed to get domain network : %s", err.Error()))
+		}
+		v.(*propsv1.HostNetwork).Replace(hostNetworkV1)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Failed to update HostProperty.NetworkV1 : %s", err.Error())
 	}
 
 	return host, nil
@@ -680,41 +687,37 @@ func (client *Client) complementHost(host *model.Host, newHost *model.Host) erro
 	}
 	host.LastState = newHost.LastState
 
-	hpNetworkV1 := propsv1.NewHostNetwork()
-	err := host.Properties.Get(HostProperty.NetworkV1, hpNetworkV1)
+	err := host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		newHostNetworkV1 := propsv1.NewHostNetwork()
+		newHost.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+			newHostNetworkV1 = v.(*propsv1.HostNetwork)
+			return nil
+		})
+		hostNetworkV1 := v.(*propsv1.HostNetwork)
+		hostNetworkV1.IPv4Addresses = newHostNetworkV1.IPv4Addresses
+		hostNetworkV1.IPv6Addresses = newHostNetworkV1.IPv6Addresses
+		hostNetworkV1.NetworksByID = newHostNetworkV1.NetworksByID
+		hostNetworkV1.NetworksByName = newHostNetworkV1.NetworksByName
+		return nil
+	})
 	if err != nil {
-		return err
-	}
-	newhpNetworkV1 := propsv1.NewHostNetwork()
-	err = newHost.Properties.Get(HostProperty.NetworkV1, newhpNetworkV1)
-	if err != nil {
-		return err
-	}
-	hpNetworkV1.IPv4Addresses = newhpNetworkV1.IPv4Addresses
-	hpNetworkV1.IPv6Addresses = newhpNetworkV1.IPv6Addresses
-	hpNetworkV1.NetworksByID = newhpNetworkV1.NetworksByID
-	hpNetworkV1.NetworksByName = newhpNetworkV1.NetworksByName
-	err = host.Properties.Set(HostProperty.NetworkV1, hpNetworkV1)
-	if err != nil {
-		return err
+		return fmt.Errorf("Failed to update HostProperty.NetworkV1 : %s", err.Error())
 	}
 
-	hpSizingV1 := propsv1.NewHostSizing()
-	err = host.Properties.Get(HostProperty.SizingV1, hpSizingV1)
+	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		newHostSizingV1 := propsv1.NewHostSizing()
+		newHost.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+			newHostSizingV1 = v.(*propsv1.HostSizing)
+			return nil
+		})
+		hostSizingV1 := v.(*propsv1.HostSizing)
+		hostSizingV1.AllocatedSize.Cores = newHostSizingV1.AllocatedSize.Cores
+		hostSizingV1.AllocatedSize.RAMSize = newHostSizingV1.AllocatedSize.RAMSize
+		hostSizingV1.AllocatedSize.DiskSize = newHostSizingV1.AllocatedSize.DiskSize
+		return nil
+	})
 	if err != nil {
-		return err
-	}
-	newhpSizingV1 := propsv1.NewHostSizing()
-	err = newHost.Properties.Get(HostProperty.SizingV1, newhpSizingV1)
-	if err != nil {
-		return err
-	}
-	hpSizingV1.AllocatedSize.Cores = newhpSizingV1.AllocatedSize.Cores
-	hpSizingV1.AllocatedSize.RAMSize = newhpSizingV1.AllocatedSize.RAMSize
-	hpSizingV1.AllocatedSize.DiskSize = newhpSizingV1.AllocatedSize.DiskSize
-	err = host.Properties.Set(HostProperty.SizingV1, hpSizingV1)
-	if err != nil {
-		return err
+		return fmt.Errorf("Failed to update HostProperty.SizingV1 : %s", err.Error())
 	}
 
 	return nil
@@ -895,49 +898,50 @@ echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 
 	host.PrivateKey = keyPair.PrivateKey
 
-	hostNetworkV1 := propsv1.NewHostNetwork()
-	if err := host.Properties.Get(HostProperty.NetworkV1, hostNetworkV1); err != nil {
-		return nil, fmt.Errorf("Failed to get the HostProperty.NetworkV1 : %s", err.Error())
-	}
+	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		hostNetworkV1 := v.(*propsv1.HostNetwork)
 
-	if bridgedVMs {
-		var vmInfo VMInfo
-		if publicIP {
-			vmInfo = <-vmInfoChannel
-			hostNetworkV1.PublicIPv4 = vmInfo.publicIP
-		}
-	}
-
-	hostNetworkV1.DefaultNetworkID = request.Networks[0].ID
-	hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != model.SingleHostNetworkName
-	if request.DefaultGateway != nil {
-		hostNetworkV1.DefaultGatewayID = request.DefaultGateway.ID
-
-		gateway, err := client.GetHost(request.DefaultGateway)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to get gateway host : %s", err.Error())
+		if bridgedVMs {
+			var vmInfo VMInfo
+			if publicIP {
+				vmInfo = <-vmInfoChannel
+				hostNetworkV1.PublicIPv4 = vmInfo.publicIP
+			}
 		}
 
-		hostNetworkV1.DefaultGatewayPrivateIP = gateway.GetPrivateIP()
+		hostNetworkV1.DefaultNetworkID = request.Networks[0].ID
+		hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != model.SingleHostNetworkName
+		if request.DefaultGateway != nil {
+			hostNetworkV1.DefaultGatewayID = request.DefaultGateway.ID
+
+			gateway, err := client.GetHost(request.DefaultGateway)
+			if err != nil {
+				return fmt.Errorf("Failed to get gateway host : %s", err.Error())
+			}
+
+			hostNetworkV1.DefaultGatewayPrivateIP = gateway.GetPrivateIP()
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Failed to update HostProperty.NetworkV1 : %s", err.Error())
 	}
 
-	hostSizingV1 := propsv1.NewHostSizing()
-	if err := host.Properties.Get(HostProperty.SizingV1, hostSizingV1); err != nil {
-		return nil, fmt.Errorf("Failed to get the HostProperty.SizingV1 : %s", err.Error())
-	}
+	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		hostSizingV1 := v.(*propsv1.HostSizing)
 
-	hostSizingV1.RequestedSize.RAMSize = float32(template.RAMSize * 1024)
-	hostSizingV1.RequestedSize.Cores = template.Cores
-	hostSizingV1.RequestedSize.DiskSize = template.DiskSize
-	// TODO GPU not implemented
-	hostSizingV1.RequestedSize.GPUNumber = template.GPUNumber
-	hostSizingV1.RequestedSize.GPUType = template.GPUType
+		hostSizingV1.RequestedSize.RAMSize = float32(template.RAMSize * 1024)
+		hostSizingV1.RequestedSize.Cores = template.Cores
+		hostSizingV1.RequestedSize.DiskSize = template.DiskSize
+		// TODO GPU not implemented
+		hostSizingV1.RequestedSize.GPUNumber = template.GPUNumber
+		hostSizingV1.RequestedSize.GPUType = template.GPUType
 
-	if err := host.Properties.Set(HostProperty.NetworkV1, hostNetworkV1); err != nil {
-		return nil, fmt.Errorf("Failed to set the HostProperty.NetworkV1 : %s", err.Error())
-	}
-	if err := host.Properties.Set(HostProperty.SizingV1, hostSizingV1); err != nil {
-		return nil, fmt.Errorf("Failed to set the HostProperty.SizingV1 : %s", err.Error())
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Failed to update HostProperty.SizingV1 : %s", err.Error())
 	}
 
 	return host, nil
