@@ -38,7 +38,6 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
-	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
@@ -301,12 +300,12 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 	return anon.(*string), nil
 }
 
-func unconfigureNode(c api.Cluster, b *controller.Blueprint, hostRef string, selectedMaster string) error {
+func unconfigureNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, selectedMaster string) error {
 	if c == nil {
 		panic("c is nil!")
 	}
-	if hostRef == "" {
-		panic("hostRef is empty!")
+	if pbHost == nil {
+		panic("pbHost is nil!")
 	}
 	if selectedMaster == "" {
 		var err error
@@ -316,16 +315,10 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, hostRef string, sel
 		}
 	}
 
-	mh, err := providermetadata.LoadHost(c.GetService(), hostRef)
-	if err != nil {
-		return err
-	}
-	host := mh.Get()
-
 	clt := brokerclient.New()
 
 	// Check worker is member of the Swarm
-	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", host.Name, host.Name)
+	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)
 	retcode, _, _, err := clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
@@ -336,16 +329,16 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, hostRef string, sel
 	}
 	// node is a worker in the Swarm: 1st ask worker to leave Swarm
 	cmd = "docker swarm leave"
-	retcode, _, stderr, err := clt.Ssh.Run(hostRef, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, _, stderr, err := clt.Ssh.Run(pbHost.ID, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to make node '%s' leave swarm: %s", host.Name, stderr)
+		return fmt.Errorf("failed to make node '%s' leave swarm: %s", pbHost.Name, stderr)
 	}
 
 	// 2nd: wait the Swarm worker to appear as down from Swarm master
-	cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", host.Name)
+	cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", pbHost.Name)
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			retcode, _, _, err := clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
@@ -353,7 +346,7 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, hostRef string, sel
 				return err
 			}
 			if retcode != 0 {
-				return fmt.Errorf("'%s' not in Down state", host.Name)
+				return fmt.Errorf("'%s' not in Down state", pbHost.Name)
 			}
 			return nil
 		},
@@ -362,20 +355,20 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, hostRef string, sel
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state after %v", host.Name, time.Minute*5)
+			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state after %v", pbHost.Name, time.Minute*5)
 		default:
-			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state: %v", host.Name, retryErr)
+			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
 		}
 	}
 
 	// 3rd, ask master to remove node from Swarm
-	cmd = fmt.Sprintf("docker node rm %s", host.Name)
+	cmd = fmt.Sprintf("docker node rm %s", pbHost.Name)
 	retcode, _, stderr, err = clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to remove worker '%s' from Swarm on master '%s': %s", host.Name, selectedMaster, stderr)
+		return fmt.Errorf("failed to remove worker '%s' from Swarm on master '%s': %s", pbHost.Name, selectedMaster, stderr)
 	}
 	return nil
 }

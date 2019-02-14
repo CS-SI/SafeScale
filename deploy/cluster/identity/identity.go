@@ -20,6 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // Identity contains the bare minimum information about a cluster
@@ -34,12 +35,27 @@ type Identity struct {
 	AdminPassword string `json:"admin_password"`
 }
 
-// // MarshalJSON implements json.Marshaller
-// func (i *Identity) MarshalJSON() ([]byte, error) {
-// 	return serialize.ToJSON(i)
-// }
+// NewIdentity ...
+func NewIdentity() *Identity {
+	return &Identity{}
+}
 
-// // UnmarshalJSON implement json.Unmarshaller
-// func (i *Identity) UnmarshalJSON(b []byte) error {
-// 	return serialize.FromJSON(b, i)
-// }
+// Content ... (serialize.Property interface)
+func (i *Identity) Content() interface{} {
+	return i
+}
+
+// Clone ... (serialize.Property interface)
+func (i *Identity) Clone() serialize.Property {
+	return NewIdentity().Replace(i)
+}
+
+// Replace ... (serialize.Property interface)
+func (i *Identity) Replace(p serialize.Property) serialize.Property {
+	src := p.(*Identity)
+	*i = *src
+	i.Keypair = &model.KeyPair{}
+	*i.Keypair = *src.Keypair
+	return i
+}
+

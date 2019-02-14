@@ -17,8 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/utils/serialize"
@@ -47,20 +45,13 @@ func (d *Defaults) Content() interface{} {
 
 // Clone ... (serialize.Property interface)
 func (d *Defaults) Clone() serialize.Property {
-	dn := newDefaults()
-	err := serialize.CloneValue(d, dn)
-	if err != nil {
-		panic(fmt.Sprintf("failed to clone 'Defaults': %v", err))
-	}
-	return dn
+	return newDefaults().Replace(d)
 }
 
 // Replace ... (serialize.Property interface)
-func (d *Defaults) Replace(v interface{}) {
-	err := serialize.CloneValue(v, d)
-	if err != nil {
-		panic(fmt.Sprintf("failed to replace 'Defaults': %v", err))
-	}
+func (d *Defaults) Replace(p serialize.Property) serialize.Property {
+	*d = *p.(*Defaults)
+	return d
 }
 
 func init() {

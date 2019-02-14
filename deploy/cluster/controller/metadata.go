@@ -51,6 +51,11 @@ func (m *Metadata) GetService() *providers.Service {
 	return m.item.GetService()
 }
 
+// Written tells if the metadata has already been written to ObjectStorage
+func (m *Metadata) Written() bool {
+	return m.item.Written()
+}
+
 // Carry links metadata with cluster struct
 func (m *Metadata) Carry(cluster *Controller) *Metadata {
 	if m.item == nil {
@@ -69,7 +74,12 @@ func (m *Metadata) Delete() error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	return m.item.Delete(m.name)
+	err := m.item.Delete(m.name)
+	if err != nil {
+		return err
+	}
+	m.item.Reset()
+	return nil
 }
 
 // Read reads metadata of cluster named 'name' from Object Storage
@@ -110,11 +120,18 @@ func (m *Metadata) Write() error {
 }
 
 // Reload reloads the metadata from ObjectStorage
-// It's a good idea to do that just after a Acquire() to be sure to have the latest data
+// It's a good idea to do that just after an Acquire() to be sure to have the latest data
 func (m *Metadata) Reload() error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
+
+	// If the metadata object has never been written yet, succeed doing nothing
+	if !m.item.Written() {
+		return nil
+	}
+
+	// Metadata had been written at least once, so try to reload (and propagate failure if it occurs)
 	var innerErr error
 	err := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
@@ -126,17 +143,18 @@ func (m *Metadata) Reload() error {
 			}
 			return nil
 		},
-		10*time.Second,
+		5*time.Second,
 	)
 	if err != nil {
-		if _, ok := err.(retry.ErrTimeout); ok {
+		if _, ok := err.(retry.ErrTimeout); ok && innerErr != nil {
+			if _, ok = innerErr.(utils.ErrNotFound); ok {
+				// On timeout and last error was NotFound, returns that last error
+				return innerErr
+			}
 			log.Debugf("timeout reading metadata of cluster '%s'", m.name)
 			return utils.NotFoundError(fmt.Sprintf("failed to reload metadata of cluster '%s'", m.name))
 		}
 		return err
-	}
-	if innerErr != nil {
-		return innerErr
 	}
 	return nil
 }
@@ -162,11 +180,6 @@ func (m *Metadata) Browse(callback func(*Controller) error) error {
 		if err != nil {
 			return err
 		}
-		cm, err := NewMetadata(m.GetService())
-		if err != nil {
-			return err
-		}
-		cm.Carry(cc)
 		return callback(cc)
 	})
 }
