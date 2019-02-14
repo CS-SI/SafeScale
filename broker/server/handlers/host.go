@@ -274,6 +274,7 @@ func (svc *HostHandler) Create(
 	if err != nil {
 		return nil, infraErrf(err, "failed to find template corresponding to requested resources")
 	}
+
 	var template model.HostTemplate
 	if len(templates) > 0 {
 		template = templates[0]
