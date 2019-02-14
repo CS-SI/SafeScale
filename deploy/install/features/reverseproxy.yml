@@ -69,7 +69,6 @@ feature:
                                     environment:
                                         - KONG_DATABASE=postgres
                                         - KONG_PG_HOST=kong-database
-                                    restart: always
                                     command: kong migrations bootstrap # up
 
                                 kong-proxy:
@@ -98,7 +97,7 @@ feature:
                                         retries: 10
                             EOF
                             docker-compose -f /opt/safescale/run/reverseproxy.compose.yml -p reverseproxy up -d
-                            while ! docker ps --all | grep reverseproxy_kong-migration_1 | grep Exited; do sleep 5; done && sleep 5
+                            RETRY=0; until docker ps --all | grep reverseproxy_kong-migration_1 | grep Exited || ((RETRY++ >= 60)); do sleep 5; done && sleep 5
                             iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
                             sfSaveIptablesRules
 

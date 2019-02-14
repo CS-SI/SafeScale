@@ -1,0 +1,195 @@
+#
+# Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    name: MetricBeat
+    suitableFor:
+        host: yes
+        cluster: all
+    parameters:
+        - KibanaSocket
+        - ElasticsearchSocket
+    install:
+        bash:
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    systemctl status metricbeat.service
+                                    ;;
+                                centos|rhel)
+                                    echo "TODO"
+                                    exit 4224
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
+
+            add:
+                pace: install,config,start
+                steps:
+                    install:
+                        serial: true
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+                                    sfWaitForApt && apt-get install -y apt-transport-https
+                                    grep "deb https://artifacts.elastic.co/packages/6.x/apt stable main" /etc/apt/sources.list.d/elastic-6.x.list >/dev/null 2>&1 || \
+                                    echo "deb https://artifacts.elastic.co/packages/6.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-6.x.list
+                                    sfWaitForApt && apt-get update 
+                                    sfWaitForApt && apt-get install -y metricbeat
+                                    ;;
+                                centos|rhel)
+                                    echo "TODO"
+                                    exit 4224
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 195
+                                    ;;
+                            esac
+                            exit 0
+
+                    config:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            mkdir -p /etc/metricbeat
+                            cat >/etc/metricbeat/metricbeat.yml << 'EOF'
+                            #-------------------------------- Autodiscovery -------------------------------
+                            metricbeat.autodiscover:
+                              providers:
+                              - type: docker
+                                hints.enabled: true
+                            #------------------------------- System Module -------------------------------
+                            metricbeat.modules:
+                            - module: system
+                              metricsets: ["cpu", "load", "memory", "network", "process", "process_summary", "core", "diskio", "socket"]
+                              processes: ['.*']
+                              process.include_top_n:
+                                by_cpu: 5
+                                by_memory: 5
+                              period: 10s
+                              cpu.metrics:  ["percentages"]
+                              core.metrics: ["percentages"]
+
+                            - module: system
+                              period: 1m
+                              metricsets:
+                                - filesystem
+                                - fsstat
+                              processors:
+                              - drop_event.when.regexp:
+                                  system.filesystem.mount_point: '^/(sys|cgroup|proc|dev|etc|host|lib)($|/)'
+
+                            - module: system
+                              period: 15m
+                              metricsets:
+                                - uptime
+                            #------------------------------- Docker Module -------------------------------
+                            - module: docker
+                              metricsets: ["container", "cpu", "diskio", "healthcheck", "info", "memory", "network", "image"]
+                              hosts: ["unix:///var/run/docker.sock"]
+                              period: 10s
+                            #------------------------------- Processors -------------------------------
+                            processors:
+                            - add_docker_metadata: ~
+                            - add_locale: ~
+
+                            #-------------------------- Elasticsearch output ------------------------------
+                            output.elasticsearch:
+                              hosts: ["http://{{.ElasticsearchSocket}}"]
+                            xpack.monitoring:
+                              enabled: true
+                              elasticsearch:
+                            #============================== Dashboards =====================================
+                            setup.dashboards:
+                              enabled: true
+                            setup.kibana:
+                              host: "http://{{.KibanaSocket}}"
+                            EOF
+
+                            exit 0
+
+                    start:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            systemctl daemon-reload
+                            systemctl start metricbeat || exit 196
+                            exit 0
+
+            remove:
+                pace: metricbeat
+                steps:
+                    metricbeat:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    systemctl stop metricbeat
+                                    systemctl disable metricbeat
+                                    sfWaitForApt && apt remove -y metricbeat
+                                    sfWaitForApt && apt purge -y metricbeat
+                                    ;;
+                                centos|rhel)
+                                    echo "TODO"
+                                    exit 4224
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 4224
+                                    ;;
+                            esac
+
+    service:
+        start: |
+            systemctl start metricbeat
+
+        stop: |
+            systemctl stop metricbeat
+
+        state: |
+            systemctl status metricbeat
+
+...

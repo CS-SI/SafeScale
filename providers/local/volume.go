@@ -21,6 +21,7 @@ package local
 import (
 	"encoding/xml"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"hash/fnv"
 	"path/filepath"
 	"sort"
@@ -220,6 +221,9 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, error) {
+	log.Debug("local.Client.CreateVolume() called")
+	defer log.Debug("local.Client.CreateVolume() done")
+
 	//volume speed is ignored
 	storagePool, err := client.getStoragePoolByPath(client.Config.LibvirtStorage)
 	if err != nil {
@@ -267,6 +271,9 @@ func (client *Client) CreateVolume(request model.VolumeRequest) (*model.Volume, 
 
 // GetVolume returns the volume identified by id
 func (client *Client) GetVolume(ref string) (*model.Volume, error) {
+	log.Debug("local.Client.GetVolume() called")
+	defer log.Debug("local.Client.GetVolume() done")
+
 	libvirtVolume, err := client.getLibvirtVolume(ref)
 	if err != nil {
 		return nil, err
@@ -282,6 +289,9 @@ func (client *Client) GetVolume(ref string) (*model.Volume, error) {
 
 //ListVolumes return the list of all volume known on the current tenant
 func (client *Client) ListVolumes() ([]model.Volume, error) {
+	log.Debug("local.Client.ListVolumes() called")
+	defer log.Debug("local.Client.ListVolumes() done")
+
 	storagePool, err := client.getStoragePoolByPath(client.Config.LibvirtStorage)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get storage pool from path : %s", err.Error())
@@ -305,6 +315,9 @@ func (client *Client) ListVolumes() ([]model.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (client *Client) DeleteVolume(ref string) error {
+	log.Debug("local.Client.DeleteVolume() called")
+	defer log.Debug("local.Client.DeleteVolume() done")
+
 	libvirtVolume, err := client.getLibvirtVolume(ref)
 	if err != nil {
 		return err
@@ -323,6 +336,9 @@ func (client *Client) DeleteVolume(ref string) error {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentRequest) (string, error) {
+	log.Debug("local.Client.CreateVolumeAttachment() called")
+	defer log.Debug("local.Client.CreateVolumeAttachment() done")
+
 	_, domain, err := client.getHostAndDomainFromRef(request.HostID)
 	if err != nil {
 		return "", fmt.Errorf("Failed to get domain from request.HostID : %s", err.Error())
@@ -377,6 +393,9 @@ func (client *Client) CreateVolumeAttachment(request model.VolumeAttachmentReque
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (client *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAttachment, error) {
+	log.Debug("local.Client.GetVolumeAttachment() called")
+	defer log.Debug("local.Client.GetVolumeAttachment() done")
+
 	_, domain, err := client.getHostAndDomainFromRef(serverID)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get domain from ref : %s", err.Error())
@@ -397,6 +416,9 @@ func (client *Client) GetVolumeAttachment(serverID, id string) (*model.VolumeAtt
 
 // DeleteVolumeAttachment ...
 func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
+	log.Debug("local.Client.DeleteVolumeAttachment() called")
+	defer log.Debug("local.Client.DeleteVolumeAttachment() done")
+
 	_, domain, err := client.getHostAndDomainFromRef(serverID)
 	if err != nil {
 		return fmt.Errorf("Failed to get domain from ref : %s", err.Error())
@@ -443,6 +465,9 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 
 // ListVolumeAttachments lists available volume attachment
 func (client *Client) ListVolumeAttachments(serverID string) ([]model.VolumeAttachment, error) {
+	log.Debug("local.Client.ListVolumeAttachments() called")
+	defer log.Debug("local.Client.ListVolumeAttachments() done")
+
 	var volumes []*libvirt.StorageVol
 	var volumeAttachments []model.VolumeAttachment
 

@@ -131,7 +131,7 @@ feature:
                             [Service]
                             Type=simple
                             User={{.Username}}
-                            ExecStartPre=sleep 5
+                            ExecStartPre=/bin/sleep 5
                             ExecStart=/usr/bin/vncconfig -display %i -nowin
 
                             [Install]
@@ -243,8 +243,9 @@ feature:
                             6DxAL5QxcUg11XgF202lp4xtaGE6Ztp54kOJl0q2WnF0147fJuLhKZ6xH4C3AAAAnOC4P8r+AxMA
                             AYsrgOADAIsbpW6xxGf7AgAAAAAEWVo=
                             EOF
-                            cat /var/tmp/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
-                            rm -f /var/tmp/xfce_conf.encoded
+                            sed -i -e "s/^[[:space:]]\+//g" /var/tmp/xfce_front.encoded
+                            cat /var/tmp/xfce_front.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
+                            rm -f /var/tmp/xfce_front.encoded
                             chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 195
 
                             systemctl daemon-reload && \
@@ -261,7 +262,7 @@ feature:
                             mkdir -p /var/tmp/remotedesktop.image
                             cd /var/tmp/remotedesktop.image
 
-                            VERSION=0.9.14
+                            VERSION=1.0.0
                             APACHE="http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${VERSION}"
                             sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || exit 192
                             sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || exit 193
@@ -308,6 +309,7 @@ feature:
                             autorestart=true
                             stopsignal=QUIT
                             EOF
+                            sed -i -e "s/^[[:space:]]\+//g" supervisord.conf
 
                             cat >logback.xml <<-'EOF'
                             <configuration>

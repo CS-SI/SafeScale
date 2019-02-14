@@ -300,6 +300,32 @@ func apacheIgniteFeature() *Feature {
 	}
 }
 
+// metricbeatFeature ...
+func metricbeatFeature() *Feature {
+	specs, err := loadSpecFile("metricbeat")
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
+		fileName:    "metricbeat",
+		specs:       specs,
+	}
+}
+
+// filebeatFeature ...
+func filebeatFeature() *Feature {
+	specs, err := loadSpecFile("filebeat")
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: specs.GetString("feature.name"),
+		fileName:    "filebeat",
+		specs:       specs,
+	}
+}
+
 // ListAvailables returns an array of availables features with the useable installers
 // func ListAvailables() []string {
 // 	var output []string

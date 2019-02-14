@@ -162,5 +162,6 @@ func (client *Client) DeleteVolumeAttachment(serverID, id string) error {
 }
 
 func init() {
+	// log.Debug("Registering fake local provider")
 	providers.Register("local", &Client{})
 }
