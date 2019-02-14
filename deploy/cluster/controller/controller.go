@@ -19,6 +19,7 @@ package controller
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -52,10 +53,20 @@ type Controller struct {
 
 // NewController ...
 func NewController(svc *providers.Service) *Controller {
+	metadata, err := NewMetadata(svc)
+	if err != nil {
+		panic("failed to create metadata object")
+	}
 	return &Controller{
 		service:    svc,
+		metadata:   metadata,
 		Properties: serialize.NewJSONProperties("clusters"),
 	}
+}
+
+func (c *Controller) replace(src *Controller) {
+	(&c.Identity).Replace(&src.Identity)
+	c.Properties = src.Properties
 }
 
 // Restore restores full ability of a Cluster controller by binding with appropriate Blueprint
@@ -300,23 +311,18 @@ func (c *Controller) FindAvailableNode(public bool) (string, error) {
 
 // UpdateMetadata writes Cluster config in Object Storage
 func (c *Controller) UpdateMetadata(updatefn func() error) error {
-	if c.metadata == nil {
-		m, err := NewMetadata(c.GetService())
-		if err != nil {
-			return err
-		}
-		m.Carry(c)
-		c.metadata = m
-		c.metadata.Acquire()
-	} else {
-		c.metadata.Acquire()
-		err := c.metadata.Reload()
-		if err != nil {
-			return err
-		}
-		*c = *(c.metadata.Get())
-	}
+	c.metadata.Acquire()
 	defer c.metadata.Release()
+
+	err := c.metadata.Reload()
+	if err != nil {
+		return err
+	}
+	if c.metadata.Written() {
+		c.replace(c.metadata.Get())
+	} else {
+		c.metadata.Carry(c)
+	}
 
 	if updatefn != nil {
 		err := updatefn()
@@ -329,11 +335,13 @@ func (c *Controller) UpdateMetadata(updatefn func() error) error {
 
 // DeleteMetadata removes Cluster metadata from Object Storage
 func (c *Controller) DeleteMetadata() error {
+	c.metadata.Acquire()
+	defer c.metadata.Release()
+
 	err := c.metadata.Delete()
 	if err != nil {
 		return nil
 	}
-	c.metadata = nil
 	return nil
 }
 
@@ -357,26 +365,6 @@ func (c *Controller) Serialize() ([]byte, error) {
 
 // Deserialize reads json code and reinstanciates cluster
 func (c *Controller) Deserialize(buf []byte) error {
-	// var parsed map[string]interface{}
-	// err := serialize.FromJSON(buf, &parsed)
-	// if err != nil {
-	// 	return err
-	// }
-	// if c.Properties == nil {
-	// 	field, found := parsed["flavor"].(float64)
-	// 	if !found {
-	// 		return fmt.Errorf("invalid JSON content in metadata: missing 'flavor' field")
-	// 	}
-	// 	c.Properties = serialize.NewJSONProperties("clusters." + strings.ToLower(Flavor.Enum(int(field)).String()))
-	// }
-	// err = c.Properties.LockForWrite(Property.FlavorV1).ThenUse(func(v interface{}) error {
-	// 	return serialize.FromJSON(buf, c)
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
-	// return nil
 	return serialize.FromJSON(buf, c)
 }
 
@@ -534,6 +522,71 @@ func (c *Controller) ForceGetState() (ClusterState.Enum, error) {
 	return state, err
 }
 
+// deleteMaster deletes the master specified by its ID
+func (c *Controller) deleteMaster(hostID string) error {
+	if c == nil {
+		panic("Calling c.deleteMaster with c==nil!")
+	}
+	if hostID == "" {
+		panic("hostID is empty!")
+	}
+
+	var (
+		found  bool
+		idx    int
+		master *clusterpropsv1.Node
+	)
+
+	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
+		nodesV1 := v.(*clusterpropsv1.Nodes)
+		found, idx = contains(nodesV1.Masters, hostID)
+		if !found {
+			return model.ResourceNotFoundError("host", hostID)
+		}
+		master = nodesV1.Masters[idx]
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Removes master from cluster metadata
+	err = c.UpdateMetadata(func() error {
+		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+			nodesV1 := v.(*clusterpropsv1.Nodes)
+			nodesV1.Masters = append(nodesV1.Masters[:idx], nodesV1.Masters[idx+1:]...)
+			return nil
+		})
+	})
+	if err != nil {
+		return err
+	}
+
+	// Starting from here, restore master in cluster metadata if exiting with error
+	defer func() {
+		if err != nil {
+			derr := c.UpdateMetadata(func() error {
+				return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+					nodesV1 := v.(*clusterpropsv1.Nodes)
+					nodesV1.Masters = append(nodesV1.Masters, master)
+					return nil
+				})
+			})
+			if derr != nil {
+				log.Errorf("failed to restore node ownership in cluster")
+			}
+		}
+	}()
+
+	// Finally delete host
+	err = brokerclient.New().Host.Delete([]string{master.ID}, 10*time.Minute)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // DeleteLastNode deletes the last Agent node added
 func (c *Controller) DeleteLastNode(public bool, selectedMaster string) error {
 	if c == nil {
@@ -673,6 +726,10 @@ func (c *Controller) deleteNode(node *clusterpropsv1.Node, index int, public boo
 	// Finally delete host
 	err = brokerclient.New().Host.Delete([]string{node.ID}, 10*time.Minute)
 	if err != nil {
+		if _, ok := err.(model.ErrResourceNotFound); ok {
+			// host seems already deleted, so it's a success (handles the case where )
+			err = nil
+		}
 		return err
 	}
 
@@ -683,9 +740,6 @@ func (c *Controller) deleteNode(node *clusterpropsv1.Node, index int, public boo
 func (c *Controller) Delete() error {
 	if c == nil {
 		panic("Calling c.Delete with c==nil!")
-	}
-	if c.metadata == nil {
-		return fmt.Errorf("no metadata found for this cluster")
 	}
 
 	// Updates metadata
@@ -699,24 +753,46 @@ func (c *Controller) Delete() error {
 		return err
 	}
 
+	var wg sync.WaitGroup
 	broker := brokerclient.New()
 
 	// Deletes the public nodes
 	list := c.ListNodeIDs(true)
 	if len(list) > 0 {
-		broker.Host.Delete(list, brokerclient.DefaultExecutionTimeout)
+		wg.Add(len(list))
+		for _, target := range list {
+			go func(h string) {
+				defer wg.Done()
+				c.DeleteSpecificNode(h, "")
+			}(target)
+		}
+		wg.Wait()
 	}
 
 	// Deletes the private nodes
 	list = c.ListNodeIDs(false)
 	if len(list) > 0 {
-		broker.Host.Delete(list, brokerclient.DefaultExecutionTimeout)
+		wg.Add(len(list))
+		for _, target := range list {
+			go func(h string) {
+				defer wg.Done()
+				c.DeleteSpecificNode(h, "")
+			}(target)
+		}
+		wg.Wait()
 	}
 
 	// Delete the Masters
 	list = c.ListMasterIDs()
 	if len(list) > 0 {
-		broker.Host.Delete(list, brokerclient.DefaultExecutionTimeout)
+		wg.Add(len(list))
+		for _, target := range list {
+			go func(h string) {
+				defer wg.Done()
+				c.deleteMaster(h)
+			}(target)
+		}
+		wg.Wait()
 	}
 
 	// Deletes the network and gateway
@@ -744,7 +820,6 @@ func (c *Controller) Delete() error {
 		return nil
 	}
 	c.service = nil
-	c.metadata = nil
 	return nil
 }
 

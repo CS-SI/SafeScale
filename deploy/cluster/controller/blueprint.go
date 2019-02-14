@@ -77,16 +77,16 @@ type BlueprintActors struct {
 	ConfigureGateway            func(c api.Cluster, b *Blueprint) error
 	CreateMaster                func(c api.Cluster, b *Blueprint, index int) error
 	ConfigureMaster             func(c api.Cluster, b *Blueprint, index int, pbHost *pb.Host) error
-	UnconfigureMaster           func(c api.Cluster, b *Blueprint, hostID string) error
+	UnconfigureMaster           func(c api.Cluster, b *Blueprint, pbHost *pb.Host) error
 	CreateNode                  func(c api.Cluster, b *Blueprint, index int, pbHost *pb.Host) error
 	ConfigureNode               func(c api.Cluster, b *Blueprint, index int, pbHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr string) error
-	UnconfigureNode             func(c api.Cluster, b *Blueprint, hostID string, selectedMasterID string) error
+	UnconfigureNode             func(c api.Cluster, b *Blueprint, pbHost *pb.Host, selectedMasterID string) error
 	ConfigureCluster            func(c api.Cluster, b *Blueprint) error
 	UnconfigureCluster          func(c api.Cluster, b *Blueprint) error
-	JoinMasterToCluster         func(c api.Cluster, b *Blueprint, phHost *pb.Host) error
-	JoinNodeToCluster           func(c api.Cluster, b *Blueprint, phHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr string) error
-	LeaveMasterFromCluster      func(c api.Cluster, b *Blueprint, phHost *pb.Host) error
-	LeaveNodeFromCluster        func(c api.Cluster, b *Blueprint, phHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr, selectedMaster string) error
+	JoinMasterToCluster         func(c api.Cluster, b *Blueprint, pbost *pb.Host) error
+	JoinNodeToCluster           func(c api.Cluster, b *Blueprint, pbHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr string) error
+	LeaveMasterFromCluster      func(c api.Cluster, b *Blueprint, pbHost *pb.Host) error
+	LeaveNodeFromCluster        func(c api.Cluster, b *Blueprint, pbHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr, selectedMaster string) error
 	GetState                    func(c api.Cluster) (ClusterState.Enum, error)
 }
 
@@ -110,7 +110,7 @@ func (b *Blueprint) Construct(req Request) error {
 	log.Infof("Constructing cluster '%s'...", req.Name)
 	defer func() {
 		if err == nil {
-			log.Infof("Cluster '%s' constructed successfully", req.Name)
+			log.Infof("Cluster '%s' construction successful.", req.Name)
 		}
 	}()
 
@@ -513,8 +513,12 @@ func (b *Blueprint) configureNode(index int, pbHost *pb.Host, nodeType NodeType.
 
 // unconfigureNode executes what has to be done to remove node from cluster
 func (b *Blueprint) unconfigureNode(hostID string, selectedMasterID string) error {
+	pbHost, err := brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		return err
+	}
 	if b.Actors.UnconfigureNode != nil {
-		return b.Actors.UnconfigureNode(b.Cluster, b, hostID, selectedMasterID)
+		return b.Actors.UnconfigureNode(b.Cluster, b, pbHost, selectedMasterID)
 	}
 	// Not finding a callback isn't an error, so return nil in this case
 	return nil
@@ -530,9 +534,9 @@ func (b *Blueprint) configureMaster(index int, pbHost *pb.Host) error {
 }
 
 // unconfigureMaster executes what has to be done to remove Master from Cluster
-func (b *Blueprint) unconfigureMaster(hostID string) error {
+func (b *Blueprint) unconfigureMaster(pbHost *pb.Host) error {
 	if b.Actors.UnconfigureMaster != nil {
-		return b.Actors.UnconfigureMaster(b.Cluster, b, hostID)
+		return b.Actors.UnconfigureMaster(b.Cluster, b, pbHost)
 	}
 	// Not finding a callback isn't an error, so return nil in this case
 	return nil
@@ -752,6 +756,10 @@ func (b *Blueprint) leaveNodesFromList(hosts []string, public bool, selectedMast
 	for _, hostID := range hosts {
 		pbHost, err := brokerHost.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
+			// If host seems deleted, consider leaving as a success
+			if _, ok := err.(model.ErrResourceNotFound); ok {
+				continue
+			}
 			return err
 		}
 		err = b.Actors.LeaveNodeFromCluster(b.Cluster, b, pbHost, nodeType, nodeTypeStr, selectedMasterID)

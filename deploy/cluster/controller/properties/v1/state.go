@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
@@ -44,20 +43,13 @@ func (s *State) Content() interface{} {
 
 // Clone ... (serialize.Property interface)
 func (s *State) Clone() serialize.Property {
-	sn := newState()
-	err := serialize.CloneValue(s, sn)
-	if err != nil {
-		panic(fmt.Sprintf("failed to clone 'State': %v", err))
-	}
-	return sn
+	return newState().Replace(s)
 }
 
 // Replace ... (serialize.Property interface)
-func (s *State) Replace(v interface{}) {
-	err := serialize.CloneValue(v, s)
-	if err != nil {
-		panic(fmt.Sprintf("failed to replace 'State': %v", err))
-	}
+func (s *State) Replace(p serialize.Property) serialize.Property {
+	*s = *p.(*State)
+	return s
 }
 
 func init() {

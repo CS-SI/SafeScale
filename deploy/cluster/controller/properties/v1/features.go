@@ -17,8 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
@@ -46,20 +44,21 @@ func (f *Features) Content() interface{} {
 
 // Clone ... (serialize.Property interface)
 func (f *Features) Clone() serialize.Property {
-	fn := newFeatures()
-	err := serialize.CloneValue(f, fn)
-	if err != nil {
-		panic(fmt.Sprintf("failed to clone 'Features': %v", err))
-	}
-	return fn
+	return newFeatures().Replace(f)
 }
 
 // Replace ... (serialize.Property interface)
-func (f *Features) Replace(v interface{}) {
-	err := serialize.CloneValue(v, f)
-	if err != nil {
-		panic(fmt.Sprintf("failed to replace 'Features': %v", err))
+func (f *Features) Replace(p serialize.Property) serialize.Property {
+	src := p.(*Features)
+	f.Installed = make(map[string]string, len(src.Installed))
+	f.Disabled = make(map[string]struct{}, len(src.Installed))
+	for k, v := range src.Installed {
+		f.Installed[k] = v
 	}
+	for k, v := range src.Disabled {
+		f.Disabled[k] = v
+	}
+	return f
 }
 
 func init() {
