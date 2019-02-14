@@ -17,10 +17,10 @@
 # Installs and configure a master node
 
 # Redirects outputs to /var/tmp/install_master.log
-rm -f /var/tmp/install_master.log
+rm -f /var/tmp/install_gateway.log
 exec 1<&-
 exec 2<&-
-exec 1<>/var/tmp/install_master.log
+exec 1<>/var/tmp/install_gateway.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}

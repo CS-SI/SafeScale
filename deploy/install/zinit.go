@@ -39,6 +39,8 @@ func init() {
 		proxycacheClientFeature(),
 		apacheIgniteFeature(),
 		//		elasticSearchFeature(),
+		metricbeatFeature(),
+		filebeatFeature(),
 		helmFeature(),
 		sparkFeature(),
 	}

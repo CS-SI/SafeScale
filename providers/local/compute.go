@@ -367,6 +367,14 @@ func getImagePathFromID(client *Client, id string) (string, error) {
 	for _, imageJSON := range imagesJSON {
 		if imageID, _ := imageJSON.(map[string]interface{})["imageID"]; imageID == id {
 			path := imageJSON.(map[string]interface{})["imagePath"].(string)
+			// check parent directory first
+			parentDir := filepath.Dir(path)
+			if _, err := os.Stat(parentDir); os.IsNotExist(err) {
+				if err != nil {
+					return "", fmt.Errorf("Failed to download image : directory %s doesn't exist", parentDir)
+				}
+			}
+			// download if image file isn't there
 			if _, err := os.Stat(path); os.IsNotExist(err) {
 				err := downloadImage(path, imageJSON.(map[string]interface{})["download"].(map[string]interface{}))
 				if err != nil {
