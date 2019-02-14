@@ -28,6 +28,7 @@ import (
 type Item struct {
 	payload serialize.Serializable
 	folder  *Folder
+	written bool
 	lock    chan struct{}
 }
 
@@ -63,6 +64,11 @@ func (i *Item) GetPath() string {
 	return i.folder.GetPath()
 }
 
+// Written tells if the item has already been written in Object Storage
+func (i *Item) Written() bool {
+	return i.written
+}
+
 // Carry links metadata with cluster struct
 func (i *Item) Carry(data serialize.Serializable) *Item {
 	i.payload = data
@@ -70,8 +76,10 @@ func (i *Item) Carry(data serialize.Serializable) *Item {
 }
 
 // Reset ...
-func (i *Item) Reset() {
+func (i *Item) Reset() *Item {
 	i.payload = nil
+	i.written = false
+	return i
 }
 
 // Get returns payload in item
@@ -97,7 +105,12 @@ func (i *Item) DeleteFrom(path string, name string) error {
 		return err
 	}
 
-	return i.folder.Delete(path, name)
+	err = i.folder.Delete(path, name)
+	if err != nil {
+		return err
+	}
+	i.Reset()
+	return nil
 }
 
 // Delete removes a metadata
@@ -117,6 +130,7 @@ func (i *Item) ReadFrom(path string, name string, callback ItemDecoderCallback) 
 		return err
 	}
 	i.payload = data
+	i.written = true
 	return nil
 }
 
@@ -137,7 +151,12 @@ func (i *Item) WriteInto(path string, name string) error {
 	if err != nil {
 		return err
 	}
-	return i.folder.Write(path, name, data)
+	err = i.folder.Write(path, name, data)
+	if err != nil {
+		return err
+	}
+	i.written = true
+	return nil
 }
 
 // Write saves the content of Item to the Object Storage
