@@ -294,7 +294,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			return errors.Errorf("Failure creating network")
 		}
 
-		err = metadata.SaveNetwork(serviceProvider, net)
+		_, err = metadata.SaveNetwork(serviceProvider, net)
 		if err != nil {
 			return errors.Errorf("Failure saving network metadata")
 		}
