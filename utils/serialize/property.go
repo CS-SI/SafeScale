@@ -22,6 +22,6 @@ type Property interface {
 	Content() interface{}
 	// Clone allows to duplicate Property
 	Clone() Property
-	// Replace allows to write real data into Property
-	Replace(interface{})
+	// Replace allows to replace Property with data from source
+	Replace(Property) Property
 }
