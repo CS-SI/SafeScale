@@ -43,7 +43,10 @@ func cleanup() {
 		text = "y"
 	}
 	if strings.TrimRight(text, "\n") == "y" {
-		client.New().ProcessManager.Stop(utils.GetUUID(), client.DefaultExecutionTimeout)
+		err = client.New().ProcessManager.Stop(utils.GetUUID(), client.DefaultExecutionTimeout)
+		if err != nil {
+			fmt.Printf("Failed to stop the process %v\n", err)
+		}
 	}
 }
 

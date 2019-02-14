@@ -410,7 +410,10 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 	}
 	defer func() {
 		if err != nil {
-			nfsClient.Unmount(server.GetAccessIP(), share.Path)
+			err2 := nfsClient.Unmount(server.GetAccessIP(), share.Path)
+			if err2 != nil {
+				log.Warnf("Failed to unmount the share %s", shareName)
+			}
 		}
 	}()
 
