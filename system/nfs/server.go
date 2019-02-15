@@ -58,7 +58,7 @@ func (s *Server) AddShare(path string, secutityModes []string, readOnly, rootSqu
 		return fmt.Errorf("Failed to create the share : %s", err.Error())
 	}
 
-	acl := ExportAcl{
+	acl := ExportACL{
 		Host:          "*",
 		SecurityModes: []SecurityFlavor.Enum{},
 		Options: ExportOptions{
@@ -90,7 +90,7 @@ func (s *Server) AddShare(path string, secutityModes []string, readOnly, rootSqu
 		}
 	}
 
-	share.AddAcl(acl)
+	share.AddACL(acl)
 
 	return share.Add()
 }
@@ -100,7 +100,7 @@ func (s *Server) RemoveShare(path string) error {
 	data := map[string]interface{}{
 		"Path": path,
 	}
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "nfs_server_path_unexport.sh", data)
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
 }
 

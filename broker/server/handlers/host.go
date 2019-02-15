@@ -410,20 +410,7 @@ func (svc *HostHandler) Create(
 	if err != nil {
 		return nil, infraErrf(err, "Metadata creation failed")
 	}
-	defer func() {
-		if err != nil {
-			mh, derr := metadata.LoadHost(svc.provider, host.ID)
-			if derr != nil {
-				log.Errorf("Failed to load host metadata '%s': %v", host.Name, derr)
-			}
-			derr = mh.Delete()
-			if derr != nil {
-				log.Errorf("Failed to delete host metadata '%s': %v", host.Name, derr)
-			}
-		}
-	}()
 	log.Infof("Compute resource created: '%s'", host.Name)
-
 	// Starting from here, remove metadata if exiting with error
 	defer func() {
 		if err != nil {
@@ -636,7 +623,7 @@ func (svc *HostHandler) Delete(ctx context.Context, ref string) error {
 		hostMountsV1 := v.(*propsv1.HostMounts)
 		for _, i := range hostMountsV1.RemoteMountsByPath {
 			// Gets share data
-			_, share, _, err := shareHandler.Inspect(i.ShareID)
+			_, share, _, err := shareHandler.Inspect(ctx, i.ShareID)
 			if err != nil {
 				return infraErr(err)
 			}
@@ -674,7 +661,7 @@ func (svc *HostHandler) Delete(ctx context.Context, ref string) error {
 	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		for k := range hostNetworkV1.NetworksByID {
-			network, err := netHandler.Inspect(k)
+			network, err := netHandler.Inspect(ctx, k)
 			if err != nil {
 				log.Errorf(err.Error())
 				continue
@@ -757,7 +744,7 @@ func (svc *HostHandler) SSH(ctx context.Context, ref string) (*system.SSHConfig,
 
 	sshHandler := NewSSHHandler(svc.provider)
 	// sshConfig, err := sshHandler.GetConfig(host.ID)
-	sshConfig, err := sshHandler.GetConfig(ref)
+	sshConfig, err := sshHandler.GetConfig(ctx, ref)
 	if err != nil {
 		return nil, logicErr(err)
 	}

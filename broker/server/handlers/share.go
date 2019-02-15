@@ -183,9 +183,12 @@ func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path s
 	}
 	defer func() {
 		if err != nil {
-			delete(serverSharesV1.ByID, share.ID)
-			delete(serverSharesV1.ByName, share.Name)
-			err2 := server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
+			err2 := server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+				serverSharesV1 := v.(*propsv1.HostShares)
+				delete(serverSharesV1.ByID, share.ID)
+				delete(serverSharesV1.ByName, share.Name)
+				return nil
+			})
 			if err2 != nil {
 				log.Warnf("Failed to set shares metadata of host %s", hostName)
 			}
@@ -244,7 +247,7 @@ func (svc *ShareHandler) Delete(ctx context.Context, name string) error {
 		}
 
 		sshHandler := NewSSHHandler(svc.provider)
-		sshConfig, err := sshHandler.GetConfig(server.ID)
+		sshConfig, err := sshHandler.GetConfig(ctx, server.ID)
 		if err != nil {
 			return infraErr(err)
 		}
@@ -398,7 +401,7 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 		}
 		shareID := serverSharesV1.ByName[shareName]
 		sshHandler := NewSSHHandler(svc.provider)
-		sshConfig, err := sshHandler.GetConfig(target)
+		sshConfig, err := sshHandler.GetConfig(ctx, target)
 		if err != nil {
 			return infraErr(err)
 		}
@@ -413,7 +416,7 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 			return infraErr(err)
 		}
 
-		err = nfsClient.Mount(export, mountPath)
+		err = nfsClient.Mount(export, mountPath, withCache)
 		if err != nil {
 			return infraErr(err)
 		}
@@ -453,9 +456,12 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 	}
 	defer func() {
 		if err != nil {
-			delete(serverSharesV1.ByID[shareID].ClientsByName, target.Name)
-			delete(serverSharesV1.ByID[shareID].ClientsByID, target.ID)
-			err2 := server.Properties.Set(HostProperty.SharesV1, serverSharesV1)
+			err2 := server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
+				serverSharesV1 := v.(*propsv1.HostShares)
+				delete(serverSharesV1.ByID[serverSharesV1.ByName[shareName]].ClientsByName, target.Name)
+				delete(serverSharesV1.ByID[serverSharesV1.ByName[shareName]].ClientsByID, target.ID)
+				return nil
+			})
 			if err2 != nil {
 				log.Warnf("Failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
 			}
@@ -473,14 +479,17 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 	}
 	defer func() {
 		if err != nil {
-			delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
-			delete(targetMountsV1.RemoteMountsByPath, mount.Path)
-			err = target.Properties.Set(HostProperty.MountsV1, targetMountsV1)
-			if err != nil {
+			err2 := server.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+				targetMountsV1 := v.(*propsv1.HostMounts)
+				delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
+				delete(targetMountsV1.RemoteMountsByPath, mount.Path)
+				return nil
+			})
+			if err2 != nil {
 				log.Warnf("Failed to remove mounted share %s from host %s metadatas", shareName, hostName)
 			}
-			err = metadata.SaveHost(svc.provider, target)
-			if err != nil {
+			err2 = metadata.SaveHost(svc.provider, target)
+			if err2 != nil {
 				log.Warnf("Failed to save host %s metadatas", hostName)
 			}
 		}
@@ -538,20 +547,20 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 			return logicErr(fmt.Errorf("not mounted on host '%s'", target.Name))
 		}
 
-	// Unmount share from client
-	sshHandler := NewSSHHandler(svc.provider)
-	sshConfig, err := sshHandler.GetConfig(ctx, target.ID)
-	if err != nil {
-		return infraErr(err)
-	}
-	nfsClient, err := nfs.NewNFSClient(sshConfig)
-	if err != nil {
-		return infraErr(err)
-	}
-	err = nfsClient.Unmount(server.GetAccessIP(), share.Path)
-	if err != nil {
-		return infraErr(err)
-	}
+		// Unmount share from client
+		sshHandler := NewSSHHandler(svc.provider)
+		sshConfig, err := sshHandler.GetConfig(ctx, target.ID)
+		if err != nil {
+			return infraErr(err)
+		}
+		nfsClient, err := nfs.NewNFSClient(sshConfig)
+		if err != nil {
+			return infraErr(err)
+		}
+		err = nfsClient.Unmount(server.GetAccessIP() + ":" + share.Path)
+		if err != nil {
+			return infraErr(err)
+		}
 
 		// Remove mount from mount list
 		delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
@@ -588,7 +597,7 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 	select {
 	case <-ctx.Done():
 		log.Warnf("Share unmount canceled by broker")
-		_, err = svc.Mount(context.Background(), shareName, hostName, mount.Path, false)
+		_, err = svc.Mount(context.Background(), shareName, hostName, share.Path, false)
 		if err != nil {
 			return fmt.Errorf("Failed to stop Share unmounting")
 		}

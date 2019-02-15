@@ -29,7 +29,7 @@ UUID=""
 {{- if not .DoNotFormat }}
 mkfs -F -t {{.FileSystem}} "{{.Device}}" >/dev/null
 {{- end }}
-eval $(blkid | grep "{{.Device}}" | grep {{.FileSystem}} | cut -d: -f2-)
+eval $(blkid | grep "{{.Device}}" | cut -d: -f2-)
 
 echo "/dev/disk/by-uuid/$UUID {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
 mkdir -p "{{.MountPoint}}" >/dev/null && \

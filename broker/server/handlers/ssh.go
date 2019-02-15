@@ -90,7 +90,7 @@ func (svc *SSHHandler) GetConfig(ctx context.Context, hostParam interface{}) (*s
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if hostNetworkV1.DefaultGatewayID != "" {
 			hostSvc := NewHostHandler(svc.provider)
-			gw, err := hostSvc.Inspect(hostNetworkV1.DefaultGatewayID)
+			gw, err := hostSvc.Inspect(ctx, hostNetworkV1.DefaultGatewayID)
 			if err != nil {
 				return throwErr(err)
 			}
