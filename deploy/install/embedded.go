@@ -332,26 +332,30 @@ func apacheIgniteFeature() *Feature {
 
 // metricbeatFeature ...
 func metricbeatFeature() *Feature {
-	filename, specs, err := loadSpecFile("metricbeat")
+	name := "metricbeat"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
+		displayName: name,
 		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
 
 // filebeatFeature ...
 func filebeatFeature() *Feature {
-	filename, specs, err := loadSpecFile("filebeat")
+	name := "filebeat"
+	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
 	}
 	return &Feature{
-		displayName: specs.GetString("feature.name"),
+		displayName: name,
 		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
