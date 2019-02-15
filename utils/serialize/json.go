@@ -53,7 +53,7 @@ type SyncedJSONProperty struct {
 // The lock applied on the extension is automatically released on exit.
 func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) error {
 	if sp == nil {
-		panic("Calling sp.ThenUse() with sp==nil!")
+		panic("Calling utils.serialize.SyncedJSONProperty::ThenUse() from a nil pointer!")
 	}
 	if sp.jsonProperty == nil {
 		panic("sp.jsonProperty is nil!")
@@ -63,19 +63,17 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(interface{}) error) error {
 	}
 	defer sp.unlock()
 
-	var err error
-	if sp.readLock {
-		// In case of read lock, the changes in property is disabled by cloning the property
-		if data, ok := sp.jsonProperty.Data.(Property); ok {
-			clone := data.Clone()
-			err = apply(clone.Content())
+	if data, ok := sp.jsonProperty.Data.(Property); ok {
+		clone := data.Clone()
+		err := apply(clone.Content())
+		if err != nil {
+			return err
 		}
-	} else {
-		err = apply((sp.jsonProperty.Data).(Property).Content())
+		if !sp.readLock {
+			sp.jsonProperty.Data.(Property).Replace(clone)
+		}
 	}
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
@@ -128,13 +126,13 @@ func (x *JSONProperties) Lookup(key string) bool {
 // can't fail because a key doesn't exist).
 func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
 	if x == nil {
-		panic("Calling x.LockForRead() with x==nil!")
+		panic("Calling utils.serialize.JSONProperties::LockForRead() from nil pointer!")
 	}
 	if x.Properties == nil {
-		panic("JSonProperties.JSonProperties is nil!")
+		panic("x.Properties is nil!")
 	}
 	if x.module == "" {
-		panic("JSonProperties.module is empty!")
+		panic("x.module is empty!")
 	}
 	if key == "" {
 		panic("key is empty!")
