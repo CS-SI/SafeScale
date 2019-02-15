@@ -179,7 +179,7 @@ var volumeAttach = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "do-not-format",
-			Usage: "Prevent the volume to be formated if possible (if he is already formated in the right format)",
+			Usage: "Prevent the volume to be formated (the previous format of the disk will be kept, beware that a new volume has no format before his first attachment and so can't be attach with this option)",
 		},
 	},
 	Action: func(c *cli.Context) error {

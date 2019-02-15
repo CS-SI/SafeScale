@@ -395,7 +395,10 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	case <-ctx.Done():
 		log.Warnf("Network delete canceled by broker")
 		hostSizing := propsv1.NewHostSizing()
-		err := metadataHost.Properties.Get(HostProperty.SizingV1, hostSizing)
+		err := metadataHost.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+			hostSizing = v.(*propsv1.HostSizing)
+			return nil
+		})
 		if err != nil {
 			return fmt.Errorf("Failed to get gateway sizingV1")
 		}
