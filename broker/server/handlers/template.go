@@ -17,6 +17,8 @@
 package handlers
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/providers"
 	"github.com/CS-SI/SafeScale/providers/model"
 )
@@ -27,7 +29,7 @@ import (
 
 //TemplateAPI defines API to manipulate hosts
 type TemplateAPI interface {
-	List(all bool) ([]model.HostTemplate, error)
+	List(ctx context.Context, all bool) ([]model.HostTemplate, error)
 }
 
 // TemplateHandler template service
@@ -43,7 +45,7 @@ func NewTemplateHandler(api *providers.Service) TemplateAPI {
 }
 
 // List returns the template list
-func (svc *TemplateHandler) List(all bool) ([]model.HostTemplate, error) {
+func (svc *TemplateHandler) List(ctx context.Context, all bool) ([]model.HostTemplate, error) {
 	tlist, err := svc.provider.ListTemplates(all)
 	return tlist, infraErr(err)
 }

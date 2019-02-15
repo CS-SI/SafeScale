@@ -17,7 +17,6 @@
 package client
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os/exec"
@@ -64,7 +63,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		connectionTimeout = executionTimeout + 1*time.Minute
 	}
 
-	_, cancel := utils.GetContext(executionTimeout)
+	_, cancel := utils.GetTimeoutContext(executionTimeout)
 	defer cancel()
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
@@ -207,7 +206,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 		connectionTimeout = executionTimeout
 	}
 
-	_, cancel := utils.GetContext(executionTimeout)
+	_, cancel := utils.GetTimeoutContext(executionTimeout)
 	defer cancel()
 
 	var (
@@ -247,7 +246,7 @@ func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.
 	// defer conn.Close()
 	s.session.Connect()
 	defer s.session.Disconnect()
-	ctx := context.Background()
+	ctx := utils.GetContext(true)
 	service := pb.NewHostServiceClient(s.session.connection)
 
 	sshConfig, err := service.SSH(ctx, &pb.Reference{Name: name})

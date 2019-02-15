@@ -17,10 +17,10 @@
 package client
 
 import (
-	"context"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/utils"
 )
 
 // host is the broker client part handling hosts
@@ -34,7 +34,7 @@ func (t *template) List(all bool, timeout time.Duration) (*pb.TemplateList, erro
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTemplateServiceClient(t.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetContext(true)
 	return service.List(ctx, &pb.TemplateListRequest{All: all})
 
 }

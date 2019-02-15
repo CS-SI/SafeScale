@@ -242,9 +242,8 @@ feature:
                             6DxAL5QxcUg11XgF202lp4xtaGE6Ztp54kOJl0q2WnF0147fJuLhKZ6xH4C3AAAAnOC4P8r+AxMA
                             AYsrgOADAIsbpW6xxGf7AgAAAAAEWVo=
                             EOF
-                            sed -i -e "s/^[[:space:]]\+//g" /var/tmp/xfce_front.encoded
-                            cat /var/tmp/xfce_front.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
-                            rm -f /var/tmp/xfce_front.encoded
+                            cat /var/tmp/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
+                            rm -f /var/tmp/xfce_conf.encoded
                             chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 195
 
                             systemctl daemon-reload && \
@@ -308,7 +307,6 @@ feature:
                             autorestart=true
                             stopsignal=QUIT
                             EOF
-                            sed -i -e "s/^[[:space:]]\+//g" supervisord.conf
 
                             cat >logback.xml <<-'EOF'
                             <configuration>

@@ -27,6 +27,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/server/handlers"
+	"github.com/CS-SI/SafeScale/broker/utils"
 )
 
 // SSHHandler exists to ease integration tests
@@ -44,6 +45,13 @@ type SSHListener struct{}
 func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshResponse, error) {
 	log.Infof("Listeners: ssh run '%s' -c '%s'", in.Host, in.Command)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "SSH Run "+in.GetCommand()+" on host "+in.GetHost().GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't execute ssh command: no tenant set")
@@ -51,7 +59,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshRespon
 	}
 
 	handler := SSHHandler(tenant.Service)
-	retcode, stdout, stderr, err := handler.Run(in.GetHost().GetName(), in.GetCommand())
+	retcode, stdout, stderr, err := handler.Run(ctx, in.GetHost().GetName(), in.GetCommand())
 	if err != nil {
 		err = grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -66,6 +74,13 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshRespon
 func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshResponse, error) {
 	log.Printf("Ssh copy called '%s', '%s'", in.Source, in.Destination)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "SSH Copy "+in.GetSource()+" to "+in.GetDestination()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't copy by ssh command: no tenant set")
@@ -73,7 +88,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshR
 	}
 
 	handler := SSHHandler(tenant.Service)
-	retcode, stdout, stderr, err := handler.Copy(in.GetSource(), in.GetDestination())
+	retcode, stdout, stderr, err := handler.Copy(ctx, in.GetSource(), in.GetDestination())
 	if err != nil {
 		return nil, err
 	}

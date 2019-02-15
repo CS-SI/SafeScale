@@ -29,6 +29,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/server/handlers"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	convert "github.com/CS-SI/SafeScale/broker/utils"
 )
 
@@ -50,6 +51,13 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb
 	log.Infof(">>> Listeners: share create '%v'", in)
 	defer log.Debugf("<<< Listeners: share create '%v'", in)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Create share "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't create share: no tenant set")
@@ -58,7 +66,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (*pb
 
 	handler := ShareHandler(tenant.Service)
 	shareName := in.GetName()
-	share, err := handler.Create(shareName, in.GetHost().GetName(), in.GetPath())
+	share, err := handler.Create(ctx, shareName, in.GetHost().GetName(), in.GetPath(), in.GetSecurityModes(), in.GetOptions().GetReadOnly(), in.GetOptions().GetRootSquash(), in.GetOptions().GetSecure(), in.GetOptions().GetAsync(), in.GetOptions().GetNoHide(), in.GetOptions().GetCrossMount(), in.GetOptions().GetSubtreeCheck())
 	if err != nil {
 		tbr := errors.Wrap(err, fmt.Sprintf("can't create share '%s'", shareName))
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())
@@ -72,6 +80,13 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 	log.Infof(">>> Listeners: share delete '%s'", shareName)
 	defer log.Debugf("<<< Listeners: share delete '%s'", shareName)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Delete share "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't delete share: no tenant set")
@@ -79,7 +94,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 	}
 
 	handler := ShareHandler(tenant.Service)
-	_, _, _, err := handler.Inspect(shareName)
+	_, _, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
@@ -89,7 +104,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 		}
 	}
 
-	err = handler.Delete(shareName)
+	err = handler.Delete(ctx, shareName)
 	if err != nil {
 		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
 	}
@@ -101,6 +116,13 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (*p
 	log.Infof(">>> Listeners: share list '%v'", in)
 	defer log.Debugf("<<< Listeners: share list '%v'", in)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "List shares "); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list share: no tenant set")
@@ -108,7 +130,7 @@ func (s *ShareListener) List(ctx context.Context, in *google_protobuf.Empty) (*p
 	}
 
 	handler := ShareHandler(tenant.Service)
-	shares, err := handler.List()
+	shares, err := handler.List(ctx)
 	if err != nil {
 		tbr := errors.Wrap(err, "Can't list Shares")
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())
@@ -129,6 +151,13 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	log.Infof(">>> Listeners: share mount '%v'", in)
 	defer log.Debugf("<<< Listeners: share mount '%v'", in)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Mount share "+in.GetShare().GetName()+" on host "+in.GetHost().GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't mount share: no tenant set")
@@ -138,7 +167,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	shareName := in.GetShare().GetName()
 
 	handler := ShareHandler(tenant.Service)
-	mount, err := handler.Mount(shareName, in.GetHost().GetName(), in.GetPath())
+	mount, err := handler.Mount(ctx, shareName, in.GetHost().GetName(), in.GetPath(), in.GetWithCache())
 	if err != nil {
 		tbr := errors.Wrap(err, fmt.Sprintf("Can't mount share '%s'", shareName))
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())
@@ -151,6 +180,13 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	log.Infof(">>> Listeners: share unmount '%v'", in)
 	defer log.Debugf("<<< Listeners: share unmount '%v'", in)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Mount share "+in.GetShare().GetName()+" off host "+in.GetHost().GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't mount share: no tenant set")
@@ -161,7 +197,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	hostName := in.GetHost().GetName()
 
 	handler := ShareHandler(tenant.Service)
-	err := handler.Unmount(shareName, hostName)
+	err := handler.Unmount(ctx, shareName, hostName)
 	if err != nil {
 		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("Can't unmount share '%s'", shareName)).Error())
 	}
@@ -174,6 +210,13 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Shar
 	log.Infof(">>> Listeners: share inspect '%s'", shareName)
 	defer log.Debugf("<<< Listeners: share inspect '%s'", shareName)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Inspect share "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't inspect share: no tenant set")
@@ -181,7 +224,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Shar
 	}
 
 	handler := ShareHandler(tenant.Service)
-	host, share, mounts, err := handler.Inspect(shareName)
+	host, share, mounts, err := handler.Inspect(ctx, shareName)
 	if err != nil {
 		err := errors.Wrap(err, fmt.Sprintf("can't inspect share '%s'", shareName))
 		return nil, grpc.Errorf(codes.Internal, err.Error())
