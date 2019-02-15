@@ -97,7 +97,7 @@ func defaultImage(c api.Cluster) string {
 
 func configureCluster(c api.Cluster) error {
 	clusterName := c.GetIdentity().Name
-	log.Println("[cluster %s] adding feature 'kubernetes'...", clusterName)
+	log.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
 	target := install.NewClusterTarget(c)
 	feature, err := install.NewFeature("kubernetes")
@@ -115,7 +115,7 @@ func configureCluster(c api.Cluster) error {
 		log.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error())
 		return err
 	}
-	log.Println("[cluster %s] feature 'kubernetes' addition successful.")
+	log.Println(fmt.Sprintf("[cluster %s] feature 'kubernetes' addition successful.", clusterName))
 	return nil
 }
 
