@@ -23,10 +23,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
-	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
+	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -46,14 +46,14 @@ type Host struct {
 }
 
 // NewHost creates an instance of api.Host
-func NewHost(svc *providers.Service) *Host {
+func NewHost(svc *iaas.Service) *Host {
 	return &Host{
 		item: metadata.NewItem(svc, hostsFolderName),
 	}
 }
 
 // Carry links an host instance to the Metadata instance
-func (mh *Host) Carry(host *model.Host) *Host {
+func (mh *Host) Carry(host *resources.Host) *Host {
 	if host == nil {
 		panic("host is nil!")
 	}
@@ -67,11 +67,11 @@ func (mh *Host) Carry(host *model.Host) *Host {
 }
 
 // Get returns the Network instance linked to metadata
-func (mh *Host) Get() *model.Host {
+func (mh *Host) Get() *resources.Host {
 	if mh.item == nil {
 		panic("m.item is nil!")
 	}
-	return mh.item.Get().(*model.Host)
+	return mh.item.Get().(*resources.Host)
 }
 
 // Write updates the metadata corresponding to the host in the Object Storage
@@ -93,7 +93,7 @@ func (mh *Host) ReadByID(id string) error {
 		panic("m.item is nil!")
 	}
 
-	host := model.NewHost()
+	host := resources.NewHost()
 	err := mh.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := host.Deserialize(buf)
 		if err != nil {
@@ -115,7 +115,7 @@ func (mh *Host) ReadByName(name string) error {
 		panic("m.item is nil!")
 	}
 
-	host := model.NewHost()
+	host := resources.NewHost()
 	err := mh.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := host.Deserialize(buf)
 		if err != nil {
@@ -149,9 +149,9 @@ func (mh *Host) Delete() error {
 }
 
 // Browse walks through host folder and executes a callback for each entries
-func (mh *Host) Browse(callback func(*model.Host) error) error {
+func (mh *Host) Browse(callback func(*resources.Host) error) error {
 	return mh.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
-		host := model.NewHost()
+		host := resources.NewHost()
 		err := host.Deserialize(buf)
 		if err != nil {
 			return err
@@ -161,7 +161,7 @@ func (mh *Host) Browse(callback func(*model.Host) error) error {
 }
 
 // SaveHost saves the Host definition in Object Storage
-func SaveHost(svc *providers.Service, host *model.Host) error {
+func SaveHost(svc *iaas.Service, host *resources.Host) error {
 	err := NewHost(svc).Carry(host).Write()
 	if err != nil {
 		return err
@@ -184,11 +184,11 @@ func SaveHost(svc *providers.Service, host *model.Host) error {
 }
 
 // RemoveHost removes the host definition from Object Storage
-func RemoveHost(svc *providers.Service, host *model.Host) error {
+func RemoveHost(svc *iaas.Service, host *resources.Host) error {
 	// First, browse networks to delete links on the deleted host
 	mn := NewNetwork(svc)
 	mnb := NewNetwork(svc)
-	err := mn.Browse(func(network *model.Network) error {
+	err := mn.Browse(func(network *resources.Network) error {
 		nerr := mnb.Carry(network).DetachHost(host.ID)
 		if nerr != nil {
 			if strings.Contains(nerr.Error(), "failed to remove metadata in Object Storage") {
@@ -212,7 +212,7 @@ func RemoveHost(svc *providers.Service, host *model.Host) error {
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadHost(svc *providers.Service, ref string) (*Host, error) {
+func LoadHost(svc *iaas.Service, ref string) (*Host, error) {
 	// We first try looking for host by ID from metadata
 	mh := NewHost(svc)
 	var innerErr error

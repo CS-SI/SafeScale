@@ -21,8 +21,8 @@ import (
 	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/identity"
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -31,7 +31,7 @@ import (
 // Cluster is an interface of methods associated to Cluster-like structs
 type Cluster interface {
 	// GetService ...
-	GetService() *providers.Service
+	GetService() *iaas.Service
 	// GetIdentity returns the identity of the cluster (name, flavor, complexity)
 	GetIdentity() identity.Identity
 	// GetNetworkConfig returns network configuration of the cluster
@@ -46,9 +46,9 @@ type Cluster interface {
 	// GetState returns the current state of the cluster
 	GetState() (ClusterState.Enum, error)
 	// AddNode adds a node
-	AddNode(bool, *model.HostDefinition) (string, error)
+	AddNode(bool, *resources.HostDefinition) (string, error)
 	// AddNodes adds several nodes
-	AddNodes(int, bool, *model.HostDefinition) ([]string, error)
+	AddNodes(int, bool, *resources.HostDefinition) ([]string, error)
 	// DeleteLastNode deletes a node
 	DeleteLastNode(bool, string) error
 	// DeleteSpecificNode deletes a node identified by its ID

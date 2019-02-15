@@ -23,9 +23,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/crypt"
 )
@@ -34,7 +33,7 @@ import (
 type Folder struct {
 	//path contains the base path where to read/write record in Object Storage
 	path     string
-	service  *providers.Service
+	service  *iaas.Service
 	crypt    bool
 	cryptKey *crypt.Key
 }
@@ -43,7 +42,7 @@ type Folder struct {
 type FolderDecoderCallback func([]byte) error
 
 // NewFolder creates a new Metadata Folder object, ready to help access the metadata inside it
-func NewFolder(svc *providers.Service, path string) *Folder {
+func NewFolder(svc *iaas.Service, path string) *Folder {
 	if svc == nil {
 		panic("svc is nil!")
 	}
@@ -61,13 +60,8 @@ func NewFolder(svc *providers.Service, path string) *Folder {
 }
 
 // GetService returns the service used by the folder
-func (f *Folder) GetService() *providers.Service {
+func (f *Folder) GetService() *iaas.Service {
 	return f.service
-}
-
-// GetClient returns the api.ClientAPI used by the folder
-func (f *Folder) GetClient() api.ClientAPI {
-	return f.service.ClientAPI
 }
 
 // GetBucket returns the bucket used by the folder to store Object Storage

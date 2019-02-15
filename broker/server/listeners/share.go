@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -82,7 +82,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (*google_p
 	_, _, _, err := handler.Inspect(shareName)
 	if err != nil {
 		switch err.(type) {
-		case model.ErrResourceNotFound:
+		case resources.ErrResourceNotFound:
 			return &google_protobuf.Empty{}, grpc.Errorf(codes.NotFound, err.Error())
 		default:
 			return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, errors.Wrap(err, fmt.Sprintf("can't delete share '%s'", shareName)).Error())
@@ -187,7 +187,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Shar
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 	if host == nil {
-		return nil, model.ResourceNotFoundError("host", "host:"+shareName)
+		return nil, resources.ResourceNotFoundError("host", "host:"+shareName)
 	}
 
 	return convert.ToPBShareMountList(host.Name, share, mounts), nil

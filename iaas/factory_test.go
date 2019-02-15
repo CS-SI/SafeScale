@@ -27,7 +27,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/utils"
 )
 
@@ -35,7 +35,7 @@ func TestTenants(t *testing.T) {
 	createTenantFile()
 	defer deleteTenantFile()
 
-	tenants, err := providers.Tenants()
+	tenants, err := iaas.GetTenants()
 	require.NoError(t, err)
 
 	foundOhVeHache := false
@@ -60,7 +60,7 @@ func TestTenantsWithNoTenantFile(t *testing.T) {
 	defer unhideTenantFiles()
 
 	//ACT
-	_, err := providers.Tenants()
+	_, err := iaas.GetTenants()
 
 	//ASSERT
 	require.Error(t, err)
@@ -69,7 +69,7 @@ func TestTenantsWithNoNameTenantFile(t *testing.T) {
 	createNoNameTenantFile()
 	defer deleteTenantFile()
 
-	_, err := providers.Tenants()
+	_, err := iaas.GetTenants()
 
 	require.Error(t, err)
 }
@@ -77,7 +77,7 @@ func TestTenantsWithNoClientTenantFile(t *testing.T) {
 	createNoClientTenantFile()
 	defer deleteTenantFile()
 
-	_, err := providers.Tenants()
+	_, err := iaas.GetTenants()
 
 	require.Error(t, err)
 }

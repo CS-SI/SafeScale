@@ -19,7 +19,7 @@ package cmds
 import (
 	"bufio"
 	"fmt"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"os"
 	"os/exec"
 
@@ -105,7 +105,7 @@ func extractClusterArgument(c *cli.Context) error {
 		}
 		clusterInstance, err = cluster.Get(clusterName)
 		if err != nil {
-			if _, ok := err.(model.ErrResourceNotFound); ok {
+			if _, ok := err.(resources.ErrResourceNotFound); ok {
 				msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)
 				return cli.NewExitError(msg, int(ExitCode.NotFound))
 			}

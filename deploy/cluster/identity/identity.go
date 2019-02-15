@@ -19,7 +19,7 @@ package identity
 import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -28,7 +28,7 @@ type Identity struct {
 	Name       string          `json:"name"`       // Name is the name of the cluster
 	Flavor     Flavor.Enum     `json:"flavor"`     // Flavor tells what kind of cluster it is
 	Complexity Complexity.Enum `json:"complexity"` // Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
-	Keypair    *model.KeyPair  `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
+	Keypair    *resources.KeyPair  `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
 
 	// AdminPassword contains the password of cladm account. This password
 	// is used to connect via Guacamole, but can't be used with SSH
@@ -54,8 +54,7 @@ func (i *Identity) Clone() serialize.Property {
 func (i *Identity) Replace(p serialize.Property) serialize.Property {
 	src := p.(*Identity)
 	*i = *src
-	i.Keypair = &model.KeyPair{}
+	i.Keypair = &resources.KeyPair{}
 	*i.Keypair = *src.Keypair
 	return i
 }
-

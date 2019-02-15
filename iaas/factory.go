@@ -23,48 +23,46 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/iaas/model"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/iaas/provider/api"
+	"github.com/CS-SI/SafeScale/iaas/providers"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils/crypt"
 )
 
 var (
-	// providers[clientName]client
-	providers = map[string]*Client{}
-	// tenants[tenantName]clientName
-	tenants = map[string]string{}
+	allProviders = map[string]*Service{}
+	allTenants   = map[string]string{}
 )
 
 // Register a Client referenced by the provider name. Ex: "ovh", ovh.New()
 // This function shoud be called by the init function of each provider to be registered in SafeScale
-func Register(name string, provider api.Provider) {
+func Register(name string, provider providers.Provider) {
 	// if already registered, leave
-	if _, ok := providers[name]; ok {
+	if _, ok := allProviders[name]; ok {
 		return
 	}
-	providers[name] = &Client{Provider: provider}
+	allProviders[name] = &Service{Provider: provider}
 }
 
-// Tenants returns all known tenants
-func Tenants() (map[string]string, error) {
+// GetTenants returns all known tenants
+func GetTenants() (map[string]string, error) {
 	err := loadConfig()
-	return tenants, err
+	return allTenants, err
 }
 
-// GetClient return the service referenced by the given name.
+// UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func GetClient(tenantName string) (*Client, error) {
+func UseService(tenantName string) (*Service, error) {
 	tenants, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
 	}
 	var (
-		tenantInCfg    = false
-		found          = false
-		name           string
-		client         *Client
-		clientProvider = "__not_found__"
+		tenantInCfg = false
+		found       = false
+		name        string
+		svc         *Service
+		svcProvider = "__not_found__"
 	)
 
 	for _, t := range tenants {
@@ -88,10 +86,10 @@ func GetClient(tenantName string) (*Client, error) {
 			}
 		}
 
-		clientProvider = provider
-		client, found = providers[provider]
+		svcProvider = provider
+		svc, found = allProviders[provider]
 		if !found {
-			log.Errorf("Failed to find client '%s' for tenant '%s'", clientProvider, name)
+			log.Errorf("Failed to find client '%s' for tenant '%s'", svcProvider, name)
 			continue
 		}
 
@@ -116,11 +114,11 @@ func GetClient(tenantName string) (*Client, error) {
 		_, tenantMetadataFound := tenant["metadata"]
 
 		// Initializes Provider
-		providerInstance, err := client.Build(tenantClient)
+		providerInstance, err := svc.Build(tenantClient)
 		if err != nil {
 			return nil, fmt.Errorf("Error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
 		}
-		clientCfg, err := providerInstance.GetCfgOpts()
+		serviceCfg, err := providerInstance.GetCfgOpts()
 		if err != nil {
 			return nil, err
 		}
@@ -154,9 +152,9 @@ func GetClient(tenantName string) (*Client, error) {
 			if err != nil {
 				return nil, fmt.Errorf("Error connecting to Object Storage Location to store metadata: %s", err.Error())
 			}
-			anon, found := clientCfg.Get("MetadataBucket")
+			anon, found := serviceCfg.Get("MetadataBucketName")
 			if !found {
-				panic("missing configuration option 'MetadataBucket'!")
+				panic("missing configuration option 'MetadataBucketName'!")
 			}
 			bucketName := anon.(string)
 			found, err = metadataLocation.FindBucket(bucketName)
@@ -182,7 +180,7 @@ func GetClient(tenantName string) (*Client, error) {
 		}
 
 		// Service is ready
-		return &Client{
+		return &Service{
 			Provider:       providerInstance,
 			Location:       objectStorageLocation,
 			MetadataBucket: metadataBucket,
@@ -193,7 +191,7 @@ func GetClient(tenantName string) (*Client, error) {
 	if !tenantInCfg {
 		return nil, fmt.Errorf("Tenant '%s' not found in configuration", tenantName)
 	}
-	return nil, model.ResourceNotFoundError("Client builder", clientProvider)
+	return nil, resources.ResourceNotFoundError("Client builder", svcProvider)
 }
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map
@@ -395,7 +393,7 @@ func loadConfig() error {
 		tenant, _ := t.(map[string]interface{})
 		if name, ok := tenant["name"].(string); ok {
 			if provider, ok := tenant["client"].(string); ok {
-				tenants[name] = provider
+				allTenants[name] = provider
 			} else {
 				return fmt.Errorf("Invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
 			}

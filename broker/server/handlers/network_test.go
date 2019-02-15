@@ -22,10 +22,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/mocks"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/mocks"
 )
 
 func TestNetworkHandler_List_with_brokerd_running(t *testing.T) {
@@ -35,14 +36,14 @@ func TestNetworkHandler_List_with_brokerd_running(t *testing.T) {
 	mockClientAPI := mocks.NewMockClientAPI(mockCtrl)
 
 	ness := &NetworkHandler{
-		provider: &providers.Service{
-			ClientAPI: mockClientAPI,
+		service: &iaas.Service{
+			Provider: mockClientAPI,
 		},
 	}
 
 	mockClientAPI.EXPECT().ListNetworks().Return(nil, nil).Times(1)
 
-	result, daerr := ness.provider.ListNetworks()
+	result, daerr := ness.service.ListNetworks()
 
 	assert.Nil(t, daerr)
 
@@ -66,14 +67,14 @@ func TestNetworkHandler_List_with_NO_brokerd_running(t *testing.T) {
 	theError := fmt.Errorf("Could not get network list: rpc error: code = Unavailable desc = all SubConns are in TransientFailure, latest connection error: connection error: desc = \"transport: Error while dialing dial tcp 127.0.0.1:%s: connect: connection refused\"", strconv.Itoa(brokerdPort))
 
 	ness := &NetworkHandler{
-		provider: &providers.Service{
-			ClientAPI: mockClientAPI,
+		service: &iaas.Service{
+			Provider: mockClientAPI,
 		},
 	}
 
 	mockClientAPI.EXPECT().ListNetworks().Return(nil, theError).Times(1)
 
-	result, daerr := ness.provider.ListNetworks()
+	result, daerr := ness.service.ListNetworks()
 
 	assert.EqualError(t, daerr, "Failure")
 
