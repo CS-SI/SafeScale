@@ -57,7 +57,7 @@ type Share struct {
 }
 
 //NewShare creates a share struct corresponding to the export of path on server
-func NewShare(server Server, path string) (*Share, error) {
+func NewShare(server *Server, path string) (*Share, error) {
 	if path == "" {
 		return nil, fmt.Errorf("invalid parameter: 'path' can't be empty")
 	}
@@ -65,7 +65,7 @@ func NewShare(server Server, path string) (*Share, error) {
 		return nil, fmt.Errorf("invalid parameter: 'path' must be absolute")
 	}
 	share := Share{
-		Server: &server,
+		Server: server,
 		Path:   path,
 		ACLs:   []ExportACL{},
 	}
@@ -85,8 +85,11 @@ func (s *Share) Add() error {
 		acl := a.Host + "("
 		if len(a.SecurityModes) > 0 {
 			acl += "sec="
-			for _, item := range a.SecurityModes {
+			for i, item := range a.SecurityModes {
 				acl += item.String()
+				if i != 0 {
+					acl += ","
+				}
 			}
 		} else {
 			acl += "sec=sys"
@@ -134,7 +137,7 @@ func (s *Share) Add() error {
 		acls += acl + " "
 	}
 	data := map[string]interface{}{
-		"MountPoint":   s.Path,
+		"Path":         s.Path,
 		"AccessRights": strings.TrimSpace(acls),
 	}
 	retcode, stdout, stderr, err := executeScript(*s.Server.SSHConfig, "nfs_server_path_export.sh", data)

@@ -286,7 +286,7 @@ func (client *Client) CreateKeyPair(name string) (*model.KeyPair, error) {
 	priKey := string(priKeyPem)
 	uuid, err := uuid.NewV4()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to génerate uuid key : %s", err.Error())
+		return nil, fmt.Errorf("Failed to generate uuid key : %s", err.Error())
 	}
 	return &model.KeyPair{
 		ID:         uuid.String(),
@@ -667,7 +667,6 @@ func (client *Client) getHostAndDomainFromRef(ref string) (*model.Host, *libvirt
 			return nil, nil, fmt.Errorf(fmt.Sprintf("Failed to fetch domain from ref : %s", err.Error()))
 		}
 	}
-
 	host, err := client.getHostFromDomain(domain)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to get host from domain : %s", err.Error())
@@ -982,7 +981,7 @@ func (client *Client) GetHostByName(name string) (*model.Host, error) {
 func (client *Client) DeleteHost(id string) error {
 	_, domain, err := client.getHostAndDomainFromRef(id)
 	if err != nil {
-		return fmt.Errorf("getHostAndDomainFromRef failed : %s", err.Error())
+		return err
 	}
 
 	volumes, err := getVolumesFromDomain(domain, client.LibvirtService)

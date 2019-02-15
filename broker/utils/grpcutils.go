@@ -17,7 +17,6 @@
 package utils
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -74,12 +73,6 @@ func GetConnection(host string, port int) *grpc.ClientConn {
 		log.Fatalf("Failed to connect to brokerd (%s:%d): %v", host, port, err)
 	}
 	return conn
-}
-
-// GetContext return a context for grpc commands
-func GetContext(timeout time.Duration) (context.Context, context.CancelFunc) {
-	// Contact the server and print out its response.
-	return context.WithTimeout(context.Background(), timeout)
 }
 
 // GetReference return a reference from the name or id given in the pb.Reference

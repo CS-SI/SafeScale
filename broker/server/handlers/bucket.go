@@ -17,6 +17,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 
@@ -29,12 +30,12 @@ import (
 
 // BucketAPI defines API to manipulate buckets
 type BucketAPI interface {
-	List() ([]string, error)
-	Create(string) error
-	Delete(string) error
-	Inspect(string) (*model.Bucket, error)
-	Mount(string, string, string) error
-	Unmount(string, string) error
+	List(context.Context) ([]string, error)
+	Create(context.Context, string) error
+	Delete(context.Context, string) error
+	Inspect(context.Context, string) (*model.Bucket, error)
+	Mount(context.Context, string, string, string) error
+	Unmount(context.Context, string, string) error
 }
 
 // BucketHandler bucket service
@@ -48,13 +49,13 @@ func NewBucketHandler(api *providers.Service) BucketAPI {
 }
 
 // List retrieves all available buckets
-func (svc *BucketHandler) List() ([]string, error) {
+func (svc *BucketHandler) List(ctx context.Context) ([]string, error) {
 	rv, err := svc.provider.ObjectStorage.ListBuckets(objectstorage.RootPath)
 	return rv, infraErr(err)
 }
 
 // Create a bucket
-func (svc *BucketHandler) Create(name string) error {
+func (svc *BucketHandler) Create(ctx context.Context, name string) error {
 	bucket, err := svc.provider.ObjectStorage.GetBucket(name)
 	if err != nil {
 		if err.Error() != "not found" {
@@ -72,7 +73,7 @@ func (svc *BucketHandler) Create(name string) error {
 }
 
 // Delete a bucket
-func (svc *BucketHandler) Delete(name string) error {
+func (svc *BucketHandler) Delete(ctx context.Context, name string) error {
 	err := svc.provider.ObjectStorage.DeleteBucket(name)
 	if err != nil {
 		return infraErrf(err, "failed to delete bucket '%s'", name)
@@ -81,7 +82,7 @@ func (svc *BucketHandler) Delete(name string) error {
 }
 
 // Inspect a bucket
-func (svc *BucketHandler) Inspect(name string) (*model.Bucket, error) {
+func (svc *BucketHandler) Inspect(ctx context.Context, name string) (*model.Bucket, error) {
 	b, err := svc.provider.ObjectStorage.GetBucket(name)
 	if err != nil {
 		if err.Error() == "not found" {
@@ -96,7 +97,7 @@ func (svc *BucketHandler) Inspect(name string) (*model.Bucket, error) {
 }
 
 // Mount a bucket on an host on the given mount point
-func (svc *BucketHandler) Mount(bucketName, hostName, path string) error {
+func (svc *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) error {
 	// Check bucket existence
 	_, err := svc.provider.ObjectStorage.GetBucket(bucketName)
 	if err != nil {
@@ -105,7 +106,7 @@ func (svc *BucketHandler) Mount(bucketName, hostName, path string) error {
 
 	// Get Host ID
 	hostHandler := NewHostHandler(svc.provider)
-	host, err := hostHandler.Inspect(hostName)
+	host, err := hostHandler.Inspect(ctx, hostName)
 	if err != nil {
 		return logicErr(fmt.Errorf("no host found with name or id '%s'", hostName))
 	}
@@ -154,14 +155,14 @@ func (svc *BucketHandler) Mount(bucketName, hostName, path string) error {
 		Protocol:   objStorageProtocol,
 	}
 
-	rerr := exec("mount_object_storage.sh", data, host.ID, svc.provider)
+	rerr := exec(ctx, "mount_object_storage.sh", data, host.ID, svc.provider)
 	return logicErr(rerr)
 }
 
 // Unmount a bucket
-func (svc *BucketHandler) Unmount(bucketName, hostName string) error {
+func (svc *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) error {
 	// Check bucket existence
-	_, err := svc.Inspect(bucketName)
+	_, err := svc.Inspect(ctx, bucketName)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
@@ -173,7 +174,7 @@ func (svc *BucketHandler) Unmount(bucketName, hostName string) error {
 
 	// Get Host ID
 	hostHandler := NewHostHandler(svc.provider)
-	host, err := hostHandler.Inspect(hostName)
+	host, err := hostHandler.Inspect(ctx, hostName)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
@@ -189,6 +190,6 @@ func (svc *BucketHandler) Unmount(bucketName, hostName string) error {
 		Bucket: bucketName,
 	}
 
-	rerr := exec("umount_object_storage.sh", data, host.ID, svc.provider)
+	rerr := exec(ctx, "umount_object_storage.sh", data, host.ID, svc.provider)
 	return infraErr(rerr)
 }

@@ -317,13 +317,24 @@ service SshService{
 // broker nas|share list
 // broker nas|share inspect share1
 
+message ExportOptions{
+    bool ReadOnly = 1;
+    bool RootSquash = 2;
+    bool Secure = 3;
+    bool Async = 4;
+    bool NoHide = 5;
+    bool CrossMount = 6;
+    bool SubtreeCheck = 7;
+}
+
 message ShareDefinition{
     string ID = 1;
     string Name = 2;
     Reference Host = 3;
     string Path = 4;
     string Type = 5;
-    string Acls = 6;
+    ExportOptions Options = 6;
+    repeated string SecurityModes = 7;
 }
 
 message ShareList{
@@ -336,6 +347,7 @@ message ShareMountDefinition{
     string Path = 3;
     string Type = 4;
     string Options = 5;
+    bool WithCache = 6;
 }
 
 message ShareMountList{
@@ -350,4 +362,19 @@ service ShareService{
     rpc Mount(ShareMountDefinition) returns (ShareMountDefinition){}
     rpc Unmount(ShareMountDefinition) returns (google.protobuf.Empty){}
     rpc Inspect(Reference) returns (ShareMountList){}
+}
+
+
+message ProcessDefinition{
+    string UUID = 1;
+    string Info = 2;
+}
+
+message ProcessList{
+    repeated ProcessDefinition List = 1;
+}
+
+service ProcessManagerService{
+    rpc Stop(ProcessDefinition) returns (google.protobuf.Empty){}
+    rpc List(google.protobuf.Empty) returns (ProcessList){}
 }

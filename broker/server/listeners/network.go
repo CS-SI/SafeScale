@@ -50,6 +50,13 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	log.Infof("Listeners: network create '%s' called", in.Name)
 	defer log.Debugf("Listeners: network create '%s' done", in.Name)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Create network "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't create network: no tenant set")
@@ -57,7 +64,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	}
 
 	handler := NetworkHandler(tenant.Service)
-	network, err := handler.Create(
+	network, err := handler.Create(ctx,
 		in.GetName(),
 		in.GetCIDR(),
 		IPVersion.IPv4,
@@ -80,6 +87,13 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.N
 	log.Infof("Listeners: network list called")
 	defer log.Debugf("Listeners: network list done")
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "List networks"); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list network: no tenant set")
@@ -87,7 +101,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.N
 	}
 
 	handler := NetworkHandler(tenant.Service)
-	networks, err := handler.List(in.GetAll())
+	networks, err := handler.List(ctx, in.GetAll())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -106,6 +120,13 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 	log.Infof("Listeners: network inspect '%s' called'", in.Name)
 	defer log.Debugf("broker.server.listeners.NetworkListener.Inspect(%s) done'", in.Name)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Inspect network "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	ref := utils.GetReference(in)
 	if ref == "" {
 		return nil, fmt.Errorf("Can't inspect network: neither name nor id given as reference")
@@ -118,7 +139,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 	}
 
 	handler := NetworkHandler(currentTenant.Service)
-	network, err := handler.Inspect(ref)
+	network, err := handler.Inspect(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -133,6 +154,13 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Delete Network called for network '%s'", in.GetName())
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Delete network "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	ref := utils.GetReference(in)
 	if ref == "" {
 		return nil, fmt.Errorf("can't delete network: neither name nor id given as reference")
@@ -145,7 +173,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google
 	}
 
 	handler := NetworkHandler(currentTenant.Service)
-	err := handler.Delete(ref)
+	err := handler.Delete(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}

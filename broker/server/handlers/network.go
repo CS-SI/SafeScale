@@ -17,6 +17,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -43,10 +44,10 @@ import (
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*model.Network, error)
-	List(all bool) ([]*model.Network, error)
-	Inspect(ref string) (*model.Network, error)
-	Delete(ref string) error
+	Create(ctx context.Context, net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*model.Network, error)
+	List(ctx context.Context, all bool) ([]*model.Network, error)
+	Inspect(ctx context.Context, ref string) (*model.Network, error)
+	Delete(ctx context.Context, ref string) error
 }
 
 // NetworkHandler an implementation of NetworkAPI
@@ -64,7 +65,7 @@ func NewNetworkHandler(api *providers.Service) NetworkAPI {
 
 // Create creates a network
 func (svc *NetworkHandler) Create(
-	name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, theos string, gwname string,
+	ctx context.Context, name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, theos string, gwname string,
 ) (*model.Network, error) {
 
 	log.Debugf(">>> broker.server.handlers.NetworkHandler::Create()")
@@ -237,7 +238,7 @@ func (svc *NetworkHandler) Create(
 	// claiming host is created
 	log.Infof("Waiting until gateway '%s' is available through SSH ...", gwname)
 	sshHandler := NewSSHHandler(svc.provider)
-	ssh, err := sshHandler.GetConfig(gw.ID)
+	ssh, err := sshHandler.GetConfig(ctx, gw.ID)
 	if err != nil {
 		//defer svc.provider.DeleteHost(gw.ID)
 		return nil, infraErrf(err, "error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
@@ -260,11 +261,18 @@ func (svc *NetworkHandler) Create(
 	}
 	log.Infof("SSH service of gateway '%s' started.", gw.Name)
 
+	select {
+	case <-ctx.Done():
+		log.Warnf("Network creation canceled by broker")
+		err = fmt.Errorf("Network creation canceld by broker")
+		return nil, err
+	default:
+	}
 	return network, nil
 }
 
 // List returns the network list
-func (svc *NetworkHandler) List(all bool) ([]*model.Network, error) {
+func (svc *NetworkHandler) List(ctx context.Context, all bool) ([]*model.Network, error) {
 	log.Debugf(">>> broker.server.handlers.NetworkHandler::List(%v)", all)
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::List(%v)", all)
 
@@ -289,9 +297,9 @@ func (svc *NetworkHandler) List(all bool) ([]*model.Network, error) {
 }
 
 // Inspect returns the network identified by ref, ref can be the name or the id
-func (svc *NetworkHandler) Inspect(ref string) (*model.Network, error) {
-	log.Debugf(">>> broker.server.handlers.NetworkHandler::Inspect(%s)", ref)
+func (svc *NetworkHandler) Inspect(ctx context.Context, ref string) (*model.Network, error) {
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Inspect(%s)", ref)
+	log.Debugf(">>> broker.server.handlers.NetworkHandler::Inspect(%s)", ref)
 
 	mn, err := metadata.LoadNetwork(svc.provider, ref)
 	if err != nil {
@@ -301,7 +309,7 @@ func (svc *NetworkHandler) Inspect(ref string) (*model.Network, error) {
 }
 
 // Delete deletes network referenced by ref
-func (svc *NetworkHandler) Delete(ref string) error {
+func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	log.Debugf(">>> broker.server.handlers.NetworkHandler::Delete(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Delete(%s)", ref)
 
@@ -343,11 +351,13 @@ func (svc *NetworkHandler) Delete(ref string) error {
 	}
 
 	// 1st delete gateway
+	var metadataHost *model.Host
 	if gwID != "" {
 		mh, err := metadata.LoadHost(svc.provider, gwID)
 		if err != nil {
 			return infraErr(err)
 		}
+		metadataHost = mh.Get()
 
 		err = svc.provider.DeleteGateway(gwID)
 		// allow no gateway, but log it
@@ -361,11 +371,46 @@ func (svc *NetworkHandler) Delete(ref string) error {
 	}
 
 	// 2nd delete network, with no tolerance
+	var deleteMatadataOnly bool
 	err = svc.provider.DeleteNetwork(network.ID)
+	if err != nil {
+		switch err.(type) {
+		case model.ErrResourceNotFound:
+			deleteMatadataOnly = true
+		default:
+			return infraErrf(err, "can't delete network")
+		}
+	}
+
+	err = mn.Delete()
 	if err != nil {
 		return infraErr(err)
 	}
 
-	delErr := mn.Delete()
-	return infraErr(delErr)
+	if deleteMatadataOnly {
+		return fmt.Errorf("Unable to find the network even if it is described by metadatas\nInchoerent metadatas have been supressed")
+	}
+
+	select {
+	case <-ctx.Done():
+		log.Warnf("Network delete canceled by broker")
+		hostSizing := propsv1.NewHostSizing()
+		err := metadataHost.Properties.Get(HostProperty.SizingV1, hostSizing)
+		if err != nil {
+			return fmt.Errorf("Failed to get gateway sizingV1")
+		}
+		//os name of the gw is not stored in metadatas so we used ubuntu 16.04 by default
+		networkBis, err := svc.Create(context.Background(), network.Name, network.CIDR, network.IPVersion, hostSizing.AllocatedSize.Cores, hostSizing.AllocatedSize.RAMSize, hostSizing.AllocatedSize.DiskSize, "Ubuntu 16.04", metadataHost.Name)
+		if err != nil {
+			return fmt.Errorf("Failed to stop network deletion")
+		}
+		buf, err := networkBis.Serialize()
+		if err != nil {
+			return fmt.Errorf("Deleted Network recreated by broker")
+		}
+		return fmt.Errorf("Deleted Network recreated by broker : %s", buf)
+	default:
+	}
+
+	return nil
 }

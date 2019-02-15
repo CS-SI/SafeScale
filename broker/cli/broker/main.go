@@ -23,18 +23,32 @@ import (
 	"os/signal"
 	"runtime"
 	"sort"
+	"strings"
 	"syscall"
 
-	"github.com/dlespiau/covertool/pkg/exit"
+	"github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/broker/cli/broker/cmd"
-	"github.com/CS-SI/SafeScale/broker/utils"
 )
 
 func cleanup() {
-	fmt.Println("\nBe careful stopping broker will not stop the execution on brokerd!")
+	fmt.Println("\nBe carfull stopping broker will not stop the execution on brokerd, but will reverse it's effects once done!")
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
+	text, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("Failed to read the imput : ", err.Error())
+		text = "y"
+	}
+	if strings.TrimRight(text, "\n") == "y" {
+		err = client.New().ProcessManager.Stop(utils.GetUUID(), client.DefaultExecutionTimeout)
+		if err != nil {
+			fmt.Printf("Failed to stop the process %v\n", err)
+		}
+	}
 }
 
 func main() {
@@ -45,16 +59,6 @@ func main() {
 		for {
 			<-c
 			cleanup()
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Print("Do you really want to stop broker ? [y]es [n]o: ")
-			text, err := reader.ReadString('\n')
-			if err != nil {
-				fmt.Println("Failed to read the imput : ", err.Error())
-				text = "y"
-			}
-			if text == "y" {
-				exit.Exit(1)
-			}
 		}
 	}()
 
@@ -136,6 +140,6 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error Running App : " + err.Error())
 	}
 }

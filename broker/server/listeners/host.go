@@ -71,6 +71,13 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 	log.Infof("Listeners: host start '%s' called", in.Name)
 	defer log.Debugf("Listeners: host start '%s' done", in.Name)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Start Host "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't start host: no tenant set")
@@ -79,7 +86,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 
 	handler := HostHandler(tenant.Service)
 	ref := utils.GetReference(in)
-	err := handler.Start(ref)
+	err := handler.Start(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -93,6 +100,13 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_prot
 	log.Infof("Listeners: host stop '%s' called", in.Name)
 	defer log.Debugf("Listeners: host stop '%s' done", in.Name)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Stop Host "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't stop host: no tenant set")
@@ -101,7 +115,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_prot
 
 	handler := HostHandler(tenant.Service)
 	ref := utils.GetReference(in)
-	err := handler.Stop(ref)
+	err := handler.Stop(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -115,6 +129,13 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_pr
 	log.Infof("Listeners: host reboot '%s' called", in.Name)
 	defer log.Debugf("Listeners: host reboot '%s' done", in.Name)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Reboot Host "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't reboot host: no tenant set")
@@ -123,7 +144,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_pr
 
 	handler := HostHandler(tenant.Service)
 	ref := utils.GetReference(in)
-	err := handler.Reboot(ref)
+	err := handler.Reboot(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -137,6 +158,13 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 	log.Infoln("Listeners: host list called")
 	defer log.Debugln("Listeners: host list done")
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "List Hosts"); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list host: no tenant set")
@@ -144,7 +172,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 	}
 
 	handler := HostHandler(tenant.Service)
-	hosts, err := handler.List(in.GetAll())
+	hosts, err := handler.List(ctx, in.GetAll())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -163,6 +191,13 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	log.Infof("Listeners: host create '%s' done", in.Name)
 	defer log.Debugf("Listeners: host create '%s' done", in.Name)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Create Host "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't create host: no tenant set")
@@ -170,7 +205,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	}
 
 	handler := HostHandler(tenant.Service)
-	host, err := handler.Create(
+	host, err := handler.Create(ctx,
 		in.GetName(),
 		in.GetNetwork(),
 		int(in.GetCPUNumber()),
@@ -187,12 +222,20 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	}
 	log.Infof("Host '%s' created", in.GetName())
 	return conv.ToPBHost(host), nil
+
 }
 
 // Resize an host
 func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
 	log.Infof("Listeners: host resize '%s' done", in.Name)
 	defer log.Debugf("Listeners: host resize '%s' done", in.Name)
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Resize Host "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -201,7 +244,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	}
 
 	handler := HostHandler(tenant.Service)
-	host, err := handler.Resize(
+	host, err := handler.Resize(ctx,
 		in.GetName(),
 		int(in.GetCPUNumber()),
 		in.GetRAM(),
@@ -221,6 +264,13 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 	log.Infof("Listeners: host status '%s' called", in.Name)
 	defer log.Debugf("Listeners: host status '%s' done", in.Name)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Status of Host "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	ref := utils.GetReference(in)
 	if ref == "" {
 		return nil, fmt.Errorf("Can't get host status: neither name nor id given as reference")
@@ -233,7 +283,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 	}
 
 	handler := HostHandler(tenant.Service)
-	host, err := handler.ForceInspect(ref)
+	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -245,6 +295,13 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host,
 	log.Infof("Receiving 'host inspect %s'", in.Name)
 	log.Debugf(">>> broker.server.listeners.HostListener::Inspect(%s)", in.Name)
 	defer log.Debugf("<<< broker.server.listeners.HostListener::Inspect(%s)", in.Name)
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Inspect Host "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -258,7 +315,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host,
 	}
 
 	handler := HostHandler(tenant.Service)
-	host, err := handler.ForceInspect(ref)
+	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, fmt.Sprintf("can't inspect host: %v", err))
 	}
@@ -270,6 +327,13 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 	log.Infof("Receiving 'host delete %s'", in.Name)
 	log.Debugf(">>> broker.server.listeners.HostListener::Delete(%s)", in.Name)
 	defer log.Debugf("<<< broker.server.Listeners.HostListener::Delete(%s)", in.Name)
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Delete Host "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -283,7 +347,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 	}
 
 	handler := HostHandler(tenant.Service)
-	err := handler.Delete(ref)
+	err := handler.Delete(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -295,6 +359,13 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
 	log.Debugf(">>> broker.server.listeners.HostListener::SSH(%s)", in.Name)
 	defer log.Debugf("<<< broker.server.listeners.HostListener::SSH(%s)", in.Name)
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "SSH config of Host "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -308,7 +379,7 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig
 	}
 
 	handler := HostHandler(currentTenant.Service)
-	sshConfig, err := handler.SSH(ref)
+	sshConfig, err := handler.SSH(ctx, ref)
 	if err != nil {
 		return nil, err
 	}

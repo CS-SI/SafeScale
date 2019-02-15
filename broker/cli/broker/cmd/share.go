@@ -56,6 +56,38 @@ var shareCreate = cli.Command{
 			Value: model.DefaultShareExportedPath,
 			Usage: "Path to be exported",
 		},
+		cli.BoolFlag{
+			Name:  "readonly",
+			Usage: "Disallow write requests on this NFS volume",
+		},
+		cli.BoolFlag{
+			Name:  "rootsquash",
+			Usage: "Map requests from uid/gid 0 to the anonymous uid/gid",
+		},
+		cli.BoolFlag{
+			Name:  "secure",
+			Usage: "Requires that requests originate on an Internet port less than IPPORT_RESERVED (1024).",
+		},
+		cli.BoolFlag{
+			Name:  "async",
+			Usage: "This option allows the NFS server to violate the NFS protocol and reply to requests before any changes made by that request have been committed to stable storage",
+		},
+		cli.BoolFlag{
+			Name:  "nohide",
+			Usage: "Enable exports of volumes mounted in the share export path",
+		},
+		cli.BoolFlag{
+			Name:  "crossmount",
+			Usage: "Similar to nohide but it makes it possible for clients to move from the filesystem marked with crossmnt to exported filesystems mounted on it",
+		},
+		cli.BoolFlag{
+			Name:  "subtreecheck",
+			Usage: "Enable subtree checking",
+		},
+		cli.StringSliceFlag{
+			Name:  "securityModes",
+			Usage: "{sys(the default--no cryptographic security), krb5(authentication only), krb5i(integrity protection), and krb5p(privacy protection)}",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
@@ -68,6 +100,16 @@ var shareCreate = cli.Command{
 			Name: shareName,
 			Host: &pb.Reference{Name: c.Args().Get(1)},
 			Path: c.String("path"),
+			Options: &pb.ExportOptions{
+				ReadOnly:     c.Bool("readonly"),
+				RootSquash:   c.Bool("rootsquash"),
+				Secure:       c.Bool("secure"),
+				Async:        c.Bool("async"),
+				NoHide:       c.Bool("nohide"),
+				CrossMount:   c.Bool("crossmount"),
+				SubtreeCheck: c.Bool("subtreecheck"),
+			},
+			SecurityModes: c.StringSlice("securityModes"),
 		}
 		err := client.New().Share.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
@@ -164,6 +206,10 @@ var shareMount = cli.Command{
 			Value: model.DefaultShareMountPath,
 			Usage: "Path to be mounted",
 		},
+		cli.BoolFlag{
+			Name:  "ac",
+			Usage: "Disable chache coherence to improve performences",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 2 {
@@ -175,10 +221,11 @@ var shareMount = cli.Command{
 		hostName := c.Args().Get(1)
 		path := c.String("path")
 		def := pb.ShareMountDefinition{
-			Host:  &pb.Reference{Name: hostName},
-			Share: &pb.Reference{Name: shareName},
-			Path:  path,
-			Type:  "nfs",
+			Host:      &pb.Reference{Name: hostName},
+			Share:     &pb.Reference{Name: shareName},
+			Path:      path,
+			Type:      "nfs",
+			WithCache: c.Bool("ac"),
 		}
 		err := client.New().Share.Mount(def, client.DefaultExecutionTimeout)
 		if err != nil {

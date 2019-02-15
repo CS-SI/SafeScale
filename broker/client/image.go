@@ -17,10 +17,10 @@
 package client
 
 import (
-	"context"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/utils"
 )
 
 // host is the broker client part handling hosts
@@ -34,7 +34,7 @@ func (img *image) List(all bool, timeout time.Duration) (*pb.ImageList, error) {
 	img.session.Connect()
 	defer img.session.Disconnect()
 	service := pb.NewImageServiceClient(img.session.connection)
-	ctx := context.Background()
+	ctx := utils.GetContext(true)
 
 	return service.List(ctx, &pb.ImageListRequest{All: all})
 }

@@ -223,11 +223,6 @@ var hostCreate = cli.Command{
 			Name:  "f, force",
 			Usage: "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
 		},
-		// // TODO list available features
-		// cli.StringFlag{
-		// 	Name:  "features",
-		// 	Usage: "Add one or several feature on your host : feature1|feature2|feature3",
-		// },
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {

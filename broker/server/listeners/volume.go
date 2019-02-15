@@ -50,6 +50,13 @@ type VolumeListener struct{}
 func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*pb.VolumeList, error) {
 	log.Printf("Volume List called")
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes List"); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't list volumes: no tenant set")
@@ -57,7 +64,7 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	volumes, err := handler.List(in.GetAll())
+	volumes, err := handler.List(ctx, in.GetAll())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -76,6 +83,13 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	log.Infof("Listeners: volume create '%v' called", in)
 	defer log.Debugf("Listeners: volume create '%v' done", in)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't create volumes: no tenant set")
@@ -83,7 +97,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	volume, err := handler.Create(in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
+	volume, err := handler.Create(ctx, in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -96,6 +110,13 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*google_protobuf.Empty, error) {
 	log.Printf("Attach volume called '%s', '%s'", in.Host.Name, in.MountPath)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Attach "+in.GetVolume().GetName()+"to host"+in.GetHost().GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't attach volumes: no tenant set")
@@ -103,7 +124,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Attach(in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
+	err := handler.Attach(ctx, in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -116,6 +137,13 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 	log.Debugf("broker.server.listeners.VolumeListener.Detach(%v) called", in)
 	defer log.Debugf("broker.server.listeners.VolumeListener.Detach(%v) done", in)
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Dettach "+in.GetVolume().GetName()+"from host"+in.GetHost().GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
+
 	volumeName := in.GetVolume().GetName()
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -125,7 +153,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 
 	hostName := in.GetHost().GetName()
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Detach(volumeName, hostName)
+	err := handler.Detach(ctx, volumeName, hostName)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -137,6 +165,13 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 // Delete a volume
 func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Printf("Volume delete called '%s'", in.Name)
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Delete "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -150,7 +185,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Delete(ref)
+	err := handler.Delete(ctx, ref)
 	if err != nil {
 		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, fmt.Sprintf("can't delete volume '%s': %s", ref, err.Error()))
 	}
@@ -161,6 +196,13 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 // Inspect a volume
 func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.VolumeInfo, error) {
 	log.Printf("Inspect Volume called '%s'", in.Name)
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Volume Inspect "+in.GetName()); err != nil {
+		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	}
+	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -174,7 +216,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Vol
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	volume, mounts, err := handler.Inspect(ref)
+	volume, mounts, err := handler.Inspect(ctx, ref)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}

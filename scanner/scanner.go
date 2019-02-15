@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -374,7 +375,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			}
 
 			sshSvc := handlers.NewSSHHandler(serviceProvider)
-			ssh, err := sshSvc.GetConfig(host.ID)
+			ssh, err := sshSvc.GetConfig(context.Background(), host.ID)
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
