@@ -20,6 +20,9 @@ sudo apt-get install -y docker-ce
 #universe repository is required (for virtinst & libguestfs-tools)
 sudo add-apt-repository universe
 sudo apt-get install -y qemu-kvm libvirt-bin libvirt-dev virtinst libguestfs-tools
+#Note: The libvirt-bin package was dropped in 18.10. The package was split into two parts: libvirst-daemon-system and libvirt-clients
+# So instead of libvirt-bin use libvirt-daemon-system libvirt-clients
+sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients libvirt-dev virtinst libguestfs-tools
 ```
 
 #### Debian
@@ -67,9 +70,9 @@ sudo su $USER
 sudo chmod 744 /boot/vmlinuz-`uname -r`
 
 # Launch object storage (here a minio S3 storage with docker)
-MINIO_ACCESS_KEY="accessKey"
-MINIO_SECRET_KEY="secretKey"
-sudo docker run -d -p 9000:9000 --name minio1 -e "MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY" -e "MINIO_SECRET_KEY=$MINIO_SECRET_KEY" -v /data/minio/data:/data -v /data/minio/config:/root/.minio minio/minio server /data
+MINIO_ACCESS_KEY="accessKey" \
+MINIO_SECRET_KEY="secretKey" \
+sudo docker run -d --rm -p 9000:9000 --name minio1 -e "MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY" -e "MINIO_SECRET_KEY=$MINIO_SECRET_KEY" -v /data/minio/data:/data -v /data/minio/config:/root/.minio minio/minio server /data
 ```
 ### Build -
 
