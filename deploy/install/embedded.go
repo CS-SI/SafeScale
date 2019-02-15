@@ -339,6 +339,7 @@ func metricbeatFeature() *Feature {
 	return &Feature{
 		displayName: specs.GetString("feature.name"),
 		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }
@@ -352,6 +353,7 @@ func filebeatFeature() *Feature {
 	return &Feature{
 		displayName: specs.GetString("feature.name"),
 		fileName:    filename,
+		embedded:    true,
 		specs:       specs,
 	}
 }

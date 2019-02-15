@@ -35,7 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc/enums/ErrorCode"
 	"github.com/CS-SI/SafeScale/deploy/install"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils/template"
 )
 
@@ -104,16 +104,16 @@ func minimumRequiredServers(c api.Cluster) (int, int, int) {
 	return 1, privateNodeCount, 0
 }
 
-func gatewaySizing(c api.Cluster) model.HostDefinition {
-	return model.HostDefinition{
+func gatewaySizing(c api.Cluster) resources.HostDefinition {
+	return resources.HostDefinition{
 		Cores:    2,
 		RAMSize:  15.0,
 		DiskSize: 60,
 	}
 }
 
-func nodeSizing(c api.Cluster) model.HostDefinition {
-	return model.HostDefinition{
+func nodeSizing(c api.Cluster) resources.HostDefinition {
+	return resources.HostDefinition{
 		Cores:    4,
 		RAMSize:  15.0,
 		DiskSize: 100,

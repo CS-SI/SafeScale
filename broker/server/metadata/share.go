@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -41,7 +42,7 @@ type Share struct {
 }
 
 // NewShare creates an instance of metadata.Nas
-func NewShare(svc *providers.Service) *Share {
+func NewShare(svc *iaas.Service) *Share {
 	return &Share{
 		item: metadata.NewItem(svc, shareFolderName),
 	}
@@ -178,21 +179,21 @@ func (ms *Share) Browse(callback func(string, string) error) error {
 }
 
 // // AddClient adds a client to the Nas definition in Object Storage
-// func (m *Nas) AddClient(nas *model.Nas) error {
+// func (m *Nas) AddClient(nas *resources.Nas) error {
 // 	return NewNas(m.item.GetService()).Carry(nas).item.WriteInto(*m.id, nas.ID)
 // 	// return m.item.WriteInto(m.id, nas.ID)
 // }
 
 // // RemoveClient removes a client to the Nas definition in Object Storage
-// func (m *Nas) RemoveClient(nas *model.Nas) error {
+// func (m *Nas) RemoveClient(nas *resources.Nas) error {
 // 	return m.item.DeleteFrom(*m.id, nas.ID)
 // }
 
 // // Listclients returns the list of ID of hosts clients of the NAS server
-// func (m *Nas) Listclients() ([]*model.Nas, error) {
-// 	var list []*model.Nas
+// func (m *Nas) Listclients() ([]*resources.Nas, error) {
+// 	var list []*resources.Nas
 // 	err := m.item.BrowseInto(*m.id, func(buf []byte) error {
-// 		nas := model.Nas{}
+// 		nas := resources.Nas{}
 // 		err := (&nas).Deserialize(buf)
 // 		if err != nil {
 // 			return err
@@ -204,10 +205,10 @@ func (ms *Share) Browse(callback func(string, string) error) error {
 // }
 
 // // FindClient returns the client hosted by the Host whose name is given
-// func (m *Nas) FindClient(hostName string) (*model.Nas, error) {
-// 	var client *model.Nas
+// func (m *Nas) FindClient(hostName string) (*resources.Nas, error) {
+// 	var client *resources.Nas
 // 	err := m.item.BrowseInto(*m.id, func(buf []byte) error {
-// 		nas := model.Nas{}
+// 		nas := resources.Nas{}
 // 		err := (&nas).Deserialize(buf)
 // 		if err != nil {
 // 			return err
@@ -238,7 +239,7 @@ func (ms *Share) Release() {
 }
 
 // SaveShare saves the Nas definition in Object Storage
-func SaveShare(svc *providers.Service, hostID, hostName, shareID, shareName string) error {
+func SaveShare(svc *iaas.Service, hostID, hostName, shareID, shareName string) error {
 	err := NewShare(svc).Carry(hostID, hostName, shareID, shareName).Write()
 	if err != nil {
 		return err
@@ -247,7 +248,7 @@ func SaveShare(svc *providers.Service, hostID, hostName, shareID, shareName stri
 }
 
 // RemoveShare removes the share definition from Object Storage
-func RemoveShare(svc *providers.Service, hostID, hostName, shareID, shareName string) error {
+func RemoveShare(svc *iaas.Service, hostID, hostName, shareID, shareName string) error {
 	return NewShare(svc).Carry(hostID, hostName, shareID, shareName).Delete()
 }
 
@@ -255,7 +256,7 @@ func RemoveShare(svc *providers.Service, hostID, hostName, shareID, shareName st
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadShare(svc *providers.Service, ref string) (string, error) {
+func LoadShare(svc *iaas.Service, ref string) (string, error) {
 	ms := NewShare(svc)
 	var innerErr error
 	err := retry.WhileUnsuccessfulDelay1Second(
@@ -291,11 +292,11 @@ func LoadShare(svc *providers.Service, ref string) (string, error) {
 }
 
 // // MountNas add the client nas to the Nas definition from Object Storage
-// func MountNas(svc *providers.Service, client *model.Nas, server *model.Nas) error {
+// func MountNas(svc *providers.Service, client *resources.Nas, server *resources.Nas) error {
 // 	return NewNas(svc).Carry(server).AddClient(client)
 // }
 
 // // UmountNas remove the client nas to the Nas definition from Object Storage
-// func UmountNas(svc *providers.Service, client *model.Nas, server *model.Nas) error {
+// func UmountNas(svc *providers.Service, client *resources.Nas, server *resources.Nas) error {
 // 	return NewNas(svc).Carry(server).RemoveClient(client)
 // }

@@ -27,16 +27,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers/metadata"
-
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/broker/server/handlers"
+	"github.com/CS-SI/SafeScale/broker/server/metadata"
 	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/utils"
 )
 
@@ -196,7 +195,7 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 // RunScanner ...
 func RunScanner() {
 	var targetedProviders []string
-	theProviders, _ := providers.Tenants()
+	theProviders, _ := iaas.GetTenants()
 
 	for tenantName := range theProviders {
 		if strings.Contains(tenantName, "-scannable-gpu-test") {
@@ -234,7 +233,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		defer group.Done()
 	}
 
-	serviceProvider, err := providers.GetService(theTenant)
+	serviceProvider, err := iaas.UseService(theTenant)
 	if err != nil {
 		log.Warnf("Unable to get serviceProvider for tenant '%s': %s", theTenant, err.Error())
 		return err
@@ -264,7 +263,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	// Prepare network
 
 	there := true
-	var net *model.Network
+	var net *resources.Network
 
 	netName := "net-safescale"
 	if net, err = serviceProvider.GetNetwork(netName); net != nil && err == nil {
@@ -275,7 +274,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	}
 
 	if !there {
-		net, err = serviceProvider.CreateNetwork(model.NetworkRequest{
+		net, err = serviceProvider.CreateNetwork(resources.NetworkRequest{
 			CIDR:      "192.168.0.0/24",
 			IPVersion: IPVersion.IPv4,
 			Name:      netName,
@@ -307,7 +306,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	concurrency := math.Min(4, float64(len(templates)/2))
 	sem := make(chan bool, int(concurrency))
 
-	hostAnalysis := func(template model.HostTemplate) error {
+	hostAnalysis := func(template resources.HostTemplate) error {
 		defer wg.Done()
 		if net != nil {
 
@@ -334,12 +333,12 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			log.Printf("Checking template %s\n", template.Name)
 
 			hostName := "scanhost-" + template.Name
-			host, err := serviceProvider.CreateHost(model.HostRequest{
+			host, err := serviceProvider.CreateHost(resources.HostRequest{
 				ResourceName: hostName,
 				PublicIP:     true,
 				ImageID:      img.ID,
 				TemplateID:   template.ID,
-				Networks:     []*model.Network{net},
+				Networks:     []*resources.Network{net},
 			})
 			if err != nil {
 				return err
@@ -418,11 +417,10 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			if nerr != nil {
 				log.Warnf("template [%s] : Error writing file: %v", template.Name, nerr)
 				return nerr
-			} else {
-				log.Infof("template [%s] : Stored in file: %s", template.Name, "$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json")
 			}
+			log.Infof("template [%s] : Stored in file: %s", template.Name, "$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json")
 		} else {
-			return errors.New("No gateway network !")
+			return errors.New("no gateway network")
 		}
 
 		return nil
@@ -433,7 +431,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	for _, target := range templates {
 		sem <- true
 		localTarget := target
-		go func(inner model.HostTemplate) {
+		go func(inner resources.HostTemplate) {
 			defer func() { <-sem }()
 			lerr := hostAnalysis(inner)
 			if lerr != nil {
@@ -451,11 +449,11 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	return nil
 }
 
-func dumpTemplates(service *providers.Service, tenant string) error {
+func dumpTemplates(service *iaas.Service, tenant string) error {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	type TemplateList struct {
-		Templates []model.HostTemplate `json:"templates,omitempty"`
+		Templates []resources.HostTemplate `json:"templates,omitempty"`
 	}
 
 	templates, err := service.ListTemplates(false)
@@ -481,11 +479,11 @@ func dumpTemplates(service *providers.Service, tenant string) error {
 	return nil
 }
 
-func dumpImages(service *providers.Service, tenant string) error {
+func dumpImages(service *iaas.Service, tenant string) error {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	type ImageList struct {
-		Images []model.Image `json:"images,omitempty"`
+		Images []resources.Image `json:"images,omitempty"`
 	}
 
 	images, err := service.ListImages(false)

@@ -27,13 +27,13 @@ import (
 	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/iaas"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant
 type Tenant struct {
 	name    string
-	Service *providers.Service
+	Service *iaas.Service
 }
 
 var (
@@ -48,7 +48,7 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 	log.Infoln("Listeners: tenant list called")
 	defer log.Debugln("Listeners: tenant list done")
 
-	tenants, err := providers.Tenants()
+	tenants, err := iaas.GetTenants()
 	if err != nil {
 		return nil, err
 	}
@@ -83,14 +83,14 @@ var GetCurrentTenant = getCurrentTenant
 // getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
 func getCurrentTenant() *Tenant {
 	if currentTenant == nil {
-		tenants, err := providers.Tenants()
+		tenants, err := iaas.GetTenants()
 		if err != nil || len(tenants) != 1 {
 			return nil
 		}
 		// Set unique tenant as selected
 		log.Println("Unique tenant set")
 		for name := range tenants {
-			service, err := providers.GetService(name)
+			service, err := iaas.UseService(name)
 			if err != nil {
 				return nil
 			}
@@ -109,7 +109,7 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_pr
 		return &google_protobuf.Empty{}, nil
 	}
 
-	service, err := providers.GetService(in.GetName())
+	service, err := iaas.UseService(in.GetName())
 	if err != nil {
 		return &google_protobuf.Empty{}, fmt.Errorf("Unable to set tenant '%s': %s", in.GetName(), err.Error())
 	}

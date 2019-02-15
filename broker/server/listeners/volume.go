@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/broker/server/handlers"
 	"github.com/CS-SI/SafeScale/broker/utils"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
 )
 
 // broker volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
@@ -62,7 +62,7 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
-	// Map model.Volume to pb.Volume
+	// Map resources.Volume to pb.Volume
 	var pbvolumes []*pb.Volume
 	for _, volume := range volumes {
 		pbvolumes = append(pbvolumes, conv.ToPBVolume(&volume))

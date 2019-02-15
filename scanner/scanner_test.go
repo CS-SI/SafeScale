@@ -28,7 +28,7 @@ import (
 )
 
 func runOnlyInIntegrationTest(key string) {
-	if tenant_override := os.Getenv(key); tenant_override == "" {
+	if tenantOverride := os.Getenv(key); tenantOverride == "" {
 		panic("This only runs as an integration test")
 	}
 }

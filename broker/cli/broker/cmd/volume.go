@@ -26,7 +26,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
 	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
 )
@@ -169,7 +169,7 @@ var volumeAttach = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: model.DefaultVolumeMountPoint,
+			Value: resources.DefaultVolumeMountPoint,
 			Usage: "Mount point of the volume",
 		},
 		cli.StringFlag{

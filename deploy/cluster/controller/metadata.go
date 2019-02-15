@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -40,14 +41,14 @@ type Metadata struct {
 }
 
 // NewMetadata creates a new Cluster Controller metadata
-func NewMetadata(svc *providers.Service) (*Metadata, error) {
+func NewMetadata(svc *iaas.Service) (*Metadata, error) {
 	return &Metadata{
 		item: metadata.NewItem(svc, clusterFolderName),
 	}, nil
 }
 
 // GetService returns the service used by metadata
-func (m *Metadata) GetService() *providers.Service {
+func (m *Metadata) GetService() *iaas.Service {
 	return m.item.GetService()
 }
 

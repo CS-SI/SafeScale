@@ -22,10 +22,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
-	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/NetworkProperty"
+	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -48,14 +48,14 @@ type Network struct {
 }
 
 // NewNetwork creates an instance of network.Metadata
-func NewNetwork(svc *providers.Service) *Network {
+func NewNetwork(svc *iaas.Service) *Network {
 	return &Network{
 		item: metadata.NewItem(svc, networksFolderName),
 	}
 }
 
 // GetService returns the provider service used
-func (m *Network) GetService() *providers.Service {
+func (m *Network) GetService() *iaas.Service {
 	return m.item.GetService()
 }
 
@@ -68,7 +68,7 @@ func (m *Network) GetPath() string {
 }
 
 // Carry links a Network instance to the Metadata instance
-func (m *Network) Carry(network *model.Network) *Network {
+func (m *Network) Carry(network *resources.Network) *Network {
 	if network == nil {
 		panic("network parameter is nil!")
 	}
@@ -85,12 +85,12 @@ func (m *Network) Carry(network *model.Network) *Network {
 	return m
 }
 
-// Get returns the model.Network instance linked to metadata
-func (m *Network) Get() *model.Network {
+// Get returns the resources.Network instance linked to metadata
+func (m *Network) Get() *resources.Network {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
-	return m.item.Get().(*model.Network)
+	return m.item.Get().(*resources.Network)
 }
 
 // Write updates the metadata corresponding to the network in the Object Storage
@@ -123,7 +123,7 @@ func (m *Network) ReadByID(id string) error {
 		panic("m.item is nil!")
 	}
 
-	network := model.NewNetwork()
+	network := resources.NewNetwork()
 	err := m.item.ReadFrom(ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 		err := network.Deserialize(buf)
 		if err != nil {
@@ -146,7 +146,7 @@ func (m *Network) ReadByName(name string) error {
 		panic("m.item is nil!")
 	}
 
-	network := model.NewNetwork()
+	network := resources.NewNetwork()
 	err := m.item.ReadFrom(ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 		err := network.Deserialize(buf)
 		if err != nil {
@@ -179,13 +179,13 @@ func (m *Network) Delete() error {
 }
 
 // Browse walks through all the metadata objects in network
-func (m *Network) Browse(callback func(*model.Network) error) error {
+func (m *Network) Browse(callback func(*resources.Network) error) error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
 
 	return m.item.BrowseInto(ByIDFolderName, func(buf []byte) error {
-		network := model.Network{}
+		network := resources.Network{}
 		err := (&network).Deserialize(buf)
 		if err != nil {
 			return err
@@ -195,7 +195,7 @@ func (m *Network) Browse(callback func(*model.Network) error) error {
 }
 
 // AttachHost links host ID to the network
-func (m *Network) AttachHost(host *model.Host) error {
+func (m *Network) AttachHost(host *resources.Host) error {
 	network := m.Get()
 	return network.Properties.LockForWrite(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
@@ -223,10 +223,10 @@ func (m *Network) DetachHost(hostID string) error {
 	return nil
 }
 
-// ListHosts returns the list of model.Host attached to the network (excluding gateway)
-func (m *Network) ListHosts() ([]*model.Host, error) {
+// ListHosts returns the list of resources.Host attached to the network (excluding gateway)
+func (m *Network) ListHosts() ([]*resources.Host, error) {
 	network := m.Get()
-	var list []*model.Host
+	var list []*resources.Host
 	err := network.Properties.LockForRead(NetworkProperty.HostsV1).ThenUse(func(v interface{}) error {
 		networkHostsV1 := v.(*propsv1.NetworkHosts)
 		for id := range networkHostsV1.ByID {
@@ -259,13 +259,13 @@ func (m *Network) Release() {
 }
 
 // SaveNetwork saves the Network definition in Object Storage
-func SaveNetwork(svc *providers.Service, net *model.Network) (*Network, error) {
+func SaveNetwork(svc *iaas.Service, net *resources.Network) (*Network, error) {
 	mn := NewNetwork(svc)
 	return mn, mn.Carry(net).Write()
 }
 
 // RemoveNetwork removes the Network definition from Object Storage
-func RemoveNetwork(svc *providers.Service, net *model.Network) error {
+func RemoveNetwork(svc *iaas.Service, net *resources.Network) error {
 	return NewNetwork(svc).Carry(net).Delete()
 }
 
@@ -273,7 +273,7 @@ func RemoveNetwork(svc *providers.Service, net *model.Network) error {
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadNetwork(svc *providers.Service, ref string) (*Network, error) {
+func LoadNetwork(svc *iaas.Service, ref string) (*Network, error) {
 	mn := NewNetwork(svc)
 	var innerErr error
 	err := retry.WhileUnsuccessfulDelay1Second(
@@ -313,7 +313,7 @@ type Gateway struct {
 }
 
 // NewGateway creates an instance of metadata.Gateway
-func NewGateway(svc *providers.Service, networkID string) (*Gateway, error) {
+func NewGateway(svc *iaas.Service, networkID string) (*Gateway, error) {
 	network := NewNetwork(svc)
 	err := network.ReadByID(networkID)
 	if err != nil {
@@ -329,7 +329,7 @@ func NewGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 }
 
 // Carry links a Network instance to the Metadata instance
-func (mg *Gateway) Carry(host *model.Host) *Gateway {
+func (mg *Gateway) Carry(host *resources.Host) *Gateway {
 	if mg.host == nil {
 		mg.host = NewHost(mg.network.GetService())
 	}
@@ -337,8 +337,8 @@ func (mg *Gateway) Carry(host *model.Host) *Gateway {
 	return mg
 }
 
-// Get returns the *model.Host linked to the metadata
-func (mg *Gateway) Get() *model.Host {
+// Get returns the *resources.Host linked to the metadata
+func (mg *Gateway) Get() *resources.Host {
 	if mg.host == nil {
 		panic("mg.host is nil!")
 	}
@@ -418,7 +418,7 @@ func (mg *Gateway) Release() {
 }
 
 // LoadGateway returns the metadata of the Gateway of a network
-func LoadGateway(svc *providers.Service, networkID string) (*Gateway, error) {
+func LoadGateway(svc *iaas.Service, networkID string) (*Gateway, error) {
 	mg, err := NewGateway(svc, networkID)
 	if err != nil {
 		return nil, err
@@ -449,7 +449,7 @@ func LoadGateway(svc *providers.Service, networkID string) (*Gateway, error) {
 }
 
 // SaveGateway saves the metadata of a gateway
-func SaveGateway(svc *providers.Service, host *model.Host, networkID string) (*Gateway, error) {
+func SaveGateway(svc *iaas.Service, host *resources.Host, networkID string) (*Gateway, error) {
 	mg, err := NewGateway(svc, networkID)
 	if err != nil {
 		return nil, err

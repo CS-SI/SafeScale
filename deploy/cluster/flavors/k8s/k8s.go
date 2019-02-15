@@ -30,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/deploy/install"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 )
 
 //go:generate rice embed-go
@@ -75,16 +75,16 @@ func minimumRequiredServers(c api.Cluster) (int, int, int) {
 	return masterCount, privateNodeCount, publicNodeCount
 }
 
-func gatewaySizing(c api.Cluster) model.HostDefinition {
-	return model.HostDefinition{
+func gatewaySizing(c api.Cluster) resources.HostDefinition {
+	return resources.HostDefinition{
 		Cores:    2,
 		RAMSize:  15.0,
 		DiskSize: 60,
 	}
 }
 
-func nodeSizing(c api.Cluster) model.HostDefinition {
-	return model.HostDefinition{
+func nodeSizing(c api.Cluster) resources.HostDefinition {
+	return resources.HostDefinition{
 		Cores:    4,
 		RAMSize:  15.0,
 		DiskSize: 100,

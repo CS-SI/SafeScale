@@ -17,8 +17,8 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 )
 
 //go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers TemplateAPI
@@ -27,23 +27,23 @@ import (
 
 //TemplateAPI defines API to manipulate hosts
 type TemplateAPI interface {
-	List(all bool) ([]model.HostTemplate, error)
+	List(all bool) ([]resources.HostTemplate, error)
 }
 
 // TemplateHandler template service
 type TemplateHandler struct {
-	provider *providers.Service
+	service *iaas.Service
 }
 
 // NewTemplateHandler creates a template service
-func NewTemplateHandler(api *providers.Service) TemplateAPI {
+func NewTemplateHandler(svc *iaas.Service) TemplateAPI {
 	return &TemplateHandler{
-		provider: api,
+		service: svc,
 	}
 }
 
 // List returns the template list
-func (svc *TemplateHandler) List(all bool) ([]model.HostTemplate, error) {
-	tlist, err := svc.provider.ListTemplates(all)
+func (handler *TemplateHandler) List(all bool) ([]resources.HostTemplate, error) {
+	tlist, err := handler.service.ListTemplates(all)
 	return tlist, infraErr(err)
 }

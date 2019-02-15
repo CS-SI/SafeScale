@@ -11,7 +11,7 @@ vet:
 	@$(GO) vet ./...
 
 clean:
-	@(cd api && $(MAKE) $@)
-	@(cd model && $(MAKE) $(@))
-	@(cd userdata && $(MAKE) $(@))
+	@(cd resources && $(MAKE) $(@))
+	@(cd stacks && $(MAKE) $(@))
+	@(cd providers && $(MAKE) $(@))
 	@$(RM) ./mocks/*.go || true

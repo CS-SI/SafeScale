@@ -24,7 +24,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/client"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	clitools "github.com/CS-SI/SafeScale/utils"
 
 	"github.com/urfave/cli"
@@ -53,7 +53,7 @@ var shareCreate = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: model.DefaultShareExportedPath,
+			Value: resources.DefaultShareExportedPath,
 			Usage: "Path to be exported",
 		},
 	},
@@ -161,7 +161,7 @@ var shareMount = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: model.DefaultShareMountPath,
+			Value: resources.DefaultShareMountPath,
 			Usage: "Path to be mounted",
 		},
 	},

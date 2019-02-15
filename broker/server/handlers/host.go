@@ -23,19 +23,18 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostState"
-	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/broker/client"
+	"github.com/CS-SI/SafeScale/broker/server/metadata"
 	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/metadata"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
-	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/NetworkProperty"
+	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -47,36 +46,36 @@ import (
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
-	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool, gpuNumber int, freq float32, force bool) (*model.Host, error)
-	List(all bool) ([]*model.Host, error)
-	ForceInspect(ref string) (*model.Host, error)
-	Inspect(ref string) (*model.Host, error)
+	Create(name string, net string, cpu int, ram float32, disk int, os string, public bool, gpuNumber int, freq float32, force bool) (*resources.Host, error)
+	List(all bool) ([]*resources.Host, error)
+	ForceInspect(ref string) (*resources.Host, error)
+	Inspect(ref string) (*resources.Host, error)
 	Delete(ref string) error
 	SSH(ref string) (*system.SSHConfig, error)
 	Reboot(ref string) error
-	Resize(name string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*model.Host, error)
+	Resize(name string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*resources.Host, error)
 	Start(ref string) error
 	Stop(ref string) error
 }
 
 // HostHandler host service
 type HostHandler struct {
-	provider *providers.Service
+	service *iaas.Service
 }
 
 // NewHostHandler ...
-func NewHostHandler(api *providers.Service) HostAPI {
+func NewHostHandler(svc *iaas.Service) HostAPI {
 	return &HostHandler{
-		provider: api,
+		service: svc,
 	}
 }
 
 // Start starts a host
-func (svc *HostHandler) Start(ref string) error {
+func (handler *HostHandler) Start(ref string) error {
 	log.Debugf(">>> broker.server.handlers.HostHandler::Start(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.HostHandler::Start(%s)", ref)
 
-	mh, err := metadata.LoadHost(svc.provider, ref)
+	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
 		// TODO Introduce error level as parameter
 		return infraErrf(err, "Error getting ssh config of host '%s': loading host metadata", ref)
@@ -85,19 +84,19 @@ func (svc *HostHandler) Start(ref string) error {
 		return infraErr(fmt.Errorf("host '%s' not found", ref))
 	}
 	id := mh.Get().ID
-	err = svc.provider.StartHost(id)
+	err = handler.service.StartHost(id)
 	if err != nil {
 		return infraErr(err)
 	}
-	return infraErr(svc.provider.WaitHostState(id, HostState.STARTED, brokerutils.GetTimeoutCtxHost()))
+	return infraErr(handler.service.WaitHostState(id, HostState.STARTED, brokerutils.GetTimeoutCtxHost()))
 }
 
 // Stop stops a host
-func (svc *HostHandler) Stop(ref string) error {
+func (handler *HostHandler) Stop(ref string) error {
 	log.Debugf(">>> broker.server.handlers.HostHandler::Stop(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.HostHandler::Stop(%s)", ref)
 
-	mh, err := metadata.LoadHost(svc.provider, ref)
+	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
 		// TODO Introduce error level as parameter
 		return infraErrf(err, "Error getting ssh config of host '%s': loading host metadata", ref)
@@ -106,19 +105,19 @@ func (svc *HostHandler) Stop(ref string) error {
 		return infraErr(fmt.Errorf("host '%s' not found", ref))
 	}
 	id := mh.Get().ID
-	err = svc.provider.StopHost(id)
+	err = handler.service.StopHost(id)
 	if err != nil {
 		return infraErr(err)
 	}
-	return infraErr(svc.provider.WaitHostState(id, HostState.STOPPED, brokerutils.GetTimeoutCtxHost()))
+	return infraErr(handler.service.WaitHostState(id, HostState.STOPPED, brokerutils.GetTimeoutCtxHost()))
 }
 
 // Reboot reboots a host
-func (svc *HostHandler) Reboot(ref string) error {
+func (handler *HostHandler) Reboot(ref string) error {
 	log.Debugf(">>> broker.server.handlers.HostHandler::Reboot(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.HostHandler::Reboot(%s)", ref)
 
-	mh, err := metadata.LoadHost(svc.provider, ref)
+	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
 		return infraErr(fmt.Errorf("failed to load metadata of host '%s': %v", ref, err))
 	}
@@ -126,13 +125,13 @@ func (svc *HostHandler) Reboot(ref string) error {
 		return infraErr(fmt.Errorf("host '%s' not found", ref))
 	}
 	id := mh.Get().ID
-	err = svc.provider.RebootHost(id)
+	err = handler.service.RebootHost(id)
 	if err != nil {
 		return infraErr(err)
 	}
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			return svc.provider.WaitHostState(id, HostState.STARTED, brokerutils.GetTimeoutCtxHost())
+			return handler.service.WaitHostState(id, HostState.STARTED, brokerutils.GetTimeoutCtxHost())
 		},
 		5*time.Minute,
 	)
@@ -143,11 +142,11 @@ func (svc *HostHandler) Reboot(ref string) error {
 }
 
 // Resize ...
-func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*model.Host, error) {
+func (handler *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*resources.Host, error) {
 	log.Debugf(">>> broker.server.handlers.HostHandler::Resize(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.HostHandler::Resize(%s)", ref)
 
-	mh, err := metadata.LoadHost(svc.provider, ref)
+	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
 		return nil, infraErrf(err, "failed to load host metadata")
 	}
@@ -156,7 +155,7 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 	}
 
 	id := mh.Get().ID
-	hostSizeRequest := model.SizingRequirements{
+	hostSizeRequest := resources.SizingRequirements{
 		MinDiskSize: disk,
 		MinRAMSize:  ram,
 		MinCores:    cpu,
@@ -166,7 +165,7 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 
 	// TODO RESIZE 1st check new requirements vs old requirements
 	host := mh.Get()
-	host, err = svc.provider.GetHost(host)
+	host, err = handler.service.GetHost(host)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -190,7 +189,7 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 		}
 	}
 
-	newHost, err := svc.provider.ResizeHost(id, hostSizeRequest)
+	newHost, err := handler.service.ResizeHost(id, hostSizeRequest)
 
 	if err != nil {
 		return nil, infraErrf(err, "Error resizing host '%s'", ref)
@@ -203,29 +202,29 @@ func (svc *HostHandler) Resize(ref string, cpu int, ram float32, disk int, gpuNu
 }
 
 // Create creates a host
-func (svc *HostHandler) Create(
+func (handler *HostHandler) Create(
 	name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32, force bool,
-) (*model.Host, error) {
+) (*resources.Host, error) {
 
 	log.Debugf(">>> broker.server.handlers.host.go:HostHandler::Create(%s)", name)
 	defer log.Debugf("<<< broker.server.handlers.hostHostHandler::Create(%s)", name)
 
-	host, err := svc.provider.GetHostByName(name)
+	host, err := handler.service.GetHostByName(name)
 	if err != nil {
-		if _, ok := err.(model.ErrResourceNotFound); !ok {
+		if _, ok := err.(resources.ErrResourceNotFound); !ok {
 			return nil, infraErrf(err, "failure creating host: failed to check if host resource name '%s' is already used: %v", name, err)
 		}
 	} else {
 		return nil, logicErr(fmt.Errorf("failed to create host '%s': name is already used", name))
 	}
 
-	var networks []*model.Network
-	var gw *model.Host
+	var networks []*resources.Network
+	var gw *resources.Host
 	if len(net) != 0 {
-		networkHandler := NewNetworkHandler(svc.provider)
+		networkHandler := NewNetworkHandler(handler.service)
 		n, err := networkHandler.Inspect(net)
 		if err != nil {
-			if _, ok := err.(model.ErrResourceNotFound); ok {
+			if _, ok := err.(resources.ErrResourceNotFound); ok {
 				return nil, infraErr(err)
 			}
 			return nil, infraErrf(err, "failed to get network resource data: '%s'", net)
@@ -234,7 +233,7 @@ func (svc *HostHandler) Create(
 			return nil, logicErr(fmt.Errorf("failed to find network '%s'", net))
 		}
 		networks = append(networks, n)
-		mgw, err := metadata.LoadHost(svc.provider, n.GatewayID)
+		mgw, err := metadata.LoadHost(handler.service, n.GatewayID)
 		if err != nil {
 			return nil, infraErr(err)
 		}
@@ -243,15 +242,15 @@ func (svc *HostHandler) Create(
 		}
 		gw = mgw.Get()
 	} else {
-		net, err := svc.getOrCreateDefaultNetwork()
+		net, err := handler.getOrCreateDefaultNetwork()
 		if err != nil {
 			return nil, infraErr(err)
 		}
 		networks = append(networks, net)
 	}
 
-	templates, err := svc.provider.SelectTemplatesBySize(
-		model.SizingRequirements{
+	templates, err := handler.service.SelectTemplatesBySize(
+		resources.SizingRequirements{
 			MinCores:    cpu,
 			MinRAMSize:  ram,
 			MinDiskSize: disk,
@@ -261,7 +260,7 @@ func (svc *HostHandler) Create(
 	if err != nil {
 		return nil, infraErrf(err, "failed to find template corresponding to requested resources")
 	}
-	var template model.HostTemplate
+	var template resources.HostTemplate
 	if len(templates) > 0 {
 		template = templates[0]
 		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores))
@@ -282,11 +281,11 @@ func (svc *HostHandler) Create(
 		return nil, logicErrf(err, "failed to find template corresponding to requested resources")
 	}
 
-	var img *model.Image
+	var img *resources.Image
 	err = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			var innerErr error
-			img, innerErr = svc.provider.SearchImage(los)
+			img, innerErr = handler.service.SearchImage(los)
 			return innerErr
 		},
 		10*time.Second,
@@ -295,7 +294,7 @@ func (svc *HostHandler) Create(
 		return nil, infraErrf(err, "failed to find image to use on compute resource")
 	}
 
-	hostRequest := model.HostRequest{
+	hostRequest := resources.HostRequest{
 		ImageID:        img.ID,
 		ResourceName:   name,
 		TemplateID:     template.ID,
@@ -304,9 +303,9 @@ func (svc *HostHandler) Create(
 		DefaultGateway: gw,
 	}
 
-	host, err = svc.provider.CreateHost(hostRequest)
+	host, err = handler.service.CreateHost(hostRequest)
 	if err != nil {
-		if _, ok := err.(model.ErrResourceInvalidRequest); ok {
+		if _, ok := err.(resources.ErrResourceInvalidRequest); ok {
 			return nil, infraErr(err)
 		}
 		return nil, infraErrf(err, "failed to create compute resource '%s'", hostRequest.ResourceName)
@@ -314,7 +313,7 @@ func (svc *HostHandler) Create(
 
 	defer func() {
 		if err != nil {
-			derr := svc.provider.DeleteHost(host.ID)
+			derr := handler.service.DeleteHost(host.ID)
 			if derr != nil {
 				log.Errorf("Failed to delete host '%s': %v", host.Name, derr)
 			}
@@ -377,10 +376,10 @@ func (svc *HostHandler) Create(
 	)
 	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
-		defaultNetworkID = hostNetworkV1.DefaultNetworkID // set earlier by svc.provider.CreateHost()
+		defaultNetworkID = hostNetworkV1.DefaultNetworkID // set earlier by handler.service.CreateHost()
 		if !public {
 			if len(networks) > 0 {
-				mgw, err := metadata.LoadGateway(svc.provider, defaultNetworkID)
+				mgw, err := metadata.LoadGateway(handler.service, defaultNetworkID)
 				if err == nil {
 					gatewayID = mgw.Get().ID
 				}
@@ -389,7 +388,7 @@ func (svc *HostHandler) Create(
 		hostNetworkV1.DefaultGatewayID = gatewayID
 
 		if net != "" {
-			mn, err := metadata.LoadNetwork(svc.provider, net)
+			mn, err := metadata.LoadNetwork(handler.service, net)
 			if err != nil {
 				return err
 			}
@@ -405,7 +404,7 @@ func (svc *HostHandler) Create(
 	}
 
 	// Updates host metadata
-	mh := metadata.NewHost(svc.provider)
+	mh := metadata.NewHost(handler.service)
 	err = mh.Carry(host).Write()
 	if err != nil {
 		return nil, infraErrf(err, "Metadata creation failed")
@@ -426,7 +425,7 @@ func (svc *HostHandler) Create(
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
 	log.Infof("Waiting start of SSH service on remote host '%s' ...", host.Name)
-	sshHandler := NewSSHHandler(svc.provider)
+	sshHandler := NewSSHHandler(handler.service)
 	sshCfg, err := sshHandler.GetConfig(host.ID)
 	if err != nil {
 		return nil, infraErr(err)
@@ -462,7 +461,7 @@ func (svc *HostHandler) Create(
 			log.Errorf(err.Error())
 			continue
 		}
-		_, err = metadata.SaveNetwork(svc.provider, i)
+		_, err = metadata.SaveNetwork(handler.service, i)
 		if err != nil {
 			log.Errorf(err.Error())
 		}
@@ -473,13 +472,13 @@ func (svc *HostHandler) Create(
 	return host, nil
 }
 
-// getOrCreateDefaultNetwork gets network model.SingleHostNetworkName or create it if necessary
+// getOrCreateDefaultNetwork gets network resources.SingleHostNetworkName or create it if necessary
 // We don't want metadata on this network, so we use directly provider api instead of services
-func (svc *HostHandler) getOrCreateDefaultNetwork() (*model.Network, error) {
-	network, err := svc.provider.GetNetworkByName(model.SingleHostNetworkName)
+func (handler *HostHandler) getOrCreateDefaultNetwork() (*resources.Network, error) {
+	network, err := handler.service.GetNetworkByName(resources.SingleHostNetworkName)
 	if err != nil {
 		switch err.(type) {
-		case model.ErrResourceNotFound:
+		case resources.ErrResourceNotFound:
 		default:
 			return nil, infraErr(err)
 		}
@@ -488,28 +487,28 @@ func (svc *HostHandler) getOrCreateDefaultNetwork() (*model.Network, error) {
 		return network, nil
 	}
 
-	request := model.NetworkRequest{
-		Name:      model.SingleHostNetworkName,
+	request := resources.NetworkRequest{
+		Name:      resources.SingleHostNetworkName,
 		IPVersion: IPVersion.IPv4,
 		CIDR:      "10.0.0.0/8",
 	}
 
-	mnet, err := svc.provider.CreateNetwork(request)
+	mnet, err := handler.service.CreateNetwork(request)
 	return mnet, infraErr(err)
 }
 
 // List returns the host list
-func (svc *HostHandler) List(all bool) ([]*model.Host, error) {
+func (handler *HostHandler) List(all bool) ([]*resources.Host, error) {
 	log.Debugf("<<< broker.server.handlers.HostHandler::List(%v)", all)
 	defer log.Debugf(">>> broker.server.handlers.HostHandler::List(%v)", all)
 
 	if all {
-		return svc.provider.ListHosts()
+		return handler.service.ListHosts()
 	}
 
-	var hosts []*model.Host
-	m := metadata.NewHost(svc.provider)
-	err := m.Browse(func(host *model.Host) error {
+	var hosts []*resources.Host
+	m := metadata.NewHost(handler.service)
+	err := m.Browse(func(host *resources.Host) error {
 		hosts = append(hosts, host)
 		return nil
 	})
@@ -521,11 +520,11 @@ func (svc *HostHandler) List(all bool) ([]*model.Host, error) {
 
 // ForceInspect ...
 // If not found, return (nil, err)
-func (svc *HostHandler) ForceInspect(ref string) (*model.Host, error) {
+func (handler *HostHandler) ForceInspect(ref string) (*resources.Host, error) {
 	log.Debugf(">>> broker.server.handlers.HostHandler::ForceInspect(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.HostHandler::ForceInspect(%s)", ref)
 
-	host, err := svc.Inspect(ref)
+	host, err := handler.Inspect(ref)
 	if err != nil {
 		return nil, throwErr(err)
 	}
@@ -535,20 +534,20 @@ func (svc *HostHandler) ForceInspect(ref string) (*model.Host, error) {
 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
-func (svc *HostHandler) Inspect(ref string) (*model.Host, error) {
+func (handler *HostHandler) Inspect(ref string) (*resources.Host, error) {
 	log.Debugf(">>> broker.server.handlers.HostHandler::Inspect(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.HostHandler::Inspect(%s)", ref)
 
-	mh, err := metadata.LoadHost(svc.provider, ref)
+	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
-			return nil, model.ResourceNotFoundError("host", ref)
+			return nil, resources.ResourceNotFoundError("host", ref)
 		}
 		return nil, throwErr(err)
 	}
 
 	host := mh.Get()
-	host, err = svc.provider.GetHost(host)
+	host, err = handler.service.GetHost(host)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -556,14 +555,14 @@ func (svc *HostHandler) Inspect(ref string) (*model.Host, error) {
 }
 
 // Delete deletes host referenced by ref
-func (svc *HostHandler) Delete(ref string) error {
+func (handler *HostHandler) Delete(ref string) error {
 	log.Debugf(">>> broker.server.handlers.HostHandler::Delete(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.HostHandler::Delete(%s)", ref)
 
-	mh, err := metadata.LoadHost(svc.provider, ref)
+	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
-			return model.ResourceNotFoundError("host", ref)
+			return resources.ResourceNotFoundError("host", ref)
 		}
 		return infraErrf(err, "can't delete host '%s'", ref)
 	}
@@ -610,7 +609,7 @@ func (svc *HostHandler) Delete(ref string) error {
 	}
 
 	// If host mounted shares, unmounts them before anything else
-	shareHandler := NewShareHandler(svc.provider)
+	shareHandler := NewShareHandler(handler.service)
 	var mounts []*propsv1.HostShare
 	err = host.Properties.LockForRead(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
 		hostMountsV1 := v.(*propsv1.HostMounts)
@@ -621,7 +620,7 @@ func (svc *HostHandler) Delete(ref string) error {
 				return infraErr(err)
 			}
 			if share == nil {
-				return model.ResourceNotFoundError("share", i.ShareID)
+				return resources.ResourceNotFoundError("share", i.ShareID)
 			}
 			mounts = append(mounts, share)
 		}
@@ -650,7 +649,7 @@ func (svc *HostHandler) Delete(ref string) error {
 	}
 
 	// Update networks property prosv1.NetworkHosts to remove the reference to the host
-	netHandler := NewNetworkHandler(svc.provider)
+	netHandler := NewNetworkHandler(handler.service)
 	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		for k := range hostNetworkV1.NetworksByID {
@@ -668,7 +667,7 @@ func (svc *HostHandler) Delete(ref string) error {
 			if err != nil {
 				log.Errorf(err.Error())
 			}
-			_, err = metadata.SaveNetwork(svc.provider, network)
+			_, err = metadata.SaveNetwork(handler.service, network)
 			if err != nil {
 				log.Errorf(err.Error())
 			}
@@ -680,7 +679,7 @@ func (svc *HostHandler) Delete(ref string) error {
 	}
 
 	// Conditions are met, delete host
-	err = svc.provider.DeleteHost(host.ID)
+	err = handler.service.DeleteHost(host.ID)
 	if err != nil {
 		return infraErrf(err, "can't delete host")
 	}
@@ -691,7 +690,7 @@ func (svc *HostHandler) Delete(ref string) error {
 }
 
 // SSH returns ssh parameters to access the host referenced by ref
-func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
+func (handler *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
 	log.Debugf(">>> broker.server.handlers.HostHandler::SSH(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.HostHandler::SSH(%s)", ref)
 
@@ -700,7 +699,7 @@ func (svc *HostHandler) SSH(ref string) (*system.SSHConfig, error) {
 	// 	return nil, logicErrf(err, fmt.Sprintf("can't access ssh parameters of host '%s': failed to query host", ref), "")
 	// }
 
-	sshHandler := NewSSHHandler(svc.provider)
+	sshHandler := NewSSHHandler(handler.service)
 	// sshConfig, err := sshHandler.GetConfig(host.ID)
 	sshConfig, err := sshHandler.GetConfig(ref)
 	if err != nil {

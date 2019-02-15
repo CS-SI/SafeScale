@@ -17,9 +17,10 @@
 package metadata
 
 import (
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"sync"
+
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
@@ -29,34 +30,29 @@ type Item struct {
 	payload serialize.Serializable
 	folder  *Folder
 	written bool
-	lock    chan struct{}
+	lock    *sync.Mutex
 }
 
 // ItemDecoderCallback ...
 type ItemDecoderCallback func([]byte) (serialize.Serializable, error)
 
 // NewItem creates a new item with 'name' and in 'path'
-func NewItem(svc *providers.Service, path string) *Item {
+func NewItem(svc *iaas.Service, path string) *Item {
 	return &Item{
 		folder:  NewFolder(svc, path),
 		payload: nil,
-		lock:    make(chan struct{}, 1),
+		lock:    &sync.Mutex{},
 	}
 }
 
 // GetService returns the service used by Item
-func (i *Item) GetService() *providers.Service {
+func (i *Item) GetService() *iaas.Service {
 	return i.folder.GetService()
 }
 
 // GetBucket returns the bucket used by Item
 func (i *Item) GetBucket() objectstorage.Bucket {
 	return i.folder.GetBucket()
-}
-
-// GetClient returns the bucket used by Item
-func (i *Item) GetClient() api.ClientAPI {
-	return i.folder.GetClient()
 }
 
 // GetPath returns the path in the Object Storage where the Item is stored
@@ -187,10 +183,10 @@ func (i *Item) Browse(callback func([]byte) error) error {
 
 // Acquire waits until the lock is available, then locks the metadata
 func (i *Item) Acquire() {
-	i.lock <- struct{}{}
+	i.lock.Lock()
 }
 
 // Release unlocks the metadata
 func (i *Item) Release() {
-	<-i.lock
+	i.lock.Unlock()
 }
