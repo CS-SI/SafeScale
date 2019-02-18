@@ -61,7 +61,7 @@ var (
 
 // provider is the providerementation of the OVH provider
 type provider struct {
-	stacks.Stack
+	*openstack.Stack
 	ExternalNetworkID string
 }
 
@@ -110,11 +110,19 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 		MetadataBucket: metadataBucketName,
 	}
 
-	stack, err := openstack.New(authOptions, nil, cfgOptions)
+	serviceVersions := map[string]string{"volume": "v1"}
+
+	stack, err := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
 	if err != nil {
 		return nil, err
 	}
-	return &provider{Stack: stack}, nil
+
+	newP := &provider{Stack: stack}
+	err = stack.InitDefaultSecurityGroup()
+	if err != nil {
+		return nil, err
+	}
+	return newP, nil
 }
 
 // GetAuthOpts returns the auth options

@@ -121,8 +121,8 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (*resources.Image, error) {
-	log.Debugf(">>> openstack.Client.GetImage(%s)", id)
-	defer log.Debugf("<<< openstack.Client.GetImage(%s)", id)
+	log.Debugf(">>> stacks.openstack::GetImage(%s)", id)
+	defer log.Debugf("<<< stacks.openstack::GetImage(%s)", id)
 
 	if s == nil {
 		panic("Calling method GetImage from nil!")
@@ -138,8 +138,8 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 
 // GetTemplate returns the Template referenced by id
 func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
-	log.Debugf(">>> openstack.Client.GetTemplate(%s) called", id)
-	defer log.Debugf("<<< openstack.Client.GetTemplate(%s) done", id)
+	log.Debugf(">>> stacks.openstack::GetTemplate(%s)", id)
+	defer log.Debugf("<<< stacks.openstack::GetTemplate(%s)", id)
 
 	if s == nil {
 		panic("Calling method GetTemplate from nil!")
@@ -171,8 +171,8 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
-	log.Debugf(">>> openstack.Client.ListTemplates() called")
-	defer log.Debugf("<<< openstack.Client.ListTemplates() done")
+	log.Debugf(">>> stacks.openstack::ListTemplates()")
+	defer log.Debugf("<<< stacks.openstack::ListTemplates()")
 
 	if s == nil {
 		panic("Calling method ListTemplates from nil!")
@@ -217,8 +217,8 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	log.Debugf(">>> openstack.Client.CreateKeyPair(%s) called", name)
-	defer log.Debugf("<<< openstack.Client.CreateKeyPair(%s) done", name)
+	log.Debugf(">>> stacks.openstack::CreateKeyPair(%s)", name)
+	defer log.Debugf("<<< stacks.openstack::CreateKeyPair(%s)", name)
 
 	if s == nil {
 		panic("Calling method CreateKeyPair from nil!")
@@ -248,8 +248,8 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	log.Debugf(">>> openstack.Client.GetKeyPair(%s) called", id)
-	defer log.Debugf("<<< openstack.Client.GetKeyPair(%s) done", id)
+	log.Debugf(">>> stacks.openstack::GetKeyPair(%s)", id)
+	defer log.Debugf("<<< stacks.openstack::GetKeyPair(%s)", id)
 
 	if s == nil {
 		panic("Calling method GetKeyPair from nil!")
@@ -271,8 +271,8 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	log.Debug(">>> openstack.Client.ListKeyPairs() called")
-	defer log.Debug("<<< openstack.Client.ListKeyPairs() done")
+	log.Debug(">>> stacks.openstack::ListKeyPairs()")
+	defer log.Debug("<<< stacks.openstack::ListKeyPairs()")
 
 	if s == nil {
 		panic("Calling method ListKeyPairs from nil!")
@@ -311,8 +311,8 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	log.Debugf(">>> openstack.Client.DeleteKeyPair(%s) called", id)
-	defer log.Debugf("<<< openstack.Client.DeleteKeyPair(%s) done", id)
+	log.Debugf(">>> stacks.openstack::DeleteKeyPair(%s)", id)
+	defer log.Debugf("<<< stacks.openstack::DeleteKeyPair(%s)", id)
 
 	if s == nil {
 		panic("Calling method DeleteKeyPair from nil!")
@@ -367,8 +367,8 @@ func toHostState(status string) HostState.Enum {
 
 // GetHost updates the data inside host with the data from provider
 func (s *Stack) GetHost(hostParam interface{}) (*resources.Host, error) {
-	log.Debug(">>> openstack.Stack.GetHost() called")
-	defer log.Debug("<<< openstack.Stack.GetHost() done")
+	log.Debug(">>> stacks.openstack::GetHost()")
+	defer log.Debug("<<< stacks.openstack::GetHost()")
 
 	if s == nil {
 		panic("Calling method GetHost from nil!")
@@ -622,8 +622,8 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 // GetHostByName returns the host using the name passed as parameter
 func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
-	log.Debugf(">>> openstack.Stack.GetHostByName(%s) called", name)
-	defer log.Debugf("<<< openstack.Stack.GetHostByName(%s) done", name)
+	log.Debugf(">>> stacks.openstack::GetHostByName(%s)", name)
+	defer log.Debugf("<<< stacks.openstack::GetHostByName(%s)", name)
 
 	if s == nil {
 		panic("Calling method GetHostByName from nil!")
@@ -679,8 +679,8 @@ type userData struct {
 
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, error) {
-	log.Debugf(">>> openstack.Stack.CreateHost(%s) called", request.ResourceName)
-	defer log.Debugf("<<< openstack.Stack.CreateHost(%s) done", request.ResourceName)
+	log.Debugf(">>> stacks.openstack::CreateHost(%s)", request.ResourceName)
+	defer log.Debugf("<<< stacks.openstack::CreateHost(%s)", request.ResourceName)
 
 	if s == nil {
 		panic("Calling s.CreateHost with s==nil!")
@@ -690,7 +690,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if request.DefaultGateway == nil && !request.PublicIP {
-		return nil, resources.ResourceInvalidRequestError("host creation", "can't create a gateway without public IP")
+		return nil, resources.ResourceInvalidRequestError("host creation", "can't create a host without public IP or without attached network")
 	}
 
 	// The Default Network is the first of the provided list, by convention
@@ -930,8 +930,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	default:
 		panic("hostParam must be a string or a *resources.Host!")
 	}
-	log.Debugf(">>> openstack.Stack::WaitHostReady(%s)", host.ID)
-	defer log.Debugf("<<< openstack.Stack::WaitHostReady(%s)", host.ID)
+	log.Debugf(">>> stacks.openstack::WaitHostReady(%s)", host.ID)
+	defer log.Debugf("<<< stacks.openstack::WaitHostReady(%s)", host.ID)
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -960,8 +960,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *resources.Host; any other type will panic
 func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
-	log.Debug(">>> openstack.Stack.GetHostState() called")
-	defer log.Debug("<<< openstack.Stack.GetHostState() done")
+	log.Debug(">>> stacks.openstack::GetHostState()")
+	defer log.Debug("<<< stacks.openstack::GetHostState()")
 
 	if s == nil {
 		panic("Calling s.GetHostState with s==nil!")
@@ -976,8 +976,8 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 
 // ListHosts lists all hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
-	log.Debug(">>> openstack.Stack.ListHosts() called")
-	defer log.Debug("<<< openstack.Stack.ListHosts() done")
+	log.Debug(">>> stacks.openstack::ListHosts()")
+	defer log.Debug("<<< stacks.openstack::ListHosts()")
 
 	if s == nil {
 		panic("Calling s.ListHosts with s==nil!")
@@ -1047,8 +1047,8 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
-	log.Debugf(">>> openstack.Stack.DeleteHost(%s) called", id)
-	defer log.Debugf("<<< openstack.Stack.DeleteHost(%s) done", id)
+	log.Debugf(">>> stacks.openstack::DeleteHost(%s)", id)
+	defer log.Debugf("<<< stacks.openstack::DeleteHost(%s)", id)
 
 	if s == nil {
 		panic("Calling s.DeleteHost with s==nil!")
@@ -1140,8 +1140,8 @@ func (s *Stack) DeleteHost(id string) error {
 
 // StopHost stops the host identified by id
 func (s *Stack) StopHost(id string) error {
-	log.Debugf(">>> openstack.Stack.StopHost(%s) called", id)
-	defer log.Debugf("<<< openstack.Stack.StopHost(%s) done", id)
+	log.Debugf(">>> stacks.openstack::StopHost(%s)", id)
+	defer log.Debugf("<<< stacks.openstack::StopHost(%s)", id)
 
 	if s == nil {
 		panic("Calling s.StopHost with s==nil!")
@@ -1157,8 +1157,8 @@ func (s *Stack) StopHost(id string) error {
 
 // RebootHost reboots inconditionnaly the host identified by id
 func (s *Stack) RebootHost(id string) error {
-	log.Debugf(">>> openstack.Stack.Reboot(%s) called", id)
-	defer log.Debugf("<<< openstack.Stack.Reboot(%s) done", id)
+	log.Debugf(">>> stacks.openstack::Reboot(%s)", id)
+	defer log.Debugf("<<< stacks.openstack::Reboot(%s)", id)
 
 	if s == nil {
 		panic("Calling s.RebootHost with s==nil!")
@@ -1174,8 +1174,8 @@ func (s *Stack) RebootHost(id string) error {
 
 // StartHost starts the host identified by id
 func (s *Stack) StartHost(id string) error {
-	log.Debugf(">>> openstack.Stack.StartHost(%s) called", id)
-	defer log.Debugf("<<< openstack.Stack.StartHost(%s) done", id)
+	log.Debugf(">>> stacks.openstack::StartHost(%s)", id)
+	defer log.Debugf("<<< stacks.openstack::StartHost(%s)", id)
 
 	if s == nil {
 		panic("Calling s.StartHost with s==nil!")
@@ -1192,8 +1192,8 @@ func (s *Stack) StartHost(id string) error {
 
 // ResizeHost ...
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	log.Debugf(">>> openstack.Stack::ResizeHost(%s) called", id)
-	defer log.Debugf("<<< openstack.Stack::ResizeHost(%s) done", id)
+	log.Debugf(">>> stacks.openstack::ResizeHost(%s)", id)
+	defer log.Debugf("<<< stacks.openstack::ResizeHost(%s)", id)
 
 	if s == nil {
 		panic("Calling s.ResizeHost with s==nil!")

@@ -59,6 +59,8 @@ var gpuMap = map[string]gpuCfg{
 // provider is the providerementation of FlexibleEngine provider
 type provider struct {
 	*huaweicloud.Stack
+
+	defaultSecurityGroupName string
 }
 
 // New creates a new instance of flexibleengine provider
@@ -112,11 +114,15 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 		},
 		MetadataBucket: metadataBucketName,
 	}
+
 	stack, err := huaweicloud.New(authOptions, cfgOptions)
 	if err != nil {
 		return nil, err
 	}
-
+	err = stack.InitDefaultSecurityGroup()
+	if err != nil {
+		return nil, err
+	}
 	return &provider{Stack: stack}, nil
 }
 
@@ -191,11 +197,13 @@ func (p *provider) GetAuthOpts() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
-	cfg.Set("TenantName", opts.TenantName)
+	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthUrl", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
+	cfg.Set("VPCName", opts.VPCName)
+
 	return cfg, nil
 }
 
@@ -208,7 +216,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
-	cfg.Set("MetadataBucket", opts.MetadataBucket)
+	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 
 	return cfg, nil
 }

@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package openstack
 
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/iaas/stacks"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
-const defaultSecurityGroup string = "30ad3142-a5ec-44b5-9560-618bde3de1ef"
-
-// getDefaultSecurityGroup returns the default security group
-func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
+// GetSecurityGroup returns the default security group
+func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecurityGroup, error) {
 	var sgList []secgroups.SecurityGroup
 
 	err := secgroups.List(s.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
@@ -35,7 +34,7 @@ func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
 			return false, err
 		}
 		for _, e := range list {
-			if e.Name == defaultSecurityGroup {
+			if e.Name == name {
 				sgList = append(sgList, e)
 			}
 		}
@@ -45,7 +44,7 @@ func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
 		return nil, err
 	}
 	if len(sgList) > 1 {
-		return nil, fmt.Errorf("Configuration error: More than one default security groups exists")
+		return nil, fmt.Errorf("several security groups named '%s' found", name)
 	}
 
 	return &sgList[0], nil
@@ -103,37 +102,11 @@ func (s *Stack) createUDPRules(groupID string) error {
 	return err
 }
 
-// createICMPRules creates UDP rules to configure the default security group
-func (s *Stack) createICMPRules(groupID string) error {
-	// Open TCP Ports
-	ruleOpts := secgroups.CreateRuleOpts{
-		ParentGroupID: groupID,
-		FromPort:      -1,
-		ToPort:        -1,
-		IPProtocol:    "ICMP",
-		CIDR:          "0.0.0.0/0",
-	}
-
-	_, err := secgroups.CreateRule(s.ComputeClient, ruleOpts).Extract()
-	if err != nil {
-		return err
-	}
-	ruleOpts = secgroups.CreateRuleOpts{
-		ParentGroupID: groupID,
-		FromPort:      -1,
-		ToPort:        -1,
-		IPProtocol:    "ICMP",
-		CIDR:          "::/0",
-	}
-	_, err = secgroups.CreateRule(s.ComputeClient, ruleOpts).Extract()
-	return err
-}
-
-// initDefaultSecurityGroup create an open Security Group
+// InitDefaultSecurityGroup create an open Security Group
 // The default security group opens all TCP, UDP, ICMP ports
 // Security is managed individually on each host using a linux firewall
-func (s *Stack) initDefaultSecurityGroup() error {
-	sg, err := s.getDefaultSecurityGroup()
+func (s *Stack) InitDefaultSecurityGroup() error {
+	sg, err := s.GetSecurityGroup(stacks.DefaultSecurityGroupName)
 	if err != nil {
 		return err
 	}
@@ -142,7 +115,7 @@ func (s *Stack) initDefaultSecurityGroup() error {
 		return nil
 	}
 	opts := secgroups.CreateOpts{
-		Name:        defaultSecurityGroup,
+		Name:        stacks.DefaultSecurityGroupName,
 		Description: "Default security group",
 	}
 
@@ -150,6 +123,7 @@ func (s *Stack) initDefaultSecurityGroup() error {
 	if err != nil {
 		return err
 	}
+
 	err = s.createTCPRules(group.ID)
 	if err != nil {
 		secgroups.Delete(s.ComputeClient, group.ID)
@@ -161,11 +135,7 @@ func (s *Stack) initDefaultSecurityGroup() error {
 		secgroups.Delete(s.ComputeClient, group.ID)
 		return err
 	}
-	err = s.createICMPRules(group.ID)
-	if err != nil {
-		secgroups.Delete(s.ComputeClient, group.ID)
-		return err
-	}
+
 	s.SecurityGroup = group
 	return nil
 }

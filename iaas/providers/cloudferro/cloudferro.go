@@ -91,11 +91,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 		DefaultImage:   defaultImage,
 	}
 
-	stack, err := openstack.New(authOptions, nil, cfgOptions)
+	stack, err := openstack.New(authOptions, nil, cfgOptions, nil)
 	if err != nil {
 		return nil, err
 	}
-
+	err = stack.InitDefaultSecurityGroup()
+	if err != nil {
+		return nil, err
+	}
 	return &provider{Stack: stack}, nil
 }
 
@@ -121,6 +124,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
+	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	return cfg, nil
 }
 

@@ -264,10 +264,13 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
-	_, r.Err = s.Stack.ComputeClient.Get(s.Stack.ComputeClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{
+	_, r.Err = s.Stack.NetworkClient.Get(s.Stack.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{
 		OkCodes: []int{200, 203},
 	})
 	if r.Err != nil {
+		if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
+			return nil, resources.ResourceAccessDeniedError("network", name)
+		}
 		return nil, fmt.Errorf("query for network '%s' failed: %v", name, r.Err)
 	}
 	subnets, found := r.Body.(map[string]interface{})["subnets"].([]interface{})

@@ -93,6 +93,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 	if err != nil {
 		return nil, err
 	}
+	err = stack.InitDefaultSecurityGroup()
+	if err != nil {
+		return nil, err
+	}
 	return &provider{Stack: stack}, nil
 }
 
@@ -126,6 +130,7 @@ func (p *provider) GetAuthOpts() (providers.Config, error) {
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthUrl", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
+
 	return cfg, nil
 }
 
@@ -138,7 +143,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
-	cfg.Set("MetadataBucket", opts.MetadataBucket)
+	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 
 	return cfg, nil
 }
