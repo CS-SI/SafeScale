@@ -21,12 +21,13 @@ package local
 import (
 	"encoding/xml"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"hash/fnv"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/providers/model"
 	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"

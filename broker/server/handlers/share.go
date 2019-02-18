@@ -390,7 +390,15 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 		return nil, err
 	}
 
-	export := server.GetAccessIP() + ":" + share.Path
+	export := ""
+	target.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		if v.(*propsv1.HostNetwork).DefaultGatewayPrivateIP == server.GetPrivateIP() {
+			export = server.GetPrivateIP() + ":" + share.Path
+		} else {
+			export = server.GetAccessIP() + ":" + share.Path
+		}
+		return nil
+	})
 
 	// Mount the share on host
 	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
@@ -428,6 +436,30 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			sshHandler := NewSSHHandler(svc.provider)
+			sshConfig, err := sshHandler.GetConfig(ctx, target)
+			if err != nil {
+				log.Warn(infraErr(err).Error())
+			}
+
+			nfsClient, err := nfs.NewNFSClient(sshConfig)
+			if err != nil {
+				err = infraErr(err)
+				log.Warn(err.Error())
+			}
+			err = nfsClient.Install()
+			if err != nil {
+				log.Warn(infraErr(err).Error())
+			}
+
+			err = nfsClient.Unmount(export)
+			if err != nil {
+				log.Warn(infraErr(err).Error())
+			}
+		}
+	}()
 
 	var mount *propsv1.HostRemoteMount
 	err = target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
@@ -465,12 +497,13 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 			if err2 != nil {
 				log.Warnf("Failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
 			}
-			err = metadata.SaveHost(svc.provider, server)
-			if err != nil {
-				log.Warnf("Failed to save host %s metadatas", server.Name)
+			err2 = metadata.SaveHost(svc.provider, server)
+			if err2 != nil {
+				log.Warnf("Failed to save host %s metadatas : %s", server.Name, err2.Error())
 			}
 		}
 	}()
+
 	if target != server {
 		err = metadata.SaveHost(svc.provider, target)
 		if err != nil {
@@ -479,10 +512,11 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 	}
 	defer func() {
 		if err != nil {
-			err2 := server.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
+			err2 := target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
 				targetMountsV1 := v.(*propsv1.HostMounts)
 				delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
 				delete(targetMountsV1.RemoteMountsByPath, mount.Path)
+				delete(targetMountsV1.RemoteMountsByExport, mount.Export)
 				return nil
 			})
 			if err2 != nil {
@@ -490,7 +524,7 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 			}
 			err2 = metadata.SaveHost(svc.provider, target)
 			if err2 != nil {
-				log.Warnf("Failed to save host %s metadatas", hostName)
+				log.Warnf("Failed to save host %s metadatas : %s", hostName, err2.Error())
 			}
 		}
 	}()
@@ -530,6 +564,7 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 	}
 
 	var target *model.Host
+	var mount_path string
 	if server.Name == hostName || server.ID == hostName {
 		target = server
 	} else {
@@ -563,8 +598,9 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 		}
 
 		// Remove mount from mount list
+		mount_path = mount.Path
 		delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
-		delete(targetMountsV1.RemoteMountsByPath, mount.Path)
+		delete(targetMountsV1.RemoteMountsByPath, mount_path)
 		return nil
 	})
 	if err != nil {
@@ -597,7 +633,7 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 	select {
 	case <-ctx.Done():
 		log.Warnf("Share unmount canceled by broker")
-		_, err = svc.Mount(context.Background(), shareName, hostName, share.Path, false)
+		_, err = svc.Mount(context.Background(), shareName, hostName, mount_path, false)
 		if err != nil {
 			return fmt.Errorf("Failed to stop Share unmounting")
 		}
