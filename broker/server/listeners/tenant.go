@@ -45,8 +45,9 @@ type TenantListener struct{}
 
 // List registerd tenants
 func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
-	log.Infoln("Listeners: tenant list called")
-	defer log.Debugln("Listeners: tenant list done")
+	log.Infoln("Listeners: receiving \"tenant list\"")
+	log.Debugln(">>> TenantListener::List()")
+	defer log.Debugln("<<< TenantListener::List()")
 
 	tenants, err := iaas.GetTenants()
 	if err != nil {
@@ -66,8 +67,9 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 
 // Get returns the name of the current tenant used
 func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
-	log.Infoln("Listeners: tenant get called")
-	defer log.Debugln("Listeners: tenant get done")
+	log.Infoln("Listeners: receiving \"tenant get\"")
+	log.Debugln(">>> TenantListener::Get()")
+	defer log.Debugln(">>> TenantListener::Get()")
 
 	getCurrentTenant()
 	if currentTenant == nil {
@@ -102,8 +104,9 @@ func getCurrentTenant() *Tenant {
 
 // Set the the tenant to use for each command
 func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
-	log.Infof("Listeners: tenant set '%s' called", in.Name)
-	defer log.Debugf("Listeners: tenant set '%s' done", in.Name)
+	log.Infof("Listeners: receiving \"tenant set %s\"", in.Name)
+	log.Debugf(">>> TenantListener::Set(%s)", in.Name)
+	defer log.Debugf("<<< TenantListener::Set(%s)", in.Name)
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return &google_protobuf.Empty{}, nil
