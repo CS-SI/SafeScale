@@ -42,7 +42,7 @@ type Stack struct {
 	// Instance of the VPC
 	vpc *VPC
 	// defaultSecurityGroup contains the name of the default security group for the VPC
-	defaultSecurityGroup string
+	defaultSecurityGroupName string
 	// SecurityGroup is an instance of the default security group
 	SecurityGroup *secgroups.SecGroup
 }
@@ -61,7 +61,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 		DomainName:  auth.DomainName,
 	}
 
-	stack, err := openstack.New(auth, &scope, cfg)
+	stack, err := openstack.New(auth, &scope, cfg, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -101,12 +101,6 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 
 	// Initializes the VPC
 	err = s.initVPC()
-	if err != nil {
-		return nil, err
-	}
-
-	// Initializes the default security group
-	err = s.initDefaultSecurityGroup()
 	if err != nil {
 		return nil, err
 	}

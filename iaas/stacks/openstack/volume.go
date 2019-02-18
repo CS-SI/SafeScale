@@ -25,7 +25,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	gc "github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
+	volumesv1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
+	volumesv2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
 
@@ -103,22 +104,44 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
 	}
 
-	vol, err := volumes.Create(s.VolumeClient, volumes.CreateOpts{
-		Name:       request.Name,
-		Size:       request.Size,
-		VolumeType: s.getVolumeType(request.Speed),
-	}).Extract()
+	var v resources.Volume
+	switch s.versions["volume"] {
+	case "v1":
+		var vol *volumesv1.Volume
+		vol, err = volumesv1.Create(s.VolumeClient, volumesv1.CreateOpts{
+			Name:       request.Name,
+			Size:       request.Size,
+			VolumeType: s.getVolumeType(request.Speed),
+		}).Extract()
+		v = resources.Volume{
+			ID:    vol.ID,
+			Name:  vol.Name,
+			Size:  vol.Size,
+			Speed: s.getVolumeSpeed(vol.VolumeType),
+			State: toVolumeState(vol.Status),
+		}
+	case "v2":
+		var vol *volumesv2.Volume
+		vol, err = volumesv2.Create(s.VolumeClient, volumesv2.CreateOpts{
+			Name:       request.Name,
+			Size:       request.Size,
+			VolumeType: s.getVolumeType(request.Speed),
+		}).Extract()
+		v = resources.Volume{
+			ID:    vol.ID,
+			Name:  vol.Name,
+			Size:  vol.Size,
+			Speed: s.getVolumeSpeed(vol.VolumeType),
+			State: toVolumeState(vol.Status),
+		}
+	default:
+		return nil, fmt.Errorf("unmanaged service 'volume' version '%s'", s.versions["volume"])
+	}
 	if err != nil {
 		log.Debugf("Error creating volume: volume creation invocation: %+v", err)
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume : %s", ProviderErrorToString(err)))
 	}
-	v := resources.Volume{
-		ID:    vol.ID,
-		Name:  vol.Name,
-		Size:  vol.Size,
-		Speed: s.getVolumeSpeed(vol.VolumeType),
-		State: toVolumeState(vol.Status),
-	}
+
 	return &v, nil
 }
 
@@ -131,7 +154,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 		panic("Calling stacks.openstack::GetVolume() from nil pointer!")
 	}
 
-	r := volumes.Get(s.VolumeClient, id)
+	r := volumesv2.Get(s.VolumeClient, id)
 	volume, err := r.Extract()
 	if err != nil {
 		if _, ok := err.(gc.ErrDefault404); ok {
@@ -161,8 +184,8 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	}
 
 	var vs []resources.Volume
-	err := volumes.List(s.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-		list, err := volumes.ExtractVolumes(page)
+	err := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+		list, err := volumesv2.ExtractVolumes(page)
 		if err != nil {
 			log.Errorf("Error listing volumes: volume extraction: %+v", err)
 			return false, err
@@ -205,7 +228,7 @@ func (s *Stack) DeleteVolume(id string) error {
 
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			r := volumes.Delete(s.VolumeClient, id, nil)
+			r := volumesv2.Delete(s.VolumeClient, id, nil)
 			err := r.ExtractErr()
 			if err != nil {
 				switch err.(type) {

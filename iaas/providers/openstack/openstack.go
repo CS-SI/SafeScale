@@ -17,10 +17,7 @@
 package openstack
 
 import (
-	"fmt"
-
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
-	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
@@ -98,173 +95,30 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 		MetadataBucket: metadataBucketName,
 	}
 
-	stack, err := openstack.New(authOptions, nil, cfgOptions)
+	stack, err := openstack.New(authOptions, nil, cfgOptions, nil)
 	if err != nil {
 		return nil, err
 	}
 	newP := &provider{Stack: stack}
-	err = newP.initDefaultSecurityGroup()
+
+	err = stack.InitDefaultSecurityGroup()
 	if err != nil {
 		return nil, err
 	}
 	return newP, nil
 }
 
-// getDefaultSecurityGroup returns the default security group
-func (p *provider) getDefaultSecurityGroup() (*secgroups.SecurityGroup, error) {
-	var sgList []secgroups.SecurityGroup
-
-	err := secgroups.List(p.Stack.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
-		list, err := secgroups.ExtractSecurityGroups(page)
-		if err != nil {
-			return false, err
-		}
-		for _, e := range list {
-			if e.Name == defaultSecurityGroup {
-				sgList = append(sgList, e)
-			}
-		}
-		return true, nil
-	})
-	if len(sgList) == 0 {
-		return nil, err
-	}
-	if len(sgList) > 1 {
-		return nil, fmt.Errorf("Configuration error: More than one default security groups exists")
-	}
-
-	return &sgList[0], nil
-}
-
-// createTCPRules creates TCP rules to configure the default security group
-func (p *provider) createTCPRules(groupID string) error {
-	// Open TCP Ports
-	ruleOpts := secgroups.CreateRuleOpts{
-		ParentGroupID: groupID,
-		FromPort:      1,
-		ToPort:        65535,
-		IPProtocol:    "TCP",
-		CIDR:          "0.0.0.0/0",
-	}
-
-	_, err := secgroups.CreateRule(p.Stack.ComputeClient, ruleOpts).Extract()
-	if err != nil {
-		return err
-	}
-	ruleOpts = secgroups.CreateRuleOpts{
-		ParentGroupID: groupID,
-		FromPort:      1,
-		ToPort:        65535,
-		IPProtocol:    "TCP",
-		CIDR:          "::/0",
-	}
-	_, err = secgroups.CreateRule(p.Stack.ComputeClient, ruleOpts).Extract()
-	return err
-}
-
-// createTCPRules creates UDP rules to configure the default security group
-func (p *provider) createUDPRules(groupID string) error {
-	// Open UDP Ports
-	ruleOpts := secgroups.CreateRuleOpts{
-		ParentGroupID: groupID,
-		FromPort:      1,
-		ToPort:        65535,
-		IPProtocol:    "UDP",
-		CIDR:          "0.0.0.0/0",
-	}
-
-	_, err := secgroups.CreateRule(p.Stack.ComputeClient, ruleOpts).Extract()
-	if err != nil {
-		return err
-	}
-	ruleOpts = secgroups.CreateRuleOpts{
-		ParentGroupID: groupID,
-		FromPort:      1,
-		ToPort:        65535,
-		IPProtocol:    "UDP",
-		CIDR:          "::/0",
-	}
-	_, err = secgroups.CreateRule(p.Stack.ComputeClient, ruleOpts).Extract()
-	return err
-}
-
-// createICMPRules creates UDP rules to configure the default security group
-func (p *provider) createICMPRules(groupID string) error {
-	// Open TCP Ports
-	ruleOpts := secgroups.CreateRuleOpts{
-		ParentGroupID: groupID,
-		FromPort:      -1,
-		ToPort:        -1,
-		IPProtocol:    "ICMP",
-		CIDR:          "0.0.0.0/0",
-	}
-
-	_, err := secgroups.CreateRule(p.Stack.ComputeClient, ruleOpts).Extract()
-	if err != nil {
-		return err
-	}
-	ruleOpts = secgroups.CreateRuleOpts{
-		ParentGroupID: groupID,
-		FromPort:      -1,
-		ToPort:        -1,
-		IPProtocol:    "ICMP",
-		CIDR:          "::/0",
-	}
-	_, err = secgroups.CreateRule(p.Stack.ComputeClient, ruleOpts).Extract()
-	return err
-}
-
-// initDefaultSecurityGroup create an open Security Group
-// The default security group opens all TCP, UDP, ICMP ports
-// Security is managed individually on each host using a linux firewall
-func (p *provider) initDefaultSecurityGroup() error {
-	sg, err := p.getDefaultSecurityGroup()
-	if err != nil {
-		return err
-	}
-	if sg != nil {
-		p.SecurityGroup = sg
-		return nil
-	}
-	opts := secgroups.CreateOpts{
-		Name:        defaultSecurityGroup,
-		Description: "Default security group",
-	}
-
-	group, err := secgroups.Create(p.Stack.ComputeClient, opts).Extract()
-	if err != nil {
-		return err
-	}
-	err = p.createTCPRules(group.ID)
-	if err != nil {
-		secgroups.Delete(p.Stack.ComputeClient, group.ID)
-		return err
-	}
-
-	err = p.createUDPRules(group.ID)
-	if err != nil {
-		secgroups.Delete(p.Stack.ComputeClient, group.ID)
-		return err
-	}
-	err = p.createICMPRules(group.ID)
-	if err != nil {
-		secgroups.Delete(p.Stack.ComputeClient, group.ID)
-		return err
-	}
-	p.SecurityGroup = group
-	return nil
-}
-
 // GetAuthOpts returns the auth options
 func (p *provider) GetAuthOpts() (providers.Config, error) {
-	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
+	cfg := providers.ConfigMap{}
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthUrl", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
+
 	return cfg, nil
 }
 
@@ -277,6 +131,9 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
+	cfg.Set("ProviderNetwork", opts.ProviderNetwork)
+	cfg.Set("MetadataBucketName", opts.MetadataBucket)
+
 	return cfg, nil
 }
 

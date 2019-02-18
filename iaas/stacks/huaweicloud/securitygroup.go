@@ -19,6 +19,7 @@ package huaweicloud
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/iaas/stacks"
 	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
@@ -199,7 +200,7 @@ func (s *Stack) createICMPRules(groupID string) error {
 func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 	var sgList []secgroups.SecGroup
 	opts := secgroups.ListOpts{
-		Name: s.defaultSecurityGroup,
+		Name: s.defaultSecurityGroupName,
 	}
 	err := secgroups.List(s.Stack.NetworkClient, opts).EachPage(func(page pagination.Page) (bool, error) {
 		list, err := secgroups.ExtractGroups(page)
@@ -207,7 +208,7 @@ func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 			return false, err
 		}
 		for _, g := range list {
-			if g.Name == s.defaultSecurityGroup {
+			if g.Name == s.defaultSecurityGroupName {
 				sgList = append(sgList, g)
 			}
 		}
@@ -220,17 +221,17 @@ func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
 		return nil, nil
 	}
 	if len(sgList) > 1 {
-		return nil, fmt.Errorf("configuration error: multiple Security Groups named '%s' exist", s.defaultSecurityGroup)
+		return nil, fmt.Errorf("configuration error: multiple Security Groups named '%s' exist", s.defaultSecurityGroupName)
 	}
 
 	return &sgList[0], nil
 }
 
-// initDefaultSecurityGroup create an open Security Group
+// InitDefaultSecurityGroup create an open Security Group
 // The default security group opens all TCP, UDP, ICMP ports
 // Security is managed individually on each host using a linux firewall
-func (s *Stack) initDefaultSecurityGroup() error {
-	s.defaultSecurityGroup = "sg-" + s.authOpts.VPCName
+func (s *Stack) InitDefaultSecurityGroup() error {
+	s.defaultSecurityGroupName = stacks.DefaultSecurityGroupName + "." + s.authOpts.VPCName
 
 	sg, err := s.getDefaultSecurityGroup()
 	if err != nil {
@@ -241,12 +242,12 @@ func (s *Stack) initDefaultSecurityGroup() error {
 		return nil
 	}
 	opts := secgroups.CreateOpts{
-		Name:        s.defaultSecurityGroup,
+		Name:        s.defaultSecurityGroupName,
 		Description: "Default security group for VPC " + s.authOpts.VPCName,
 	}
 	group, err := secgroups.Create(s.Stack.NetworkClient, opts).Extract()
 	if err != nil {
-		return fmt.Errorf("Failed to create Security Group '%s': %s", s.defaultSecurityGroup, openstack.ProviderErrorToString(err))
+		return fmt.Errorf("Failed to create Security Group '%s': %s", s.defaultSecurityGroupName, openstack.ProviderErrorToString(err))
 	}
 	err = s.createTCPRules(group.ID)
 	if err == nil {

@@ -26,7 +26,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	gc "github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
@@ -69,8 +69,8 @@ type Subnet struct {
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
-	log.Debugf(">>> stacks.openstack::CreateNetwork(%s) called", req.Name)
-	defer log.Debugf("<<< stacks.openstack::CreateNetwork(%s) called", req.Name)
+	log.Debugf(">>> stacks.openstack::CreateNetwork(%s)", req.Name)
+	defer log.Debugf("<<< stacks.openstack::CreateNetwork(%s)", req.Name)
 
 	if s == nil {
 		panic("Calling stacks.openstack::CreateNetwork from nil pointer!")
@@ -144,10 +144,13 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
-	_, r.Err = s.ComputeClient.Get(s.NetworkClient.ServiceURL("networks?name="+name), &r.Body, &gc.RequestOpts{
+	_, r.Err = s.ComputeClient.Get(s.NetworkClient.ServiceURL("networks?name="+name), &r.Body, &gophercloud.RequestOpts{
 		OkCodes: []int{200, 203},
 	})
 	if r.Err != nil {
+		if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
+			return nil, resources.ResourceAccessDeniedError("network", name)
+		}
 		return nil, fmt.Errorf("query for network '%s' failed: %v", name, r.Err)
 	}
 	nets, found := r.Body.(map[string]interface{})["networks"].([]interface{})
@@ -172,7 +175,7 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 	// 1st try with id
 	network, err := networks.Get(s.NetworkClient, id).Extract()
 	if err != nil {
-		if _, ok := err.(gc.ErrDefault404); !ok {
+		if _, ok := err.(gophercloud.ErrDefault404); !ok {
 			// log.Errorf("Error getting network: %+v", err)
 			return nil, errors.Wrap(err, fmt.Sprintf("Error getting network '%s': %s", id, ProviderErrorToString(err)))
 		}
@@ -375,19 +378,19 @@ func (s *Stack) DeleteGateway(id string) error {
 }
 
 // ToGopherIPversion ...
-func ToGopherIPversion(v IPVersion.Enum) gc.IPVersion {
+func ToGopherIPversion(v IPVersion.Enum) gophercloud.IPVersion {
 	if v == IPVersion.IPv4 {
-		return gc.IPv4
+		return gophercloud.IPv4
 	} else if v == IPVersion.IPv6 {
-		return gc.IPv6
+		return gophercloud.IPv6
 	}
 	return -1
 }
 
-func fromGopherIPversion(v gc.IPVersion) IPVersion.Enum {
-	if v == gc.IPv4 {
+func fromGopherIPversion(v gophercloud.IPVersion) IPVersion.Enum {
+	if v == gophercloud.IPv4 {
 		return IPVersion.IPv4
-	} else if v == gc.IPv6 {
+	} else if v == gophercloud.IPv6 {
 		return IPVersion.IPv6
 	}
 	return -1
@@ -436,7 +439,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 	subnet, err := r.Extract()
 	if err != nil {
 		switch r.Err.(type) {
-		case gc.ErrDefault400:
+		case gophercloud.ErrDefault400:
 			neutronError := ParseNeutronError(r.Err.Error())
 			if neutronError != nil {
 				msg := fmt.Sprintf("Error creating subnet: bad request: %s\n", neutronError["message"])
@@ -589,7 +592,7 @@ func (s *Stack) deleteSubnet(id string) error {
 			r := subnets.Delete(s.NetworkClient, id)
 			err = r.ExtractErr()
 			if err != nil {
-				if _, ok := err.(gc.ErrUnexpectedResponseCode); ok {
+				if _, ok := err.(gophercloud.ErrUnexpectedResponseCode); ok {
 					neutronError := ParseNeutronError(err.Error())
 					switch neutronError["type"] {
 					case "SubnetInUse":

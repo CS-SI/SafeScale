@@ -39,7 +39,7 @@ type ErrResourceNotFound struct {
 }
 
 // ResourceNotFoundError creates a ResourceNotFound error
-func ResourceNotFoundError(resource string, name string) ErrResourceNotFound {
+func ResourceNotFoundError(resource, name string) ErrResourceNotFound {
 	return ErrResourceNotFound{
 		ErrResource{
 			Name:         name,
@@ -47,6 +47,7 @@ func ResourceNotFoundError(resource string, name string) ErrResourceNotFound {
 		},
 	}
 }
+
 func (e ErrResourceNotFound) Error() string {
 	tmpl := "failed to find %s"
 	if e.Name != "" {
@@ -80,7 +81,7 @@ type ErrResourceAlreadyExists struct {
 }
 
 // ResourceAlreadyExistsError creates a ResourceAlreadyExists error
-func ResourceAlreadyExistsError(resource string, name string) ErrResourceAlreadyExists {
+func ResourceAlreadyExistsError(resource, name string) ErrResourceAlreadyExists {
 	return ErrResourceAlreadyExists{
 		ErrResource{
 			Name:         name,
@@ -99,7 +100,7 @@ type ErrResourceInvalidRequest struct {
 }
 
 // ResourceInvalidRequestError creates a ErrResourceInvalidRequest error
-func ResourceInvalidRequestError(resource string, reason string) ErrResourceInvalidRequest {
+func ResourceInvalidRequestError(resource, reason string) ErrResourceInvalidRequest {
 	return ErrResourceInvalidRequest{
 		ErrResource{
 			Name:         reason,
@@ -110,4 +111,23 @@ func ResourceInvalidRequestError(resource string, reason string) ErrResourceInva
 
 func (e ErrResourceInvalidRequest) Error() string {
 	return fmt.Sprintf("%s request is invalid: %s", e.ResourceType, e.Name)
+}
+
+// ErrResourceAccessDenied ...
+type ErrResourceAccessDenied struct {
+	ErrResource
+}
+
+// ResourceAccessDeniedError creates a ErrResourceAccessDenied error
+func ResourceAccessDeniedError(resource, name string) ErrResourceAccessDenied {
+	return ErrResourceAccessDenied{
+		ErrResource{
+			Name:         name,
+			ResourceType: resource,
+		},
+	}
+}
+
+func (e ErrResourceAccessDenied) Error() string {
+	return fmt.Sprintf("access to %s resource '%s' is denied", e.ErrResource.ResourceType, e.ErrResource.Name)
 }
