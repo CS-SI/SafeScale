@@ -707,27 +707,36 @@ func (svc *HostHandler) Delete(ctx context.Context, ref string) error {
 		return fmt.Errorf("Unable to find the host even if it is described by metadatas\nInchoerent metadatas have been supressed")
 	}
 
-	// select {
-	// case <-ctx.Done():
-	// 	log.Warnf("Host delete canceled by broker")
-	// 	hostSizing := propsv1.NewHostSizing()
-	// 	host.Properties.Get(HostProperty.SizingV1, hostSizing)
-	// 	//host's os name is not stored in metadatas so we used ubuntu 16.04 by default
-	// 	netID := ""
-	// 	for _, netID = range hostNetworkV1.NetworksByName {
-	// 		break
-	// 	}
-	// 	hostBis, err := svc.Create(context.Background(), host.Name, netID, hostSizing.AllocatedSize.Cores, hostSizing.AllocatedSize.RAMSize, hostSizing.AllocatedSize.DiskSize, "ubuntu 16.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, hostSizing.AllocatedSize.GPUNumber, hostSizing.AllocatedSize.CPUFreq, true)
-	// 	if err != nil {
-	// 		return fmt.Errorf("Failed to stop host deletion")
-	// 	}
-	// 	buf, err := hostBis.Serialize()
-	// 	if err != nil {
-	// 		return fmt.Errorf("Deleted Hist recreated by broker")
-	// 	}
-	// 	return fmt.Errorf("Deleted Host recreated by broker : %s", buf)
-	// default:
-	// }
+	select {
+	case <-ctx.Done():
+		log.Warnf("Host delete canceled by broker")
+		var hostBis *model.Host
+		err2 := host.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+			hostSizingV1 := v.(*propsv1.HostSizing)
+			host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+				hostNetworkV1 := v.(*propsv1.HostNetwork)
+				//host's os name is not stored in metadatas so we used ubuntu 16.04 by default
+				var err2 error
+				hostBis, err2 = svc.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, hostSizingV1.AllocatedSize.Cores, hostSizingV1.AllocatedSize.RAMSize, hostSizingV1.AllocatedSize.DiskSize, "ubuntu 16.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, hostSizingV1.AllocatedSize.GPUNumber, hostSizingV1.AllocatedSize.CPUFreq, true)
+				if err2 != nil {
+					return fmt.Errorf("Failed to stop host deletion : %s", err.Error())
+				}
+				return nil
+			})
+			return nil
+		})
+		if err2 != nil {
+			return fmt.Errorf("Failed to cancel host deletion : %s", err2.Error())
+		}
+
+		buf, err2 := hostBis.Serialize()
+		if err2 != nil {
+			return fmt.Errorf("Deleted Host recreated by broker")
+		}
+		return fmt.Errorf("Deleted Host recreated by broker : %s", buf)
+
+	default:
+	}
 
 	return nil
 }
