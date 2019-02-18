@@ -86,7 +86,7 @@ func (s *Share) Add() error {
 		if len(a.SecurityModes) > 0 {
 			acl += "sec="
 			for i, item := range a.SecurityModes {
-				acl += item.String()
+				acl += strings.ToLower(item.String())
 				if i != 0 {
 					acl += ","
 				}
@@ -140,6 +140,7 @@ func (s *Share) Add() error {
 		"Path":         s.Path,
 		"AccessRights": strings.TrimSpace(acls),
 	}
+
 	retcode, stdout, stderr, err := executeScript(*s.Server.SSHConfig, "nfs_server_path_export.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }
