@@ -79,11 +79,11 @@ func (s *Server) AddShare(path string, secutityModes []string, readOnly, rootSqu
 		switch securityMode {
 		case "sys":
 			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Sys)
-		case "kbr5":
+		case "krb5":
 			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5)
-		case "kbr5i":
+		case "krb5i":
 			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5i)
-		case "kbr5p":
+		case "krb5p":
 			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5p)
 		default:
 			return fmt.Errorf("Can't add the share, %s is not a valid security mode", securityMode)
