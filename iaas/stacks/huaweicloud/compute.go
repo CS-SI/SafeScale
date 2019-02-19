@@ -536,7 +536,7 @@ func validatehostName(req resources.HostRequest) (bool, error) {
 }
 
 // GetHost updates the data inside host with the data from provider
-func (s *Stack) GetHost(hostParam interface{}) (*resources.Host, error) {
+func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	var (
 		host     *resources.Host
 		server   *servers.Server
@@ -557,8 +557,7 @@ func (s *Stack) GetHost(hostParam interface{}) (*resources.Host, error) {
 	const timeout = time.Minute * 15
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			result := servers.Get(s.Stack.ComputeClient, host.ID)
-			server, err := result.Extract()
+			server, err = servers.Get(s.Stack.ComputeClient, host.ID).Extract()
 			if err != nil {
 				switch err.(type) {
 				case gc.ErrDefault404:
@@ -568,12 +567,13 @@ func (s *Stack) GetHost(hostParam interface{}) (*resources.Host, error) {
 					return nil
 				case gc.ErrDefault500:
 					// When the response is "Internal Server Error", retries
-					log.Println("received 'Internal Server Error', retrying...")
+					log.Debugf("received 'Internal Server Error', retrying...")
 					return err
+				default:
+					// Any other error stops the retry
+					err = fmt.Errorf("error getting host '%s': %s", host.ID, openstack.ProviderErrorToString(err))
+					return nil
 				}
-				// Any other error stops the retry
-				err = fmt.Errorf("error getting host '%s': %s", host.ID, openstack.ProviderErrorToString(err))
-				return nil
 			}
 			if server.Status != "ERROR" && server.Status != "CREATING" {
 				host.LastState = toHostState(server.Status)
@@ -585,8 +585,7 @@ func (s *Stack) GetHost(hostParam interface{}) (*resources.Host, error) {
 		1*time.Second,
 	)
 	if retryErr != nil {
-		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			msg := "failed to get host"
 			if host != nil {
 				msg += fmt.Sprintf(" '%s'", host.Name)
@@ -596,7 +595,6 @@ func (s *Stack) GetHost(hostParam interface{}) (*resources.Host, error) {
 				msg += fmt.Sprintf(": %v", err)
 			}
 			return nil, fmt.Errorf(msg)
-		default:
 		}
 	}
 	if err != nil {
@@ -800,7 +798,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
-	_, err := s.GetHost(id)
+	_, err := s.InspectHost(id)
 	if err != nil {
 		return err
 	}
@@ -965,7 +963,7 @@ func (s *Stack) enableHostRouterMode(host *resources.Host) error {
 		},
 	}
 	opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
-	_, err = ports.Update(s.Stack.ComputeClient, *portID, opts).Extract()
+	_, err = ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
 	if err != nil {
 		return fmt.Errorf("Failed to enable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
@@ -983,7 +981,7 @@ func (s *Stack) disableHostRouterMode(host *resources.Host) error {
 	}
 
 	opts := ports.UpdateOpts{AllowedAddressPairs: nil}
-	_, err = ports.Update(s.Stack.ComputeClient, *portID, opts).Extract()
+	_, err = ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
 	if err != nil {
 		return fmt.Errorf("Failed to disable Router Mode on host '%s': %s", host.Name, openstack.ProviderErrorToString(err))
 	}
@@ -1133,7 +1131,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			host, err = s.GetHost(hostParam)
+			host, err = s.InspectHost(hostParam)
 			if err != nil {
 				return err
 			}
