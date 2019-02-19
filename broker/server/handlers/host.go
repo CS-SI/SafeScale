@@ -165,7 +165,7 @@ func (handler *HostHandler) Resize(ref string, cpu int, ram float32, disk int, g
 
 	// TODO RESIZE 1st check new requirements vs old requirements
 	host := mh.Get()
-	host, err = handler.service.GetHost(host)
+	host, err = handler.service.InspectHost(host)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -547,7 +547,7 @@ func (handler *HostHandler) Inspect(ref string) (*resources.Host, error) {
 	}
 
 	host := mh.Get()
-	host, err = handler.service.GetHost(host)
+	host, err = handler.service.InspectHost(host)
 	if err != nil {
 		return nil, infraErr(err)
 	}

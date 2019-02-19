@@ -98,7 +98,7 @@ func (svc *Service) WaitHostState(hostID string, state HostState.Enum, timeout t
 	host := resources.NewHost()
 	host.ID = hostID
 	for next {
-		host, err = svc.GetHost(host)
+		host, err = svc.InspectHost(host)
 		if err != nil {
 			return err
 		}

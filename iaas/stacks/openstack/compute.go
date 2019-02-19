@@ -366,9 +366,9 @@ func toHostState(status string) HostState.Enum {
 }
 
 // GetHost updates the data inside host with the data from provider
-func (s *Stack) GetHost(hostParam interface{}) (*resources.Host, error) {
-	log.Debug(">>> stacks.openstack::GetHost()")
-	defer log.Debug("<<< stacks.openstack::GetHost()")
+func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
+	log.Debug(">>> stacks.openstack::InspectHost()")
+	defer log.Debug("<<< stacks.openstack::InspectHost()")
 
 	if s == nil {
 		panic("Calling method GetHost from nil!")
@@ -649,7 +649,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 				host := resources.NewHost()
 				host.ID = entry["id"].(string)
 				host.Name = name
-				return s.GetHost(host)
+				return s.InspectHost(host)
 			}
 		}
 	}
@@ -935,7 +935,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			host, err = s.GetHost(host)
+			host, err = s.InspectHost(host)
 			if err != nil {
 				return err
 			}
@@ -967,7 +967,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 		panic("Calling s.GetHostState with s==nil!")
 	}
 
-	host, err := s.GetHost(hostParam)
+	host, err := s.InspectHost(hostParam)
 	if err != nil {
 		return HostState.ERROR, err
 	}

@@ -540,7 +540,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 			return nil, err
 		}
 		gwID = net.GatewayID
-		gw, err = s.GetHost(gwID)
+		gw, err = s.InspectHost(gwID)
 		if err != nil {
 			return nil, err
 		}
@@ -683,7 +683,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 }
 
 // GetHost returns the host identified by id
-func (s *Stack) GetHost(id string) (*resources.Host, error) {
+func (s *Stack) InspectHost(id string) (*resources.Host, error) {
 
 	out, err := s.EC2.DescribeInstances(&ec2.DescribeInstancesInput{
 		InstanceIds: []*string{aws.String(id)},

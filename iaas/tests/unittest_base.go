@@ -203,7 +203,7 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *reso
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 18.04")
 	assert.Nil(t, err)
-	gw, _ := tester.Service.GetHost(network.GatewayID)
+	gw, _ := tester.Service.InspectHost(network.GatewayID)
 	hostRequest := resources.HostRequest{
 		ImageID:        img.ID,
 		ResourceName:   name,
@@ -404,7 +404,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	}
 	assert.Equal(t, 3, found)
 
-	host1Bis, err := tester.Service.GetHost(host1)
+	host1Bis, err := tester.Service.InspectHost(host1)
 	assert.NoError(t, err)
 	assert.Equal(t, host1.ID, host1Bis.ID)
 	assert.Equal(t, host1.Name, host1Bis.Name)

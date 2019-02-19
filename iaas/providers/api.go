@@ -67,7 +67,7 @@ type Provider interface {
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request resources.HostRequest) (*resources.Host, error)
 	// GetHost returns the host identified by id or updates content of a *resources.Host
-	GetHost(interface{}) (*resources.Host, error)
+	InspectHost(interface{}) (*resources.Host, error)
 	// GetHostByName returns the host identified by name
 	GetHostByName(string) (*resources.Host, error)
 	// GetHostState returns the current state of the host identified by id

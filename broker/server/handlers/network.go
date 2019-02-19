@@ -196,7 +196,7 @@ func (handler *NetworkHandler) Create(
 	}()
 
 	// Reloads the host to be sure all the properties are updated
-	gw, err = handler.service.GetHost(gw)
+	gw, err = handler.service.InspectHost(gw)
 	if err != nil {
 		return nil, infraErr(err)
 	}
