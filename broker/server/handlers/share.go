@@ -391,7 +391,7 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 	}
 
 	export := ""
-	target.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = target.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		if v.(*propsv1.HostNetwork).DefaultGatewayPrivateIP == server.GetPrivateIP() {
 			export = server.GetPrivateIP() + ":" + share.Path
 		} else {
@@ -399,6 +399,9 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	// Mount the share on host
 	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {

@@ -713,7 +713,7 @@ func (svc *HostHandler) Delete(ctx context.Context, ref string) error {
 		var hostBis *model.Host
 		err2 := host.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
 			hostSizingV1 := v.(*propsv1.HostSizing)
-			host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+			return host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 				hostNetworkV1 := v.(*propsv1.HostNetwork)
 				//host's os name is not stored in metadatas so we used ubuntu 16.04 by default
 				var err2 error
@@ -723,7 +723,6 @@ func (svc *HostHandler) Delete(ctx context.Context, ref string) error {
 				}
 				return nil
 			})
-			return nil
 		})
 		if err2 != nil {
 			return fmt.Errorf("Failed to cancel host deletion : %s", err2.Error())
