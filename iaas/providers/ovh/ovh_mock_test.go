@@ -374,7 +374,7 @@ func TestMock_CreateHost(t *testing.T) {
 }
 
 // GetHost returns the host identified by id
-func TestMock_GetHost(t *testing.T) {
+func TestMock_InspectHost(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object
 }

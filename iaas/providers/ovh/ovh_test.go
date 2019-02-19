@@ -292,7 +292,7 @@ func Test_CreateHost(t *testing.T) {
 }
 
 // GetHost returns the host identified by id
-func Test_GetHost(t *testing.T) {
+func Test_InspectHost(t *testing.T) {
 	// TODO Implement Test
 
 }
