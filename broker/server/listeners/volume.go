@@ -48,7 +48,16 @@ type VolumeListener struct{}
 
 // List the available volumes
 func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*pb.VolumeList, error) {
-	log.Printf("Volume List called")
+	if s == nil {
+		panic("Calling server.listeners.VolumeListener::List from nil pointer!")
+	}
+	if in == nil {
+		panic("Calling server.listeners.VolumeListener::List with nil parameter!")
+	}
+
+	log.Infof("safescaled receiving 'volume list'")
+	log.Debugf(">>> server.listeners.VolumeListener::List()")
+	defer log.Debugf("<<< server.listeners.VolumeListener::List")
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -73,8 +82,17 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 
 // Create a new volume
 func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*pb.Volume, error) {
-	log.Infof("Listeners: volume create '%v' called", in)
-	defer log.Debugf("Listeners: volume create '%v' done", in)
+	if s == nil {
+		panic("Calling server.listeners.VolumeListener::Create from nil pointer!")
+	}
+	if in == nil {
+		panic("Calling server.listeners.VolumeListener::Create with nil parameter!")
+	}
+
+	volumeName := in.GetName()
+	log.Infof("safescaled receiving 'volume create %s'", volumeName)
+	log.Debugf(">>> server.listeners.VolumeListener::Create(%s)", volumeName)
+	defer log.Debugf("<<< server.listeners.VolumeListener::Create(%s)", volumeName)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -83,18 +101,29 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	volume, err := handler.Create(in.GetName(), int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
+	volume, err := handler.Create(volumeName, int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
-	log.Printf("Volume '%s' created: %v", in.GetName(), volume.Name)
+	log.Infof("Volume '%s' created: %v", in.GetName(), volume.Name)
 	return conv.ToPBVolume(volume), nil
 }
 
 // Attach a volume to an host and create a mount point
 func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*google_protobuf.Empty, error) {
-	log.Printf("Attach volume called '%s', '%s'", in.Host.Name, in.MountPath)
+	if s == nil {
+		panic("Calling server.listeners.VolumeListener::Attach from nil pointer!")
+	}
+	if in == nil {
+		panic("Calling server.listeners.VolumeListener::Attach with nil parameter!")
+	}
+
+	volumeName := in.GetVolume().GetName()
+	hostName := in.GetHost().GetName()
+	log.Infof("safescaled receiving 'volume attach %s %s'", volumeName, hostName)
+	log.Debugf(">>> server.listeners.VolumeListener::Attach(%s, %s)", volumeName, hostName)
+	defer log.Debugf("<<< server.listeners.VolumeListener::Attach(%s, %s)", volumeName, hostName)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -103,7 +132,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Attach(in.GetVolume().GetName(), in.GetHost().GetName(), in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
+	err := handler.Attach(volumeName, hostName, in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -113,17 +142,25 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 
 // Detach a volume from an host. It umount associated mountpoint
 func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*google_protobuf.Empty, error) {
-	log.Debugf("broker.server.listeners.VolumeListener.Detach(%v) called", in)
-	defer log.Debugf("broker.server.listeners.VolumeListener.Detach(%v) done", in)
+	if s == nil {
+		panic("Calling server.listeners.VolumeListener::Detach from nil pointer!")
+	}
+	if in == nil {
+		panic("Calling server.listeners.VolumeListener::Detach with nil parameter!")
+	}
 
 	volumeName := in.GetVolume().GetName()
+	hostName := in.GetHost().GetName()
+	log.Infof("safescaled receiving 'volume detach %s %s'", volumeName, hostName)
+	log.Debugf(">>> server.listeners.VolumeListener::Detach(%s, %s)", volumeName, hostName)
+	defer log.Debugf("<<< server.listeners.VolumeListener::Detach(%s, %s)", volumeName, hostName)
+
 	tenant := GetCurrentTenant()
 	if tenant == nil {
 		log.Info("Can't detach volumes: no tenant set")
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't detach volume: no tenant set")
 	}
 
-	hostName := in.GetHost().GetName()
 	handler := VolumeHandler(tenant.Service)
 	err := handler.Detach(volumeName, hostName)
 	if err != nil {
@@ -136,7 +173,16 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 
 // Delete a volume
 func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Volume delete called '%s'", in.Name)
+	if s == nil {
+		panic("Calling server.listeners.VolumeListener::Delete from nil pointer!")
+	}
+	if in == nil {
+		panic("Calling server.listeners.VolumeListener::Delete with nil parameter!")
+	}
+
+	log.Infof("safescaled receiving 'volume delete %s'", in.Name)
+	log.Debugf(">>> server.listeners.VolumeListener::Delete(%s)", in.Name)
+	defer log.Debugf("<<< server.listeners.VolumeListener::Delete(%s)", in.Name)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -160,12 +206,21 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 
 // Inspect a volume
 func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.VolumeInfo, error) {
-	log.Printf("Inspect Volume called '%s'", in.Name)
+	if s == nil {
+		panic("Calling server.listeners.VolumeListener::Inspect from nil pointer!")
+	}
+	if in == nil {
+		panic("Calling server.listeners.VolumeListener::Inspect with nil parameter!")
+	}
 
 	ref := utils.GetReference(in)
 	if ref == "" {
 		return nil, grpc.Errorf(codes.InvalidArgument, "can't inspect volume: neither name nor id given as reference")
 	}
+
+	log.Infof("safescaled receiving 'volume inspect %s'", ref)
+	log.Debugf(">>> server.listeners.VolumeListener::Inspect(%s)", ref)
+	defer log.Debugf("<<< server.listeners.VolumeListener::Inspect(%s)", ref)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -179,7 +234,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Vol
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 	if volume == nil {
-		return nil, grpc.Errorf(codes.NotFound, fmt.Sprintf("can't inspect volume: no volume '%s' found", ref))
+		return nil, grpc.Errorf(codes.NotFound, fmt.Sprintf("can't inspect volume '%s': volume not found", ref))
 	}
 
 	return conv.ToPBVolumeInfo(volume, mounts), nil
