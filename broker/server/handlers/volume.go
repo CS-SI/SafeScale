@@ -26,13 +26,13 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/metadata"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeProperty"
-	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
-	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/broker/server/metadata"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeProperty"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
+	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/system/nfs"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -42,37 +42,43 @@ import (
 
 // VolumeAPI defines API to manipulate hosts
 type VolumeAPI interface {
+	Delete(ref string) error
 	Delete(ctx context.Context, ref string) error
-	Get(ctx context.Context, ref string) (*model.Volume, error)
+	Inspect(ref string) (*resources.Volume, map[string]*propsv1.HostLocalMount, error)
+	List(all bool) ([]resources.Volume, error)
 	Inspect(ctx context.Context, ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error)
+	Create(name string, size int, speed VolumeSpeed.Enum) (*resources.Volume, error)
 	List(ctx context.Context, all bool) ([]model.Volume, error)
+	Attach(volume string, host string, path string, format string, doNotFormat bool) error
 	Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error)
 	Attach(ctx context.Context, volume string, host string, path string, format string, doNotFormat bool) error
+	Detach(volume string, host string) error
 	Detach(ctx context.Context, volume string, host string) error
 }
 
 // VolumeHandler volume service
 type VolumeHandler struct {
-	provider *providers.Service
+	service *iaas.Service
 }
 
 // NewVolumeHandler creates a Volume service
-func NewVolumeHandler(api *providers.Service) VolumeAPI {
+func NewVolumeHandler(svc *iaas.Service) VolumeAPI {
 	return &VolumeHandler{
-		provider: api,
+		service: svc,
 	}
 }
 
 // List returns the network list
+func (handler *VolumeHandler) List(all bool) ([]resources.Volume, error) {
 func (svc *VolumeHandler) List(ctx context.Context, all bool) ([]model.Volume, error) {
 	if all {
-		volumes, err := svc.provider.ListVolumes()
+		volumes, err := handler.service.ListVolumes()
 		return volumes, infraErr(err)
 	}
 
-	var volumes []model.Volume
-	mv := metadata.NewVolume(svc.provider)
-	err := mv.Browse(func(volume *model.Volume) error {
+	var volumes []resources.Volume
+	mv := metadata.NewVolume(handler.service)
+	err := mv.Browse(func(volume *resources.Volume) error {
 		volumes = append(volumes, *volume)
 		return nil
 	})
@@ -85,12 +91,14 @@ func (svc *VolumeHandler) List(ctx context.Context, all bool) ([]model.Volume, e
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // Delete deletes volume referenced by ref
+func (handler *VolumeHandler) Delete(ref string) error {
 func (svc *VolumeHandler) Delete(ctx context.Context, ref string) error {
+	mv, err := metadata.LoadVolume(handler.service, ref)
 	mv, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		switch err.(type) {
-		case model.ErrResourceNotFound:
-			return err
+		case utils.ErrNotFound:
+			return resources.ResourceNotFoundError("volume", ref)
 		default:
 			log.Debugf("Failed to delete volume: %+v", err)
 			return infraErrf(err, "failed to delete volume")
@@ -116,6 +124,7 @@ func (svc *VolumeHandler) Delete(ctx context.Context, ref string) error {
 
 	var deleteMatadataOnly bool
 	err = svc.provider.DeleteVolume(volume.ID)
+	err = handler.service.DeleteVolume(volume.ID)
 	if err != nil {
 		switch err.(type) {
 		case model.ErrResourceNotFound:
@@ -166,19 +175,21 @@ func (svc *VolumeHandler) Get(ctx context.Context, ref string) (*model.Volume, e
 }
 
 // Inspect returns the volume identified by ref and its attachment (if any)
+func (handler *VolumeHandler) Inspect(ref string) (*resources.Volume, map[string]*propsv1.HostLocalMount, error) {
 func (svc *VolumeHandler) Inspect(ctx context.Context, ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error) {
+	mv, err := metadata.LoadVolume(handler.service, ref)
 	volume, err := svc.Get(ctx, ref)
 	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return nil, nil, logicErr(resources.ResourceNotFoundError("volume", ref))
+		}
 		err := infraErr(err)
 		return nil, nil, err
 	}
-
-	if volume == nil {
-		return nil, nil, infraErr(errors.Errorf("Volume '%s' not found !", ref))
-	}
+	volume := mv.Get()
 
 	mounts := map[string]*propsv1.HostLocalMount{}
-	hostSvc := NewHostHandler(svc.provider)
+	hostSvc := NewHostHandler(handler.service)
 
 	err = volume.Properties.LockForRead(VolumeProperty.AttachedV1).ThenUse(func(v interface{}) error {
 		volumeAttachedV1 := v.(*propsv1.VolumeAttachments)
@@ -220,7 +231,9 @@ func (svc *VolumeHandler) Inspect(ctx context.Context, ref string) (*model.Volum
 }
 
 // Create a volume
+func (handler *VolumeHandler) Create(name string, size int, speed VolumeSpeed.Enum) (*resources.Volume, error) {
 func (svc *VolumeHandler) Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error) {
+	volume, err := handler.service.CreateVolume(resources.VolumeRequest{
 	volume, err := svc.provider.CreateVolume(model.VolumeRequest{
 		Name:  name,
 		Size:  size,
@@ -231,14 +244,14 @@ func (svc *VolumeHandler) Create(ctx context.Context, name string, size int, spe
 	}
 	defer func() {
 		if err != nil {
-			derr := svc.provider.DeleteVolume(volume.ID)
+			derr := handler.service.DeleteVolume(volume.ID)
 			if derr != nil {
 				log.Debugf("failed to delete volume '%s': %v", volume.Name, derr)
 			}
 		}
 	}()
 
-	err = metadata.SaveVolume(svc.provider, volume)
+	err = metadata.SaveVolume(handler.service, volume)
 	if err != nil {
 		log.Debugf("Error creating volume: saving volume metadata: %+v", err)
 		return nil, infraErrf(err, "Error creating volume '%s' saving its volume metadata", name)
@@ -268,12 +281,14 @@ func (svc *VolumeHandler) Create(ctx context.Context, name string, size int, spe
 }
 
 // Attach a volume to an host
+func (handler *VolumeHandler) Attach(volumeName, hostName, path, format string, doNotFormat bool) error {
 func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) error {
 	// Get volume data
+	volume, _, err := handler.Inspect(volumeName)
 	volume, err := svc.Get(ctx, volumeName)
 	if err != nil {
 		switch err.(type) {
-		case model.ErrResourceNotFound:
+		case resources.ErrResourceNotFound:
 			return infraErr(err)
 		default:
 			return infraErr(err)
@@ -281,7 +296,7 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 	}
 
 	// Get Host data
-	hostSvc := NewHostHandler(svc.provider)
+	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
 		return throwErr(err)
@@ -299,15 +314,15 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 		volumeAttachedV1 := v.(*propsv1.VolumeAttachments)
 
 		mountPoint = path
-		if path == model.DefaultVolumeMountPoint {
-			mountPoint = model.DefaultVolumeMountPoint + volume.Name
+		if path == resources.DefaultVolumeMountPoint {
+			mountPoint = resources.DefaultVolumeMountPoint + volume.Name
 		}
 
 		// For now, allows only one attachment...
 		if len(volumeAttachedV1.Hosts) > 0 {
 			for id := range volumeAttachedV1.Hosts {
 				if id != host.ID {
-					return model.ResourceNotAvailableError("volume", volumeName)
+					return resources.ResourceNotAvailableError("volume", volumeName)
 				}
 				break
 			}
@@ -345,11 +360,13 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 				// Note: most providers are not able to tell the real device name the volume
 				//       will have on the host, so we have to use a way that can work everywhere
 				// Get list of disks before attachment
+				oldDiskSet, err := handler.listAttachedDevices(host)
 				oldDiskSet, err := svc.listAttachedDevices(ctx, host)
 				if err != nil {
 					err := logicErrf(err, "failed to get list of connected disks")
 					return err
 				}
+				vaID, err := handler.service.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
 				vaID, err = svc.provider.CreateVolumeAttachment(model.VolumeAttachmentRequest{
 					Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
 					HostID:   host.ID,
@@ -361,7 +378,7 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 				// Starting from here, remove volume attachment if exit with error
 				defer func() {
 					if err != nil {
-						derr := svc.provider.DeleteVolumeAttachment(host.ID, vaID)
+						derr := handler.service.DeleteVolumeAttachment(host.ID, vaID)
 						if derr != nil {
 							log.Errorf("failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 						}
@@ -376,6 +393,7 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 				retryErr := retry.WhileUnsuccessfulDelay1Second(
 					func() error {
 						// Get new of disk after attachment
+						newDiskSet, err := handler.listAttachedDevices(host)
 						newDiskSet, err := svc.listAttachedDevices(ctx, host)
 						if err != nil {
 							err := logicErrf(err, "failed to get list of connected disks")
@@ -398,7 +416,7 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 				deviceName = "/dev/" + newDisk.ToSlice()[0].(string)
 
 				// Create mount point
-				sshHandler := NewSSHHandler(svc.provider)
+				sshHandler := NewSSHHandler(handler.service)
 				sshConfig, err := sshHandler.GetConfig(ctx, host.ID)
 				if err != nil {
 					err = infraErr(err)
@@ -462,7 +480,7 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 		}
 	}()
 
-	err = metadata.SaveVolume(svc.provider, volume)
+	err = metadata.SaveVolume(handler.service, volume)
 	if err != nil {
 		return infraErrf(err, "can't attach volume")
 	}
@@ -528,6 +546,7 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 	return nil
 }
 
+func (handler *VolumeHandler) listAttachedDevices(host *resources.Host) (mapset.Set, error) {
 func (svc *VolumeHandler) listAttachedDevices(ctx context.Context, host *model.Host) (mapset.Set, error) {
 	var (
 		retcode        int
@@ -535,7 +554,7 @@ func (svc *VolumeHandler) listAttachedDevices(ctx context.Context, host *model.H
 		err            error
 	)
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
-	sshHandler := NewSSHHandler(svc.provider)
+	sshHandler := NewSSHHandler(handler.service)
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			retcode, stdout, stderr, err = sshHandler.Run(ctx, host.ID, cmd)
@@ -565,21 +584,23 @@ func (svc *VolumeHandler) listAttachedDevices(ctx context.Context, host *model.H
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
+func (handler *VolumeHandler) Detach(volumeName, hostName string) error {
 func (svc *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) error {
 	// Load volume data
+	volume, _, err := handler.Inspect(volumeName)
 	volume, err := svc.Get(ctx, volumeName)
 	if err != nil {
 		switch err.(type) {
-		case model.ErrResourceNotFound:
+		case resources.ErrResourceNotFound:
 			return infraErr(err)
 		default:
-			return infraErr(model.ResourceNotFoundError("volume", volumeName))
+			return infraErr(resources.ResourceNotFoundError("volume", volumeName))
 		}
 	}
 	mountPath := ""
 
 	// Load host data
-	hostSvc := NewHostHandler(svc.provider)
+	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
 		return throwErr(err)
@@ -634,7 +655,7 @@ func (svc *VolumeHandler) Detach(ctx context.Context, volumeName, hostName strin
 				}
 
 				// Unmount the Block Device ...
-				sshHandler := NewSSHHandler(svc.provider)
+				sshHandler := NewSSHHandler(handler.service)
 				sshConfig, err := sshHandler.GetConfig(ctx, host.ID)
 				if err != nil {
 					err = logicErrf(err, "error getting ssh config")
@@ -652,7 +673,7 @@ func (svc *VolumeHandler) Detach(ctx context.Context, volumeName, hostName strin
 				}
 
 				// ... then detach volume
-				err = svc.provider.DeleteVolumeAttachment(host.ID, attachment.AttachID)
+				err = handler.service.DeleteVolumeAttachment(host.ID, attachment.AttachID)
 				if err != nil {
 					err = infraErr(err)
 					return err
@@ -682,12 +703,11 @@ func (svc *VolumeHandler) Detach(ctx context.Context, volumeName, hostName strin
 	}
 
 	// Updates metadata
-	err = metadata.SaveHost(svc.provider, host)
+	err = metadata.SaveHost(handler.service, host)
 	if err != nil {
 		return infraErr(err)
 	}
-	// Updates metadata
-	err = metadata.SaveVolume(svc.provider, volume)
+	err = metadata.SaveVolume(handler.service, volume)
 	if err != nil {
 		err = infraErr(err)
 		return err

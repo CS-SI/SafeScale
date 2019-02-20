@@ -21,7 +21,7 @@ import (
 	"context"
 	"text/template"
 
-	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/iaas"
 	rice "github.com/GeertJohan/go.rice"
 )
 
@@ -55,12 +55,13 @@ func getBoxContent(script string, data interface{}) (string, error) {
 
 // Execute the given script (embeded in a rice-box) with the given data on the host identified by hostid
 func exec(ctx context.Context, script string, data interface{}, hostid string, provider *providers.Service) error {
+func exec(script string, data interface{}, hostid string, svc *iaas.Service) error {
 	scriptCmd, err := getBoxContent(script, data)
 	if err != nil {
 		return infraErrf(err, "Unable to get the script string")
 	}
 	// retrieve ssh config to perform some commands
-	sshHandler := NewSSHHandler(provider)
+	sshHandler := NewSSHHandler(svc)
 	ssh, err := sshHandler.GetConfig(ctx, hostid)
 	if err != nil {
 		return infraErrf(err, "Unable to fetch the SSHConfig from the host")

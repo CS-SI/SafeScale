@@ -61,7 +61,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 		return nil, err
 	}
 
-	// Map model.Host to pb.Host
+	// Map resources.Host to pb.Host
 	var pbTemplates []*pb.HostTemplate
 	for _, template := range templates {
 		pbTemplates = append(pbTemplates, conv.ToPBHostTemplate(&template))

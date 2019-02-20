@@ -32,8 +32,8 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/deploy/cluster/identity"
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
@@ -46,13 +46,13 @@ type Controller struct {
 
 	blueprint *Blueprint
 	metadata  *Metadata
-	service   *providers.Service
+	service   *iaas.Service
 
 	lastStateCollection time.Time
 }
 
 // NewController ...
-func NewController(svc *providers.Service) *Controller {
+func NewController(svc *iaas.Service) *Controller {
 	metadata, err := NewMetadata(svc)
 	if err != nil {
 		panic("failed to create metadata object")
@@ -93,7 +93,7 @@ func (c *Controller) Create(req Request, b *Blueprint) error {
 }
 
 // GetService returns the service from the provider
-func (c *Controller) GetService() *providers.Service {
+func (c *Controller) GetService() *iaas.Service {
 	if c == nil {
 		panic("Calling c.GetService() with c==nil!")
 	}
@@ -369,7 +369,7 @@ func (c *Controller) Deserialize(buf []byte) error {
 }
 
 // AddNode adds one node
-func (c *Controller) AddNode(public bool, req *model.HostDefinition) (string, error) {
+func (c *Controller) AddNode(public bool, req *resources.HostDefinition) (string, error) {
 	hosts, err := c.AddNodes(1, public, req)
 	if err != nil {
 		return "", err
@@ -378,12 +378,12 @@ func (c *Controller) AddNode(public bool, req *model.HostDefinition) (string, er
 }
 
 // AddNodes adds <count> nodes
-func (c *Controller) AddNodes(count int, public bool, req *model.HostDefinition) ([]string, error) {
+func (c *Controller) AddNodes(count int, public bool, req *resources.HostDefinition) ([]string, error) {
 	log.Debugf(">>> deploy.cluster.controller.Controller::AddNodes(%d, %v)", count, public)
 	defer log.Debugf("<<< deploy.cluster.controller.Controller::AddNodes(%d, %v)", count, public)
 
 	var (
-		nodeDef   model.HostDefinition
+		nodeDef   resources.HostDefinition
 		hostImage string
 	)
 	err := c.Properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
@@ -541,7 +541,7 @@ func (c *Controller) deleteMaster(hostID string) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
 		found, idx = contains(nodesV1.Masters, hostID)
 		if !found {
-			return model.ResourceNotFoundError("host", hostID)
+			return resources.ResourceNotFoundError("host", hostID)
 		}
 		master = nodesV1.Masters[idx]
 		return nil
@@ -726,7 +726,7 @@ func (c *Controller) deleteNode(node *clusterpropsv1.Node, index int, public boo
 	// Finally delete host
 	err = brokerclient.New().Host.Delete([]string{node.ID}, 10*time.Minute)
 	if err != nil {
-		if _, ok := err.(model.ErrResourceNotFound); ok {
+		if _, ok := err.(resources.ErrResourceNotFound); ok {
 			// host seems already deleted, so it's a success (handles the case where )
 			err = nil
 		}
@@ -881,8 +881,8 @@ func (c *Controller) Start() error {
 // 		}
 // 		gw := mgw.Get()
 // 		hm := providermetadata.NewHost(svc)
-// 		hosts := []*model.Host{}
-// 		err = hm.Browse(func(h *model.Host) error {
+// 		hosts := []*resources.Host{}
+// 		err = hm.Browse(func(h *resources.Host) error {
 // 			if strings.HasPrefix(h.Name, instance.Core.Name+"-") {
 // 				hosts = append(hosts, h)
 // 			}

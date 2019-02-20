@@ -18,9 +18,9 @@ package utils
 
 import (
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
-	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
+	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/system"
 )
 
@@ -55,7 +55,7 @@ func ToSystemSshConfig(from *pb.SshConfig) *system.SSHConfig {
 }
 
 // ToPBVolume converts an api.Volume to a *Volume
-func ToPBVolume(in *model.Volume) *pb.Volume {
+func ToPBVolume(in *resources.Volume) *pb.Volume {
 	return &pb.Volume{
 		ID:    in.ID,
 		Name:  in.Name,
@@ -65,7 +65,7 @@ func ToPBVolume(in *model.Volume) *pb.Volume {
 }
 
 // ToPBVolumeAttachment converts an api.Volume to a *Volume
-func ToPBVolumeAttachment(in *model.VolumeAttachment) *pb.VolumeAttachment {
+func ToPBVolumeAttachment(in *resources.VolumeAttachment) *pb.VolumeAttachment {
 	return &pb.VolumeAttachment{
 		Volume:    &pb.Reference{ID: in.VolumeID},
 		Host:      &pb.Reference{ID: in.ServerID},
@@ -75,7 +75,7 @@ func ToPBVolumeAttachment(in *model.VolumeAttachment) *pb.VolumeAttachment {
 }
 
 // ToPBVolumeInfo converts an api.Volume to a *VolumeInfo
-func ToPBVolumeInfo(volume *model.Volume, mounts map[string]*propsv1.HostLocalMount) *pb.VolumeInfo {
+func ToPBVolumeInfo(volume *resources.Volume, mounts map[string]*propsv1.HostLocalMount) *pb.VolumeInfo {
 	pbvi := &pb.VolumeInfo{
 		ID:    volume.ID,
 		Name:  volume.Name,
@@ -107,7 +107,7 @@ func ToPBBucketList(in []string) *pb.BucketList {
 }
 
 // ToPBBucketMountPoint convert a Bucket into a BucketMountingPoint
-func ToPBBucketMountPoint(in *model.Bucket) *pb.BucketMountingPoint {
+func ToPBBucketMountPoint(in *resources.Bucket) *pb.BucketMountingPoint {
 	return &pb.BucketMountingPoint{
 		Bucket: in.Name,
 		Path:   in.MountPoint,
@@ -154,7 +154,7 @@ func ToPBShareMountList(hostName string, share *propsv1.HostShare, mounts map[st
 }
 
 // ToPBHost convert an host from api to protocolbuffer format
-func ToPBHost(in *model.Host) *pb.Host {
+func ToPBHost(in *resources.Host) *pb.Host {
 	var (
 		hostNetworkV1 *propsv1.HostNetwork
 		hostSizingV1  *propsv1.HostSizing
@@ -194,7 +194,7 @@ func ToPBHost(in *model.Host) *pb.Host {
 }
 
 // ToPBHostDefinition ...
-func ToPBHostDefinition(in *model.HostDefinition) *pb.HostDefinition {
+func ToPBHostDefinition(in *resources.HostDefinition) *pb.HostDefinition {
 	return &pb.HostDefinition{
 		CPUNumber: int32(in.Cores),
 		RAM:       in.RAMSize,
@@ -206,7 +206,7 @@ func ToPBHostDefinition(in *model.HostDefinition) *pb.HostDefinition {
 }
 
 // ToPBGatewayDefinition ...
-func ToPBGatewayDefinition(in *model.HostDefinition) *pb.GatewayDefinition {
+func ToPBGatewayDefinition(in *resources.HostDefinition) *pb.GatewayDefinition {
 	return &pb.GatewayDefinition{
 		CPU:     int32(in.Cores),
 		RAM:     in.RAMSize,
@@ -216,7 +216,7 @@ func ToPBGatewayDefinition(in *model.HostDefinition) *pb.GatewayDefinition {
 }
 
 // ToHostStatus ...
-func ToHostStatus(in *model.Host) *pb.HostStatus {
+func ToHostStatus(in *resources.Host) *pb.HostStatus {
 	return &pb.HostStatus{
 		Name:   in.Name,
 		Status: pb.HostState(in.LastState).String(),
@@ -224,7 +224,7 @@ func ToHostStatus(in *model.Host) *pb.HostStatus {
 }
 
 // ToPBHostTemplate convert an template from api to protocolbuffer format
-func ToPBHostTemplate(in *model.HostTemplate) *pb.HostTemplate {
+func ToPBHostTemplate(in *resources.HostTemplate) *pb.HostTemplate {
 	return &pb.HostTemplate{
 		ID:      in.ID,
 		Name:    in.Name,
@@ -237,7 +237,7 @@ func ToPBHostTemplate(in *model.HostTemplate) *pb.HostTemplate {
 }
 
 // ToPBImage convert an image from api to protocolbuffer format
-func ToPBImage(in *model.Image) *pb.Image {
+func ToPBImage(in *resources.Image) *pb.Image {
 	return &pb.Image{
 		ID:   in.ID,
 		Name: in.Name,
@@ -245,7 +245,7 @@ func ToPBImage(in *model.Image) *pb.Image {
 }
 
 //ToPBNetwork convert a network from api to protocolbuffer format
-func ToPBNetwork(in *model.Network) *pb.Network {
+func ToPBNetwork(in *resources.Network) *pb.Network {
 	return &pb.Network{
 		ID:        in.ID,
 		Name:      in.Name,

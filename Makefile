@@ -54,9 +54,9 @@ endif
 EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd/brokerd broker/cli/brokerd/brokerd-cover deploy/cli/deploy deploy/cli/deploy-cover perform/perform perform/perform-cover scanner/scanner
 
 # List of packages
-PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/)
+PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
 # List of packages to test (nor deploy neither providers are ready for prime time :( )
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /deploy | grep -v /providers/aws | grep -v /iaas/)
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v /iaas/stacks/aws)
 
 
 # DEPENDENCIES MANAGEMENT
@@ -95,7 +95,7 @@ WARN_STRING  = "[WARNING]"
 BUILD_TAGS = ""
 export BUILD_TAGS
 
-all: begin ground getdevdeps ensure generate providers broker system deploy perform scanner utils vet err
+all: begin ground getdevdeps ensure generate utils system iaas broker deploy perform scanner err vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps ensure generate
@@ -143,23 +143,23 @@ utils: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd utils && $(MAKE) all)
 
-providers: common
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building providers, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd providers && $(MAKE) all)
+iaas: common
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building iaas, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd iaas && $(MAKE) all)
 
 system: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building system, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd system && $(MAKE) all)
 
-broker: common utils system providers
+broker: common utils system iaas
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service broker, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd broker && $(MAKE) all)
 
-deploy: common utils system providers broker
+deploy: common utils system iaas broker
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service deploy, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd deploy && $(MAKE) all)
 
-perform: common utils system providers broker
+perform: common utils system iaas broker
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd perform && $(MAKE) all)
 
@@ -169,7 +169,7 @@ scanner: common
 
 clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd providers && $(MAKE) $@)
+	@(cd iaas && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
 	@(cd broker && $(MAKE) $@)
 	@(cd deploy && $(MAKE) $@)

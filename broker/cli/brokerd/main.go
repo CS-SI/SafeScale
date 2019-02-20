@@ -36,7 +36,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/server/listeners"
 	"github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/iaas"
 )
 
 /*
@@ -101,7 +101,7 @@ func work() {
 	}()
 
 	log.Infoln("Checking configuration")
-	_, err := providers.Tenants()
+	_, err := iaas.GetTenants()
 	if err != nil {
 		log.Fatalf(err.Error())
 	}

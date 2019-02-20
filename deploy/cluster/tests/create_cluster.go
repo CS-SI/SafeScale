@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 
 	"github.com/CS-SI/SafeScale/deploy/cluster"
 )
@@ -36,7 +36,7 @@ func Run() {
 	clusterName := "test-cluster"
 	instance, err := cluster.Get(clusterName)
 	if err != nil {
-		if _, ok := err.(model.ErrResourceNotFound); ok {
+		if _, ok := err.(resources.ErrResourceNotFound); ok {
 			log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
 			instance, err = cluster.Create(controller.Request{
 				Name:       clusterName,
@@ -64,7 +64,7 @@ func Run() {
 	fmt.Printf("Cluster state: %s\n", state.String())
 
 	// Creates a Private Agent Node
-	_, err = instance.AddNode(false, &model.HostDefinition{
+	_, err = instance.AddNode(false, &resources.HostDefinition{
 		Cores:    2,
 		RAMSize:  7.0,
 		DiskSize: 60,

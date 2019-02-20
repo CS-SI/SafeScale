@@ -177,7 +177,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
-	// Map model.Host to pb.Host
+	// Map resources.Host to pb.Host
 	var pbhost []*pb.Host
 	for _, host := range hosts {
 		pbhost = append(pbhost, conv.ToPBHost(host))
