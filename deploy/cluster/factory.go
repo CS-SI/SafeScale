@@ -30,8 +30,8 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/k8s"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/ohpc"
 	"github.com/CS-SI/SafeScale/deploy/cluster/flavors/swarm"
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils"
 )
 
@@ -42,7 +42,7 @@ func Get(name string) (api.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc, err := providers.GetService(tenant.Name)
+	svc, err := iaas.UseService(tenant.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func Get(name string) (api.Cluster, error) {
 	err = m.Read(name)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
-			return nil, model.ResourceNotFoundError("cluster", name)
+			return nil, resources.ResourceNotFoundError("cluster", name)
 		}
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
 	}
@@ -72,7 +72,7 @@ func Load(name string) (api.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc, err := providers.GetService(tenant.Name)
+	svc, err := iaas.UseService(tenant.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func Create(req controller.Request) (api.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc, err := providers.GetService(tenant.Name)
+	svc, err := iaas.UseService(tenant.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func List() ([]api.Cluster, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc, err := providers.GetService(tenant.Name)
+	svc, err := iaas.UseService(tenant.Name)
 	if err != nil {
 		return nil, err
 	}

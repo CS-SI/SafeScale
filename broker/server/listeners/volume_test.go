@@ -25,9 +25,9 @@ import (
 	pb "github.com/CS-SI/SafeScale/broker"
 	"github.com/CS-SI/SafeScale/broker/server/handlers"
 	"github.com/CS-SI/SafeScale/broker/server/listeners"
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
 )
 
 type MyMockedVolService struct {
@@ -35,17 +35,17 @@ type MyMockedVolService struct {
 	err error
 }
 
-func (m *MyMockedVolService) Create(name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error) {
+func (m *MyMockedVolService) Create(name string, size int, speed VolumeSpeed.Enum) (*resources.Volume, error) {
 	m.Called(name, size, speed)
 
-	return &model.Volume{Name: name,
+	return &resources.Volume{Name: name,
 		Size:  size,
 		Speed: speed}, m.err
 }
 func (m *MyMockedVolService) Delete(name string) error {
 	return nil
 }
-func (m *MyMockedVolService) List() ([]model.Volume, error) {
+func (m *MyMockedVolService) List() ([]resources.Volume, error) {
 	return nil, nil
 }
 func (m *MyMockedVolService) Attach(volume string, host string, path string, format string) error {
@@ -54,8 +54,8 @@ func (m *MyMockedVolService) Attach(volume string, host string, path string, for
 func (m *MyMockedVolService) Detach(volume string, host string) error {
 	return nil
 }
-func (m *MyMockedVolService) Get(ref string) (*model.Volume, error) {
-	return &model.Volume{}, nil
+func (m *MyMockedVolService) Get(ref string) (*resources.Volume, error) {
+	return &resources.Volume{}, nil
 }
 
 func TestCreate(t *testing.T) {
@@ -66,7 +66,7 @@ func TestCreate(t *testing.T) {
 	old := listeners.VolumeHandler
 	defer func() { listeners.VolumeHandler = old }()
 
-	listeners.VolumeHandler = func(api *providers.Service) handlers.VolumeAPI {
+	listeners.VolumeHandler = func(svc *iaas.Service) handlers.VolumeAPI {
 		return nil
 		// TODO Fix this test
 		// return myMockedVolService
@@ -76,7 +76,7 @@ func TestCreate(t *testing.T) {
 	oldGetCurrentTeant := listeners.GetCurrentTenant
 	defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
 	listeners.GetCurrentTenant = func() *listeners.Tenant {
-		return &listeners.Tenant{Service: &providers.Service{}}
+		return &listeners.Tenant{Service: &iaas.Service{}}
 	}
 
 	underTest := &listeners.VolumeListener{}
@@ -106,7 +106,7 @@ func TestCreate_Err(t *testing.T) {
 	old := listeners.VolumeHandler
 	defer func() { listeners.VolumeHandler = old }()
 
-	listeners.VolumeHandler = func(api *providers.Service) handlers.VolumeAPI {
+	listeners.VolumeHandler = func(api *iaas.Service) handlers.VolumeAPI {
 		// TODO Fix this test
 		return nil
 		// return myMockedVolService
@@ -116,7 +116,7 @@ func TestCreate_Err(t *testing.T) {
 	oldGetCurrentTeant := listeners.GetCurrentTenant
 	defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
 	listeners.GetCurrentTenant = func() *listeners.Tenant {
-		return &listeners.Tenant{Service: &providers.Service{}}
+		return &listeners.Tenant{Service: &iaas.Service{}}
 	}
 
 	underTest := &listeners.VolumeListener{}

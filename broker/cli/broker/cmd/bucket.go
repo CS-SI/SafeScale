@@ -23,7 +23,7 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/broker/client"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
 )
@@ -130,7 +130,7 @@ var bucketMount = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: model.DefaultBucketMountPoint,
+			Value: resources.DefaultBucketMountPoint,
 			Usage: "Mount point of the bucket",
 		},
 	},

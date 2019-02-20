@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 
 	log "github.com/sirupsen/logrus"
 
@@ -138,7 +138,7 @@ func (w *worker) Host() (*pb.Host, error) {
 // for all the life of the action (prevent to request too often)
 func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 	if w.cluster == nil {
-		return nil, model.ResourceNotAvailableError("cluster", "")
+		return nil, resources.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
 		hostID, err := w.cluster.FindAvailableMaster()
@@ -156,7 +156,7 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 // identifyAvailableNode finds a node available and will use this one during all the install session
 func (w *worker) identifyAvailableNode(public bool) (*pb.Host, error) {
 	if w.cluster == nil {
-		return nil, model.ResourceNotAvailableError("cluster", "")
+		return nil, resources.ResourceNotAvailableError("cluster", "")
 	}
 	found := false
 	if public {

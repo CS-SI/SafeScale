@@ -29,6 +29,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/broker"
 	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	providermetadata "github.com/CS-SI/SafeScale/broker/server/metadata"
 	pbutils "github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
@@ -36,9 +37,8 @@ import (
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/deploy/install"
-	"github.com/CS-SI/SafeScale/providers"
-	providermetadata "github.com/CS-SI/SafeScale/providers/metadata"
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/template"
@@ -65,11 +65,11 @@ var (
 
 // BlueprintActors ...
 type BlueprintActors struct {
-	MinimumRequiredServers      func(c api.Cluster) (int, int, int)      // returns masterCount, pruvateNodeCount, publicNodeCount
-	DefaultGatewaySizing        func(c api.Cluster) model.HostDefinition // sizing of Gateway(s)
-	DefaultMasterSizing         func(c api.Cluster) model.HostDefinition // default sizing of master(s)
-	DefaultNodeSizing           func(c api.Cluster) model.HostDefinition // defailt sizing of node(s)
-	DefaultImage                func(c api.Cluster) string               // default image of server(s)
+	MinimumRequiredServers      func(c api.Cluster) (int, int, int)          // returns masterCount, pruvateNodeCount, publicNodeCount
+	DefaultGatewaySizing        func(c api.Cluster) resources.HostDefinition // sizing of Gateway(s)
+	DefaultMasterSizing         func(c api.Cluster) resources.HostDefinition // default sizing of master(s)
+	DefaultNodeSizing           func(c api.Cluster) resources.HostDefinition // defailt sizing of node(s)
+	DefaultImage                func(c api.Cluster) string                   // default image of server(s)
 	GetNodeInstallationScript   func(c api.Cluster, nodeType NodeType.Enum) (string, map[string]interface{})
 	GetGlobalSystemRequirements func(c api.Cluster) (*string, error)
 	GetTemplateBox              func() (*rice.Box, error)
@@ -127,7 +127,7 @@ func (b *Blueprint) Construct(req Request) error {
 	}
 
 	// Determine Gateway sizing
-	gatewayDef := model.HostDefinition{
+	gatewayDef := resources.HostDefinition{
 		Cores:    2,
 		RAMSize:  7.0,
 		DiskSize: 60,
@@ -142,7 +142,7 @@ func (b *Blueprint) Construct(req Request) error {
 	pbGatewayDef := *pbutils.ToPBGatewayDefinition(&gatewayDef)
 
 	// Determine master sizing
-	masterDef := model.HostDefinition{
+	masterDef := resources.HostDefinition{
 		Cores:    4,
 		RAMSize:  15.0,
 		DiskSize: 100,
@@ -152,12 +152,12 @@ func (b *Blueprint) Construct(req Request) error {
 		masterDef = b.Actors.DefaultMasterSizing(b.Cluster)
 		masterDef.ImageID = imageID
 	}
-	//Note: no way yet to define master sizing from cli...
-	// mastersDef = complementHostDefinition(req.NodesDef, mastersDef)
+	// Note: no way yet to define master sizing from cli...
+	masterDef = complementHostDefinition(req.NodesDef, masterDef)
 	pbMasterDef := *pbutils.ToPBHostDefinition(&masterDef)
 
 	// Determine node sizing
-	nodeDef := model.HostDefinition{
+	nodeDef := resources.HostDefinition{
 		Cores:    4,
 		RAMSize:  15.0,
 		DiskSize: 100,
@@ -202,9 +202,9 @@ func (b *Blueprint) Construct(req Request) error {
 
 	// Saving Cluster parameters, with status 'Creating'
 	var (
-		kp     *model.KeyPair
+		kp     *resources.KeyPair
 		kpName string
-		gw     *model.Host
+		gw     *resources.Host
 		m      *providermetadata.Gateway
 	)
 
@@ -212,7 +212,7 @@ func (b *Blueprint) Construct(req Request) error {
 	if err != nil {
 		return err
 	}
-	svc, err := providers.GetService(tenant.Name)
+	svc, err := iaas.UseService(tenant.Name)
 	if err != nil {
 		return err
 	}
@@ -427,8 +427,8 @@ func (b *Blueprint) Construct(req Request) error {
 }
 
 // complementHostDefinition complements req with default values if needed
-func complementHostDefinition(req *model.HostDefinition, def model.HostDefinition) model.HostDefinition {
-	var finalDef model.HostDefinition
+func complementHostDefinition(req *resources.HostDefinition, def resources.HostDefinition) resources.HostDefinition {
+	var finalDef resources.HostDefinition
 	if req == nil {
 		finalDef = def
 	} else {
@@ -757,7 +757,7 @@ func (b *Blueprint) leaveNodesFromList(hosts []string, public bool, selectedMast
 		pbHost, err := brokerHost.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			// If host seems deleted, consider leaving as a success
-			if _, ok := err.(model.ErrResourceNotFound); ok {
+			if _, ok := err.(resources.ErrResourceNotFound); ok {
 				continue
 			}
 			return err
@@ -1033,8 +1033,8 @@ func (b *Blueprint) asyncCreateMaster(index int, def pb.HostDefinition, timeout 
 		}
 	}()
 
-	// Locks for write the Flavor extension...
 	err = b.Cluster.UpdateMetadata(func() error {
+		// Locks for write the NodesV1 extension...
 		return b.Cluster.GetProperties().LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
 			// Update swarmCluster definition in Object Storage

@@ -26,15 +26,15 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/broker/server/metadata"
 	brokerutils "github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/metadata"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/providers/model/enums/NetworkProperty"
-	propsv1 "github.com/CS-SI/SafeScale/providers/model/properties/v1"
-	"github.com/CS-SI/SafeScale/providers/openstack"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/NetworkProperty"
+	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/utils"
 )
 
@@ -44,6 +44,10 @@ import (
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
+	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*resources.Network, error)
+	List(all bool) ([]*resources.Network, error)
+	Inspect(ref string) (*resources.Network, error)
+	Delete(ref string) error
 	Create(ctx context.Context, net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*model.Network, error)
 	List(ctx context.Context, all bool) ([]*model.Network, error)
 	Inspect(ctx context.Context, ref string) (*model.Network, error)
@@ -52,18 +56,20 @@ type NetworkAPI interface {
 
 // NetworkHandler an implementation of NetworkAPI
 type NetworkHandler struct {
-	provider  *providers.Service
+	service   *iaas.Service
 	ipVersion IPVersion.Enum
 }
 
 // NewNetworkHandler Creates new Network service
-func NewNetworkHandler(api *providers.Service) NetworkAPI {
+func NewNetworkHandler(svc *iaas.Service) NetworkAPI {
 	return &NetworkHandler{
-		provider: api,
+		service: svc,
 	}
 }
 
 // Create creates a network
+func (handler *NetworkHandler) Create(
+) (*resources.Network, error) {
 func (svc *NetworkHandler) Create(
 	ctx context.Context, name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, theos string, gwname string,
 ) (*model.Network, error) {
@@ -72,10 +78,10 @@ func (svc *NetworkHandler) Create(
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Create()")
 
 	// Verify that the network doesn't exist first
-	_, err := svc.provider.GetNetworkByName(name)
+	_, err := handler.service.GetNetworkByName(name)
 	if err != nil {
 		switch err.(type) {
-		case model.ErrResourceNotFound:
+		case resources.ErrResourceNotFound:
 		default:
 			return nil, infraErrf(err, "failed to check if a network already exists with name '%s'", name)
 		}
@@ -85,7 +91,7 @@ func (svc *NetworkHandler) Create(
 
 	// Create the network
 	log.Debugf("Creating network '%s' ...", name)
-	network, err := svc.provider.CreateNetwork(model.NetworkRequest{
+	network, err := handler.service.CreateNetwork(resources.NetworkRequest{
 		Name:      name,
 		IPVersion: ipVersion,
 		CIDR:      cidr,
@@ -98,7 +104,7 @@ func (svc *NetworkHandler) Create(
 	// Starting from here, delete network if exiting with error
 	defer func() {
 		if err != nil {
-			derr := svc.provider.DeleteNetwork(network.ID)
+			derr := handler.service.DeleteNetwork(network.ID)
 			if derr != nil {
 				log.Errorf("Failed to delete network: %+v", derr)
 			}
@@ -106,7 +112,7 @@ func (svc *NetworkHandler) Create(
 	}()
 
 	log.Debugf("Saving network metadata '%s' ...", network.Name)
-	mn, err := metadata.SaveNetwork(svc.provider, network)
+	mn, err := metadata.SaveNetwork(handler.service, network)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -129,8 +135,8 @@ func (svc *NetworkHandler) Create(
 
 	// Create a gateway
 
-	var template model.HostTemplate
-	tpls, err := svc.provider.SelectTemplatesBySize(model.SizingRequirements{
+	var template resources.HostTemplate
+	tpls, err := handler.service.SelectTemplatesBySize(resources.SizingRequirements{
 		MinCores:    cpu,
 		MinRAMSize:  ram,
 		MinDiskSize: disk,
@@ -156,19 +162,19 @@ func (svc *NetworkHandler) Create(
 	} else {
 		return nil, logicErr(fmt.Errorf("Error creating network: No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
 	}
-	img, err := svc.provider.SearchImage(theos)
+	img, err := handler.service.SearchImage(theos)
 	if err != nil {
 		err := infraErrf(err, "Error creating network: Error searching image '%s'", theos)
 		return nil, err
 	}
 
 	keypairName := "kp_" + network.Name
-	keypair, err := svc.provider.CreateKeyPair(keypairName)
+	keypair, err := handler.service.CreateKeyPair(keypairName)
 	if err != nil {
 		return nil, infraErr(err)
 	}
 
-	gwRequest := model.GatewayRequest{
+	gwRequest := resources.GatewayRequest{
 		ImageID:    img.ID,
 		Network:    network,
 		KeyPair:    keypair,
@@ -178,9 +184,9 @@ func (svc *NetworkHandler) Create(
 	}
 
 	log.Infof("Requesting the creation of a gateway '%s' using template '%s' with image '%s'", gwname, template.Name, img.Name)
-	gw, err := svc.provider.CreateGateway(gwRequest)
+	gw, err := handler.service.CreateGateway(gwRequest)
 	if err != nil {
-		//defer svc.provider.DeleteNetwork(network.ID)
+		//defer handler.service.DeleteNetwork(network.ID)
 		return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", gwname)
 	}
 
@@ -188,7 +194,7 @@ func (svc *NetworkHandler) Create(
 	defer func() {
 		if err != nil {
 			log.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", gw.Name)
-			derr := svc.provider.DeleteHost(gw.ID)
+			derr := handler.service.DeleteHost(gw.ID)
 			if derr != nil {
 				log.Errorf("failed to delete gateway '%s': %v", gw.Name, derr)
 			}
@@ -197,7 +203,7 @@ func (svc *NetworkHandler) Create(
 	}()
 
 	// Reloads the host to be sure all the properties are updated
-	gw, err = svc.provider.GetHost(gw)
+	gw, err = handler.service.InspectHost(gw)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -217,7 +223,7 @@ func (svc *NetworkHandler) Create(
 	}
 
 	// Writes Gateway metadata
-	mg, err := metadata.SaveGateway(svc.provider, gw, network.ID)
+	mg, err := metadata.SaveGateway(handler.service, gw, network.ID)
 	if err != nil {
 		return nil, infraErrf(err, "failed to create gateway: failed to save metadata: %s", err.Error())
 	}
@@ -237,10 +243,11 @@ func (svc *NetworkHandler) Create(
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
 	log.Infof("Waiting until gateway '%s' is available through SSH ...", gwname)
+	sshHandler := NewSSHHandler(handler.service)
 	sshHandler := NewSSHHandler(svc.provider)
 	ssh, err := sshHandler.GetConfig(ctx, gw.ID)
 	if err != nil {
-		//defer svc.provider.DeleteHost(gw.ID)
+		//defer handler.service.DeleteHost(gw.ID)
 		return nil, infraErrf(err, "error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
 	}
 
@@ -272,18 +279,19 @@ func (svc *NetworkHandler) Create(
 }
 
 // List returns the network list
+func (handler *NetworkHandler) List(all bool) ([]*resources.Network, error) {
 func (svc *NetworkHandler) List(ctx context.Context, all bool) ([]*model.Network, error) {
 	log.Debugf(">>> broker.server.handlers.NetworkHandler::List(%v)", all)
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::List(%v)", all)
 
 	if all {
-		return svc.provider.ListNetworks()
+		return handler.service.ListNetworks()
 	}
 
-	var netList []*model.Network
+	var netList []*resources.Network
 
-	mn := metadata.NewNetwork(svc.provider)
-	err := mn.Browse(func(network *model.Network) error {
+	mn := metadata.NewNetwork(handler.service)
+	err := mn.Browse(func(network *resources.Network) error {
 		netList = append(netList, network)
 		return nil
 	})
@@ -297,11 +305,12 @@ func (svc *NetworkHandler) List(ctx context.Context, all bool) ([]*model.Network
 }
 
 // Inspect returns the network identified by ref, ref can be the name or the id
+func (handler *NetworkHandler) Inspect(ref string) (*resources.Network, error) {
 func (svc *NetworkHandler) Inspect(ctx context.Context, ref string) (*model.Network, error) {
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Inspect(%s)", ref)
 	log.Debugf(">>> broker.server.handlers.NetworkHandler::Inspect(%s)", ref)
 
-	mn, err := metadata.LoadNetwork(svc.provider, ref)
+	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -309,13 +318,14 @@ func (svc *NetworkHandler) Inspect(ctx context.Context, ref string) (*model.Netw
 }
 
 // Delete deletes network referenced by ref
+func (handler *NetworkHandler) Delete(ref string) error {
 func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	log.Debugf(">>> broker.server.handlers.NetworkHandler::Delete(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Delete(%s)", ref)
 
-	mn, err := metadata.LoadNetwork(svc.provider, ref)
+	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
-		if _, ok := err.(model.ErrResourceNotFound); !ok {
+		if _, ok := err.(resources.ErrResourceNotFound); !ok {
 			return infraErrf(err, "failed to load metadata of network '%s'", ref)
 		}
 		return err
@@ -339,12 +349,12 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 			}
 			errorMsg = fmt.Sprintf("can't delete network '%s': %d host%s %s still attached to it: %s",
 				network.Name, hostsLen, utils.Plural(hostsLen), verb, strings.Join(list, ", "))
-			return model.ResourceNotAvailableError("network", network.Name)
+			return resources.ResourceNotAvailableError("network", network.Name)
 		}
 		return nil
 	})
 	if err != nil {
-		if _, ok := err.(model.ErrResourceNotAvailable); ok {
+		if _, ok := err.(resources.ErrResourceNotAvailable); ok {
 			return logicErr(fmt.Errorf(errorMsg))
 		}
 		return infraErr(err)
@@ -353,13 +363,13 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	// 1st delete gateway
 	var metadataHost *model.Host
 	if gwID != "" {
-		mh, err := metadata.LoadHost(svc.provider, gwID)
+		mh, err := metadata.LoadHost(handler.service, gwID)
 		if err != nil {
 			return infraErr(err)
 		}
 		metadataHost = mh.Get()
 
-		err = svc.provider.DeleteGateway(gwID)
+		err = handler.service.DeleteGateway(gwID)
 		// allow no gateway, but log it
 		if err != nil {
 			log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
@@ -371,6 +381,7 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	}
 
 	// 2nd delete network, with no tolerance
+	err = handler.service.DeleteNetwork(network.ID)
 	var deleteMatadataOnly bool
 	err = svc.provider.DeleteNetwork(network.ID)
 	if err != nil {

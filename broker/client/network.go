@@ -19,6 +19,7 @@ package client
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -54,7 +55,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 
 	var (
 		wg   sync.WaitGroup
-		errs int
+		errs int32
 	)
 
 	networkDeleter := func(aname string) {
@@ -63,7 +64,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 
 		if err != nil {
 			fmt.Println(DecorateError(err, "deletion of network", true).Error())
-			errs++
+			atomic.AddInt32(&errs, 1)
 		} else {
 			fmt.Printf("Network '%s' deleted\n", aname)
 		}

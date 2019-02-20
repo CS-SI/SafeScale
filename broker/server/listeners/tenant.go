@@ -27,14 +27,13 @@ import (
 	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/broker"
-	"github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/iaas"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant
 type Tenant struct {
 	name    string
-	Service *providers.Service
+	Service *iaas.Service
 }
 
 var (
@@ -46,17 +45,11 @@ type TenantListener struct{}
 
 // List registerd tenants
 func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
-	log.Infoln("Listeners: tenant list called")
-	defer log.Debugln("Listeners: tenant list done")
+	log.Infoln("Listeners: receiving \"tenant list\"")
+	log.Debugln(">>> TenantListener::List()")
+	defer log.Debugln("<<< TenantListener::List()")
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenants List"); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
-	}
-	defer utils.ProcessDeregister(ctx)
-
-	tenants, err := providers.Tenants()
+	tenants, err := iaas.GetTenants()
 	if err != nil {
 		return nil, err
 	}
@@ -74,8 +67,9 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 
 // Get returns the name of the current tenant used
 func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantName, error) {
-	log.Infoln("Listeners: tenant get called")
-	defer log.Debugln("Listeners: tenant get done")
+	log.Infoln("Listeners: receiving \"tenant get\"")
+	log.Debugln(">>> TenantListener::Get()")
+	defer log.Debugln(">>> TenantListener::Get()")
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -98,14 +92,14 @@ var GetCurrentTenant = getCurrentTenant
 // getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
 func getCurrentTenant() *Tenant {
 	if currentTenant == nil {
-		tenants, err := providers.Tenants()
+		tenants, err := iaas.GetTenants()
 		if err != nil || len(tenants) != 1 {
 			return nil
 		}
 		// Set unique tenant as selected
 		log.Println("Unique tenant set")
 		for name := range tenants {
-			service, err := providers.GetService(name)
+			service, err := iaas.UseService(name)
 			if err != nil {
 				return nil
 			}
@@ -117,8 +111,9 @@ func getCurrentTenant() *Tenant {
 
 // Set the the tenant to use for each command
 func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
-	log.Infof("Listeners: tenant set '%s' called", in.Name)
-	defer log.Debugf("Listeners: tenant set '%s' done", in.Name)
+	log.Infof("Listeners: receiving \"tenant set %s\"", in.Name)
+	log.Debugf(">>> TenantListener::Set(%s)", in.Name)
+	defer log.Debugf("<<< TenantListener::Set(%s)", in.Name)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -131,7 +126,7 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_pr
 		return &google_protobuf.Empty{}, nil
 	}
 
-	service, err := providers.GetService(in.GetName())
+	service, err := iaas.UseService(in.GetName())
 	if err != nil {
 		return &google_protobuf.Empty{}, fmt.Errorf("Unable to set tenant '%s': %s", in.GetName(), err.Error())
 	}

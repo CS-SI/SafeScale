@@ -61,7 +61,7 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
-	// Map model.Image to pb.Image
+	// Map resources.Image to pb.Image
 	var pbImages []*pb.Image
 	for _, image := range images {
 		pbImages = append(pbImages, conv.ToPBImage(&image))

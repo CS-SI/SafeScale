@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 )
 
 //go:generate mockgen -destination=../mocks/mock_bucketapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers BucketAPI
@@ -40,12 +40,12 @@ type BucketAPI interface {
 
 // BucketHandler bucket service
 type BucketHandler struct {
-	provider *providers.Service
+	service *iaas.Service
 }
 
 // NewBucketHandler creates a Bucket service
-func NewBucketHandler(api *providers.Service) BucketAPI {
-	return &BucketHandler{provider: api}
+func NewBucketHandler(svc *iaas.Service) BucketAPI {
+	return &BucketHandler{service: svc}
 }
 
 // List retrieves all available buckets
@@ -63,9 +63,9 @@ func (svc *BucketHandler) Create(ctx context.Context, name string) error {
 		}
 	}
 	if bucket != nil {
-		return logicErr(model.ResourceAlreadyExistsError("bucket", name))
+		return logicErr(resources.ResourceAlreadyExistsError("bucket", name))
 	}
-	_, err = svc.provider.ObjectStorage.CreateBucket(name)
+	_, err = handler.service.CreateBucket(name)
 	if err != nil {
 		return infraErrf(err, "failed to create bucket '%s'", name)
 	}
@@ -86,11 +86,11 @@ func (svc *BucketHandler) Inspect(ctx context.Context, name string) (*model.Buck
 	b, err := svc.provider.ObjectStorage.GetBucket(name)
 	if err != nil {
 		if err.Error() == "not found" {
-			return nil, logicErr(model.ResourceNotFoundError("bucket", name))
+			return nil, logicErr(resources.ResourceNotFoundError("bucket", name))
 		}
 		return nil, infraErrf(err, "failed to inspect bucket '%s'", name)
 	}
-	mb := model.Bucket{
+	mb := resources.Bucket{
 		Name: b.GetName(),
 	}
 	return &mb, nil
@@ -99,7 +99,7 @@ func (svc *BucketHandler) Inspect(ctx context.Context, name string) (*model.Buck
 // Mount a bucket on an host on the given mount point
 func (svc *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) error {
 	// Check bucket existence
-	_, err := svc.provider.ObjectStorage.GetBucket(bucketName)
+	_, err := handler.service.GetBucket(bucketName)
 	if err != nil {
 		return infraErr(err)
 	}
@@ -107,17 +107,19 @@ func (svc *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path 
 	// Get Host ID
 	hostHandler := NewHostHandler(svc.provider)
 	host, err := hostHandler.Inspect(ctx, hostName)
+	hostHandler := NewHostHandler(handler.service)
+	host, err := hostHandler.Inspect(hostName)
 	if err != nil {
 		return logicErr(fmt.Errorf("no host found with name or id '%s'", hostName))
 	}
 
 	// Create mount point
 	mountPoint := path
-	if path == model.DefaultBucketMountPoint {
-		mountPoint = model.DefaultBucketMountPoint + bucketName
+	if path == resources.DefaultBucketMountPoint {
+		mountPoint = resources.DefaultBucketMountPoint + bucketName
 	}
 
-	authOpts, _ := svc.provider.GetAuthOpts()
+	authOpts, _ := handler.service.GetAuthOpts()
 	authurlCfg, _ := authOpts.Config("AuthUrl")
 	authurl := authurlCfg.(string)
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
@@ -130,7 +132,7 @@ func (svc *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path 
 	regionCfg, _ := authOpts.Config("Region")
 	region := regionCfg.(string)
 
-	objStorageProtocol := svc.provider.ObjectStorage.GetType()
+	objStorageProtocol := handler.service.GetType()
 	if objStorageProtocol == "swift" {
 		objStorageProtocol = "swiftks"
 	}
@@ -155,7 +157,7 @@ func (svc *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path 
 		Protocol:   objStorageProtocol,
 	}
 
-	rerr := exec(ctx, "mount_object_storage.sh", data, host.ID, svc.provider)
+	rerr := exec("mount_object_storage.sh", data, host.ID, handler.service)
 	return logicErr(rerr)
 }
 
@@ -164,24 +166,20 @@ func (svc *BucketHandler) Unmount(ctx context.Context, bucketName, hostName stri
 	// Check bucket existence
 	_, err := svc.Inspect(ctx, bucketName)
 	if err != nil {
-		switch err.(type) {
-		case model.ErrResourceNotFound:
-			return infraErr(err)
-		default:
-			return infraErr(err)
+		if _, ok := err.(resources.ErrResourceNotFound); ok {
+			return err
 		}
+		return infraErr(err)
 	}
 
 	// Get Host ID
-	hostHandler := NewHostHandler(svc.provider)
+	hostHandler := NewHostHandler(handler.service)
 	host, err := hostHandler.Inspect(ctx, hostName)
 	if err != nil {
-		switch err.(type) {
-		case model.ErrResourceNotFound:
-			return infraErr(err)
-		default:
-			return infraErrf(err, "failed to get host '%s':", hostName)
+		if _, ok := err.(resources.ErrResourceNotFound); ok {
+			return err
 		}
+		return infraErrf(err, "failed to get host '%s':", hostName)
 	}
 
 	data := struct {
@@ -190,6 +188,6 @@ func (svc *BucketHandler) Unmount(ctx context.Context, bucketName, hostName stri
 		Bucket: bucketName,
 	}
 
-	rerr := exec(ctx, "umount_object_storage.sh", data, host.ID, svc.provider)
+	rerr := exec("umount_object_storage.sh", data, host.ID, handler.service)
 	return infraErr(rerr)
 }

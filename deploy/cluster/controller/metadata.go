@@ -18,14 +18,16 @@ package controller
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/providers"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -37,17 +39,19 @@ const (
 type Metadata struct {
 	item *metadata.Item
 	name string
+	lock *sync.Mutex
 }
 
 // NewMetadata creates a new Cluster Controller metadata
-func NewMetadata(svc *providers.Service) (*Metadata, error) {
+func NewMetadata(svc *iaas.Service) (*Metadata, error) {
 	return &Metadata{
 		item: metadata.NewItem(svc, clusterFolderName),
+		lock: &sync.Mutex{},
 	}, nil
 }
 
 // GetService returns the service used by metadata
-func (m *Metadata) GetService() *providers.Service {
+func (m *Metadata) GetService() *iaas.Service {
 	return m.item.GetService()
 }
 
@@ -186,10 +190,14 @@ func (m *Metadata) Browse(callback func(*Controller) error) error {
 
 // Acquire waits until the write lock is available, then locks the metadata
 func (m *Metadata) Acquire() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.item.Acquire()
 }
 
 // Release unlocks the metadata
 func (m *Metadata) Release() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.item.Release()
 }

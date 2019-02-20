@@ -25,7 +25,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
 
-	"github.com/CS-SI/SafeScale/providers/model"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 
 	log "github.com/sirupsen/logrus"
 
@@ -94,7 +94,7 @@ func extractClusterArgument(c *cli.Context) error {
 		clusterInstance, err = cluster.Get(clusterName)
 		if err != nil {
 			switch err.(type) {
-			case model.ErrResourceNotFound:
+			case resources.ErrResourceNotFound:
 				if !c.Command.HasName("create") {
 					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
 				}
@@ -388,9 +388,9 @@ var clusterCreateCommand = cli.Command{
 		ram := float32(c.Float64("ram"))
 		disk := int32(c.Uint("disk"))
 
-		var nodesDef *model.HostDefinition
+		var nodesDef *resources.HostDefinition
 		if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
-			nodesDef = &model.HostDefinition{
+			nodesDef = &resources.HostDefinition{
 				Cores:    int(cpu),
 				RAMSize:  ram,
 				DiskSize: int(disk),
@@ -655,9 +655,9 @@ var clusterExpandCommand = cli.Command{
 		_ = c.Bool("gpu")
 
 		// err := createNodes(clusterName, public, count, los, cpu, ram, disk)
-		var nodeRequest *model.HostDefinition
+		var nodeRequest *resources.HostDefinition
 		if los != "" || cpu > 0 || ram > 0.0 || disk > 0 {
-			nodeRequest = &model.HostDefinition{
+			nodeRequest = &resources.HostDefinition{
 				Cores:    int(cpu),
 				RAMSize:  ram,
 				DiskSize: int(disk),

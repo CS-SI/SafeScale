@@ -8,16 +8,15 @@ import (
 	"net/url"
 	"strings"
 
+	oidc "github.com/coreos/go-oidc"
 	"github.com/gobwas/glob"
 	"github.com/gorilla/websocket"
-
-	"github.com/CS-SI/SafeScale/security/model"
-
-	oidc "github.com/coreos/go-oidc"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
+
+	"github.com/CS-SI/SafeScale/security/model"
 )
 
 var ctx = context.Background()

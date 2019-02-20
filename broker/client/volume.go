@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/broker"
@@ -64,7 +65,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 
 	var (
 		wg   sync.WaitGroup
-		errs int
+		errs int32
 	)
 
 	volumeDeleter := func(aname string) {
@@ -73,7 +74,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 
 		if err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, DecorateError(err, "deletion of volume", true).Error())
-			errs++
+			atomic.AddInt32(&errs, 1)
 		} else {
 			fmt.Printf("Volume '%s' deleted\n", aname)
 		}

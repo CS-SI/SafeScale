@@ -31,7 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/broker/server/handlers"
 	"github.com/CS-SI/SafeScale/broker/utils"
 	conv "github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
 )
 
 // NetworkHandler ...
@@ -106,7 +106,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.N
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
-	// Map model.Network to pb.Network
+	// Map resources.Network to pb.Network
 	var pbnetworks []*pb.Network
 	for _, network := range networks {
 		pbnetworks = append(pbnetworks, conv.ToPBNetwork(network))
