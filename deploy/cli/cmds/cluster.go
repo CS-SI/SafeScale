@@ -77,37 +77,36 @@ var ClusterCommand = cli.Command{
 }
 
 func extractClusterArgument(c *cli.Context) error {
-	if !c.Command.HasName("list") {
-		if c.NArg() < 1 {
-			fmt.Fprintf(os.Stderr, "Missing mandatory argument CLUSTERNAME")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
-		}
-		clusterName = c.Args().First()
-		if clusterName == "" {
-			fmt.Fprintf(os.Stderr, "Invalid argument CLUSTERNAME")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
-		}
+	if c.NArg() < 1 {
+		fmt.Fprintf(os.Stderr, "Missing mandatory argument CLUSTERNAME")
+		_ = cli.ShowSubcommandHelp(c)
+		return clitools.ExitOnInvalidArgument()
+	}
+	clusterName = c.Args().First()
+	if clusterName == "" {
+		fmt.Fprintf(os.Stderr, "Invalid argument CLUSTERNAME")
+		_ = cli.ShowSubcommandHelp(c)
+		return clitools.ExitOnInvalidArgument()
+	}
 
-		var err error
-		clusterInstance, err = cluster.Get(clusterName)
-		if err != nil {
-			switch err.(type) {
-			case model.ErrResourceNotFound:
-				if !c.Command.HasName("create") {
-					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
-				}
-			default:
-				msg := fmt.Sprintf("Failed to query for cluster '%s': %s\n", clusterName, err.Error())
-				return clitools.ExitOnRPC(msg)
+	var err error
+	clusterInstance, err = cluster.Get(clusterName)
+	if err != nil {
+		switch err.(type) {
+		case model.ErrResourceNotFound:
+			if !c.Command.HasName("create") {
+				return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
 			}
-		} else {
-			if c.Command.HasName("create") {
-				return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
-			}
+		default:
+			msg := fmt.Sprintf("Failed to query for cluster '%s': %s\n", clusterName, err.Error())
+			return clitools.ExitOnRPC(msg)
+		}
+	} else {
+		if c.Command.HasName("create") {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
 		}
 	}
+
 	return nil
 }
 
@@ -1065,7 +1064,9 @@ var clusterDeleteFeatureCommand = cli.Command{
 
 // clusterNodeCommand handles 'deploy cluster <name> node'
 var clusterNodeCommand = cli.Command{
-	Name: "node",
+	Name:      "node",
+	Usage:     "manage cluster nodes",
+	ArgsUsage: "COMMAND",
 
 	Subcommands: []cli.Command{
 		clusterNodeListCommand,
@@ -1090,31 +1091,6 @@ var clusterNodeCommand = cli.Command{
 	// 		Footer: `
 	// Run 'deploy cluster COMMAND --help' for more information on a command.`,
 	// 	},
-
-	Before: func(c *cli.Context) error {
-		err := extractClusterArgument(c)
-		if err != nil {
-			return err
-		}
-
-		if !c.Command.HasName("list") {
-			hostName = c.Args().Get(1)
-			if hostName == "" {
-				fmt.Fprintln(os.Stderr, "missing mandatory argument HOSTNAME")
-				_ = cli.ShowSubcommandHelp(c)
-				return clitools.ExitOnInvalidArgument()
-			}
-
-			var err error
-			hostInstance, err = brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
-			if err != nil {
-				msg := fmt.Sprintf("Failed to list nodes of cluster '%s'", clusterName)
-				return clitools.ExitOnRPC(msg)
-			}
-		}
-
-		return nil
-	},
 }
 
 // clusterNodeListCommand handles 'deploy cluster node list CLUSTERNAME'
@@ -1143,6 +1119,11 @@ var clusterNodeListCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+
 		public := c.Bool("public")
 		all := c.Bool("all")
 
@@ -1213,6 +1194,15 @@ var clusterNodeInspectCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractHostArgument(c, 1)
+		if err != nil {
+			return err
+		}
+
 		host, err := brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
 		if err != nil {
 			return clitools.ExitOnRPC(err.Error())
@@ -1266,6 +1256,15 @@ var clusterNodeDeleteCommand = &cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractHostArgument(c, 1)
+		if err != nil {
+			return err
+		}
+
 		yes := c.Bool("yes")
 		force := c.Bool("force")
 
@@ -1277,7 +1276,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 			log.Println("'-f,--force' does nothing yet")
 		}
 
-		err := clusterInstance.Delete()
+		err = clusterInstance.Delete()
 		if err != nil {
 			return clitools.ExitOnRPC(err.Error())
 		}
@@ -1301,6 +1300,14 @@ var clusterNodeStopCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractHostArgument(c, 1)
+		if err != nil {
+			return err
+		}
 		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented")
 	},
 }
@@ -1309,6 +1316,7 @@ var clusterNodeStopCommand = cli.Command{
 var clusterNodeStartCommand = cli.Command{
 	Name:    "start",
 	Aliases: []string{"unfreeze"},
+	Usage:   "node start CLUSTERNAME HOSTNAME",
 
 	//Help: &cli.HelpContent{
 	// 		Usage: `
@@ -1322,6 +1330,14 @@ var clusterNodeStartCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractHostArgument(c, 1)
+		if err != nil {
+			return err
+		}
 		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented")
 	},
 }
@@ -1339,6 +1355,14 @@ var clusterNodeStateCommand = cli.Command{
 	// 	},
 
 	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+		err = extractHostArgument(c, 1)
+		if err != nil {
+			return err
+		}
 		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented")
 	},
 }
