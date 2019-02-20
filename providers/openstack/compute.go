@@ -835,13 +835,14 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 			host.ID = server.ID
 
 			// Wait that Host is ready, not just that the build is started
-			host, err = client.WaitHostReady(host, 5*time.Minute)
+			hostTmp, err := client.WaitHostReady(host, 5*time.Minute)
 			if err != nil {
 				servers.Delete(client.Compute, server.ID)
 				msg := ProviderErrorToString(err)
 				log.Warnf(msg)
 				return fmt.Errorf(msg)
 			}
+			host = hostTmp
 			return nil
 		},
 		10*time.Minute,
