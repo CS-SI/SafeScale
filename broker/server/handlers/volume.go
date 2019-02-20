@@ -87,8 +87,8 @@ func (handler *VolumeHandler) Delete(ref string) error {
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
 		switch err.(type) {
-		case resources.ErrResourceNotFound:
-			return err
+		case utils.ErrNotFound:
+			return resources.ResourceNotFoundError("volume", ref)
 		default:
 			log.Debugf("Failed to delete volume: %+v", err)
 			return infraErrf(err, "failed to delete volume")

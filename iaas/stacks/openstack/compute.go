@@ -365,7 +365,7 @@ func toHostState(status string) HostState.Enum {
 	}
 }
 
-// GetHost updates the data inside host with the data from provider
+// InspectHost updates the data inside host with the data from provider
 func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	log.Debug(">>> stacks.openstack::InspectHost()")
 	defer log.Debug("<<< stacks.openstack::InspectHost()")
@@ -828,6 +828,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 				msg := ProviderErrorToString(err)
 				log.Warnf(msg)
 				return fmt.Errorf(msg)
+			}
+			if server == nil {
+				return fmt.Errorf("failed to create server")
 			}
 			host.ID = server.ID
 
