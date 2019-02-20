@@ -17,6 +17,7 @@
 package cloudferro
 
 import (
+	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/iaas/providers"
 	"github.com/CS-SI/SafeScale/iaas/resources"
@@ -146,4 +147,8 @@ func (p *provider) ListImages(all bool) ([]resources.Image, error) {
 		return nil, err
 	}
 	return allImages, nil
+}
+
+func init() {
+	iaas.Register("cloudferro", &provider{})
 }
