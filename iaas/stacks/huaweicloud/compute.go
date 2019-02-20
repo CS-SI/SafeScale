@@ -254,7 +254,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 // CreateHost creates a new host
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, error) {
 	log.Debugf(">>> huaweicloud.Stack::CreateHost(%s)", request.ResourceName)
-	defer log.Debugf("<<< huaweicloud.Stack::::CreateHost(%s)", request.ResourceName)
+	defer log.Debugf("<<< huaweicloud.Stack::CreateHost(%s)", request.ResourceName)
 
 	//msgFail := "Failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)

@@ -191,7 +191,7 @@ func UseService(tenantName string) (*Service, error) {
 	if !tenantInCfg {
 		return nil, fmt.Errorf("Tenant '%s' not found in configuration", tenantName)
 	}
-	return nil, resources.ResourceNotFoundError("Client builder", svcProvider)
+	return nil, resources.ResourceNotFoundError("provider builder for", svcProvider)
 }
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map
