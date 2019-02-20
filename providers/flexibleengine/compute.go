@@ -453,7 +453,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 			host.ID = server.ID
 
 			// Wait that host is ready, not just that the build is started
-			host, err = client.WaitHostReady(host, time.Minute*5)
+			hostTmp, err := client.WaitHostReady(host, time.Minute*5)
 			if err != nil {
 				switch err.(type) {
 				case model.ErrResourceNotAvailable:
@@ -462,6 +462,7 @@ func (client *Client) CreateHost(request model.HostRequest) (*model.Host, error)
 					return fmt.Errorf("timeout waiting host '%s' ready: %s", request.ResourceName, openstack.ProviderErrorToString(err))
 				}
 			}
+			host = hostTmp
 			return nil
 		},
 		10*time.Minute,
