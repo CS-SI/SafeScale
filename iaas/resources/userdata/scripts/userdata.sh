@@ -71,14 +71,12 @@ fw_f_accept() {
     iptables -A FORWARD -j ACCEPT $*
 }
 
-PR_IP=
-PR_IF=
+PR_IPs=
+PR_IFs=
 PU_IP=
 PU_IF=
 i_PR_IF=
-i_PU_IF=
 o_PR_IF=
-o_PU_IF=
 
 sfSaveIptablesRules() {
    case $LINUX_KIND in
@@ -106,7 +104,11 @@ EOF
     chmod 0700 /home/{{.User}}/.ssh
     chmod -R 0600 /home/{{.User}}/.ssh/*
 
-    touch /home/{{.User}}/.hushlogin
+    for i in /home/{{.User}}/.hushlogin /home/{{.User}}/.cloud-warnings.skip; do
+        touch $i
+        chown root:{{.User}} $i
+        chmod ug+r-wx,o-rwx $i
+    done
 
     cat >>/home/gpac/.bashrc <<-'EOF'
 pathremove() {
@@ -151,7 +153,7 @@ configure_network_debian() {
     rm -f $cfg
     mkdir -p $path
 
-    for IF in $(ls /sys/class/net); do
+    for IF in $(get_nic_names); do
         if [ $IF != "lo" ]; then
             echo "auto ${IF}" >>$cfg
             echo "iface ${IF} inet dhcp" >>$cfg
@@ -164,30 +166,61 @@ configure_network_debian() {
     echo done
 }
 
+# search for network device names
+get_nic_names() {
+    echo $(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
+}
+
+ip2long() {
+    IFS=. read -r a b c d <<<$*
+    echo $((a * 256 ** 3 + b * 256 ** 2 + c * 256 + d))
+}
+
+is_ip_private() {
+    ip=$1
+    ipv=$(ip2long $ip)
+    for r in "192.168.0.0-192.168.255.255" "172.16.0.0-172.31.255.255" "10.0.0.0-10.255.255.255"; do
+        bv=$(ip2long $(cut -d- -f1 <<<$r))
+        ev=$(ip2long $(cut -d- -f2 <<<$r))
+        [ $ipv -ge $bv -a $ipv -le $ev ] && return 0
+    done
+    return 1
+}
+
+substring_diff() {
+    read -a l1 <<<$1
+    read -a l2 <<<$2
+    echo ${l1[@]} ${l2[@]} | tr ' ' '\n' | sort | uniq -u
+}
+
 # Configure network using netplan
 configure_network_netplan() {
     echo "Configuring network (netplan-based)..."
 
     mv -f /etc/netplan /etc/netplan.orig
     mkdir -p /etc/netplan
-    cat <<-'EOF' >/etc/netplan/50-cloud-init.yaml
+    NICS=$(get_nic_names)
+    fname=/etc/netplan/50-cloud-init.yaml
+    cat <<-'EOF' >$fname
 network:
   version: 2
   renderer: networkd
   ethernets:
-    ens3:
-      dhcp4: true
-    ens4:
-      dhcp4: true
-{{- if .GatewayIP }}
-      gateway4: {{.GatewayIP}}
-{{- end }}
 EOF
+    for i in $NICS; do
+        cat <<-EOF >>$fname
+    $i:
+      dhcp4: true
+EOF
+    done
+{{- if .GatewayIP }}
+    cat <<-'EOF' >>$fname
+      gateway4: {{.GatewayIP}}
+EOF
+{{- end }}
 
     netplan generate
-
     configure_dhcp_client
-
     netplan apply
 
     echo done
@@ -211,6 +244,15 @@ DEVICE=$IF
 BOOTPROTO=dhcp
 ONBOOT=yes
 EOF
+            {{- if .DNSServers }}
+            i=1
+            {{- range .DNSServers }}
+            echo "DNS$i={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            i=$((i+1))
+            {{- end }}
+            {{- else }}
+            echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            {{- end }}
         fi
     done
     # Disable resolv.conf by dhcp
@@ -253,7 +295,7 @@ enable_iptables() {
             [ $? -ne 0 ] && {
                 mkdir -p /etc/iptables /etc/network/if-pre-up.d
                 cd /etc/network/if-pre-up.d
-                cat <<-'EOF' >iptables
+                cat >iptables <<-'EOF'
 #!/bin/sh
 DIR=/etc/iptables
 mkdir -p $DIR
@@ -272,20 +314,20 @@ EOF
             ;;
     esac
 
-    # We flush the current firewall rules possibly introduced by iptables service
+    # We flush the current firewall rules possibly introduced by iptables pkg
     iptables -F
     sfSaveIptablesRules
-    #iptables-save | awk '/^[*]/ { print $1 }
-    #                     /^:[A-Z]+ [^-]/ { print $1 " ACCEPT" ; }
-    #                     /COMMIT/ { print $0; }' | iptables-restore
 }
 
 configure_as_gateway() {
     echo "Configuring host as gateway..."
 
+    echo "removing ufw and reset fW rules"
     reset_fw
+    echo "enabling iptables"
     enable_iptables
 
+    echo "configuring iptables"
     # Change default policy for table filter chain INPUT to be DROP (block everything)
     iptables -P INPUT DROP
     # Opens up the required (loopback comm, ping, ssh, established connection)
@@ -295,20 +337,27 @@ configure_as_gateway() {
     fw_i_accept -m conntrack --ctstate ESTABLISHED,RELATED
     fw_i_accept -p tcp --dport ssh
 
-    PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
-    PU_IF=$(netstat -ie | grep -B1 ${PU_IP} | head -n1 | awk '{print $1}')
-    PU_IF=${PU_IF%%:}
-
-    for IF in $(ls /sys/class/net); do
-        if [ "$IF" != "lo" ] && [ "$IF" != "$PU_IF" ]; then
-            PR_IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1)
-            PR_IF=$IF
-        fi
+    for IF in $(get_nic_names); do
+        IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1)
+echo "IP='$IP'
+        is_ip_private $IP && {
+            PR_IFs="$PR_IFs $IF"
+            PR_IPs="$PR_IPs $IP"
+        }
     done
 
-    [ -z ${PR_IP} ] && return 1
+    [ -z ${PR_IPs} ] && echo "no private ip!" && return 1
 
-    if [ ! -z $PR_IF ]; then
+    PU_IFs=$(substring_diff "$(get_nic_names)" "$PR_IFs" )
+    if [ -z $PU_IFs ]; then
+        PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
+        PU_IF=$(netstat -ie | grep -B1 ${PU_IP} | head -n1 | awk '{print $1}')
+    else
+        PU_IP=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null)
+        PU_IF=${PU_IF%%:}
+    fi
+
+    if [ ! -z $PR_IFs ]; then
         # Enable forwarding
         for i in /etc/sysctl.d/* /etc/sysctl.conf; do
             grep -v "net.ipv4.ip_forward=" $i >${i}.new
@@ -318,12 +367,16 @@ configure_as_gateway() {
         systemctl restart systemd-sysctl
 
         # Routing
-        o_PR_IF="-o $PR_IF"
-        i_PR_IF="-i $PR_IF"
-        [ ! -z $PU_IF ] && o_PU_IF="-o $PU_IF" && i_PU_IF="-i $PU_IF"
-        iptables -t nat -A POSTROUTING -j MASQUERADE $o_PU_IF
-        fw_f_accept $i_PR_IF $o_PU_IF -s {{ .CIDR }}
-        fw_f_accept $i_PU_IF $o_PR_IF -m state --state RELATED,ESTABLISHED
+        for IF in ${PR_IFs}; do
+            o_PR_IF="-o $IF"
+            i_PR_IF="-i $IF"
+            o_PU_IF=
+            i_PU_IF=
+            [ ! -z $PU_IF ] && o_PU_IF="-o $PU_IF" && i_PU_IF="-i $PU_IF"
+            iptables -t nat -A POSTROUTING -j MASQUERADE $o_PU_IF
+            fw_f_accept $i_PR_IF $o_PU_IF -s {{ .CIDR }}
+            fw_f_accept $i_PU_IF $o_PR_IF -m state --state RELATED,ESTABLISHED
+        done
     fi
 
     sfSaveIptablesRules
@@ -338,7 +391,6 @@ configure_as_gateway() {
 
 configure_dns_legacy() {
     echo "Configuring /etc/resolv.conf..."
-
     cat <<-'EOF' >/etc/resolv.conf
 {{- if .DNSServers }}
   {{- range .DNSServers }}
@@ -348,12 +400,13 @@ nameserver {{ . }}
 nameserver 1.1.1.1
 {{- end }}
 EOF
+    echo done
 }
 
 configure_dns_resolvconf() {
     echo "Configuring resolvconf..."
 
-    cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/base
+    cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/head
 {{- if .DNSServers }}
   {{- range .DNSServers }}
 nameserver {{ . }}
@@ -363,11 +416,17 @@ nameserver 1.1.1.1
 {{- end }}
 EOF
     #rm -f /etc/resolvconf/resolv.conf.d/tail
-    systemctl restart resolvconf
+    resolvconf -u
+    echo done
 }
 
 configure_dns_systemd_resolved() {
     echo "Configuring systemd-resolved..."
+
+{{- if not .GatewayIP }}
+    rm -f /etc/resolv.conf
+    ln -s /run/systemd/resolve/resolv.conf /etc
+{{- end }}
 
     cat <<-'EOF' >/etc/systemd/resolved.conf
 [Resolve]
@@ -385,13 +444,13 @@ Cache=yes
 DNSStubListener=yes
 EOF
     systemctl restart systemd-resolved
+    echo done
 }
 
 configure_gateway() {
-    echo "Configuring default router to {{ .GatewayIP }}"
+    echo "Configuring default route by {{ .GatewayIP }}"
 
     reset_fw
-
     route del -net default &>/dev/null
 
     cat <<-'EOF' > /sbin/gateway
@@ -406,6 +465,8 @@ After=network.target
 
 [Service]
 ExecStart=/sbin/gateway
+Restart=on-failure
+StartLimitIntervalSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -484,30 +545,43 @@ install_packages() {
      esac
 }
 
-disable_sudo_requiretty() {
-    sed -i -e 's/^Defaults[[:space:]]+requiretty$/Defaults !requiretty/g' /etc/sudoers
+# Disable cloud-init automatic network configuration to be sure our configuration won't be replaced
+disable_cloudinit_network_autoconf() {
+    fname=/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    mkdir -p $(dirname $fname)
+    echo "network: {config: disabled}" >$fname
 }
 
 # ---- Main
 
-#disable_sudo_requiretty
+disable_cloudinit_network_autoconf
 
 case $LINUX_KIND in
     debian|ubuntu)
         export DEBIAN_FRONTEND=noninteractive
         systemctl stop apt-daily.service &>/dev/null
         systemctl kill --kill-who=all apt-daily.service &>/dev/null
+
         create_user
-        {{- if .ConfIF }}
-        systemctl status systemd-networkd &>/dev/null && configure_network_netplan || configure_network_debian
-        {{- end }}
+
+        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || {
+            systemctl status resolvconf &>/dev/null && configure_dns_resolvconf || \
+            configure_dns_legacy
+        }
+
         {{- if .IsGateway }}
         configure_as_gateway
         {{- end }}
-        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_resolvconf
+
+        {{- if .ConfIF }}
+        which netplan &>/dev/null && configure_network_netplan && sleep 5
+        systemctl status networking &>/dev/null && configure_network_debian
+        {{- end }}
+
         {{- if .AddGateway }}
         configure_gateway
         {{- end }}
+
         ;;
 
     redhat|centos)
@@ -515,10 +589,10 @@ case $LINUX_KIND in
         {{- if .ConfIF }}
         configure_network_redhat
         {{- end }}
+        configure_dns_legacy
         {{- if .IsGateway }}
         configure_as_gateway
         {{- end }}
-        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || configure_dns_legacy
         {{- if .AddGateway }}
         configure_gateway_redhat
         {{- end }}
@@ -529,9 +603,10 @@ case $LINUX_KIND in
         ;;
 esac
 
+touch /etc/cloud/cloud-init.disabled
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
-echo "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
+echo -n "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
 systemctl reboot
 exit 0
