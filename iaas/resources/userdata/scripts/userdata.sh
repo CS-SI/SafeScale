@@ -154,10 +154,8 @@ configure_network_debian() {
     mkdir -p $path
 
     for IF in $(get_nic_names); do
-        if [ $IF != "lo" ]; then
-            echo "auto ${IF}" >>$cfg
-            echo "iface ${IF} inet dhcp" >>$cfg
-        fi
+        echo "auto ${IF}" >>$cfg
+        echo "iface ${IF} inet dhcp" >>$cfg
     done
 
     configure_dhcp_client
@@ -337,21 +335,23 @@ configure_as_gateway() {
     fw_i_accept -m conntrack --ctstate ESTABLISHED,RELATED
     fw_i_accept -p tcp --dport ssh
 
-    for IF in $(get_nic_names); do
+    nics=$(get_nic_names)
+    for IF in $nics; do
         IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1)
-echo "IP='$IP'
-        is_ip_private $IP && {
-            PR_IFs="$PR_IFs $IF"
-            PR_IPs="$PR_IPs $IP"
+        [ ! -z $IP ] && {
+            is_ip_private $IP && {
+                PR_IFs="$PR_IFs $IF"
+                PR_IPs="$PR_IPs $IP"
+            }
         }
     done
 
-    [ -z ${PR_IPs} ] && echo "no private ip!" && return 1
+    [ -z $PR_IPs ] && echo "no private ip!" && return 1
 
-    PU_IFs=$(substring_diff "$(get_nic_names)" "$PR_IFs" )
+    PU_IFs=$(substring_diff "$nics" "$PR_IFs" )
     if [ -z $PU_IFs ]; then
         PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
-        PU_IF=$(netstat -ie | grep -B1 ${PU_IP} | head -n1 | awk '{print $1}')
+        PU_IF=$(netstat -ie | grep -B1 $PU_IP | head -n1 | awk '{print $1}')
     else
         PU_IP=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null)
         PU_IF=${PU_IF%%:}
@@ -367,7 +367,7 @@ echo "IP='$IP'
         systemctl restart systemd-sysctl
 
         # Routing
-        for IF in ${PR_IFs}; do
+        for IF in $PR_IFs; do
             o_PR_IF="-o $IF"
             i_PR_IF="-i $IF"
             o_PU_IF=
@@ -569,13 +569,16 @@ case $LINUX_KIND in
             configure_dns_legacy
         }
 
-        {{- if .IsGateway }}
-        configure_as_gateway
+        {{- if .ConfIF }}
+        which netplan &>/dev/null && {
+            configure_network_netplan && sleep 5
+        } || {
+            systemctl status networking &>/dev/null && configure_network_debian
+        }
         {{- end }}
 
-        {{- if .ConfIF }}
-        which netplan &>/dev/null && configure_network_netplan && sleep 5
-        systemctl status networking &>/dev/null && configure_network_debian
+        {{- if .IsGateway }}
+        configure_as_gateway
         {{- end }}
 
         {{- if .AddGateway }}
