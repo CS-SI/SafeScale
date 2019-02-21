@@ -33,7 +33,7 @@ func TestNetworkHandler_List_with_brokerd_running(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	mockClientAPI := mocks.NewMockClientAPI(mockCtrl)
+	mockClientAPI := mocks.NewMockProvider(mockCtrl)
 
 	ness := &NetworkHandler{
 		service: &iaas.Service{
@@ -63,7 +63,7 @@ func TestNetworkHandler_List_with_NO_brokerd_running(t *testing.T) {
 		}
 	}
 
-	mockClientAPI := mocks.NewMockClientAPI(mockCtrl)
+	mockClientAPI := mocks.NewMockProvider(mockCtrl)
 	theError := fmt.Errorf("Could not get network list: rpc error: code = Unavailable desc = all SubConns are in TransientFailure, latest connection error: connection error: desc = \"transport: Error while dialing dial tcp 127.0.0.1:%s: connect: connection refused\"", strconv.Itoa(brokerdPort))
 
 	ness := &NetworkHandler{
