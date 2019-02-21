@@ -9,7 +9,7 @@ ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
 
-VERSION := 0.1.1
+VERSION := 19.03.0
 
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
@@ -95,7 +95,7 @@ WARN_STRING  = "[WARNING]"
 BUILD_TAGS = ""
 export BUILD_TAGS
 
-all: begin ground getdevdeps ensure generate utils system iaas broker deploy perform scanner err vet
+all: begin ground getdevdeps ensure generate utils system iaas broker deploy perform scanner err #vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps ensure generate
