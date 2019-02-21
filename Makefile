@@ -56,7 +56,7 @@ EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
 # List of packages to test (nor deploy neither providers are ready for prime time :( )
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v /iaas/stacks/aws)
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v stacks/aws )
 
 
 # DEPENDENCIES MANAGEMENT
@@ -95,7 +95,7 @@ WARN_STRING  = "[WARNING]"
 BUILD_TAGS = ""
 export BUILD_TAGS
 
-all: begin ground getdevdeps ensure generate utils system iaas broker deploy perform scanner err #vet
+all: begin ground getdevdeps ensure generate utils system iaas broker deploy perform scanner err vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps ensure generate

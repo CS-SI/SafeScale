@@ -42,13 +42,13 @@ var (
 
 func extractFeatureArgument(c *cli.Context) error {
 	if c.NArg() < 2 {
-		fmt.Fprintln(os.Stderr, "Missing mandatory argument FEATURENAME")
+		_, _ = fmt.Fprintln(os.Stderr, "Missing mandatory argument FEATURENAME")
 		_ = cli.ShowSubcommandHelp(c)
 		return clitools.ExitOnInvalidArgument()
 	}
 	featureName = c.Args().Get(1)
 	if featureName == "" {
-		fmt.Fprintln(os.Stderr, "Invalid argument FEATURENAME")
+		_, _ = fmt.Fprintln(os.Stderr, "Invalid argument FEATURENAME")
 		return clitools.ExitOnInvalidArgument()
 	}
 	return nil
@@ -58,7 +58,7 @@ func extractFeatureArgument(c *cli.Context) error {
 func extractHostArgument(c *cli.Context, hostnamePos int) error {
 	hostName = c.Args().Get(hostnamePos)
 	if hostName == "" {
-		fmt.Fprintln(os.Stderr, "argument HOSTNAME invalid")
+		_, _ = fmt.Fprintln(os.Stderr, "argument HOSTNAME invalid")
 		return clitools.ExitOnInvalidArgument()
 	}
 

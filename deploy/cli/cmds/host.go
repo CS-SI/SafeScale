@@ -92,7 +92,7 @@ var hostAddFeatureCommand = cli.Command{
 
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
+			_, _ = fmt.Fprintln(os.Stderr, err.Error())
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		if feature == nil {

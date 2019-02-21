@@ -79,13 +79,13 @@ var ClusterCommand = cli.Command{
 func extractClusterArgument(c *cli.Context) error {
 	if !c.Command.HasName("list") {
 		if c.NArg() < 1 {
-			fmt.Fprintf(os.Stderr, "Missing mandatory argument CLUSTERNAME")
+			_, _ = fmt.Fprintf(os.Stderr, "Missing mandatory argument CLUSTERNAME")
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
 		clusterName = c.Args().First()
 		if clusterName == "" {
-			fmt.Fprintf(os.Stderr, "Invalid argument CLUSTERNAME")
+			_, _ = fmt.Fprintf(os.Stderr, "Invalid argument CLUSTERNAME")
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument()
 		}
@@ -852,9 +852,9 @@ func executeCommand(command string) error {
 	for i, m := range masters {
 		retcode, stdout, stderr, err := brokerssh.Run(m, command, brokerclient.DefaultConnectionTimeout, 5*time.Minute)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
+			_, _ = fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {
-				fmt.Fprintln(os.Stderr, "Trying another master...")
+				_, _ = fmt.Fprintln(os.Stderr, "Trying another master...")
 				continue
 			}
 		}
@@ -864,7 +864,7 @@ func executeCommand(command string) error {
 				output += "\n"
 			}
 			output += stderr
-			// fmt.Fprintf(os.Stderr, "Run on master #%d, retcode=%d\n%s\n", i+1, retcode, output)
+			// _, _ = fmt.Fprintf(os.Stderr, "Run on master #%d, retcode=%d\n%s\n", i+1, retcode, output)
 			return clitools.ExitOnRPC(output)
 		}
 		fmt.Println(stdout)
@@ -965,7 +965,7 @@ var clusterCheckFeatureCommand = cli.Command{
 		}
 		feature, err := install.NewFeature(featureName)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
+			_, _ = fmt.Fprintln(os.Stderr, err.Error())
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
 		if feature == nil {

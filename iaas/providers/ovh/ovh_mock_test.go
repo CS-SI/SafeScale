@@ -34,14 +34,14 @@ import (
 )
 
 var mock_tester *tests.ServiceTester
-var gmci *mocks.MockClientAPI
+var gmci *mocks.MockProvider
 
 func GetMockService(t *testing.T, tenant string) (*iaas.Service, error) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
 	if strings.Contains(tenant, "Ovh") {
-		mci := mocks.NewMockClientAPI(mockCtrl)
+		mci := mocks.NewMockProvider(mockCtrl)
 
 		return &iaas.Service{
 			Provider: mci,
@@ -50,7 +50,7 @@ func GetMockService(t *testing.T, tenant string) (*iaas.Service, error) {
 	return iaas.UseService(tenant)
 }
 
-func getMockableService(t *testing.T) (*tests.ServiceTester, *mocks.MockClientAPI, error) {
+func getMockableService(t *testing.T) (*tests.ServiceTester, *mocks.MockProvider, error) {
 	if mock_tester == nil {
 		tenant_name := "TestOvh"
 		if tenant_override := os.Getenv("TEST_OVH"); tenant_override != "" {
@@ -64,7 +64,7 @@ func getMockableService(t *testing.T) (*tests.ServiceTester, *mocks.MockClientAP
 			Service: service,
 		}
 
-		gmci_local, ok := service.Provider.(*mocks.MockClientAPI)
+		gmci_local, ok := service.Provider.(*mocks.MockProvider)
 
 		if ok {
 			gmci = gmci_local
