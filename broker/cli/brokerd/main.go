@@ -146,7 +146,7 @@ func work() {
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
 
-	version := VERSION + ", build date: " + BUILD_DATE + ", build hash: " + REV
+	version := VERSION + ", build " + REV + " (" + BUILD_DATE + ")"
 	fmt.Printf("Brokerd version: %s\nReady to serve :-)\n", version)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
@@ -159,7 +159,8 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "brokerd"
 	app.Usage = "brokerd [OPTIONS]"
-	app.Version = VERSION + " (" + BUILD_DATE + ")"
+	app.Version = VERSION + ", build " + REV + " (" + BUILD_DATE + ")"
+
 	app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "CS-SI",
