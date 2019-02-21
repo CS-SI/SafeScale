@@ -29,10 +29,10 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-// ImageHandler ...
+// ProcessManagerHandler ...
 var ProcessManagerHandler = handlers.NewProcessManagerHandler
 
-//ProcessManagerListner service server grpc
+// ProcessManagerListener service server gRPC
 type ProcessManagerListener struct{}
 
 // Stop specified process

@@ -102,7 +102,6 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	defer log.Debugf("<<< server.listeners.VolumeListener::Create(%s)", volumeName)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
@@ -115,7 +114,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	volume, err := handler.Create(volumeName, int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
+	volume, err := handler.Create(ctx, volumeName, int(in.GetSize()), VolumeSpeed.Enum(in.GetSpeed()))
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -140,8 +139,8 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	defer log.Debugf("<<< server.listeners.VolumeListener::Attach(%s, %s)", volumeName, hostName)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Attach "+in.GetVolume().GetName()+"to host"+in.GetHost().GetName()); err != nil {
+	err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Attach "+volumeName+" to host "+hostName)
+	if err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -153,7 +152,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	}
 
 	handler := VolumeHandler(tenant.Service)
-	err := handler.Attach(volumeName, hostName, in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
+	err = handler.Attach(ctx, volumeName, hostName, in.GetMountPath(), in.GetFormat(), in.GetDoNotFormat())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}

@@ -47,6 +47,7 @@ func (c *bucket) List(timeout time.Duration) (*pb.BucketList, error) {
 func (c *bucket) Create(name string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
+
 	service := pb.NewBucketServiceClient(c.session.connection)
 	ctx := utils.GetContext(true)
 

@@ -42,20 +42,13 @@ import (
 
 // ShareAPI defines API to manipulate Shares
 type ShareAPI interface {
-	Create(name, host, path string) (*propsv1.HostShare, error)
-	Create(ctx context.Context, shareName, hostName, path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) (*propsv1.HostShare, error)
-	ForceInspect(name string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
-	ForceInspect(ctx context.Context, name string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
-	Inspect(name string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
-	Inspect(ctx context.Context, name string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
-	Delete(name string) error
-	Delete(ctx context.Context, name string) error
-	List() (map[string]map[string]*propsv1.HostShare, error)
-	List(ctx context.Context) (map[string]map[string]*propsv1.HostShare, error)
-	Mount(name, host, path string) (*propsv1.HostRemoteMount, error)
-	Mount(ctx context.Context, name, host, path string, withCache bool) (*propsv1.HostRemoteMount, error)
-	Unmount(name, host string) error
-	Unmount(ctx context.Context, name, host string) error
+	Create(context.Context, string, string, string, []string, bool, bool, bool, bool, bool, bool, bool) (*propsv1.HostShare, error)
+	ForceInspect(context.Context, string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
+	Inspect(context.Context, string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
+	Delete(context.Context, string) error
+	List(context.Context) (map[string]map[string]*propsv1.HostShare, error)
+	Mount(context.Context, string, string, string, bool) (*propsv1.HostRemoteMount, error)
+	Unmount(context.Context, string, string) error
 }
 
 // ShareHandler nas service
@@ -79,18 +72,21 @@ func sanitize(in string) (string, error) {
 }
 
 // Create a share on host
-func (handler *ShareHandler) Create(shareName, hostName, path string) (*propsv1.HostShare, error) {
-func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) (*propsv1.HostShare, error) {
+func (handler *ShareHandler) Create(
+	ctx context.Context,
+	shareName, hostName, path string, securityModes []string,
+	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,
+) (*propsv1.HostShare, error) {
+
 	// Check if a share already exists with the same name
-	server, _, _, err := handler.Inspect(shareName)
-	server, _, _, err := svc.Inspect(ctx, shareName)
+	server, _, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); !ok {
 			return nil, infraErr(err)
 		}
 	}
 	if server != nil {
-		return nil, logicErr(resources.ResourceAlreadyExistsError("share", shareName))
+		return nil, logicErr(resources.ResourceDuplicateError("share", shareName))
 	}
 
 	// Sanitize path
@@ -148,7 +144,7 @@ func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path s
 	if err != nil {
 		return nil, err
 	}
-	err = nfsServer.AddShare(sharePath, secutityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
+	err = nfsServer.AddShare(sharePath, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -186,7 +182,7 @@ func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path s
 		return nil, err
 	}
 
-	err = metadata.SaveHost(handler.service, server)
+	mh, err := metadata.SaveHost(handler.service, server)
 	if err != nil {
 		return nil, logicErrf(err, "Error saving server metadata")
 	}
@@ -201,29 +197,29 @@ func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path s
 			if err2 != nil {
 				log.Warnf("Failed to set shares metadata of host %s", hostName)
 			}
-			err2 = metadata.SaveHost(svc.provider, server)
+			err2 = mh.Write()
 			if err2 != nil {
 				log.Warnf("Failed to save metadata of host %s", hostName)
 			}
 		}
 	}()
-	err = metadata.SaveShare(svc.provider, server.ID, server.Name, share.ID, share.Name)
+	ms, err := metadata.SaveShare(handler.service, server.ID, server.Name, share.ID, share.Name)
 	if err != nil {
 		return nil, infraErr(err)
 	}
 	defer func() {
 		if err != nil {
-			err2 := metadata.RemoveShare(svc.provider, server.ID, server.Name, share.ID, share.Name)
-			if err2 != nil {
-				log.Warnf("Failed to delete metadata of share %s", share.Name)
+			derr := ms.Delete()
+			if derr != nil {
+				log.Warnf("Failed to delete metadata of share '%s'", share.Name)
 			}
 		}
 	}()
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Share creation canceled by broker")
-		err = fmt.Errorf("Share creation canceld by broker")
+		log.Warnf("Share creation cancelled by user")
+		err = fmt.Errorf("share creation cancelled by user")
 		return nil, err
 	default:
 	}
@@ -232,16 +228,14 @@ func (svc *ShareHandler) Create(ctx context.Context, shareName, hostName, path s
 }
 
 // Delete a share from host
-func (handler *ShareHandler) Delete(name string) error {
-func (svc *ShareHandler) Delete(ctx context.Context, name string) error {
+func (handler *ShareHandler) Delete(ctx context.Context, name string) error {
 	// Retrieve info about the share
-	server, share, _, err := handler.ForceInspect(name)
-	server, share, _, err := svc.ForceInspect(ctx, name)
+	server, share, _, err := handler.ForceInspect(ctx, name)
 	if err != nil {
 		return throwErr(err)
 	}
 	if server == nil {
-		return throwErrf("Delete share: unable to inspect host '%s'", name)
+		return throwErrf("delete share: unable to inspect host '%s'", name)
 	}
 	if share == nil {
 		return throwErrf("Delete share: unable to found share of host '%s'", name)
@@ -281,25 +275,25 @@ func (svc *ShareHandler) Delete(ctx context.Context, name string) error {
 	}
 
 	// Save server metadata
-	err = metadata.SaveHost(handler.service, server)
+	_, err = metadata.SaveHost(handler.service, server)
 	if err != nil {
 		return infraErr(err)
 	}
 
 	// Remove share metadata
-	err = metadata.RemoveShare(svc.provider, server.ID, server.Name, share.ID, share.Name)
+	err = metadata.RemoveShare(handler.service, server.ID, server.Name, share.ID, share.Name)
 	if err != nil {
 		return infraErr(err)
 	}
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Share delete canceled by broker")
-		_, err = svc.Create(context.Background(), share.Name, server.Name, share.Path, []string{}, false, false, false, false, false, false, false)
+		log.Warnf("Share deletion cancelled by user")
+		_, err = handler.Create(context.Background(), share.Name, server.Name, share.Path, []string{}, false, false, false, false, false, false, false)
 		if err != nil {
-			return fmt.Errorf("Failed to stop Share deletion")
+			return fmt.Errorf("failed to stop share deletion")
 		}
-		return fmt.Errorf("Share deletion canceld by broker")
+		return fmt.Errorf("share deletion cancelled by user")
 	default:
 	}
 
@@ -307,8 +301,7 @@ func (svc *ShareHandler) Delete(ctx context.Context, name string) error {
 }
 
 // List return the list of all shares from all servers
-func (handler *ShareHandler) List() (map[string]map[string]*propsv1.HostShare, error) {
-func (svc *ShareHandler) List(ctx context.Context) (map[string]map[string]*propsv1.HostShare, error) {
+func (handler *ShareHandler) List(ctx context.Context) (map[string]map[string]*propsv1.HostShare, error) {
 	shares := map[string]map[string]*propsv1.HostShare{}
 
 	var servers []string
@@ -318,7 +311,7 @@ func (svc *ShareHandler) List(ctx context.Context) (map[string]map[string]*props
 		return nil
 	})
 	if err != nil {
-		return nil, logicErrf(err, "Error browsing NASes")
+		return nil, logicErrf(err, "error browsing shares")
 	}
 
 	// Now walks through the hosts acting as Nas
@@ -346,11 +339,9 @@ func (svc *ShareHandler) List(ctx context.Context) (map[string]map[string]*props
 }
 
 // Mount a share on a local directory of an host
-func (handler *ShareHandler) Mount(shareName, hostName, path string) (*propsv1.HostRemoteMount, error) {
-func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path string, withCache bool) (*propsv1.HostRemoteMount, error) {
+func (handler *ShareHandler) Mount(ctx context.Context, shareName, hostName, path string, withCache bool) (*propsv1.HostRemoteMount, error) {
 	// Retrieve info about the share
-	server, share, _, err := handler.Inspect(shareName)
-	server, share, _, err := svc.Inspect(ctx, shareName)
+	server, share, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
 		return nil, throwErr(err)
 	}
@@ -417,6 +408,12 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 		return nil, err
 	}
 
+	sshHandler := NewSSHHandler(handler.service)
+	sshConfig, err := sshHandler.GetConfig(ctx, target)
+	if err != nil {
+		return nil, infraErr(err)
+	}
+
 	// Mount the share on host
 	err = server.Properties.LockForWrite(HostProperty.SharesV1).ThenUse(func(v interface{}) error {
 		serverSharesV1 := v.(*propsv1.HostShares)
@@ -425,11 +422,6 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 			return logicErr(fmt.Errorf("failed to find metadata about share '%s'", shareName))
 		}
 		shareID := serverSharesV1.ByName[shareName]
-		sshHandler := NewSSHHandler(handler.service)
-		sshConfig, err := sshHandler.GetConfig(ctx, target)
-		if err != nil {
-			return infraErr(err)
-		}
 
 		nfsClient, err := nfs.NewNFSClient(sshConfig)
 		if err != nil {
@@ -455,7 +447,7 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 	}
 	defer func() {
 		if err != nil {
-			sshHandler := NewSSHHandler(svc.provider)
+			sshHandler := NewSSHHandler(handler.service)
 			sshConfig, err := sshHandler.GetConfig(ctx, target)
 			if err != nil {
 				log.Warn(infraErr(err).Error())
@@ -499,7 +491,7 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 		return nil, err
 	}
 
-	err = metadata.SaveHost(handler.service, server)
+	mh, err := metadata.SaveHost(handler.service, server)
 	if err != nil {
 		return nil, infraErr(err)
 	}
@@ -514,7 +506,7 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 			if err2 != nil {
 				log.Warnf("Failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
 			}
-			err2 = metadata.SaveHost(svc.provider, server)
+			err2 = mh.Write()
 			if err2 != nil {
 				log.Warnf("Failed to save host %s metadatas : %s", server.Name, err2.Error())
 			}
@@ -522,11 +514,12 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 	}()
 
 	if target != server {
-		err = metadata.SaveHost(handler.service, target)
+		_, err = metadata.SaveHost(handler.service, target)
 		if err != nil {
 			return nil, infraErr(err)
 		}
 	}
+
 	defer func() {
 		if err != nil {
 			err2 := target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
@@ -537,19 +530,19 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("Failed to remove mounted share %s from host %s metadatas", shareName, hostName)
+				log.Warnf("Failed to remove mounted share '%s' from host '%s' metadata", shareName, hostName)
 			}
-			err2 = metadata.SaveHost(svc.provider, target)
+			_, err2 = metadata.SaveHost(handler.service, target)
 			if err2 != nil {
-				log.Warnf("Failed to save host %s metadatas : %s", hostName, err2.Error())
+				log.Warnf("Failed to save host '%s' metadata : %s", hostName, err2.Error())
 			}
 		}
 	}()
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Share mount canceled by broker")
-		err = fmt.Errorf("Share mount canceld by broker")
+		log.Warnf("Share mount cancelled by user")
+		err = fmt.Errorf("share mount cancelled by user")
 		return nil, err
 	default:
 	}
@@ -558,10 +551,8 @@ func (svc *ShareHandler) Mount(ctx context.Context, shareName, hostName, path st
 }
 
 // Unmount a share from local directory of an host
-func (handler *ShareHandler) Unmount(shareName, hostName string) error {
-func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) error {
-	server, _, _, err := handler.ForceInspect(shareName)
-	server, share, _, err := svc.ForceInspect(ctx, shareName)
+func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) error {
+	server, share, _, err := handler.ForceInspect(ctx, shareName)
 	if err != nil {
 		return throwErr(err)
 	}
@@ -587,14 +578,13 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 		target = server
 	} else {
 		hostSvc := NewHostHandler(handler.service)
-		hostSvc := NewHostHandler(svc.provider)
-		target, err = hostSvc.ForceInspect(hostName)
 		target, err = hostSvc.ForceInspect(ctx, hostName)
 		if err != nil {
 			return throwErr(err)
 		}
 	}
 
+	var mountPath string
 	err = target.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
 		targetMountsV1 := v.(*propsv1.HostMounts)
 		mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
@@ -618,9 +608,9 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 		}
 
 		// Remove mount from mount list
-		mount_path = mount.Path
+		mountPath = mount.Path
 		delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
-		delete(targetMountsV1.RemoteMountsByPath, mount_path)
+		delete(targetMountsV1.RemoteMountsByPath, mountPath)
 		return nil
 	})
 	if err != nil {
@@ -639,12 +629,12 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 	}
 
 	// Saves metadata
-	err = metadata.SaveHost(handler.service, server)
+	_, err = metadata.SaveHost(handler.service, server)
 	if err != nil {
 		return infraErr(err)
 	}
 	if server != target {
-		err = metadata.SaveHost(handler.service, target)
+		_, err = metadata.SaveHost(handler.service, target)
 		if err != nil {
 			return infraErr(err)
 		}
@@ -652,12 +642,12 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Share unmount canceled by broker")
-		_, err = svc.Mount(context.Background(), shareName, hostName, mount_path, false)
+		log.Warnf("Share unmount cancelled by user")
+		_, err = handler.Mount(context.Background(), shareName, hostName, mountPath, false)
 		if err != nil {
-			return fmt.Errorf("Failed to stop Share unmounting")
+			return fmt.Errorf("failed to stop share unmount")
 		}
-		return fmt.Errorf("Share unmounting canceld by broker")
+		return fmt.Errorf("share unmounting cancelled by user")
 	default:
 	}
 
@@ -665,10 +655,12 @@ func (svc *ShareHandler) Unmount(ctx context.Context, shareName, hostName string
 }
 
 // ForceInspect returns the host and share corresponding to 'shareName'
-func (handler *ShareHandler) ForceInspect(shareName string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
-func (svc *ShareHandler) ForceInspect(ctx context.Context, shareName string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
-	host, share, mounts, err := handler.Inspect(shareName)
-	host, share, mounts, err := svc.Inspect(ctx, shareName)
+func (handler *ShareHandler) ForceInspect(
+	ctx context.Context,
+	shareName string,
+) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
+
+	host, share, mounts, err := handler.Inspect(ctx, shareName)
 	if err != nil {
 		return nil, nil, nil, throwErr(err)
 	}
@@ -680,10 +672,12 @@ func (svc *ShareHandler) ForceInspect(ctx context.Context, shareName string) (*m
 
 // Inspect returns the host and share corresponding to 'shareName'
 // If share isn't found, return (nil, nil, nil, resources.ErrResourceNotFound)
-func (handler *ShareHandler) Inspect(shareName string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
-func (svc *ShareHandler) Inspect(ctx context.Context, shareName string) (*model.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
+func (handler *ShareHandler) Inspect(
+	ctx context.Context,
+	shareName string,
+) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error) {
+
 	hostName, err := metadata.LoadShare(handler.service, shareName)
-	hostName, err := metadata.LoadShare(svc.provider, shareName)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			return nil, nil, nil, resources.ResourceNotFoundError("share", shareName)

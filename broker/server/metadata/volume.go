@@ -169,8 +169,9 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) error {
 }
 
 // SaveVolume saves the Volume definition in Object Storage
-func SaveVolume(svc *iaas.Service, volume *resources.Volume) error {
-	return NewVolume(svc).Carry(volume).Write()
+func SaveVolume(svc *iaas.Service, volume *resources.Volume) (*Volume, error) {
+	mv := NewVolume(svc)
+	return mv, mv.Carry(volume).Write()
 }
 
 // RemoveVolume removes the Volume definition from Object Storage

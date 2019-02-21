@@ -75,14 +75,14 @@ func (e ErrResourceNotAvailable) Error() string {
 	return fmt.Sprintf("%s '%s' is unavailable", e.ResourceType, e.Name)
 }
 
-// ErrResourceAlreadyExists resource already exists error
-type ErrResourceAlreadyExists struct {
+// ErrResourceDuplicate resource already exists error
+type ErrResourceDuplicate struct {
 	ErrResource
 }
 
-// ResourceAlreadyExistsError creates a ResourceAlreadyExists error
-func ResourceAlreadyExistsError(resource, name string) ErrResourceAlreadyExists {
-	return ErrResourceAlreadyExists{
+// ResourceDuplicateError creates a ResourceAlreadyExists error
+func ResourceDuplicateError(resource, name string) ErrResourceDuplicate {
+	return ErrResourceDuplicate{
 		ErrResource{
 			Name:         name,
 			ResourceType: resource,
@@ -90,7 +90,7 @@ func ResourceAlreadyExistsError(resource, name string) ErrResourceAlreadyExists 
 	}
 }
 
-func (e ErrResourceAlreadyExists) Error() string {
+func (e ErrResourceDuplicate) Error() string {
 	return fmt.Sprintf("%s '%s' already exists", e.ResourceType, e.Name)
 }
 

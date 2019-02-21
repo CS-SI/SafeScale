@@ -17,9 +17,10 @@
 package handlers
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/resources"
-	"context"
 )
 
 //go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers ImageAPI
@@ -28,12 +29,9 @@ import (
 
 // ImageAPI defines API to manipulate images
 type ImageAPI interface {
-	List(ctx context.Context, all bool) ([]model.Image, error)
-	List(all bool) ([]resources.Image, error)
-	Select(ctx context.Context, osfilter string) (*model.Image, error)
-	Select(osfilter string) (*resources.Image, error)
-	Filter(ctx context.Context, osfilter string) ([]model.Image, error)
-	Filter(osfilter string) ([]resources.Image, error)
+	List(ctx context.Context, all bool) ([]resources.Image, error)
+	Select(ctx context.Context, osfilter string) (*resources.Image, error)
+	Filter(ctx context.Context, osfilter string) ([]resources.Image, error)
 }
 
 // ImageHandler image service
@@ -49,19 +47,17 @@ func NewImageHandler(svc *iaas.Service) ImageAPI {
 }
 
 // List returns the image list
-func (srv *ImageHandler) List(ctx context.Context, all bool) ([]model.Image, error) {
+func (handler *ImageHandler) List(ctx context.Context, all bool) ([]resources.Image, error) {
 	images, err := handler.service.ListImages(all)
 	return images, infraErr(err)
 }
 
 // Select selects the image that best fits osname
-func (srv *ImageHandler) Select(ctx context.Context, osname string) (*model.Image, error) {
-func (handler *ImageHandler) Select(osname string) (*resources.Image, error) {
+func (handler *ImageHandler) Select(ctx context.Context, osname string) (*resources.Image, error) {
 	return nil, nil
 }
 
 // Filter filters the images that do not fit osname
-func (srv *ImageHandler) Filter(ctx context.Context, osname string) ([]model.Image, error) {
-func (handler *ImageHandler) Filter(osname string) ([]resources.Image, error) {
+func (handler *ImageHandler) Filter(ctx context.Context, osname string) ([]resources.Image, error) {
 	return nil, nil
 }

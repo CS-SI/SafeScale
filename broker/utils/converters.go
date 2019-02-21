@@ -39,11 +39,11 @@ func ToPBSshConfig(from *system.SSHConfig) *pb.SshConfig {
 	}
 }
 
-// ToSystemSshConfig converts a pb.SshConfig into a system.SSHConfig
-func ToSystemSshConfig(from *pb.SshConfig) *system.SSHConfig {
+// ToSystemSSHConfig converts a pb.SshConfig into a system.SSHConfig
+func ToSystemSSHConfig(from *pb.SshConfig) *system.SSHConfig {
 	var gw *system.SSHConfig
 	if from.Gateway != nil {
-		gw = ToSystemSshConfig(from.Gateway)
+		gw = ToSystemSSHConfig(from.Gateway)
 	}
 	return &system.SSHConfig{
 		User:          from.User,

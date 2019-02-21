@@ -18,15 +18,12 @@ package metadata
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
-	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -161,47 +158,52 @@ func (mh *Host) Browse(callback func(*resources.Host) error) error {
 }
 
 // SaveHost saves the Host definition in Object Storage
-func SaveHost(svc *iaas.Service, host *resources.Host) error {
-	err := NewHost(svc).Carry(host).Write()
+func SaveHost(svc *iaas.Service, host *resources.Host) (*Host, error) {
+	mh := NewHost(svc)
+	err := mh.Carry(host).Write()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	mn := NewNetwork(svc)
-	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
-		hostNetworkV1 := v.(*propsv1.HostNetwork)
-		for netID := range hostNetworkV1.NetworksByID {
-			err := mn.ReadByID(netID)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	return nil
+	// mn := NewNetwork(svc)
+	// err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	// 	hostNetworkV1 := v.(*propsv1.HostNetwork)
+	// 	for netID := range hostNetworkV1.NetworksByID {
+	// 		err := mn.ReadByID(netID)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		err = mn.AttachHost(host)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 	}
+	// 	return nil
+	// })
+	// if err != nil {
+	// 	return nil, err
+	// }
+	return mh, nil
 }
 
 // RemoveHost removes the host definition from Object Storage
 func RemoveHost(svc *iaas.Service, host *resources.Host) error {
-	// First, browse networks to delete links on the deleted host
-	mn := NewNetwork(svc)
-	mnb := NewNetwork(svc)
-	err := mn.Browse(func(network *resources.Network) error {
-		nerr := mnb.Carry(network).DetachHost(host.ID)
-		if nerr != nil {
-			if strings.Contains(nerr.Error(), "failed to remove metadata in Object Storage") {
-				log.Debugf("Error while browsing network: %v", nerr)
-			} else {
-				log.Warnf("Error while browsing network: %v", nerr)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
+	// // First, browse networks to delete links on the deleted host
+	// mn := NewNetwork(svc)
+	// mnb := NewNetwork(svc)
+	// err := mn.Browse(func(network *resources.Network) error {
+	// 	nerr := mnb.Carry(network).DetachHost(host.ID)
+	// 	if nerr != nil {
+	// 		if strings.Contains(nerr.Error(), "failed to remove metadata in Object Storage") {
+	// 			log.Debugf("Error while browsing network: %v", nerr)
+	// 		} else {
+	// 			log.Warnf("Error while browsing network: %v", nerr)
+	// 		}
+	// 	}
+	// 	return nil
+	// })
+	// if err != nil {
+	// 	return err
+	// }
 
 	// Second deletes host metadata
 	mh := NewHost(svc)

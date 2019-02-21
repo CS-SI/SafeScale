@@ -33,7 +33,7 @@ type BucketAPI interface {
 	List(context.Context) ([]string, error)
 	Create(context.Context, string) error
 	Delete(context.Context, string) error
-	Inspect(context.Context, string) (*model.Bucket, error)
+	Inspect(context.Context, string) (*resources.Bucket, error)
 	Mount(context.Context, string, string, string) error
 	Unmount(context.Context, string, string) error
 }
@@ -49,21 +49,21 @@ func NewBucketHandler(svc *iaas.Service) BucketAPI {
 }
 
 // List retrieves all available buckets
-func (svc *BucketHandler) List(ctx context.Context) ([]string, error) {
-	rv, err := svc.provider.ObjectStorage.ListBuckets(objectstorage.RootPath)
+func (handler *BucketHandler) List(ctx context.Context) ([]string, error) {
+	rv, err := handler.service.ListBuckets(objectstorage.RootPath)
 	return rv, infraErr(err)
 }
 
 // Create a bucket
-func (svc *BucketHandler) Create(ctx context.Context, name string) error {
-	bucket, err := svc.provider.ObjectStorage.GetBucket(name)
+func (handler *BucketHandler) Create(ctx context.Context, name string) error {
+	bucket, err := handler.service.GetBucket(name)
 	if err != nil {
 		if err.Error() != "not found" {
 			return infraErrf(err, "failed to search of bucket '%s' already exists", name)
 		}
 	}
 	if bucket != nil {
-		return logicErr(resources.ResourceAlreadyExistsError("bucket", name))
+		return logicErr(resources.ResourceDuplicateError("bucket", name))
 	}
 	_, err = handler.service.CreateBucket(name)
 	if err != nil {
@@ -73,8 +73,8 @@ func (svc *BucketHandler) Create(ctx context.Context, name string) error {
 }
 
 // Delete a bucket
-func (svc *BucketHandler) Delete(ctx context.Context, name string) error {
-	err := svc.provider.ObjectStorage.DeleteBucket(name)
+func (handler *BucketHandler) Delete(ctx context.Context, name string) error {
+	err := handler.service.DeleteBucket(name)
 	if err != nil {
 		return infraErrf(err, "failed to delete bucket '%s'", name)
 	}
@@ -82,8 +82,8 @@ func (svc *BucketHandler) Delete(ctx context.Context, name string) error {
 }
 
 // Inspect a bucket
-func (svc *BucketHandler) Inspect(ctx context.Context, name string) (*model.Bucket, error) {
-	b, err := svc.provider.ObjectStorage.GetBucket(name)
+func (handler *BucketHandler) Inspect(ctx context.Context, name string) (*resources.Bucket, error) {
+	b, err := handler.service.GetBucket(name)
 	if err != nil {
 		if err.Error() == "not found" {
 			return nil, logicErr(resources.ResourceNotFoundError("bucket", name))
@@ -97,7 +97,7 @@ func (svc *BucketHandler) Inspect(ctx context.Context, name string) (*model.Buck
 }
 
 // Mount a bucket on an host on the given mount point
-func (svc *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) error {
+func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) error {
 	// Check bucket existence
 	_, err := handler.service.GetBucket(bucketName)
 	if err != nil {
@@ -105,10 +105,8 @@ func (svc *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path 
 	}
 
 	// Get Host ID
-	hostHandler := NewHostHandler(svc.provider)
-	host, err := hostHandler.Inspect(ctx, hostName)
 	hostHandler := NewHostHandler(handler.service)
-	host, err := hostHandler.Inspect(hostName)
+	host, err := hostHandler.Inspect(ctx, hostName)
 	if err != nil {
 		return logicErr(fmt.Errorf("no host found with name or id '%s'", hostName))
 	}
@@ -157,14 +155,14 @@ func (svc *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path 
 		Protocol:   objStorageProtocol,
 	}
 
-	rerr := exec("mount_object_storage.sh", data, host.ID, handler.service)
+	rerr := exec(ctx, "mount_object_storage.sh", data, host.ID, handler.service)
 	return logicErr(rerr)
 }
 
 // Unmount a bucket
-func (svc *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) error {
+func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) error {
 	// Check bucket existence
-	_, err := svc.Inspect(ctx, bucketName)
+	_, err := handler.Inspect(ctx, bucketName)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); ok {
 			return err
@@ -188,6 +186,6 @@ func (svc *BucketHandler) Unmount(ctx context.Context, bucketName, hostName stri
 		Bucket: bucketName,
 	}
 
-	rerr := exec("umount_object_storage.sh", data, host.ID, handler.service)
+	rerr := exec(ctx, "umount_object_storage.sh", data, host.ID, handler.service)
 	return infraErr(rerr)
 }

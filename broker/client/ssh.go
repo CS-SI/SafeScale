@@ -253,7 +253,7 @@ func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.
 	if err != nil {
 		return nil, err
 	}
-	return conv.ToSystemSshConfig(sshConfig), nil
+	return conv.ToSystemSSHConfig(sshConfig), nil
 }
 
 // Connect ...
