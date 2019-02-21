@@ -41,10 +41,9 @@ func (s *ProcessManagerListener) Stop(ctx context.Context, in *pb.ProcessDefinit
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Stop process "+in.UUID); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Stop process "+in.UUID); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -64,10 +63,9 @@ func (s *ProcessManagerListener) List(ctx context.Context, in *google_protobuf.E
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "List Processes"); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "List Processes"); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {

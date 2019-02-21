@@ -50,6 +50,12 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 	log.Debugln(">>> TenantListener::List()")
 	defer log.Debugln("<<< TenantListener::List()")
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenants List"); err == nil {
+		defer utils.ProcessDeregister(ctx)
+	}
+
 	tenants, err := iaas.GetTenants()
 	if err != nil {
 		return nil, err
@@ -74,10 +80,9 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*p
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant Get"); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant Get"); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	getCurrentTenant()
 	if currentTenant == nil {
@@ -118,10 +123,9 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_pr
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant Set "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant Set "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return &google_protobuf.Empty{}, nil

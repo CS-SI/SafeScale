@@ -75,7 +75,6 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Start Host "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -101,10 +100,9 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_prot
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Stop Host "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Stop Host "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -130,10 +128,9 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_pr
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Reboot Host "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Reboot Host "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -159,10 +156,9 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "List Hosts"); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "List Hosts"); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -192,10 +188,9 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Create Host "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Create Host "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -231,10 +226,9 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.H
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Resize Host "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Resize Host "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -265,10 +259,9 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Status of Host "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Status of Host "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -297,10 +290,9 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host,
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Inspect Host "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Inspect Host "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -329,10 +321,9 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Delete Host "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Delete Host "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -361,10 +352,9 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "SSH config of Host "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "SSH config of Host "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {

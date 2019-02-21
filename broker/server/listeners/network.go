@@ -52,10 +52,9 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Create network "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Create network "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -89,10 +88,9 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.N
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "List networks"); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "List networks"); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -122,10 +120,9 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Inspect network "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Inspect network "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -156,10 +153,9 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Delete network "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Delete network "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {

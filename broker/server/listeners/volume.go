@@ -57,10 +57,9 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (*p
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes List"); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes List"); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	log.Infof("safescaled receiving 'volume list'")
 	log.Debugf(">>> server.listeners.VolumeListener::List()")
@@ -105,7 +104,6 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (*
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -143,7 +141,6 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (*
 	if err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
@@ -171,10 +168,9 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (*
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Dettach "+in.GetVolume().GetName()+"from host"+in.GetHost().GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Dettach "+in.GetVolume().GetName()+"from host"+in.GetHost().GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	volumeName := in.GetVolume().GetName()
 	hostName := in.GetHost().GetName()
@@ -213,10 +209,9 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Delete "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Volumes Delete "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {
@@ -249,10 +244,9 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Vol
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Volume Inspect "+in.GetName()); err != nil {
-		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Volume Inspect "+in.GetName()); err == nil {
+		defer utils.ProcessDeregister(ctx)
 	}
-	defer utils.ProcessDeregister(ctx)
 
 	ref := utils.GetReference(in)
 	if ref == "" {

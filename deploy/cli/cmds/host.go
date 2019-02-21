@@ -61,32 +61,6 @@ var HostCommand = cli.Command{
 
 }
 
-func extractHostArgument(c *cli.Context) error {
-	if !c.Command.HasName("list") {
-		if c.NArg() < 1 {
-			fmt.Fprintln(os.Stderr, "Missing mandatory argument HOSTNAME")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
-		}
-		hostName = c.Args().First()
-		if hostName == "" {
-			fmt.Fprintln(os.Stderr, "argument HOSTNAME invalid")
-			return clitools.ExitOnInvalidArgument()
-		}
-
-		var err error
-		hostInstance, err = brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
-		if err != nil {
-			fmt.Printf("%s\n", err.Error())
-			return clitools.ExitOnRPC(err.Error())
-		}
-		if hostInstance == nil {
-			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Host '%s' not found.\n", hostName))
-		}
-	}
-	return nil
-}
-
 // hostAddFeatureCommand handles 'deploy host <host name or id> package <pkgname> add'
 var hostAddFeatureCommand = cli.Command{
 	Name:      "add-feature",
@@ -106,7 +80,7 @@ var hostAddFeatureCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
-		err := extractHostArgument(c)
+		err := extractHostArgument(c, 0)
 		if err != nil {
 			return err
 		}
@@ -163,7 +137,6 @@ var hostAddFeatureCommand = cli.Command{
 	},
 }
 
-
 // hostCheckFeatureCommand handles 'deploy host <host name or id> package <pkgname> check'
 var hostListFeatureCommand = cli.Command{
 	Name:      "list-features",
@@ -212,7 +185,7 @@ var hostCheckFeatureCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
-		err := extractHostArgument(c)
+		err := extractHostArgument(c, 0)
 		if err != nil {
 			return err
 		}
@@ -281,7 +254,7 @@ var hostDeleteFeatureCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
-		err := extractHostArgument(c)
+		err := extractHostArgument(c, 0)
 		if err != nil {
 			return err
 		}
