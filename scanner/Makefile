@@ -6,7 +6,7 @@ else
 	EXEC:=scanner
 endif
 
-BUILD_DATE := `date +%Y-%m-%d\ %H:%M`
+BUILD_DATE := `date +%Y/%m/%d-%H:%M`
 VERSIONFILE := version.go
 REV := `git rev-parse HEAD 2>/dev/null || echo ""`
 
@@ -27,7 +27,7 @@ gensrc:
 	@($(RM) -f $(VERSIONFILE) || true)
 	@echo "package main" > $(VERSIONFILE)
 	@echo "const (" >> $(VERSIONFILE)
-	@echo "  VERSION = \"0.1.1\"" >> $(VERSIONFILE)
+	@echo "  VERSION = \"19.03.0\"" >> $(VERSIONFILE)
 	@echo "  BUILD_DATE = \"$(BUILD_DATE)\"" >> $(VERSIONFILE)
 	@echo "  REV = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)

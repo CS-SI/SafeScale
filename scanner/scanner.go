@@ -511,8 +511,7 @@ func dumpImages(service *iaas.Service, tenant string) error {
 }
 
 func main() {
-	log.Printf("%s version %s\n", os.Args[0], VERSION)
-	log.Printf("built on %s, hash id: %s\n", BUILD_DATE, REV)
+	log.Printf("%s version %s\n", os.Args[0], VERSION+", build "+REV+" ("+BUILD_DATE+")")
 
 	// time.Sleep(time.Duration(10) * time.Second)
 
