@@ -33,8 +33,6 @@ import (
 	conv "github.com/CS-SI/SafeScale/broker/utils"
 )
 
-const logListenerBase = "Listeners: bucket"
-
 // BucketHandler ...
 var BucketHandler = handlers.NewBucketHandler
 
@@ -50,8 +48,9 @@ type BucketListener struct{}
 
 // List available buckets
 func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.BucketList, error) {
-	log.Infof("%s list called", logListenerBase)
-	defer log.Debugf("%s list done", logListenerBase)
+	log.Infof("safescaled receiving 'bucket list'")
+	log.Debugf(">>> listeners.BucketListener::List()")
+	defer log.Debugf("<<< listeners.BucketListener::List()")
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -78,12 +77,13 @@ func (s *BucketListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 
 // Create a new bucket
 func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_protobuf.Empty, error) {
-	log.Infof("%s create '%s' called", logListenerBase, in.Name)
-	defer log.Debugf("%s create '%s' done", logListenerBase, in.Name)
+	bucketName := in.GetName()
+	log.Infof("safescaled receiving 'bucket create %s'", bucketName)
+	log.Debugf(">>> listeners.BucketListener::Create(%s)", bucketName)
+	defer log.Debugf("<<< listeners.BucketListener::Create(%s)", bucketName)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Create : "+in.GetName()); err != nil {
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Create : "+bucketName); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -95,7 +95,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_pro
 	}
 
 	handler := BucketHandler(tenant.Service)
-	err := handler.Create(ctx, in.GetName())
+	err := handler.Create(ctx, bucketName)
 	if err != nil {
 		tbr := errors.Wrap(err, "can't create bucket")
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())
@@ -106,12 +106,14 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (*google_pro
 
 // Delete a bucket
 func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_protobuf.Empty, error) {
-	log.Infof("%s delete '%s' called", logListenerBase, in.Name)
-	defer log.Debugf("%s delete '%s' done", logListenerBase, in.Name)
+	bucketName := in.GetName()
+	log.Infof("safescaled receiving 'bucket delete %s'", bucketName)
+	log.Debugf(">>> listeners.BucketListener::Delete(%s)", bucketName)
+	defer log.Debugf("<<< listeners.BucketListener::Delete(%s)", bucketName)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Delete : "+in.GetName()); err != nil {
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Delete : "+bucketName); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -123,7 +125,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_pro
 	}
 
 	handler := BucketHandler(tenant.Service)
-	err := handler.Delete(ctx, in.GetName())
+	err := handler.Delete(ctx, bucketName)
 	if err != nil {
 		tbr := errors.Wrap(err, "can't delete bucket")
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())
@@ -134,11 +136,12 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (*google_pro
 
 // Inspect a bucket
 func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.BucketMountingPoint, error) {
-	log.Infof("%s inspect '%s' called", logListenerBase, in.Name)
-	defer log.Debugf("%s inspect '%s' called", logListenerBase, in.Name)
+	bucketName := in.GetName()
+	log.Infof("safescaled receiving 'bucket inspect %s'", bucketName)
+	log.Debugf(">>> listeners.BucketListener::Inspect(%s)", bucketName)
+	defer log.Debugf("<<< listeners.BucketListener::Inspect(%s)", bucketName)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Inspect : "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
@@ -151,7 +154,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.Bucket
 	}
 
 	handler := BucketHandler(tenant.Service)
-	resp, err := handler.Inspect(ctx, in.GetName())
+	resp, err := handler.Inspect(ctx, bucketName)
 	if err != nil {
 		tbr := errors.Wrap(err, "can't inspect bucket")
 		return nil, grpc.Errorf(codes.Internal, tbr.Error())
@@ -164,12 +167,14 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (*pb.Bucket
 
 // Mount a bucket on the filesystem of the host
 func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) (*google_protobuf.Empty, error) {
-	log.Infof("%s mount '%v' called", logListenerBase, in)
-	defer log.Debugf("%s mount '%v' called", logListenerBase, in)
+	bucketName := in.GetBucket()
+	hostName := in.GetHost().GetName()
+	log.Infof("safescaled receiving 'bucket mount %s %s'", bucketName, hostName)
+	log.Debugf(">>> listeners.BucketListener::Mount(%s, %s)", bucketName, hostName)
+	defer log.Debugf("<<< listeners.BucketListener::Mount(%s, %s)", bucketName, hostName)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Mount : "+in.GetBucket()+" on "+in.GetHost().GetName()); err != nil {
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Mount : "+bucketName+" on "+hostName); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -181,7 +186,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 	}
 
 	handler := BucketHandler(tenant.Service)
-	err := handler.Mount(ctx, in.GetBucket(), in.GetHost().GetName(), in.GetPath())
+	err := handler.Mount(ctx, bucketName, hostName, in.GetPath())
 	if err != nil {
 		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -190,12 +195,15 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 
 // Unmount a bucket from the filesystem of the host
 func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint) (*google_protobuf.Empty, error) {
-	log.Infof("%s umount '%v' called", logListenerBase, in)
-	defer log.Debugf("%s umount '%v' done", logListenerBase, in)
+	bucketName := in.GetBucket()
+	hostName := in.GetHost().GetName()
+	log.Infof("safescaled receiving 'bucket unmount %s %s'", bucketName, hostName)
+	log.Debugf(">>> listeners.BucketListener::Unmount(%s, %s)", bucketName, hostName)
+	defer log.Debugf("<<< listeners.BucketListener::Unmount(%s, %s)", bucketName, hostName)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Unount : "+in.GetBucket()+" off "+in.GetHost().GetName()); err != nil {
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Bucket Unount : "+bucketName+" off "+hostName); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}
 	defer utils.ProcessDeregister(ctx)
@@ -207,7 +215,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 	}
 
 	handler := BucketHandler(tenant.Service)
-	err := handler.Unmount(ctx, in.GetBucket(), in.GetHost().GetName())
+	err := handler.Unmount(ctx, bucketName, hostName)
 	if err != nil {
 		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, err.Error())
 	}

@@ -37,7 +37,7 @@ func (pi *processInfo) toString() string {
 }
 
 var processMap map[string](processInfo)
-var mutex_processManager sync.Mutex
+var mutexProcessManager sync.Mutex
 
 // ProcessRegister ...
 func ProcessRegister(ctx context.Context, cancelFunc func(), command string) error {
@@ -46,23 +46,23 @@ func ProcessRegister(ctx context.Context, cancelFunc func(), command string) err
 	}
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return fmt.Errorf("No uuid in grpc metadatas")
+		return fmt.Errorf("No uuid in grpc metadata")
 	}
-	mutex_processManager.Lock()
+	mutexProcessManager.Lock()
 	processMap[md.Get("uuid")[0]] = processInfo{
 		commandName: command,
 		launchTime:  time.Now(),
 		context:     ctx,
 		cancelFunc:  cancelFunc,
 	}
-	mutex_processManager.Unlock()
+	mutexProcessManager.Unlock()
 	return nil
 }
 
 // ProcessCancelUUID ...
 func ProcessCancelUUID(uuid string) {
-	mutex_processManager.Lock()
-	defer mutex_processManager.Unlock()
+	mutexProcessManager.Lock()
+	defer mutexProcessManager.Unlock()
 	if info, found := processMap[uuid]; found {
 		info.cancelFunc()
 	}
@@ -70,8 +70,8 @@ func ProcessCancelUUID(uuid string) {
 
 // ProcessDeregisterUUID ...
 func ProcessDeregisterUUID(uuid string) {
-	mutex_processManager.Lock()
-	defer mutex_processManager.Unlock()
+	mutexProcessManager.Lock()
+	defer mutexProcessManager.Unlock()
 	delete(processMap, uuid)
 }
 
@@ -79,7 +79,7 @@ func ProcessDeregisterUUID(uuid string) {
 func ProcessDeregister(ctx context.Context) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		panic("no uuid in metadatas")
+		panic("no uuid in metadata")
 	}
 	ProcessDeregisterUUID(md.Get("uuid")[0])
 }

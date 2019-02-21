@@ -327,7 +327,7 @@ func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 
 	_, err := svc.GetHostByName(request.ResourceName)
 	if err == nil {
-		return nil, nil, resources.ResourceAlreadyExistsError("Host", request.ResourceName)
+		return nil, nil, resources.ResourceDuplicateError("Host", request.ResourceName)
 	}
 
 	// Create temporary key pair

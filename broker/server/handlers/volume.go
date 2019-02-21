@@ -42,17 +42,11 @@ import (
 
 // VolumeAPI defines API to manipulate hosts
 type VolumeAPI interface {
-	Delete(ref string) error
 	Delete(ctx context.Context, ref string) error
-	Inspect(ref string) (*resources.Volume, map[string]*propsv1.HostLocalMount, error)
-	List(all bool) ([]resources.Volume, error)
-	Inspect(ctx context.Context, ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error)
-	Create(name string, size int, speed VolumeSpeed.Enum) (*resources.Volume, error)
-	List(ctx context.Context, all bool) ([]model.Volume, error)
-	Attach(volume string, host string, path string, format string, doNotFormat bool) error
-	Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error)
+	List(ctx context.Context, all bool) ([]resources.Volume, error)
+	Inspect(ctx context.Context, ref string) (*resources.Volume, map[string]*propsv1.HostLocalMount, error)
+	Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (*resources.Volume, error)
 	Attach(ctx context.Context, volume string, host string, path string, format string, doNotFormat bool) error
-	Detach(volume string, host string) error
 	Detach(ctx context.Context, volume string, host string) error
 }
 
@@ -69,8 +63,7 @@ func NewVolumeHandler(svc *iaas.Service) VolumeAPI {
 }
 
 // List returns the network list
-func (handler *VolumeHandler) List(all bool) ([]resources.Volume, error) {
-func (svc *VolumeHandler) List(ctx context.Context, all bool) ([]model.Volume, error) {
+func (handler *VolumeHandler) List(ctx context.Context, all bool) ([]resources.Volume, error) {
 	if all {
 		volumes, err := handler.service.ListVolumes()
 		return volumes, infraErr(err)
@@ -91,10 +84,8 @@ func (svc *VolumeHandler) List(ctx context.Context, all bool) ([]model.Volume, e
 // TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // Delete deletes volume referenced by ref
-func (handler *VolumeHandler) Delete(ref string) error {
-func (svc *VolumeHandler) Delete(ctx context.Context, ref string) error {
+func (handler *VolumeHandler) Delete(ctx context.Context, ref string) error {
 	mv, err := metadata.LoadVolume(handler.service, ref)
-	mv, err := metadata.LoadVolume(svc.provider, ref)
 	if err != nil {
 		switch err.(type) {
 		case utils.ErrNotFound:
@@ -122,63 +113,43 @@ func (svc *VolumeHandler) Delete(ctx context.Context, ref string) error {
 		return err
 	}
 
-	var deleteMatadataOnly bool
-	err = svc.provider.DeleteVolume(volume.ID)
 	err = handler.service.DeleteVolume(volume.ID)
 	if err != nil {
-		switch err.(type) {
-		case model.ErrResourceNotFound:
-			deleteMatadataOnly = true
-		default:
+		if _, ok := err.(resources.ErrResourceNotFound); !ok {
 			return infraErrf(err, "can't delete volume")
 		}
+		log.Warnf("Unable to find the volume on provider side, cleaning up metadata")
 	}
-
 	err = mv.Delete()
 	if err != nil {
 		return infraErr(err)
 	}
-	if deleteMatadataOnly {
-		return fmt.Errorf("Unable to find the volume even if it is described by metadatas\nInchoerent metadatas have been supressed")
-	}
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Volume deletion canceled by broker")
-		volumeBis, err := svc.Create(context.Background(), volume.Name, volume.Size, volume.Speed)
+		log.Warnf("Volume deletion cancelled by user")
+		volumeBis, err := handler.Create(context.Background(), volume.Name, volume.Size, volume.Speed)
 		if err != nil {
-			return fmt.Errorf("Failed to stop volume deletion")
+			return fmt.Errorf("failed to stop volume deletion")
 		}
 		buf, err := volumeBis.Serialize()
 		if err != nil {
-			return fmt.Errorf("Deleted volume recreated by broker")
+			return fmt.Errorf("failed to recreate deleted volume")
 		}
-		return fmt.Errorf("Deleted volume recreated by broker : %s", buf)
+		return fmt.Errorf("deleted volume recreated by broker : %s", buf)
 	default:
 	}
 
 	return nil
 }
 
-// Get returns the volume identified by ref, ref can be the name or the id
-func (svc *VolumeHandler) Get(ctx context.Context, ref string) (*model.Volume, error) {
-	mv, err := metadata.LoadVolume(svc.provider, ref)
-	if err != nil {
-		err := infraErr(err)
-		return nil, err
-	}
-	if mv == nil {
-		return nil, logicErr(model.ResourceNotFoundError("volume", ref))
-	}
-
-	return mv.Get(), nil
-}
-
 // Inspect returns the volume identified by ref and its attachment (if any)
-func (handler *VolumeHandler) Inspect(ref string) (*resources.Volume, map[string]*propsv1.HostLocalMount, error) {
-func (svc *VolumeHandler) Inspect(ctx context.Context, ref string) (*model.Volume, map[string]*propsv1.HostLocalMount, error) {
+func (handler *VolumeHandler) Inspect(
+	ctx context.Context,
+	ref string,
+) (*resources.Volume, map[string]*propsv1.HostLocalMount, error) {
+
 	mv, err := metadata.LoadVolume(handler.service, ref)
-	volume, err := svc.Get(ctx, ref)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			return nil, nil, logicErr(resources.ResourceNotFoundError("volume", ref))
@@ -231,10 +202,8 @@ func (svc *VolumeHandler) Inspect(ctx context.Context, ref string) (*model.Volum
 }
 
 // Create a volume
-func (handler *VolumeHandler) Create(name string, size int, speed VolumeSpeed.Enum) (*resources.Volume, error) {
-func (svc *VolumeHandler) Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (*model.Volume, error) {
+func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed VolumeSpeed.Enum) (*resources.Volume, error) {
 	volume, err := handler.service.CreateVolume(resources.VolumeRequest{
-	volume, err := svc.provider.CreateVolume(model.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
@@ -251,28 +220,25 @@ func (svc *VolumeHandler) Create(ctx context.Context, name string, size int, spe
 		}
 	}()
 
-	err = metadata.SaveVolume(handler.service, volume)
+	md, err := metadata.SaveVolume(handler.service, volume)
 	if err != nil {
 		log.Debugf("Error creating volume: saving volume metadata: %+v", err)
-		return nil, infraErrf(err, "Error creating volume '%s' saving its volume metadata", name)
+		return nil, infraErrf(err, "error creating volume '%s' saving its metadata", name)
 	}
+
 	defer func() {
 		if err != nil {
-			md, err2 := metadata.LoadVolume(svc.provider, volume.ID)
-			if err2 != nil {
-				log.Warnf("Failed to load volume %s metadatas", volume.Name)
-			}
-			err2 = md.Delete()
-			if err2 != nil {
-				log.Warnf("Failed to delete volume %s metadatas", volume.Name)
+			derr := md.Delete()
+			if derr != nil {
+				log.Warnf("Failed to delete metadata of volume '%s'", volume.Name)
 			}
 		}
 	}()
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Volume creation canceled by broker")
-		err = fmt.Errorf("Volume creation canceld by broker")
+		log.Warnf("Volume creation cancelled by user")
+		err = fmt.Errorf("volume creation cancelled by user")
 		return nil, err
 	default:
 	}
@@ -281,18 +247,14 @@ func (svc *VolumeHandler) Create(ctx context.Context, name string, size int, spe
 }
 
 // Attach a volume to an host
-func (handler *VolumeHandler) Attach(volumeName, hostName, path, format string, doNotFormat bool) error {
-func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) error {
+func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) error {
 	// Get volume data
-	volume, _, err := handler.Inspect(volumeName)
-	volume, err := svc.Get(ctx, volumeName)
+	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
-		switch err.(type) {
-		case resources.ErrResourceNotFound:
-			return infraErr(err)
-		default:
-			return infraErr(err)
+		if _, ok := err.(resources.ErrResourceNotFound); ok {
+			return err
 		}
+		return infraErr(err)
 	}
 
 	// Get Host data
@@ -360,14 +322,12 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 				// Note: most providers are not able to tell the real device name the volume
 				//       will have on the host, so we have to use a way that can work everywhere
 				// Get list of disks before attachment
-				oldDiskSet, err := handler.listAttachedDevices(host)
-				oldDiskSet, err := svc.listAttachedDevices(ctx, host)
+				oldDiskSet, err := handler.listAttachedDevices(ctx, host)
 				if err != nil {
 					err := logicErrf(err, "failed to get list of connected disks")
 					return err
 				}
 				vaID, err := handler.service.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
-				vaID, err = svc.provider.CreateVolumeAttachment(model.VolumeAttachmentRequest{
 					Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
 					HostID:   host.ID,
 					VolumeID: volume.ID,
@@ -393,8 +353,7 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 				retryErr := retry.WhileUnsuccessfulDelay1Second(
 					func() error {
 						// Get new of disk after attachment
-						newDiskSet, err := handler.listAttachedDevices(host)
-						newDiskSet, err := svc.listAttachedDevices(ctx, host)
+						newDiskSet, err := handler.listAttachedDevices(ctx, host)
 						if err != nil {
 							err := logicErrf(err, "failed to get list of connected disks")
 							return err
@@ -467,23 +426,25 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 	if err != nil {
 		return infraErrf(err, "can't attach volume")
 	}
+
 	defer func() {
 		if err != nil {
 			derr := server.UnmountBlockDevice(volumeUUID)
 			if derr != nil {
 				log.Errorf("failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 			}
-			derr = svc.provider.DeleteVolumeAttachment(host.ID, vaID)
+			derr = handler.service.DeleteVolumeAttachment(host.ID, vaID)
 			if derr != nil {
 				log.Errorf("failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr)
 			}
 		}
 	}()
 
-	err = metadata.SaveVolume(handler.service, volume)
+	_, err = metadata.SaveVolume(handler.service, volume)
 	if err != nil {
 		return infraErrf(err, "can't attach volume")
 	}
+
 	defer func() {
 		if err != nil {
 			err2 := volume.Properties.LockForWrite(VolumeProperty.AttachedV1).ThenUse(func(v interface{}) error {
@@ -494,19 +455,20 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 			if err2 != nil {
 				log.Warnf("Failed to set volume %s metadatas", volumeName)
 			}
-			err2 = metadata.SaveVolume(svc.provider, volume)
+			_, err2 = metadata.SaveVolume(handler.service, volume)
 			if err2 != nil {
 				log.Warnf("Failed to save volume %s metadatas", volumeName)
 			}
 		}
 	}()
-	err = metadata.SaveHost(svc.provider, host)
+
+	mh, err := metadata.SaveHost(handler.service, host)
 	if err != nil {
 		return infraErrf(err, "can't attach volume")
 	}
+
 	defer func() {
 		if err != nil {
-
 			err2 := host.Properties.LockForWrite(HostProperty.VolumesV1).ThenUse(func(v interface{}) error {
 				hostVolumesV1 := v.(*propsv1.HostVolumes)
 				delete(hostVolumesV1.VolumesByID, volume.ID)
@@ -516,7 +478,7 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("Failed to set host %s VolumesV1 metadatas", volumeName)
+				log.Warnf("Failed to set host '%s' metadata about volumes", volumeName)
 			}
 			err2 = host.Properties.LockForWrite(HostProperty.MountsV1).ThenUse(func(v interface{}) error {
 				hostMountsV1 := v.(*propsv1.HostMounts)
@@ -525,19 +487,18 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 				return nil
 			})
 			if err2 != nil {
-				log.Warnf("Failed to set host %s MountsV1 metadatas", volumeName)
+				log.Warnf("Failed to set host '%s' metadata about mounts", volumeName)
 			}
-			err2 = metadata.SaveHost(svc.provider, host)
-			if err2 != nil {
-				log.Warnf("Failed to save host %s metadatas", volumeName)
+			if mh.Write() != nil {
+				log.Warnf("Failed to save host '%s' metadata", volumeName)
 			}
 		}
 	}()
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Volume attachment canceled by broker")
-		err = fmt.Errorf("Volume attachment canceld by broker")
+		log.Warnf("Volume attachment cancelled by user")
+		err = fmt.Errorf("volume attachment cancelled by user")
 		return err
 	default:
 	}
@@ -546,8 +507,7 @@ func (svc *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path
 	return nil
 }
 
-func (handler *VolumeHandler) listAttachedDevices(host *resources.Host) (mapset.Set, error) {
-func (svc *VolumeHandler) listAttachedDevices(ctx context.Context, host *model.Host) (mapset.Set, error) {
+func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *resources.Host) (mapset.Set, error) {
 	var (
 		retcode        int
 		stdout, stderr string
@@ -584,18 +544,14 @@ func (svc *VolumeHandler) listAttachedDevices(ctx context.Context, host *model.H
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (handler *VolumeHandler) Detach(volumeName, hostName string) error {
-func (svc *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) error {
+func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName string) error {
 	// Load volume data
-	volume, _, err := handler.Inspect(volumeName)
-	volume, err := svc.Get(ctx, volumeName)
+	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
-		switch err.(type) {
-		case resources.ErrResourceNotFound:
+		if _, ok := err.(resources.ErrResourceNotFound); !ok {
 			return infraErr(err)
-		default:
-			return infraErr(resources.ResourceNotFoundError("volume", volumeName))
 		}
+		return infraErr(resources.ResourceNotFoundError("volume", volumeName))
 	}
 	mountPath := ""
 
@@ -703,25 +659,25 @@ func (svc *VolumeHandler) Detach(ctx context.Context, volumeName, hostName strin
 	}
 
 	// Updates metadata
-	err = metadata.SaveHost(handler.service, host)
+	_, err = metadata.SaveHost(handler.service, host)
 	if err != nil {
 		return infraErr(err)
 	}
-	err = metadata.SaveVolume(handler.service, volume)
+	_, err = metadata.SaveVolume(handler.service, volume)
 	if err != nil {
 		err = infraErr(err)
 		return err
 	}
+
 	select {
 	case <-ctx.Done():
-		log.Warnf("Volume detachment canceled by broker")
-		//Currently format is not registerd anywhere so we use ext4 the most common format (but as we mount the volume the format parameter is ignored anyway)
-		err = svc.Attach(context.Background(), volumeName, hostName, mountPath, "ext4", true)
+		log.Warnf("Volume detachment cancelled by user")
+		// Currently format is not registerd anywhere so we use ext4 the most common format (but as we mount the volume the format parameter is ignored anyway)
+		err = handler.Attach(context.Background(), volumeName, hostName, mountPath, "ext4", true)
 		if err != nil {
-			return fmt.Errorf("Failed to stop volume detachment")
+			return fmt.Errorf("failed to stop volume detachment")
 		}
-		return fmt.Errorf("Volume detachment canceld by broker")
-
+		return fmt.Errorf("volume detachment canceld by user")
 	default:
 	}
 

@@ -239,12 +239,9 @@ func (ms *Share) Release() {
 }
 
 // SaveShare saves the Nas definition in Object Storage
-func SaveShare(svc *iaas.Service, hostID, hostName, shareID, shareName string) error {
-	err := NewShare(svc).Carry(hostID, hostName, shareID, shareName).Write()
-	if err != nil {
-		return err
-	}
-	return nil
+func SaveShare(svc *iaas.Service, hostID, hostName, shareID, shareName string) (*Share, error) {
+	ms := NewShare(svc).Carry(hostID, hostName, shareID, shareName)
+	return ms, ms.Write()
 }
 
 // RemoveShare removes the share definition from Object Storage

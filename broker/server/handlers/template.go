@@ -29,8 +29,7 @@ import (
 
 //TemplateAPI defines API to manipulate hosts
 type TemplateAPI interface {
-	List(all bool) ([]resources.HostTemplate, error)
-	List(ctx context.Context, all bool) ([]model.HostTemplate, error)
+	List(ctx context.Context, all bool) ([]resources.HostTemplate, error)
 }
 
 // TemplateHandler template service
@@ -46,9 +45,7 @@ func NewTemplateHandler(svc *iaas.Service) TemplateAPI {
 }
 
 // List returns the template list
-func (handler *TemplateHandler) List(all bool) ([]resources.HostTemplate, error) {
-func (svc *TemplateHandler) List(ctx context.Context, all bool) ([]model.HostTemplate, error) {
+func (handler *TemplateHandler) List(ctx context.Context, all bool) ([]resources.HostTemplate, error) {
 	tlist, err := handler.service.ListTemplates(all)
-	tlist, err := svc.provider.ListTemplates(all)
 	return tlist, infraErr(err)
 }

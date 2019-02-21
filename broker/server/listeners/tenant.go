@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/broker"
+	"github.com/CS-SI/SafeScale/broker/utils"
 	"github.com/CS-SI/SafeScale/iaas"
 )
 

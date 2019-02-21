@@ -25,9 +25,9 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-var client_RPCUUID uuid.UUID
-var uuid_set bool
-var mutex_contextManager sync.Mutex
+var clientRPCUUID uuid.UUID
+var uuidSet bool
+var mutexContextManager sync.Mutex
 
 //--------------------- CLIENT ---------------------------------
 
@@ -46,22 +46,22 @@ func GetTimeoutContext(timeout time.Duration) (context.Context, context.CancelFu
 
 //GetUUID ...
 func GetUUID() string {
-	mutex_contextManager.Lock()
-	defer mutex_contextManager.Unlock()
-	return client_RPCUUID.String()
+	mutexContextManager.Lock()
+	defer mutexContextManager.Unlock()
+	return clientRPCUUID.String()
 }
 
 // generateUUID ...
 func generateUUID(store bool) string {
-	mutex_contextManager.Lock()
-	defer mutex_contextManager.Unlock()
+	mutexContextManager.Lock()
+	defer mutexContextManager.Unlock()
 	uuid, err := uuid.NewV4()
 	if err != nil {
 		panic("Failed to generate UUID")
 	}
 	if store {
-		uuid_set = true
-		client_RPCUUID = uuid
+		uuidSet = true
+		clientRPCUUID = uuid
 	}
 	return uuid.String()
 }

@@ -72,7 +72,6 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 	defer log.Debugf("Listeners: host start '%s' done", in.Name)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-
 	if err := utils.ProcessRegister(ctx, cancelFunc, "Start Host "+in.GetName()); err != nil {
 		return nil, fmt.Errorf("Failed to register the process : %s", err.Error())
 	}

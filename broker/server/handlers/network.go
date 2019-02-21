@@ -40,18 +40,14 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/broker/server/handlers NetworkAPI
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO At service level, we need to log before returning, because it's the last chance to track the real issue in server side
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*resources.Network, error)
-	List(all bool) ([]*resources.Network, error)
-	Inspect(ref string) (*resources.Network, error)
-	Delete(ref string) error
-	Create(ctx context.Context, net string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, os string, gwname string) (*model.Network, error)
-	List(ctx context.Context, all bool) ([]*model.Network, error)
-	Inspect(ctx context.Context, ref string) (*model.Network, error)
-	Delete(ctx context.Context, ref string) error
+	Create(context.Context, string, string, IPVersion.Enum, int, float32, int, string, string) (*resources.Network, error)
+	List(context.Context, bool) ([]*resources.Network, error)
+	Inspect(context.Context, string) (*resources.Network, error)
+	Delete(context.Context, string) error
 }
 
 // NetworkHandler an implementation of NetworkAPI
@@ -69,10 +65,10 @@ func NewNetworkHandler(svc *iaas.Service) NetworkAPI {
 
 // Create creates a network
 func (handler *NetworkHandler) Create(
+	ctx context.Context,
+	name string, cidr string, ipVersion IPVersion.Enum,
+	cpu int, ram float32, disk int, theos string, gwname string,
 ) (*resources.Network, error) {
-func (svc *NetworkHandler) Create(
-	ctx context.Context, name string, cidr string, ipVersion IPVersion.Enum, cpu int, ram float32, disk int, theos string, gwname string,
-) (*model.Network, error) {
 
 	log.Debugf(">>> broker.server.handlers.NetworkHandler::Create()")
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Create()")
@@ -242,9 +238,8 @@ func (svc *NetworkHandler) Create(
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
-	log.Infof("Waiting until gateway '%s' is available through SSH ...", gwname)
+	log.Infof("Waiting until gateway '%s' is available by SSH ...", gwname)
 	sshHandler := NewSSHHandler(handler.service)
-	sshHandler := NewSSHHandler(svc.provider)
 	ssh, err := sshHandler.GetConfig(ctx, gw.ID)
 	if err != nil {
 		//defer handler.service.DeleteHost(gw.ID)
@@ -270,17 +265,17 @@ func (svc *NetworkHandler) Create(
 
 	select {
 	case <-ctx.Done():
-		log.Warnf("Network creation canceled by broker")
-		err = fmt.Errorf("Network creation canceld by broker")
+		log.Warnf("Network creation cancelled by user")
+		err = fmt.Errorf("network creation cancelled by user")
 		return nil, err
 	default:
 	}
+
 	return network, nil
 }
 
 // List returns the network list
-func (handler *NetworkHandler) List(all bool) ([]*resources.Network, error) {
-func (svc *NetworkHandler) List(ctx context.Context, all bool) ([]*model.Network, error) {
+func (handler *NetworkHandler) List(ctx context.Context, all bool) ([]*resources.Network, error) {
 	log.Debugf(">>> broker.server.handlers.NetworkHandler::List(%v)", all)
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::List(%v)", all)
 
@@ -305,8 +300,7 @@ func (svc *NetworkHandler) List(ctx context.Context, all bool) ([]*model.Network
 }
 
 // Inspect returns the network identified by ref, ref can be the name or the id
-func (handler *NetworkHandler) Inspect(ref string) (*resources.Network, error) {
-func (svc *NetworkHandler) Inspect(ctx context.Context, ref string) (*model.Network, error) {
+func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (*resources.Network, error) {
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Inspect(%s)", ref)
 	log.Debugf(">>> broker.server.handlers.NetworkHandler::Inspect(%s)", ref)
 
@@ -318,8 +312,7 @@ func (svc *NetworkHandler) Inspect(ctx context.Context, ref string) (*model.Netw
 }
 
 // Delete deletes network referenced by ref
-func (handler *NetworkHandler) Delete(ref string) error {
-func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
+func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	log.Debugf(">>> broker.server.handlers.NetworkHandler::Delete(%s)", ref)
 	defer log.Debugf("<<< broker.server.handlers.NetworkHandler::Delete(%s)", ref)
 
@@ -361,7 +354,7 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	}
 
 	// 1st delete gateway
-	var metadataHost *model.Host
+	var metadataHost *resources.Host
 	if gwID != "" {
 		mh, err := metadata.LoadHost(handler.service, gwID)
 		if err != nil {
@@ -380,31 +373,26 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 		}
 	}
 
-	// 2nd delete network, with no tolerance
+	// 2nd delete network, with tolerance
 	err = handler.service.DeleteNetwork(network.ID)
-	var deleteMatadataOnly bool
-	err = svc.provider.DeleteNetwork(network.ID)
 	if err != nil {
-		switch err.(type) {
-		case model.ErrResourceNotFound:
-			deleteMatadataOnly = true
-		default:
+		if _, ok := err.(resources.ErrResourceNotFound); !ok {
 			return infraErrf(err, "can't delete network")
 		}
+		// If network doesn't exist anymore on the provider infrastructure, don't fail
+		// to cleanup the metadata
+		log.Warnf("network not found on provider side, cleaning up metadata.")
 	}
 
+	// Delete metadata,
 	err = mn.Delete()
 	if err != nil {
 		return infraErr(err)
 	}
 
-	if deleteMatadataOnly {
-		return fmt.Errorf("Unable to find the network even if it is described by metadatas\nInchoerent metadatas have been supressed")
-	}
-
 	select {
 	case <-ctx.Done():
-		log.Warnf("Network delete canceled by broker")
+		log.Warnf("Network delete cancelled by user")
 		hostSizing := propsv1.NewHostSizing()
 		err := metadataHost.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
 			hostSizing = v.(*propsv1.HostSizing)
@@ -414,7 +402,7 @@ func (svc *NetworkHandler) Delete(ctx context.Context, ref string) error {
 			return fmt.Errorf("Failed to get gateway sizingV1")
 		}
 		//os name of the gw is not stored in metadatas so we used ubuntu 16.04 by default
-		networkBis, err := svc.Create(context.Background(), network.Name, network.CIDR, network.IPVersion, hostSizing.AllocatedSize.Cores, hostSizing.AllocatedSize.RAMSize, hostSizing.AllocatedSize.DiskSize, "Ubuntu 16.04", metadataHost.Name)
+		networkBis, err := handler.Create(context.Background(), network.Name, network.CIDR, network.IPVersion, hostSizing.AllocatedSize.Cores, hostSizing.AllocatedSize.RAMSize, hostSizing.AllocatedSize.DiskSize, "Ubuntu 16.04", metadataHost.Name)
 		if err != nil {
 			return fmt.Errorf("Failed to stop network deletion")
 		}

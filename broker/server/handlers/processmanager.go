@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/broker/utils"
-	"github.com/CS-SI/SafeScale/providers"
+	"github.com/CS-SI/SafeScale/iaas"
 )
 
 // ProcessManagerAPI defines API to manipulate process
@@ -31,22 +31,22 @@ type ProcessManagerAPI interface {
 
 // ProcessManagerHandler service
 type ProcessManagerHandler struct {
-	provider *providers.Service
+	service *iaas.Service
 }
 
-// NewVolumeHandler creates a Volume service
-func NewProcessManagerHandler(api *providers.Service) ProcessManagerAPI {
+// NewProcessManagerHandler creates a Volume service
+func NewProcessManagerHandler(svc *iaas.Service) ProcessManagerAPI {
 	return &ProcessManagerHandler{
-		provider: api,
+		service: svc,
 	}
 }
 
 // List returns the Running Process list
-func (svc *ProcessManagerHandler) List(ctx context.Context) (map[string]string, error) {
+func (pmh *ProcessManagerHandler) List(ctx context.Context) (map[string]string, error) {
 	return utils.ProcessList(), nil
 }
 
 // Stop stop the designed Process
-func (svc *ProcessManagerHandler) Stop(ctx context.Context, uuid string) {
+func (pmh *ProcessManagerHandler) Stop(ctx context.Context, uuid string) {
 	utils.ProcessCancelUUID(uuid)
 }
