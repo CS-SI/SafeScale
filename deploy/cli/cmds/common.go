@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"os"
 
+	brokerclient "github.com/CS-SI/SafeScale/broker/client"
 	clitools "github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
 
 	pb "github.com/CS-SI/SafeScale/broker"
 
@@ -49,5 +51,26 @@ func extractFeatureArgument(c *cli.Context) error {
 		fmt.Fprintln(os.Stderr, "Invalid argument FEATURENAME")
 		return clitools.ExitOnInvalidArgument()
 	}
+	return nil
+}
+
+// Use the hostnamPos-th argument of the command as a hostName and use it to get the host instance
+func extractHostArgument(c *cli.Context, hostnamePos int) error {
+	hostName = c.Args().Get(hostnamePos)
+	if hostName == "" {
+		fmt.Fprintln(os.Stderr, "argument HOSTNAME invalid")
+		return clitools.ExitOnInvalidArgument()
+	}
+
+	var err error
+	hostInstance, err = brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
+	if err != nil {
+		fmt.Printf("%s\n", err.Error())
+		return clitools.ExitOnRPC(err.Error())
+	}
+	if hostInstance == nil {
+		return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Host '%s' not found.\n", hostName))
+	}
+
 	return nil
 }
