@@ -77,37 +77,34 @@ var ClusterCommand = cli.Command{
 }
 
 func extractClusterArgument(c *cli.Context) error {
-	if c.NArg() < 1 {
-		fmt.Fprintf(os.Stderr, "Missing mandatory argument CLUSTERNAME")
-		_ = cli.ShowSubcommandHelp(c)
-		return clitools.ExitOnInvalidArgument()
-	}
-	clusterName = c.Args().First()
-	if clusterName == "" {
-		fmt.Fprintf(os.Stderr, "Invalid argument CLUSTERNAME")
-		_ = cli.ShowSubcommandHelp(c)
-		return clitools.ExitOnInvalidArgument()
-	}
+	if !c.Command.HasName("list") {
+		if c.NArg() < 1 {
+			fmt.Fprintf(os.Stderr, "Missing mandatory argument CLUSTERNAME")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
+		}
+		clusterName = c.Args().First()
+		if clusterName == "" {
+			fmt.Fprintf(os.Stderr, "Invalid argument CLUSTERNAME")
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument()
+		}
 
 		var err error
 		clusterInstance, err = cluster.Get(clusterName)
 		if err != nil {
-			switch err.(type) {
-			case resources.ErrResourceNotFound:
+			if _, ok := err.(resources.ErrResourceNotFound); ok {
 				if !c.Command.HasName("create") {
 					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
 				}
-			default:
+			} else {
 				msg := fmt.Sprintf("Failed to query for cluster '%s': %s\n", clusterName, err.Error())
 				return clitools.ExitOnRPC(msg)
 			}
-		default:
-			msg := fmt.Sprintf("Failed to query for cluster '%s': %s\n", clusterName, err.Error())
-			return clitools.ExitOnRPC(msg)
-		}
-	} else {
-		if c.Command.HasName("create") {
-			return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
+		} else {
+			if c.Command.HasName("create") {
+				return clitools.ExitOnErrorWithMessage(ExitCode.Duplicate, fmt.Sprintf("Cluster '%s' already exists.\n", clusterName))
+			}
 		}
 	}
 
