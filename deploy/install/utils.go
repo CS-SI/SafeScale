@@ -180,7 +180,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 		1*time.Second,
 		2*time.Minute,
 	)
-	os.Remove(f.Name())
+	_ = os.Remove(f.Name())
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
