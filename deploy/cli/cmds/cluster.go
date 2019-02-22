@@ -408,7 +408,7 @@ var clusterCreateCommand = cli.Command{
 		})
 		if err != nil {
 			if clusterInstance != nil {
-				clusterInstance.Delete()
+				_ = clusterInstance.Delete()
 			}
 			msg := fmt.Sprintf("failed to create cluster: %s\n", err.Error())
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
