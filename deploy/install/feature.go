@@ -258,7 +258,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	results, err := installer.Check(f, t, myV, s)
-	checkCache.ForceSet(cacheKey, results)
+	_ = checkCache.ForceSet(cacheKey, results)
 	return results, err
 }
 
@@ -320,7 +320,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	}
 	results, err = installer.Add(f, t, myV, s)
 	if err == nil {
-		checkCache.ForceSet(f.DisplayName()+"@"+t.Name(), results)
+		_ = checkCache.ForceSet(f.DisplayName()+"@"+t.Name(), results)
 	}
 	return results, err
 }

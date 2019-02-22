@@ -115,7 +115,7 @@ func (c *Controller) GetNetworkConfig() (config clusterpropsv1.Network) {
 		panic("Calling c.GetNetworkConfig() with c==nil!")
 	}
 
-	c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
+	_ = c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
 		config = *(v.(*clusterpropsv1.Network))
 		return nil
 	})
@@ -242,7 +242,7 @@ func (c *Controller) GetNode(hostID string) (*pb.Host, error) {
 // SearchNode tells if an host ID corresponds to a node of the Cluster
 func (c *Controller) SearchNode(hostID string, public bool) bool {
 	found := false
-	c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
+	_ = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
 		if public {
 			found, _ = contains(nodesV1.PublicNodes, hostID)
@@ -763,7 +763,7 @@ func (c *Controller) Delete() error {
 		for _, target := range list {
 			go func(h string) {
 				defer wg.Done()
-				c.DeleteSpecificNode(h, "")
+				_ = c.DeleteSpecificNode(h, "")
 			}(target)
 		}
 		wg.Wait()
@@ -776,7 +776,7 @@ func (c *Controller) Delete() error {
 		for _, target := range list {
 			go func(h string) {
 				defer wg.Done()
-				c.DeleteSpecificNode(h, "")
+				_ = c.DeleteSpecificNode(h, "")
 			}(target)
 		}
 		wg.Wait()
@@ -789,7 +789,7 @@ func (c *Controller) Delete() error {
 		for _, target := range list {
 			go func(h string) {
 				defer wg.Done()
-				c.deleteMaster(h)
+				_ = c.deleteMaster(h)
 			}(target)
 		}
 		wg.Wait()
