@@ -953,9 +953,9 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return nil, fmt.Errorf("timeout waiting to get host '%s' information after %v", host.Name, timeout)
+			return host, fmt.Errorf("timeout waiting to get host '%s' information after %v", host.Name, timeout)
 		}
-		return nil, retryErr
+		return host, retryErr
 	}
 	return host, nil
 }
