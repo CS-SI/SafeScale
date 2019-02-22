@@ -18,7 +18,6 @@ package controller
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -39,14 +38,14 @@ const (
 type Metadata struct {
 	item *metadata.Item
 	name string
-	lock *sync.Mutex
+	// lock *sync.Mutex
 }
 
 // NewMetadata creates a new Cluster Controller metadata
 func NewMetadata(svc *iaas.Service) (*Metadata, error) {
 	return &Metadata{
 		item: metadata.NewItem(svc, clusterFolderName),
-		lock: &sync.Mutex{},
+		// lock: &sync.Mutex{},
 	}, nil
 }
 
@@ -113,7 +112,6 @@ func (m *Metadata) Read(name string) error {
 	if err != nil {
 		return err
 	}
-
 	m.name = ptr.GetIdentity().Name
 	return nil
 }
@@ -169,8 +167,8 @@ func (m *Metadata) Get() *Controller {
 		panic("m.item is nil!")
 	}
 	if p, ok := m.item.Get().(*Controller); ok {
-		p.service = m.GetService()
-		p.metadata = m
+		// p.service = m.GetService()
+		// p.metadata = m
 		return p
 	}
 	panic("invalid cluster content in metadata")
@@ -178,6 +176,9 @@ func (m *Metadata) Get() *Controller {
 
 // Browse walks through cluster folder and executes a callback for each entry
 func (m *Metadata) Browse(callback func(*Controller) error) error {
+	if m.item == nil {
+		panic("m.item is nil!")
+	}
 	return m.item.Browse(func(buf []byte) error {
 		cc := NewController(m.GetService())
 		err := cc.Deserialize(buf)
@@ -190,14 +191,14 @@ func (m *Metadata) Browse(callback func(*Controller) error) error {
 
 // Acquire waits until the write lock is available, then locks the metadata
 func (m *Metadata) Acquire() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	// m.lock.Lock()
+	// defer m.lock.Unlock()
 	m.item.Acquire()
 }
 
 // Release unlocks the metadata
 func (m *Metadata) Release() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	// m.lock.Lock()
+	// defer m.lock.Unlock()
 	m.item.Release()
 }
