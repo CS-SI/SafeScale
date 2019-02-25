@@ -137,6 +137,9 @@ func main() {
 	app.Commands = append(app.Commands, cmd.TemplateCmd)
 	sort.Sort(cli.CommandsByName(cmd.TemplateCmd.Subcommands))
 
+	app.Commands = append(app.Commands, cmd.ClusterCommand)
+	sort.Sort(cli.CommandsByName(cmd.ClusterCommand.Subcommands))
+
 	sort.Sort(cli.CommandsByName(app.Commands))
 
 	err := app.Run(os.Args)
