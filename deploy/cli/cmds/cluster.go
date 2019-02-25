@@ -31,7 +31,7 @@ import (
 
 	"github.com/urfave/cli"
 
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/deploy/cluster"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
@@ -278,11 +278,11 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	// 	results, err := feature.Check(target, install.Variables{}, install.Settings{})
 	// 	found = err == nil && results.Successful()
 	// 	if found {
-	// 		brkclt := brokerclient.New().Host
+	// 		brkclt := safescaleclient.New().Host
 	// 		remoteDesktops := []string{}
 	// 		gwPublicIP := clusterInstance.GetNetworkConfig().PublicIP
 	// 		for _, id := range clusterInstance.ListMasterIDs() {
-	// 			host, err := brkclt.Inspect(id, brokerclient.DefaultExecutionTimeout)
+	// 			host, err := brkclt.Inspect(id, safescaleclient.DefaultExecutionTimeout)
 	// 			if err != nil {
 	// 				return nil, err
 	// 			}
@@ -848,9 +848,9 @@ func executeCommand(command string) error {
 		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetIdentity().Name)
 		return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 	}
-	brokerssh := brokerclient.New().Ssh
+	safescalessh := safescaleclient.New().Ssh
 	for i, m := range masters {
-		retcode, stdout, stderr, err := brokerssh.Run(m, command, brokerclient.DefaultConnectionTimeout, 5*time.Minute)
+		retcode, stdout, stderr, err := safescalessh.Run(m, command, safescaleclient.DefaultConnectionTimeout, 5*time.Minute)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {
@@ -1128,13 +1128,13 @@ var clusterNodeListCommand = cli.Command{
 		public := c.Bool("public")
 		all := c.Bool("all")
 
-		broker := brokerclient.New().Host
+		safescale := safescaleclient.New().Host
 		formatted := []map[string]interface{}{}
 
 		if all || !public {
 			listPriv := clusterInstance.ListNodeIDs(false)
 			for _, i := range listPriv {
-				host, err := broker.Inspect(i, brokerclient.DefaultExecutionTimeout)
+				host, err := safescale.Inspect(i, safescaleclient.DefaultExecutionTimeout)
 				if err != nil {
 					msg := fmt.Sprintf("Failed to get data for node '%s': %s. Ignoring.", i, err.Error())
 					fmt.Println(msg)
@@ -1151,7 +1151,7 @@ var clusterNodeListCommand = cli.Command{
 		if all || public {
 			listPub := clusterInstance.ListNodeIDs(true)
 			for _, i := range listPub {
-				host, err := broker.Inspect(i, brokerclient.DefaultExecutionTimeout)
+				host, err := safescale.Inspect(i, safescaleclient.DefaultExecutionTimeout)
 				if err != nil {
 					msg := fmt.Sprintf("failed to get data for node '%s': %s. Ignoring.", i, err.Error())
 					fmt.Println(msg)
@@ -1204,7 +1204,7 @@ var clusterNodeInspectCommand = cli.Command{
 			return err
 		}
 
-		host, err := brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
+		host, err := safescaleclient.New().Host.Inspect(hostName, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			return clitools.ExitOnRPC(err.Error())
 		}

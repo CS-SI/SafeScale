@@ -25,8 +25,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	broker "github.com/CS-SI/SafeScale/broker/client"
+	pb "github.com/CS-SI/SafeScale/safescale"
+	safescale "github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/utils"
 )
 
@@ -40,7 +40,7 @@ var kongProxyCheckedCache = utils.NewMapCache()
 // KongController allows to control Kong, installed on a host
 type KongController struct {
 	host   *pb.Host
-	broker broker.Client
+	safescale safescale.Client
 }
 
 // NewKongController ...
@@ -77,7 +77,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 
 	return &KongController{
 		host:   host,
-		broker: broker.New(),
+		safescale: safescale.New(),
 	}, nil
 }
 
@@ -179,7 +179,7 @@ func (k *KongController) createUpstream(name string, v *Variables) error {
 func (k *KongController) get(name, url string) (map[string]interface{}, error) {
 	// Now apply the rule to Kong
 	cmd := fmt.Sprintf(curlGet, url)
-	retcode, stdout, _, err := broker.New().Ssh.Run(k.host.Name, cmd, broker.DefaultConnectionTimeout, broker.DefaultExecutionTimeout)
+	retcode, stdout, _, err := safescale.New().Ssh.Run(k.host.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, error) {
 func (k *KongController) post(name, url, data string, v *Variables) (map[string]interface{}, error) {
 	// Now apply the rule to Kong
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, err := broker.New().Ssh.Run(k.host.Name, cmd, broker.DefaultConnectionTimeout, broker.DefaultExecutionTimeout)
+	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.host.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}

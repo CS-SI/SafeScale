@@ -23,7 +23,7 @@ import (
 
 	"github.com/urfave/cli"
 
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/deploy/install"
 	clitools "github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
@@ -112,9 +112,9 @@ var hostAddFeatureCommand = cli.Command{
 		settings.SkipProxy = c.Bool("skip-proxy")
 
 		// Wait for SSH service on remote host first
-		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
+		err = safescaleclient.New().Ssh.WaitReady(hostInstance.ID, safescaleclient.DefaultConnectionTimeout)
 		if err != nil {
-			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, safescaleclient.DecorateError(err, "waiting ssh on host", false))
 			return clitools.ExitOnRPC(msg)
 		}
 
@@ -214,9 +214,9 @@ var hostCheckFeatureCommand = cli.Command{
 		}
 
 		// Wait for SSH service on remote host first
-		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
+		err = safescaleclient.New().Ssh.WaitReady(hostInstance.ID, safescaleclient.DefaultConnectionTimeout)
 		if err != nil {
-			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, safescaleclient.DecorateError(err, "waiting ssh on host", false))
 			return clitools.ExitOnRPC(msg)
 		}
 
@@ -283,9 +283,9 @@ var hostDeleteFeatureCommand = cli.Command{
 		}
 
 		// Wait for SSH service on remote host first
-		err = brokerclient.New().Ssh.WaitReady(hostInstance.ID, brokerclient.DefaultConnectionTimeout)
+		err = safescaleclient.New().Ssh.WaitReady(hostInstance.ID, safescaleclient.DefaultConnectionTimeout)
 		if err != nil {
-			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, brokerclient.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, safescaleclient.DecorateError(err, "waiting ssh on host", false))
 			return clitools.ExitOnRPC(msg)
 		}
 

@@ -44,10 +44,10 @@ service ImageService{
     rpc List(ImageListRequest) returns (ImageList){}
 }
 
-// broker network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
-// broker network list
-// broker network delete net1
-// broker network inspect net1
+// safescale network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
+// safescale network list
+// safescale network delete net1
+// safescale network inspect net1
 
 message NetworkDefinition{
     string Name = 2;
@@ -85,10 +85,10 @@ service NetworkService{
     rpc Delete(Reference) returns (google.protobuf.Empty){}
 }
 
-// broker host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
-// broker host list
-// broker host inspect host1
-// broker host create host2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
+// safescale host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
+// safescale host list
+// safescale host inspect host1
+// safescale host create host2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
 
 message HostDefinition{
     string Name = 2;
@@ -185,12 +185,12 @@ service TemplateService{
     rpc List(TemplateListRequest) returns (TemplateList){}
 }
 
-// broker volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
-// broker volume attach v1 host1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
-// broker volume detach v1
-// broker volume delete v1
-// broker volume inspect v1
-// broker volume update v1 --speed="HDD" --size=1000
+// safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
+// safescale volume attach v1 host1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
+// safescale volume detach v1
+// safescale volume delete v1
+// safescale volume inspect v1
+// safescale volume update v1 --speed="HDD" --size=1000
 
 enum VolumeSpeed{
     COLD = 0;
@@ -257,12 +257,12 @@ service VolumeService{
     rpc Inspect(Reference) returns (VolumeInfo){}
 }
 
-// broker bucket create c1
-// broker bucket mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /buckets/c1)
-// broker bucket umount c1 host1
-// broker bucket delete c1
-// broker bucket list
-// broker bucket inspect C1
+// safescale bucket create c1
+// safescale bucket mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /buckets/c1)
+// safescale bucket umount c1 host1
+// safescale bucket delete c1
+// safescale bucket list
+// safescale bucket inspect C1
 
 message Bucket{
     string Name = 1;
@@ -287,9 +287,9 @@ service BucketService{
     rpc Inspect(Bucket) returns (BucketMountPoint){}
 }
 
-// broker ssh copy
-// broker ssh run
-// broker ssh connect
+// safescale ssh copy
+// safescale ssh run
+// safescale ssh connect
 message SshCommand{
     Reference Host = 1;
     string Command = 2;
@@ -310,12 +310,12 @@ service SshService{
     rpc Copy(SshCopyCommand) returns (SshResponse){}
 }
 
-//broker nas create nas1 host1 --path="/shared/data"
-//broker nas delete nas1
-//broker nas mount nas1 host2 --path="/data"
-//broker nas umount nas1 host2
-//broker nas list
-//broker nas inspect nas1
+//safescale nas create nas1 host1 --path="/shared/data"
+//safescale nas delete nas1
+//safescale nas mount nas1 host2 --path="/data"
+//safescale nas umount nas1 host2
+//safescale nas list
+//safescale nas inspect nas1
 
 // message NasName{
 //     string Name = 1;

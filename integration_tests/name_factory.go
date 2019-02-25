@@ -52,25 +52,25 @@ func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHo
 func (names *Names) TearDown() {
 	//TODO is it possible to supress a non empty bucket?
 	for _, bucketName := range names.Buckets {
-		_, _ = GetOutput(fmt.Sprintf("broker bucket delete %s", bucketName))
+		_, _ = GetOutput(fmt.Sprintf("safescale bucket delete %s", bucketName))
 	}
 	for _, volumeName := range names.Volumes {
 		for _, hostName := range names.Hosts {
-			_, _ = GetOutput(fmt.Sprintf("broker volume detach %s %s", volumeName, hostName))
+			_, _ = GetOutput(fmt.Sprintf("safescale volume detach %s %s", volumeName, hostName))
 		}
-		_, _ = GetOutput(fmt.Sprintf("broker volume delete %s", volumeName))
+		_, _ = GetOutput(fmt.Sprintf("safescale volume delete %s", volumeName))
 	}
 	for _, shareName := range names.Shares {
 		for _, hostName := range names.Hosts {
-			_, _ = GetOutput(fmt.Sprintf("broker share umount %s %s", shareName, hostName))
+			_, _ = GetOutput(fmt.Sprintf("safescale share umount %s %s", shareName, hostName))
 		}
-		_, _ = GetOutput(fmt.Sprintf("broker share delete %s", shareName))
+		_, _ = GetOutput(fmt.Sprintf("safescale share delete %s", shareName))
 	}
 	for _, hostName := range names.Hosts {
-		_, _ = GetOutput(fmt.Sprintf("broker host delete %s", hostName))
+		_, _ = GetOutput(fmt.Sprintf("safescale host delete %s", hostName))
 	}
 	for _, networkName := range names.Networks {
-		_, _ = GetOutput(fmt.Sprintf("broker network delete %s", networkName))
+		_, _ = GetOutput(fmt.Sprintf("safescale network delete %s", networkName))
 	}
 	for _, clusterName := range names.Clusters {
 		_, _ = GetOutput(fmt.Sprintf("deploy cluster delete --yes %s", clusterName))

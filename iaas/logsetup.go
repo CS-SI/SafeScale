@@ -48,7 +48,7 @@ func init() {
 	}
 
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale"), 0777)
-	bfile, err := os.OpenFile(utils.AbsPathify("$HOME/.safescale/brokerd-session.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	bfile, err := os.OpenFile(utils.AbsPathify("$HOME/.safescale/safescaled-session.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		panic(err)
 	}

@@ -26,8 +26,8 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pb "github.com/CS-SI/SafeScale/safescale"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
@@ -318,13 +318,13 @@ func getState(c api.Cluster) (ClusterState.Enum, error) {
 	)
 
 	cmd := "/opt/mesosphere/bin/dcos-diagnostics --diag"
-	brokerClt := brokerclient.New()
-	brokerCltHost := brokerClt.Host
+	safescaleClt := safescaleclient.New()
+	safescaleCltHost := safescaleClt.Host
 	masterID, err := c.FindAvailableMaster()
 	if err != nil {
 		return ClusterState.Unknown, err
 	}
-	sshCfg, err := brokerCltHost.SSHConfig(masterID)
+	sshCfg, err := safescaleCltHost.SSHConfig(masterID)
 	if err != nil {
 		log.Errorf("failed to get ssh config to connect to master '%s': %s", masterID, err.Error())
 		return ClusterState.Error, err
@@ -335,7 +335,7 @@ func getState(c api.Cluster) (ClusterState.Enum, error) {
 		if err != nil {
 			return ClusterState.Error, err
 		}
-		retcode, _, stderr, err = brokerClt.Ssh.Run(masterID, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+		retcode, _, stderr, err = safescaleClt.Ssh.Run(masterID, cmd, safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			log.Errorf("failed to run remote command to get cluster state: %v\n%s", err, stderr)
 			return ClusterState.Error, err

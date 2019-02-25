@@ -22,7 +22,7 @@ import (
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
 
-	pb "github.com/CS-SI/SafeScale/broker"
+	pb "github.com/CS-SI/SafeScale/safescale"
 )
 
 //go:generate mockgen -destination=../mocks/mock_target.go -package=mocks github.com/CS-SI/SafeScale/deploy/install Target

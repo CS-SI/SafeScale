@@ -51,7 +51,7 @@ endif
 endif
 
 # Binaries generated
-EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd/brokerd broker/cli/brokerd/brokerd-cover deploy/cli/deploy deploy/cli/deploy-cover perform/perform perform/perform-cover scanner/scanner
+EXECS=safescale/cli/safescale/safescale safescale/cli/safescale/safescale-cover safescale/cli/safescaled/safescaled safescale/cli/safescaled/safescaled-cover deploy/cli/deploy deploy/cli/deploy-cover perform/perform perform/perform-cover scanner/scanner
 
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
@@ -95,7 +95,7 @@ WARN_STRING  = "[WARNING]"
 BUILD_TAGS = ""
 export BUILD_TAGS
 
-all: begin ground getdevdeps ensure generate utils system iaas broker deploy perform scanner err vet-light
+all: begin ground getdevdeps ensure generate utils system iaas safescale deploy perform scanner err vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps ensure generate
@@ -151,15 +151,15 @@ system: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building system, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd system && $(MAKE) all)
 
-broker: common utils system iaas
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service broker, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd broker && $(MAKE) all)
+safescale: common utils system iaas
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd safescale && $(MAKE) all)
 
-deploy: common utils system iaas broker
+deploy: common utils system iaas safescale
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service deploy, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd deploy && $(MAKE) all)
 
-perform: common utils system iaas broker
+perform: common utils system iaas safescale
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd perform && $(MAKE) all)
 
@@ -171,16 +171,16 @@ clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd iaas && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
-	@(cd broker && $(MAKE) $@)
+	@(cd safescale && $(MAKE) $@)
 	@(cd deploy && $(MAKE) $@)
 	@(cd perform && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
 
-broker/client/broker: broker
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service broker (client) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+safescale/client/safescale: safescale
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale (client) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
-broker/server/brokerd: broker
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service broker (daemon) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+safescale/server/safescaled: safescale
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale (daemon) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
 deploy/cli/deploy: deploy
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service deploy, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -211,7 +211,7 @@ depclean: begin
 
 generate: begin # Run generation
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@cd broker && $(MAKE) sdk
+	@cd safescale && $(MAKE) sdk
 	@$(GO) generate -run stringer ./... 2>&1 | tee generation_results.log
 	@$(GO) generate -run rice ./... 2>&1 | tee -a generation_results.log
 	@$(GO) generate -run stringer ./... 2>&1 | tee -a generation_results.log

@@ -126,7 +126,7 @@ func (i *dcosInstaller) GetName() {
 func (i *dcosInstaller) Add(t api.Target) error {
 	if i.AddCommand != "" {
 		cmdStr := "sudo -u cladm -i " + i.AddCommand
-		return brokerclient.New().Ssh.Run(h.ID, cmdStr, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+		return safescaleclient.New().Ssh.Run(h.ID, cmdStr, safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 	}
 	return fmt.Errorf("no command to add component found")
 }
@@ -135,7 +135,7 @@ func (i *dcosInstaller) Add(t api.Target) error {
 func (i *dcosInstaller) Remove(t api.Target) error {
 	if i.RemoveCommand != "" {
 		cmdStr := "sudo -u cladm -i " + i.AddCommand
-		return brokerclient.New().Ssh.Run(h.ID, cmdStr, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+		return safescaleclient.New().Ssh.Run(h.ID, cmdStr, safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 	}
 	return fmt.Errorf("no command to remove component found")
 }

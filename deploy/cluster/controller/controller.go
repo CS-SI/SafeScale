@@ -24,9 +24,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-	pbutils "github.com/CS-SI/SafeScale/broker/utils"
+	pb "github.com/CS-SI/SafeScale/safescale"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
+	pbutils "github.com/CS-SI/SafeScale/safescale/utils"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/NodeType"
@@ -236,7 +236,7 @@ func (c *Controller) GetNode(hostID string) (*pb.Host, error) {
 	if !found {
 		return nil, fmt.Errorf("failed to find node '%s' in Cluster '%s'", hostID, c.Name)
 	}
-	return brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+	return safescaleclient.New().Host.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 }
 
 // SearchNode tells if an host ID corresponds to a node of the Cluster
@@ -258,10 +258,10 @@ func (c *Controller) SearchNode(hostID string, public bool) bool {
 func (c *Controller) FindAvailableMaster() (string, error) {
 	masterID := ""
 	found := false
-	brokerHost := brokerclient.New().Host
+	safescaleHost := safescaleclient.New().Host
 	masterIDs := c.ListMasterIDs()
 	for _, masterID = range masterIDs {
-		sshCfg, err := brokerHost.SSHConfig(masterID)
+		sshCfg, err := safescaleHost.SSHConfig(masterID)
 		if err != nil {
 			log.Errorf("failed to get ssh config for master '%s': %s", masterID, err.Error())
 			continue
@@ -286,9 +286,9 @@ func (c *Controller) FindAvailableMaster() (string, error) {
 func (c *Controller) FindAvailableNode(public bool) (string, error) {
 	hostID := ""
 	found := false
-	brokerHost := brokerclient.New().Host
+	safescaleHost := safescaleclient.New().Host
 	for _, hostID = range c.ListNodeIDs(public) {
-		sshCfg, err := brokerHost.SSHConfig(hostID)
+		sshCfg, err := safescaleHost.SSHConfig(hostID)
 		if err != nil {
 			log.Errorf("failed to get ssh config of node '%s': %s", hostID, err.Error())
 			continue
@@ -424,7 +424,7 @@ func (c *Controller) AddNodes(count int, public bool, req *resources.HostDefinit
 		dones   []chan error
 		results []chan string
 	)
-	timeout := brokerclient.DefaultExecutionTimeout + time.Duration(count)*time.Minute
+	timeout := safescaleclient.DefaultExecutionTimeout + time.Duration(count)*time.Minute
 
 	for i := 0; i < count; i++ {
 		r := make(chan string)
@@ -443,13 +443,13 @@ func (c *Controller) AddNodes(count int, public bool, req *resources.HostDefinit
 			errors = append(errors, err.Error())
 		}
 	}
-	brokerHost := brokerclient.New().Host
+	safescaleHost := safescaleclient.New().Host
 
 	// Starting from here, delete nodes if exiting with error
 	defer func() {
 		if err != nil {
 			if len(hosts) > 0 {
-				derr := brokerHost.Delete(hosts, brokerclient.DefaultExecutionTimeout)
+				derr := safescaleHost.Delete(hosts, safescaleclient.DefaultExecutionTimeout)
 				if derr != nil {
 					log.Errorf("failed to delete nodes after failure to expand cluster")
 				}
@@ -579,7 +579,7 @@ func (c *Controller) deleteMaster(hostID string) error {
 	}()
 
 	// Finally delete host
-	err = brokerclient.New().Host.Delete([]string{master.ID}, 10*time.Minute)
+	err = safescaleclient.New().Host.Delete([]string{master.ID}, 10*time.Minute)
 	if err != nil {
 		return err
 	}
@@ -724,7 +724,7 @@ func (c *Controller) deleteNode(node *clusterpropsv1.Node, index int, public boo
 	}
 
 	// Finally delete host
-	err = brokerclient.New().Host.Delete([]string{node.ID}, 10*time.Minute)
+	err = safescaleclient.New().Host.Delete([]string{node.ID}, 10*time.Minute)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); ok {
 			// host seems already deleted, so it's a success (handles the case where )
@@ -754,7 +754,7 @@ func (c *Controller) Delete() error {
 	}
 
 	var wg sync.WaitGroup
-	broker := brokerclient.New()
+	safescale := safescaleclient.New()
 
 	// Deletes the public nodes
 	list := c.ListNodeIDs(true)
@@ -806,7 +806,7 @@ func (c *Controller) Delete() error {
 	}
 	err = retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
-			return broker.Network.Delete([]string{networkID}, brokerclient.DefaultExecutionTimeout)
+			return safescale.Network.Delete([]string{networkID}, safescaleclient.DefaultExecutionTimeout)
 		},
 		3*time.Minute,
 	)

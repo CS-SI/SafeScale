@@ -31,9 +31,9 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/broker/server/handlers"
-	"github.com/CS-SI/SafeScale/broker/server/metadata"
-	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
+	"github.com/CS-SI/SafeScale/safescale/server/handlers"
+	"github.com/CS-SI/SafeScale/safescale/server/metadata"
+	_ "github.com/CS-SI/SafeScale/safescale/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
@@ -207,7 +207,7 @@ func RunScanner() {
 		}
 	}
 
-	// TODO Enable when several brokerd instances can run in parallel
+	// TODO Enable when several safescaled instances can run in parallel
 	/*
 		var wtg sync.WaitGroup
 

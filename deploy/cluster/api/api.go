@@ -17,7 +17,7 @@
 package api
 
 import (
-	pb "github.com/CS-SI/SafeScale/broker"
+	pb "github.com/CS-SI/SafeScale/safescale"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/deploy/cluster/identity"

@@ -27,10 +27,10 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
-	providermetadata "github.com/CS-SI/SafeScale/broker/server/metadata"
-	pbutils "github.com/CS-SI/SafeScale/broker/utils"
+	pb "github.com/CS-SI/SafeScale/safescale"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
+	providermetadata "github.com/CS-SI/SafeScale/safescale/server/metadata"
+	pbutils "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/ClusterState"
@@ -182,8 +182,8 @@ func (b *Blueprint) Construct(req Request) error {
 		CIDR:    req.CIDR,
 		Gateway: &pbGatewayDef,
 	}
-	broker := brokerclient.New()
-	network, err := broker.Network.Create(def, brokerclient.DefaultExecutionTimeout)
+	safescale := safescaleclient.New()
+	network, err := safescale.Network.Create(def, safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		err = fmt.Errorf("[cluster %s] failed to create Network '%s': %s", req.Name, networkName, err.Error())
 		return err
@@ -193,7 +193,7 @@ func (b *Blueprint) Construct(req Request) error {
 
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			derr := broker.Network.Delete([]string{network.ID}, brokerclient.DefaultExecutionTimeout)
+			derr := safescale.Network.Delete([]string{network.ID}, safescaleclient.DefaultExecutionTimeout)
 			if derr != nil {
 				log.Debugf("failed to delete up network on failure")
 			}
@@ -208,7 +208,7 @@ func (b *Blueprint) Construct(req Request) error {
 		m      *providermetadata.Gateway
 	)
 
-	tenant, err := broker.Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	tenant, err := safescale.Tenant.Get(safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -233,9 +233,9 @@ func (b *Blueprint) Construct(req Request) error {
 	}
 	gw = m.Get()
 
-	err = broker.Ssh.WaitReady(gw.ID, brokerclient.DefaultExecutionTimeout)
+	err = safescale.Ssh.WaitReady(gw.ID, safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
-		return brokerclient.DecorateError(err, "wait for remote ssh service to be ready", false)
+		return safescaleclient.DecorateError(err, "wait for remote ssh service to be ready", false)
 	}
 
 	// Create a KeyPair for the user cladm
@@ -337,7 +337,7 @@ func (b *Blueprint) Construct(req Request) error {
 	// Starting from here, delete masters if exiting with error and req.KeepOnFailure is not true
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			derr := brokerclient.New().Host.Delete(b.Cluster.ListMasterIDs(), brokerclient.DefaultExecutionTimeout)
+			derr := safescaleclient.New().Host.Delete(b.Cluster.ListMasterIDs(), safescaleclient.DefaultExecutionTimeout)
 			if derr != nil {
 				log.Errorf("failed to delete masters on failure")
 			}
@@ -363,12 +363,12 @@ func (b *Blueprint) Construct(req Request) error {
 	// Starting from here, delete nodes on failure if exits with error and req.KeepOnFailure is false
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
-			broker := brokerclient.New().Host
-			derr := broker.Delete(b.Cluster.ListNodeIDs(false), brokerclient.DefaultExecutionTimeout)
+			safescale := safescaleclient.New().Host
+			derr := safescale.Delete(b.Cluster.ListNodeIDs(false), safescaleclient.DefaultExecutionTimeout)
 			if derr != nil {
 				log.Debugf("failed to remove private nodes on failure")
 			}
-			derr = broker.Delete(b.Cluster.ListNodeIDs(true), brokerclient.DefaultExecutionTimeout)
+			derr = safescale.Delete(b.Cluster.ListNodeIDs(true), safescaleclient.DefaultExecutionTimeout)
 			if derr != nil {
 				log.Debugf("failed to remove public nodes on failure")
 			}
@@ -491,7 +491,7 @@ func (b *Blueprint) ExecuteScript(
 	} else {
 		cmd = fmt.Sprintf("sudo bash %s; rc=$?; rm %s; exit $rc", path, path)
 	}
-	return brokerclient.New().Ssh.Run(hostID, cmd, brokerclient.DefaultConnectionTimeout, time.Duration(20)*time.Minute)
+	return safescaleclient.New().Ssh.Run(hostID, cmd, safescaleclient.DefaultConnectionTimeout, time.Duration(20)*time.Minute)
 }
 
 // GetState returns "actively" the current state of the cluster
@@ -513,7 +513,7 @@ func (b *Blueprint) configureNode(index int, pbHost *pb.Host, nodeType NodeType.
 
 // unconfigureNode executes what has to be done to remove node from cluster
 func (b *Blueprint) unconfigureNode(hostID string, selectedMasterID string) error {
-	pbHost, err := brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+	pbHost, err := safescaleclient.New().Host.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -587,8 +587,8 @@ func uploadTemplateToFile(
 	if box == nil {
 		panic("box is nil!")
 	}
-	broker := brokerclient.New()
-	host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+	safescale := safescaleclient.New()
+	host, err := safescale.Host.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return "", fmt.Errorf("failed to get host information: %s", err)
 	}
@@ -641,9 +641,9 @@ func (b *Blueprint) configureNodesFromList(public bool, hosts []string) error {
 	)
 
 	dones := []chan error{}
-	brokerHost := brokerclient.New().Host
+	safescaleHost := safescaleclient.New().Host
 	for i, hostID = range hosts {
-		host, err = brokerHost.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		host, err = safescaleHost.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			break
 		}
@@ -688,11 +688,11 @@ func (b *Blueprint) joinNodesFromList(public bool, hosts []string) error {
 
 	log.Debugf("Joining %s Nodes to cluster...", nodeTypeStr)
 
-	brokerHost := brokerclient.New().Host
+	safescaleHost := safescaleclient.New().Host
 	// Joins to cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
-		pbHost, err := brokerHost.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		pbHost, err := safescaleHost.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			return err
 		}
@@ -713,11 +713,11 @@ func (b *Blueprint) leaveMastersFromList(public bool, hosts []string) error {
 
 	log.Debugf("Making Mastersleaving cluster...")
 
-	brokerHost := brokerclient.New().Host
+	safescaleHost := safescaleclient.New().Host
 	// Joins to cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
-		pbHost, err := brokerHost.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		pbHost, err := safescaleHost.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			return err
 		}
@@ -750,11 +750,11 @@ func (b *Blueprint) leaveNodesFromList(hosts []string, public bool, selectedMast
 
 	log.Debugf("Making %s Nodes leaving cluster...", nodeTypeStr)
 
-	brokerHost := brokerclient.New().Host
+	safescaleHost := safescaleclient.New().Host
 	// Joins to cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
-		pbHost, err := brokerHost.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		pbHost, err := safescaleHost.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			// If host seems deleted, consider leaving as a success
 			if _, ok := err.(resources.ErrResourceNotFound); ok {
@@ -889,7 +889,7 @@ func (b *Blueprint) asyncInstallGateway(pbGateway *pb.Host, done chan error) {
 	hostLabel := "gateway"
 	log.Debugf("[%s] starting installation...", hostLabel)
 
-	sshCfg, err := brokerclient.New().Host.SSHConfig(pbGateway.ID)
+	sshCfg, err := safescaleclient.New().Host.SSHConfig(pbGateway.ID)
 	if err != nil {
 		done <- err
 		return
@@ -1013,10 +1013,10 @@ func (b *Blueprint) asyncCreateMaster(index int, def pb.HostDefinition, timeout 
 	def.Network = b.Cluster.GetNetworkConfig().NetworkID
 	def.Public = false
 	def.Name = name
-	brokerHost := brokerclient.New().Host
-	pbHost, err := brokerHost.Create(def, timeout)
+	safescaleHost := safescaleclient.New().Host
+	pbHost, err := safescaleHost.Create(def, timeout)
 	if err != nil {
-		err = brokerclient.DecorateError(err, "creation of host resource", false)
+		err = safescaleclient.DecorateError(err, "creation of host resource", false)
 		log.Errorf("[%s] host resource creation failed: %s", hostLabel, err.Error())
 		done <- fmt.Errorf("failed to create '%s': %s", hostLabel, err.Error())
 		return
@@ -1026,7 +1026,7 @@ func (b *Blueprint) asyncCreateMaster(index int, def pb.HostDefinition, timeout 
 
 	defer func() {
 		if err != nil {
-			derr := brokerHost.Delete([]string{pbHost.ID}, timeout)
+			derr := safescaleHost.Delete([]string{pbHost.ID}, timeout)
 			if derr != nil {
 				log.Errorf("failed to delete master after failure")
 			}
@@ -1083,10 +1083,10 @@ func (b *Blueprint) asyncConfigureMasters(done chan error) {
 
 	log.Debugf("[cluster %s] Configuring masters...", b.Cluster.Name)
 
-	broker := brokerclient.New().Host
+	safescale := safescaleclient.New().Host
 	dones := []chan error{}
 	for i, hostID := range b.Cluster.ListMasterIDs() {
-		host, err := broker.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		host, err := safescale.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			done <- fmt.Errorf("failed to get metadata of host: %s", err.Error())
 		}
@@ -1222,10 +1222,10 @@ func (b *Blueprint) asyncCreateNode(
 	}
 	def.Public = publicIP
 	def.Network = b.Cluster.GetNetworkConfig().NetworkID
-	brokerHost := brokerclient.New().Host
-	pbHost, err := brokerHost.Create(def, 10*time.Minute)
+	safescaleHost := safescaleclient.New().Host
+	pbHost, err := safescaleHost.Create(def, 10*time.Minute)
 	if err != nil {
-		err = brokerclient.DecorateError(err, "creation of host resource", true)
+		err = safescaleclient.DecorateError(err, "creation of host resource", true)
 		log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
 		result <- ""
 		done <- err
@@ -1254,7 +1254,7 @@ func (b *Blueprint) asyncCreateNode(
 		})
 	})
 	if err != nil {
-		derr := brokerHost.Delete([]string{pbHost.ID}, 10*time.Minute)
+		derr := safescaleHost.Delete([]string{pbHost.ID}, 10*time.Minute)
 		if derr != nil {
 			log.Errorf("failed to delete node after failure")
 		}
@@ -1328,9 +1328,9 @@ func (b *Blueprint) asyncConfigureNodes(public bool, done chan error) {
 	)
 
 	dones := []chan error{}
-	brokerHost := brokerclient.New().Host
+	safescaleHost := safescaleclient.New().Host
 	for i, hostID = range list {
-		pbHost, err = brokerHost.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		pbHost, err = safescaleHost.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			break
 		}

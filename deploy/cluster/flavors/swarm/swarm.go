@@ -32,8 +32,8 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	// log "github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pb "github.com/CS-SI/SafeScale/safescale"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
@@ -123,31 +123,31 @@ func defaultImage(c api.Cluster) string {
 
 // configureCluster configures cluster
 func configureCluster(c api.Cluster, b *controller.Blueprint) error {
-	broker := brokerclient.New()
+	safescale := safescaleclient.New()
 
 	// Join masters in Docker Swarm as managers
 	joinCmd := ""
 	for _, hostID := range c.ListMasterIDs() {
-		host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		host, err := safescale.Host.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
 		}
 		if joinCmd == "" {
-			retcode, _, _, err := broker.Ssh.Run(hostID, "docker swarm init",
-				brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+			retcode, _, _, err := safescale.Ssh.Run(hostID, "docker swarm init",
+				safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 			if err != nil || retcode != 0 {
 				return fmt.Errorf("failed to init docker swarm")
 			}
-			retcode, token, stderr, err := broker.Ssh.Run(hostID, "docker swarm join-token manager -q",
-				brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+			retcode, token, stderr, err := safescale.Ssh.Run(hostID, "docker swarm join-token manager -q",
+				safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 			if err != nil || retcode != 0 {
 				return fmt.Errorf("failed to generate token to join swarm as manager: %s", stderr)
 			}
 			token = strings.Trim(token, "\n")
 			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, hostID)
 		} else {
-			retcode, _, stderr, err := broker.Ssh.Run(hostID, joinCmd,
-				brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+			retcode, _, stderr, err := safescale.Ssh.Run(hostID, joinCmd,
+				safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 			if err != nil || retcode != 0 {
 				return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", host.Name, stderr)
 			}
@@ -162,24 +162,24 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 
 	// Join private node in Docker Swarm as workers
 	for _, hostID := range c.ListNodeIDs(false) {
-		host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		host, err := safescale.Host.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
 		}
-		retcode, _, stderr, err := broker.Ssh.Run(hostID, joinCmd,
-			brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+		retcode, _, stderr, err := safescale.Ssh.Run(hostID, joinCmd,
+			safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
 		}
 	}
 	// Join public nodes in Docker Swarm as workers
 	for _, hostID := range c.ListNodeIDs(true) {
-		host, err := broker.Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		host, err := safescale.Host.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
 		}
-		retcode, _, stderr, err := broker.Ssh.Run(hostID, joinCmd,
-			brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+		retcode, _, stderr, err := safescale.Ssh.Run(hostID, joinCmd,
+			safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
 		}
@@ -190,14 +190,14 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 
 // joinMaster is the code to use to join a new master to the cluster
 func joinMaster(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host) error {
-	brokerSsh := brokerclient.New().Ssh
+	safescaleSsh := safescaleclient.New().Ssh
 
 	joinCmd, err := getSwarmJoinCommand(c, false)
 	if err != nil {
 		return err
 	}
-	retcode, _, stderr, err := brokerSsh.Run(pbHost.ID, joinCmd,
-		brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, _, stderr, err := safescaleSsh.Run(pbHost.ID, joinCmd,
+		safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", pbHost.Name, stderr)
 	}
@@ -207,14 +207,14 @@ func joinMaster(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host) error {
 
 // joinNode is the code to use join a new node to the cluster
 func joinNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr string) error {
-	brokerSsh := brokerclient.New().Ssh
+	safescaleSsh := safescaleclient.New().Ssh
 
 	joinCmd, err := getSwarmJoinCommand(c, true)
 	if err != nil {
 		return err
 	}
-	retcode, _, stderr, err := brokerSsh.Run(pbHost.ID, joinCmd,
-		brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, _, stderr, err := safescaleSsh.Run(pbHost.ID, joinCmd,
+		safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", pbHost.Name, stderr)
 	}
@@ -227,8 +227,8 @@ func getSwarmJoinCommand(c api.Cluster, worker bool) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to join workers to Docker Swarm: %v", err)
 	}
-	broker := brokerclient.New()
-	master, err := broker.Host.Inspect(masterID, brokerclient.DefaultExecutionTimeout)
+	safescale := safescaleclient.New()
+	master, err := safescale.Host.Inspect(masterID, safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return "", fmt.Errorf("failed to get metadata of master: %s", err.Error())
 	}
@@ -237,8 +237,8 @@ func getSwarmJoinCommand(c api.Cluster, worker bool) (string, error) {
 		memberType = "worker"
 	}
 	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
-	retcode, token, stderr, err := broker.Ssh.Run(masterID, tokenCmd,
-		brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, token, stderr, err := safescale.Ssh.Run(masterID, tokenCmd,
+		safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 	if err != nil || retcode != 0 {
 		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
 	}
@@ -315,11 +315,11 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, se
 		}
 	}
 
-	clt := brokerclient.New()
+	clt := safescaleclient.New()
 
 	// Check worker is member of the Swarm
 	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)
-	retcode, _, _, err := clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, _, _, err := clt.Ssh.Run(selectedMaster, cmd, safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, se
 	}
 	// node is a worker in the Swarm: 1st ask worker to leave Swarm
 	cmd = "docker swarm leave"
-	retcode, _, stderr, err := clt.Ssh.Run(pbHost.ID, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, _, stderr, err := clt.Ssh.Run(pbHost.ID, cmd, safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, se
 	cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", pbHost.Name)
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			retcode, _, _, err := clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+			retcode, _, _, err := clt.Ssh.Run(selectedMaster, cmd, safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 			if err != nil {
 				return err
 			}
@@ -363,7 +363,7 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, se
 
 	// 3rd, ask master to remove node from Swarm
 	cmd = fmt.Sprintf("docker node rm %s", pbHost.Name)
-	retcode, _, stderr, err = clt.Ssh.Run(selectedMaster, cmd, brokerclient.DefaultConnectionTimeout, brokerclient.DefaultExecutionTimeout)
+	retcode, _, stderr, err = clt.Ssh.Run(selectedMaster, cmd, safescaleclient.DefaultConnectionTimeout, safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}

@@ -26,8 +26,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pb "github.com/CS-SI/SafeScale/safescale"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
 	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
@@ -145,7 +145,7 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 		if err != nil {
 			return nil, err
 		}
-		w.availableMaster, err = brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		w.availableMaster, err = safescaleclient.New().Host.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +169,7 @@ func (w *worker) identifyAvailableNode(public bool) (*pb.Host, error) {
 		if err != nil {
 			return nil, err
 		}
-		host, err := brokerclient.New().Host.Inspect(hostID, brokerclient.DefaultExecutionTimeout)
+		host, err := safescaleclient.New().Host.Inspect(hostID, safescaleclient.DefaultExecutionTimeout)
 		if err != nil {
 			return nil, err
 		}
@@ -250,9 +250,9 @@ func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 	}
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []*pb.Host{}
-		broker := brokerclient.New().Host
+		safescale := safescaleclient.New().Host
 		for _, i := range w.cluster.ListMasterIDs() {
-			host, err := broker.Inspect(i, brokerclient.DefaultExecutionTimeout)
+			host, err := safescale.Inspect(i, safescaleclient.DefaultExecutionTimeout)
 			if err != nil {
 				return nil, err
 			}
@@ -308,10 +308,10 @@ func (w *worker) identifyAllNodes(public bool) ([]*pb.Host, error) {
 		found = w.allPrivateNodes != nil && len(w.allPrivateNodes) > 0
 	}
 	if !found {
-		brokerhost := brokerclient.New().Host
+		safescalehost := safescaleclient.New().Host
 		allHosts := []*pb.Host{}
 		for _, i := range w.cluster.ListNodeIDs(public) {
-			host, err := brokerhost.Inspect(i, brokerclient.DefaultExecutionTimeout)
+			host, err := safescalehost.Inspect(i, safescaleclient.DefaultExecutionTimeout)
 			if err != nil {
 				return nil, err
 			}

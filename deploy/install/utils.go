@@ -26,8 +26,8 @@ import (
 
 	"github.com/spf13/viper"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pb "github.com/CS-SI/SafeScale/safescale"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
@@ -155,11 +155,11 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 		return fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
 	to := fmt.Sprintf("%s:%s", host.Name, filename)
-	broker := brokerclient.New().Ssh
+	safescale := safescaleclient.New().Ssh
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = broker.Copy(f.Name(), to, 15*time.Second, brokerclient.DefaultExecutionTimeout)
+			retcode, _, _, err = safescale.Copy(f.Name(), to, 15*time.Second, safescaleclient.DefaultExecutionTimeout)
 			if err != nil {
 				return err
 			}
@@ -167,7 +167,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = broker.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), 15*time.Second, brokerclient.DefaultExecutionTimeout)
+					_, _, _, err = safescale.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), 15*time.Second, safescaleclient.DefaultExecutionTimeout)
 					return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 				}
 				if system.IsSCPRetryable(retcode) {
@@ -208,7 +208,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = broker.Run(host.Name, cmd, 15*time.Second, brokerclient.DefaultExecutionTimeout)
+			retcode, _, _, err = safescale.Run(host.Name, cmd, 15*time.Second, safescaleclient.DefaultExecutionTimeout)
 			if err != nil {
 				return err
 			}
@@ -361,7 +361,7 @@ func gatewayFromHost(host *pb.Host) *pb.Host {
 	if gwID == "" {
 		return host
 	}
-	gw, err := brokerclient.New().Host.Inspect(gwID, brokerclient.DefaultExecutionTimeout)
+	gw, err := safescaleclient.New().Host.Inspect(gwID, safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil
 	}
