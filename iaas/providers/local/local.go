@@ -21,9 +21,9 @@ package local
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/iaas/stacks"
 
-	"github.com/CS-SI/LocalDriver/metadata"
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/providers"
 	"github.com/CS-SI/SafeScale/iaas/resources"
@@ -80,7 +80,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 	config.ProviderNetwork = "safescale"
 	config.AutoHostNetworkInterfaces = false
 	config.UseLayer3Networking = false
-	config.MetadataBucket = metadata.BuildMetadataBucketName("id")
+	bucketName, err := objectstorage.BuildMetadataBucketName("local", "", "", "")
+	if err != nil {
+		return nil, fmt.Errorf("Failed to build metadata bucket name %v", err)
+	}
+	config.MetadataBucket = bucketName
 
 	compute, _ := params["compute"].(map[string]interface{})
 
