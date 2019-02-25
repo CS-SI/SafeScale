@@ -221,6 +221,11 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	return cfg, nil
 }
 
+// GetProvider returns the providerName
+func (p *provider) GetProvider() string {
+	return "flexibleengine"
+}
+
 func init() {
 	iaas.Register("flexibleengine", &provider{})
 }

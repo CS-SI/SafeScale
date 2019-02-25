@@ -196,10 +196,13 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 // RunScanner ...
 func RunScanner() {
 	var targetedProviders []string
-	theProviders, _ := iaas.GetTenants()
+	theProviders, err := iaas.GetTenants()
+	if err != nil {
+		panic(fmt.Sprintf("Unable to get Tenants %s", err.Error()))
+	}
 
-	for tenantName := range theProviders {
-		if strings.Contains(tenantName, "-scannable-gpu-test") {
+	for tenantName, _ := range theProviders {
+		if strings.Contains(tenantName, "-scannable") {
 			targetedProviders = append(targetedProviders, tenantName)
 		}
 	}
@@ -224,9 +227,10 @@ func RunScanner() {
 		if err != nil {
 			fmt.Printf("Error working with tenant %s\n", tenantName)
 		}
+		if err := collect(tenantName); err != nil {
+			log.Warn("Failed to save scanned info from tenant %s", tenantName)
+		}
 	}
-
-	collect()
 }
 
 func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
@@ -254,7 +258,6 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	if err != nil {
 		return err
 	}
-
 	img, err := serviceProvider.SearchImage("Ubuntu 18.04")
 	if err != nil {
 		log.Warnf("No image here...")

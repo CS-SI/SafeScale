@@ -204,6 +204,10 @@ func (p *provider) CreateNetwork(req resources.NetworkRequest) (*resources.Netwo
 	return p.Stack.CreateNetwork(req)
 }
 
+func (p *provider) GetProvider() string {
+	return "ovh"
+}
+
 func init() {
 	iaas.Register("ovh", &provider{})
 }

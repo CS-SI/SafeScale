@@ -189,20 +189,28 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 		_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 		if err != nil {
-			if !force {
-				fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
-				log.Warnf("Problem creating / accessing Scanner database, ignoring for now...: %v", err)
+			if force {
+				log.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 			} else {
 				noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 				log.Error(noHostError)
 				return nil, errors.New(noHostError)
 			}
 		} else {
-			imageList, err := db.ReadAll("images")
+			authOpts, err := svc.GetAuthOpts()
 			if err != nil {
-				if !force {
-					fmt.Println("Problem accessing Scanner database: ignoring GPU and Freq parameters...")
-					log.Warnf("Error reading Scanner database: %v", err)
+				return nil, err
+			}
+			region, ok := authOpts.Get("Region")
+			if !ok {
+				return nil, fmt.Errorf("Region value unset")
+			}
+			folder := fmt.Sprintf("images/%s/%s", svc.GetProvider(), region)
+
+			imageList, err := db.ReadAll(folder)
+			if err != nil {
+				if force {
+					log.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 				} else {
 					noHostError := fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem listing images from Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 					log.Error(noHostError)
