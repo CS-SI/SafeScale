@@ -4,10 +4,8 @@ Some providers didn't provide all the informations (cpu frequency, gpu, ...) abo
 
 ## Scanner usage
 
-To launch the scan just launch the command scanner.
-```
-scanner
-```
+To launch the scan just launch the command ```scanner```.
+
 
 To be scanned, a tenant name should be followed by scannable
 
@@ -20,5 +18,5 @@ To be scanned, a tenant name should be followed by scannable
 .
 ```
 
-A database of all templates availables will then be strored in $HOME/.Safescale/ allowing SafeScale to create hosts more precisely.<br>
-Please be aware than a scan is specific to a provider and to a region, as templates can be differents betwen regions and providers.
+A database of all templates availables will then be stored in $HOME/.safescale/ allowing SafeScale to create hosts more precisely.<br>
+Please be aware that a scan is specific to a provider and to a region, as templates can vary with regions and providers.

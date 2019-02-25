@@ -52,8 +52,78 @@ The same configuration can be provided in JSON or in YAML.
 
 Here is the JSON equivalent of the example TOML configuration file :
 
+```json
+{
+  "tenants": [
+    {
+      "name": "TenantName",
+      "client": "ovh",
+      "compute": {
+        "DefaultImage": "<OS Image Name to use as default, ex: Ubuntu 18.04>",
+        "ProjectID": "<Project ID>",
+        "Region": "<Region>"
+      },
+      "identity": {
+        "DomainName": "<Domain Name>",
+        "Password": "<Password>",
+        "Username": "<Username>"
+      },
+      "metadata": {
+        "ApplicationKey": "<Openstack Application Key>",
+        "AuthURL": "https://auth.cloud.ovh.net/v2.0",
+        "CryptKey": "<metadata crypt password>",
+        "OpenstackID": "<Openstack ID>",
+        "OpenstackPassword": "<Openstack password>",
+        "Type": "swift"
+      },
+
+      "network": {
+        "ProviderNetwork": "<Provider network for public access, ex:Ext-Net>",
+        "VPCCIDR": "<VPC CIDR, ex: 192.168.0.0/16>",
+        "VPCName": "<VPC Name>"
+      },
+      "objectstorage": {
+        "AccessKey": "<Access Key>",
+        "Endpoint": "https://oss.eu-west-0.prod-cloud-ocb.orange-business.com",
+        "SecretKey": "<Secret Key>",
+        "Type": "s3"
+      }
+    }
+  ]
+}
+```
+
 Here is the YAML equivalent of the example TOML configuration file :
 
+```yaml
+tenants:
+- client: ovh
+  compute:
+    DefaultImage: '<OS Image Name to use as default, ex: Ubuntu 18.04>'
+    ProjectID: <Project ID>
+    Region: <Region>
+  identity:
+    DomainName: <Domain Name>
+    Password: <Password>
+    Username: <Username>
+  metadata:
+    ApplicationKey: <Openstack Application Key>
+    AuthURL: https://auth.cloud.ovh.net/v2.0
+    CryptKey: <metadata crypt password>
+    OpenstackID: <Openstack ID>
+    OpenstackPassword: <Openstack password>
+    Type: swift
+  name: TenantName
+  network:
+    ProviderNetwork: <Provider network for public access, ex:Ext-Net>
+    VPCCIDR: '<VPC CIDR, ex: 192.168.0.0/16>'
+    VPCName: <VPC Name>
+  objectstorage:
+    AccessKey: <Access Key>
+    Endpoint: https://oss.eu-west-0.prod-cloud-ocb.orange-business.com
+    SecretKey: <Secret Key>
+    Type: s3
+```
 When SafeScale commands are invoked, they search for a tenant configuration file in these folders, in that order :
 
 - ./ (current dir)

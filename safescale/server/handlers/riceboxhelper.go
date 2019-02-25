@@ -30,9 +30,9 @@ import (
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
 func getBoxContent(script string, data interface{}) (string, error) {
 
-	box, err := rice.FindBox("safescale_scripts")
+	box, err := rice.FindBox("../handlers/scripts")
 	if err != nil {
-		return "", infraErrf(err, "Unable to find script safescale_scripts")
+		return "", infraErrf(err, "Unable to find script folder ../handlers/scripts")
 	}
 	scriptContent, err := box.String(script)
 	if err != nil {

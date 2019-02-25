@@ -4,15 +4,16 @@ SafeScale stores metadata of the objects it uses in Object Storage. This documen
 
 ## SafeScale metadata Bucket
 
-The bucket name format is ``0.safescale-<unique provider-dependent data>[.<$SAFESCALE_METADATA_SUFFIX>]``; every metadata is stored in there.
+The bucket name format is ``0.safescale-<unique provider-dependent value>[.<$SAFESCALE_METADATA_SUFFIX>]``; every metadata is stored in there.
 
 SAFESCALE_METADATA_SUFFIX is an optional environment variable that can specialized even further the name of the bucket.
-For example, with SAFESCALE_METADATA_SUFFIX=dev, the bucket name will be ``0.safescale-<unique provider-dependent data>.dev``.
+For example, with SAFESCALE_METADATA_SUFFIX=dev, the bucket name will be ``0.safescale-<unique provider-dependent value>.dev``.
 The variable needs to be defined before starting safescaled, and for every SafeScale cli use (safescale, deploy, perform, ...).
 
 Each object in this bucket is stored as a JSON representation of Go structs, optionally encrypted (cf. MetadataKey in TENANTS.md).
 
 In the following, each reference to this bucket name will be simplified to ``<SAFESCALE>``.
+
 ### SafeScale Hosts
 
 The hosts informations are stored in folder ``<SAFESCALE>/hosts``.
@@ -119,28 +120,6 @@ Inside this subfolder is stored :
 +- clusters
    |
    +- mycluster (dir)
-   |  |
-   |  +- config (obj)
-   |  |
-   |  +- masters (dir)
-   |  |  |
-   |  |  +- 4d17de45-e019-445f-b746-9ab0805008a7 (obj)
-   |  |  |
-   |  |  +- ...
-   |  |
-   |  +- nodes (dir)
-   |     |
-   |     +- private (dir)
-   |     |  |
-   |     |  + 4d17de45-e019-445f-b746-9ab0805008a7 (obj)
-   |     |  |
-   |     |  +- ...
-   |     |
-   |     +- public (dir)
-   |        |
-   |        +- 4d17de45-e019-445f-b746-9ab0805008a7 (obj)
-   |        |
-   |        + ...
    |
    + ...
    ```

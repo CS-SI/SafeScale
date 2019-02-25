@@ -54,9 +54,9 @@ endif
 EXECS=safescale/cli/safescale/safescale safescale/cli/safescale/safescale-cover safescale/cli/safescaled/safescaled safescale/cli/safescaled/safescaled-cover deploy/cli/deploy deploy/cli/deploy-cover perform/perform perform/perform-cover scanner/scanner
 
 # List of packages
-PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
+PKG_LIST := $(shell $(GO) list ./... | grep -v /cli/ | grep -v /lib/ | grep -v /vendor/)
 # List of packages to test (nor deploy neither providers are ready for prime time :( )
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v stacks/aws )
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v stacks/aws | grep -v /cli/ | grep -v /lib/)
 
 
 # DEPENDENCIES MANAGEMENT

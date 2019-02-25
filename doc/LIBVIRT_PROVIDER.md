@@ -1,9 +1,9 @@
 # Libvirt Provider
 
-For testing purposes it's possible to emulate a cloud provider locally with Libvirt/Qemu-KVM. Safescale will work the same way except than all the hosts will be created on your own computer. The driver is designed to work with Ubuntu18.04, Debian9 and Centos7
+For testing purposes it's possible to emulate a cloud provider locally with Libvirt/Qemu-KVM. SafeScale will work the same way except than all the hosts will be created on your own computer. The driver is designed to work with Ubuntu18.04, Debian9 and Centos7
 
 ## Build SafeScale with libvirt provider enabled
-As the libvirt dependency is huge, libvirt provider it's disabled by default and have to be enabled while building Safescale
+As the libvirt dependency is huge, libvirt provider is disabled by default and have to be enabled while building SafeScale.
 
 ### Downloading dependencies -
 
@@ -89,7 +89,7 @@ make libvirt all
 make install
 ```
 
-## Local Tenant 
+## Local Tenant
 The local tenant is like [other providers tenants](TENANTS.md) but with some specificities. The ``[tenant.compute]`` section is used with modifications , ``[tenant.metadata] / [tenant.objectstorage]`` sections are used as any other provider, ``[tenant.identity]`` and ``[tenant.network]`` sections should be left empty.
 
 ### Section ``[tenant.compute]`` -
