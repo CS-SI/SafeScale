@@ -1,18 +1,18 @@
 # SafeScale usage
 
-## Broker
+## CLI tools
 
-The SafeScale safescale tool is composed of 2 elements:
- - a daemon working in background
- - a client offering a CLI to interact with the daemon
+SafeScale is composed of 2 parts:
+ - a daemon working in background, called ```safescaled```
+ - a client called ```ßafescale``` allowing to interact with the daemon
 
-### Brokerd
+### Safescaled
 
-Brokerd is a daemon and you only need to launch it on your machine.
-The purpose of this daemon is to execute requests from SafeScale safescale's client on the providers.
+```safescaled``` is a daemon and you only need to launch it on your own computer.
+The purpose of this daemon is to execute requests ordered by ```safescale``` client on the providers.
 
 #### Configuration
-To dialog with the different providers, the daemon needs authentication parameters to be able to connect to the underlying provider's API. These credentials are given in the file `tenants.toml`. This file is search in order (first file founs is used) in the folowing directories:
+To dialog with the different providers, the daemon needs authentication parameters to be able to connect to the underlying provider's API. These credentials are given in the file `tenants.toml`. This file is searched in order (first file found is used) in the folowing directories:
  - . (current directory)
  - $HOME/.safescale
  - $HOME/.config/safescale
@@ -111,27 +111,28 @@ One section 'tenants' with specific authentication parameters for each tenant. S
     AccessKey = "your_S3_login"
     SecretKey = "your_S3_password"
 ```
-A detail description of the content of the file tenants.toml can be found in TENANTS.md (TODO)
+A detail description of the content of the file tenants.toml can be found in [TENANTS.md](TENANTS.md).
 
 #### Usage
 
-To launch the SafeScale safescale's daemon simply execute the following command:
+If you built SafeScale from source, make install will have installed the binaries in $GOPATH/bin.
+To launch the SafeScale daemon, simply execute the following command:
 ```bash
-${GOPATH:-$HOME}/src/github.com/CS-SI/SafeScale/safescale/server/safescaled &
+${GOPATH}/bin/safescaled &
 ```
-It should display in your terminal:
+It should display in your terminal something like this:
 ```
-Brokerd version: 0.1, build date: 2018-11-27 09:51
+Brokerd version: 19.03.0, build f3973fb5a642b7d93b0f20417631e2706a86c211 (2019/02/25-14:49)
 Ready to serve :-)
 ```
 
 By default, safescaled displays only warnings and errors messages. To have more information, you can use -v to increase verbosity, and -d to use debug mode.
 
-### Broker
+### ```safescale```
 
-Broker is the client part of the SafeScale safescale layer. It consists of a CLI to interact with the safescale daemon to manage clound infrastructures.
+```safescale``` is the client part of SafeScale. It consists of a CLI to interact with the safescale daemon to manage cloud infrastructures.
 
-The different available commands can be obtained via the '**--help**' option on each command and are reminded hereafter. _Note that, dispite of our efforts, the help got by the CLI might be more accurate and up-to-date than the followings descriptions._
+The different available commands can be obtained via the '**--help**' option on each command and are reminded hereafter. _Note that, despite of our efforts, the help got by the CLI might be more accurate and up-to-date than the following descriptions._
 
 Each command returns its results on the standard output in 2 forms according to the expected result type:
  - no result is expected: a simple comment about the execution of the comment
@@ -140,7 +141,7 @@ Each command returns its results on the standard output in 2 forms according to 
 The commands are presented in logical order as if the user wanted to create some machines with a shared storage space.
 
 #### tenant
-A tenant must be set before using any other command as it indicates to SafeScale which tenant the command must be executed on. _Note that if only one tenant is defined in the `tenants.toml`, it will be automatically set while invoking any other command._
+A tenant must be set before using any other command as it indicates to SafeScale which tenant the command must be executed on. _Note that if only one tenant is defined in the `tenants.toml`, it will be automatically selected while invoking any other command._
 
 command | description
 ----- | -----

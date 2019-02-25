@@ -110,3 +110,7 @@ safescale/cli/safescale/safescale-cover
 safescale/cli/safescale/version\.go
 
 safescale/cli/safescaled/version\.go
+
+safescale/cli/safescaled/safescaled
+
+safescale/cli/safescaled/safescaled-cover
