@@ -106,8 +106,8 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	return cfg, nil
 }
 
-// GetProvider returns the providerName
-func (p *provider) GetProvider() string {
+// GetName returns the providerName
+func (p *provider) GetName() string {
 	return "aws"
 }
 

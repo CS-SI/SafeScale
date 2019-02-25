@@ -115,6 +115,6 @@ type Provider interface {
 	GetAuthOpts() (Config, error)
 	// GetCfgOpts returns configuration options as a Config
 	GetCfgOpts() (Config, error)
-	// GetProvider returns the providerName
-	GetProvider() string
+	// GetName returns the providerName
+	GetName() string
 }

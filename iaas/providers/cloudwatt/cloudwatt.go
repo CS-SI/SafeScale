@@ -140,8 +140,8 @@ func (p *provider) ListImages(all bool) ([]resources.Image, error) {
 	return allImages, nil
 }
 
-// GetProvider returns the providerName
-func (p *provider) GetProvider() string {
+// GetName returns the providerName
+func (p *provider) GetName() string {
 	return "cloudwatt"
 }
 
