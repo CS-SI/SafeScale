@@ -21,7 +21,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/deploy/cluster/api"
 	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
 	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
@@ -38,7 +38,7 @@ import (
 // Get returns the Cluster instance corresponding to the cluster named 'name'
 // TODO: rename to Inspect ?
 func Get(name string) (api.Cluster, error) {
-	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	tenant, err := safescaleclient.New().Tenant.Get(safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func Get(name string) (api.Cluster, error) {
 
 // Load ...
 func Load(name string) (api.Cluster, error) {
-	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	tenant, err := safescaleclient.New().Tenant.Get(safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func Create(req controller.Request) (api.Cluster, error) {
 
 	log.Printf("Creating infrastructure for cluster '%s'", req.Name)
 
-	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	tenant, err := safescaleclient.New().Tenant.Get(safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func Delete(name string) error {
 
 // List lists the clusters already created
 func List() ([]api.Cluster, error) {
-	tenant, err := brokerclient.New().Tenant.Get(brokerclient.DefaultExecutionTimeout)
+	tenant, err := safescaleclient.New().Tenant.Get(safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}

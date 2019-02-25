@@ -19,7 +19,7 @@ package service
 import (
 	"fmt"
 
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
 
 	svcapi "github.com/CS-SI/SafeScale/deploy/service/api"
 
@@ -70,17 +70,17 @@ func (s *Service) GetComponent() installapi.ComponentAPI {
 
 // State ...
 func (s *Service) State(target installapi.Target) error {
-	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.StateScript, brokerclient.DefaultTimeout)
+	return safescaleclient.New().Ssh.Run(target.GetName(), s.manager.StateScript, safescaleclient.DefaultTimeout)
 }
 
 // Start ...
 func (s *Service) Start(target installapi.Target) error {
-	return brokerclient.New().Ssh.RUn(target.GetName(), s.manager.StartScript, brokerclient.DefaultTimeout)
+	return safescaleclient.New().Ssh.RUn(target.GetName(), s.manager.StartScript, safescaleclient.DefaultTimeout)
 }
 
 // Stop ...
 func (s *Service) Stop(target installapi.Target) error {
-	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.StopScript, brokerclient.DefaultTimeout)
+	return safescaleclient.New().Ssh.Run(target.GetName(), s.manager.StopScript, safescaleclient.DefaultTimeout)
 }
 
 // Restart ...
@@ -94,10 +94,10 @@ func (s *Service) Restart(target installapi.Target) error {
 
 // Pause ...
 func (s *Service) Pause(target installapi.Target) error {
-	return brokerclient.New().Ssh.RUn(target.GetName(), s.manager.PauseScript, brokerclient.DefaultTimeout)
+	return safescaleclient.New().Ssh.RUn(target.GetName(), s.manager.PauseScript, safescaleclient.DefaultTimeout)
 }
 
 // Resume ...
 func (s *Service) Resume(target installapi.Target) error {
-	return brokerclient.New().Ssh.Run(target.GetName(), s.manager.ResumeScript, brokerclient.DefaultTimeout)
+	return safescaleclient.New().Ssh.Run(target.GetName(), s.manager.ResumeScript, safescaleclient.DefaultTimeout)
 }

@@ -23,7 +23,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/iaas/stacks"
-
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/providers"
 	"github.com/CS-SI/SafeScale/iaas/resources"

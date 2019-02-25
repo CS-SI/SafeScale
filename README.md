@@ -4,7 +4,7 @@ SafeScale is an Infrastructure and Platform as a Code tool.
 
 ## Table of content
   - [Description](#description)
-    - [SafeScale Broker](#safescale-broker)
+    - [SafeScale Broker](#safescale-safescale)
     - [SafeScale Perform](#safescale-perform)
     - [SafeScale Security](#safescale-security)
   - [Currently available features](#currently-available-features)

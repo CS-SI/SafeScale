@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"os"
 
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
 	clitools "github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
 
-	pb "github.com/CS-SI/SafeScale/broker"
+	pb "github.com/CS-SI/SafeScale/safescale"
 
 	"github.com/urfave/cli"
 )
@@ -63,7 +63,7 @@ func extractHostArgument(c *cli.Context, hostnamePos int) error {
 	}
 
 	var err error
-	hostInstance, err = brokerclient.New().Host.Inspect(hostName, brokerclient.DefaultExecutionTimeout)
+	hostInstance, err = safescaleclient.New().Host.Inspect(hostName, safescaleclient.DefaultExecutionTimeout)
 	if err != nil {
 		fmt.Printf("%s\n", err.Error())
 		return clitools.ExitOnRPC(err.Error())

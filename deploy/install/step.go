@@ -23,8 +23,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/broker"
-	brokerclient "github.com/CS-SI/SafeScale/broker/client"
+	pb "github.com/CS-SI/SafeScale/safescale"
+	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/deploy/install/enums/Action"
 )
 
@@ -308,7 +308,7 @@ func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
 	}
 
 	// Executes the script on the remote host
-	retcode, _, _, err := brokerclient.New().Ssh.Run(host.Name, command, brokerclient.DefaultConnectionTimeout, is.WallTime)
+	retcode, _, _, err := safescaleclient.New().Ssh.Run(host.Name, command, safescaleclient.DefaultConnectionTimeout, is.WallTime)
 	if err != nil {
 		return stepResult{success: false, err: err}
 	}

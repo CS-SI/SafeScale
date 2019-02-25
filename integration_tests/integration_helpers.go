@@ -21,12 +21,12 @@ type HostInfo struct {
 
 //IsBrokerdLaunched ...
 func IsBrokerdLaunched() (bool, error) {
-	cmd := "ps -ef | grep brokerd | grep -v grep"
+	cmd := "ps -ef | grep safescaled | grep -v grep"
 	out, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {
 		return false, err
 	}
-	return strings.Contains(string(out), "brokerd"), nil
+	return strings.Contains(string(out), "safescaled"), nil
 }
 
 //CanBeRun ...
