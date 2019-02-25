@@ -148,6 +148,10 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	return cfg, nil
 }
 
+func (p *provider) GetProvider() string {
+	return "opentelekom"
+}
+
 // init registers the opentelekom provider
 func init() {
 	iaas.Register("opentelekom", &provider{})

@@ -922,7 +922,6 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 
 	var (
 		host *resources.Host
-		err  error
 	)
 	switch hostParam.(type) {
 	case string:
@@ -938,10 +937,11 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			host, err = s.InspectHost(host)
+			hostTmp, err := s.InspectHost(host)
 			if err != nil {
 				return err
 			}
+			host = hostTmp
 			if host.LastState != HostState.STARTED {
 				return fmt.Errorf("not in ready state (current state: %s)", host.LastState.String())
 			}
