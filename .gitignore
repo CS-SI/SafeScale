@@ -102,3 +102,11 @@ scanner/version\.go
 cli/safescale/safescale
 
 cli/safescale/safescale-cover
+
+safescale/cli/safescale/safescale
+
+safescale/cli/safescale/safescale-cover
+
+safescale/cli/safescale/version\.go
+
+safescale/cli/safescaled/version\.go
