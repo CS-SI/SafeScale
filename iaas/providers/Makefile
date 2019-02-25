@@ -18,4 +18,5 @@ clean:
 	@(cd openstack && $(MAKE) $(@))
 	@(cd opentelekom && $(MAKE) $(@))
 	@(cd ovh && $(MAKE) $(@))
+	@(cd local && $(MAKE) $(@))
 	@$(RM) ./mocks/*.go || true
