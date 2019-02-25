@@ -5,7 +5,7 @@ GO?=go
 all: generate
 
 generate:
-	@$(GO) generate
+	@$(GO) generate -tags libvirt
 
 vet:
 	@$(GO) vet ./...
