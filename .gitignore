@@ -98,3 +98,7 @@ deploy/cli/version\.go
 perform/version\.go
 
 scanner/version\.go
+
+cli/safescale/safescale
+
+cli/safescale/safescale-cover
