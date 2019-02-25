@@ -133,6 +133,11 @@ func Prepare(
 	return dataBuffer.Bytes(), nil
 }
 
+//Append add some usefull code on the end of userdata.sh just before the reboot (on the label #insert_tag)
+func Append(userdata []byte, addedPart string) []byte {
+	return bytes.Replace(userdata, []byte("#insert_tag"), []byte(addedPart+"\n\n#insert_tag"), 1)
+}
+
 func initUserdataTemplate() error {
 	if userdataTemplate != nil {
 		// Already loaded

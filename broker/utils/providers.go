@@ -23,7 +23,7 @@ import (
 	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudferro"     // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudwatt"      // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/iaas/providers/flexibleengine" // Imported to initialise tenants
-	// _ "github.com/CS-SI/SafeScale/iaas/providers/local"          // Imported to initialise tenants
-	_ "github.com/CS-SI/SafeScale/iaas/providers/opentelekom" // Imported to initialise tenants
-	_ "github.com/CS-SI/SafeScale/iaas/providers/ovh"         // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/iaas/providers/local"          // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/iaas/providers/opentelekom"    // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/iaas/providers/ovh"            // Imported to initialise tenants
 )
