@@ -8,7 +8,7 @@ vet:
 	@$(GO) vet ./...
 
 generate:
-	@$(GO) generate
+	@$(GO) generate -tags libvirt
 	
 test:
 	$(GO) test
