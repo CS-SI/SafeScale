@@ -37,9 +37,9 @@ import (
 	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudwatt"      // Imported to initialize tenant cloudwatt
 	_ "github.com/CS-SI/SafeScale/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
-	// _ "github.com/CS-SI/SafeScale/iaas/providers/local"          // Imported to initialize tenant local
-	_ "github.com/CS-SI/SafeScale/iaas/providers/opentelekom" // Imported to initialize tenant opentelekoms
-	_ "github.com/CS-SI/SafeScale/iaas/providers/ovh"         // Imported to initialize tenant ovh
+	_ "github.com/CS-SI/SafeScale/iaas/providers/local"          // Imported to initialize tenant local
+	_ "github.com/CS-SI/SafeScale/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekoms
+	_ "github.com/CS-SI/SafeScale/iaas/providers/ovh"            // Imported to initialize tenant ovh
 )
 
 // ServiceTester helper class to test clients
