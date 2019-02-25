@@ -148,7 +148,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	return cfg, nil
 }
 
-func (p *provider) GetProvider() string {
+func (p *provider) GetName() string {
 	return "opentelekom"
 }
 

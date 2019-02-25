@@ -204,7 +204,7 @@ func (p *provider) CreateNetwork(req resources.NetworkRequest) (*resources.Netwo
 	return p.Stack.CreateNetwork(req)
 }
 
-func (p *provider) GetProvider() string {
+func (p *provider) GetName() string {
 	return "ovh"
 }
 

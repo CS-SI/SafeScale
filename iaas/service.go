@@ -205,7 +205,7 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 			if !ok {
 				return nil, fmt.Errorf("Region value unset")
 			}
-			folder := fmt.Sprintf("images/%s/%s", svc.GetProvider(), region)
+			folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
 
 			imageList, err := db.ReadAll(folder)
 			if err != nil {
