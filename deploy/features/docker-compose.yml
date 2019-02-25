@@ -1,0 +1,94 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+    requirements:
+        features:
+        - docker
+    install:
+        bash:
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu|centos|rhel|fedora)
+                                    docker-compose -v &>/dev/null
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 1
+                                    ;;
+                            esac
+
+            add:
+                pace: docker-compose
+                steps:
+                    docker-compose:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                ubuntu)
+                                    VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r")
+                                    [ $? -ne 0 ] && exit 192
+                                    URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
+                                    sfDownload "$URL" docker-compose 3m 5 || exit 193
+                                    chmod +x docker-compose && mv docker-compose /usr/bin
+                                    ;;
+                                debian)
+                                    VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r")
+                                    [ $? -ne 0 ] && exit 192
+                                    URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
+                                    curl -k -SsL -o docker-compose "$URL" || exit 193
+                                    chmod +x docker-compose && mv docker-compose /usr/bin
+                                    ;;
+                                centos|rhel)
+                                    yum install -y epel-release python-pip
+                                    pip install docker-compose
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 195
+                                    ;;
+                            esac
+                            exit 0
+
+            remove:
+                pace: docker-compose
+                steps:
+                    docker-compose:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            rm /usr/bin/docker-compose || rm -f /usr/local/bin/docker-compose
+...
