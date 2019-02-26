@@ -108,7 +108,7 @@ func work() {
 
 	safescaledPort := 50051
 
-	if portCandidate := os.Getenv("BROKERD_PORT"); portCandidate != "" {
+	if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
 		num, err := strconv.Atoi(portCandidate)
 		if err == nil {
 			safescaledPort = num
@@ -147,7 +147,7 @@ func work() {
 	reflection.Register(s)
 
 	version := VERSION + ", build " + REV + " (" + BUILD_DATE + ")"
-	fmt.Printf("Brokerd version: %s\nReady to serve :-)\n", version)
+	fmt.Printf("Safescaled version: %s\nReady to serve :-)\n", version)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}

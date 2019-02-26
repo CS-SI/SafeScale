@@ -56,7 +56,7 @@ func TestNetworkHandler_List_with_NO_safescaled_running(t *testing.T) {
 
 	safescaledPort := 50051
 
-	if portCandidate := os.Getenv("BROKERD_PORT"); portCandidate != "" {
+	if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
 		num, err := strconv.Atoi(portCandidate)
 		if err == nil {
 			safescaledPort = num

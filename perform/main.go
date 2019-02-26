@@ -59,7 +59,7 @@ func main() {
 
 	safescaledPort := 50051
 
-	if portCandidate := os.Getenv("BROKERD_PORT"); portCandidate != "" {
+	if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
 		num, err := strconv.Atoi(portCandidate)
 		if err == nil {
 			safescaledPort = num
