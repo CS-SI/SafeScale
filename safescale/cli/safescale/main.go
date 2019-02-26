@@ -35,7 +35,7 @@ import (
 )
 
 func cleanup() {
-	fmt.Println("\nBe carfull stopping safescale will not stop the execution on safescaled, but will reverse it's effects once done!")
+	fmt.Println("\nBe carfull stopping safescale will not stop the execution on safescaled, but will try to go back to the previous state as much as possible!")
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
 	text, err := reader.ReadString('\n')
@@ -48,6 +48,7 @@ func cleanup() {
 		if err != nil {
 			fmt.Printf("Failed to stop the process %v\n", err)
 		}
+		os.Exit(0)
 	}
 }
 
