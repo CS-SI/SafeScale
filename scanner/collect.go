@@ -48,9 +48,8 @@ func collect(tenantName string) error {
 		log.Fatal(err)
 	}
 
-	acpu := StoredCPUInfo{}
-
 	for _, file := range files {
+		acpu := StoredCPUInfo{}
 		theFile := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/scanner/%s", file.Name()))
 		if strings.Contains(file.Name(), tenantName+"#") {
 			log.Printf("Storing: %s", file.Name())
