@@ -19,8 +19,8 @@ type HostInfo struct {
 	PrivateKey string
 }
 
-//IsBrokerdLaunched ...
-func IsBrokerdLaunched() (bool, error) {
+//IsSafescaledLaunched ...
+func IsSafescaledLaunched() (bool, error) {
 	cmd := "ps -ef | grep safescaled | grep -v grep"
 	out, err := exec.Command("bash", "-c", cmd).Output()
 	if err != nil {

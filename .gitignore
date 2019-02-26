@@ -89,28 +89,20 @@ docs/*.html
 docs/.nojekyll
 docs/Other
 
+# ignore version info
 broker/cli/broker/version\.go
-
 broker/cli/brokerd/version\.go
-
 deploy/cli/version\.go
-
 perform/version\.go
-
 scanner/version\.go
-
-cli/safescale/safescale
-
-cli/safescale/safescale-cover
-
-safescale/cli/safescale/safescale
-
-safescale/cli/safescale/safescale-cover
-
 safescale/cli/safescale/version\.go
-
 safescale/cli/safescaled/version\.go
 
-safescale/cli/safescaled/safescaled
 
+# ignore binaries from safescale
+cli/safescale/safescale
+cli/safescale/safescale-cover
+safescale/cli/safescale/safescale
+safescale/cli/safescale/safescale-cover
+safescale/cli/safescaled/safescaled
 safescale/cli/safescaled/safescaled-cover

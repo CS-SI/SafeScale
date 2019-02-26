@@ -122,7 +122,7 @@ ${GOPATH}/bin/safescaled &
 ```
 It should display in your terminal something like this:
 ```
-Brokerd version: 19.03.0, build f3973fb5a642b7d93b0f20417631e2706a86c211 (2019/02/25-14:49)
+Safescaled version: 19.03.0, build f3973fb5a642b7d93b0f20417631e2706a86c211 (2019/02/25-14:49)
 Ready to serve :-)
 ```
 

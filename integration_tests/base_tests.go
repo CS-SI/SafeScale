@@ -45,7 +45,7 @@ func EnvSetup(t *testing.T, provider Providers.Enum) {
 
 	RunOnlyInIntegrationTest(key)
 
-	safescaledLaunched, err := IsBrokerdLaunched()
+	safescaledLaunched, err := IsSafescaledLaunched()
 	if !safescaledLaunched {
 		fmt.Println("This requires that you launch safescaled in background and set the tenant")
 	}
