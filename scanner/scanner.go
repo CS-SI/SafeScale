@@ -31,12 +31,12 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/safescale/server/handlers"
-	"github.com/CS-SI/SafeScale/safescale/server/metadata"
-	_ "github.com/CS-SI/SafeScale/safescale/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/safescale/server/handlers"
+	"github.com/CS-SI/SafeScale/safescale/server/metadata"
+	_ "github.com/CS-SI/SafeScale/safescale/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/utils"
 )
 
@@ -201,10 +201,15 @@ func RunScanner() {
 		panic(fmt.Sprintf("Unable to get Tenants %s", err.Error()))
 	}
 
-	for tenantName, _ := range theProviders {
+	for tenantName := range theProviders {
 		if strings.Contains(tenantName, "-scannable") {
 			targetedProviders = append(targetedProviders, tenantName)
 		}
+	}
+
+	if len(targetedProviders) < 1 {
+		log.Warn("No scannable tenant found. Consider adding '-scannable' to tenant name as stated in documentation")
+		return
 	}
 
 	// TODO Enable when several safescaled instances can run in parallel
@@ -228,7 +233,7 @@ func RunScanner() {
 			fmt.Printf("Error working with tenant %s\n", tenantName)
 		}
 		if err := collect(tenantName); err != nil {
-			log.Warn("Failed to save scanned info from tenant %s", tenantName)
+			log.Warn(fmt.Printf("Failed to save scanned info from tenant %s", tenantName))
 		}
 	}
 }
