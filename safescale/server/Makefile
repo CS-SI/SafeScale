@@ -1,20 +1,23 @@
 GO?=go
-EXEC:=safescaled
 
-.PHONY:	safescaled handlers clean
+.PHONY:	cluster handlers install clean
 
-all:	safescaled
+all:	cluster handlers install
 
 vet:
 	@$(GO) vet ./...
 
-safescaled: handlers main.go commands/*.go ../utils/*.go ../safescale.pb.go
-	@$(GO) build -race -o $(EXEC) $(BUILD_TAGS)
+cluster:
+	@(cd cluster && $(MAKE))
 
 handlers:
 	@(cd handlers && $(MAKE))
 
+install:
+	@(cd install && $(MAKE))
+
 clean:
 	@(cd handlers && $(MAKE) $@)
-	@$(RM) $(EXEC) || true
+	@(cd cluster && $(MAKE) $@)
+	@(cd install && $(MAKE) $@)
 	@$(RM) ./mocks/*.go || true

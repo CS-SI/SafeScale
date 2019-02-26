@@ -54,7 +54,7 @@ perform/cluster/tests/deploy-cover
 # ignore binaries from deploy
 deploy/deploy
 deploy/deploy-cover
-deploy/cluster/tests/create_cluster
+safescale/server/cluster/tests/create_cluster
 deploy/cli/deploy
 deploy/cli/deploy-cover
 
