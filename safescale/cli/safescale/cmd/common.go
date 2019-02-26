@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
+	"github.com/CS-SI/SafeScale/safescale/client"
 	clitools "github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
 
@@ -63,7 +63,7 @@ func extractHostArgument(c *cli.Context, hostnamePos int) error {
 	}
 
 	var err error
-	hostInstance, err = safescaleclient.New().Host.Inspect(hostName, safescaleclient.DefaultExecutionTimeout)
+	hostInstance, err = client.New().Host.Inspect(hostName, client.DefaultExecutionTimeout)
 	if err != nil {
 		fmt.Printf("%s\n", err.Error())
 		return clitools.ExitOnRPC(err.Error())

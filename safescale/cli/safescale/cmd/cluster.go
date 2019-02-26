@@ -23,22 +23,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Property"
-
-	"github.com/CS-SI/SafeScale/iaas/resources"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster"
-	"github.com/CS-SI/SafeScale/deploy/cluster/api"
-	"github.com/CS-SI/SafeScale/deploy/cluster/controller"
-	clusterpropsv1 "github.com/CS-SI/SafeScale/deploy/cluster/controller/properties/v1"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Complexity"
-	"github.com/CS-SI/SafeScale/deploy/cluster/enums/Flavor"
-	"github.com/CS-SI/SafeScale/deploy/install"
-	safescaleclient "github.com/CS-SI/SafeScale/safescale/client"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/safescale/client"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/api"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/controller"
+	clusterpropsv1 "github.com/CS-SI/SafeScale/safescale/server/cluster/controller/properties/v1"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Complexity"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/safescale/server/install"
 	"github.com/CS-SI/SafeScale/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
@@ -278,11 +276,11 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	// 	results, err := feature.Check(target, install.Variables{}, install.Settings{})
 	// 	found = err == nil && results.Successful()
 	// 	if found {
-	// 		brkclt := safescaleclient.New().Host
+	// 		brkclt := client.New().Host
 	// 		remoteDesktops := []string{}
 	// 		gwPublicIP := clusterInstance.GetNetworkConfig().PublicIP
 	// 		for _, id := range clusterInstance.ListMasterIDs() {
-	// 			host, err := brkclt.Inspect(id, safescaleclient.DefaultExecutionTimeout)
+	// 			host, err := brkclt.Inspect(id, client.DefaultExecutionTimeout)
 	// 			if err != nil {
 	// 				return nil, err
 	// 			}
@@ -848,9 +846,9 @@ func executeCommand(command string) error {
 		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetIdentity().Name)
 		return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 	}
-	safescalessh := safescaleclient.New().Ssh
+	safescalessh := client.New().Ssh
 	for i, m := range masters {
-		retcode, stdout, stderr, err := safescalessh.Run(m, command, safescaleclient.DefaultConnectionTimeout, 5*time.Minute)
+		retcode, stdout, stderr, err := safescalessh.Run(m, command, client.DefaultConnectionTimeout, 5*time.Minute)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {
@@ -1128,13 +1126,13 @@ var clusterNodeListCommand = cli.Command{
 		public := c.Bool("public")
 		all := c.Bool("all")
 
-		safescale := safescaleclient.New().Host
+		safescale := client.New().Host
 		formatted := []map[string]interface{}{}
 
 		if all || !public {
 			listPriv := clusterInstance.ListNodeIDs(false)
 			for _, i := range listPriv {
-				host, err := safescale.Inspect(i, safescaleclient.DefaultExecutionTimeout)
+				host, err := safescale.Inspect(i, client.DefaultExecutionTimeout)
 				if err != nil {
 					msg := fmt.Sprintf("Failed to get data for node '%s': %s. Ignoring.", i, err.Error())
 					fmt.Println(msg)
@@ -1151,7 +1149,7 @@ var clusterNodeListCommand = cli.Command{
 		if all || public {
 			listPub := clusterInstance.ListNodeIDs(true)
 			for _, i := range listPub {
-				host, err := safescale.Inspect(i, safescaleclient.DefaultExecutionTimeout)
+				host, err := safescale.Inspect(i, client.DefaultExecutionTimeout)
 				if err != nil {
 					msg := fmt.Sprintf("failed to get data for node '%s': %s. Ignoring.", i, err.Error())
 					fmt.Println(msg)
@@ -1204,7 +1202,7 @@ var clusterNodeInspectCommand = cli.Command{
 			return err
 		}
 
-		host, err := safescaleclient.New().Host.Inspect(hostName, safescaleclient.DefaultExecutionTimeout)
+		host, err := client.New().Host.Inspect(hostName, client.DefaultExecutionTimeout)
 		if err != nil {
 			return clitools.ExitOnRPC(err.Error())
 		}

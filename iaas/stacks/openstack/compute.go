@@ -367,20 +367,11 @@ func toHostState(status string) HostState.Enum {
 
 // InspectHost updates the data inside host with the data from provider
 func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
-	log.Debug(">>> stacks.openstack::InspectHost()")
-	defer log.Debug("<<< stacks.openstack::InspectHost()")
-
 	if s == nil {
-		panic("Calling method GetHost from nil!")
+		panic("Calling openstack.Stack::InspectHost from nil pointer!")
 	}
 
-	var (
-		host     *resources.Host
-		server   *servers.Server
-		err      error
-		notFound bool
-	)
-
+	var host *resources.Host
 	switch hostParam.(type) {
 	case string:
 		host := resources.NewHost()
@@ -388,8 +379,20 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	case *resources.Host:
 		host = hostParam.(*resources.Host)
 	default:
-		panic("hostParam must be a string or a *resources.Host!")
+		panic("openstack.Stack::InspectHost(): parameter 'hostParam' must be a string or a *resources.Host!")
 	}
+	hostRef := host.Name
+	if hostRef == "" {
+		hostRef = host.ID
+	}
+	log.Debugf(">>> stacks.openstack::InspectHost(%s)", hostRef)
+	defer log.Debugf("<<< stacks.openstack::InspectHost(%s)", hostRef)
+
+	var (
+		server   *servers.Server
+		err      error
+		notFound bool
+	)
 
 	const timeout = time.Second * 60
 
