@@ -26,6 +26,7 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/api"
@@ -34,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/dcos/enums/ErrorCode"
-	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils/template"
 )
 
@@ -237,7 +237,7 @@ func configureGateway(c api.Cluster, b *controller.Blueprint) error {
 		"MasterIPs":                c.ListMasterIPs(),
 		"DNSServerIPs":             dnsServers,
 	}
-	retcode, _, _, err := b.ExecuteScript(box, funcMap, "dcos_configure_bootstrap.sh", data, netCfg.GatewayID)
+	retcode, _, _, err := b.ExecuteScript(box, funcMap, "dcos_prepare_bootstrap.sh", data, netCfg.GatewayID)
 	if err != nil {
 		log.Errorf("[gateway] configuration failed: %s", err.Error())
 		return err
