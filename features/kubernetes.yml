@@ -171,8 +171,9 @@ feature:
                         run: |
                             [ -f /etc/kubernetes/.joined ] && exit 0
 
-                            VERSION=$(sfRetry 5m 5 "curl -ksSL https://dl.k8s.io/release/stable.txt")
-                            [[ $VERSION =~ v[0-9]+\.[0-9]+\.[0-9]+ ]] || VERSION=v1.13.1
+                            #VERSION=$(sfRetry 5m 5 "curl -ksSL https://dl.k8s.io/release/stable.txt")
+                            #[[ $VERSION =~ v[0-9]+\.[0-9]+\.[0-9]+ ]] || VERSION=v1.13.1
+                            VERSION=v1.12.6
                             URL="https://storage.googleapis.com/kubernetes-release/release/${VERSION}/bin/linux/amd64"
                             sfDownload "$URL/kubeadm" kubeadm 5m 5 || exit 193
                             sfDownload "$URL/kubelet" kubelet 5m 5 || exit 194
@@ -181,14 +182,14 @@ feature:
                             mv kubeadm kubelet kubectl /usr/local/bin
 
                             cd /var/tmp
-                            VERSION=v1.12.0
+                            VERSION=v1.13.0
                             URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${VERSION}/crictl-${VERSION}-linux-amd64.tar.gz"
                             sfDownload "$URL" crictl.tgz 5m 5 || exit 192
                             tar zxf crictl.tgz -C /usr/local/bin || exit 193
                             rm -f crictl.tgz
 
                             mkdir -p /opt/cni/bin
-                            VERSION=v0.7.1
+                            VERSION=v0.7.4
                             URL="https://github.com/containernetworking/plugins/releases/download/${VERSION}/cni-plugins-amd64-${VERSION}.tgz"
                             sfDownload "$URL" cni-plugins.tgz 5m 5 || exit 192
                             tar zxf cni-plugins.tgz -C /opt/cni/bin
@@ -275,7 +276,8 @@ feature:
                             [ -f /etc/kubernetes/.joined ] && exit 0
 
                             # Gather the stable release of K8S
-                            RELEASE=$(sfRetry 2m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
+                            #RELEASE=$(sfRetry 2m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
+                            RELEASE=v1.12.6
                             [ $? -ne 0 ] && exit 192
 
                             cd /opt/safescale/k8s/config
@@ -308,7 +310,7 @@ feature:
                             EOF
 
                             cat >kubeadm-k8s-cpx.config.template <<-EOF
-                            apiVersion: kubeadm.k8s.io/v1alpha2
+                            apiVersion: kubeadm.k8s.io/v1alpha3
                             kind: MasterConfiguration
                             kubernetesVersion: $RELEASE
                             apiServerCertSANs:
