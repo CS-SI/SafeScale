@@ -13,6 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+sfFinishPreviousInstall() {
+    local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
+    if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
+}
+export -f sfFinishPreviousInstall
+
 # sfWaitForApt waits an already running apt-like command to finish
 sfWaitForApt() {
     sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
