@@ -34,6 +34,12 @@ sfDetectFacts() {
 }
 sfDetectFacts
 
+sfFinishPreviousInstall() {
+    local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
+    if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
+}
+export -f sfFinishPreviousInstall
+
 sfWaitForApt() {
     sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
 }

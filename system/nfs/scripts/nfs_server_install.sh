@@ -33,6 +33,12 @@ function dns_fallback {
     return 0
 }
 
+function finishPreviousInstall() {
+    local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
+    if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
+    return 0
+}
+
 dns_fallback
 
 {{.reserved_BashLibrary}}
@@ -45,7 +51,12 @@ case $LINUX_KIND in
         touch /var/log/lastlog
         chgrp utmp /var/log/lastlog
         chmod 664 /var/log/lastlog
-        sfWaitForApt && apt-get update && sfWaitForApt && apt-get install -qqy nfs-common nfs-kernel-server
+        sfWaitForApt
+        finishPreviousInstall
+        sfWaitForApt
+        apt-get update
+        sfWaitForApt
+        apt-get install -qqy nfs-common nfs-kernel-server
         ;;
 
     rhel|centos)
