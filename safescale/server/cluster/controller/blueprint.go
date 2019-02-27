@@ -117,7 +117,9 @@ func (b *Blueprint) Construct(req Request) error {
 	// Generate needed password for account cladm
 	cladmPassword, err := utils.GeneratePassword(16)
 	if err != nil {
-		return fmt.Errorf("[cluster %s] failed to generate password for user cladm: %s", req.Name, err.Error())
+		msg := fmt.Sprintf("failed to generate password for user cladm: %s", err.Error())
+		log.Errorf("[cluster %s] %s", req.Name, msg)
+		return fmt.Errorf(msg)
 	}
 
 	// Determine default image
@@ -186,17 +188,18 @@ func (b *Blueprint) Construct(req Request) error {
 	clientNetwork := clientInstance.Network
 	network, err := clientNetwork.Create(def, client.DefaultExecutionTimeout)
 	if err != nil {
-		err = fmt.Errorf("[cluster %s] failed to create Network '%s': %s", req.Name, networkName, err.Error())
-		return err
+		msg := fmt.Sprintf("failed to create network '%s': %s", networkName, err.Error())
+		log.Errorf("[cluster %s] %s", req.Name, msg)
+		return fmt.Errorf(msg)
 	}
-	log.Debugf("[cluster %s] network '%s' creation successful.", req.Name, network.Name)
+	log.Debugf("[cluster %s] network '%s' creation successful.", req.Name, networkName)
 	req.NetworkID = network.ID
 
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
 			derr := clientNetwork.Delete([]string{network.ID}, client.DefaultExecutionTimeout)
 			if derr != nil {
-				log.Debugf("failed to delete up network on failure")
+				log.Errorf("after failure, failed to delete network '%s'", networkName)
 			}
 		}
 	}()
@@ -227,7 +230,9 @@ func (b *Blueprint) Construct(req Request) error {
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			if !ok {
-				return fmt.Errorf("[cluster %s] failed to load gateway metadata", req.Name)
+				msg := fmt.Sprintf("failed to load gateway metadata of network '%s'", networkName)
+				log.Errorf("[cluster %s] %s", req.Name, msg)
+				return fmt.Errorf(msg)
 			}
 		}
 		return err
@@ -243,7 +248,9 @@ func (b *Blueprint) Construct(req Request) error {
 	kpName = "cluster_" + req.Name + "_cladm_key"
 	kp, err = svc.CreateKeyPair(kpName)
 	if err != nil {
-		return fmt.Errorf("[cluster %s] failed to create Key Pair: %s", req.Name, err.Error())
+		msg := fmt.Sprintf("failed to create Key Pair: %s", err.Error())
+		log.Errorf("[cluster %s] %s", req.Name, msg)
+		return fmt.Errorf(msg)
 	}
 
 	// Saving Cluster metadata, with status 'Creating'
@@ -294,14 +301,16 @@ func (b *Blueprint) Construct(req Request) error {
 		})
 	})
 	if err != nil {
-		return fmt.Errorf("[cluster %s] creation failed: %s", req.Name, err.Error())
+		msg := fmt.Sprintf("creation failed: %s", err.Error())
+		log.Errorf("[cluster %s] %s", req.Name, msg)
+		return fmt.Errorf(msg)
 	}
 
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
 			derr := b.Cluster.DeleteMetadata()
 			if derr != nil {
-				log.Debugf("failed to delete metadata on failure")
+				log.Debugf("after failure, failed to delete metadata of cluster")
 			}
 		}
 	}()
@@ -340,7 +349,7 @@ func (b *Blueprint) Construct(req Request) error {
 		if err != nil && !req.KeepOnFailure {
 			derr := client.New().Host.Delete(b.Cluster.ListMasterIDs(), client.DefaultExecutionTimeout)
 			if derr != nil {
-				log.Errorf("failed to delete masters on failure")
+				log.Errorf("[cluster %s] after failure, failed to delete masters", req.Name)
 			}
 		}
 	}()
@@ -545,8 +554,8 @@ func (b *Blueprint) unconfigureMaster(pbHost *pb.Host) error {
 
 // configureCluster ...
 func (b *Blueprint) configureCluster() error {
-	log.Debugf(">>> deploy.cluster.controller.Blueprint::configureCluster()")
-	defer log.Debugf("<<< deploy.cluster.controller.Blueprint::configureCluster()")
+	log.Debugf(">>> safescale.cluster.controller.Blueprint::configureCluster()")
+	defer log.Debugf("<<< safescale.cluster.controller.Blueprint::configureCluster()")
 
 	var err error
 
@@ -1003,8 +1012,8 @@ func (b *Blueprint) asyncCreateMasters(count int, def pb.HostDefinition, done ch
 
 // asyncCreateMaster adds a master node
 func (b *Blueprint) asyncCreateMaster(index int, def pb.HostDefinition, timeout time.Duration, done chan error) {
-	log.Debugf(">>> deploy.cluster.controller.blueprint.Blueprint::asyncCreateMaster(%d)", index)
-	defer log.Debugf("<<< deploy.cluster.controller.blueprint.Blueprint::asyncCreateMaster(%d)", index)
+	log.Debugf(">>> safescale.cluster.controller.blueprint.Blueprint::asyncCreateMaster(%d)", index)
+	defer log.Debugf("<<< safescale.cluster.controller.blueprint.Blueprint::asyncCreateMaster(%d)", index)
 
 	hostLabel := fmt.Sprintf("master #%d", index)
 	log.Debugf("[%s] starting host resource creation...\n", hostLabel)
@@ -1304,8 +1313,8 @@ func (b *Blueprint) asyncCreateNode(
 
 // asyncConfigureNodes ...
 func (b *Blueprint) asyncConfigureNodes(public bool, done chan error) {
-	log.Debugf(">>> deploy.cluster.controller.Blueprint::asyncConfigureNodes(%v)", public)
-	defer log.Debugf("<<< deploy.cluster.controller.Blueprint::asyncConfigureNodes(%v)", public)
+	log.Debugf(">>> safescale.cluster.controller.Blueprint::asyncConfigureNodes(%v)", public)
+	defer log.Debugf("<<< safescale.cluster.controller.Blueprint::asyncConfigureNodes(%v)", public)
 
 	var (
 		nodeType    NodeType.Enum
@@ -1373,8 +1382,8 @@ func (b *Blueprint) asyncConfigureNode(
 	done chan error,
 ) {
 
-	log.Debugf(">>> deploy.cluster.controller.Blueprint::asyncConfigureNode(%d, %s)", index, pbHost.Name)
-	defer log.Debugf("<<< deploy.cluster.controller.Blueprint::asyncConfigureNode(%d, %s)", index, pbHost.Name)
+	log.Debugf(">>> safescale.cluster.controller.Blueprint::asyncConfigureNode(%d, %s)", index, pbHost.Name)
+	defer log.Debugf("<<< safescale.cluster.controller.Blueprint::asyncConfigureNode(%d, %s)", index, pbHost.Name)
 
 	hostLabel := fmt.Sprintf("%s node #%d (%s)", nodeTypeStr, index, pbHost.Name)
 	log.Debugf("[%s] starting configuration...", hostLabel)
