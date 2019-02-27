@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,15 +26,16 @@ function print_error {
 }
 trap print_error ERR
 
-function dns_fallback {
-    grep nameserver /etc/resolv.conf && return 0
-    echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
-    sudo cp /tmp/resolv.conf /etc/resolv.conf
-    return 0
-}
+# function dns_fallback {
+#     grep nameserver /etc/resolv.conf && return 0
+#     echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
+#     sudo cp /tmp/resolv.conf /etc/resolv.conf
+#     return 0
+# }
 
-dns_fallback
+# dns_fallback
 
+echo mount.{{.Format}} -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" > /tmp/whatever.txt
 mkdir -p "{{.MountPoint}}" && \
-mount -o noac "{{.Host}}:{{.Share}}" "{{.MountPoint}}" && \
-echo "{{.Host}}:{{.Share}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,noac 0   0" >>/etc/fstab
+mount.{{.Format}} -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" && \
+echo "{{.Export}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,{{ .cacheOption }} 0   0" >>/etc/fstab

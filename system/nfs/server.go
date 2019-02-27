@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,12 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/system/nfs/SecurityFlavor"
 )
 
 // Server structure
 type Server struct {
-	SshConfig *system.SSHConfig
+	SSHConfig *system.SSHConfig
 }
 
 // NewServer instanciates a new nfs.Server struct
@@ -34,50 +35,64 @@ func NewServer(sshconfig *system.SSHConfig) (*Server, error) {
 	}
 
 	server := Server{
-		SshConfig: sshconfig,
+		SSHConfig: sshconfig,
 	}
 	return &server, nil
 }
 
 // GetHost returns the hostname or IP address of the nfs.Server
 func (s *Server) GetHost() string {
-	return s.SshConfig.Host
+	return s.SSHConfig.Host
 }
 
 // Install installs and configure NFS service on the remote host
 func (s *Server) Install() error {
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "nfs_server_install.sh", map[string]interface{}{})
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install nfs server")
 }
 
-// MountBlockDevice mounts a block device in the remote system
-func (s *Server) MountBlockDevice(device, mountPoint, format string) error {
-	data := map[string]interface{}{
-		"Device":     device,
-		"MountPoint": mountPoint,
-		"FileSystem": format,
-	}
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "block_device_mount.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
-}
-
-// UnmountBlockDevice unmounts a local block device on the remote system
-func (s *Server) UnmountBlockDevice(device string) error {
-	data := map[string]interface{}{
-		"Device": device,
-	}
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "block_device_unmount.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount block device")
-}
-
 // AddShare configures a local path to be exported by NFS
-func (s *Server) AddShare(path string, acl string) error {
-	data := map[string]interface{}{
-		"Path":         path,
-		"AccessRights": acl,
+func (s *Server) AddShare(path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) error {
+	share, err := NewShare(s, path)
+	if err != nil {
+		return fmt.Errorf("Failed to create the share : %s", err.Error())
 	}
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "nfs_server_path_export.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
+
+	acl := ExportACL{
+		Host:          "*",
+		SecurityModes: []SecurityFlavor.Enum{},
+		Options: ExportOptions{
+			ReadOnly:       readOnly,
+			NoRootSquash:   !rootSquash,
+			Secure:         secure,
+			Async:          async,
+			NoHide:         noHide,
+			CrossMount:     crossMount,
+			NoSubtreeCheck: !subtreeCheck,
+			SetFSID:        false,
+			AnonUID:        0,
+			AnonGID:        0,
+		},
+	}
+
+	for _, securityMode := range secutityModes {
+		switch securityMode {
+		case "sys":
+			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Sys)
+		case "krb5":
+			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5)
+		case "krb5i":
+			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5i)
+		case "krb5p":
+			acl.SecurityModes = append(acl.SecurityModes, SecurityFlavor.Krb5p)
+		default:
+			return fmt.Errorf("Can't add the share, %s is not a valid security mode", securityMode)
+		}
+	}
+
+	share.AddACL(acl)
+
+	return share.Add()
 }
 
 // RemoveShare stops export of a local mount point by NFS on the remote server
@@ -85,6 +100,28 @@ func (s *Server) RemoveShare(path string) error {
 	data := map[string]interface{}{
 		"Path": path,
 	}
-	retcode, stdout, stderr, err := executeScript(*s.SshConfig, "nfs_server_path_unexport.sh", data)
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
+}
+
+// MountBlockDevice mounts a block device in the remote system
+func (s *Server) MountBlockDevice(deviceName, mountPoint, format string, doNotFormat bool) (string, error) {
+	data := map[string]interface{}{
+		"Device":      deviceName,
+		"MountPoint":  mountPoint,
+		"FileSystem":  format,
+		"DoNotFormat": doNotFormat,
+	}
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "block_device_mount.sh", data)
+	err = handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount block device")
+	return stdout, err
+}
+
+// UnmountBlockDevice unmounts a local block device on the remote system
+func (s *Server) UnmountBlockDevice(volumeUUID string) error {
+	data := map[string]interface{}{
+		"UUID": volumeUUID,
+	}
+	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "block_device_unmount.sh", data)
+	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to umount block device")
 }

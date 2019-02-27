@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,13 +19,14 @@ package cmds
 import (
 	"bufio"
 	"fmt"
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"os"
 	"os/exec"
 
 	//log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster"
-	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/safescale/server/cluster/api"
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/perform/enums/ExitCode"
@@ -79,12 +80,16 @@ func runCommand(cmdStr string) error {
 	}()
 	go func() {
 		for stderrScanner.Scan() {
-			fmt.Fprintln(os.Stderr, stderrScanner.Text())
+			_, _ = fmt.Fprintln(os.Stderr, stderrScanner.Text())
 		}
 	}()
 
-	cmd.Start()
-	err := cmd.Wait()
+	err := cmd.Start()
+	if err != nil {
+		return cli.NewExitError(err.Error(), int(ExitCode.Run))
+	}
+
+	err = cmd.Wait()
 	if err != nil {
 		return cli.NewExitError(err.Error(), int(ExitCode.Run))
 	}
@@ -99,17 +104,18 @@ func extractClusterArgument(c *cli.Context) error {
 			return cli.NewExitError("Invalid argument CLUSTERNAME", int(ExitCode.InvalidArgument))
 		}
 		clusterInstance, err = cluster.Get(clusterName)
-		if c.Command.HasName("create") && clusterInstance != nil {
-			msg := fmt.Sprintf("Cluster '%s' already exists", clusterName)
-			return cli.NewExitError(msg, int(ExitCode.Duplicate))
-		}
 		if err != nil {
+			if _, ok := err.(resources.ErrResourceNotFound); ok {
+				msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)
+				return cli.NewExitError(msg, int(ExitCode.NotFound))
+			}
+
 			msg := fmt.Sprintf("Failed to get cluster '%s' information: %s\n", clusterName, err.Error())
 			return cli.NewExitError(msg, int(ExitCode.RPC))
 		}
-		if clusterInstance == nil {
-			msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)
-			return cli.NewExitError(msg, int(ExitCode.NotFound))
+		if c.Command.HasName("create") {
+			msg := fmt.Sprintf("Cluster '%s' already exists", clusterName)
+			return cli.NewExitError(msg, int(ExitCode.Duplicate))
 		}
 	}
 	return nil

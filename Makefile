@@ -1,3 +1,5 @@
+ndef = $(if $(value $(1)),,$(error $(1) not set))
+
 .DEFAULT_GOAL := help
 
 .PHONY: default
@@ -7,7 +9,7 @@ ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
 
-VERSION := 0.1.0
+VERSION := 19.03.0
 
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
@@ -30,7 +32,11 @@ GOPATH?=$(HOME)/go
 GOBIN?=$(GOPATH)/bin
 
 ifeq (, $(shell which git))
- $(error "No git in your PATH: $(PATH), you must have git installed and available through your PATH")
+ $(error "No git in your PATH: [$(PATH)], you must have git installed and available through your PATH")
+endif
+
+ifeq (, $(GOPATH))
+ $(error "No GOPATH defined")
 endif
 
 # Handling multiple gopath: use ~/go by default
@@ -38,13 +44,19 @@ ifeq ($(findstring :,$(GOBIN)),:)
     GOBIN=$(HOME)/go/bin
 endif
 
+ifneq ($(OS),Windows_NT)
+ifneq ($(findstring $(GOBIN),$(PATH)),$(GOBIN))
+ $(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
+endif
+endif
+
 # Binaries generated
-EXECS=broker/cli/broker/broker broker/cli/broker/broker-cover broker/cli/brokerd/brokerd broker/cli/brokerd/brokerd-cover deploy/cli/deploy deploy/cli/deploy-cover perform/perform perform/perform-cover scanner/scanner
+EXECS=safescale/cli/safescale/safescale safescale/cli/safescale/safescale-cover safescale/cli/safescaled/safescaled safescale/cli/safescaled/safescaled-cover perform/perform perform/perform-cover scanner/scanner
 
 # List of packages
-PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
-# List of packages to test (nor deploy neither providers are ready for prime time :( )
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /deploy | grep -v /providers/aws | grep -v /iaas/)
+PKG_LIST := $(shell $(GO) list ./... | grep -v /cli/ | grep -v /lib/ | grep -v /vendor/)
+# List of packages to test
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v stacks/aws | grep -v /cli/ | grep -v /lib/)
 
 
 # DEPENDENCIES MANAGEMENT
@@ -80,13 +92,28 @@ INFO_STRING  = "[INFO]"
 ERROR_STRING = "[ERROR]"
 WARN_STRING  = "[WARNING]"
 
-all: begin ground getdevdeps ensure generate providers broker system deploy perform scanner utils vet-light
+BUILD_TAGS = ""
+export BUILD_TAGS
+
+all: begin ground getdevdeps ensure generate utils system iaas safescale perform scanner err vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps ensure generate
 
 begin:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
+
+libvirt:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Libvirt driver enabled$(NO_COLOR)\n";
+	@systemctl status libvirtd.service >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) libvirt is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
+	@lsmod | grep kvm >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) kvm is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
+	@grep -E '^flags.*(vmx|svm)' /proc/cpuinfo >/dev/null 2>&1 && \
+	if [ $$? -eq 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(OK_STRING) Hardware acceleration is available!\n"; \
+	else \
+		printf "%b" "$(WARN_COLOR)$(WARN_STRING) Hardware acceleration is NOT available!\n"; \
+	fi
+	$(eval BUILD_TAGS = "--tags=libvirt")
 
 with_git:
 	@command -v git >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) git is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
@@ -107,30 +134,28 @@ ensure:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Checking versions, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@if [ ! -d ./vendor ]; then printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading all dependencies from zero, this is gonna take a while..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; else printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating vendor dir..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi;
 	@(dep ensure)
+	@($(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
 	@(dep ensure -update "github.com/gophercloud/gophercloud")
 	@(dep ensure -update "github.com/graymeta/stow")
+	@$(GO) version | grep 1.10 > /dev/null || dep ensure -update "golang.org/x/tools"
 
 utils: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd utils && $(MAKE) all)
 
-providers: common
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building providers, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd providers && $(MAKE) all)
+iaas: common
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building iaas, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd iaas && $(MAKE) all)
 
 system: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building system, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd system && $(MAKE) all)
 
-broker: common utils system providers
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service broker, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd broker && $(MAKE) all)
+safescale: common utils system iaas
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd safescale && $(MAKE) all)
 
-deploy: common utils system providers broker
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service deploy, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd deploy && $(MAKE) all)
-
-perform: common utils system providers broker
+perform: common utils system iaas safescale
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd perform && $(MAKE) all)
 
@@ -140,21 +165,17 @@ scanner: common
 
 clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd providers && $(MAKE) $@)
+	@(cd iaas && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
-	@(cd broker && $(MAKE) $@)
-	@(cd deploy && $(MAKE) $@)
+	@(cd safescale && $(MAKE) $@)
 	@(cd perform && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
 
-broker/client/broker: broker
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service broker (client) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+safescale/client/safescale: safescale
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale (client) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
-broker/server/brokerd: broker
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service broker (daemon) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-
-deploy/cli/deploy: deploy
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service deploy, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+safescale/server/safescaled: safescale
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale (daemon) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
 perform/perform: perform
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -162,7 +183,7 @@ perform/perform: perform
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
 
-docs:
+godocs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(godoc -http=:6060 &)
 
@@ -176,12 +197,13 @@ depclean: begin
 	@rm -rf ./vendor
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading all dependencies from zero, this is gonna take a while..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(dep ensure)
+	@($(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
 	@(dep ensure -update "github.com/gophercloud/gophercloud")
 	@(dep ensure -update "github.com/graymeta/stow")
 
 generate: begin # Run generation
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@cd broker && $(MAKE) sdk
+	@cd safescale && $(MAKE) sdk
 	@$(GO) generate -run stringer ./... 2>&1 | tee generation_results.log
 	@$(GO) generate -run rice ./... 2>&1 | tee -a generation_results.log
 	@$(GO) generate -run stringer ./... 2>&1 | tee -a generation_results.log

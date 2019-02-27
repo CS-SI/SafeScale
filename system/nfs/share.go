@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/system/nfs/SecurityFlavor"
 )
 
+// ExportOptions ...
 type ExportOptions struct {
 	ReadOnly       bool
 	NoRootSquash   bool
@@ -38,7 +39,8 @@ type ExportOptions struct {
 	AnonGID        int
 }
 
-type ExportAcl struct {
+// ExportACL ...
+type ExportACL struct {
 	//Host contains the pattern of hosts authorized (cf. exports man page)
 	Host string
 	//SecurityMode contains all the security mode allowed for the Host
@@ -51,11 +53,11 @@ type ExportAcl struct {
 type Share struct {
 	Server *Server
 	Path   string
-	ACLs   []ExportAcl
+	ACLs   []ExportACL
 }
 
 //NewShare creates a share struct corresponding to the export of path on server
-func NewShare(server Server, path string) (*Share, error) {
+func NewShare(server *Server, path string) (*Share, error) {
 	if path == "" {
 		return nil, fmt.Errorf("invalid parameter: 'path' can't be empty")
 	}
@@ -63,15 +65,15 @@ func NewShare(server Server, path string) (*Share, error) {
 		return nil, fmt.Errorf("invalid parameter: 'path' must be absolute")
 	}
 	share := Share{
-		Server: &server,
+		Server: server,
 		Path:   path,
-		ACLs:   []ExportAcl{},
+		ACLs:   []ExportACL{},
 	}
 	return &share, nil
 }
 
-//AddAcl adds an ACL to the share
-func (s *Share) AddAcl(acl ExportAcl) {
+// AddACL adds an ACL to the share
+func (s *Share) AddACL(acl ExportACL) {
 	acls := append(s.ACLs, acl)
 	s.ACLs = acls
 }
@@ -83,8 +85,11 @@ func (s *Share) Add() error {
 		acl := a.Host + "("
 		if len(a.SecurityModes) > 0 {
 			acl += "sec="
-			for _, item := range a.SecurityModes {
-				acl += item.String()
+			for i, item := range a.SecurityModes {
+				acl += strings.ToLower(item.String())
+				if i != 0 {
+					acl += ","
+				}
 			}
 		} else {
 			acl += "sec=sys"
@@ -132,9 +137,10 @@ func (s *Share) Add() error {
 		acls += acl + " "
 	}
 	data := map[string]interface{}{
-		"MountPoint":   s.Path,
+		"Path":         s.Path,
 		"AccessRights": strings.TrimSpace(acls),
 	}
-	retcode, stdout, stderr, err := executeScript(*s.Server.SshConfig, "nfs_server_path_export.sh", data)
+
+	retcode, stdout, stderr, err := executeScript(*s.Server.SSHConfig, "nfs_server_path_export.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 }

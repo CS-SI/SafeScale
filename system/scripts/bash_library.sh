@@ -1,5 +1,5 @@
 #
-# Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+sfFinishPreviousInstall() {
+    local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
+    if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
+}
+export -f sfFinishPreviousInstall
 
 # sfWaitForApt waits an already running apt-like command to finish
 sfWaitForApt() {
@@ -268,6 +274,7 @@ sfSaveIptablesRules() {
         debian|ubuntu) iptables-save >/etc/iptables/rules.v4 ;;
     esac
 }
+export -f sfSaveIptablesRules
 
 sfDetectFacts() {
     declare -gA FACTS

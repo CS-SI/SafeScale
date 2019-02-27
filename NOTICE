@@ -1,5 +1,5 @@
 SafeScale
-Copyright 2018 CS Systèmes d'Information
+Copyright 2018-2019 CS Systèmes d'Information
 
 This product includes software developed by
 CS Systèmes d'Information (http://www.c-s.fr/)
@@ -11,7 +11,7 @@ The Apache 2.0 License
 The following components are provided under the  Apache 2.0 License  (https://opensource.org/licenses/Apache-2.0). See project link for details.
 
 github.com/aws/aws-sdk-go
-github.com/gophercloud/gophercloud                                       
+github.com/gophercloud/gophercloud
 
 
 ================================================================

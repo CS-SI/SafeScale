@@ -9,7 +9,7 @@ vet:
 	@$(GO) vet ./...
 
 safe-securityd:	proxy.go
-	@$(GO) build -o $(EXEC)
+	@$(GO) build -race -o $(EXEC)
 
 clean:
 	@$(RM) $(EXEC) || true

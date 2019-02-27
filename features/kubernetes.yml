@@ -1,0 +1,520 @@
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+feature:
+    suitableFor:
+        host: no
+        cluster: all
+    requirements:
+        features:
+            - docker
+            - docker-compose
+        clusterSizing:
+            dcos:
+                small:
+                    minPrivateNodes: 2
+                normal:
+                    minPrivateNodes: 4
+                large:
+                    minPrivateNodes: 6
+            boh:
+                small:
+                    minMasters: 1
+                    minPrivateNodes: 1
+                normal:
+                    minMasters: 3
+                    minPrivateNodes: 1
+                large:
+                    minMasters: 3
+                    minPrivateNodes: 3
+            k8s:
+                small:
+                    minMasters: 1
+                    minPrivateNodes: 1
+                normal:
+                    minMasters: 3
+                    minPrivateNodes: 3
+                large:
+                    minMasters: 5
+                    minPrivateNodes: 8
+
+    install:
+        dcos:
+            check:
+                pace: deploy
+                steps:
+                    deploy:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDcos kubernetes &>/dev/null
+
+            add:
+                #pace: package,cli+config
+                pace: package,cli,config
+                steps:
+                    package:
+                        targets:
+                            masters: one
+                        options:
+                            small: |
+                                {
+                                    "kubernetes": {
+                                        "node_count": 1,
+                                        "reserved_resources": {
+                                            "kube_cpus": 1,
+                                            "kube_mem": 1024,
+                                            "kube_disk": 512
+                                        }
+                                    }
+                                }
+                            normal: |
+                                {
+                                    "kubernetes": {
+                                        "high_availability": true,
+                                        "node_count": 1,
+                                        "reserved_resources": {
+                                            "kube_cpus": 1,
+                                            "kube_mem": 1024,
+                                            "kube_disk": 512
+                                        }
+                                    }
+                                }
+                            large: |
+                                {
+                                    "kubernetes": {
+                                        "high_availability": true,
+                                        "node_count": 3,
+                                        "reserved_resources": {
+                                            "kube_cpus": 1,
+                                            "kube_mem": 1024,
+                                            "kube_disk": 512
+                                        }
+                                    }
+                                }
+
+                        run: |
+                            output=$(sfDcos package install --yes kubernetes {{.options}} 2>&1)
+                            rc=$?
+                            [ $rc -ne 0 ] && {
+                                echo $output
+                                echo $output | grep "already installed" &>/dev/null || exit $rc
+                            }
+                            exit 0
+
+                    cli:
+                        targets:
+                            masters: all
+                        run: |
+                            sfDcos package install --yes kubernetes --cli
+
+                    config:
+                        targets:
+                            masters: all
+                        run: |
+                            sfRetry 10m 20 "sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null" || exit 193
+                            sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
+                            sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
+
+            remove:
+                pace: package
+                steps:
+                    package:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDcos package remove --yes kubernetes
+
+        bash:
+            check:
+                pace: kubectl,nodes
+                steps:
+                    kubectl:
+                        targets:
+                            masters: all
+                        run: |
+                            [ $(sfKubectl get nodes &>/dev/null | wc -l) -gt 1 ]
+
+                    nodes:
+                        targets:
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            pidof kubelet &>/dev/null
+
+            add:
+                pace: cp-dir,common-tools,sysconf,kubelet,cp1-init,cpx-init,join,weavenet,final
+                steps:
+                    cp-dir:
+                        targets:
+                            masters: all
+                        run: |
+                            mkdir -p /opt/safescale/k8s/ssl /opt/safescale/k8s/config
+
+                    common-tools:
+                        targets:
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && exit 0
+
+                            #VERSION=$(sfRetry 5m 5 "curl -ksSL https://dl.k8s.io/release/stable.txt")
+                            #[[ $VERSION =~ v[0-9]+\.[0-9]+\.[0-9]+ ]] || VERSION=v1.13.1
+                            VERSION=v1.12.6
+                            URL="https://storage.googleapis.com/kubernetes-release/release/${VERSION}/bin/linux/amd64"
+                            sfDownload "$URL/kubeadm" kubeadm 5m 5 || exit 193
+                            sfDownload "$URL/kubelet" kubelet 5m 5 || exit 194
+                            sfDownload "$URL/kubectl" kubectl 5m 5 || exit 195
+                            chmod 755 kubeadm kubelet kubectl
+                            mv kubeadm kubelet kubectl /usr/local/bin
+
+                            cd /var/tmp
+                            VERSION=v1.13.0
+                            URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${VERSION}/crictl-${VERSION}-linux-amd64.tar.gz"
+                            sfDownload "$URL" crictl.tgz 5m 5 || exit 192
+                            tar zxf crictl.tgz -C /usr/local/bin || exit 193
+                            rm -f crictl.tgz
+
+                            mkdir -p /opt/cni/bin
+                            VERSION=v0.7.4
+                            URL="https://github.com/containernetworking/plugins/releases/download/${VERSION}/cni-plugins-amd64-${VERSION}.tgz"
+                            sfDownload "$URL" cni-plugins.tgz 5m 5 || exit 192
+                            tar zxf cni-plugins.tgz -C /opt/cni/bin
+                            [ $? -eq 0 ] && rm -f cni-plugins.tgz
+                            chmod -R a+rx /opt/cni/bin
+
+                    sysconf:
+                        targets:
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && exit 0
+
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfWaitForApt
+                                    sfRetry 5m 5 apt install -y ebtables socat || exit 192
+                                    ;;
+                                redhat|centos)
+                                    sfRetry 5m 5 yum install -y ebtables socat || exit 193
+                                    ;;
+                                *)
+                                    echo "Unmanaged Linux distribution"
+                                    exit 1
+                                    ;;
+                            esac
+
+                            echo "# IPVS modules used by Kubernetes" >>/etc/modules
+                            for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh nf_conntrack_ipv4; do
+                                echo $i >>/etc/modules
+                                modprobe $i
+                            done
+
+                            echo "net.ipv4.ip_forward=1" >>/etc/sysctl.d/99-sysctl.conf
+                            sysctl -p
+
+                    kubelet:
+                        targets:
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && exit 0
+                            chmod a+rx /usr/local/bin/*
+
+                            cat >/etc/systemd/system/kubelet.service <<-'EOF'
+                            [Unit]
+                            Description=kubelet: The Kubernetes Node Agent
+                            Documentation=http://kubernetes.io/docs/
+
+                            [Service]
+                            ExecStart=/usr/local/bin/kubelet
+                            Restart=always
+                            StartLimitInterval=0
+                            RestartSec=10
+
+                            [Install]
+                            WantedBy=multi-user.target
+                            EOF
+
+                            mkdir -p /etc/systemd/system/kubelet.service.d
+                            cat >/etc/systemd/system/kubelet.service.d/10-kubeadm.conf <<-'EOF'
+                            [Service]
+                            Environment="KUBELET_KUBECONFIG_ARGS=--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf"
+                            Environment="KUBELET_CONFIG_ARGS=--config=/var/lib/kubelet/config.yaml"
+                            # This is a file that "kubeadm init" and "kubeadm join" generates at runtime, populating the KUBELET_KUBEADM_ARGS variable dynamically
+                            EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
+                            # This is a file that the user can use for overrides of the kubelet args as a last resort. Preferably, the user should use
+                            # the .NodeRegistration.KubeletExtraArgs object in the configuration files instead. KUBELET_EXTRA_ARGS should be sourced from this file.
+                            EnvironmentFile=-/etc/default/kubelet
+                            ExecStart=
+                            ExecStart=/usr/local/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
+                            EOF
+
+                            systemctl daemon-reload
+                            systemctl enable kubelet
+                            exit 0
+
+                    cp1-init:
+                        targets:
+                            masters: one
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && exit 0
+
+                            # Gather the stable release of K8S
+                            #RELEASE=$(sfRetry 2m 5 "curl -sSL https://dl.k8s.io/release/stable.txt")
+                            RELEASE=v1.12.6
+                            [ $? -ne 0 ] && exit 192
+
+                            cd /opt/safescale/k8s/config
+
+                            #untested api version !!
+                            cat >kubeadm-bootstrap.config.yaml <<-EOF
+                            apiVersion: kubeadm.k8s.io/v1alpha3
+                            kind: MasterConfiguration
+                            kubernetesVersion: $RELEASE
+                            apiServerCertSANs:
+                                - "{{.HostIP}}"
+                            api:
+                                controlPlaneEndpoint: "{{.HostIP}}:6443"
+                            etcd:
+                                local:
+                                    extraArgs:
+                                        listen-client-urls: "https://127.0.0.1:2379,https://{{.HostIP}}:2379"
+                                        advertise-client-urls: "https://{{.HostIP}}:2379"
+                                        listen-peer-urls: "https://{{.HostIP}}:2380"
+                                        initial-advertise-peer-urls: "https://{{.HostIP}}:2380"
+                                        initial-cluster: "{{.Hostname}}=https://{{.HostIP}}:2380"
+                                    serverCertSANs:
+                                        - {{.Hostname}}
+                                        - {{.HostIP}}
+                                    peerCertSANs:
+                                        - {{.Hostname}}
+                                        - {{.HostIP}}
+                                networking:
+                                    podSubnet: "10.100.0.0/16"
+                            EOF
+
+                            cat >kubeadm-k8s-cpx.config.template <<-EOF
+                            apiVersion: kubeadm.k8s.io/v1alpha3
+                            kind: MasterConfiguration
+                            kubernetesVersion: $RELEASE
+                            apiServerCertSANs:
+                                - "{{.HostIP}}"
+                            api:
+                                controlPlaneEndpoint: "{{.HostIP}}:6443"
+                            etcd:
+                                local:
+                                    extraArgs:
+                                        listen-client-urls: "https://127.0.0.1:2379,https://##HOSTIP##:2379"
+                                        advertise-client-urls: "https://##HOSTIP##:2379"
+                                        listen-peer-urls: "https://##HOSTIP##:2380"
+                                        initial-advertise-peer-urls: "https://##HOSTIP##:2380"
+                                        initial-cluster: "{{.Hostname}}=https://{{.HostIP}}:2380,##HOSTNAME##=https://##HOSTIP##:2380"
+                                        initial-cluster-state: existing
+                                    serverCertSANs:
+                                        - ##HOSTNAME##
+                                        - ##HOSTIP##
+                                    peerCertSANs:
+                                        - ##HOSTNAME##
+                                        - ##HOSTIP##
+                                networking:
+                                    podSubnet: "10.100.0.0/16"
+                            EOF
+
+                            cat >etcd-join.sh.template <<-'EOF'
+                                export KUBECONFIG=/etc/kubernetes/admin.conf
+                                kubectl exec -n kube-system etcd-##HOSTNAME## -- etcdctl --ca-file /etc/kubernetes/pki/etcd/ca.crt --cert-file /etc/kubernetes/pki/etcd/peer.crt --key-file /etc/kubernetes/pki/etcd/peer.key --endpoints=https://{{.HostIP}}:2379 member add ##HOSTNAME## https://##HOSTIP##:2380
+                            EOF
+
+                            sfRetry 5m 5 kubeadm config images pull && kubeadm init --config kubeadm-bootstrap.config.yaml && echo "init done" || exit 193
+                            touch /etc/kubernetes/.joined
+
+                            cp /etc/kubernetes/pki/ca.crt ../ssl
+                            cp /etc/kubernetes/pki/ca.key ../ssl
+                            cp /etc/kubernetes/pki/sa.key ../ssl
+                            cp /etc/kubernetes/pki/sa.pub ../ssl
+                            cp /etc/kubernetes/pki/front-proxy-ca.crt ../ssl
+                            cp /etc/kubernetes/pki/front-proxy-ca.key ../ssl
+                            cp /etc/kubernetes/pki/etcd/ca.crt ../ssl/etcd-ca.crt
+                            cp /etc/kubernetes/pki/etcd/ca.key ../ssl/etcd-ca.key
+                            ( cd .. ; tar zcvf /var/tmp/files.tgz . )
+                            sfDropzonePush /var/tmp/files.tgz || exit 194
+                            rm /var/tmp/files.tgz
+
+                            for ip in {{range .MasterIPs}}{{.}} {{end}}; do
+                                [ "$ip" = "{{.HostIP}}" ] && continue
+                                sed -e "s:{{.HostIP}}:${ip}:g" /etc/kubernetes/admin.conf >/var/tmp/admin.conf
+                                sed -e "s:##HOSTIP##:${ip}:g" kubeadm-k8s-cpx.config.yaml.template >/tmp/kubeadm-k8s-cpx.config.yaml
+                                sfDropzonePush /tmp/admin.conf && \
+                                sfDropzonePush /tmp/kubeadm-k8s-cpx.config.yaml && \
+                                sfDropzonePush etcd-join.sh.template && \
+                                sfDropzoneSync $ip || exit 195
+                                rm -f /var/tmp/admin.conf /tmp/kubeadm-k8s-cpx.config.yaml
+                            done
+                            sfDropzoneClean
+
+                    cpx-init:
+                        targets:
+                            masters: all
+                        run: |
+                            # Don't try to init a kubernetes cluster already running
+                            [ ! -f /etc/kubernetes/.joined ] && {
+                                cd /opt/safescale/k8s/config
+                                sfDropzonePop "*" . || :
+                                [ -f files.tgz ] && {
+                                    tar zxvf files.tgz -C .. || exit 192
+                                    rm files.tgz
+
+                                    mkdir -p /etc/kubernetes/pki/etcd
+                                    cp ../ssl/ca.crt /etc/kubernetes/pki/
+                                    cp ../ssl/ca.key /etc/kubernetes/pki/
+                                    cp ../ssl/sa.pub /etc/kubernetes/pki/
+                                    cp ../ssl/sa.key /etc/kubernetes/pki/
+                                    cp ../ssl/front-proxy-ca.crt /etc/kubernetes/pki/
+                                    cp ../ssl/front-proxy-ca.key /etc/kubernetes/pki/
+                                    cp ../ssl/etcd-ca.crt /etc/kubernetes/pki/etcd/ca.crt
+                                    cp ../ssl/etcd-ca.key /etc/kubernetes/pki/etcd/ca.key
+                                    cp admin.conf /etc/kubernetes/admin.conf
+
+                                    sfRetry 5m 5 kubeadm config images pull && \
+                                    kubeadm alpha phase certs all --config kubeadm-k8s-cpx.config.yaml && \
+                                    kubeadm alpha phase kubelet config write-to-disk --config kubeadm-k8s-cpx.config.yaml && \
+                                    kubeadm alpha phase kubelet write-env-file --config kubeadm-k8s-cpx.config.yaml && \
+                                    kubeadm alpha phase kubeconfig kubelet --config kubeadm-k8s-cpx.config.yaml && \
+                                    systemctl start kubelet || exit 193
+
+                                    # "realize" the etcd-join template to a working script then executes it and starts k8s master
+                                    sed -e 's/##HOSTNAME##/{{.Hostname}}' -e 's/##HOSTIP##/{{.HostIP}}' etcd-join.sh.template >etcd-join.sh
+                                    bash ./etcd-join.sh && \
+                                    kubeadm alpha phase etcd local --config kubeadm-k8s-cpx.config.yaml && \
+                                    kubeadm alpha phase kubeconfig all --config kubeadm-k8s-cpx.config.yaml && \
+                                    kubeadm alpha phase controlplane all --config kubeadm-k8s-cpx.config.yaml
+                                    kubeadm alpha phase mark-master --config kubeadm-k8s-cpx.config.yaml || exit 194
+                                    rm -f etcd-join.sh
+                                    touch /etc/kubernetes/.joined
+                                }
+                                sfDropzoneClean
+                            }
+
+                            mkdir -p ~{{.Username}}/.kube
+                            cp -i /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
+                            chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
+                            chmod -R go-rwx ~{{.Username}}/.kube
+
+                    join:
+                        targets:
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && exit 0
+
+                            MASTERIP=
+                            for m in {{ range .MasterIPs }}{{.}} {{ end -}}; do
+                                TOKEN=$(sfRemoteExec $m kubeadm token create)
+                                [ $? -ne 0 ] && continue
+                                HASH=$(sfRemoteExec $m openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //')
+                                MASTERIP=$m
+                                break
+                            done
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && exit 192
+                            kubeadm join --token $TOKEN $MASTERIP:6443 --discovery-token-ca-cert-hash sha256:$HASH && touch /etc/kubernetes/.joined
+
+                    weavenet:
+                        targets:
+                            masters: one
+                        run: |
+                            VERSION=$(sfKubectl version | base64 | tr -d '\n')
+                            [ $? -ne 0 ] && exit 192
+                            sfRetry 3m 5 sfKubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$VERSION" || exit 193
+                            #sfRetry 3m 5 sfKubectl apply -f "https://cloud.weave.works/k8s/scope.yaml?k8s-version=$VERSION" || exit 194
+                            #sleep 10
+                            #NAME=$(sfKubectl get -n weave pod --selector=weave-scope-feature=app -o jsonpath='{.items..metadata.name}')
+                            #sfKubectl port-forward -n weave "$NAME" 4040
+
+                    final:
+                        targets:
+                            masters: one
+                        run: |
+                            # Allows pods to start on master
+                            [ "{{.Complexity}}" = "small" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master-
+                            # adds Kubernetes Dashboard
+                            sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/src/deploy/recommended/kubernetes-dashboard.yaml || exit 192
+
+            remove:
+                pace: node,reset,clean
+                steps:
+                    node:
+                        targets:
+                            masters: one
+                        run: |
+                            kubectl drain {{.Hostname}} --delete-local-data --force --ignore-daemonsets
+                            kubectl delete node {{.Hostname}}
+
+                    reset:
+                        targets:
+                            masters: one
+                        run: |
+                            kubeadm reset
+
+                    clean:
+                        targets:
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            kubeadm reset &>/dev/null
+                            rm -rf /opt/safescale/k8s
+                            rm -rf /usr/local/bin/kube*
+
+    # proxy:
+    #     rules:
+    #         - name: upstream
+    #           type: upstream
+    #           targets:
+    #               masters: all
+    #           content: |
+    #               {
+    #                   "name": "k8s-CPs",
+    #                   "target": "{{.HostIP}}:6443",
+    #                   "weigth": 100
+    #               }
+
+    #         - name: service
+    #           type: service
+    #           targets:
+    #               masters: one
+    #           content: |
+    #               {
+    #                   "protocol": "https",
+    #                   "name": "k8s-CPs-{{.ClusterName}}",
+    #                   "host": "k8s-CPs",
+    #                   "port": 6443
+    #               }
+
+    #         - name: route
+    #           type: route
+    #           targets:
+    #               masters: one
+    #           content: |
+    #               {
+    #                   "protocols": ["https"],
+    #                   "paths": ["/"],
+    #                   "service": { "id": "{{.service}}" }
+    #               }
+
+...

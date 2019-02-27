@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ function dns_fallback {
 dns_fallback
 
 # Determines the FSID value to use
-FSIDs=$(cat /etc/exports | sed -r 's/ /\n/g' | grep fsid= | sed -r 's/.+fsid=([[:alnum:]]+),.*/\1/g' | uniq | sort -n)
+FSIDs=$(cat /etc/exports | sed -r 's/ /\n/g' | sed -r 's/,/\n/g' | grep fsid= | grep -o [0-9]* | uniq | sort -n)
 LAST_FSID=$(echo "$FSIDs" | tail -n 1)
 if [ -z "$LAST_FSID" ]; then
     FSID=1
@@ -52,25 +52,24 @@ if [ -z "$ACCESS_RIGHTS" ]; then
     FILTERED_ACCESS_RIGHTS="*(rw,fsid=$FSID,sync,no_root_squash,no_subtree_check)"
 else
     # Wants to ensure FSID is valid otherwise updates it
-    ACL=$(echo $ACCESS_RIGHTS | sed -r 's/\((.*)\)')
+    ACL=$(echo $ACCESS_RIGHTS | sed "s/.*(\(.*\))/\1/")
     if [ ! -z "$ACL" ]; then
         # If there is something between parenthesis, checks if there is some fsid directive, and check the values
         # are not already used for other shares
-        ACL_FSIDs=$(echo $ACL | sed -r 's/ /\n/g' | grep fsid= | sed -r 's/.+fsid=([[:alnum:]]+),.*/\1/g' | uniq | sort -n)
-        for f in $ACL_FSIDs; do
-            echo $FSIDs | grep "^${f}$" && {
+        ACL_FSIDs=$(echo $ACL | sed -r 's/ /\n/g' | sed -r 's/,/\n/g' | grep fsid= | grep -o [0-9]* | uniq | sort -n)
+        for fsid in $ACL_FSIDs; do
+            echo $FSIDs | grep "^${fsid}" && {
                 # FSID value is already used, updating the Access Rights to use the calculated new FSID
-                FILTERED_ACCESS_RIGHTS=$(echo $ACCESS_RIGHTS | sed -r 's/fsid=[[:numeric:]]*/fsid=$FSID/g')
-            }
-            break
+                FILTERED_ACCESS_RIGHTS=$(echo $ACCESS_RIGHTS | sed -r "s/fsid=[[:numeric:]]*/fsid=$FSID/g")
+            } && break
         done
         if [ -z $FILTERED_ACCESS_RIGHTS ]; then
             # No updated access rights, with something between parenthesis, adding fsid= directive
-            FILTERED_ACCESS_RIGHTS=$(echo $ACCESS_RIGHTS | sed -r 's/\)/,fsid=$FSID\)/g')
+            FILTERED_ACCESS_RIGHTS=$(echo $ACCESS_RIGHTS | sed -r "s/\)/,fsid=$FSID)/g")
         fi
     else
         # No updated access rights without anything between parenthesis, adding fsid= directive
-        FILTERED_ACCESS_RIGHTS=$(echo $ACCESS_RIGHTS | sed -r 's/\)/fsid=$FSID/g')
+        FILTERED_ACCESS_RIGHTS=$(echo $ACCESS_RIGHTS | sed -r "s/\(\)/(fsid=$FSID)/g")
     fi
 fi
 #VPL: case not managed: nothing between braces...

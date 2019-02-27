@@ -37,7 +37,7 @@ EXPDIR=/usr/local/safescale/bin
 echo "Copy produced binaries to export directory '${EXPDIR}'"
 mkdir -p ${EXPDIR}
 
-cp ${GOPATH}/bin/broker ${EXPDIR}
-cp ${GOPATH}/bin/brokerd ${EXPDIR}
+cp ${GOPATH}/bin/safescale ${EXPDIR}
+cp ${GOPATH}/bin/safescaled ${EXPDIR}
 cp ${GOPATH}/bin/deploy ${EXPDIR}
 cp ${GOPATH}/bin/perform ${EXPDIR}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,6 +31,12 @@ function dns_fallback {
     return 0
 }
 
+function finishPreviousInstall() {
+    local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
+    if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
+    return 0
+}
+
 dns_fallback
 
 {{.reserved_BashLibrary}}
@@ -42,6 +48,8 @@ case $LINUX_KIND in
         touch /var/log/lastlog
         chgrp utmp /var/log/lastlog
         chmod 664 /var/log/lastlog
+        sfWaitForApt
+        finishPreviousInstall
 
         sfRetry 3m 5 "sfWaitForApt && apt -y update"
         sfRetry 5m 5 "sfWaitForApt && apt-get install -qqy nfs-common"

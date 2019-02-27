@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -70,7 +71,12 @@ func (kc *KeyCloak) GetAccessToken() (string, error) {
 		return "", err
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		clErr := body.Close()
+		if clErr != nil {
+			log.Error(clErr)
+		}
+	}()
 	buffer, err := ioutil.ReadAll(body)
 	if err != nil {
 		return "", err
@@ -86,6 +92,10 @@ func (kc *KeyCloak) GetAccessToken() (string, error) {
 //CreateClientApplication create a client application
 func (kc *KeyCloak) CreateClientApplication(clientID, clientSecret, clientName string) error {
 	token, err := kc.GetAccessToken()
+	if err != nil {
+		return err
+	}
+
 	tokens := []string{"auth/realms", kc.Realm, "protocol/openid-connect/token", "/"}
 	resource := strings.Join(tokens, "/")
 	apiURL := kc.BaseURL
@@ -165,6 +175,10 @@ func newKeyCloackUser(name, email string, attrs map[string]interface{}) map[stri
 //CreateUser create a user
 func (kc *KeyCloak) CreateUser(name, email string, attrs map[string]interface{}) error {
 	token, err := kc.GetAccessToken()
+	if err != nil {
+		return err
+	}
+
 	tokens := []string{"admin/realms", kc.Realm, "users", "/"}
 	resource := strings.Join(tokens, "/")
 	apiURL := kc.BaseURL

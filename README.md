@@ -4,7 +4,7 @@ SafeScale is an Infrastructure and Platform as a Code tool.
 
 ## Table of content
   - [Description](#description)
-    - [SafeScale Broker](#safescale-broker)
+    - [SafeScale Broker](#safescale-safescale)
     - [SafeScale Perform](#safescale-perform)
     - [SafeScale Security](#safescale-security)
   - [Currently available features](#currently-available-features)
@@ -82,7 +82,7 @@ If you wish to contribute you can [fork the project](https://help.github.com/for
 For bugs and feature requests, [please create an issue](../../issues/new).
 
 ## Build
-  [See Build file](doc/BUILDING.md)
+  [See Build file](doc/build/BUILDING.md)
 
 ## Usage
   [See Usage file](doc/USAGE.md)
