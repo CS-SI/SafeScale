@@ -32,7 +32,7 @@ install_common_requirements() {
     yum install -y python-backports-ssl_match_hostname && \
     yum upgrade --assumeyes --tolerant && \
     yum update --assumeyes
-    [ $? -ne 0 ] && exit {{ errcode "SystemUpdate" }}
+    [ $? -ne 0 ] && exit 192
 
     # Create group nogroup
     groupadd nogroup &>/dev/null
@@ -81,15 +81,15 @@ EOF
     # Disables installation of docker-python from yum and adds some requirements
     yum remove -y python-docker-py &>/dev/null
     yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils jq rclone && \
-    yum versionlock exclude python-docker-py || exit $?
+    yum versionlock exclude python-docker-py || exit 193
 
     # Installs PIP
     yum install -y epel-release && \
     yum makecache fast && \
-    yum install -y python-pip || yum install -y python2-pip || exit $?
+    yum install -y python-pip || yum install -y python2-pip || exit 194
 
     # Installs docker-python with pip
-    pip install -q docker-py==1.10.6 || exit $?
+    pip install -q docker-py==1.10.6 || exit 195
 
     # Enable overlay module
     echo overlay >/etc/modules-load.d/10-overlay.conf

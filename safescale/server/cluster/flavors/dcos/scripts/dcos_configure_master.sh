@@ -79,15 +79,15 @@ sfAsyncStart DKB 10m bash -c download_kubectl_binary
 #########################
 
 echo "Waiting for DCOS Installer download..."
-sfAsyncWait DDI || exit {{ errcode "DcosInstallDownload" }}
+sfAsyncWait DDI || exit 192
 
 # Launch DCOS installation
 cd /usr/local/dcos
-bash dcos_install.sh master || exit {{ errcode "DcosInstallExecution" }}
+bash dcos_install.sh master || exit 193
 
 # Sets the url of the dcos master
 echo "Waiting for DCOS cli download..."
-sfAsyncWait DDB || exit {{ errcode "DcosCliDownload" }}
+sfAsyncWait DDB || exit 194
 cat >>~cladm/.bashrc <<-EOF
 # Makes sure dcos is configured correctly
 dcos cluster setup https://localhost &>/dev/null
@@ -99,7 +99,7 @@ chown -R cladm:cladm ~cladm
 ########################################################
 
 echo "Waiting for kubectl download..."
-sfAsyncWait DKB || exit {{ errcode "KubectlDownload" }}
+sfAsyncWait DKB || exit 195
 
 ### Done
 echo

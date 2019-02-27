@@ -28,9 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/controller"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/boh"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/dcos"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/k8s"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/ohpc"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/swarm"
 	"github.com/CS-SI/SafeScale/utils"
 )
@@ -100,25 +97,25 @@ func setBlueprint(controller *controller.Controller) error {
 	flavor := controller.GetIdentity().Flavor
 	switch flavor {
 	case Flavor.DCOS:
-		err := controller.Restore(dcos.Blueprint(controller))
-		if err != nil {
-			return err
-		}
+		// err := controller.Restore(dcos.Blueprint(controller))
+		// if err != nil {
+		// 	return err
+		// }
 	case Flavor.BOH:
 		err := controller.Restore(boh.Blueprint(controller))
 		if err != nil {
 			return err
 		}
-	case Flavor.OHPC:
-		err := controller.Restore(ohpc.Blueprint(controller))
-		if err != nil {
-			return err
-		}
-	case Flavor.K8S:
-		err := controller.Restore(k8s.Blueprint(controller))
-		if err != nil {
-			return err
-		}
+	// case Flavor.OHPC:
+	// 	err := controller.Restore(ohpc.Blueprint(controller))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// case Flavor.K8S:
+	// 	err := controller.Restore(k8s.Blueprint(controller))
+	// 	if err != nil {
+	// 		return err
+	// 	}
 	case Flavor.SWARM:
 		err := controller.Restore(swarm.Blueprint(controller))
 		if err != nil {
@@ -132,8 +129,8 @@ func setBlueprint(controller *controller.Controller) error {
 
 // Create creates a cluster following the parameters of the request
 func Create(req controller.Request) (api.Cluster, error) {
-	log.Debugf(">>> deploy.cluster.factory::Create()")
-	defer log.Debugf("<<< deploy.cluster.factory::Create()")
+	log.Debugf(">>> safescale.server.cluster.factory::Create()")
+	defer log.Debugf("<<< safescale.cluster.factory::Create()")
 
 	// Validates parameters
 	if req.Name == "" {
@@ -157,26 +154,26 @@ func Create(req controller.Request) (api.Cluster, error) {
 	controller := controller.NewController(svc)
 	req.Tenant = tenant.Name
 	switch req.Flavor {
-	case Flavor.DCOS:
-		err = controller.Create(req, dcos.Blueprint(controller))
-		if err != nil {
-			return nil, err
-		}
 	case Flavor.BOH:
 		err = controller.Create(req, boh.Blueprint(controller))
 		if err != nil {
 			return nil, err
 		}
-	case Flavor.OHPC:
-		err = controller.Create(req, ohpc.Blueprint(controller))
-		if err != nil {
-			return nil, err
-		}
-	case Flavor.K8S:
-		err = controller.Create(req, k8s.Blueprint(controller))
-		if err != nil {
-			return nil, err
-		}
+	// case Flavor.DCOS:
+	// 	err = controller.Create(req, dcos.Blueprint(controller))
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// case Flavor.K8S:
+	// 	err = controller.Create(req, k8s.Blueprint(controller))
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// case Flavor.OHPC:
+	// 	err = controller.Create(req, ohpc.Blueprint(controller))
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 	case Flavor.SWARM:
 		err = controller.Create(req, swarm.Blueprint(controller))
 		if err != nil {
