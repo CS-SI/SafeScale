@@ -729,6 +729,9 @@ func (c *Controller) DeleteSpecificNode(hostID string, selectedMaster string) er
 
 // deleteNode deletes the node specified by its ID
 func (c *Controller) deleteNode(node *clusterpropsv1.Node, index int, public bool, selectedMaster string) error {
+	log.Debugf(">>> safescale.server.cluster.controller.Controller::deleteNode(%s, %d)", node.ID, index)
+	defer log.Debugf("<<< safescale.server.cluster.controller.Controller::deleteNode(%s, %d)", node.ID, index)
+
 	if c == nil {
 		panic("Calling safescale.server.cluster.controller.Controller::DeleteSpecificNode from nil pointer!")
 	}
