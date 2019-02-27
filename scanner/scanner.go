@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -30,11 +31,12 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	server "github.com/CS-SI/SafeScale/broker/server/services"
-	_ "github.com/CS-SI/SafeScale/broker/utils" // Imported to initialise tenants
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/model/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/safescale/server/handlers"
+	"github.com/CS-SI/SafeScale/safescale/server/metadata"
+	_ "github.com/CS-SI/SafeScale/safescale/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/utils"
 )
 
@@ -194,15 +196,23 @@ func createCPUInfo(output string) (*CPUInfo, error) {
 // RunScanner ...
 func RunScanner() {
 	var targetedProviders []string
-	theProviders, _ := providers.Tenants()
+	theProviders, err := iaas.GetTenants()
+	if err != nil {
+		panic(fmt.Sprintf("Unable to get Tenants %s", err.Error()))
+	}
 
 	for tenantName := range theProviders {
-		if strings.Contains(tenantName, "-scannable-gpu-test") {
+		if strings.Contains(tenantName, "-scannable") {
 			targetedProviders = append(targetedProviders, tenantName)
 		}
 	}
 
-	// TODO Enable when several brokerd instances can run in parallel
+	if len(targetedProviders) < 1 {
+		log.Warn("No scannable tenant found. Consider adding '-scannable' to tenant name as stated in documentation")
+		return
+	}
+
+	// TODO Enable when several safescaled instances can run in parallel
 	/*
 		var wtg sync.WaitGroup
 
@@ -218,10 +228,14 @@ func RunScanner() {
 
 	for _, tenantName := range targetedProviders {
 		fmt.Printf("Working with tenant %s\n", tenantName)
-		analyzeTenant(nil, tenantName)
+		err := analyzeTenant(nil, tenantName)
+		if err != nil {
+			fmt.Printf("Error working with tenant %s\n", tenantName)
+		}
+		if err := collect(tenantName); err != nil {
+			log.Warn(fmt.Printf("Failed to save scanned info from tenant %s", tenantName))
+		}
 	}
-
-	collect()
 }
 
 func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
@@ -229,25 +243,27 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 		defer group.Done()
 	}
 
-	service, err := providers.GetService(theTenant)
+	serviceProvider, err := iaas.UseService(theTenant)
 	if err != nil {
-		log.Warnf("Unable to get service for tenant '%s': %s", theTenant, err.Error())
+		log.Warnf("Unable to get serviceProvider for tenant '%s': %s", theTenant, err.Error())
 		return err
 	}
 
-	err = dumpImages(service, theTenant)
-	if err != nil {
-		return err
-	}
-
-	err = dumpTemplates(service, theTenant)
+	err = dumpImages(serviceProvider, theTenant)
 	if err != nil {
 		return err
 	}
 
-	templates, err := service.ListTemplates(true)
+	err = dumpTemplates(serviceProvider, theTenant)
+	if err != nil {
+		return err
+	}
 
-	img, err := service.SearchImage("Ubuntu 16.04")
+	templates, err := serviceProvider.ListTemplates(true)
+	if err != nil {
+		return err
+	}
+	img, err := serviceProvider.SearchImage("Ubuntu 18.04")
 	if err != nil {
 		log.Warnf("No image here...")
 		return err
@@ -256,10 +272,10 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	// Prepare network
 
 	there := true
-	var net *model.Network
+	var net *resources.Network
 
-	netName := "scanner"
-	if net, err = service.GetNetwork(netName); net != nil && err == nil {
+	netName := "net-safescale"
+	if net, err = serviceProvider.GetNetwork(netName); net != nil && err == nil {
 		there = true
 		log.Warnf("Network '%s' already there", netName)
 	} else {
@@ -267,18 +283,28 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	}
 
 	if !there {
-		net, err = service.CreateNetwork(model.NetworkRequest{
+		net, err = serviceProvider.CreateNetwork(resources.NetworkRequest{
 			CIDR:      "192.168.0.0/24",
 			IPVersion: IPVersion.IPv4,
 			Name:      netName,
 		})
 		if err == nil {
-			defer service.DeleteNetwork(net.ID)
+			defer func() {
+				delerr := serviceProvider.DeleteNetwork(net.ID)
+				if delerr != nil {
+					log.Warnf("Error deleting network '%s'", net.ID)
+				}
+			}()
 		} else {
 			return errors.Wrapf(err, "Error waiting for server ready: %v", err)
 		}
 		if net == nil {
 			return errors.Errorf("Failure creating network")
+		}
+
+		_, err = metadata.SaveNetwork(serviceProvider, net)
+		if err != nil {
+			return errors.Errorf("Failure saving network metadata")
 		}
 	}
 
@@ -289,42 +315,79 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	concurrency := math.Min(4, float64(len(templates)/2))
 	sem := make(chan bool, int(concurrency))
 
-	hostAnalysis := func(template model.HostTemplate) error {
+	hostAnalysis := func(template resources.HostTemplate) error {
 		defer wg.Done()
 		if net != nil {
 
-			// TODO Remove this later
+			// Limit scanner tests for integration test purposes
+			testSubset := ""
 
-			/*
-				if template.Name != "s1-2" {
+			if testSubsetCandidate := os.Getenv("SCANNER_SUBSET"); testSubsetCandidate != "" {
+				testSubset = testSubsetCandidate
+			}
+
+			if len(testSubset) > 0 {
+				if !strings.Contains(template.Name, testSubset) {
 					return nil
 				}
-			*/
+			}
+
+			// TODO If there is a file with today's date, skip it...
+			fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + theTenant + "#" + template.Name + ".json")
+			if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
+				// path/to/whatever exists
+				return nil
+			}
 
 			log.Printf("Checking template %s\n", template.Name)
 
 			hostName := "scanhost-" + template.Name
-			host, err := service.CreateHost(model.HostRequest{
+			host, err := serviceProvider.CreateHost(resources.HostRequest{
 				ResourceName: hostName,
 				PublicIP:     true,
 				ImageID:      img.ID,
 				TemplateID:   template.ID,
-				Networks:     []*model.Network{net},
+				Networks:     []*resources.Network{net},
 			})
+			if err != nil {
+				return err
+			}
 
-			defer service.DeleteHost(hostName)
+			err = metadata.NewHost(serviceProvider).Carry(host).Write()
+			if err != nil {
+				return err
+			}
+
+			defer func() {
+				log.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.ID)
+				delerr := serviceProvider.DeleteHost(host.ID)
+				if delerr != nil {
+					log.Warnf("Error deleting host '%s'", host.ID)
+				}
+
+				md, err := metadata.LoadHost(serviceProvider, host.ID)
+				if err != nil {
+					log.Warnf("Error loading host metadata of '%s'", hostName)
+				} else {
+					mdDeleteErr := md.Delete()
+					if mdDeleteErr != nil {
+						log.Warnf("Error deleting metadata of '%s'", hostName)
+					}
+				}
+			}()
+
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error creation: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
 
-			sshSvc := server.NewSSHService(service)
-			ssh, err := sshSvc.GetConfig(host.ID)
+			sshSvc := handlers.NewSSHHandler(serviceProvider)
+			ssh, err := sshSvc.GetConfig(context.Background(), host.ID)
 			if err != nil {
 				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
-			nerr := ssh.WaitServerReady(time.Duration(concurrency-1) * time.Minute)
+			nerr := ssh.WaitServerReady(time.Duration(6+concurrency-1) * time.Minute)
 			if nerr != nil {
 				log.Warnf("template [%s] : Error waiting for server ready: %v", template.Name, nerr)
 				return nerr
@@ -364,8 +427,9 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				log.Warnf("template [%s] : Error writing file: %v", template.Name, nerr)
 				return nerr
 			}
+			log.Infof("template [%s] : Stored in file: %s", template.Name, "$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json")
 		} else {
-			return errors.New("No gateway network !")
+			return errors.New("no gateway network")
 		}
 
 		return nil
@@ -375,13 +439,14 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 
 	for _, target := range templates {
 		sem <- true
-		go func(inner model.HostTemplate) {
+		localTarget := target
+		go func(inner resources.HostTemplate) {
 			defer func() { <-sem }()
-			err = hostAnalysis(inner)
-			if err != nil {
-				log.Warnf("Error running scanner: %+v", err)
+			lerr := hostAnalysis(inner)
+			if lerr != nil {
+				log.Warnf("Error running scanner: %+v", lerr)
 			}
-		}(target)
+		}(localTarget)
 	}
 
 	for i := 0; i < cap(sem); i++ {
@@ -393,11 +458,11 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	return nil
 }
 
-func dumpTemplates(service *providers.Service, tenant string) error {
+func dumpTemplates(service *iaas.Service, tenant string) error {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	type TemplateList struct {
-		Templates []model.HostTemplate `json:"templates,omitempty"`
+		Templates []resources.HostTemplate `json:"templates,omitempty"`
 	}
 
 	templates, err := service.ListTemplates(false)
@@ -408,6 +473,9 @@ func dumpTemplates(service *providers.Service, tenant string) error {
 	content, err := json.Marshal(TemplateList{
 		Templates: templates,
 	})
+	if err != nil {
+		return err
+	}
 
 	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", tenant)
 	f = utils.AbsPathify(f)
@@ -420,11 +488,11 @@ func dumpTemplates(service *providers.Service, tenant string) error {
 	return nil
 }
 
-func dumpImages(service *providers.Service, tenant string) error {
+func dumpImages(service *iaas.Service, tenant string) error {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	type ImageList struct {
-		Images []model.Image `json:"images,omitempty"`
+		Images []resources.Image `json:"images,omitempty"`
 	}
 
 	images, err := service.ListImages(false)
@@ -435,6 +503,9 @@ func dumpImages(service *providers.Service, tenant string) error {
 	content, err := json.Marshal(ImageList{
 		Images: images,
 	})
+	if err != nil {
+		return err
+	}
 
 	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", tenant)
 	f = utils.AbsPathify(f)
@@ -448,8 +519,9 @@ func dumpImages(service *providers.Service, tenant string) error {
 }
 
 func main() {
-	log.Printf("%s version %s\n", os.Args[0], VERSION)
-	log.Printf("built %s\n", BUILD_DATE)
+	log.Printf("%s version %s\n", os.Args[0], VERSION+", build "+REV+" ("+BUILD_DATE+")")
+
+	// time.Sleep(time.Duration(10) * time.Second)
 
 	RunScanner()
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,8 +111,8 @@ func Plural(value int) string {
 	return ""
 }
 
-// TitleFirst makes the first letter of the first word uppercased
-func TitleFirst(value string) string {
+// Capitalize makes the first letter of the first word uppercased
+func Capitalize(value string) string {
 	fields := strings.Fields(value)
 	if len(fields) > 0 {
 		// WORKAROUND: strings.Title consider ' as the beginning of a new word, so "can't" becomes "Can'T"...

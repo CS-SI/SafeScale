@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
-	"github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 )
 
 //go:generate rice embed-go
@@ -63,6 +63,9 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	data["reserved_BashLibrary"] = bashLibrary
 
 	tmplBox, err := getTemplateBox()
+	if err != nil {
+		return 255, "", "", err
+	}
 
 	// get file content as string
 	tmplContent, err := tmplBox.String(name)
@@ -186,15 +189,15 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	}
 
 	/*
-	k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
-	if uperr != nil {
-		log.Warn("Network problem...")
-	} else {
-		_, uptext, _, kerr := k.Run()
-		if kerr == nil {
-			log.Warnf("Network working !!: %s", uptext)
+		k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
+		if uperr != nil {
+			log.Warn("Network problem...")
+		} else {
+			_, uptext, _, kerr := k.Run()
+			if kerr == nil {
+				log.Warnf("Network working !!: %s", uptext)
+			}
 		}
-	}
 	*/
 
 	return retcode, stdout, stderr, err

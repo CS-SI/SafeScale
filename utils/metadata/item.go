@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,32 +19,34 @@ package metadata
 import (
 	"sync"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/model"
-	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
 // Item is an entry in the ObjectStorage
 type Item struct {
-	payload model.Serializable
+	payload serialize.Serializable
 	folder  *Folder
-	lock    sync.Mutex
+	written bool
+	lock    *sync.Mutex
 }
 
 // ItemDecoderCallback ...
-type ItemDecoderCallback func([]byte) (model.Serializable, error)
+type ItemDecoderCallback func([]byte) (serialize.Serializable, error)
 
 // NewItem creates a new item with 'name' and in 'path'
-func NewItem(svc *providers.Service, path string) *Item {
+func NewItem(svc *iaas.Service, path string) *Item {
 	return &Item{
 		folder:  NewFolder(svc, path),
 		payload: nil,
+		lock:    &sync.Mutex{},
 	}
 }
 
 // GetService returns the service used by Item
-func (i *Item) GetService() *providers.Service {
+func (i *Item) GetService() *iaas.Service {
 	return i.folder.GetService()
 }
 
@@ -53,25 +55,27 @@ func (i *Item) GetBucket() objectstorage.Bucket {
 	return i.folder.GetBucket()
 }
 
-// GetClient returns the bucket used by Item
-func (i *Item) GetClient() api.ClientAPI {
-	return i.folder.GetClient()
-}
-
 // GetPath returns the path in the Object Storage where the Item is stored
 func (i *Item) GetPath() string {
 	return i.folder.GetPath()
 }
 
+// Written tells if the item has already been written in Object Storage
+func (i *Item) Written() bool {
+	return i.written
+}
+
 // Carry links metadata with cluster struct
-func (i *Item) Carry(data model.Serializable) *Item {
+func (i *Item) Carry(data serialize.Serializable) *Item {
 	i.payload = data
 	return i
 }
 
 // Reset ...
-func (i *Item) Reset() {
+func (i *Item) Reset() *Item {
 	i.payload = nil
+	i.written = false
+	return i
 }
 
 // Get returns payload in item
@@ -88,16 +92,21 @@ func (i *Item) DeleteFrom(path string, name string) error {
 		path = "."
 	}
 
-	if there, err := i.folder.Search(path, name); err != nil || !there {
-		if err != nil {
-			return err
-		}
-		if !there {
+	err := i.folder.Search(path, name)
+	if err != nil {
+		if _, ok := err.(utils.ErrNotFound); ok {
+			// If entry not found, consider a success
 			return nil
 		}
+		return err
 	}
 
-	return i.folder.Delete(path, name)
+	err = i.folder.Delete(path, name)
+	if err != nil {
+		return err
+	}
+	i.Reset()
+	return nil
 }
 
 // Delete removes a metadata
@@ -106,35 +115,44 @@ func (i *Item) Delete(name string) error {
 }
 
 // ReadFrom reads metadata of item from Object Storage in a subfolder
-func (i *Item) ReadFrom(path string, name string, callback ItemDecoderCallback) (bool, error) {
-	var data model.Serializable
-	found, err := i.folder.Read(path, name, func(buf []byte) error {
+func (i *Item) ReadFrom(path string, name string, callback ItemDecoderCallback) error {
+	var data serialize.Serializable
+	err := i.folder.Read(path, name, func(buf []byte) error {
 		var err error
 		data, err = callback(buf)
 		return err
 	})
 	if err != nil {
-		return false, err
-	}
-	if !found {
-		return false, nil
+		return err
 	}
 	i.payload = data
-	return true, nil
+	i.written = true
+	return nil
 }
 
 // Read read metadata of item from Object Storage (in current folder)
-func (i *Item) Read(name string, callback ItemDecoderCallback) (bool, error) {
+func (i *Item) Read(name string, callback ItemDecoderCallback) error {
 	return i.ReadFrom(".", name, callback)
 }
 
 // WriteInto saves the content of Item in a subfolder to the Object Storage
 func (i *Item) WriteInto(path string, name string) error {
+	if i == nil {
+		panic("i is nil!")
+	}
+	if i.payload == nil {
+		panic("i.payload is nil!")
+	}
 	data, err := i.payload.Serialize()
 	if err != nil {
 		return err
 	}
-	return i.folder.Write(path, name, data)
+	err = i.folder.Write(path, name, data)
+	if err != nil {
+		return err
+	}
+	i.written = true
+	return nil
 }
 
 // Write saves the content of Item to the Object Storage
@@ -163,7 +181,7 @@ func (i *Item) Browse(callback func([]byte) error) error {
 	})
 }
 
-// Acquire waits until the write lock is available, then locks the metadata
+// Acquire waits until the lock is available, then locks the metadata
 func (i *Item) Acquire() {
 	i.lock.Lock()
 }

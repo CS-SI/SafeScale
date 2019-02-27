@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,64 +23,45 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/providers"
-	"github.com/CS-SI/SafeScale/providers/api"
-	"github.com/CS-SI/SafeScale/providers/objectstorage"
+	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/crypt"
 )
 
-var bucketName string
-
-// InitializeBucket creates the Object Storage Bucket that will store the metadata
-func InitializeBucket(location objectstorage.Location) error {
-	_, err := location.CreateBucket(bucketName)
-	if err != nil {
-		return fmt.Errorf("failed to create Object Storage Bucket '%s': %s", bucketName, err.Error())
-	}
-	return nil
-}
-
-//Folder describes a metadata folder
+// Folder describes a metadata folder
 type Folder struct {
 	//path contains the base path where to read/write record in Object Storage
 	path     string
-	service  *providers.Service
+	service  *iaas.Service
 	crypt    bool
-	cryptKey []byte
+	cryptKey *crypt.Key
 }
 
 // FolderDecoderCallback is the prototype of the function that will decode data read from Metadata
 type FolderDecoderCallback func([]byte) error
 
 // NewFolder creates a new Metadata Folder object, ready to help access the metadata inside it
-func NewFolder(svc *providers.Service, path string) *Folder {
+func NewFolder(svc *iaas.Service, path string) *Folder {
 	if svc == nil {
 		panic("svc is nil!")
 	}
-	cfg, err := svc.GetCfgOpts()
-	if err != nil {
-		panic(fmt.Sprintf("config options are not available! %s", err.Error()))
-	}
-	cryptKey, crypt := cfg.Get("MetadataKey")
+	cryptKey := svc.MetadataKey
+	crypt := cryptKey != nil && len(cryptKey) > 0
 	f := &Folder{
 		path:    strings.Trim(path, "/"),
 		service: svc,
-		// bucketName: name.(string),
-		crypt: crypt,
+		crypt:   crypt,
 	}
 	if crypt {
-		f.cryptKey = []byte(cryptKey.(string))
+		f.cryptKey = cryptKey
 	}
 	return f
 }
 
 // GetService returns the service used by the folder
-func (f *Folder) GetService() *providers.Service {
+func (f *Folder) GetService() *iaas.Service {
 	return f.service
-}
-
-// GetClient returns the api.ClientAPI used by the folder
-func (f *Folder) GetClient() api.ClientAPI {
-	return f.service.ClientAPI
 }
 
 // GetBucket returns the bucket used by the folder to store Object Storage
@@ -108,23 +89,22 @@ func (f *Folder) absolutePath(path ...string) string {
 }
 
 // Search tells if the object named 'name' is inside the ObjectStorage folder
-func (f *Folder) Search(path string, name string) (bool, error) {
+func (f *Folder) Search(path string, name string) error {
 	absPath := strings.Trim(f.absolutePath(path), "/")
 	list, err := f.service.MetadataBucket.List(absPath, objectstorage.NoPrefix)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if absPath != "" {
 		absPath += "/"
 	}
-	found := false
+	fullPath := absPath + name
 	for _, item := range list {
-		if item == absPath+name {
-			found = true
-			break
+		if item == fullPath {
+			return nil
 		}
 	}
-	return found, nil
+	return utils.NotFoundError(fmt.Sprintf("failed to find '%s'", fullPath))
 }
 
 // Delete removes metadata passed as parameter
@@ -141,27 +121,32 @@ func (f *Folder) Delete(path string, name string) error {
 // returns false, err if an error occured
 // returns true, nil if the object has been found
 // The callback function has to know how to decode it and where to store the result
-func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) (bool, error) {
-	found, err := f.Search(path, name)
+func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) error {
+	err := f.Search(path, name)
 	if err != nil {
-		return false, err
+		if _, ok := err.(utils.ErrNotFound); ok {
+			return err
+		}
+		return fmt.Errorf("failed to search in Metadata Storage: %v", err)
 	}
-	if found {
-		var buffer bytes.Buffer
-		_, err := f.service.MetadataBucket.ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
+
+	var buffer bytes.Buffer
+	_, err = f.service.MetadataBucket.ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
+	if err != nil {
+		return utils.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
+	}
+	data := buffer.Bytes()
+	if f.crypt {
+		data, err = crypt.Decrypt(data, f.cryptKey)
 		if err != nil {
-			return false, err
+			return utils.NotFoundError(fmt.Sprintf("failed to decrypt metadata '%s/%s': %v", path, name, err))
 		}
-		data := buffer.Bytes()
-		if f.crypt {
-			data, err = decrypt(f.cryptKey, data)
-			if err != nil {
-				return false, err
-			}
-		}
-		return true, callback(data)
 	}
-	return false, nil
+	err = callback(data)
+	if err != nil {
+		return utils.NotFoundError(fmt.Sprintf("failed to decode metadata '%s/%s': %v", path, name, err))
+	}
+	return nil
 }
 
 // Write writes the content in Object Storage
@@ -172,7 +157,7 @@ func (f *Folder) Write(path string, name string, content []byte) error {
 	)
 
 	if f.crypt {
-		data, err = encrypt(f.cryptKey, content)
+		data, err = crypt.Encrypt(content, f.cryptKey)
 		if err != nil {
 			return err
 		}
@@ -202,7 +187,7 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 		}
 		data := buffer.Bytes()
 		if f.crypt {
-			data, err = decrypt(f.cryptKey, data)
+			data, err = crypt.Decrypt(data, f.cryptKey)
 			if err != nil {
 				return err
 			}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,17 +25,16 @@ function print_error {
 }
 trap print_error ERR
 
-function dns_fallback {
-    grep nameserver /etc/resolv.conf && return 0
-    echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
-    sudo cp /tmp/resolv.conf /etc/resolv.conf
-    return 0
-}
+UUID=""
+{{- if not .DoNotFormat }}
+mkfs -F -t {{.FileSystem}} "{{.Device}}" >/dev/null
+{{- end }}
+eval $(blkid | grep "{{.Device}}" | cut -d: -f2-)
 
-dns_fallback
+echo "/dev/disk/by-uuid/$UUID {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
+mkdir -p "{{.MountPoint}}" >/dev/null && \
+mount {{.MountPoint}} >/dev/null && \
+chmod a+rwx "{{.MountPoint}}" >/dev/null && \
+echo -n $UUID && exit 0
 
-mkfs -F -t {{.FileSystem}} "{{.Device}}" && \
-mkdir -p "{{.MountPoint}}" && \
-echo "{{.Device}} {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
-mount "{{.MountPoint}}" && \
-chmod a+rwx "{{.MountPoint}}"
+exit 1

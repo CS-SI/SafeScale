@@ -3,21 +3,20 @@ package gateway
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
 
+	oidc "github.com/coreos/go-oidc"
 	"github.com/gobwas/glob"
 	"github.com/gorilla/websocket"
-
-	"github.com/CS-SI/SafeScale/security/model"
-
-	oidc "github.com/coreos/go-oidc"
 	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
+
+	"github.com/CS-SI/SafeScale/security/model"
 )
 
 var ctx = context.Background()
@@ -176,8 +175,18 @@ func authorizedAndAuthenticated(w http.ResponseWriter, r *http.Request, info req
 }
 
 func fowardWSMessages(from *websocket.Conn, to *websocket.Conn) {
-	defer from.Close()
-	defer to.Close()
+	defer func() {
+		fromErr := from.Close()
+		if fromErr != nil {
+			log.Error(fromErr)
+		}
+	}()
+	defer func() {
+		toErr := to.Close()
+		if toErr != nil {
+			log.Error(toErr)
+		}
+	}()
 	for {
 		mType, buffer, err := from.ReadMessage()
 		if err != nil {
@@ -209,6 +218,10 @@ func wsProxyFunc(w http.ResponseWriter, r *http.Request) {
 	}
 	header := http.Header{}
 	cDest, _, err := websocket.DefaultDialer.Dial(url.String(), header)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
+		return
+	}
 
 	go fowardWSMessages(cOrig, cDest)
 	go fowardWSMessages(cDest, cOrig)

@@ -8,35 +8,34 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/utils"
-	"github.com/nanobox-io/golang-scribble"
 	_ "github.com/nanobox-io/golang-scribble"
+	scribble "github.com/nanobox-io/golang-scribble"
 )
 
 // StoredCPUInfo ...
 type StoredCPUInfo struct {
-	Id           string `bow:"key"`
-	TenantName   string `json:"tenant_name,omitempty"`
-	TemplateID   string `json:"template_id,omitempty"`
-	TemplateName string `json:"template_name,omitempty"`
-	ImageID      string `json:"image_id,omitempty"`
-	ImageName    string `json:"image_name,omitempty"`
-	LastUpdated  string `json:"last_updated,omitempty"`
-
-	NumberOfCPU    int     `json:"number_of_cpu,omitempty"`
-	NumberOfCore   int     `json:"number_of_core,omitempty"`
-	NumberOfSocket int     `json:"number_of_socket,omitempty"`
-	CPUFrequency   float64 `json:"cpu_frequency,omitempty"`
-	CPUArch        string  `json:"cpu_arch,omitempty"`
-	Hypervisor     string  `json:"hypervisor,omitempty"`
-	CPUModel       string  `json:"cpu_model,omitempty"`
-	RAMSize        float64 `json:"ram_size,omitempty"`
-	RAMFreq        float64 `json:"ram_freq,omitempty"`
-	GPU            int     `json:"gpu,omitempty"`
-	GPUModel       string  `json:"gpu_model,omitempty"`
+	Id string `bow:"key"`
+	CPUInfo
 }
 
-func collect() {
+func collect(tenantName string) error {
+	serviceProvider, err := iaas.UseService(tenantName)
+	if err != nil {
+		return err
+	}
+	authOpts, err := serviceProvider.GetAuthOpts()
+	if err != nil {
+		return err
+	}
+	region, ok := authOpts.Get("Region")
+	if !ok {
+		return fmt.Errorf("Region value unset")
+	}
+
+	folder := fmt.Sprintf("images/%s/%s", serviceProvider.GetName(), region)
+
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
@@ -49,16 +48,13 @@ func collect() {
 		log.Fatal(err)
 	}
 
-	acpu := StoredCPUInfo{}
-
 	for _, file := range files {
-		if strings.Contains(file.Name(), "#") {
-
-			theFile := fmt.Sprintf("$HOME/.safescale/scanner/%s", file.Name())
-
+		acpu := StoredCPUInfo{}
+		theFile := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/scanner/%s", file.Name()))
+		if strings.Contains(file.Name(), tenantName+"#") {
 			log.Printf("Storing: %s", file.Name())
 
-			byteValue, err := ioutil.ReadFile(utils.AbsPathify(theFile))
+			byteValue, err := ioutil.ReadFile(theFile)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -70,11 +66,17 @@ func collect() {
 
 			acpu.Id = acpu.ImageID
 
-			err = db.Write("images", acpu.TemplateName, acpu)
+			err = db.Write(folder, acpu.TemplateName, acpu)
 			if err != nil {
 				log.Fatal(err)
 			}
 		}
+		if !file.IsDir() {
+			err := os.Remove(theFile)
+			if err != nil {
+				fmt.Printf("Error Supressing %s : %s", file.Name(), err.Error())
+			}
+		}
 	}
-
+	return nil
 }

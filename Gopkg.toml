@@ -1,30 +1,4 @@
-# Gopkg.toml example
-#
-# Refer to https://golang.github.io/dep/docs/Gopkg.toml.html
-# for detailed Gopkg.toml documentation.
-#
-# required = ["github.com/user/thing/cmd/thing"]
-# ignored = ["github.com/user/project/pkgX", "bitbucket.org/user/project/pkgA/pkgY"]
-#
-# [[constraint]]
-#   name = "github.com/user/project"
-#   version = "1.0.0"
-#
-# [[constraint]]
-#   name = "github.com/user/project2"
-#   branch = "dev"
-#   source = "github.com/myfork/project2"
-#
-# [[override]]
-#   name = "github.com/x/y"
-#   version = "2.4.0"
-#
-# [prune]
-#   non-go = false
-#   go-tests = true
-#   unused-packages = true
-
-required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", "github.com/GeertJohan/go.rice/rice", "github.com/golang/protobuf/protoc-gen-go", "github.com/golang/protobuf/ptypes/empty", "github.com/golang/mock/gomock", "github.com/golang/mock/mockgen", "golang.org/x/tools/cmd/cover", "golang.org/x/lint/golint", "github.com/tebeka/go2xunit", "github.com/kisielk/errcheck", "github.com/360EntSecGroup-Skylar/goreporter", "github.com/dlespiau/covertool"]
+required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", "github.com/GeertJohan/go.rice/rice", "github.com/golang/protobuf/protoc-gen-go", "github.com/golang/protobuf/ptypes/empty", "github.com/golang/mock/gomock", "github.com/golang/mock/mockgen", "golang.org/x/tools/cmd/cover", "golang.org/x/lint/golint", "github.com/tebeka/go2xunit", "github.com/kisielk/errcheck", "github.com/360EntSecGroup-Skylar/goreporter", "github.com/dlespiau/covertool", "github.com/libvirt/libvirt-go", "github.com/libvirt/libvirt-go-xml"]
 
 [[override]]
   version = "=v1.7.1"
@@ -53,7 +27,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 [[override]]
   name = "github.com/gophercloud/gophercloud"
   branch = "master"
-#  source = "github.com/oscarpicas/gophercloud.git"
+# source = "github.com/oscarpicas/gophercloud.git"
 
 [[constraint]]
   name = "github.com/gorilla/websocket"
@@ -127,6 +101,19 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/graymeta/stow"
   branch = "master"
   source = "github.com/appscode/stow.git"
+
+# [[constraint]]
+#   name = "github.com/xrash/smetrics"
+#   branch = "master"
+
+[[override]]
+  version = "4.8.0"
+  name = "github.com/libvirt/libvirt-go"
+
+[[override]]
+  version = "4.8.0"
+  name = "github.com/libvirt/libvirt-go-xml"
+
 
 [prune]
   go-tests = true
