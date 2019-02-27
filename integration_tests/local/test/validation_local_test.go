@@ -19,6 +19,12 @@ func Test_ShareError(t *testing.T) {
 	integration_tests.ShareError(t, Providers.LOCAL)
 }
 
+/*
+func Test_SharePartialError(t *testing.T) {
+	integration_tests.SharePartialError(t, Providers.LOCAL)
+}
+*/
+
 func Test_VolumeError(t *testing.T) {
 	integration_tests.VolumeError(t, Providers.LOCAL)
 }
@@ -38,3 +44,9 @@ func Test_UntilShare(t *testing.T) {
 func Test_UntilVolume(t *testing.T) {
 	integration_tests.UntilVolume(t, Providers.LOCAL)
 }
+
+/*
+func Test_Wip(t *testing.T) {
+	integration_tests.ShareVolumeMounted(t, Providers.LOCAL)
+}
+*/
