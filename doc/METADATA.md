@@ -8,7 +8,7 @@ The bucket name format is ``0.safescale-<unique provider-dependent value>[.<$SAF
 
 SAFESCALE_METADATA_SUFFIX is an optional environment variable that can specialized even further the name of the bucket.
 For example, with SAFESCALE_METADATA_SUFFIX=dev, the bucket name will be `0.safescale-<unique provider-dependent value>.dev`.
-The variable needs to be defined before starting safescaled, and for every SafeScale cli use (safescale, deploy, perform, ...).
+The variable needs to be defined before running any SafeScale CLI (safescaled, safescale, ...).
 
 Each object in this bucket is stored as a JSON representation of Go structs, optionally encrypted (cf. MetadataKey in TENANTS.md).
 
