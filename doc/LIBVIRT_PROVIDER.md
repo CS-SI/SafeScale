@@ -1,6 +1,6 @@
 # Libvirt Provider
 
-For testing purposes it's possible to emulate a cloud provider locally with Libvirt/Qemu-KVM. SafeScale will work the same way except than all the hosts will be created on your own computer. The driver is designed to work with Ubuntu18.04, Debian9 and Centos7
+For testing purposes it's possible to emulate a cloud provider locally with Libvirt/Qemu-KVM. SafeScale will work the same way except that all the hosts will be created on your own computer. The driver is designed to work with Ubuntu18.04, Debian9 and Centos7
 
 ## Build SafeScale with libvirt provider enabled
 As the libvirt dependency is huge, libvirt provider is disabled by default and have to be enabled while building SafeScale.
@@ -74,7 +74,7 @@ MINIO_ACCESS_KEY="accessKey" \
 MINIO_SECRET_KEY="secretKey" \
 sudo docker run -d --rm -p 9000:9000 --name minio1 -e "MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY" -e "MINIO_SECRET_KEY=$MINIO_SECRET_KEY" -v /data/minio/data:/data -v /data/minio/config:/root/.minio minio/minio server /data
 ```
-### Build -
+### Build
 
 ```
 cd ${GOPATH:-$HOME}/src/github.com/CS-SI/SafeScale
@@ -92,7 +92,7 @@ make install
 ## Local Tenant
 The local tenant is like [other providers tenants](TENANTS.md) but with some specificities. The ``[tenant.compute]`` section is used with modifications , ``[tenant.metadata] / [tenant.objectstorage]`` sections are used as any other provider, ``[tenant.identity]`` and ``[tenant.network]`` sections should be left empty.
 
-### Section ``[tenant.compute]`` -
+### Section ``[tenant.compute]``
 
 The valid keywords in this section are :
 
@@ -122,7 +122,7 @@ The [templates.json](#templates) file path
 
 The Folder that will be used by libvirt to store disk images and block storages (the folder must exists).
 
-### Example -
+### Example
 
 ```
 [[tenants]]
@@ -149,21 +149,21 @@ The Folder that will be used by libvirt to store disk images and block storages 
 
 ## Images
 
-To create an host we need a disk image with the os and usefull functionalities pre-installed, available images are registered in a JSON file.
+To create a host we need a disk image with the os and usefull functionalities pre-installed, available images are registered in a JSON file.
 
-### Structure of JSON file -
+### Structure of JSON file
 
 A List of images, each image is made up of :
 
 * **imagePath** : The image path
-* **imageName** : The image Name
+* **imageName** : The image name
 * **imageID**   : The image ID
 * **disk**      : The name of the disk partition containing the root
 * **download**  : How to download the image if not found localy, made of
     * **method**    : Method choosed to download the image (only GoogleDrive currently implemented)
     * **id**        : Id of the file to download (GoogleDrive)
 
-### Example -
+### Example
 
 ```
 {
@@ -226,12 +226,12 @@ A List of images, each image is made up of :
 
 to create a host you need a template specifying its characteristics, all the availables templates are stored in JSON file
 
-### Structure of JSON file -
+### Structure of JSON file
 
 A List of templates, each template is made up of :
 
 * **templateID**    : The template ID
-* **templateName**  : The template Name
+* **templateName**  : The template name
 * **templateSpecs** : The template specifications
     * **coresNumber**   : The number of cores allowed to the host
     * **ramSize**       : The ram size allowed to the host (in GB)
@@ -240,7 +240,7 @@ A List of templates, each template is made up of :
     * **gpuType**       : Currently unused
 
 
-### Example -
+### Example
 
 ```
 {
