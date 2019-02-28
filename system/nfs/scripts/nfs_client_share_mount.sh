@@ -35,7 +35,7 @@ trap print_error ERR
 
 # dns_fallback
 
-echo mount.{{.Format}} -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" > /tmp/whatever.txt
+echo mount.nfs -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" > /tmp/whatever.txt
 mkdir -p "{{.MountPoint}}" && \
 mount.{{.Format}} -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" && \
 echo "{{.Export}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,{{ .cacheOption }} 0   0" >>/etc/fstab
