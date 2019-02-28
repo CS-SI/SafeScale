@@ -27,6 +27,7 @@ exec 1<&-
 exec 2<&-
 exec 1<>/var/tmp/user_data.log
 exec 2>&1
+set -x
 
 sfDetectFacts() {
    local -g LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
@@ -166,6 +167,7 @@ configure_network_debian() {
 
     configure_dhcp_client
 
+    /sbin/dhclient || true
     systemctl restart networking
     echo done
 }
@@ -397,6 +399,12 @@ configure_as_gateway() {
 
 configure_dns_legacy() {
     echo "Configuring /etc/resolv.conf..."
+    rm -f /etc/resolv.conf
+    {{- if .DNSServers }}
+    if [[ -e /etc/dhcp/dhclient.conf ]]; then echo "prepend domain-name-servers {{range .DNSServers}}{{.}} {{end}};" >> /etc/dhcp/dhclient.conf; else echo "Dhclient.conf not modified"; fi
+    {{- else }}
+    if [[ -e /etc/dhcp/dhclient.conf ]]; then echo "prepend domain-name-servers 1.1.1.1;" >> /etc/dhcp/dhclient.conf; else echo "Dhclient.conf not modified"; fi
+    {{- end }}
     cat <<-'EOF' >/etc/resolv.conf
 {{- if .DNSServers }}
   {{- range .DNSServers }}
@@ -617,5 +625,6 @@ install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
 echo -n "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
+set +x
 systemctl reboot
 exit 0
