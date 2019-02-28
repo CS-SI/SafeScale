@@ -24,9 +24,9 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/safescale/server/install"
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/client"
+	"github.com/CS-SI/SafeScale/safescale/server/install"
 	"github.com/CS-SI/SafeScale/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
@@ -130,9 +130,22 @@ var hostList = cli.Command{
 		if err != nil {
 			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error()))
 		}
-		out, _ := json.Marshal(hosts.GetHosts())
-		fmt.Println(string(out))
-
+		jsoned, _ := json.Marshal(hosts.GetHosts())
+		result := []map[string]interface{}{}
+		err = json.Unmarshal([]byte(jsoned), &result)
+		if err != nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error()))
+		}
+		for _, v := range result {
+			delete(v, "PrivateKey")
+			delete(v, "State")
+			delete(v, "GatewayID")
+		}
+		rejsoned, err := json.Marshal(result)
+		if err != nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error()))
+		}
+		fmt.Println(string(rejsoned))
 		return nil
 	},
 }
