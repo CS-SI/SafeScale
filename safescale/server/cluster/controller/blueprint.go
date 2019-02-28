@@ -295,7 +295,7 @@ func (b *Blueprint) Construct(req Request) error {
 			networkV1.NetworkID = req.NetworkID
 			networkV1.GatewayID = gw.ID
 			networkV1.GatewayIP = gw.GetPrivateIP()
-			networkV1.PublicIP = gw.GetAccessIP()
+			networkV1.PublicIP = gw.GetPublicIP()
 			networkV1.CIDR = req.CIDR
 			return nil
 		})

@@ -622,7 +622,8 @@ func (w *worker) setReverseProxy() error {
 	}
 
 	// Sets the values useable in any cases
-	w.variables["GatewayIP"] = gw.PublicIP
+	w.variables["PublicIP"] = gw.PublicIP
+	w.variables["GatewayIP"] = gw.PrivateIP
 
 	// Now submits all the rules to reverse proxy
 	for _, r := range rules {
