@@ -6,14 +6,14 @@
 
 ## Following binaries will be produced :
 
-- **safescale** in `SafeScale/safescale/cli/safescale/`: CLI to deal with daemon safescaled. Available commands are described in [usage](../USAGE.md)
-- **safescaled** in `SafeScale/safescale/cli/safescaled/`: daemon in charge of executing requests from safescale on providers
-- **deploy** in `SafeScale/deploy/cli/`: CLI to manage cluster. Available commands are described in [usage](../USAGE.md)
-- **perform** in `SafeScale/perform/`: CLI to manage cluster. Available commands are described in [usage](../USAGE.md)
+- **safescale** in `SafeScale/safescale/cli/safescale/`: CLI to deal with daemon safescaled. Available commands are described [here](../USAGE.md#safescale)
+- **safescaled** in `SafeScale/safescale/cli/safescaled/`: daemon in charge of executing requests from safescale on providers. Usage is describe [here](../USAGE.md#safescaled)
+<!-- - **perform** in `SafeScale/safescale/cli/perform/`: CLI to manage cluster. Available commands are described [here](../USAGE.md#perform) -->
+- **scanner** in `SafeScale/safescale/cli/scanner/`: CLI to discover host templates. Available commands are described [here](../SCANNER.md)
 
 For each previous binaries a cover version, is produced. They generate code coverage reports and are therefore only intended for developers.
 
 - **safescale-cover** in `SafeScale/safescale/cli/safescale/`
 - **safescaled-cover** in `SafeScale/safescale/cli/safescaled/`
-- **deploy-cover** in `SafeScale/deploy/cli/`
-- **perform-cover** in `SafeScale/perform/`
+<!-- - **perform-cover** in `SafeScale/safescale/cli/perform/` -->
+- **scanner-cover** in `SafeScale/safescale/cli/scanner/`
