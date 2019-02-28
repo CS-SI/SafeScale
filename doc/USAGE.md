@@ -46,7 +46,7 @@ Each section `tenants` contains specific authentication parameters for each Clou
 > - `client` can be one of the available provider's drivers in
 >    - cloudwatt
 >    - cloudferro
->    - local
+>    - local (unstable, not compiled by default, cf this [documentation](LIBVIRT_PROVIDER.md))
 >    - flexibleengine
 >    - opentelekom
 >    - ovh
