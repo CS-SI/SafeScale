@@ -21,11 +21,11 @@ package local
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/iaas/stacks"
 	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/iaas/providers"
 	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/iaas/stacks"
 	libStack "github.com/CS-SI/SafeScale/iaas/stacks/libvirt"
 )
 
@@ -84,6 +84,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 		return nil, fmt.Errorf("Failed to build metadata bucket name %v", err)
 	}
 	config.MetadataBucket = bucketName
+
+	// Add custom dns
+	// config.DNSList = []string{"1.1.1.1"}
 
 	compute, _ := params["compute"].(map[string]interface{})
 
