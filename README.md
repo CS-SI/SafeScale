@@ -4,7 +4,7 @@ SafeScale is an Infrastructure and Platform as a Code tool.
 
 ## Table of content
   - [Description](#description)
-    - [SafeScale Broker](#safescale-safescale)
+    - [SafeScale Infra](#safescale-safescale)
     - [SafeScale Perform](#safescale-perform)
     - [SafeScale Security](#safescale-security)
   - [Currently available features](#currently-available-features)
@@ -14,24 +14,26 @@ SafeScale is an Infrastructure and Platform as a Code tool.
 ## Description
 SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters that span multiple Clouds. These APIs and CLIs are divided in 3 service layers:
 
-* SafeScale Broker to manage Cloud infrastructure
-* SafeScale Perform to manage Cloud computing platforms
-* SafeScale Security to secure user environments
+- SafeScale Infra to manage Cloud infrastructure
+- SafeScale Perform to manage Cloud computing platforms
+- SafeScale Security to secure user environments
 
 ![SafeScale](doc/img/SafeScale.png "SafeScale")
 
-### SafeScale Broker
+### SafeScale Infra
 
-SafeScale Broker offers an API to completely abstract the IaaS services offered by Cloud platforms providers.
+SafeScale Infra offers an API to completely abstract the IaaS services offered by Cloud platforms providers.
 It allows to:
 
-* Create / Destroy private networks, Create routers, Manage firewall
-* Create/Destroy Virtual Machine (host),
-* Create / Destroy block and object storage,
-* Mount object storage on file system,
-* Create NAS, Connect/disconnect host to NAS,
+- Create / Destroy private networks, Create routers, Manage firewall
+- Create / Destroy hosts,
+- Create / Destroy block and object storage,
+- Mount / Unmount object storage as file system,
+- Create / Destroy shares, Connect / Disconnect host to/from shares,
+- Create / Destroy clusters
+- Add / Remove "features" (software components) on hosts and clusters
 
-![SafeScale Broker](doc/img/SafeScale_Broker.png "SafeScale Broker")
+![SafeScale Infra](doc/img/SafeScale_Infra.png "SafeScale Broker")
 
 SafeScale Broker provides a complete abstraction overlay over underlying IaaS APIs to mask their heterogeneity.
 
@@ -49,29 +51,40 @@ It is also important to precise that SafeScale Perform platforms are not static,
 
 SafeScale Security is a Web API and a Web Portal to create on-demand security gateways to protect Web services along 5 axes: Encryption, Authentication, Authorization, Auditability and Intrusion detection.
 SafeScale Security relies on Kong, an open source generic proxy to be put in between user and service. Kong intercepts user requests and service responses and executes plugins to empower any API. To build a SafeScale Security gateway 3 plugins are used:
-* Dynamic SSL plugin to encrypt traffic between the user and the service protected
-* Open ID plugin to connect the Identity and Access Management server, KeyCloak
-* UDP Log plugin to connect the Log management system, Logstash
+- Dynamic SSL plugin to encrypt traffic between the user and the service protected
+- Open ID plugin to connect the Identity and Access Management server, KeyCloak
+- UDP Log plugin to connect the Log management system, Logstash
 The design of a SafeScale Security gateway can be depicted as bellow:
 ![SafeScale Security](doc/img/SafeScale_Security.png "SafeScale Security")
 
 ## Currently available features
 SafeScale is currently under active development and does not yet offer all the features planned. However, we are already publishing it with the following features:
-* SafeScale Broker:
-  * Create / Destroy private networks
-  * Create/Destroy Virtual Machine (host),
-  * Create / Destroy block and object storage,
-  * Mount object storage on file system,
-  * Create Shares, Connect/disconnect host to share,
 
-* Providers addressed:
-  * Generic OpenStack
-  * OVH Public Cloud
-  * FlexibleEngine
-  * OpenTelekom
-  * CloudWatt
-  * CloudFerro
-  * AWS: under development
+  - SafeScale Infra:
+    - Create / Destroy private networks
+    - Create / Destroy hosts,
+    - Create / Destroy block and object storage,
+    - Mount object storage on file system,
+    - Create Shares, Connect/disconnect host to share,
+    - Create / Destroy clusters composed of a network, servers and services
+      currently supported:
+        - Swarm cluster
+        - BOH = Bunch Of Hosts (without any cluster management layer)
+      coming soon:
+        - DCOS (with or without Kubernetes)
+        - Kubernetes
+        - OHPC
+    - Add / Remove "features" on host and clusters
+
+ - Support Cloud providers:
+    - OVH Public Cloud
+    - FlexibleEngine
+    - OpenTelekom
+    - CloudWatt
+    - CloudFerro
+    - Generic OpenStack
+    - AWS: under development
+
 
 ## Contributing
 
