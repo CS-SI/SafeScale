@@ -314,8 +314,8 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 // CreateGateway creates a public Gateway for a private network
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, error) {
-	log.Debug(">>> stacks.openstack::CreateGateway()")
-	defer log.Debug("<<< stacks.openstack::CreateGateway()")
+	log.Debugf(">>> stacks.openstack::CreateGateway(%s)", req.Name)
+	defer log.Debugf("<<< stacks.openstack::CreateGateway(%s)", req.Name)
 
 	if s == nil {
 		panic("Calling stacks.openstack::CreateGateway from nil pointer!")

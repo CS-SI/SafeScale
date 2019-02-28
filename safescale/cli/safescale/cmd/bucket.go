@@ -28,7 +28,7 @@ import (
 	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
-//BucketCmd bucket command
+// BucketCmd bucket command
 var BucketCmd = cli.Command{
 	Name:  "bucket",
 	Usage: "bucket COMMAND",

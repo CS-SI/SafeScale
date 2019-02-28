@@ -51,11 +51,11 @@ endif
 endif
 
 # Binaries generated
-EXECS=safescale/cli/safescale/safescale safescale/cli/safescale/safescale-cover safescale/cli/safescaled/safescaled safescale/cli/safescaled/safescaled-cover deploy/cli/deploy deploy/cli/deploy-cover perform/perform perform/perform-cover scanner/scanner
+EXECS=safescale/cli/safescale/safescale safescale/cli/safescale/safescale-cover safescale/cli/safescaled/safescaled safescale/cli/safescaled/safescaled-cover perform/perform perform/perform-cover scanner/scanner
 
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v /cli/ | grep -v /lib/ | grep -v /vendor/)
-# List of packages to test (nor deploy neither providers are ready for prime time :( )
+# List of packages to test
 TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v stacks/aws | grep -v /cli/ | grep -v /lib/)
 
 
@@ -95,7 +95,7 @@ WARN_STRING  = "[WARNING]"
 BUILD_TAGS = ""
 export BUILD_TAGS
 
-all: begin ground getdevdeps ensure generate utils system iaas safescale deploy perform scanner err vet-light
+all: begin ground getdevdeps ensure generate utils system iaas safescale perform scanner err vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps ensure generate
@@ -155,10 +155,6 @@ safescale: common utils system iaas
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd safescale && $(MAKE) all)
 
-deploy: common utils system iaas safescale
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service deploy, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd deploy && $(MAKE) all)
-
 perform: common utils system iaas safescale
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd perform && $(MAKE) all)
@@ -172,7 +168,6 @@ clean:
 	@(cd iaas && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
 	@(cd safescale && $(MAKE) $@)
-	@(cd deploy && $(MAKE) $@)
 	@(cd perform && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
 
@@ -181,9 +176,6 @@ safescale/client/safescale: safescale
 
 safescale/server/safescaled: safescale
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale (daemon) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-
-deploy/cli/deploy: deploy
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service deploy, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
 perform/perform: perform
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
