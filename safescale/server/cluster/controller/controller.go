@@ -101,7 +101,7 @@ func (c *Controller) Create(req Request, b *Blueprint) error {
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to disable feature 'proxycache': %v")
+		log.Errorf("failed to disable feature 'proxycache': %v", err)
 		return err
 	}
 	c.Unlock()
