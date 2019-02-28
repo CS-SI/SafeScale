@@ -83,6 +83,7 @@ SafeScale is currently under active development and does not yet offer all the f
     - CloudWatt
     - CloudFerro
     - Generic OpenStack
+    - local provider (unstable, not compiled by default)
     - AWS: under development
 
 

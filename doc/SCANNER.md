@@ -1,6 +1,6 @@
 # Safescale Scanner
 
-Some providers didn't provide all the informations (cpu frequency, gpu, ...) about a host template. So in order to allow the host selection to be more precise, the scanner will investigate all templates to register some useful informations.
+Some providers don't provide all the informations (cpu frequency, gpu, ...) about a host template. So in order to allow the host selection to be more precise, the scanner will investigate all templates to register some useful informations.
 
 ## Scanner usage
 
