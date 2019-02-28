@@ -1,5 +1,6 @@
 # SafeScale usage
 <br>
+
 ## Content
 
 - [safescaled](#safescaled)
@@ -25,7 +26,7 @@ SafeScale is composed of 2 parts:
  - a client interacting with the daemon, called [`safescale`](#safescale)
 <br>
 
-##<a name="safescaled"></a>safescaled
+## <a name="safescaled"></a>safescaled
 
 `safescaled` is a daemon and you only need to launch it on your own computer.
 The purpose of this daemon is to execute requests ordered by `safescale` client on the providers.
@@ -156,6 +157,7 @@ Ready to serve :-)
 
 By default, safescaled displays only warnings and errors messages. To have more information, you can use -v to increase verbosity, and -d to use debug mode.
 <br><br>
+
 ## <a name="safescale"></a>safescale
 ___
 `safescale` is the client part of SafeScale. It consists of a CLI to interact with the safescale daemon to manage cloud infrastructures.
@@ -169,6 +171,7 @@ Each command returns its results on the standard output in 2 forms according to 
 
 The commands are presented in logical order as if the user wanted to create some machines with a shared storage space.
 <br>
+
 #### <a name="safescale_globals"></a>Global options
 
 ``safescale`` accepts global_options just before the subcommand, which are :
@@ -183,9 +186,9 @@ Example:
 $ safescale -v host create myhost
 ```
 <br>
+
 #### <a name="safescale_cmds"></a>Commands
 
-<br>
 #### <a name="safescale_tenant"></a>tenant
 A tenant must be set before using any other command as it indicates to SafeScale which tenant the command must be executed on. _Note that if only one tenant is defined in the `tenants.toml`, it will be automatically selected while invoking any other command._
 The following actions are proposed:
