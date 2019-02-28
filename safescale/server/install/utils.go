@@ -314,7 +314,7 @@ func checkParameters(f *Feature, v Variables) error {
 	return nil
 }
 
-// setImplicitParameters configures parameters that are implicitely defined, based on context
+// setImplicitParameters configures parameters that are implicitely defined, based on target
 func setImplicitParameters(t Target, v Variables) {
 	hT, cT, nT := determineContext(t)
 	if cT != nil {
@@ -348,6 +348,9 @@ func setImplicitParameters(t Target, v Variables) {
 		gw := gatewayFromHost(host)
 		if gw != nil {
 			v["GatewayIP"] = gw.PrivateIP
+			v["PublicIP"] = gw.PublicIP
+		} else {
+			v["PublicIP"] = host.PublicIP
 		}
 		if _, ok := v["Username"]; !ok {
 			v["Username"] = "gpac"

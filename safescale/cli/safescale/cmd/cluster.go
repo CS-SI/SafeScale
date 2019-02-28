@@ -56,6 +56,7 @@ var ClusterCommand = cli.Command{
 	ArgsUsage: "COMMAND",
 	Subcommands: []cli.Command{
 		clusterNodeCommand,
+		clusterMasterCommand,
 		clusterListCommand,
 		clusterCreateCommand,
 		clusterDeleteCommand,
@@ -265,34 +266,25 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	result["admin_login"] = "cladm"
 
-	// // Add information not directly in cluster GetConfig()
-	// // TODO: add and use feature metadata
-	// feature, err := install.NewFeature("remotedesktop")
-	// found := false
-	// if err == nil {
-	// 	target := install.NewClusterTarget(clusterInstance)
-	// 	var results install.Results
-	// 	results, err := feature.Check(target, install.Variables{}, install.Settings{})
-	// 	found = err == nil && results.Successful()
-	// 	if found {
-	// 		brkclt := client.New().Host
-	// 		remoteDesktops := []string{}
-	// 		gwPublicIP := clusterInstance.GetNetworkConfig().PublicIP
-	// 		for _, id := range clusterInstance.ListMasterIDs() {
-	// 			host, err := brkclt.Inspect(id, client.DefaultExecutionTimeout)
-	// 			if err != nil {
-	// 				return nil, err
-	// 			}
-	// 			remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s/", gwPublicIP, host.Name))
-	// 		}
-	// 		toFormat["remote_desktop"] = remoteDesktops
-	// 	}
-	// }
-	// if !found {
-	// 	toFormat["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'deploy cluster %s feature remotedesktop add'.", clusterName)
-	// }
-	// toFormat["admin_login"] = "cladm"
+	// Add information not directly in cluster GetConfig()
+	//TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
+	if _, ok := result["features"].(*clusterpropsv1.Features).Disabled["remotedesktop"]; !ok {
+		remoteDesktops := []string{}
+		clientHost := client.New().Host
+		gwPublicIP := clusterInstance.GetNetworkConfig().PublicIP
+		for _, id := range clusterInstance.ListMasterIDs() {
+			host, err := clientHost.Inspect(id, client.DefaultExecutionTimeout)
+			if err != nil {
+				return nil, err
+			}
+			remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s/", gwPublicIP, host.Name))
+		}
+		result["remote_desktop"] = remoteDesktops
+	} else {
+		result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'deploy cluster %s feature remotedesktop add'.", clusterName)
+	}
 
 	return result, nil
 }
@@ -1363,5 +1355,75 @@ var clusterNodeStateCommand = cli.Command{
 			return err
 		}
 		return clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented")
+	},
+}
+
+// clusterMasterCommand handles 'safescale cluster master ...
+var clusterMasterCommand = cli.Command{
+	Name:      "master",
+	Usage:     "manage cluster masters",
+	ArgsUsage: "COMMAND",
+
+	Subcommands: []cli.Command{
+		clusterMasterListCommand,
+	},
+}
+
+// clusterMasterListCommand handles 'safescale cluster master list CLUSTERNAME'
+var clusterMasterListCommand = cli.Command{
+	Name:      "list",
+	Aliases:   []string{"ls"},
+	Usage:     "list CLUSTERNAME",
+	ArgsUsage: "CLUSTERNAME",
+
+	// 	Help: &cli.HelpContent{
+	// 		Usage: `
+	// Usage: {{.ProgName}} [options] cluster <clustername> node list|ls`,
+	// 		Description: `
+	// List nodes in the clusters.`,
+	// 	},
+
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "public, p",
+			Usage: "If set, list public nodes. Otherwise list private nodes.",
+		},
+		cli.BoolFlag{
+			Name:  "all, a",
+			Usage: "If set, list all nodes, being private or public. Take precedence over --public",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		err := extractClusterArgument(c)
+		if err != nil {
+			return err
+		}
+
+		clientHost := client.New().Host
+		formatted := []map[string]interface{}{}
+
+		list := clusterInstance.ListMasterIDs()
+		for _, i := range list {
+			host, err := clientHost.Inspect(i, client.DefaultExecutionTimeout)
+			if err != nil {
+				msg := fmt.Sprintf("Failed to get data for master '%s': %s. Ignoring.", i, err.Error())
+				fmt.Println(msg)
+				log.Warnln(msg)
+				continue
+			}
+			formatted = append(formatted, map[string]interface{}{
+				"name": host.Name,
+				"id":   host.ID,
+			})
+		}
+
+		jsoned, err := json.Marshal(formatted)
+		if err != nil {
+			log.Errorln(err.Error())
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+		}
+		fmt.Println(string(jsoned))
+		return nil
 	},
 }
