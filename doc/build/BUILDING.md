@@ -1,8 +1,8 @@
 # Building instructions for SafeScale
 
-[How to build Safecale on Ubuntu](UBUNTU_BUILD.md)
-[How to build SafeScale on Debian](DEBIAN_BUILD.md)
-[How to build SafeScale on Centos](CENTOS_BUILD.md)
+- [How to build Safecale on Ubuntu](UBUNTU_BUILD.md)
+- [How to build SafeScale on Debian](DEBIAN_BUILD.md)
+- [How to build SafeScale on Centos](CENTOS_BUILD.md)
 
 ## Following binaries will be produced :
 
