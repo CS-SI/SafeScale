@@ -52,7 +52,6 @@ func (c *Client) Mount(export string, mountPoint string, withCache bool) error {
 		"Export":      export,
 		"MountPoint":  mountPoint,
 		"cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
-		"Format": "nfs",
 	}
 	retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_share_mount.sh", data)
 	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount remote NFS share")
