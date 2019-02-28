@@ -7,44 +7,44 @@ SafeScale stores metadata of the objects it uses in Object Storage. This documen
 The bucket name format is ``0.safescale-<unique provider-dependent value>[.<$SAFESCALE_METADATA_SUFFIX>]``; every metadata is stored in there.
 
 SAFESCALE_METADATA_SUFFIX is an optional environment variable that can specialized even further the name of the bucket.
-For example, with SAFESCALE_METADATA_SUFFIX=dev, the bucket name will be ``0.safescale-<unique provider-dependent value>.dev``.
-The variable needs to be defined before starting safescaled, and for every SafeScale cli use (safescale, deploy, perform, ...).
+For example, with SAFESCALE_METADATA_SUFFIX=dev, the bucket name will be `0.safescale-<unique provider-dependent value>.dev`.
+The variable needs to be defined before running any SafeScale CLI (safescaled, safescale, ...).
 
 Each object in this bucket is stored as a JSON representation of Go structs, optionally encrypted (cf. MetadataKey in TENANTS.md).
 
-In the following, each reference to this bucket name will be simplified to ``<SAFESCALE>``.
+In the following, each reference to this bucket name will be simplified to `<SAFESCALE>`.
 
 ### SafeScale Hosts
 
-The hosts informations are stored in folder ``<SAFESCALE>/hosts``.
+The hosts informations are stored in folder `<SAFESCALE>/hosts`.
 
 Inside this folder, the metadata of an host is stored in object named with its ID in subfolder ``byID``,
 and in object named with its name in subfolder ``byName``.
 
 ### SafeScale Networks
 
-The metadata for network informations are stored in ``<SAFESCALE>/networks``.
+The metadata for network informations are stored in `<SAFESCALE>/networks`.
 
 Inside this folder, the metadata of a network are stored in an object named with its ID in subfolder ``byID``,
 and in an object named with its name in subfolder ``byName``.
 
 ### SafeScale Shares
 
-The metadata for Shares informations are stored in ``<SAFESCALE>/shares``.
+The metadata for Shares informations are stored in `<SAFESCALE>/shares`.
 
-Inside this folder, the metadata of a share are stored in an object named with its ID in subfolder ``byID``,
-and in an object named with its name in subfolder ``byName``.
+Inside this folder, the metadata of a share are stored in an object named with its ID in subfolder `byID`,
+and in an object named with its name in subfolder `byName`.
 
 ### SafeScale Volumes
 
-The metadata for volume informations are stored in ``<SAFESCALE>/volumes`.
+The metadata for volume informations are stored in `<SAFESCALE>/volumes`.
 
-Inside this folder, the metadata of a volume are stored in an object named with its ID in subfolder ``byID``,
-and in an object named with its name in subfolder ``byName``.
+Inside this folder, the metadata of a volume are stored in an object named with its ID in subfolder `byID`,
+and in an object named with its name in subfolder `byName`.
 
 ### SafeScale Clusters
 
-The metadata for Cluster informations are stored in ``<SAFESCALE>/clusters``.
+The metadata for Cluster informations are stored in `<SAFESCALE>/clusters`.
 
 Inside this folder, the metadata of a cluster is stored in a folder named as the Cluster Name submitted at its creation.
 
