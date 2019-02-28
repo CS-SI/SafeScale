@@ -33,13 +33,13 @@ It allows to:
 - Create / Destroy clusters
 - Add / Remove "features" (software components) on hosts and clusters
 
-![SafeScale Infra](doc/img/SafeScale_Infra.png "SafeScale Broker")
+![SafeScale Infra](doc/img/SafeScale_Infra.png "SafeScale Infra")
 
-SafeScale Broker provides a complete abstraction overlay over underlying IaaS APIs to mask their heterogeneity.
+SafeScale Infra provides a complete abstraction overlay over underlying IaaS APIs to mask their heterogeneity.
 
 ### SafeScale Perform
 
-The concept of SafeScale Perform revolves around the offer of an API to create on-demand computing platforms. These platforms are built to by highly versatile providing all necessary building blocks to create a cutting-edge, production grade, scalable and highly available services: Micro service orchestration, Big Data and HPC computing frameworks, large scale data management, AI training and inference frameworks.
+The concept of SafeScale Perform revolves around the offer of an API to create on-demand computing platforms. These platforms are built to be highly versatile providing all necessary building blocks to create a cutting-edge, production grade, scalable and highly available services: Micro service orchestration, Big Data and HPC computing frameworks, large scale data management, AI training and inference frameworks.
 ![SafeScale Perform](doc/img/SafeScale_Perform.png "SafeScale Perform")
 
 The innovative aspect of SafeScale Perform platforms lies in their capacity to offer a combined usage of a large variety of frameworks and technologies without having to manage resources allocation (Node, RAM, CPU, and GPU).
