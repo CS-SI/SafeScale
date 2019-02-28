@@ -57,6 +57,7 @@ func UseService(tenantName string) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var (
 		tenantInCfg = false
 		found       = false

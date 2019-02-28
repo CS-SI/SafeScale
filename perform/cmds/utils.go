@@ -25,8 +25,8 @@ import (
 
 	//log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/deploy/cluster"
-	clusterapi "github.com/CS-SI/SafeScale/deploy/cluster/api"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/safescale/server/cluster/api"
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/perform/enums/ExitCode"

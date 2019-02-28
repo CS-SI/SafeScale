@@ -19,13 +19,17 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/urfave/cli"
 
+	"github.com/CS-SI/SafeScale/safescale/server/install"
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
 )
 
 // HostCmd command
@@ -43,6 +47,10 @@ var HostCmd = cli.Command{
 		hostReboot,
 		hostStart,
 		hostStop,
+		hostCheckFeatureCommand,
+		hostAddFeatureCommand,
+		hostDeleteFeatureCommand,
+		hostListFeatureCommand,
 	},
 }
 
@@ -363,6 +371,253 @@ var hostSsh = cli.Command{
 		}
 		out, _ := json.Marshal(resp)
 		fmt.Println(string(out))
+		return nil
+	},
+}
+
+// hostAddFeatureCommand handles 'deploy host <host name or id> package <pkgname> add'
+var hostAddFeatureCommand = cli.Command{
+	Name:      "add-feature",
+	Aliases:   []string{"install-feature"},
+	Usage:     "add-feature HOSTNAME FEATURENAME",
+	ArgsUsage: "HOSTNAME FEATURENAME",
+
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters",
+		},
+		cli.BoolFlag{
+			Name:  "skip-proxy",
+			Usage: "Disable reverse proxy rules",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		err := extractHostArgument(c, 0)
+		if err != nil {
+			return err
+		}
+
+		err = extractFeatureArgument(c)
+		if err != nil {
+			return err
+		}
+
+		feature, err := install.NewFeature(featureName)
+		if err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err.Error())
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+		}
+		if feature == nil {
+			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
+		}
+		values := install.Variables{}
+		params := c.StringSlice("param")
+		for _, k := range params {
+			res := strings.Split(k, "=")
+			if len(res[0]) > 0 {
+				values[res[0]] = strings.Join(res[1:], "=")
+			}
+		}
+
+		settings := install.Settings{}
+		settings.SkipProxy = c.Bool("skip-proxy")
+
+		// Wait for SSH service on remote host first
+		err = client.New().Ssh.WaitReady(hostInstance.ID, client.DefaultConnectionTimeout)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			return clitools.ExitOnRPC(msg)
+		}
+
+		target := install.NewHostTarget(hostInstance)
+		results, err := feature.Add(target, values, settings)
+		if err != nil {
+			msg := fmt.Sprintf("Error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
+			return clitools.ExitOnRPC(msg)
+		}
+		if !results.Successful() {
+			msg := fmt.Sprintf("Failed to add feature '%s' on host '%s'", featureName, hostName)
+			if Debug || Verbose {
+				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+			}
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
+		}
+
+		fmt.Printf("Feature '%s' added successfully on host '%s'\n", featureName, hostName)
+		return nil
+	},
+}
+
+// hostCheckFeatureCommand handles 'deploy host <host name or id> package <pkgname> check'
+var hostListFeatureCommand = cli.Command{
+	Name:      "list-features",
+	Aliases:   []string{"list-available-features"},
+	Usage:     "list-features",
+	ArgsUsage: "",
+
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		feats, err := install.ListFeatures()
+		if err != nil {
+			return err
+		}
+
+		for _, feat := range feats {
+			view, ok := feat.(string)
+			if ok {
+				fmt.Println(view)
+			} else {
+				view = ""
+			}
+		}
+
+		return nil
+	},
+}
+
+// hostCheckFeatureCommand handles 'deploy host <host name or id> package <pkgname> check'
+var hostCheckFeatureCommand = cli.Command{
+	Name:      "check-feature",
+	Aliases:   []string{"verify-feature"},
+	Usage:     "check-feature HOSTNAME FEATURENAME",
+	ArgsUsage: "HOSTNAME FEATURENAME",
+
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		err := extractHostArgument(c, 0)
+		if err != nil {
+			return err
+		}
+
+		err = extractFeatureArgument(c)
+		if err != nil {
+			return err
+		}
+
+		feature, err := install.NewFeature(featureName)
+		if err != nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+		}
+		if feature == nil {
+			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
+		}
+
+		values := install.Variables{}
+		params := c.StringSlice("param")
+		for _, k := range params {
+			res := strings.Split(k, "=")
+			if len(res[0]) > 0 {
+				values[res[0]] = strings.Join(res[1:], "=")
+			}
+		}
+
+		// Wait for SSH service on remote host first
+		err = client.New().Ssh.WaitReady(hostInstance.ID, client.DefaultConnectionTimeout)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			return clitools.ExitOnRPC(msg)
+		}
+
+		target := install.NewHostTarget(hostInstance)
+		results, err := feature.Check(target, values, install.Settings{})
+		if err != nil {
+			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
+			return clitools.ExitOnRPC(msg)
+		}
+		if !results.Successful() {
+			msg := fmt.Sprintf("Feature '%s' not found on host '%s'", featureName, hostName)
+			if Verbose || Debug {
+				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+			}
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
+		}
+
+		fmt.Printf("Feature '%s' found on host '%s'\n", featureName, hostName)
+		return nil
+	},
+}
+
+// hostDeleteFeatureCommand handles 'deploy host delete-feature <host name> <feature name>'
+var hostDeleteFeatureCommand = cli.Command{
+	Name:      "rm-feature",
+	Aliases:   []string{"remove-feature", "delete-feature", "uninstall-feature"},
+	Usage:     "Remove a feature from host.",
+	ArgsUsage: "HOSTNAME FEATURENAME",
+
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Define value of feature parameter (can be used multiple times)",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		err := extractHostArgument(c, 0)
+		if err != nil {
+			return err
+		}
+
+		err = extractFeatureArgument(c)
+		if err != nil {
+			return err
+		}
+
+		feature, err := install.NewFeature(featureName)
+		if err != nil {
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+		}
+		if feature == nil {
+			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
+			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
+		}
+
+		values := install.Variables{}
+		params := c.StringSlice("param")
+		for _, k := range params {
+			res := strings.Split(k, "=")
+			if len(res[0]) > 0 {
+				values[res[0]] = strings.Join(res[1:], "=")
+			}
+		}
+
+		// Wait for SSH service on remote host first
+		err = client.New().Ssh.WaitReady(hostInstance.ID, client.DefaultConnectionTimeout)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			return clitools.ExitOnRPC(msg)
+		}
+
+		target := install.NewHostTarget(hostInstance)
+		results, err := feature.Remove(target, values, install.Settings{})
+		if err != nil {
+			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
+			return clitools.ExitOnRPC(msg)
+		}
+		if !results.Successful() {
+			msg := fmt.Sprintf("Failed to delete feature '%s' from host '%s'", featureName, hostName)
+			if Verbose || Debug {
+				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+			}
+			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
+		}
+
+		fmt.Printf("Feature '%s' deleted successfully on host '%s'\n", featureName, hostName)
 		return nil
 	},
 }
