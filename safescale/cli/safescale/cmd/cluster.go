@@ -130,7 +130,7 @@ var clusterListCommand = cli.Command{
 				return clitools.ExitOnErrorWithMessage(ExitCode.Run,
 					fmt.Sprintf("failed to extract data about cluster '%s'", c.GetIdentity().Name))
 			}
-			formatted = append(formatted, formatClusterConfig(converted))
+			formatted = append(formatted, formatClusterConfig(converted, false))
 		}
 		jsoned, err := json.Marshal(formatted)
 		if err != nil {
@@ -144,14 +144,19 @@ var clusterListCommand = cli.Command{
 }
 
 // formatClusterConfig...
-func formatClusterConfig(value interface{}) map[string]interface{} {
+func formatClusterConfig(value interface{}, detailed bool) map[string]interface{} {
 	core := value.(map[string]interface{})
 
-	if !Debug {
+	delete(core, "keypair")
+	if !detailed {
+		delete(core, "admin_login")
+		delete(core, "admin_password")
 		delete(core, "defaults")
-		delete(core, "keypair")
+		delete(core, "features")
+		delete(core, "gateway_ip")
+		delete(core, "network_id")
+		delete(core, "nodes")
 	}
-
 	return core
 }
 
@@ -186,7 +191,7 @@ func outputClusterConfig() error {
 	if err != nil {
 		return err
 	}
-	formatted := formatClusterConfig(toFormat)
+	formatted := formatClusterConfig(toFormat, true)
 
 	jsoned, err := json.Marshal(formatted)
 	if err != nil {
@@ -273,8 +278,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	if _, ok := result["features"].(*clusterpropsv1.Features).Disabled["remotedesktop"]; !ok {
 		remoteDesktops := []string{}
 		clientHost := client.New().Host
-		gwPublicIP := clusterInstance.GetNetworkConfig().PublicIP
-		for _, id := range clusterInstance.ListMasterIDs() {
+		gwPublicIP := netCfg.PublicIP
+		for _, id := range c.ListMasterIDs() {
 			host, err := clientHost.Inspect(id, client.DefaultExecutionTimeout)
 			if err != nil {
 				return nil, err
@@ -408,7 +413,7 @@ var clusterCreateCommand = cli.Command{
 		if err != nil {
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
-		formatted := formatClusterConfig(toFormat)
+		formatted := formatClusterConfig(toFormat, true)
 		if !Debug {
 			delete(formatted, "defaults")
 		}
