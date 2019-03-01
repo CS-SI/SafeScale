@@ -735,13 +735,14 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 		return fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
 	}
 
-	_, err = os.Stat(cmdOutput.String())
+	target := strings.TrimSpace(cmdOutput.String())
+	_, err = os.Stat(target)
 	if os.IsNotExist(err) {
-		logrus.Warnf("Kernel file [%s] not found", cmdOutput.String())
+		logrus.Warnf("Kernel file [%s] not found", target)
 		return nil
 	}
 
-	return unix.Access(cmdOutput.String(), unix.R_OK)
+	return unix.Access(target, unix.R_OK)
 }
 
 // CreateHost creates an host satisfying request
