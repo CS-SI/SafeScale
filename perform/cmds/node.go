@@ -34,7 +34,7 @@ var ClusterDeleteNodeCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		yes := c.Bool("assume-yes")
 		force := c.Bool("force")
-		cmdStr := fmt.Sprintf("deploy cluster delete-node %s %s", clusterName, nodeName)
+		cmdStr := fmt.Sprintf("safescale cluster delete-node %s %s", clusterName, nodeName)
 		if yes {
 			cmdStr += " -y"
 		}
@@ -78,7 +78,7 @@ var ClusterListNodesCommand = cli.Command{
 		public := c.Bool("public")
 		all := c.Bool("all")
 
-		cmdStr := fmt.Sprintf("deploy cluster ls-nodes %s", clusterName)
+		cmdStr := fmt.Sprintf("safescale cluster ls-nodes %s", clusterName)
 		if all {
 			cmdStr += " -a"
 		} else if public {
@@ -107,7 +107,7 @@ var ClusterInspectNodeCommand = cli.Command{
 			return err
 		}
 
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster inspect-node %s %s", clusterName, nodeName))
+		cmdStr := RebrandCommand(fmt.Sprintf("safescale cluster inspect-node %s %s", clusterName, nodeName))
 		log.Debugf("Calling '%s'", cmdStr)
 		return runCommand(cmdStr)
 	},
@@ -131,7 +131,7 @@ var ClusterStopNodeCommand = cli.Command{
 			return err
 		}
 
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster stop-node %s %s", clusterName, nodeName))
+		cmdStr := RebrandCommand(fmt.Sprintf("safescale cluster stop-node %s %s", clusterName, nodeName))
 		log.Debugf("Calling '%s'", cmdStr)
 		return runCommand(cmdStr)
 	},
@@ -155,7 +155,7 @@ var ClusterStartNodeCommand = cli.Command{
 			return err
 		}
 
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster start-node %s %s", clusterName, nodeName))
+		cmdStr := RebrandCommand(fmt.Sprintf("safescale cluster start-node %s %s", clusterName, nodeName))
 		log.Debugf("Calling '%s'", cmdStr)
 		return runCommand(cmdStr)
 	},
@@ -178,7 +178,7 @@ var ClusterProbeNodeCommand = cli.Command{
 			return err
 		}
 
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster probe-node %s %s", clusterName, nodeName))
+		cmdStr := RebrandCommand(fmt.Sprintf("safescale cluster probe-node %s %s", clusterName, nodeName))
 		log.Debugf("Calling '%s'", cmdStr)
 		return runCommand(cmdStr)
 	},

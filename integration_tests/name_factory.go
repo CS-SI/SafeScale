@@ -73,6 +73,6 @@ func (names *Names) TearDown() {
 		_, _ = GetOutput(fmt.Sprintf("safescale network delete %s", networkName))
 	}
 	for _, clusterName := range names.Clusters {
-		_, _ = GetOutput(fmt.Sprintf("deploy cluster delete --yes %s", clusterName))
+		_, _ = GetOutput(fmt.Sprintf("safescale cluster delete --yes %s", clusterName))
 	}
 }

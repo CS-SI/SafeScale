@@ -25,10 +25,10 @@ func Docker(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 
-	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " docker")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " docker")
 	require.NotNil(t, err)
 
-	out, err = GetOutput("deploy host add-feature gw-" + names.Networks[0] + " docker")
+	out, err = GetOutput("safescale host add-feature gw-" + names.Networks[0] + " docker")
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker ps\"")
@@ -36,13 +36,13 @@ func Docker(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "CONTAINER"))
 
-	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " docker")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " docker")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host delete-feature gw-" + names.Networks[0] + " docker")
+	out, err = GetOutput("safescale host delete-feature gw-" + names.Networks[0] + " docker")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " docker")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " docker")
 	require.NotNil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker ps\"")
@@ -69,10 +69,10 @@ func DockerNotGateway(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale host create " + names.Hosts[0] + " --net " + names.Networks[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature " + names.Hosts[0] + " docker")
+	out, err = GetOutput("safescale host check-feature " + names.Hosts[0] + " docker")
 	require.NotNil(t, err)
 
-	out, err = GetOutput("deploy host add-feature " + names.Hosts[0] + " docker")
+	out, err = GetOutput("safescale host add-feature " + names.Hosts[0] + " docker")
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"docker ps\"")
@@ -80,13 +80,13 @@ func DockerNotGateway(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "CONTAINER"))
 
-	out, err = GetOutput("deploy host check-feature " + names.Hosts[0] + " docker")
+	out, err = GetOutput("safescale host check-feature " + names.Hosts[0] + " docker")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host delete-feature " + names.Hosts[0] + " docker")
+	out, err = GetOutput("safescale host delete-feature " + names.Hosts[0] + " docker")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature " + names.Hosts[0] + " docker")
+	out, err = GetOutput("safescale host check-feature " + names.Hosts[0] + " docker")
 	require.NotNil(t, err)
 
 	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"docker ps\"")
@@ -110,23 +110,23 @@ func DockerCompose(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "0 users"))
 
-	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " docker-compose")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " docker-compose")
 	require.NotNil(t, err)
 
-	out, err = GetOutput("deploy host add-feature gw-" + names.Networks[0] + " docker-compose")
+	out, err = GetOutput("safescale host add-feature gw-" + names.Networks[0] + " docker-compose")
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker-compose -v\"")
 	fmt.Print(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " docker-compose")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " docker-compose")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host delete-feature gw-" + names.Networks[0] + " docker-compose")
+	out, err = GetOutput("safescale host delete-feature gw-" + names.Networks[0] + " docker-compose")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " docker-compose")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " docker-compose")
 	require.NotNil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker-compose -v\"")
@@ -149,10 +149,10 @@ func RemoteDesktop(t *testing.T, provider Providers.Enum) {
 	host := HostInfo{}
 	json.Unmarshal([]byte(out), &host)
 
-	out, err = GetOutput("deploy host check-feature --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = GetOutput("safescale host check-feature --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.NotNil(t, err)
 
-	out, err = GetOutput("deploy host add-feature --skip-proxy --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = GetOutput("safescale host add-feature --skip-proxy --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.Nil(t, err)
 
 	//TODO : try to connect to the host through guacamole?
@@ -161,14 +161,14 @@ func RemoteDesktop(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 
 	fmt.Println(names.Hosts[0])
-	out, err = GetOutput("deploy host check-feature --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = GetOutput("safescale host check-feature --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host delete-feature --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = GetOutput("safescale host delete-feature --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
+	out, err = GetOutput("safescale host check-feature --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.NotNil(t, err)
 
 	out, err = GetOutput("wget " + host.PUBLIC_IP + ":9080/guacamole")
@@ -186,23 +186,23 @@ func ReverseProxy(t *testing.T, provider Providers.Enum) {
 	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.104.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " reverseproxy")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " reverseproxy")
 	require.NotNil(t, err)
 
-	out, err = GetOutput("deploy host add-feature gw-" + names.Networks[0] + " reverseproxy")
+	out, err = GetOutput("safescale host add-feature gw-" + names.Networks[0] + " reverseproxy")
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep \\\"HTTP/1.1 200 OK\\\"\"")
 	fmt.Print(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " reverseproxy")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " reverseproxy")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host delete-feature gw-" + names.Networks[0] + " reverseproxy")
+	out, err = GetOutput("safescale host delete-feature gw-" + names.Networks[0] + " reverseproxy")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy host check-feature gw-" + names.Networks[0] + " reverseproxy")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " reverseproxy")
 	require.NotNil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep \\\"HTTP/1.1 200 OK\\\"\"")
