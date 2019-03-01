@@ -1,6 +1,7 @@
 package integration_tests
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -41,6 +42,7 @@ func CanBeRun(command string) (bool, error) {
 
 //GetOutput ...
 func GetOutput(command string) (string, error) {
+	fmt.Printf("Running [%s]\n", command)
 	out, err := exec.Command("bash", "-c", command).CombinedOutput()
 	if err != nil {
 		return string(out), err
