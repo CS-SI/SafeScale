@@ -23,16 +23,17 @@ package boh
 import (
 	"bytes"
 	"fmt"
+	"sync/atomic"
 	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
 
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/api"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/controller"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/boh/enums/ErrorCode"
-	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils/template"
 )
 
@@ -48,8 +49,8 @@ import (
 // )
 
 var (
-	// bohTemplateBox is the rice box to use in this package
-	bohTemplateBox *rice.Box
+	// templateBox is the rice box to use in this package
+	templateBox atomic.Value
 
 	// funcMap defines the custome functions to be used in templates
 	funcMap = txttmpl.FuncMap{
@@ -65,7 +66,7 @@ var (
 		},
 	}
 
-	globalSystemRequirementsContent *string
+	globalSystemRequirementsContent atomic.Value
 )
 
 // Blueprint returns a configured blueprint to construct a BOH Cluster
@@ -120,21 +121,24 @@ func defaultImage(c api.Cluster) string {
 func getTemplateBox() (*rice.Box, error) {
 	var b *rice.Box
 	var err error
-	if bohTemplateBox == nil {
+	anon := templateBox.Load()
+	if anon == nil {
 		// Note: path MUST be literal for rice to work
 		b, err = rice.FindBox("../boh/scripts")
 		if err != nil {
 			return nil, err
 		}
-		bohTemplateBox = b
+		templateBox.Store(b)
+		anon = templateBox.Load()
 	}
-	return bohTemplateBox, nil
+	return anon.(*rice.Box), nil
 }
 
 // getGlobalSystemRequirements returns the string corresponding to the script boh_install_requirements.sh
 // which installs common features (docker in particular)
 func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
-	if globalSystemRequirementsContent == nil {
+	anon := globalSystemRequirementsContent.Load()
+	if anon == nil {
 		// find the rice.Box
 		b, err := getTemplateBox()
 		if err != nil {
@@ -165,9 +169,10 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
 		}
 		result := dataBuffer.String()
-		globalSystemRequirementsContent = &result
+		globalSystemRequirementsContent.Store(&result)
+		anon = globalSystemRequirementsContent.Load()
 	}
-	return globalSystemRequirementsContent, nil
+	return anon.(*string), nil
 }
 
 func getNodeInstallationScript(c api.Cluster, nodeType NodeType.Enum) (string, map[string]interface{}) {
