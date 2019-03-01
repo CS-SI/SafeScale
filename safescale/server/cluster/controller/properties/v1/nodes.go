@@ -24,6 +24,7 @@ import (
 // Node ...
 type Node struct {
 	ID        string `json:"id"`         // ID of the node
+	Name      string `json:"name"`       // Name of the node
 	PublicIP  string `json:"public_ip"`  // public ip of the node
 	PrivateIP string `json:"private_ip"` // private ip of the node
 }
