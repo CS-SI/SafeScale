@@ -19,6 +19,7 @@ package dcos
 import (
 	"bytes"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	txttmpl "text/template"
@@ -50,10 +51,10 @@ const (
 
 var (
 	// templateBox is the rice box to use in this package
-	templateBox *rice.Box
+	templateBox atomic.Value
 
-	//GlobalSystemRequirementsContent contains the script to install/configure Core features
-	globalSystemRequirementsContent *string
+	// globalSystemRequirementsContent contains the script to install/configure Core features
+	globalSystemRequirementsContent atomic.Value
 
 	// funcMap defines the custom functions to be used in templates
 	funcMap = txttmpl.FuncMap{
@@ -258,21 +259,24 @@ func configureGateway(c api.Cluster, b *controller.Blueprint) error {
 
 // TODO: make templateBox an AtomicValue
 func getTemplateBox() (*rice.Box, error) {
-	if templateBox == nil {
+	anon := templateBox.Load()
+	if anon == nil {
 		// Note: path MUST be literal for rice to work
 		b, err := rice.FindBox("../dcos/scripts")
 		if err != nil {
 			return nil, err
 		}
-		templateBox = b
+		templateBox.Store(b)
+		anon = templateBox.Load()
 	}
-	return templateBox, nil
+	return anon.(*rice.Box), nil
 }
 
 // getGlobalSystemRequirements returns the string corresponding to the script dcos_install_requirements.sh
 // which installs common features (docker in particular)
 func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
-	if globalSystemRequirementsContent == nil {
+	anon := globalSystemRequirementsContent.Load()
+	if anon == nil {
 		// find the rice.Box
 		box, err := getTemplateBox()
 		if err != nil {
@@ -303,9 +307,10 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
 		}
 		result := dataBuffer.String()
-		globalSystemRequirementsContent = &result
+		globalSystemRequirementsContent.Store(&result)
+		anon = globalSystemRequirementsContent.Load()
 	}
-	return globalSystemRequirementsContent, nil
+	return anon.(*string), nil
 }
 
 // getState returns the current state of the cluster

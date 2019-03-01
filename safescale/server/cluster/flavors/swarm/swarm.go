@@ -52,7 +52,7 @@ const (
 )
 
 var (
-	templateBox *rice.Box
+	templateBox atomic.Value
 
 	// GlobalSystemRequirementsContent *string
 	globalSystemRequirementsContent atomic.Value
@@ -250,18 +250,20 @@ func getSwarmJoinCommand(c api.Cluster, worker bool) (string, error) {
 
 // getTemplateBox
 func getTemplateBox() (*rice.Box, error) {
-	if templateBox == nil {
+	anon := templateBox.Load()
+	if anon == nil {
 		// Note: path MUST be literal for rice to work
 		b, err := rice.FindBox("../swarm/scripts")
 		if err != nil {
 			return nil, err
 		}
-		templateBox = b
+		templateBox.Store(b)
+		anon = templateBox.Load()
 	}
-	return templateBox, nil
+	return anon.(*rice.Box), nil
 }
 
-// GetGlobalSystemRequirements returns the string corresponding to the script swarm_install_requirements.sh
+// getGlobalSystemRequirements returns the string corresponding to the script swarm_install_requirements.sh
 // which installs common features (docker in particular)
 func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 	anon := globalSystemRequirementsContent.Load()

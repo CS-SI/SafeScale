@@ -19,6 +19,7 @@ package k8s
 import (
 	"bytes"
 	"fmt"
+	"sync/atomic"
 
 	txttmpl "text/template"
 
@@ -36,8 +37,8 @@ import (
 //go:generate rice embed-go
 
 var (
-	templateBox                     *rice.Box
-	globalSystemRequirementsContent *string
+	templateBox                     atomic.Value
+	globalSystemRequirementsContent atomic.Value
 )
 
 // Blueprint returns a configured blueprint to construct a BOH Cluster
@@ -137,19 +138,22 @@ func getNodeInstallationScript(c api.Cluster, nodeType NodeType.Enum) (string, m
 }
 
 func getTemplateBox() (*rice.Box, error) {
-	if templateBox == nil {
+	anon := templateBox.Load()
+	if anon == nil {
 		// Note: path MUST be literal for rice to work
 		b, err := rice.FindBox("../k8s/scripts")
 		if err != nil {
 			return nil, err
 		}
-		templateBox = b
+		templateBox.Store(b)
+		anon = templateBox.Load()
 	}
-	return templateBox, nil
+	return anon.(*rice.Box), nil
 }
 
 func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
-	if globalSystemRequirementsContent == nil {
+	anon := globalSystemRequirementsContent.Load()
+	if anon == nil {
 		// find the rice.Box
 		box, err := getTemplateBox()
 		if err != nil {
@@ -180,7 +184,8 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
 		}
 		result := dataBuffer.String()
-		globalSystemRequirementsContent = &result
+		globalSystemRequirementsContent.Store(&result)
+		anon = globalSystemRequirementsContent.Load()
 	}
-	return globalSystemRequirementsContent, nil
+	return anon.(*string), nil
 }
