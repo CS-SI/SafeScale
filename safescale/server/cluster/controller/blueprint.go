@@ -1055,6 +1055,7 @@ func (b *Blueprint) asyncCreateMaster(index int, def pb.HostDefinition, timeout 
 			// Update swarmCluster definition in Object Storage
 			node := &clusterpropsv1.Node{
 				ID:        pbHost.ID,
+				Name:      pbHost.Name,
 				PrivateIP: pbHost.PrivateIP,
 				PublicIP:  pbHost.GetPublicIP(),
 			}
@@ -1260,6 +1261,7 @@ func (b *Blueprint) asyncCreateNode(
 			// Registers the new Agent in the swarmCluster struct
 			node = &clusterpropsv1.Node{
 				ID:        pbHost.ID,
+				Name:      pbHost.Name,
 				PrivateIP: pbHost.PrivateIP,
 				PublicIP:  pbHost.GetPublicIP(),
 			}
