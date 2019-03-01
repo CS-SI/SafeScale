@@ -128,6 +128,8 @@ func (c *Controller) GetIdentity() identity.Identity {
 	if c == nil {
 		panic("Calling safescale.server.cluster.controller.Controller::GetIdentity() from nil pointer!")
 	}
+	c.RLock()
+	defer c.RUnlock()
 	return c.Identity
 }
 
@@ -733,20 +735,30 @@ func (c *Controller) deleteNode(node *clusterpropsv1.Node, index int, public boo
 	defer log.Debugf("<<< safescale.server.cluster.controller.Controller::deleteNode(%s, %d)", node.ID, index)
 
 	if c == nil {
-		panic("Calling safescale.server.cluster.controller.Controller::DeleteSpecificNode from nil pointer!")
+		panic("Calling safescale.server.cluster.controller.Controller::deleteNode() from nil pointer!")
 	}
 	if node == nil {
 		panic("parameter 'node' is nil!")
 	}
 
-	// Removes node from cluster metadata
+	// Removes node from cluster metadata (done before really deleting node to prevent operations on the node in parallel)
 	err := c.UpdateMetadata(func() error {
 		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
 			if public {
-				nodesV1.PublicNodes = append(nodesV1.PublicNodes[:index], nodesV1.PublicNodes[index+1:]...)
+				length := len(nodesV1.PublicNodes)
+				if length <= index {
+					nodesV1.PublicNodes = nodesV1.PublicNodes[:index]
+				} else {
+					nodesV1.PublicNodes = append(nodesV1.PublicNodes[:index], nodesV1.PublicNodes[index+1:]...)
+				}
 			} else {
-				nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:index], nodesV1.PrivateNodes[index+1:]...)
+				length := len(nodesV1.PrivateNodes)
+				if length <= index {
+					nodesV1.PrivateNodes = nodesV1.PrivateNodes[:index]
+				} else {
+					nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:index], nodesV1.PrivateNodes[index+1:]...)
+				}
 			}
 			return nil
 		})

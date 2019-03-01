@@ -18,14 +18,13 @@ package client
 
 import (
 	"fmt"
-	"log"
 	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
-	logr "github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/utils"
@@ -89,7 +88,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		connectionTimeout,
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
-				log.Printf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
+				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
 			}
 		},
 	)
@@ -269,7 +268,7 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 		2*time.Minute,
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
-				log.Printf("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
+				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
 			}
 		},
 	)
@@ -302,10 +301,10 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 				for _, t := range tunnels {
 					nerr := t.Close()
 					if nerr != nil {
-						logr.Warnf("Error closing ssh tunnel: %v", nerr)
+						log.Errorf("error closing ssh tunnel: %v", nerr)
 					}
 				}
-				return fmt.Errorf("Unable to create command : %s", err.Error())
+				return fmt.Errorf("unable to create command : %s", err.Error())
 			}
 
 			return nil
@@ -313,7 +312,7 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 		2*time.Minute,
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
-				log.Printf("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
+				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
 			}
 		},
 	)
@@ -344,13 +343,13 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 		for _, portStr := range portStrs {
 			_, err = strconv.Atoi(portStr)
 			if err != nil {
-				log.Printf("Atoi failed on pid: %s\n", reflect.TypeOf(err).String())
-				return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+				log.Errorf("atoi failed on pid: %s", reflect.TypeOf(err).String())
+				return fmt.Errorf("unable to close tunnel :%s", err.Error())
 			}
 			err = exec.Command("kill", "-9", portStr).Run()
 			if err != nil {
-				log.Printf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
-				return fmt.Errorf("Unable to close tunnel :%s", err.Error())
+				log.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
+				return fmt.Errorf("unable to close tunnel :%s", err.Error())
 			}
 		}
 	}
