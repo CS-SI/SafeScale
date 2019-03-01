@@ -32,7 +32,7 @@ var ClusterListCommand = cli.Command{
 	Category: "Cluster",
 
 	Action: func(c *cli.Context) error {
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster list"))
+		cmdStr := RebrandCommand(fmt.Sprintf("safescale cluster list"))
 		log.Debugf("Calling '%s'", cmdStr)
 		return runCommand(cmdStr)
 	},
@@ -49,7 +49,7 @@ var ClusterInspectCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster inspect %s", clusterName))
+		cmdStr := RebrandCommand(fmt.Sprintf("safescale cluster inspect %s", clusterName))
 		return runCommand(cmdStr)
 	},
 }
@@ -125,7 +125,7 @@ var ClusterCreateCommand = cli.Command{
 		disk := c.Uint("disk")
 
 		// Create cluster with deploy
-		cmdStr := fmt.Sprintf("deploy cluster create %s -F DCOS -C %s -N %s --cpu %d --ram %f --disk %d",
+		cmdStr := fmt.Sprintf("safescale cluster create %s -F DCOS -C %s -N %s --cpu %d --ram %f --disk %d",
 			clusterName, complexityStr, cidr, cpu, ram, disk)
 		if keep {
 			cmdStr += " -k"
@@ -137,7 +137,7 @@ var ClusterCreateCommand = cli.Command{
 		}
 
 		// Installs feature Spark
-		cmdStr = fmt.Sprintf("deploy cluster add-feature %s sparkmaster", clusterName)
+		cmdStr = fmt.Sprintf("safescale cluster add-feature %s sparkmaster", clusterName)
 		err = runCommand(cmdStr)
 		if err != nil {
 			return err
@@ -172,7 +172,7 @@ var ClusterDeleteCommand = cli.Command{
 
 		yes := c.Bool("assume-yes")
 
-		cmdStr := fmt.Sprintf("deploy cluster rm %s", clusterName)
+		cmdStr := fmt.Sprintf("safescale cluster rm %s", clusterName)
 		if yes {
 			cmdStr += " -y"
 		}
@@ -193,7 +193,7 @@ var ClusterStopCommand = cli.Command{
 			return err
 		}
 
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster stop %s", clusterName))
+		cmdStr := RebrandCommand(fmt.Sprintf("safescale cluster stop %s", clusterName))
 		return runCommand(cmdStr)
 	},
 }
@@ -210,7 +210,7 @@ var ClusterStartCommand = cli.Command{
 			return err
 		}
 
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster start %s", clusterName))
+		cmdStr := RebrandCommand(fmt.Sprintf("safescale cluster start %s", clusterName))
 		return runCommand(cmdStr)
 	},
 }
@@ -226,7 +226,7 @@ var ClusterStateCommand = cli.Command{
 			return err
 		}
 
-		cmdStr := RebrandCommand(fmt.Sprintf("deploy cluster state %s", clusterName))
+		cmdStr := RebrandCommand(fmt.Sprintf("safescale cluster state %s", clusterName))
 		return runCommand(cmdStr)
 	},
 }
@@ -289,7 +289,7 @@ var ClusterExpandCommand = cli.Command{
 		ram := c.Float64("ram")
 		disk := c.Uint("disk")
 
-		cmdStr := fmt.Sprintf("deploy cluster expand %s -n %d", clusterName, count)
+		cmdStr := fmt.Sprintf("safescale cluster expand %s -n %d", clusterName, count)
 		if public {
 			cmdStr += " -p"
 		}
@@ -344,7 +344,7 @@ var ClusterShrinkCommand = cli.Command{
 		}
 		public := c.Bool("public")
 
-		cmdStr := fmt.Sprintf("deploy cluster shrink %s -n %d", clusterName, count)
+		cmdStr := fmt.Sprintf("safescale cluster shrink %s -n %d", clusterName, count)
 		if public {
 			cmdStr += " -p"
 		}
@@ -401,7 +401,7 @@ Everything after COMMAND will be considered a parameter of the COMMAND.
 		tail := args.Tail()
 		command := args.Get(1)
 
-		cmdStr := fmt.Sprintf("deploy cluster call %s %s %s %s", target, clusterName, command, strings.Join(tail[1:], " "))
+		cmdStr := fmt.Sprintf("safescale cluster call %s %s %s %s", target, clusterName, command, strings.Join(tail[1:], " "))
 		cmdStr = RebrandCommand(cmdStr)
 		log.Debugf("Calling '%s'", cmdStr)
 		return runCommand(cmdStr)
