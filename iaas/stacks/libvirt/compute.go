@@ -27,6 +27,8 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -45,9 +47,9 @@ import (
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"golang.org/x/crypto/ssh"
 
-	libvirt "github.com/libvirt/libvirt-go"
-	libvirtxml "github.com/libvirt/libvirt-go-xml"
-	uuid "github.com/satori/go.uuid"
+	"github.com/libvirt/libvirt-go"
+	"github.com/libvirt/libvirt-go-xml"
+	"github.com/satori/go.uuid"
 )
 
 // The createds hosts could be connected to the network with a bridge or a nat
@@ -722,6 +724,26 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) er
 	return nil
 }
 
+func verifyVirtResizeCanAccessKernel() (err error) {
+	command := "echo /boot/vmlinuz-`uname -r`"
+	cmd := exec.Command("bash", "-c", command)
+
+	cmdOutput := &bytes.Buffer{}
+	cmd.Stdout = cmdOutput
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+	}
+
+	_, err = os.Stat(cmdOutput.String())
+	if os.IsNotExist(err) {
+		logrus.Warnf("Kernel file [%s] not found", cmdOutput.String())
+		return nil
+	}
+
+	return unix.Access(cmdOutput.String(), unix.R_OK)
+}
+
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, error) {
 	resourceName := request.ResourceName
@@ -858,6 +880,11 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	}
 
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
+	err = verifyVirtResizeCanAccessKernel()
+	if err != nil {
+		return nil, fmt.Errorf("Libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
+	}
+
 	// TODO gpu is ignored
 	// TODO use libvirt-go functions not bash commands
 	commandSetup := fmt.Sprintf("IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"", imagePath, s.LibvirtConfig.LibvirtStorage, resourceName)
