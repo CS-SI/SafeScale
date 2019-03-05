@@ -243,8 +243,7 @@ func (s *Stack) DeleteVolume(id string) error {
 		timeout,
 	)
 	if retryErr != nil {
-		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			if err != nil {
 				return fmt.Errorf("timeout after %v to delete volume: %v", timeout, err)
 			}

@@ -329,6 +329,11 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, er
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
 	}
+
+	password, err := utils.GeneratePassword(16)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate password: %s", err.Error())
+	}
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
@@ -336,6 +341,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, er
 		TemplateID:   req.TemplateID,
 		Networks:     []*resources.Network{req.Network},
 		PublicIP:     true,
+		Password:     password,
 	}
 	host, err := s.CreateHost(hostReq)
 	if err != nil {
@@ -594,8 +600,7 @@ func (s *Stack) deleteSubnet(id string) error {
 		1*time.Minute,
 	)
 	if retryErr != nil {
-		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			// If we have the last error of the delete try, returns this error
 			if err != nil {
 				if _, ok := err.(resources.ErrResourceNotAvailable); ok {
@@ -603,9 +608,8 @@ func (s *Stack) deleteSubnet(id string) error {
 				}
 				return fmt.Errorf("failed to delete subnet after %v: %v", 1*time.Minute, err)
 			}
-		default:
-			return fmt.Errorf("failed to delete subnet after %v: %v", 1*time.Minute, retryErr)
 		}
+		return fmt.Errorf("failed to delete subnet after %v: %v", 1*time.Minute, retryErr)
 	}
 	return nil
 }
