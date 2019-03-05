@@ -159,7 +159,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	 <network>
 		 <name>` + name + `</name>
 		 <ip address="` + ip + `" netmask="` + netmask + `">
-			 <dhcp> 
+			 <dhcp>
 				 <range start="` + dhcpStart + `" end="` + dhcpEnd + `" />
 			 </dhcp>
 		 </ip>

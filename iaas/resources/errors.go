@@ -23,7 +23,7 @@ type ErrTimeout struct {
 	Message string
 }
 
-func (e *ErrTimeout) Error() string {
+func (e ErrTimeout) Error() string {
 	return e.Message
 }
 
