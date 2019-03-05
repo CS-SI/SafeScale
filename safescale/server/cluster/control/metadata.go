@@ -14,7 +14,7 @@
 * limitations under the License.
  */
 
-package controller
+package control
 
 import (
 	"fmt"
@@ -24,6 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 	"github.com/CS-SI/SafeScale/utils/metadata"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/serialize"
@@ -60,15 +61,15 @@ func (m *Metadata) Written() bool {
 }
 
 // Carry links metadata with cluster struct
-func (m *Metadata) Carry(cluster *Controller) *Metadata {
+func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
 	if cluster == nil {
-		panic("cluster is nil!")
+		panic("Invalid parameter 'cluster': can't be nil!")
 	}
 	m.item.Carry(cluster)
-	m.name = cluster.GetIdentity().Name
+	m.name = cluster.GetIdentity(task).Name
 	return m
 }
 
@@ -86,7 +87,7 @@ func (m *Metadata) Delete() error {
 }
 
 // Read reads metadata of cluster named 'name' from Object Storage
-func (m *Metadata) Read(name string) error {
+func (m *Metadata) Read(task concurrency.Task, name string) error {
 	var (
 		ptr *Controller
 		ok  bool
@@ -112,7 +113,7 @@ func (m *Metadata) Read(name string) error {
 	if err != nil {
 		return err
 	}
-	m.name = ptr.GetIdentity().Name
+	m.name = ptr.GetIdentity(task).Name
 	return nil
 }
 
@@ -123,7 +124,7 @@ func (m *Metadata) Write() error {
 
 // Reload reloads the metadata from ObjectStorage
 // It's a good idea to do that just after an Acquire() to be sure to have the latest data
-func (m *Metadata) Reload() error {
+func (m *Metadata) Reload(task concurrency.Task) error {
 	if m.item == nil {
 		panic("m.item is nil!")
 	}
@@ -137,7 +138,7 @@ func (m *Metadata) Reload() error {
 	var innerErr error
 	err := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			innerErr = m.Read(m.name)
+			innerErr = m.Read(task, m.name)
 			if innerErr != nil {
 				if _, ok := innerErr.(utils.ErrNotFound); ok {
 					return innerErr
@@ -167,11 +168,9 @@ func (m *Metadata) Get() *Controller {
 		panic("m.item is nil!")
 	}
 	if p, ok := m.item.Get().(*Controller); ok {
-		// p.service = m.GetService()
-		// p.metadata = m
 		return p
 	}
-	panic("invalid cluster content in metadata")
+	panic("Missing cluster content in metadata!")
 }
 
 // Browse walks through cluster folder and executes a callback for each entry

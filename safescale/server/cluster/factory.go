@@ -25,16 +25,17 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/api"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/controller"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/control"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/swarm"
 	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 )
 
 // Get returns the Cluster instance corresponding to the cluster named 'name'
 // TODO: rename to Inspect ?
-func Get(name string) (api.Cluster, error) {
+func Get(task concurrency.Task, name string) (api.Cluster, error) {
 	tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
@@ -44,11 +45,14 @@ func Get(name string) (api.Cluster, error) {
 		return nil, err
 	}
 
-	m, err := controller.NewMetadata(svc)
+	m, err := control.NewMetadata(svc)
 	if err != nil {
 		return nil, err
 	}
-	err = m.Read(name)
+	if task == nil {
+		task = concurrency.RootTask()
+	}
+	err = m.Read(task, name)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			return nil, resources.ResourceNotFoundError("cluster", name)
@@ -56,7 +60,7 @@ func Get(name string) (api.Cluster, error) {
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
 	}
 	controller := m.Get()
-	err = setBlueprint(controller)
+	err = setForeman(task, controller)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +68,7 @@ func Get(name string) (api.Cluster, error) {
 }
 
 // Load ...
-func Load(name string) (api.Cluster, error) {
+func Load(task concurrency.Task, name string) (api.Cluster, error) {
 	tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
@@ -74,11 +78,11 @@ func Load(name string) (api.Cluster, error) {
 		return nil, err
 	}
 
-	m, err := controller.NewMetadata(svc)
+	m, err := control.NewMetadata(svc)
 	if err != nil {
 		return nil, err
 	}
-	err = m.Read(name)
+	err = m.Read(task, name)
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			return nil, err
@@ -86,41 +90,29 @@ func Load(name string) (api.Cluster, error) {
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
 	}
 	controller := m.Get()
-	err = setBlueprint(controller)
+	err = setForeman(task, controller)
 	if err != nil {
 		return nil, err
 	}
 	return controller, nil
 }
 
-func setBlueprint(controller *controller.Controller) error {
-	flavor := controller.GetIdentity().Flavor
+func setForeman(task concurrency.Task, controller *control.Controller) error {
+	flavor := controller.GetIdentity(task).Flavor
 	switch flavor {
 	case Flavor.DCOS:
-		// err := controller.Restore(dcos.Blueprint(controller))
+		// err := controller.Restore(task, control.NewForeman(controller, dcos.Makers))
 		// if err != nil {
 		// 	return err
 		// }
 	case Flavor.BOH:
-		err := controller.Restore(boh.Blueprint(controller))
-		if err != nil {
-			return err
-		}
+		controller.Restore(task, control.NewForeman(controller, boh.Makers))
 	// case Flavor.OHPC:
-	// 	err := controller.Restore(ohpc.Blueprint(controller))
-	// 	if err != nil {
-	// 		return err
-	// 	}
+	// 	controller.Restore(task, control.NewForeman(controller, ohpc.Makers))
 	// case Flavor.K8S:
-	// 	err := controller.Restore(k8s.Blueprint(controller))
-	// 	if err != nil {
-	// 		return err
-	// 	}
+	// 	controller.Restore(task, control.NewForeman(controller, k8s.Makers))
 	case Flavor.SWARM:
-		err := controller.Restore(swarm.Blueprint(controller))
-		if err != nil {
-			return err
-		}
+		controller.Restore(task, control.NewForeman(controller, swarm.Makers))
 	default:
 		return fmt.Errorf("cluster Flavor '%s' not yet implemented", flavor.String())
 	}
@@ -128,7 +120,7 @@ func setBlueprint(controller *controller.Controller) error {
 }
 
 // Create creates a cluster following the parameters of the request
-func Create(req controller.Request) (api.Cluster, error) {
+func Create(task concurrency.Task, req control.Request) (api.Cluster, error) {
 	log.Debugf(">>> safescale.server.cluster.factory::Create()")
 	defer log.Debugf("<<< safescale.cluster.factory::Create()")
 
@@ -151,31 +143,31 @@ func Create(req controller.Request) (api.Cluster, error) {
 		return nil, err
 	}
 
-	controller := controller.NewController(svc)
+	controller := control.NewController(svc)
 	req.Tenant = tenant.Name
 	switch req.Flavor {
 	case Flavor.BOH:
-		err = controller.Create(req, boh.Blueprint(controller))
+		err = controller.Create(task, req, control.NewForeman(controller, boh.Makers))
 		if err != nil {
 			return nil, err
 		}
 	// case Flavor.DCOS:
-	// 	err = controller.Create(req, dcos.Blueprint(controller))
+	// 	err = control.Create(task, req, control.NewForeman(controller, dcos.Makers))
 	// 	if err != nil {
 	// 		return nil, err
 	// 	}
 	// case Flavor.K8S:
-	// 	err = controller.Create(req, k8s.Blueprint(controller))
+	// 	err = control.Create(task, req, control.NewForeman(controller, k8s.Makers))
 	// 	if err != nil {
 	// 		return nil, err
 	// 	}
 	// case Flavor.OHPC:
-	// 	err = controller.Create(req, ohpc.Blueprint(controller))
+	// 	err = control.Create(task, req, control.NewForema(controller, ohpc.Makers))
 	// 	if err != nil {
 	// 		return nil, err
 	// 	}
 	case Flavor.SWARM:
-		err = controller.Create(req, swarm.Blueprint(controller))
+		err = controller.Create(task, req, control.NewForeman(controller, swarm.Makers))
 		if err != nil {
 			return nil, err
 		}
@@ -188,14 +180,14 @@ func Create(req controller.Request) (api.Cluster, error) {
 }
 
 // Delete deletes the infrastructure of the cluster named 'name'
-func Delete(name string) error {
-	instance, err := Get(name)
+func Delete(task concurrency.Task, name string) error {
+	instance, err := Get(task, name)
 	if err != nil {
 		return fmt.Errorf("failed to find a cluster named '%s': %s", name, err.Error())
 	}
 
 	// Deletes all the infrastructure built for the cluster
-	return instance.Delete()
+	return instance.Delete(task)
 }
 
 // List lists the clusters already created
@@ -210,11 +202,11 @@ func List() ([]api.Cluster, error) {
 	}
 
 	var clusterList []api.Cluster
-	m, err := controller.NewMetadata(svc)
+	m, err := control.NewMetadata(svc)
 	if err != nil {
 		return clusterList, err
 	}
-	err = m.Browse(func(controller *controller.Controller) error {
+	err = m.Browse(func(controller *control.Controller) error {
 		clusterList = append(clusterList, controller)
 		return nil
 	})
@@ -223,7 +215,7 @@ func List() ([]api.Cluster, error) {
 
 // // Sanitize ...
 // func Sanitize(svc *providers.Service, name string) error {
-// m, err := controller.NewMetadata(svc)
+// m, err := control.NewMetadata(svc)
 // if err != nil {
 // return err
 // }
@@ -236,7 +228,7 @@ func List() ([]api.Cluster, error) {
 // }
 //
 // controller := m.Get()
-// switch controller.GetIdentity().Flavor {
+// switch control.GetIdentity().Flavor {
 // case Flavor.DCOS:
 // return dcos.Sanitize(m)
 // default:

@@ -61,7 +61,7 @@ func Parse(v string) (Enum, error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = StringMap[lowered]; !ok {
-		return e, fmt.Errorf("failed to find a Flavor.Enum corresponding to '%s'", v)
+		return e, fmt.Errorf("failed to find a Flavor matching with '%s'", v)
 	}
 	return e, nil
 
@@ -82,5 +82,5 @@ func (e Enum) String() string {
 	if str, found := enumMap[e]; found {
 		return str
 	}
-	panic(fmt.Sprintf("failed to find a Flavor.Enum string corresponding to value '%d'!", e))
+	panic(fmt.Sprintf("failed to find a string matching with Flavor '%d'!", e))
 }
