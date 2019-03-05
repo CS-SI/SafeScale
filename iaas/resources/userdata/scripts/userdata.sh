@@ -42,6 +42,7 @@ sfFinishPreviousInstall() {
 export -f sfFinishPreviousInstall
 
 sfWaitForApt() {
+    sfFinishPreviousInstall || true
     sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
 }
 
@@ -325,6 +326,11 @@ EOF
     sfSaveIptablesRules
 }
 
+put_hostname_in_hosts() {
+    HON=$(hostname)
+    ping $HON -c 5 2>/dev/null || echo "127.0.0.1 $HON" >>/etc/hosts
+}
+
 configure_as_gateway() {
     echo "Configuring host as gateway..."
 
@@ -599,6 +605,8 @@ case $LINUX_KIND in
         configure_gateway
         {{- end }}
 
+        put_hostname_in_hosts
+
         ;;
 
     redhat|centos)
@@ -613,6 +621,8 @@ case $LINUX_KIND in
         {{- if .AddGateway }}
         configure_gateway_redhat
         {{- end }}
+
+        put_hostname_in_hosts
         ;;
     *)
         echo "Unsupported Linux distribution '$LINUX_KIND'!"

@@ -59,17 +59,20 @@ feature:
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfRetry 5m 3 "sfWaitForApt && apt-get update"
-                                    sfRetry 5m 3 "apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common" || exit 192
+                                    sfRetry 5m 3 "apt-get install -y gnupg2 || apt-get install -y gnupg"
+                                    sfRetry 5m 3 "apt-get install -y apt-transport-https ca-certificates curl software-properties-common" || exit 192
                                     sfRetry 5m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || exit 193
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
                                     sfRetry 5m 3 "sfWaitForApt && apt-get update"
-                                    sfRetry 5m 3 "sfWaitForApt && apt-get install -qqy docker-ce jq"
+                                    sfRetry 5m 3 "sfWaitForApt && apt-get install jq || true"
+                                    sfRetry 5m 3 "sfWaitForApt && apt-get install -qqy docker-ce"
                                     [ $? -ne 0 ] && exit 194
                                     mkdir /etc/docker
                                     echo -e "{\n\t\"iptables\": false\n}" > ~/daemon.json && mv ~/daemon.json /etc/docker/daemon.json
 
                                     systemctl enable docker
                                     systemctl start docker
+                                    [ $? -ne 0 ] && exit 194
                                     ;;
                                 centos|rhel)
                                     yum install -y yum-utils device-mapper-persistent-data lvm2 || exit 192
@@ -80,6 +83,7 @@ feature:
 
                                     systemctl enable docker
                                     systemctl start docker
+                                    [ $? -ne 0 ] && exit 194
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

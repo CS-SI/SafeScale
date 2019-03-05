@@ -27,6 +27,8 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -46,9 +48,9 @@ import (
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"golang.org/x/crypto/ssh"
 
-	libvirt "github.com/libvirt/libvirt-go"
-	libvirtxml "github.com/libvirt/libvirt-go-xml"
-	uuid "github.com/satori/go.uuid"
+	"github.com/libvirt/libvirt-go"
+	"github.com/libvirt/libvirt-go-xml"
+	"github.com/satori/go.uuid"
 )
 
 // The createds hosts could be connected to the network with a bridge or a nat
@@ -723,6 +725,27 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) er
 	return nil
 }
 
+func verifyVirtResizeCanAccessKernel() (err error) {
+	command := "echo /boot/vmlinuz-`uname -r`"
+	cmd := exec.Command("bash", "-c", command)
+
+	cmdOutput := &bytes.Buffer{}
+	cmd.Stdout = cmdOutput
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+	}
+
+	target := strings.TrimSpace(cmdOutput.String())
+	_, err = os.Stat(target)
+	if os.IsNotExist(err) {
+		logrus.Warnf("Kernel file [%s] not found", target)
+		return nil
+	}
+
+	return unix.Access(target, unix.R_OK)
+}
+
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, error) {
 	resourceName := request.ResourceName
@@ -868,21 +891,39 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	}
 
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
+	err = verifyVirtResizeCanAccessKernel()
+	if err != nil {
+		return nil, fmt.Errorf("Libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
+	}
+
+	var commands []string
 	// TODO gpu is ignored
 	// TODO use libvirt-go functions not bash commands
 	commandSetup := fmt.Sprintf("IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"", imagePath, s.LibvirtConfig.LibvirtStorage, resourceName)
+
 	commandResize := fmt.Sprintf("cd $LIBVIRT_STORAGE && chmod 666 $IMAGE_PATH && truncate $VM_IMAGE -s %dG && virt-resize --expand %s $IMAGE_PATH $VM_IMAGE", template.DiskSize, imageDisk)
+	commands = append(commands, commandResize)
+
 	commandSysprep := fmt.Sprintf("virt-sysprep -a $VM_IMAGE --hostname %s --operations defaults,-ssh-hostkeys --firstboot %s && rm %s", hostName, userdataFileName, userdataFileName)
+	commands = append(commands, commandSysprep)
+
 	commandVirtInstall := fmt.Sprintf("virt-install --connect \"%s\" --noautoconsole --name=%s --vcpus=%d --memory=%d --import --disk=$VM_IMAGE %s", s.LibvirtConfig.URI, resourceName, template.Cores, int(template.RAMSize*1024), networksCommandString)
-	command := strings.Join([]string{commandSetup, commandResize, commandSysprep, commandVirtInstall}, " && ")
+	commands = append(commands, commandVirtInstall)
 
-	cmd := exec.Command("bash", "-c", command)
+	for _, command := range commands {
+		joinCommand := strings.Join([]string{commandSetup, command}, " && ")
 
-	cmdOutput := &bytes.Buffer{}
-	cmd.Stdout = cmdOutput
-	err = cmd.Run()
-	if err != nil {
-		return nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+		cmd := exec.Command("bash", "-c", joinCommand)
+
+		cmdOutput := &bytes.Buffer{}
+		cmdError := &bytes.Buffer{}
+		cmd.Stdout = cmdOutput
+		cmd.Stderr = cmdError
+		err = cmd.Run()
+		if err != nil {
+			logrus.Errorf("Commands failed: [%s] with error [%s], stdOutput [%s] and stdError [%s]", command, err.Error(), cmdOutput.String(), cmdError.String())
+			return nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+		}
 	}
 
 	defer func() {
