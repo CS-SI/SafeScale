@@ -3,12 +3,12 @@ syntax = "proto3";
 import "github.com/golang/protobuf/ptypes/empty/empty.proto";
 
 message Tenant{
-    string Name = 1;
-    string Provider = 2;
+    string name = 1;
+    string provider = 2;
 }
 
 message TenantList{
-    repeated Tenant Tenants = 1;
+    repeated Tenant tenants = 1;
 }
 
 service TenantService{
@@ -18,22 +18,22 @@ service TenantService{
 }
 
 message Image{
-    string ID = 1;
-    string Name = 2;
+    string id = 1;
+    string name = 2;
 }
 
 message Reference{
-    string TenantID = 1;
-    string ID = 2;
-    string Name = 3;
+    string tenant_id = 1;
+    string id = 2;
+    string name = 3;
 }
 
 message TenantName{
-    string Name = 1;
+    string name = 1;
 }
 
 message ImageList{
-    repeated Image Images= 1;
+    repeated Image images= 1;
 }
 
 message ImageListRequest{
@@ -50,37 +50,37 @@ service ImageService{
 // safescale network inspect net1
 
 message NetworkDefinition{
-    string Name = 2;
-    string CIDR = 3;
-    GatewayDefinition Gateway = 4;
+    string name = 2;
+    string cidr = 3;
+    GatewayDefinition gateway = 4;
 }
 
 message GatewayDefinition{
-    int32 CPU = 1;
-    float RAM = 2;
-    int32 Disk = 3;
-    string ImageID = 5;
+    int32 cpu = 1;
+    float ram = 2;
+    int32 disk = 3;
+    string image_id = 5;
     string name = 6;
 }
 
 message Network{
-    string ID = 1;
-    string Name = 2;
-    string CIDR = 3;
-    string GatewayID = 4;
+    string id = 1;
+    string name = 2;
+    string cidr = 3;
+    string gateway_id = 4;
 }
 
 
 message NetworkList{
-    repeated Network Networks = 1;
+    repeated Network networks = 1;
 }
 
-message NWListRequest{
-    bool All =1;
+message NetworkListRequest{
+    bool all =1;
 }
 service NetworkService{
     rpc Create(NetworkDefinition) returns (Network){}
-    rpc List(NWListRequest) returns (NetworkList){}
+    rpc List(NetworkListRequest) returns (NetworkList){}
     rpc Inspect(Reference) returns (Network) {}
     rpc Delete(Reference) returns (google.protobuf.Empty){}
 }
@@ -91,16 +91,16 @@ service NetworkService{
 // safescale host create host2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
 
 message HostDefinition{
-    string Name = 2;
-    string Network = 3;
-    int32 CPUNumber = 4;
-    float RAM = 6;
-    int32 Disk = 7;
-    string ImageID = 9;
-    bool Public = 10;
-    int32 GPUNumber = 11;
-    float Freq = 12;
-    bool Force = 13;
+    string name = 2;
+    string network = 3;
+    int32 cpu_count = 4;
+    float ram = 6;
+    int32 disk = 7;
+    string image_id = 9;
+    bool public = 10;
+    int32 gpu_count = 11;
+    float cpu_freq = 12;
+    bool force = 13;
 }
 
 enum HostState {
@@ -117,39 +117,40 @@ enum HostState {
   }
 
 message Host{
-    string ID = 1;
-    string Name = 2;
-    int32 CPU = 3;
-    float RAM = 4;
-    int32 Disk = 5;
-    string PublicIP = 6;
-    string PrivateIP = 7;
-    HostState State = 8;
-    string PrivateKey = 9;
-    string GatewayID = 10;
-    string OsKind = 11;
-    repeated string AttachedVolumeNames = 12;
+    string id = 1;
+    string name = 2;
+    int32 cpu = 3;
+    float ram = 4;
+    int32 disk = 5;
+    string public_ip = 6;
+    string private_ip = 7;
+    HostState state = 8;
+    string private_key = 9;
+    string gateway_id = 10;
+    string os_kind = 11;
+    repeated string attached_volume_names = 12;
+    string password = 13;
 }
 
 message HostStatus {
-    string Name = 1;
-    string Status = 2;
+    string name = 1;
+    string status = 2;
 }
 
 message HostList{
-    repeated Host Hosts= 1;
+    repeated Host hosts= 1;
 }
 
 message SshConfig{
-    string User = 1;
-    string Host = 2;
-    string PrivateKey = 3;
-    int32 Port = 4;
+    string user = 1;
+    string host = 2;
+    string private_key = 3;
+    int32 port = 4;
     SshConfig gateway = 5;
 }
 
 message HostListRequest{
-    bool All = 1;
+    bool all = 1;
 }
 
 service HostService{
@@ -166,21 +167,21 @@ service HostService{
 }
 
 message HostTemplate{
-    string ID = 1;
-    string Name = 2;
-    int32 Cores = 3;
-    int32 Ram = 4;
-    int32 Disk = 5;
-    int32 GPUs = 6;
-    string GPUType = 7;
+    string id = 1;
+    string name = 2;
+    int32 cores = 3;
+    int32 ram = 4;
+    int32 disk = 5;
+    int32 gpu_count = 6;
+    string gpu_type = 7;
 }
 
 message TemplateList{
-    repeated HostTemplate Templates = 1;
+    repeated HostTemplate templates = 1;
 }
 
 message TemplateListRequest{
-    bool All = 1;
+    bool all = 1;
 }
 
 service TemplateService{
@@ -201,54 +202,54 @@ enum VolumeSpeed{
 }
 
 message VolumeDefinition{
-    string Name = 2;
-    VolumeSpeed Speed = 3;
-    int32 Size = 4;
+    string name = 2;
+    VolumeSpeed speed = 3;
+    int32 size = 4;
 }
 
 message Volume{
-    string ID = 1;
-    string Name = 2;
-    VolumeSpeed Speed = 3;
-    int32 Size = 4;
+    string id = 1;
+    string name = 2;
+    VolumeSpeed speed = 3;
+    int32 size = 4;
 }
 //message VolumeInfo{
-//    Volume Volume = 1;
-//    VolumeAttachment Attachment = 2;
+//    Volume volume = 1;
+//    VolumeAttachment attachment = 2;
 //
 //}
 
 message VolumeInfo{
-    string ID = 1;
-    string Name = 2;
-    VolumeSpeed Speed = 3;
-    int32 Size = 4;
-    Reference Host = 5;
-    string MountPath = 6;
-    string Format = 7;
-    string Device = 8;
+    string id = 1;
+    string name = 2;
+    VolumeSpeed speed = 3;
+    int32 size = 4;
+    Reference host = 5;
+    string mount_path = 6;
+    string format = 7;
+    string device = 8;
 }
 
 message VolumeListRequest{
-    bool All = 1;
+    bool all = 1;
 }
 
 message VolumeList{
-    repeated Volume Volumes = 1;
+    repeated Volume volumes = 1;
 }
 
 message VolumeAttachment{
-    Reference Volume = 2;
-    Reference Host = 3;
-    string MountPath = 4;
-    string Format = 5;
-    string Device = 6;
-    bool DoNotFormat = 7;
+    Reference volume = 2;
+    Reference host = 3;
+    string mount_path = 4;
+    string format = 5;
+    string device = 6;
+    bool do_not_format = 7;
 }
 
 message VolumeDetachment{
-    Reference Volume = 1;
-    Reference Host = 2;
+    Reference volume = 1;
+    Reference host = 2;
 }
 
 service VolumeService{
@@ -268,17 +269,17 @@ service VolumeService{
 // safescale bucket|container inspect C1
 
 message Bucket{
-    string Name = 1;
+    string name = 1;
 }
 
 message BucketList{
-    repeated Bucket Buckets = 1;
+    repeated Bucket buckets = 1;
 }
 
 message BucketMountingPoint{
-    string Bucket = 1;
-    Reference Host = 2;
-    string Path = 3;
+    string bucket = 1;
+    Reference host = 2;
+    string path = 3;
 }
 
 service BucketService{
@@ -291,18 +292,18 @@ service BucketService{
 }
 
 message SshCommand{
-    Reference Host = 1;
-    string Command = 2;
+    Reference host = 1;
+    string command = 2;
 }
 message SshCopyCommand{
-    string Source = 1;
-    string Destination = 2;
+    string source = 1;
+    string destination = 2;
 }
 
 message SshResponse{
-    string OutputStd = 1;
-    string OutputErr = 2;
-    int32 Status = 3;
+    string output_std = 1;
+    string output_err = 2;
+    int32 status = 3;
 }
 
 service SshService{
@@ -318,41 +319,41 @@ service SshService{
 // safescale nas|share inspect share1
 
 message ExportOptions{
-    bool ReadOnly = 1;
-    bool RootSquash = 2;
-    bool Secure = 3;
-    bool Async = 4;
-    bool NoHide = 5;
-    bool CrossMount = 6;
-    bool SubtreeCheck = 7;
+    bool read_only = 1;
+    bool root_squash = 2;
+    bool secure = 3;
+    bool async = 4;
+    bool no_hide = 5;
+    bool cross_mount = 6;
+    bool subtree_check = 7;
 }
 
 message ShareDefinition{
-    string ID = 1;
-    string Name = 2;
-    Reference Host = 3;
-    string Path = 4;
-    string Type = 5;
-    ExportOptions Options = 6;
-    repeated string SecurityModes = 7;
+    string id = 1;
+    string name = 2;
+    Reference host = 3;
+    string path = 4;
+    string type = 5;
+    ExportOptions options = 6;
+    repeated string security_modes = 7;
 }
 
 message ShareList{
-    repeated ShareDefinition ShareList = 1;
+    repeated ShareDefinition share_list = 1;
 }
 
 message ShareMountDefinition{
-    Reference Host = 1;
-    Reference Share = 2;
-    string Path = 3;
-    string Type = 4;
-    string Options = 5;
-    bool WithCache = 6;
+    Reference host = 1;
+    Reference share = 2;
+    string path = 3;
+    string type = 4;
+    string options = 5;
+    bool with_cache = 6;
 }
 
 message ShareMountList{
-    ShareDefinition Share = 1;
-    repeated ShareMountDefinition MountList = 2;
+    ShareDefinition share = 1;
+    repeated ShareMountDefinition mount_list = 2;
 }
 
 service ShareService{
@@ -366,12 +367,12 @@ service ShareService{
 
 
 message ProcessDefinition{
-    string UUID = 1;
-    string Info = 2;
+    string uuid = 1;
+    string info = 2;
 }
 
 message ProcessList{
-    repeated ProcessDefinition List = 1;
+    repeated ProcessDefinition list = 1;
 }
 
 service ProcessManagerService{
