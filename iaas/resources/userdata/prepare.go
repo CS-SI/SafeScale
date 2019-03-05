@@ -52,7 +52,7 @@ type userData struct {
 	CIDR string
 	// GatewayIP is the IP of the gateway
 	GatewayIP string
-	// Password for the user gpac (for troubleshoot use, useable only in console)
+	// Password for the user safescale (for troubleshoot use, useable only in console)
 	Password string
 	// HostName contains the name wanted as host name (default == name of the Cloud resource)
 	HostName string
@@ -62,25 +62,22 @@ var userdataTemplate *template.Template
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func Prepare(
-	options stacks.ConfigurationOptions, request resources.HostRequest, kp *resources.KeyPair, cidr string,
+	options stacks.ConfigurationOptions, request resources.HostRequest, cidr string,
 ) ([]byte, error) {
 
-	// Generate password for user gpac
+	// Generate password for user safescale
 	var (
-		gpacPassword              string
 		err                       error
 		autoHostNetworkInterfaces bool
 		useLayer3Networking       = true
 		dnsList                   []string
 	)
-	//if debug
-	if false {
-		gpacPassword = "SafeScale"
-	} else {
-		gpacPassword, err = utils.GeneratePassword(16)
+	if request.Password == "" {
+		password, err := utils.GeneratePassword(16)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate password: %s", err.Error())
 		}
+		request.Password = password
 	}
 
 	// Determine Gateway IP
@@ -113,15 +110,15 @@ func Prepare(
 
 	data := userData{
 		User:       resources.DefaultUser,
-		PublicKey:  strings.Trim(kp.PublicKey, "\n"),
-		PrivateKey: strings.Trim(kp.PrivateKey, "\n"),
+		PublicKey:  strings.Trim(request.KeyPair.PublicKey, "\n"),
+		PrivateKey: strings.Trim(request.KeyPair.PrivateKey, "\n"),
 		ConfIF:     !autoHostNetworkInterfaces,
 		IsGateway:  request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking,
 		AddGateway: !request.PublicIP && !useLayer3Networking,
 		DNSServers: dnsList,
 		CIDR:       cidr,
 		GatewayIP:  ip,
-		Password:   gpacPassword,
+		Password:   request.Password,
 		//HostName:   request.Name,
 	}
 

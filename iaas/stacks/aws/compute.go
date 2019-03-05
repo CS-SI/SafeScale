@@ -36,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
 	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/utils"
 )
 
 func wrapError(msg string, err error) error {
@@ -522,13 +523,19 @@ func getState(state *ec2.InstanceState) (HostState.Enum, error) {
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, error) {
 
 	// If no KeyPair is supplied a temporay one is created
-	kp := request.KeyPair
-	if kp == nil {
-		kpTmp, err := s.CreateKeyPair(request.ResourceName)
+	if request.KeyPair == nil {
+		kp, err := s.CreateKeyPair(request.ResourceName)
 		if err != nil {
 			return nil, err
 		}
-		kp = kpTmp
+		request.KeyPair = kp
+	}
+	if request.Password == "" {
+		password, err := utils.GeneratePassword(16)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate password: %s", err.Error())
+		}
+		request.Password = password
 	}
 
 	// If the host is not a Gateway, get gateway of the first network
@@ -550,7 +557,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	sns, err := s.getSubnets(request.Networks)
 
 	//Prepare user data
-	userData, err := userdata.Prepare(s.cfgOpts, request, kp, gw.ID)
+	userData, err := userdata.Prepare(s.cfgOpts, request, gw.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -678,6 +685,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		PrivateKey:   kp.PrivateKey,
 		State:        state,
 		GatewayID:    gwID,
+		Password:     request.Password,
 	}
 	return &host, nil
 }
