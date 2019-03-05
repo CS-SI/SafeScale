@@ -152,14 +152,14 @@ var networkCreate = cli.Command{
 			return clitools.ExitOnInvalidArgument()
 		}
 		netdef := pb.NetworkDefinition{
-			CIDR: c.String("cidr"),
+			Cidr: c.String("cidr"),
 			Name: c.Args().Get(0),
 			Gateway: &pb.GatewayDefinition{
-				CPU:  int32(c.Int("cpu")),
+				Cpu:  int32(c.Int("cpu")),
 				Disk: int32(c.Int("disk")),
-				RAM:  float32(c.Float64("ram")),
-				// CPUFrequency: ??,
-				ImageID: c.String("os"),
+				Ram:  float32(c.Float64("ram")),
+				// CpuFreq: ??,
+				ImageId: c.String("os"),
 				Name:    c.String("gwname"),
 			},
 		}
