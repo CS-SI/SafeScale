@@ -26,9 +26,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/safescale/client"
-	"github.com/CS-SI/SafeScale/safescale/server/metadata"
-	safescaleutils "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
@@ -36,6 +33,9 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/safescale/client"
+	"github.com/CS-SI/SafeScale/safescale/server/metadata"
+	safescaleutils "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -717,10 +717,10 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) error {
 			return host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 				hostNetworkV1 := v.(*propsv1.HostNetwork)
 				//host's os name is not stored in metadatas so we used ubuntu 16.04 by default
-				var err2 error
-				hostBis, err2 = handler.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, hostSizingV1.AllocatedSize.Cores, hostSizingV1.AllocatedSize.RAMSize, hostSizingV1.AllocatedSize.DiskSize, "ubuntu 16.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, hostSizingV1.AllocatedSize.GPUNumber, hostSizingV1.AllocatedSize.CPUFreq, true)
-				if err2 != nil {
-					return fmt.Errorf("Failed to stop host deletion : %s", err.Error())
+				var err3 error
+				hostBis, err3 = handler.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, hostSizingV1.AllocatedSize.Cores, hostSizingV1.AllocatedSize.RAMSize, hostSizingV1.AllocatedSize.DiskSize, "ubuntu 16.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, hostSizingV1.AllocatedSize.GPUNumber, hostSizingV1.AllocatedSize.CPUFreq, true)
+				if err3 != nil {
+					return fmt.Errorf("Failed to stop host deletion : %s", err3.Error())
 				}
 				return nil
 			})
