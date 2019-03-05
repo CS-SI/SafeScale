@@ -314,52 +314,8 @@ func checkParameters(f *Feature, v Variables) error {
 	return nil
 }
 
-// setImplicitParameters configures parameters that are implicitely defined, based on target
-func setImplicitParameters(t Target, v Variables) {
-	hT, cT, nT := determineContext(t)
-	if cT != nil {
-		cluster := cT.cluster
-		identity := cluster.GetIdentity()
-		v["ClusterName"] = identity.Name
-		v["ClusterComplexity"] = strings.ToLower(identity.Complexity.String())
-		v["ClusterFlavor"] = strings.ToLower(identity.Flavor.String())
-		networkCfg := cluster.GetNetworkConfig()
-		v["GatewayIP"] = networkCfg.GatewayIP
-		v["PublicIP"] = networkCfg.PublicIP
-		v["MasterIDs"] = cluster.ListMasterIDs()
-		v["MasterIPs"] = cluster.ListMasterIPs()
-		if _, ok := v["Username"]; !ok {
-			v["Username"] = "cladm"
-			v["Password"] = identity.AdminPassword
-		}
-		if _, ok := v["CIDR"]; !ok {
-			v["CIDR"] = networkCfg.CIDR
-		}
-	} else {
-		var host *pb.Host
-		if nT != nil {
-			host = nT.HostTarget.host
-		}
-		if hT != nil {
-			host = hT.host
-		}
-		v["Hostname"] = host.Name
-		v["HostIP"] = host.PrivateIP
-		gw := gatewayFromHost(host)
-		if gw != nil {
-			v["GatewayIP"] = gw.PrivateIP
-			v["PublicIP"] = gw.PublicIP
-		} else {
-			v["PublicIP"] = host.PublicIP
-		}
-		if _, ok := v["Username"]; !ok {
-			v["Username"] = "gpac"
-		}
-	}
-}
-
 func gatewayFromHost(host *pb.Host) *pb.Host {
-	gwID := host.GetGatewayID()
+	gwID := host.GetGatewayId()
 	// If host has no gateway, host is gateway
 	if gwID == "" {
 		return host

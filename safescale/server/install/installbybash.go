@@ -58,7 +58,7 @@ func (i *bashInstaller) Add(f *Feature, t Target, v Variables, s Settings) (Resu
 	}
 	if !worker.ConcernCluster() {
 		if _, ok := v["Username"]; !ok {
-			v["Username"] = "gpac"
+			v["Username"] = "safescale"
 		}
 	}
 	return worker.Proceed(v, s)
@@ -85,7 +85,7 @@ func (i *bashInstaller) Remove(f *Feature, t Target, v Variables, s Settings) (R
 	_, clusterTarget, _ := determineContext(t)
 	if clusterTarget == nil {
 		if _, ok := v["Username"]; !ok {
-			v["Username"] = "gpac"
+			v["Username"] = "safescale"
 		}
 	}
 	return worker.Proceed(v, s)
