@@ -27,11 +27,11 @@ import (
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 
+	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/server/handlers"
 	"github.com/CS-SI/SafeScale/safescale/utils"
 	conv "github.com/CS-SI/SafeScale/safescale/utils"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
 )
 
 // NetworkHandler ...
@@ -65,12 +65,12 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	handler := NetworkHandler(tenant.Service)
 	network, err := handler.Create(ctx,
 		in.GetName(),
-		in.GetCIDR(),
+		in.GetCidr(),
 		IPVersion.IPv4,
-		int(in.Gateway.GetCPU()),
-		in.GetGateway().GetRAM(),
+		int(in.Gateway.GetCpu()),
+		in.GetGateway().GetRam(),
 		int(in.GetGateway().GetDisk()),
-		in.GetGateway().GetImageID(),
+		in.GetGateway().GetImageId(),
 		in.GetGateway().GetName(),
 	)
 	if err != nil {
@@ -82,7 +82,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 }
 
 // List existing networks
-func (s *NetworkListener) List(ctx context.Context, in *pb.NWListRequest) (*pb.NetworkList, error) {
+func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (*pb.NetworkList, error) {
 	log.Infof("Listeners: network list called")
 	defer log.Debugf("Listeners: network list done")
 

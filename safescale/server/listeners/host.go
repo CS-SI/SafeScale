@@ -202,13 +202,13 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	host, err := handler.Create(ctx,
 		in.GetName(),
 		in.GetNetwork(),
-		int(in.GetCPUNumber()),
-		in.GetRAM(),
+		int(in.GetCpuCount()),
+		in.GetRam(),
 		int(in.GetDisk()),
-		in.GetImageID(),
+		in.GetImageId(),
 		in.GetPublic(),
-		int(in.GetGPUNumber()),
-		float32(in.GetFreq()),
+		int(in.GetGpuCount()),
+		float32(in.GetCpuFreq()),
 		in.Force,
 	)
 	if err != nil {
@@ -239,11 +239,11 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.H
 	handler := HostHandler(tenant.Service)
 	host, err := handler.Resize(ctx,
 		in.GetName(),
-		int(in.GetCPUNumber()),
-		in.GetRAM(),
+		int(in.GetCpuCount()),
+		in.GetRam(),
 		int(in.GetDisk()),
-		int(in.GetGPUNumber()),
-		float32(in.GetFreq()),
+		int(in.GetGpuCount()),
+		float32(in.GetCpuFreq()),
 	)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
