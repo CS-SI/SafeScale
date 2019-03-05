@@ -21,12 +21,12 @@ import (
 	"log"
 	"runtime"
 
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/controller"
+	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/control"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Flavor"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-
-	"github.com/CS-SI/SafeScale/safescale/server/cluster"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 )
 
 // Run runs the deployment
@@ -34,11 +34,11 @@ func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	clusterName := "test-cluster"
-	instance, err := cluster.Get(clusterName)
+	instance, err := cluster.Get(concurrency.RootTask(), clusterName)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); ok {
 			log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
-			instance, err = cluster.Create(controller.Request{
+			instance, err = cluster.Create(concurrency.RootTask(), control.Request{
 				Name:       clusterName,
 				Complexity: Complexity.Small,
 				//Complexity: Complexity.Normal,
@@ -56,7 +56,7 @@ func Run() {
 		}
 	}
 
-	state, err := instance.GetState()
+	state, err := instance.GetState(concurrency.RootTask())
 	if err != nil {
 		fmt.Println("Failed to get cluster state.")
 		return
@@ -64,7 +64,7 @@ func Run() {
 	fmt.Printf("Cluster state: %s\n", state.String())
 
 	// Creates a Private Agent Node
-	_, err = instance.AddNode(false, &resources.HostDefinition{
+	_, err = instance.AddNode(concurrency.RootTask(), false, &resources.HostDefinition{
 		Cores:    2,
 		RAMSize:  7.0,
 		DiskSize: 60,

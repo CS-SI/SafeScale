@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package controller
+package control
 
 import (
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Flavor"
-	"github.com/CS-SI/SafeScale/iaas/resources"
 )
 
 // Request defines what kind of Cluster is wanted
