@@ -27,8 +27,10 @@ import (
 
 	"github.com/spf13/viper"
 
+	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/server/install/enums/Method"
 	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 )
 
 var (
@@ -39,6 +41,15 @@ var (
 
 // Variables defines the parameters a Installer may need
 type Variables map[string]interface{}
+
+// Clone clones the content of a Variables
+func (v Variables) Clone() Variables {
+	clone := Variables{}
+	for k, v := range v {
+		clone[k] = v
+	}
+	return clone
+}
 
 // Settings are used to tune the feature
 type Settings struct {
@@ -69,6 +80,7 @@ type Feature struct {
 	//Management map[string]interface{}
 	// specs is the Viper instance containing feature specification
 	specs *viper.Viper
+	task  concurrency.Task
 }
 
 // ListFeatures lists all features suitable for hosts
@@ -117,7 +129,7 @@ func ListFeatures() ([]interface{}, error) {
 
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func NewFeature(name string) (*Feature, error) {
+func NewFeature(task concurrency.Task, name string) (*Feature, error) {
 	if name == "" {
 		panic("name is empty!")
 	}
@@ -129,7 +141,7 @@ func NewFeature(name string) (*Feature, error) {
 	v.AddConfigPath("/etc/safescale/features")
 	v.SetConfigName(name)
 
-	var feature *Feature
+	var feat Feature
 	err := v.ReadInConfig()
 	if err != nil {
 		switch err.(type) {
@@ -137,22 +149,25 @@ func NewFeature(name string) (*Feature, error) {
 			// Failed to find a spec file on filesystem, trying with embedded ones
 			err = nil
 			var ok bool
-			if feature, ok = allEmbeddedMap[name]; !ok {
+			if _, ok = allEmbeddedMap[name]; !ok {
 				err = fmt.Errorf("failed to find a feature named '%s'", name)
 			}
+			feat = *allEmbeddedMap[name]
+			feat.task = task
 		default:
 			err = fmt.Errorf("failed to read the specification file of feature called '%s': %s", name, err.Error())
 		}
 	} else {
 		if v.IsSet("feature") {
-			feature = &Feature{
+			feat = Feature{
 				fileName:    name + ".yml",
 				displayName: name,
 				specs:       v,
+				task:        task,
 			}
 		}
 	}
-	return feature, err
+	return &feat, err
 }
 
 // installerOfMethod instanciates the right installer corresponding to the method
@@ -249,7 +264,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	// Inits implicit parameters
-	setImplicitParameters(t, myV)
+	f.setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
 	err := checkParameters(f, myV)
@@ -295,7 +310,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	// Inits implicit parameters
-	setImplicitParameters(t, myV)
+	f.setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
 	err := checkParameters(f, myV)
@@ -308,7 +323,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to check feature '%s': %s", f.DisplayName(), err.Error())
 	}
 	if results.Successful() {
-		log.Printf("Feature '%s' is already installed.", f.DisplayName())
+		log.Infof("Feature '%s' is already installed.", f.DisplayName())
 		return results, nil
 	}
 
@@ -352,7 +367,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 	}
 
 	// Inits implicit parameters
-	setImplicitParameters(t, myV)
+	f.setImplicitParameters(t, myV)
 
 	// Checks required parameters have value
 	err := checkParameters(f, myV)
@@ -381,12 +396,12 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 				msgTail = fmt.Sprintf("on cluster node '%s'", nodeInstance.host.Name)
 			}
 			if clusterInstance != nil {
-				msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetIdentity().Name)
+				msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetIdentity(f.task).Name)
 			}
 			log.Printf("%s %s...\n", msgHead, msgTail)
 		}
 		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
-			needed, err := NewFeature(requirement)
+			needed, err := NewFeature(f.task, requirement)
 			if err != nil {
 				return fmt.Errorf("failed to find required feature '%s': %s", requirement, err.Error())
 			}
@@ -406,4 +421,48 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 		}
 	}
 	return nil
+}
+
+// setImplicitParameters configures parameters that are implicitely defined, based on target
+func (f *Feature) setImplicitParameters(t Target, v Variables) {
+	hT, cT, nT := determineContext(t)
+	if cT != nil {
+		cluster := cT.cluster
+		identity := cluster.GetIdentity(f.task)
+		v["ClusterName"] = identity.Name
+		v["ClusterComplexity"] = strings.ToLower(identity.Complexity.String())
+		v["ClusterFlavor"] = strings.ToLower(identity.Flavor.String())
+		networkCfg := cluster.GetNetworkConfig(f.task)
+		v["GatewayIP"] = networkCfg.GatewayIP
+		v["PublicIP"] = networkCfg.PublicIP
+		v["MasterIDs"] = cluster.ListMasterIDs(f.task)
+		v["MasterIPs"] = cluster.ListMasterIPs(f.task)
+		if _, ok := v["Username"]; !ok {
+			v["Username"] = "cladm"
+			v["Password"] = identity.AdminPassword
+		}
+		if _, ok := v["CIDR"]; !ok {
+			v["CIDR"] = networkCfg.CIDR
+		}
+	} else {
+		var host *pb.Host
+		if nT != nil {
+			host = nT.HostTarget.host
+		}
+		if hT != nil {
+			host = hT.host
+		}
+		v["Hostname"] = host.Name
+		v["HostIP"] = host.PrivateIp
+		gw := gatewayFromHost(host)
+		if gw != nil {
+			v["GatewayIP"] = gw.PrivateIp
+			v["PublicIP"] = gw.PublicIp
+		} else {
+			v["PublicIP"] = host.PublicIp
+		}
+		if _, ok := v["Username"]; !ok {
+			v["Username"] = "safescale"
+		}
+	}
 }

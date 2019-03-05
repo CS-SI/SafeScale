@@ -28,6 +28,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/safescale"
 	safescale "github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 )
 
 const (
@@ -39,7 +40,7 @@ var kongProxyCheckedCache = utils.NewMapCache()
 
 // KongController allows to control Kong, installed on a host
 type KongController struct {
-	host   *pb.Host
+	host      *pb.Host
 	safescale safescale.Client
 }
 
@@ -50,7 +51,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 	}
 
 	// Check if reverseproxy feature is installed on host
-	rp, err := NewFeature("reverseproxy")
+	rp, err := NewFeature(concurrency.VoidTask(), "reverseproxy")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find a feature called 'reverseproxy'")
 	}
@@ -60,6 +61,9 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(host.Name, func() (interface{}, error) {
 			target := NewHostTarget(host)
+			if err != nil {
+				return nil, err
+			}
 			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to check if feature 'reverseproxy' is installed on gateway: %s", err.Error())
@@ -76,7 +80,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 	}
 
 	return &KongController{
-		host:   host,
+		host:      host,
 		safescale: safescale.New(),
 	}, nil
 }
