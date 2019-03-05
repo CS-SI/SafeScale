@@ -29,7 +29,8 @@ func GeneratePassword(length uint8) (string, error) {
 	if length < 12 {
 		panic("length under 12!")
 	}
-	password, err := generator.Generate(int(length), 4, 4, false, true)
+	numsym := int(length) % 3
+	password, err := generator.Generate(int(length), numsym, numsym, false, true)
 	if err != nil {
 		return "", err
 	}
@@ -39,14 +40,20 @@ func GeneratePassword(length uint8) (string, error) {
 func init() {
 	var err error
 	// generator is created with characters allowed
-	// potential confusing characters, like i/l/| or 0/O, are removed to ease human readability
+	// Removed characters:
+	// - confusing characters like: il|! or 0O
+	// - alphabetic characters that can moved between QWERTY and AZERTY: AaQqWwZz
+	// - symbols that can be difficult to find on different layouts, like: #_[]{}
 	generator, err = password.NewGenerator(&password.GeneratorInput{
-		LowerLetters: "abcdefghjkmnopqrstuvwxyz",
-		UpperLetters: "ABCDEFGHJKLMNPQRSTUVWXYZ",
+		// LowerLetters: "abcdefghjkmnopqrstuvwxyz",
+		// UpperLetters: "ABCDEFGHJKLMNPQRSTUVWXYZ",
+		LowerLetters: "bcdefghjknprstuvxy",
+		UpperLetters: "BCDEFGHJKLNPRSTUVXY",
 		Digits:       "123456789",
-		Symbols:      "-+*/.,:()[]{}#_",
+		// Symbols:      "-+*/.,:()[]{}#_",
+		Symbols: "-+*/.,;:()_",
 	})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create password generator: %s!", err.Error()))
+		panic(fmt.Sprintf("Failed to create password generator: %v!", err))
 	}
 }
