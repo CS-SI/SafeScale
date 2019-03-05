@@ -1,0 +1,17 @@
+Index: providers/flexibleengine/compute.go
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- providers/flexibleengine/compute.go	(date 1545989409000)
++++ providers/flexibleengine/compute.go	(date 1551794423000)
+@@ -441,6 +441,9 @@
+ 				}
+ 				return fmt.Errorf("query to create host '%s' failed: %s (HTTP return code: %d)", request.ResourceName, openstack.ProviderErrorToString(err), httpResp.StatusCode)
+ 			}
++			if server == nil {
++				return fmt.Errorf("query to create host '%s' failed: nil server returned", request.ResourceName)
++			}
+ 			host.ID = server.ID
+ 
+ 			defer func() {
