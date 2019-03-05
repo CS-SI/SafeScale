@@ -93,8 +93,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		},
 	)
 	if retryErr != nil {
-		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			return -1, "", "", fmt.Errorf("failed to connect after %v", connectionTimeout)
 		}
 	}
