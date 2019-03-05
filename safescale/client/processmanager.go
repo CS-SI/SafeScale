@@ -47,6 +47,6 @@ func (c *processManager) Stop(uuid string, timeout time.Duration) error {
 	service := pb.NewProcessManagerServiceClient(c.session.connection)
 	ctx := utils.GetContext(false)
 
-	_, err := service.Stop(ctx, &pb.ProcessDefinition{UUID: uuid})
+	_, err := service.Stop(ctx, &pb.ProcessDefinition{Uuid: uuid})
 	return err
 }
