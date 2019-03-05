@@ -30,12 +30,12 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/client"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/api"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/controller"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/control"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/dcos/enums/ErrorCode"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 	"github.com/CS-SI/SafeScale/utils/template"
 )
 
@@ -65,11 +65,9 @@ var (
 			return 1023
 		},
 	}
-)
 
-// Blueprint returns a configured blueprint to construct a BOH Cluster
-func Blueprint(c *controller.Controller) *controller.Blueprint {
-	actors := controller.BlueprintActors{
+	// Makers initializes the control.Makers struct to construct a DCOS cluster
+	Makers = control.Makers{
 		MinimumRequiredServers:      minimumRequiredServers,
 		DefaultGatewaySizing:        gatewaySizing,
 		DefaultMasterSizing:         masterSizing,
@@ -81,14 +79,13 @@ func Blueprint(c *controller.Controller) *controller.Blueprint {
 		GetGlobalSystemRequirements: getGlobalSystemRequirements,
 		GetNodeInstallationScript:   getNodeInstallationScript,
 	}
-	return controller.NewBlueprint(c, actors)
-}
+)
 
-func minimumRequiredServers(c api.Cluster) (int, int, int) {
+func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int, int, int) {
 	masterCount := 0
 	privateNodeCount := 0
 
-	switch c.GetIdentity().Complexity {
+	switch foreman.Cluster().GetIdentity(task).Complexity {
 	case Complexity.Small:
 		masterCount = 1
 		privateNodeCount = 2
@@ -102,7 +99,7 @@ func minimumRequiredServers(c api.Cluster) (int, int, int) {
 	return masterCount, privateNodeCount, 0
 }
 
-func gatewaySizing(c api.Cluster) resources.HostDefinition {
+func gatewaySizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
 		Cores:    2,
 		RAMSize:  15.0,
@@ -110,7 +107,7 @@ func gatewaySizing(c api.Cluster) resources.HostDefinition {
 	}
 }
 
-func masterSizing(c api.Cluster) resources.HostDefinition {
+func masterSizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
 		Cores:    4,
 		RAMSize:  15.0,
@@ -118,7 +115,7 @@ func masterSizing(c api.Cluster) resources.HostDefinition {
 	}
 }
 
-func nodeSizing(c api.Cluster) resources.HostDefinition {
+func nodeSizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
 		Cores:    4,
 		RAMSize:  15.0,
@@ -126,11 +123,11 @@ func nodeSizing(c api.Cluster) resources.HostDefinition {
 	}
 }
 
-func defaultImage(c api.Cluster) string {
+func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 	return centos
 }
 
-func configureMaster(c api.Cluster, b *controller.Blueprint, index int, host *pb.Host) error {
+func configureMaster(task concurrency.Task, foreman control.Foreman, index int, host *pb.Host) error {
 	box, err := getTemplateBox()
 	if err != nil {
 		return err
@@ -138,10 +135,10 @@ func configureMaster(c api.Cluster, b *controller.Blueprint, index int, host *pb
 
 	hostLabel := fmt.Sprintf("master #%d (%s)", index, host.Name)
 
-	retcode, _, _, err := b.ExecuteScript(box, funcMap, "dcos_configure_master.sh", map[string]interface{}{
-		"BootstrapIP":   c.GetNetworkConfig().GatewayIP,
+	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_master.sh", map[string]interface{}{
+		"BootstrapIP":   foreman.Cluster().GetNetworkConfig(task).GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
-	}, host.ID)
+	}, host.Id)
 	if err != nil {
 		log.Debugf("[%s] failed to remotely run configuration script: %s", hostLabel, err.Error())
 		return err
@@ -159,7 +156,12 @@ func configureMaster(c api.Cluster, b *controller.Blueprint, index int, host *pb
 	return nil
 }
 
-func configureNode(c api.Cluster, b *controller.Blueprint, index int, host *pb.Host, nodeType NodeType.Enum, nodeTypeStr string) error {
+func configureNode(
+	task concurrency.Task,
+	foreman control.Foreman,
+	index int, host *pb.Host, nodeType NodeType.Enum, nodeTypeStr string,
+) error {
+
 	var publicStr string
 	if nodeType == NodeType.PublicNode {
 		publicStr = "yes"
@@ -173,11 +175,11 @@ func configureNode(c api.Cluster, b *controller.Blueprint, index int, host *pb.H
 	if err != nil {
 		return err
 	}
-	retcode, _, _, err := b.ExecuteScript(box, funcMap, "dcos_configure_node.sh", map[string]interface{}{
+	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_node.sh", map[string]interface{}{
 		"PublicNode":    publicStr,
-		"BootstrapIP":   c.GetNetworkConfig().GatewayIP,
+		"BootstrapIP":   foreman.Cluster().GetNetworkConfig(task).GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
-	}, host.ID)
+	}, host.Id)
 	if err != nil {
 		log.Debugf("[%s] failed to remotely run configuration script: %s\n", hostLabel, err.Error())
 		return err
@@ -195,7 +197,7 @@ func configureNode(c api.Cluster, b *controller.Blueprint, index int, host *pb.H
 	return nil
 }
 
-func getNodeInstallationScript(c api.Cluster, hostType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType NodeType.Enum) (string, map[string]interface{}) {
 	data := map[string]interface{}{
 		"DCOSVersion": dcosVersion,
 	}
@@ -214,8 +216,8 @@ func getNodeInstallationScript(c api.Cluster, hostType NodeType.Enum) (string, m
 	return script, data
 }
 
-func configureGateway(c api.Cluster, b *controller.Blueprint) error {
-	globalSystemRequirements, err := getGlobalSystemRequirements(c)
+func configureGateway(task concurrency.Task, foreman control.Foreman) error {
+	globalSystemRequirements, err := getGlobalSystemRequirements(task, foreman)
 	if err != nil {
 		return err
 	}
@@ -225,20 +227,21 @@ func configureGateway(c api.Cluster, b *controller.Blueprint) error {
 	}
 
 	var dnsServers []string
-	cfg, err := c.GetService().GetCfgOpts()
+	cluster := foreman.Cluster()
+	cfg, err := cluster.GetService(task).GetCfgOpts()
 	if err == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
-	netCfg := c.GetNetworkConfig()
+	netCfg := cluster.GetNetworkConfig(task)
 	data := map[string]interface{}{
 		"GlobalSystemRequirements": *globalSystemRequirements,
 		"BootstrapIP":              netCfg.GatewayIP,
 		"BootstrapPort":            bootstrapHTTPPort,
-		"ClusterName":              c.GetIdentity().Name,
-		"MasterIPs":                c.ListMasterIPs(),
+		"ClusterName":              cluster.GetIdentity(task).Name,
+		"MasterIPs":                cluster.ListMasterIPs(task),
 		"DNSServerIPs":             dnsServers,
 	}
-	retcode, _, _, err := b.ExecuteScript(box, funcMap, "dcos_prepare_bootstrap.sh", data, netCfg.GatewayID)
+	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_prepare_bootstrap.sh", data, netCfg.GatewayID)
 	if err != nil {
 		log.Errorf("[gateway] configuration failed: %s", err.Error())
 		return err
@@ -274,7 +277,7 @@ func getTemplateBox() (*rice.Box, error) {
 
 // getGlobalSystemRequirements returns the string corresponding to the script dcos_install_requirements.sh
 // which installs common features (docker in particular)
-func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
+func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman) (*string, error) {
 	anon := globalSystemRequirementsContent.Load()
 	if anon == nil {
 		// find the rice.Box
@@ -295,9 +298,10 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
 		}
 		dataBuffer := bytes.NewBufferString("")
-		identity := c.GetIdentity()
+		cluster := foreman.Cluster()
+		identity := cluster.GetIdentity(task)
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
-			"CIDR":          c.GetNetworkConfig().CIDR,
+			"CIDR":          cluster.GetNetworkConfig(task).CIDR,
 			"Username":      "cladm",
 			"CladmPassword": identity.AdminPassword,
 			"SSHPublicKey":  identity.Keypair.PublicKey,
@@ -315,7 +319,7 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 
 // getState returns the current state of the cluster
 // This method will trigger a effective state collection at each call
-func getState(c api.Cluster) (ClusterState.Enum, error) {
+func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum, error) {
 	var (
 		retcode int
 		ran     bool // Tells if command has been run on remote host
@@ -325,7 +329,7 @@ func getState(c api.Cluster) (ClusterState.Enum, error) {
 	cmd := "/opt/mesosphere/bin/dcos-diagnostics --diag"
 	safescaleClt := client.New()
 	safescaleCltHost := safescaleClt.Host
-	masterID, err := c.FindAvailableMaster()
+	masterID, err := foreman.Cluster().FindAvailableMaster(task)
 	if err != nil {
 		return ClusterState.Unknown, err
 	}

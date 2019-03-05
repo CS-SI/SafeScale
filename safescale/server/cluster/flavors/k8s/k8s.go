@@ -27,11 +27,11 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/api"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/controller"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/control"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/safescale/server/install"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 )
 
 //go:generate rice embed-go
@@ -39,11 +39,9 @@ import (
 var (
 	templateBox                     atomic.Value
 	globalSystemRequirementsContent atomic.Value
-)
 
-// Blueprint returns a configured blueprint to construct a BOH Cluster
-func Blueprint(c *controller.Controller) *controller.Blueprint {
-	actors := controller.BlueprintActors{
+	// Makers initializes a control.Makers struct to construct a BOH Cluster
+	Makers = control.Makers{
 		MinimumRequiredServers:      minimumRequiredServers,
 		DefaultGatewaySizing:        gatewaySizing,
 		DefaultMasterSizing:         nodeSizing,
@@ -54,11 +52,10 @@ func Blueprint(c *controller.Controller) *controller.Blueprint {
 		GetNodeInstallationScript:   getNodeInstallationScript,
 		ConfigureCluster:            configureCluster,
 	}
-	return controller.NewBlueprint(c, actors)
-}
+)
 
-func minimumRequiredServers(c api.Cluster) (int, int, int) {
-	complexity := c.GetIdentity().Complexity
+func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int, int, int) {
+	complexity := foreman.Cluster().GetIdentity(task).Complexity
 	masterCount := 0
 	privateNodeCount := 0
 	publicNodeCount := 0
@@ -77,7 +74,7 @@ func minimumRequiredServers(c api.Cluster) (int, int, int) {
 	return masterCount, privateNodeCount, publicNodeCount
 }
 
-func gatewaySizing(c api.Cluster) resources.HostDefinition {
+func gatewaySizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
 		Cores:    2,
 		RAMSize:  15.0,
@@ -85,7 +82,7 @@ func gatewaySizing(c api.Cluster) resources.HostDefinition {
 	}
 }
 
-func nodeSizing(c api.Cluster) resources.HostDefinition {
+func nodeSizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
 		Cores:    4,
 		RAMSize:  15.0,
@@ -93,16 +90,16 @@ func nodeSizing(c api.Cluster) resources.HostDefinition {
 	}
 }
 
-func defaultImage(c api.Cluster) string {
+func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 	return "Ubuntu 18.04"
 }
 
-func configureCluster(c api.Cluster, b *controller.Blueprint) error {
-	clusterName := c.GetIdentity().Name
+func configureCluster(task concurrency.Task, foreman control.Foreman) error {
+	clusterName := foreman.Cluster().GetIdentity(task).Name
 	log.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
-	target := install.NewClusterTarget(c)
-	feature, err := install.NewFeature("kubernetes")
+	target := install.NewClusterTarget(task, foreman.Cluster())
+	feature, err := install.NewFeature(task, "kubernetes")
 	if err != nil {
 		log.Errorf("[cluster %s] failed to instanciate feature 'kubernetes': %v", clusterName, err)
 		return fmt.Errorf("failed to prepare feature 'kubernetes': %s", err.Error())
@@ -121,7 +118,7 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 	return nil
 }
 
-func getNodeInstallationScript(c api.Cluster, nodeType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType NodeType.Enum) (string, map[string]interface{}) {
 	script := ""
 	data := map[string]interface{}{}
 
@@ -151,7 +148,7 @@ func getTemplateBox() (*rice.Box, error) {
 	return anon.(*rice.Box), nil
 }
 
-func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
+func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman) (*string, error) {
 	anon := globalSystemRequirementsContent.Load()
 	if anon == nil {
 		// find the rice.Box
@@ -172,9 +169,10 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
 		}
 		dataBuffer := bytes.NewBufferString("")
-		identity := c.GetIdentity()
+		cluster := foreman.Cluster()
+		identity := cluster.GetIdentity(task)
 		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
-			"CIDR":          c.GetNetworkConfig().CIDR,
+			"CIDR":          cluster.GetNetworkConfig(task).CIDR,
 			"Username":      "cladm",
 			"CladmPassword": identity.AdminPassword,
 			"SSHPublicKey":  identity.Keypair.PublicKey,

@@ -22,7 +22,7 @@ install_common_requirements() {
     # Creates user cladm
     useradd -s /bin/bash -m -d /home/cladm cladm
     groupadd -r -f docker &>/dev/null
-    usermod -aG docker gpac
+    usermod -aG docker safescale
     usermod -aG docker cladm
     echo "cladm:{{ .CladmPassword }}" | chpasswd
     mkdir -p ~cladm/.ssh && chmod 0700 ~cladm/.ssh
