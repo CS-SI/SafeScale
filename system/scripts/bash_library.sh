@@ -21,6 +21,7 @@ export -f sfFinishPreviousInstall
 
 # sfWaitForApt waits an already running apt-like command to finish
 sfWaitForApt() {
+    sfFinishPreviousInstall || true
     sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
 }
 export -f sfWaitForApt
