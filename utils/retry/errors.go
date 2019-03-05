@@ -43,12 +43,18 @@ func (e ErrTimeout) Error() string {
 	return msgFinal
 }
 
+// TimeoutError ...
+func TimeoutError(limit time.Duration) ErrTimeout {
+	return ErrTimeout{limit: limit}
+}
+
 // ErrLimit is returned when the maximum attempts has been reached.
 type ErrLimit struct {
 	b     errBase
 	limit uint
 }
 
+// Error
 func (e ErrLimit) Error() string {
 	msg := fmt.Sprintf("retry limit exceeded after %d tries", e.limit)
 	msgFinal := e.b.Error()
@@ -58,4 +64,9 @@ func (e ErrLimit) Error() string {
 		msgFinal = msg
 	}
 	return msgFinal
+}
+
+// LimitError ...
+func LimitError(limit uint) ErrLimit {
+	return ErrLimit{limit: limit}
 }

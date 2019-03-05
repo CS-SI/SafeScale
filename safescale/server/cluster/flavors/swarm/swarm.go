@@ -35,10 +35,10 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/client"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/api"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/controller"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/control"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
@@ -56,11 +56,9 @@ var (
 
 	// GlobalSystemRequirementsContent *string
 	globalSystemRequirementsContent atomic.Value
-)
 
-// Blueprint returns a configured blueprint to construct a Docker Swarm Cluster
-func Blueprint(c *controller.Controller) *controller.Blueprint {
-	callbacks := controller.BlueprintActors{
+	// Makers initializes a control.Makers struct to construct a Docker Swarm Cluster
+	Makers = control.Makers{
 		MinimumRequiredServers:      minimumRequiredServers,
 		DefaultGatewaySizing:        gatewaySizing,
 		DefaultNodeSizing:           nodeSizing,
@@ -73,12 +71,11 @@ func Blueprint(c *controller.Controller) *controller.Blueprint {
 		GetGlobalSystemRequirements: getGlobalSystemRequirements,
 		GetNodeInstallationScript:   getNodeInstallationScript,
 	}
-	return controller.NewBlueprint(c, callbacks)
-}
+)
 
-func minimumRequiredServers(c api.Cluster) (int, int, int) {
+func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int, int, int) {
 	var masterCount, privateNodeCount int
-	complexity := c.GetIdentity().Complexity
+	complexity := foreman.Cluster().GetIdentity(task).Complexity
 	switch complexity {
 	case Complexity.Small:
 		masterCount = 1
@@ -93,7 +90,7 @@ func minimumRequiredServers(c api.Cluster) (int, int, int) {
 	return masterCount, privateNodeCount, 0
 }
 
-func gatewaySizing(c api.Cluster) resources.HostDefinition {
+func gatewaySizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
 		Cores:    2,
 		RAMSize:  15.0,
@@ -101,7 +98,7 @@ func gatewaySizing(c api.Cluster) resources.HostDefinition {
 	}
 }
 
-func masterSizing(c api.Cluster) resources.HostDefinition {
+func masterSizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
 		Cores:    4,
 		RAMSize:  15.0,
@@ -109,7 +106,7 @@ func masterSizing(c api.Cluster) resources.HostDefinition {
 	}
 }
 
-func nodeSizing(c api.Cluster) resources.HostDefinition {
+func nodeSizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
 		Cores:    4,
 		RAMSize:  15.0,
@@ -117,19 +114,21 @@ func nodeSizing(c api.Cluster) resources.HostDefinition {
 	}
 }
 
-func defaultImage(c api.Cluster) string {
+func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 	return "Ubuntu 18.04"
 }
 
 // configureCluster configures cluster
-func configureCluster(c api.Cluster, b *controller.Blueprint) error {
+func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	clientInstance := client.New()
 	clientHost := clientInstance.Host
 	clientSSH := clientInstance.Ssh
 
+	cluster := foreman.Cluster()
+
 	// Join masters in Docker Swarm as managers
 	joinCmd := ""
-	for _, hostID := range c.ListMasterIDs() {
+	for _, hostID := range cluster.ListMasterIDs(task) {
 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
@@ -146,7 +145,7 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 				return fmt.Errorf("failed to generate token to join swarm as manager: %s", stderr)
 			}
 			token = strings.Trim(token, "\n")
-			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, hostID)
+			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, host.PrivateIp)
 		} else {
 			retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd,
 				client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
@@ -157,13 +156,13 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 	}
 
 	// build command to join Docker Swarm as workers
-	joinCmd, err := getSwarmJoinCommand(c, true)
+	joinCmd, err := getSwarmJoinCommand(task, foreman, true)
 	if err != nil {
 		return err
 	}
 
 	// Join private node in Docker Swarm as workers
-	for _, hostID := range c.ListNodeIDs(false) {
+	for _, hostID := range cluster.ListNodeIDs(task, false) {
 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
@@ -175,7 +174,7 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 		}
 	}
 	// Join public nodes in Docker Swarm as workers
-	for _, hostID := range c.ListNodeIDs(true) {
+	for _, hostID := range cluster.ListNodeIDs(task, true) {
 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
@@ -191,14 +190,14 @@ func configureCluster(c api.Cluster, b *controller.Blueprint) error {
 }
 
 // joinMaster is the code to use to join a new master to the cluster
-func joinMaster(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host) error {
+func joinMaster(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host) error {
 	clientSSH := client.New().Ssh
 
-	joinCmd, err := getSwarmJoinCommand(c, false)
+	joinCmd, err := getSwarmJoinCommand(task, foreman, false)
 	if err != nil {
 		return err
 	}
-	retcode, _, stderr, err := clientSSH.Run(pbHost.ID, joinCmd,
+	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, joinCmd,
 		client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", pbHost.Name, stderr)
@@ -208,14 +207,14 @@ func joinMaster(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host) error {
 }
 
 // joinNode is the code to use join a new node to the cluster
-func joinNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr string) error {
+func joinNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr string) error {
 	clientSSH := client.New().Ssh
 
-	joinCmd, err := getSwarmJoinCommand(c, true)
+	joinCmd, err := getSwarmJoinCommand(task, foreman, true)
 	if err != nil {
 		return err
 	}
-	retcode, _, stderr, err := clientSSH.Run(pbHost.ID, joinCmd,
+	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, joinCmd,
 		client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", pbHost.Name, stderr)
@@ -224,8 +223,8 @@ func joinNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, nodeType 
 }
 
 // getSwarmToken obtains token to join Docker Swarm as workers
-func getSwarmJoinCommand(c api.Cluster, worker bool) (string, error) {
-	masterID, err := c.FindAvailableMaster()
+func getSwarmJoinCommand(task concurrency.Task, foreman control.Foreman, worker bool) (string, error) {
+	masterID, err := foreman.Cluster().FindAvailableMaster(task)
 	if err != nil {
 		return "", fmt.Errorf("failed to join workers to Docker Swarm: %v", err)
 	}
@@ -245,7 +244,7 @@ func getSwarmJoinCommand(c api.Cluster, worker bool) (string, error) {
 		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
 	}
 	token = strings.Trim(token, "\n")
-	return fmt.Sprintf("docker swarm join --token %s %s", token, master.PrivateIP), nil
+	return fmt.Sprintf("docker swarm join --token %s %s", token, master.PrivateIp), nil
 }
 
 // getTemplateBox
@@ -265,7 +264,7 @@ func getTemplateBox() (*rice.Box, error) {
 
 // getGlobalSystemRequirements returns the string corresponding to the script swarm_install_requirements.sh
 // which installs common features (docker in particular)
-func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
+func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman) (*string, error) {
 	anon := globalSystemRequirementsContent.Load()
 	if anon == nil {
 		// find the rice.Box
@@ -286,9 +285,10 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
 		}
 		dataBuffer := bytes.NewBufferString("")
-		identity := c.GetIdentity()
+		cluster := foreman.Cluster()
+		identity := cluster.GetIdentity(task)
 		data := map[string]interface{}{
-			"CIDR":          c.GetNetworkConfig().CIDR,
+			"CIDR":          cluster.GetNetworkConfig(task).CIDR,
 			"CladmPassword": identity.AdminPassword,
 			"SSHPublicKey":  identity.Keypair.PublicKey,
 			"SSHPrivateKey": identity.Keypair.PrivateKey,
@@ -304,8 +304,8 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 	return anon.(*string), nil
 }
 
-func unconfigureNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, selectedMaster string) error {
-	if c == nil {
+func unconfigureNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host, selectedMaster string) error {
+	if foreman == nil {
 		panic("c is nil!")
 	}
 	if pbHost == nil {
@@ -313,7 +313,7 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, se
 	}
 	if selectedMaster == "" {
 		var err error
-		selectedMaster, err = c.FindAvailableMaster()
+		selectedMaster, err = foreman.Cluster().FindAvailableMaster(task)
 		if err != nil {
 			return err
 		}
@@ -333,7 +333,7 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, se
 	}
 	// node is a worker in the Swarm: 1st ask worker to leave Swarm
 	cmd = "docker swarm leave"
-	retcode, _, stderr, err := clientSSH.Run(pbHost.ID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+	retcode, _, stderr, err := clientSSH.Run(pbHost.Id, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 	if err != nil {
 		return err
 	}
@@ -377,7 +377,7 @@ func unconfigureNode(c api.Cluster, b *controller.Blueprint, pbHost *pb.Host, se
 	return nil
 }
 
-func getNodeInstallationScript(c api.Cluster, hostType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType NodeType.Enum) (string, map[string]interface{}) {
 	script := ""
 	data := map[string]interface{}{}
 

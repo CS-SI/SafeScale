@@ -40,7 +40,7 @@ func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error)
 	service := pb.NewNetworkServiceClient(n.session.connection)
 	ctx := utils.GetContext(true)
 
-	return service.List(ctx, &pb.NWListRequest{
+	return service.List(ctx, &pb.NetworkListRequest{
 		All: all,
 	})
 }

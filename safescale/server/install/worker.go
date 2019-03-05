@@ -141,7 +141,7 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 		return nil, resources.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
-		hostID, err := w.cluster.FindAvailableMaster()
+		hostID, err := w.cluster.FindAvailableMaster(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +165,7 @@ func (w *worker) identifyAvailableNode(public bool) (*pb.Host, error) {
 		found = w.availablePrivateNode != nil
 	}
 	if !found {
-		hostID, err := w.cluster.FindAvailableNode(public)
+		hostID, err := w.cluster.FindAvailableNode(w.feature.task, public)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +251,7 @@ func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []*pb.Host{}
 		safescale := client.New().Host
-		for _, i := range w.cluster.ListMasterIDs() {
+		for _, i := range w.cluster.ListMasterIDs(w.feature.task) {
 			host, err := safescale.Inspect(i, client.DefaultExecutionTimeout)
 			if err != nil {
 				return nil, err
@@ -310,7 +310,7 @@ func (w *worker) identifyAllNodes(public bool) ([]*pb.Host, error) {
 	if !found {
 		safescalehost := client.New().Host
 		allHosts := []*pb.Host{}
-		for _, i := range w.cluster.ListNodeIDs(public) {
+		for _, i := range w.cluster.ListNodeIDs(w.feature.task, public) {
 			host, err := safescalehost.Inspect(i, client.DefaultExecutionTimeout)
 			if err != nil {
 				return nil, err
@@ -445,7 +445,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 				ok      bool
 				content interface{}
 			)
-			complexity := strings.ToLower(w.cluster.GetIdentity().Complexity.String())
+			complexity := strings.ToLower(w.cluster.GetIdentity(w.feature.task).Complexity.String())
 			for k, anon := range options {
 				avails[strings.ToLower(k)] = anon
 			}
@@ -525,7 +525,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 // 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommanded)
 func (w *worker) validateContextForCluster() error {
-	clusterFlavor := w.cluster.GetIdentity().Flavor
+	clusterFlavor := w.cluster.GetIdentity(w.feature.task).Flavor
 
 	yamlKey := "feature.suitableFor.cluster"
 	if w.feature.specs.IsSet(yamlKey) {
@@ -562,28 +562,28 @@ func (w *worker) validateContextForHost() error {
 }
 
 func (w *worker) validateClusterSizing() error {
-	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(w.cluster.GetIdentity().Flavor.String())
+	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(w.cluster.GetIdentity(w.feature.task).Flavor.String())
 	if !w.feature.specs.IsSet(yamlKey) {
 		return nil
 	}
 	sizing := w.feature.specs.GetStringMap(yamlKey)
 	if anon, ok := sizing["minMasters"]; ok {
 		minMasters := anon.(int)
-		curMasters := len(w.cluster.ListMasterIDs())
+		curMasters := len(w.cluster.ListMasterIDs(w.feature.task))
 		if curMasters < minMasters {
 			return fmt.Errorf("cluster doesn't meet the minimum number of masters (%d < %d)", curMasters, minMasters)
 		}
 	}
 	if anon, ok := sizing["minPrivateNodes"]; ok {
 		minNodes := anon.(int)
-		curNodes := len(w.cluster.ListNodeIDs(false))
+		curNodes := len(w.cluster.ListNodeIDs(w.feature.task, false))
 		if curNodes < minNodes {
 			return fmt.Errorf("cluster doesn't meet the minimum number of private nodes (%d < %d)", curNodes, minNodes)
 		}
 	}
 	if anon, ok := sizing["minPublicNodes"]; ok {
 		minNodes := anon.(int)
-		curNodes := len(w.cluster.ListNodeIDs(true))
+		curNodes := len(w.cluster.ListNodeIDs(w.feature.task, true))
 		if curNodes < minNodes {
 			return fmt.Errorf("cluster doesn't meet the minimum number of public nodes (%d < %d)", curNodes, minNodes)
 		}
@@ -622,8 +622,8 @@ func (w *worker) setReverseProxy() error {
 	}
 
 	// Sets the values useable in any cases
-	w.variables["PublicIP"] = gw.PublicIP
-	w.variables["GatewayIP"] = gw.PrivateIP
+	w.variables["PublicIP"] = gw.PublicIp
+	w.variables["GatewayIP"] = gw.PrivateIp
 
 	// Now submits all the rules to reverse proxy
 	for _, r := range rules {
@@ -655,7 +655,7 @@ func (w *worker) setReverseProxy() error {
 			return fmt.Errorf("failed to apply proxy rules: %s", err.Error())
 		}
 		for _, h := range hosts {
-			w.variables["HostIP"] = h.PrivateIP
+			w.variables["HostIP"] = h.PrivateIp
 			w.variables["Hostname"] = h.Name
 			err := kc.Apply(rule, &(w.variables))
 			if err != nil {
