@@ -96,9 +96,9 @@ sfSaveIptablesRules() {
 create_user() {
     echo "Creating user {{.User}}..."
     useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
-    echo "gpac:{{.Password}}" | chpasswd
+    echo "{{.User}}:{{.Password}}" | chpasswd
     groupadd -r docker
-    usermod -aG docker gpac
+    usermod -aG docker {{.User}}
     SUDOERS_FILE=/etc/sudoers.d/{{.User}}
     [ ! -d "$(dirname $SUDOERS_FILE)" ] && SUDOERS_FILE=/etc/sudoers
     cat >>$SUDOERS_FILE <<-'EOF'
@@ -118,7 +118,7 @@ EOF
         chmod ug+r-wx,o-rwx $i
     done
 
-    cat >>/home/gpac/.bashrc <<-'EOF'
+    cat >>/home/{{.User}}/.bashrc <<-'EOF'
 pathremove() {
         local IFS=':'
         local NEWPATH
