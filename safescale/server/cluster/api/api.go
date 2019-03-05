@@ -17,12 +17,13 @@
 package api
 
 import (
-	pb "github.com/CS-SI/SafeScale/safescale"
-	clusterpropsv1 "github.com/CS-SI/SafeScale/safescale/server/cluster/controller/properties/v1"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/ClusterState"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/identity"
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/resources"
+	pb "github.com/CS-SI/SafeScale/safescale"
+	clusterpropsv1 "github.com/CS-SI/SafeScale/safescale/server/cluster/control/properties/v1"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/ClusterState"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/identity"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 	"github.com/CS-SI/SafeScale/utils/serialize"
 )
 
@@ -31,47 +32,47 @@ import (
 // Cluster is an interface of methods associated to Cluster-like structs
 type Cluster interface {
 	// GetService ...
-	GetService() *iaas.Service
+	GetService(task concurrency.Task) *iaas.Service
 	// GetIdentity returns the identity of the cluster (name, flavor, complexity)
-	GetIdentity() identity.Identity
+	GetIdentity(task concurrency.Task) identity.Identity
 	// GetNetworkConfig returns network configuration of the cluster
-	GetNetworkConfig() clusterpropsv1.Network
+	GetNetworkConfig(concurrency.Task) clusterpropsv1.Network
 	// GetProperties returns the extension of the cluster
-	GetProperties() *serialize.JSONProperties
+	GetProperties(concurrency.Task) *serialize.JSONProperties
 
 	// Start starts the cluster
-	Start() error
+	Start(concurrency.Task) error
 	// Stop stops the cluster
-	Stop() error
+	Stop(concurrency.Task) error
 	// GetState returns the current state of the cluster
-	GetState() (ClusterState.Enum, error)
+	GetState(concurrency.Task) (ClusterState.Enum, error)
 	// AddNode adds a node
-	AddNode(bool, *resources.HostDefinition) (string, error)
+	AddNode(concurrency.Task, bool, *resources.HostDefinition) (string, error)
 	// AddNodes adds several nodes
-	AddNodes(int, bool, *resources.HostDefinition) ([]string, error)
+	AddNodes(concurrency.Task, int, bool, *resources.HostDefinition) ([]string, error)
 	// DeleteLastNode deletes a node
-	DeleteLastNode(bool, string) error
+	DeleteLastNode(concurrency.Task, bool, string) error
 	// DeleteSpecificNode deletes a node identified by its ID
-	DeleteSpecificNode(string, string) error
+	DeleteSpecificNode(concurrency.Task, string, string) error
 	// ListMasterIDs lists the IDs of masters (if there is such masters in the flavor...)
-	ListMasterIDs() []string
+	ListMasterIDs(concurrency.Task) []string
 	// ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
-	ListMasterIPs() []string
+	ListMasterIPs(concurrency.Task) []string
 	// FindAvailableMaster returns ID of the first master available to execute order
-	FindAvailableMaster() (string, error)
+	FindAvailableMaster(concurrency.Task) (string, error)
 	// ListNodeIDs lists IDs of the nodes in the cluster
-	ListNodeIDs(bool) []string
+	ListNodeIDs(concurrency.Task, bool) []string
 	// ListNodeIPs lists the IPs of the nodes in the cluster
-	ListNodeIPs(bool) []string
+	ListNodeIPs(concurrency.Task, bool) []string
 	// FindAvailableNode returns ID of the first node available to execute order
-	FindAvailableNode(bool) (string, error)
+	FindAvailableNode(concurrency.Task, bool) (string, error)
 	// SearchNode tells if the ID of the host passed as parameter is a node
-	SearchNode(string, bool) bool
+	SearchNode(concurrency.Task, string, bool) bool
 	// GetNode returns a node based on its ID
-	GetNode(string) (*pb.Host, error)
+	GetNode(concurrency.Task, string) (*pb.Host, error)
 	// CountNodes counts the nodes of the cluster
-	CountNodes(bool) uint
+	CountNodes(concurrency.Task, bool) uint
 
 	// Delete allows to destroy infrastructure of cluster
-	Delete() error
+	Delete(concurrency.Task) error
 }
