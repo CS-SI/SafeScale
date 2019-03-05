@@ -350,6 +350,11 @@ func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 		return nil, nil, err
 	}
 
+	password, err := utils.GeneratePassword(16)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
+	}
+
 	// Create host
 	hostReq := resources.HostRequest{
 		ResourceName:   request.ResourceName,
@@ -360,6 +365,7 @@ func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 		Networks:       request.Networks,
 		DefaultGateway: request.DefaultGateway,
 		TemplateID:     request.TemplateID,
+		Password:       password,
 	}
 	host, err := svc.CreateHost(hostReq)
 	if err != nil {

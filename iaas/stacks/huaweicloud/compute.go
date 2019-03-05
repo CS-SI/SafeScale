@@ -309,11 +309,18 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 			log.Debugf(utils.Capitalize(msg))
 		}
 	}
+	if request.Password == "" {
+		password, err := utils.GeneratePassword(16)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate password: %s", err.Error())
+		}
+		request.Password = password
+	}
 
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	userData, err := userdata.Prepare(s.cfgOpts, request, request.KeyPair, defaultNetwork.CIDR)
+	userData, err := userdata.Prepare(s.cfgOpts, request, defaultNetwork.CIDR)
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		log.Debugf(utils.Capitalize(msg))
@@ -382,6 +389,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 
 	host := resources.NewHost()
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
+	host.Password = request.Password
 
 	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
@@ -535,7 +543,7 @@ func validatehostName(req resources.HostRequest) (bool, error) {
 	return true, nil
 }
 
-// GetHost updates the data inside host with the data from provider
+// InspectHost updates the data inside host with the data from provider
 func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	var (
 		host     *resources.Host
@@ -860,13 +868,11 @@ func (s *Stack) DeleteHost(id string) error {
 				1*time.Minute,
 			)
 			if innerRetryErr != nil {
-				switch innerRetryErr.(type) {
-				case retry.ErrTimeout:
+				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
 					// retry deletion...
 					return fmt.Errorf("host '%s' not deleted after %v", id, 1*time.Minute)
-				default:
-					return innerRetryErr
 				}
+				return innerRetryErr
 			}
 			if !resourcePresent {
 				return nil
@@ -1148,8 +1154,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 		timeout,
 	)
 	if retryErr != nil {
-		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			msg := "timeout waiting to get host"
 			if host != nil {
 				msg += fmt.Sprintf(" '%s'", host.Name)
@@ -1159,9 +1164,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 				msg += fmt.Sprintf(": %v", err)
 			}
 			return nil, fmt.Errorf(msg)
-		default:
-			return nil, retryErr
 		}
+		return nil, retryErr
 	}
 	// If hoste state is ERROR, returns the error
 	if hostInError {

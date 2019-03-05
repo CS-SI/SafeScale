@@ -93,6 +93,8 @@ type HostRequest struct {
 	ImageID string
 	// KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
 	KeyPair *KeyPair
+	// Password contains the safescale password useable on host console only
+	Password string
 }
 
 // HostDefinition ...
@@ -126,6 +128,7 @@ type Host struct {
 	Name       string                    `json:"name,omitempty"`
 	LastState  HostState.Enum            `json:"state,omitempty"`
 	PrivateKey string                    `json:"private_key,omitempty"`
+	Password   string                    `json:"password,omitempty"`
 	Properties *serialize.JSONProperties `json:"properties,omitempty"`
 }
 
