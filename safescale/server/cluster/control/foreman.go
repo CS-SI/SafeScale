@@ -1087,26 +1087,19 @@ func (b *foreman) taskCreateMasters(tr concurrency.TaskRunner, params interface{
 
 	log.Debugf("[cluster %s] creating %d master%s...\n", clusterName, count, utils.Plural(count))
 
-	// var dones []chan error
 	var subtasks []concurrency.Task
 	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
 	for i := 0; i < count; i++ {
-		// d := make(chan error)
-		// dones = append(dones, d)
-		// go b.taskCreateMaster(i, def, timeout, d)
-		subtask := concurrency.NewTask(tr.Task(), b.taskCreateMaster)
-		subtasks = append(subtasks, subtask)
-		subtask.Start(map[string]interface{}{
+		subtask := concurrency.NewTask(tr.Task(), b.taskCreateMaster).Start(map[string]interface{}{
 			"index":     i + 1,
 			"masterDef": def,
 			"timeout":   timeout,
 		})
+		subtasks = append(subtasks, subtask)
 	}
 	var state error
 	var errors []string
-	// for i := range dones {
 	for _, s := range subtasks {
-		// state = <-dones[i]
 		s.Wait()
 		state = s.GetError()
 		if state != nil {
@@ -1134,8 +1127,8 @@ func (b *foreman) taskCreateMaster(tr concurrency.TaskRunner, params interface{}
 	def := p["masterDef"].(pb.HostDefinition)
 	timeout := p["timeout"].(time.Duration)
 
-	log.Debugf(">>> safescale.cluster.controller.foreman::taskCreateMaster(%d)", index)
-	defer log.Debugf("<<< safescale.cluster.controller.foreman::taskCreateMaster(%d)", index)
+	log.Debugf(">>>{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", tr.ID(), index)
+	defer log.Debugf("<<<{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", tr.ID(), index)
 
 	// defer task end based on err
 	var err error
@@ -1514,7 +1507,7 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	// Starting from here, delete node from cluster if exiting with error
 	defer func() {
 		if err != nil {
-			derr := b.cluster.deleteNode(tr.Task(), node, 1, publicIP, "")
+			derr := b.cluster.deleteNode(tr.Task(), node, publicIP, "")
 			if derr != nil {
 				log.Errorf("failed to delete node after failure")
 			}
