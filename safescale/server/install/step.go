@@ -26,6 +26,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/safescale/server/install/enums/Action"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 )
 
 const (
@@ -224,54 +225,50 @@ type step struct {
 
 // Run executes the step on all the concerned hosts
 func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, error) {
-	//if debug
-	if false {
-		log.Printf("running step '%s' on %d hosts...", is.Name, len(hosts))
-	}
+	// log.Printf("running step '%s' on %d hosts...", is.Name, len(hosts))
 
 	results := stepResults{}
 
 	if is.Serial || s.Serialize {
+		subtask := concurrency.NewTask(is.Worker.feature.task, is.taskRunOnHost)
 		for _, h := range hosts {
 			//if debug
 			if false {
 				log.Printf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 			}
-			v["HostIP"] = h.PrivateIP
-			v["Hostname"] = h.Name
-			results[h.Name] = is.runOnHost(h, v)
-			//if debug {
-			if false {
-				if !results[h.Name].Successful() {
-					log.Printf("%s(%s):step(%s)@%s: fail\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
-				} else {
-					log.Printf("%s(%s):step(%s)@%s: success\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
-				}
-			}
+			variables := v.Clone()
+			variables["HostIP"] = h.PrivateIp
+			variables["Hostname"] = h.Name
+			_ = subtask.Run(map[string]interface{}{"host": h, "variables": variables})
+			results[h.Name] = subtask.GetResult().(stepResult)
+			subtask.Reset()
+			// if !results[h.Name].Successful() {
+			// 	log.Infof("%s(%s):step(%s)@%s: fail", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			// } else {
+			// 	log.Infof("%s(%s):step(%s)@%s: success", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			// }
 		}
 	} else {
-		dones := map[string]chan stepResult{}
+		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
-			//if debug
-			if false {
-				log.Printf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
-			}
-			v["HostIP"] = h.PrivateIP
-			v["Hostname"] = h.Name
-			d := make(chan stepResult)
-			dones[h.Name] = d
-			go func(host *pb.Host, done chan stepResult) {
-				done <- is.runOnHost(host, v)
-			}(h, d)
+			// log.Debugf("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			variables := v.Clone()
+			variables["HostIP"] = h.PrivateIp
+			variables["Hostname"] = h.Name
+			subtask := concurrency.NewTask(is.Worker.feature.task, is.taskRunOnHost).Start(map[string]interface{}{
+				"host":      h,
+				"variables": variables,
+			})
+			subtasks[h.Name] = subtask
 		}
-		for k, d := range dones {
-			results[k] = <-d
-			//if debug {
+		for k, s := range subtasks {
+			s.Wait()
+			results[k] = s.GetResult().(stepResult)
 			if false {
 				if !results[k].Successful() {
-					log.Printf("%s(%s):step(%s)@%s: fail\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+					log.Infof("%s(%s):step(%s)@%s: fail", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
 				} else {
-					log.Printf("%s(%s):step(%s)@%s: done\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+					log.Infof("%s(%s):step(%s)@%s: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
 				}
 			}
 		}
@@ -279,18 +276,37 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 	return results, nil
 }
 
-func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
+// taskRunOnHost ...
+// Respects interface concurrency.TaskFunc
+// func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
+func (is *step) taskRunOnHost(tr concurrency.TaskRunner, params interface{}) {
+	// Get parameters
+	p := params.(map[string]interface{})
+	host := p["host"].(*pb.Host)
+	variables := p["variables"].(Variables)
+
+	var err error
+	defer func() {
+		if err != nil {
+			tr.Fail(err)
+		} else {
+			tr.Done()
+		}
+	}()
+
 	// Updates variables in step script
-	command, err := replaceVariablesInString(is.Script, v)
+	command, err := replaceVariablesInString(is.Script, variables)
 	if err != nil {
-		return stepResult{success: false, err: fmt.Errorf("failed to finalize installer script for step '%s': %s", is.Name, err.Error())}
+		tr.StoreResult(stepResult{success: false, err: fmt.Errorf("failed to finalize installer script for step '%s': %s", is.Name, err.Error())})
+		return
 	}
 
 	// If options file is defined, upload it to the remote host
 	if is.OptionsFileContent != "" {
-		err := UploadStringToRemoteFile(is.OptionsFileContent, host, "/var/tmp/options.json", "cladm", "gpac", "ug+rw-x,o-rwx")
+		err := UploadStringToRemoteFile(is.OptionsFileContent, host, "/var/tmp/options.json", "cladm", "safescale", "ug+rw-x,o-rwx")
 		if err != nil {
-			return stepResult{success: false, err: err}
+			tr.StoreResult(stepResult{success: false, err: err})
+			return
 		}
 	}
 
@@ -298,7 +314,8 @@ func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
 	filename := fmt.Sprintf("/var/tmp/feature.%s.%s_%s.sh", is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
 	if err != nil {
-		return stepResult{success: false, err: err}
+		tr.StoreResult(stepResult{success: false, err: err})
+		return
 	}
 	//if debug {
 	if true {
@@ -310,12 +327,13 @@ func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
 	// Executes the script on the remote host
 	retcode, _, _, err := client.New().Ssh.Run(host.Name, command, client.DefaultConnectionTimeout, is.WallTime)
 	if err != nil {
-		return stepResult{success: false, err: err}
+		tr.StoreResult(stepResult{success: false, err: err})
+		return
 	}
 	err = nil
 	ok := retcode == 0
 	if !ok {
 		err = fmt.Errorf("step '%s' failed (retcode=%d)", is.Name, retcode)
 	}
-	return stepResult{success: ok, err: err}
+	tr.StoreResult(stepResult{success: ok, err: err})
 }
