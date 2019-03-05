@@ -41,7 +41,7 @@ func (s *ProcessManagerListener) Stop(ctx context.Context, in *pb.ProcessDefinit
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
-	if err := utils.ProcessRegister(ctx, cancelFunc, "Stop process "+in.UUID); err == nil {
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Stop process "+in.Uuid); err == nil {
 		defer utils.ProcessDeregister(ctx)
 	}
 
@@ -52,7 +52,7 @@ func (s *ProcessManagerListener) Stop(ctx context.Context, in *pb.ProcessDefinit
 	}
 
 	handler := ProcessManagerHandler(tenant.Service)
-	handler.Stop(ctx, in.UUID)
+	handler.Stop(ctx, in.Uuid)
 
 	return &google_protobuf.Empty{}, nil
 }
@@ -80,7 +80,7 @@ func (s *ProcessManagerListener) List(ctx context.Context, in *google_protobuf.E
 	}
 	var pbProcessList []*pb.ProcessDefinition
 	for uuid, info := range processMap {
-		pbProcessList = append(pbProcessList, &pb.ProcessDefinition{UUID: uuid, Info: info})
+		pbProcessList = append(pbProcessList, &pb.ProcessDefinition{Uuid: uuid, Info: info})
 	}
 
 	return &pb.ProcessList{List: pbProcessList}, nil

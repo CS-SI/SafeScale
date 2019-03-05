@@ -82,7 +82,7 @@ func GetReference(in *pb.Reference) string {
 	if strings.TrimSpace(name) != "" {
 		ref = name
 	}
-	id := in.GetID()
+	id := in.GetId()
 	if strings.TrimSpace(id) != "" {
 		ref = id
 	}
