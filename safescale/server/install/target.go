@@ -18,6 +18,7 @@ package install
 
 import (
 	"github.com/CS-SI/SafeScale/safescale/server/install/enums/Method"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 
 	clusterapi "github.com/CS-SI/SafeScale/safescale/server/cluster/api"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Flavor"
@@ -44,12 +45,13 @@ type Target interface {
 type HostTarget struct {
 	host    *pb.Host
 	methods map[uint8]Method.Enum
+	name    string
 }
 
 // NewHostTarget ...
 func NewHostTarget(host *pb.Host) Target {
 	if host == nil {
-		panic("host is nil!")
+		panic("Invalid parameter 'host': can't be nil!")
 	}
 	return createHostTarget(host)
 }
@@ -81,6 +83,7 @@ func createHostTarget(host *pb.Host) *HostTarget {
 	return &HostTarget{
 		host:    host,
 		methods: methods,
+		name:    host.Name,
 	}
 }
 
@@ -91,7 +94,7 @@ func (t *HostTarget) Type() string {
 
 // Name returns the name of the Target
 func (t *HostTarget) Name() string {
-	return t.host.GetName()
+	return t.name
 }
 
 // Methods returns a list of packaging managers useable on the target
@@ -109,10 +112,11 @@ func (t *HostTarget) Installed() []string {
 type ClusterTarget struct {
 	cluster clusterapi.Cluster
 	methods map[uint8]Method.Enum
+	name    string
 }
 
 // NewClusterTarget ...
-func NewClusterTarget(cluster clusterapi.Cluster) Target {
+func NewClusterTarget(task concurrency.Task, cluster clusterapi.Cluster) Target {
 	if cluster == nil {
 		panic("cluster is nil!")
 	}
@@ -120,7 +124,8 @@ func NewClusterTarget(cluster clusterapi.Cluster) Target {
 		index   uint8
 		methods = map[uint8]Method.Enum{}
 	)
-	if cluster.GetIdentity().Flavor == Flavor.DCOS {
+	identity := cluster.GetIdentity(task)
+	if identity.Flavor == Flavor.DCOS {
 		index++
 		methods[index] = Method.DCOS
 	}
@@ -129,6 +134,7 @@ func NewClusterTarget(cluster clusterapi.Cluster) Target {
 	return &ClusterTarget{
 		cluster: cluster,
 		methods: methods,
+		name:    identity.Name,
 	}
 }
 
@@ -139,7 +145,7 @@ func (t *ClusterTarget) Type() string {
 
 // Name returns the name of the cluster
 func (t *ClusterTarget) Name() string {
-	return t.cluster.GetIdentity().Name
+	return t.name
 }
 
 // Methods returns a list of packaging managers useable on the target

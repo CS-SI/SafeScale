@@ -96,7 +96,7 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 	}.loop()
 }
 
-// WhileUnsuccessful retries every 'delay' while 'run' is unsuccessful with a 'timeout'
+// WhileUnsuccessfulTimeout retries every 'delay' while 'run' is unsuccessful with a 'timeout'
 func WhileUnsuccessfulTimeout(run func() error, delay time.Duration, timeout time.Duration) error {
 	if delay <= 0 {
 		delay = time.Second
@@ -129,6 +129,7 @@ func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) err
 	return WhileUnsuccessful(run, 5*time.Second, timeout)
 }
 
+// WhileUnsuccessfulDelay5SecondsTimeout ...
 func WhileUnsuccessfulDelay5SecondsTimeout(run func() error, timeout time.Duration) error {
 	return WhileUnsuccessfulTimeout(run, 5*time.Second, timeout)
 }

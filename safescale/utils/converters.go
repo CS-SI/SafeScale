@@ -17,10 +17,10 @@
 package utils
 
 import (
-	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
+	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/system"
 )
 
@@ -57,7 +57,7 @@ func ToSystemSSHConfig(from *pb.SshConfig) *system.SSHConfig {
 // ToPBVolume converts an api.Volume to a *Volume
 func ToPBVolume(in *resources.Volume) *pb.Volume {
 	return &pb.Volume{
-		ID:    in.ID,
+		Id:    in.ID,
 		Name:  in.Name,
 		Size:  int32(in.Size),
 		Speed: pb.VolumeSpeed(in.Speed),
@@ -67,8 +67,8 @@ func ToPBVolume(in *resources.Volume) *pb.Volume {
 // ToPBVolumeAttachment converts an api.Volume to a *Volume
 func ToPBVolumeAttachment(in *resources.VolumeAttachment) *pb.VolumeAttachment {
 	return &pb.VolumeAttachment{
-		Volume:    &pb.Reference{ID: in.VolumeID},
-		Host:      &pb.Reference{ID: in.ServerID},
+		Volume:    &pb.Reference{Id: in.VolumeID},
+		Host:      &pb.Reference{Id: in.ServerID},
 		MountPath: in.MountPoint,
 		Device:    in.Device,
 	}
@@ -77,7 +77,7 @@ func ToPBVolumeAttachment(in *resources.VolumeAttachment) *pb.VolumeAttachment {
 // ToPBVolumeInfo converts an api.Volume to a *VolumeInfo
 func ToPBVolumeInfo(volume *resources.Volume, mounts map[string]*propsv1.HostLocalMount) *pb.VolumeInfo {
 	pbvi := &pb.VolumeInfo{
-		ID:    volume.ID,
+		Id:    volume.ID,
 		Name:  volume.Name,
 		Size:  int32(volume.Size),
 		Speed: pb.VolumeSpeed(volume.Speed),
@@ -118,7 +118,7 @@ func ToPBBucketMountPoint(in *resources.Bucket) *pb.BucketMountingPoint {
 // ToPBShare convert a share from model to protocolbuffer format
 func ToPBShare(hostName string, share *propsv1.HostShare) *pb.ShareDefinition {
 	return &pb.ShareDefinition{
-		ID:   share.ID,
+		Id:   share.ID,
 		Name: share.Name,
 		Host: &pb.Reference{Name: hostName},
 		Path: share.Path,
@@ -179,15 +179,16 @@ func ToPBHost(in *resources.Host) *pb.Host {
 		return nil
 	}
 	return &pb.Host{
-		CPU:                 int32(hostSizingV1.AllocatedSize.Cores),
+		Cpu:                 int32(hostSizingV1.AllocatedSize.Cores),
 		Disk:                int32(hostSizingV1.AllocatedSize.DiskSize),
-		GatewayID:           hostNetworkV1.DefaultGatewayID,
-		ID:                  in.ID,
-		PublicIP:            in.GetPublicIP(),
-		PrivateIP:           in.GetPrivateIP(),
+		GatewayId:           hostNetworkV1.DefaultGatewayID,
+		Id:                  in.ID,
+		PublicIp:            in.GetPublicIP(),
+		PrivateIp:           in.GetPrivateIP(),
 		Name:                in.Name,
 		PrivateKey:          in.PrivateKey,
-		RAM:                 hostSizingV1.AllocatedSize.RAMSize,
+		Password:            in.Password,
+		Ram:                 hostSizingV1.AllocatedSize.RAMSize,
 		State:               pb.HostState(in.LastState),
 		AttachedVolumeNames: volumes,
 	}
@@ -196,22 +197,22 @@ func ToPBHost(in *resources.Host) *pb.Host {
 // ToPBHostDefinition ...
 func ToPBHostDefinition(in *resources.HostDefinition) *pb.HostDefinition {
 	return &pb.HostDefinition{
-		CPUNumber: int32(in.Cores),
-		RAM:       in.RAMSize,
-		Disk:      int32(in.DiskSize),
-		GPUNumber: int32(in.GPUNumber),
-		Freq:      in.CPUFreq,
-		ImageID:   in.ImageID,
+		CpuCount: int32(in.Cores),
+		Ram:      in.RAMSize,
+		Disk:     int32(in.DiskSize),
+		GpuCount: int32(in.GPUNumber),
+		CpuFreq:  in.CPUFreq,
+		ImageId:  in.ImageID,
 	}
 }
 
 // ToPBGatewayDefinition ...
 func ToPBGatewayDefinition(in *resources.HostDefinition) *pb.GatewayDefinition {
 	return &pb.GatewayDefinition{
-		CPU:     int32(in.Cores),
-		RAM:     in.RAMSize,
+		Cpu:     int32(in.Cores),
+		Ram:     in.RAMSize,
 		Disk:    int32(in.DiskSize),
-		ImageID: in.ImageID,
+		ImageId: in.ImageID,
 	}
 }
 
@@ -226,20 +227,20 @@ func ToHostStatus(in *resources.Host) *pb.HostStatus {
 // ToPBHostTemplate convert an template from api to protocolbuffer format
 func ToPBHostTemplate(in *resources.HostTemplate) *pb.HostTemplate {
 	return &pb.HostTemplate{
-		ID:      in.ID,
-		Name:    in.Name,
-		Cores:   int32(in.Cores),
-		Ram:     int32(in.RAMSize),
-		Disk:    int32(in.DiskSize),
-		GPUs:    int32(in.GPUNumber),
-		GPUType: in.GPUType,
+		Id:       in.ID,
+		Name:     in.Name,
+		Cores:    int32(in.Cores),
+		Ram:      int32(in.RAMSize),
+		Disk:     int32(in.DiskSize),
+		GpuCount: int32(in.GPUNumber),
+		GpuType:  in.GPUType,
 	}
 }
 
 // ToPBImage convert an image from api to protocolbuffer format
 func ToPBImage(in *resources.Image) *pb.Image {
 	return &pb.Image{
-		ID:   in.ID,
+		Id:   in.ID,
 		Name: in.Name,
 	}
 }
@@ -247,9 +248,9 @@ func ToPBImage(in *resources.Image) *pb.Image {
 //ToPBNetwork convert a network from api to protocolbuffer format
 func ToPBNetwork(in *resources.Network) *pb.Network {
 	return &pb.Network{
-		ID:        in.ID,
+		Id:        in.ID,
 		Name:      in.Name,
-		CIDR:      in.CIDR,
-		GatewayID: in.GatewayID,
+		Cidr:      in.CIDR,
+		GatewayId: in.GatewayID,
 	}
 }

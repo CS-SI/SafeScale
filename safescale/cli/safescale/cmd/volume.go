@@ -23,10 +23,10 @@ import (
 
 	"github.com/urfave/cli"
 
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/client"
 	safescaleutils "github.com/CS-SI/SafeScale/safescale/utils"
-	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
 )
@@ -244,7 +244,7 @@ type volumeDisplayable struct {
 
 func toDisplaybleVolumeInfo(volumeInfo *pb.VolumeInfo) *volumeInfoDisplayable {
 	return &volumeInfoDisplayable{
-		volumeInfo.GetID(),
+		volumeInfo.GetId(),
 		volumeInfo.GetName(),
 		pb.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),
@@ -257,7 +257,7 @@ func toDisplaybleVolumeInfo(volumeInfo *pb.VolumeInfo) *volumeInfoDisplayable {
 
 func toDisplaybleVolume(volumeInfo *pb.Volume) *volumeDisplayable {
 	return &volumeDisplayable{
-		volumeInfo.GetID(),
+		volumeInfo.GetId(),
 		volumeInfo.GetName(),
 		pb.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		volumeInfo.GetSize(),

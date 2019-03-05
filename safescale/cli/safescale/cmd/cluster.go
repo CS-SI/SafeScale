@@ -31,14 +31,15 @@ import (
 	"github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/api"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/controller"
-	clusterpropsv1 "github.com/CS-SI/SafeScale/safescale/server/cluster/controller/properties/v1"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/control"
+	clusterpropsv1 "github.com/CS-SI/SafeScale/safescale/server/cluster/control/properties/v1"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/safescale/server/install"
 	"github.com/CS-SI/SafeScale/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
 )
 
@@ -90,7 +91,7 @@ func extractClusterArgument(c *cli.Context) error {
 		}
 
 		var err error
-		clusterInstance, err = cluster.Get(clusterName)
+		clusterInstance, err = cluster.Get(concurrency.RootTask(), clusterName)
 		if err != nil {
 			if _, ok := err.(resources.ErrResourceNotFound); ok {
 				if !c.Command.HasName("create") {
@@ -128,7 +129,7 @@ var clusterListCommand = cli.Command{
 			converted, err := convertToMap(c)
 			if err != nil {
 				return clitools.ExitOnErrorWithMessage(ExitCode.Run,
-					fmt.Sprintf("failed to extract data about cluster '%s'", c.GetIdentity().Name))
+					fmt.Sprintf("failed to extract data about cluster '%s'", c.GetIdentity(concurrency.RootTask()).Name))
 			}
 			formatted = append(formatted, formatClusterConfig(converted, false))
 		}
@@ -204,7 +205,7 @@ func outputClusterConfig() error {
 // convertToMap converts clusterInstance to its equivalent in map[string]interface{},
 // with fields converted to string and used as keys
 func convertToMap(c api.Cluster) (map[string]interface{}, error) {
-	identity := c.GetIdentity()
+	identity := c.GetIdentity(concurrency.RootTask())
 
 	result := map[string]interface{}{
 		"name":             identity.Name,
@@ -217,7 +218,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		"keypair":          identity.Keypair,
 	}
 
-	properties := c.GetProperties()
+	properties := c.GetProperties(concurrency.RootTask())
 	err := properties.LockForRead(Property.CompositeV1).ThenUse(func(v interface{}) error {
 		result["tenant"] = v.(*clusterpropsv1.Composite).Tenants[0]
 		return nil
@@ -226,7 +227,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	netCfg := c.GetNetworkConfig()
+	netCfg := c.GetNetworkConfig(concurrency.RootTask())
 	result["network_id"] = netCfg.NetworkID
 	result["cidr"] = netCfg.CIDR
 	result["gateway_ip"] = netCfg.GatewayIP
@@ -279,7 +280,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		remoteDesktops := []string{}
 		clientHost := client.New().Host
 		gwPublicIP := netCfg.PublicIP
-		for _, id := range c.ListMasterIDs() {
+		for _, id := range c.ListMasterIDs(concurrency.RootTask()) {
 			host, err := clientHost.Inspect(id, client.DefaultExecutionTimeout)
 			if err != nil {
 				return nil, err
@@ -392,7 +393,7 @@ var clusterCreateCommand = cli.Command{
 				ImageID:  los,
 			}
 		}
-		clusterInstance, err = cluster.Create(controller.Request{
+		clusterInstance, err = cluster.Create(concurrency.RootTask(), control.Request{
 			Name:                    clusterName,
 			Complexity:              complexity,
 			CIDR:                    cidr,
@@ -403,7 +404,7 @@ var clusterCreateCommand = cli.Command{
 		})
 		if err != nil {
 			if clusterInstance != nil {
-				_ = clusterInstance.Delete()
+				_ = clusterInstance.Delete(concurrency.RootTask())
 			}
 			msg := fmt.Sprintf("failed to create cluster: %s\n", err.Error())
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
@@ -470,7 +471,7 @@ var clusterDeleteCommand = cli.Command{
 			log.Println("'-f,--force' does nothing yet")
 		}
 
-		err = clusterInstance.Delete()
+		err = clusterInstance.Delete(concurrency.RootTask())
 		if err != nil {
 			return clitools.ExitOnRPC(err.Error())
 		}
@@ -500,7 +501,7 @@ var clusterStopCommand = cli.Command{
 			return err
 		}
 
-		err = clusterInstance.Stop()
+		err = clusterInstance.Stop(concurrency.RootTask())
 		if err != nil {
 			return clitools.ExitOnRPC(err.Error())
 		}
@@ -529,7 +530,7 @@ var clusterStartCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		err = clusterInstance.Start()
+		err = clusterInstance.Start(concurrency.RootTask())
 		if err != nil {
 			return clitools.ExitOnRPC(err.Error())
 		}
@@ -556,7 +557,7 @@ var clusterStateCommand = cli.Command{
 			return err
 		}
 
-		state, err := clusterInstance.GetState()
+		state, err := clusterInstance.GetState(concurrency.RootTask())
 		if err != nil {
 			msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
 			return clitools.ExitOnRPC(msg)
@@ -659,7 +660,7 @@ var clusterExpandCommand = cli.Command{
 				ImageID:  los,
 			}
 		}
-		hosts, err := clusterInstance.AddNodes(count, public, nodeRequest)
+		hosts, err := clusterInstance.AddNodes(concurrency.RootTask(), count, public, nodeRequest)
 		if err != nil {
 			return clitools.ExitOnRPC(err.Error())
 		}
@@ -723,7 +724,7 @@ var clusterShrinkCommand = cli.Command{
 		if count > 1 {
 			countS = "s"
 		}
-		present := clusterInstance.CountNodes(public)
+		present := clusterInstance.CountNodes(concurrency.RootTask(), public)
 		if count > present {
 			msg := fmt.Sprintf("can't delete %d %s node%s, the cluster contains only %d of them", count, nodeTypeString, countS, present)
 			return clitools.ExitOnInvalidOption(msg)
@@ -739,12 +740,12 @@ var clusterShrinkCommand = cli.Command{
 
 		fmt.Printf("Deleting %d %s node%s from Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
 		var msgs []string
-		availableMaster, err := clusterInstance.FindAvailableMaster()
+		availableMaster, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
 		if err != nil {
 			return err
 		}
 		for i := uint(0); i < count; i++ {
-			err := clusterInstance.DeleteLastNode(public, availableMaster)
+			err := clusterInstance.DeleteLastNode(concurrency.RootTask(), public, availableMaster)
 			if err != nil {
 				msgs = append(msgs, fmt.Sprintf("Failed to delete node #%d: %s", i+1, err.Error()))
 			}
@@ -777,7 +778,7 @@ var clusterDcosCommand = cli.Command{
 			return err
 		}
 
-		identity := clusterInstance.GetIdentity()
+		identity := clusterInstance.GetIdentity(concurrency.RootTask())
 		if identity.Flavor != Flavor.DCOS {
 			msg := fmt.Sprintf("Can't call dcos on this cluster, its flavor isn't DCOS (%s).\n", identity.Flavor.String())
 			return clitools.ExitOnErrorWithMessage(ExitCode.NotApplicable, msg)
@@ -838,9 +839,9 @@ var clusterRunCommand = cli.Command{
 }
 
 func executeCommand(command string) error {
-	masters := clusterInstance.ListMasterIDs()
+	masters := clusterInstance.ListMasterIDs(concurrency.RootTask())
 	if len(masters) <= 0 {
-		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetIdentity().Name)
+		msg := fmt.Sprintf("No masters found for the cluster '%s'", clusterInstance.GetIdentity(concurrency.RootTask()).Name)
 		return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 	}
 	safescalessh := client.New().Ssh
@@ -897,7 +898,7 @@ var clusterAddFeatureCommand = cli.Command{
 			return err
 		}
 
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
@@ -918,7 +919,7 @@ var clusterAddFeatureCommand = cli.Command{
 		settings := install.Settings{}
 		settings.SkipProxy = c.Bool("skip-proxy")
 
-		target := install.NewClusterTarget(clusterInstance)
+		target := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
@@ -958,7 +959,7 @@ var clusterCheckFeatureCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, err.Error())
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
@@ -979,7 +980,7 @@ var clusterCheckFeatureCommand = cli.Command{
 
 		settings := install.Settings{}
 
-		target := install.NewClusterTarget(clusterInstance)
+		target := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
 		results, err := feature.Check(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
@@ -1017,7 +1018,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
@@ -1040,7 +1041,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 		// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
 		settings.SkipProxy = true
 
-		target := install.NewClusterTarget(clusterInstance)
+		target := install.NewClusterTarget(concurrency.RootTask(), clusterInstance)
 		results, err := feature.Remove(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, clusterName, err.Error())
@@ -1127,7 +1128,7 @@ var clusterNodeListCommand = cli.Command{
 		formatted := []map[string]interface{}{}
 
 		if all || !public {
-			listPriv := clusterInstance.ListNodeIDs(false)
+			listPriv := clusterInstance.ListNodeIDs(concurrency.RootTask(), false)
 			for _, i := range listPriv {
 				host, err := safescale.Inspect(i, client.DefaultExecutionTimeout)
 				if err != nil {
@@ -1144,7 +1145,7 @@ var clusterNodeListCommand = cli.Command{
 		}
 
 		if all || public {
-			listPub := clusterInstance.ListNodeIDs(true)
+			listPub := clusterInstance.ListNodeIDs(concurrency.RootTask(), true)
 			for _, i := range listPub {
 				host, err := safescale.Inspect(i, client.DefaultExecutionTimeout)
 				if err != nil {
@@ -1272,7 +1273,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 			log.Println("'-f,--force' does nothing yet")
 		}
 
-		err = clusterInstance.Delete()
+		err = clusterInstance.Delete(concurrency.RootTask())
 		if err != nil {
 			return clitools.ExitOnRPC(err.Error())
 		}
@@ -1408,7 +1409,7 @@ var clusterMasterListCommand = cli.Command{
 		clientHost := client.New().Host
 		formatted := []map[string]interface{}{}
 
-		list := clusterInstance.ListMasterIDs()
+		list := clusterInstance.ListMasterIDs(concurrency.RootTask())
 		for _, i := range list {
 			host, err := clientHost.Inspect(i, client.DefaultExecutionTimeout)
 			if err != nil {
@@ -1419,7 +1420,7 @@ var clusterMasterListCommand = cli.Command{
 			}
 			formatted = append(formatted, map[string]interface{}{
 				"name": host.Name,
-				"id":   host.ID,
+				"id":   host.Id,
 			})
 		}
 

@@ -22,9 +22,9 @@ import (
 	"os"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/client"
-	"github.com/CS-SI/SafeScale/iaas/resources"
 	clitools "github.com/CS-SI/SafeScale/utils"
 
 	"github.com/urfave/cli"
@@ -181,7 +181,7 @@ var shareList = cli.Command{
 			var output []map[string]interface{}
 			for _, i := range list.ShareList {
 				output = append(output, map[string]interface{}{
-					"ID":   i.GetID(),
+					"ID":   i.GetId(),
 					"Name": i.GetName(),
 					"Host": i.GetHost().GetName(),
 					"Path": i.GetPath(),
@@ -281,7 +281,7 @@ var shareInspect = cli.Command{
 		}
 
 		output := map[string]interface{}{
-			"ID":   list.GetShare().GetID(),
+			"ID":   list.GetShare().GetId(),
 			"Name": list.GetShare().GetName(),
 			"Host": list.GetShare().GetHost().GetName(),
 			"Path": list.GetShare().GetPath(),

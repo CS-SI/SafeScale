@@ -29,11 +29,11 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/api"
-	"github.com/CS-SI/SafeScale/safescale/server/cluster/controller"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster/control"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/flavors/boh/enums/ErrorCode"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 	"github.com/CS-SI/SafeScale/utils/template"
 )
 
@@ -67,11 +67,9 @@ var (
 	}
 
 	globalSystemRequirementsContent atomic.Value
-)
 
-// Blueprint returns a configured blueprint to construct a BOH Cluster
-func Blueprint(c *controller.Controller) *controller.Blueprint {
-	actors := controller.BlueprintActors{
+	// Makers returns a configured Makers to construct a BOH Cluster
+	Makers = control.Makers{
 		MinimumRequiredServers:      minimumRequiredServers,
 		DefaultGatewaySizing:        gatewaySizing,
 		DefaultMasterSizing:         nodeSizing,
@@ -81,12 +79,11 @@ func Blueprint(c *controller.Controller) *controller.Blueprint {
 		GetTemplateBox:              getTemplateBox,
 		GetGlobalSystemRequirements: getGlobalSystemRequirements,
 	}
-	return controller.NewBlueprint(c, actors)
-}
+)
 
-func minimumRequiredServers(c api.Cluster) (int, int, int) {
+func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int, int, int) {
 	var privateNodeCount int
-	switch c.GetIdentity().Complexity {
+	switch foreman.Cluster().GetIdentity(task).Complexity {
 	case Complexity.Small:
 		privateNodeCount = 1
 	case Complexity.Normal:
@@ -97,7 +94,7 @@ func minimumRequiredServers(c api.Cluster) (int, int, int) {
 	return 1, privateNodeCount, 0
 }
 
-func gatewaySizing(c api.Cluster) resources.HostDefinition {
+func gatewaySizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
 		Cores:    2,
 		RAMSize:  15.0,
@@ -105,7 +102,7 @@ func gatewaySizing(c api.Cluster) resources.HostDefinition {
 	}
 }
 
-func nodeSizing(c api.Cluster) resources.HostDefinition {
+func nodeSizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
 		Cores:    4,
 		RAMSize:  15.0,
@@ -113,7 +110,7 @@ func nodeSizing(c api.Cluster) resources.HostDefinition {
 	}
 }
 
-func defaultImage(c api.Cluster) string {
+func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 	return "Ubuntu 18.04"
 }
 
@@ -136,7 +133,7 @@ func getTemplateBox() (*rice.Box, error) {
 
 // getGlobalSystemRequirements returns the string corresponding to the script boh_install_requirements.sh
 // which installs common features (docker in particular)
-func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
+func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman) (*string, error) {
 	anon := globalSystemRequirementsContent.Load()
 	if anon == nil {
 		// find the rice.Box
@@ -157,9 +154,10 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
 		}
 		dataBuffer := bytes.NewBufferString("")
-		identity := c.GetIdentity()
+		cluster := foreman.Cluster()
+		identity := cluster.GetIdentity(task)
 		data := map[string]interface{}{
-			"CIDR":          c.GetNetworkConfig().CIDR,
+			"CIDR":          cluster.GetNetworkConfig(task).CIDR,
 			"CladmPassword": identity.AdminPassword,
 			"SSHPublicKey":  identity.Keypair.PublicKey,
 			"SSHPrivateKey": identity.Keypair.PrivateKey,
@@ -175,7 +173,7 @@ func getGlobalSystemRequirements(c api.Cluster) (*string, error) {
 	return anon.(*string), nil
 }
 
-func getNodeInstallationScript(c api.Cluster, nodeType NodeType.Enum) (string, map[string]interface{}) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType NodeType.Enum) (string, map[string]interface{}) {
 	data := map[string]interface{}{}
 	script := ""
 
