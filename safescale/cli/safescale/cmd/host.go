@@ -29,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/safescale/server/install"
 	"github.com/CS-SI/SafeScale/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
 )
 
@@ -137,9 +138,9 @@ var hostList = cli.Command{
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error()))
 		}
 		for _, v := range result {
-			delete(v, "PrivateKey")
-			delete(v, "State")
-			delete(v, "GatewayID")
+			delete(v, "private_key")
+			delete(v, "state")
+			delete(v, "gateway_id")
 		}
 		rejsoned, err := json.Marshal(result)
 		if err != nil {
@@ -254,16 +255,16 @@ var hostCreate = cli.Command{
 		// hostName := c.Args().Get(1)
 
 		def := pb.HostDefinition{
-			Name:      c.Args().First(),
-			CPUNumber: int32(c.Int("cpu")),
-			Disk:      int32(c.Float64("disk")),
-			ImageID:   c.String("os"),
-			Network:   c.String("net"),
-			Public:    c.Bool("public"),
-			RAM:       float32(c.Float64("ram")),
-			GPUNumber: int32(c.Int("gpu")),
-			Freq:      float32(c.Float64("cpu-freq")),
-			Force:     c.Bool("force"),
+			Name:     c.Args().First(),
+			CpuCount: int32(c.Int("cpu")),
+			Disk:     int32(c.Float64("disk")),
+			ImageId:  c.String("os"),
+			Network:  c.String("net"),
+			Public:   c.Bool("public"),
+			Ram:      float32(c.Float64("ram")),
+			GpuCount: int32(c.Int("gpu")),
+			CpuFreq:  float32(c.Float64("cpu-freq")),
+			Force:    c.Bool("force"),
 		}
 		resp, err := client.New().Host.Create(def, client.DefaultExecutionTimeout)
 		if err != nil {
@@ -323,13 +324,13 @@ var hostResize = cli.Command{
 		}
 
 		def := pb.HostDefinition{
-			Name:      c.Args().First(),
-			CPUNumber: int32(c.Int("cpu")),
-			Disk:      int32(c.Float64("disk")),
-			RAM:       float32(c.Float64("ram")),
-			GPUNumber: int32(c.Int("gpu")),
-			Freq:      float32(c.Float64("cpu-freq")),
-			Force:     c.Bool("force"),
+			Name:     c.Args().First(),
+			CpuCount: int32(c.Int("cpu")),
+			Disk:     int32(c.Float64("disk")),
+			Ram:      float32(c.Float64("ram")),
+			GpuCount: int32(c.Int("gpu")),
+			CpuFreq:  float32(c.Float64("cpu-freq")),
+			Force:    c.Bool("force"),
 		}
 		resp, err := client.New().Host.Resize(def, client.DefaultExecutionTimeout)
 		if err != nil {
@@ -417,7 +418,7 @@ var hostAddFeatureCommand = cli.Command{
 			return err
 		}
 
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, err.Error())
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
@@ -439,7 +440,7 @@ var hostAddFeatureCommand = cli.Command{
 		settings.SkipProxy = c.Bool("skip-proxy")
 
 		// Wait for SSH service on remote host first
-		err = client.New().Ssh.WaitReady(hostInstance.ID, client.DefaultConnectionTimeout)
+		err = client.New().Ssh.WaitReady(hostInstance.Id, client.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.ExitOnRPC(msg)
@@ -522,7 +523,7 @@ var hostCheckFeatureCommand = cli.Command{
 			return err
 		}
 
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
@@ -541,7 +542,7 @@ var hostCheckFeatureCommand = cli.Command{
 		}
 
 		// Wait for SSH service on remote host first
-		err = client.New().Ssh.WaitReady(hostInstance.ID, client.DefaultConnectionTimeout)
+		err = client.New().Ssh.WaitReady(hostInstance.Id, client.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.ExitOnRPC(msg)
@@ -591,7 +592,7 @@ var hostDeleteFeatureCommand = cli.Command{
 			return err
 		}
 
-		feature, err := install.NewFeature(featureName)
+		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
 			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
 		}
@@ -610,7 +611,7 @@ var hostDeleteFeatureCommand = cli.Command{
 		}
 
 		// Wait for SSH service on remote host first
-		err = client.New().Ssh.WaitReady(hostInstance.ID, client.DefaultConnectionTimeout)
+		err = client.New().Ssh.WaitReady(hostInstance.Id, client.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
 			return clitools.ExitOnRPC(msg)
