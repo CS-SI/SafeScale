@@ -16,29 +16,38 @@
 
 package utils
 
-// ErrCore ...
-type ErrCore struct {
+// errCore ...
+type errCore struct {
 	message string
 }
 
-func (e *ErrCore) Error() string {
+func (e errCore) Error() string {
 	return e.message
 }
 
 // ErrTimeout defines a Timeout error
 type ErrTimeout struct {
-	*ErrCore
+	errCore
+}
+
+// TimeoutError ...
+func TimeoutError(msg string) ErrTimeout {
+	return ErrTimeout{
+		errCore: errCore{
+			message: msg,
+		},
+	}
 }
 
 // ErrNotFound resource not found error
 type ErrNotFound struct {
-	*ErrCore
+	errCore
 }
 
 // NotFoundError creates a ResourceNotFound error
 func NotFoundError(msg string) ErrNotFound {
 	return ErrNotFound{
-		ErrCore: &ErrCore{
+		errCore: errCore{
 			message: msg,
 		},
 	}
@@ -46,13 +55,13 @@ func NotFoundError(msg string) ErrNotFound {
 
 // ErrNotAvailable resource not available error
 type ErrNotAvailable struct {
-	*ErrCore
+	errCore
 }
 
 // NotAvailableError creates a NotAvailable error
 func NotAvailableError(msg string) ErrNotAvailable {
 	return ErrNotAvailable{
-		ErrCore: &ErrCore{
+		errCore: errCore{
 			message: msg,
 		},
 	}
@@ -60,13 +69,13 @@ func NotAvailableError(msg string) ErrNotAvailable {
 
 // ErrAlreadyExists resource already exists error
 type ErrAlreadyExists struct {
-	*ErrCore
+	errCore
 }
 
 // AlreadyExistsError creates a ResourceAlreadyExists error
 func AlreadyExistsError(msg string) ErrAlreadyExists {
 	return ErrAlreadyExists{
-		ErrCore: &ErrCore{
+		errCore: errCore{
 			message: msg,
 		},
 	}
@@ -74,13 +83,13 @@ func AlreadyExistsError(msg string) ErrAlreadyExists {
 
 // ErrInvalidRequest ...
 type ErrInvalidRequest struct {
-	*ErrCore
+	errCore
 }
 
 // InvalidRequestError creates a ErrInvalidRequest error
 func InvalidRequestError(msg string) ErrInvalidRequest {
 	return ErrInvalidRequest{
-		ErrCore: &ErrCore{
+		errCore: errCore{
 			message: msg,
 		},
 	}
