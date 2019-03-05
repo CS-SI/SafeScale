@@ -16,7 +16,7 @@ func ClusterK8S(t *testing.T, provider Providers.Enum) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := GetOutput("deploy -v -d cluster create + --cidr 168.192.200.0/24 --disable remotedesktop " + names.Clusters[0])
+	out, err := GetOutput("safescale -v -d cluster create + --cidr 168.192.200.0/24 --disable remotedesktop " + names.Clusters[0])
 	require.Nil(t, err)
 
 	command := "sudo -u cladm -i kubectl run hello-world-za --image=gcr.io/google-samples/node-hello:1.0  --port=8080"
@@ -27,10 +27,10 @@ func ClusterK8S(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale ssh run " + names.Clusters[0] + "-master-1 -c \"" + command + "\"")
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy cluster inspect " + names.Clusters[0])
+	out, err = GetOutput("safescale cluster inspect " + names.Clusters[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy cluster delete --yes " + names.Clusters[0])
+	out, err = GetOutput("safescale cluster delete --yes " + names.Clusters[0])
 	require.Nil(t, err)
 	fmt.Println(out)
 }
@@ -42,7 +42,7 @@ func ClusterSwarm(t *testing.T, provider Providers.Enum) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := GetOutput("deploy -v -d cluster create + --cidr 168.192.201.0/24 --disable remotedesktop --flavor SWARM " + names.Clusters[0])
+	out, err := GetOutput("safescale -v -d cluster create + --cidr 168.192.201.0/24 --disable remotedesktop --flavor SWARM " + names.Clusters[0])
 	require.Nil(t, err)
 
 	command := "docker service create --name webtest --publish 8118:80 httpd"
@@ -58,22 +58,22 @@ func ClusterSwarm(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "It works!"))
 
-	out, err = GetOutput("deploy host check-feature gw-net-" + names.Clusters[0] + " reverseproxy")
+	out, err = GetOutput("safescale host check-feature gw-net-" + names.Clusters[0] + " reverseproxy")
 	require.Nil(t, err)
 
 	//need --param Password=
-	//out, err = GetOutput("deploy -v -d cluster add-feature " + names.Clusters[0] + " remotedesktop --skip-proxy")
+	//out, err = GetOutput("safescale -v -d cluster add-feature " + names.Clusters[0] + " remotedesktop --skip-proxy")
 	//require.Nil(t, err)
 
-	//out, err = GetOutput("deploy -v -d cluster check-feature " + names.Clusters[0] + " remotedesktop")
+	//out, err = GetOutput("safescale -v -d cluster check-feature " + names.Clusters[0] + " remotedesktop")
 	//require.Nil(t, err)
 
-	//out, err = GetOutput("deploy -v -d cluster delete-feature " + names.Clusters[0] + " remotedesktop")
+	//out, err = GetOutput("safescale -v -d cluster delete-feature " + names.Clusters[0] + " remotedesktop")
 	//require.Nil(t, err)
 
-	out, err = GetOutput("deploy cluster inspect " + names.Clusters[0])
+	out, err = GetOutput("safescale cluster inspect " + names.Clusters[0])
 	require.Nil(t, err)
 
-	out, err = GetOutput("deploy cluster delete --yes " + names.Clusters[0])
+	out, err = GetOutput("safescale cluster delete --yes " + names.Clusters[0])
 	require.Nil(t, err)
 }

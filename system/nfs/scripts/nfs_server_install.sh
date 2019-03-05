@@ -70,6 +70,15 @@ case $LINUX_KIND in
         systemctl start nfs-server
         systemctl start nfs-lock
         systemctl start nfs-idmap
+
+        setsebool -P use_nfs_home_dirs 1
+        firewall-cmd --permanent --add-service=nfs
+        firewall-cmd --permanent --add-service=mountd
+        firewall-cmd --permanent --add-service=rpc-bind
+        firewall-cmd --reload
+        systemctl restart rpcbind
+        systemctl restart nfs-server
+        systemctl restart nfs
         ;;
 
     *)

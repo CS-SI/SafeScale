@@ -46,7 +46,7 @@ var (
 
 // RebrandCommand allows to prefix a command with cmds.RebrandingPrefix
 // ie: with cmds.RebrandingPrefix == "safe "
-//     "deploy ..." becomes "safe deploy ..."
+//     "safescale ..." becomes "safe deploy ..."
 //     with cmds.RebrandingPrefix == "my"
 //     "perform ..." becomes "myperform ..."
 func RebrandCommand(command string) string {

@@ -26,15 +26,7 @@ function print_error {
 }
 trap print_error ERR
 
-# function dns_fallback {
-#     grep nameserver /etc/resolv.conf && return 0
-#     echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
-#     sudo cp /tmp/resolv.conf /etc/resolv.conf
-#     return 0
-# }
-
-# dns_fallback
-
 mkdir -p "{{.MountPoint}}" && \
+echo mount.nfs -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" > /var/tmp/moco.txt && \
 mount.nfs -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" && \
 echo "{{.Export}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,{{ .cacheOption }} 0   0" >>/etc/fstab
