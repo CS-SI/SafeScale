@@ -18,7 +18,7 @@ package resources
 
 const (
 	// DefaultUser Default Host user
-	DefaultUser = "gpac"
+	DefaultUser = "safescale"
 
 	// DefaultVolumeMountPoint Default mount point for volumes
 	DefaultVolumeMountPoint = "/data/"
