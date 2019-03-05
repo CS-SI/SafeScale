@@ -19,17 +19,18 @@ package cmds
 import (
 	"bufio"
 	"fmt"
-	"github.com/CS-SI/SafeScale/iaas/resources"
 	"os"
 	"os/exec"
 
 	//log "github.com/sirupsen/logrus"
-
-	"github.com/CS-SI/SafeScale/safescale/server/cluster"
-	clusterapi "github.com/CS-SI/SafeScale/safescale/server/cluster/api"
 	"github.com/urfave/cli"
 
+	"github.com/CS-SI/SafeScale/iaas/resources"
+
 	"github.com/CS-SI/SafeScale/perform/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/safescale/server/cluster"
+	clusterapi "github.com/CS-SI/SafeScale/safescale/server/cluster/api"
+	"github.com/CS-SI/SafeScale/utils/concurrency"
 )
 
 var (
@@ -103,7 +104,7 @@ func extractClusterArgument(c *cli.Context) error {
 		if clusterName == "" {
 			return cli.NewExitError("Invalid argument CLUSTERNAME", int(ExitCode.InvalidArgument))
 		}
-		clusterInstance, err = cluster.Get(clusterName)
+		clusterInstance, err = cluster.Get(concurrency.RootTask(), clusterName)
 		if err != nil {
 			if _, ok := err.(resources.ErrResourceNotFound); ok {
 				msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)
