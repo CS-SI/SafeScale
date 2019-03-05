@@ -65,8 +65,6 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 		if err != nil {
 			fmt.Println(DecorateError(err, "deletion of network", true).Error())
 			atomic.AddInt32(&errs, 1)
-		} else {
-			fmt.Printf("Network '%s' deleted\n", aname)
 		}
 	}
 
