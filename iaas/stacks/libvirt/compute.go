@@ -44,6 +44,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"golang.org/x/crypto/ssh"
 
@@ -787,7 +788,16 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		if err != nil {
 			return nil, fmt.Errorf("KeyPair creation failed : %s", err.Error())
 		}
+		request.KeyPair = keyPair
 	}
+	if request.Password == "" {
+		password, err := utils.GeneratePassword(16)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate password: %s", err.Error())
+		}
+		request.Password = password
+	}
+
 	template, err := s.GetTemplate(templateID)
 	if err != nil {
 		return nil, fmt.Errorf("GetTemplate failed : %s", err.Error())
@@ -801,7 +811,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		return nil, fmt.Errorf("GetDiskFromID failled %s: ", err.Error())
 	}
 
-	userData, err := userdata.Prepare(*s.Config, request, keyPair, networks[0].CIDR)
+	userData, err := userdata.Prepare(*s.Config, request, networks[0].CIDR)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare user data content: %+v", err)
 	}
@@ -937,6 +947,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	}
 
 	host.PrivateKey = keyPair.PrivateKey
+	host.Password = request.Password
 
 	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
