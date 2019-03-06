@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/safescale/client"
 	"os"
 	"strconv"
 	"strings"
@@ -259,7 +260,16 @@ func (handler *NetworkHandler) Create(
 	err = ssh.WaitServerReady(time.Duration(sshDefaultTimeout) * time.Minute)
 	// err = ssh.WaitServerReady(time.Second * 3)
 	if err != nil {
-		return nil, logicErrf(err, "error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name)
+		if client.IsTimeout(err) {
+			return nil, infraErrf(err, "Timeout creating a gateway")
+		}
+
+		if client.IsProvisioningError(err) {
+			log.Errorf("%+v", err)
+			return nil, logicErr(fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name))
+		}
+
+		return nil, infraErr(err)
 	}
 	log.Infof("SSH service of gateway '%s' started.", gw.Name)
 

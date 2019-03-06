@@ -294,6 +294,21 @@ reset_fw() {
 
 }
 
+check_for_network() {
+    case $LINUX_KIND in
+        debian)
+            ping -c 5 archive.debian.org || return 1
+            ;;
+        ubuntu)
+            ping -c 5 archive.ubuntu.com || return 1
+            ;;
+        rhel|centos)
+            ping -c 5 www.google.com || return 1
+            ;;
+    esac
+    return 0
+}
+
 enable_iptables() {
     case $LINUX_KIND in
         debian|ubuntu)
@@ -400,6 +415,12 @@ configure_as_gateway() {
     mv /etc/ssh/sshd_config.new /etc/ssh/sshd_config
     systemctl restart ssh
 
+    check_for_network
+    [ $? -ne 0 ] && {
+        echo "PROVISIONING_ERROR: No network available"
+        exit 1
+    }
+
     echo done
 }
 
@@ -495,6 +516,12 @@ EOF
     systemctl enable gateway
     systemctl start gateway
 
+    check_for_network
+    [ $? -ne 0 ] && {
+        echo "PROVISIONING_ERROR: No network available"
+        exit 1
+    }
+
     enable_iptables
 
     echo done
@@ -510,6 +537,12 @@ configure_gateway_redhat() {
     echo "GATEWAY={{.GatewayIP}}" >/etc/sysconfig/network
 
     enable_iptables
+
+    check_for_network
+    [ $? -ne 0 ] && {
+        echo "PROVISIONING_ERROR: No network available"
+        exit 1
+    }
 
     echo done
 }
