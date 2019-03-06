@@ -136,3 +136,15 @@ func DecorateError(err error, action string, maySucceed bool) error {
 func IsTimeout(err error) bool {
 	return status.Code(err) == codes.DeadlineExceeded
 }
+
+
+// IsProvisioningError detects provisioning errors
+func IsProvisioningError(err error) bool {
+	errText := err.Error()
+	if strings.Contains(errText, "PROVISIONING_ERROR:") {
+		return true
+	}
+	return false
+}
+
+

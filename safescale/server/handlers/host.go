@@ -439,13 +439,20 @@ func (handler *HostHandler) Create(
 			sshDefaultTimeout = num
 		}
 	}
-	// TODO configurable timeout here
+
+	// FIXME configurable timeout here
 	err = sshCfg.WaitServerReady(time.Duration(sshDefaultTimeout) * time.Minute)
 	if err != nil {
+		if client.IsTimeout(err) {
+			return nil, infraErrf(err, "Timeout creating a host")
+		}
+
+		if client.IsProvisioningError(err) {
+			log.Errorf("%+v", err)
+			return nil, fmt.Errorf("Error creating the host [%s], error provisioning the new host, please check daemon logs", host.Name)
+		}
+
 		return nil, infraErr(err)
-	}
-	if client.IsTimeout(err) {
-		return nil, infraErrf(err, "Timeout creating a host")
 	}
 
 	log.Infof("SSH service started on host '%s'.", host.Name)
