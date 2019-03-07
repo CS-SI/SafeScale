@@ -556,7 +556,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, public bool, req
 		if hostName != "" {
 			hosts = append(hosts, hostName)
 		}
-		err := s.GetError().(error)
+		err := s.GetError()
 		if err != nil {
 			errors = append(errors, err.Error())
 		}
