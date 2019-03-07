@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path"
 	"runtime"
 	"sort"
 	"strings"
@@ -98,7 +99,13 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
-		log.SetLevel(log.WarnLevel)
+		if strings.Contains(path.Base(os.Args[0]), "-cover") {
+			log.SetLevel(log.DebugLevel)
+			utils.Verbose = true
+		} else {
+			log.SetLevel(log.WarnLevel)
+		}
+
 		if c.GlobalBool("verbose") {
 			log.SetLevel(log.InfoLevel)
 			utils.Verbose = true

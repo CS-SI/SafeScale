@@ -383,10 +383,6 @@ func (c *SSHCommand) Start() error {
 // If the command starts but does not complete successfully, the error is of
 // type *ExitError. Other error types may be returned for other situations.
 func (c *SSHCommand) Run() (int, string, string, error) {
-	//	err := c.cmd.Run()
-	//	c.end()
-	//	return err
-
 	// Set up the outputs (std and err)
 	stdOut, err := c.StdoutPipe()
 	if err != nil {
@@ -412,14 +408,11 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 		return 0, "", "", err
 	}
 
-	defer func() {
-		nerr := c.end()
-		if nerr != nil {
-			log.Warnf("Error waiting for command end: %v", nerr)
-		}
-	}()
-
 	err = c.Wait()
+	nerr := c.end()
+	if nerr != nil {
+		log.Warnf("Error waiting for command end: %v", nerr)
+	}
 	if err != nil {
 		msgError, retCode, erro := ExtractRetCode(err)
 		if erro != nil {
@@ -429,7 +422,78 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 	}
 
 	return 0, string(msgOut[:]), string(msgErr[:]), nil
+}
 
+func (c *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
+	log.Info("Running command with timeout")
+
+	// Set up the outputs (std and err)
+	stdOut, err := c.StdoutPipe()
+	if err != nil {
+		return 0, "", "", err
+	}
+	stderr, err := c.StderrPipe()
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	// Launch the command and wait for its execution
+	if err = c.Start(); err != nil {
+		return 0, "", "", err
+	}
+
+	doneCh := make(chan bool)
+
+	var msgOut []byte
+	var msgErr []byte
+
+	go func() {
+		defer close(doneCh)
+
+		clean := true
+
+		err = c.Wait()
+		closeErr := c.end()
+		if closeErr != nil {
+			log.Debugf("Error waiting for command end: %v", closeErr)
+			clean = false
+		}
+
+		msgOut, closeErr = ioutil.ReadAll(stdOut)
+		if closeErr != nil {
+			log.Debugf("Error recovering standard output of command: %v", closeErr)
+			clean = false
+		}
+
+		msgErr, closeErr = ioutil.ReadAll(stderr)
+		if closeErr != nil {
+			log.Debugf("Error recovering standard error of command: %v", closeErr)
+			clean = false
+		}
+
+		doneCh <- clean
+	}()
+
+	select {
+	case issues := <- doneCh:
+		if err != nil {
+			msgError, retCode, erro := ExtractRetCode(err)
+			if erro != nil {
+				return 0, "", "", err
+			}
+			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
+		} else {
+			if issues {
+				log.Warnf("There have been issues running this command, please check daemon logs")
+			}
+		}
+	case <-time.After(timeout):
+		errMsg := fmt.Sprintf("Timeout of (%s) waiting for the command to end", timeout)
+		log.Warnf(errMsg)
+		return 0, "", "", fmt.Errorf(errMsg)
+	}
+
+	return 0, string(msgOut[:]), string(msgErr[:]), nil
 }
 
 func (c *SSHCommand) end() error {

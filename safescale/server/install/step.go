@@ -225,7 +225,7 @@ type step struct {
 
 // Run executes the step on all the concerned hosts
 func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, error) {
-	// log.Printf("running step '%s' on %d hosts...", is.Name, len(hosts))
+	log.Printf("running step '%s' on %d hosts...", is.Name, len(hosts))
 
 	results := stepResults{}
 
@@ -251,7 +251,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 	} else {
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
-			// log.Debugf("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+			log.Debugf("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 			variables := v.Clone()
 			variables["HostIP"] = h.PrivateIp
 			variables["Hostname"] = h.Name
