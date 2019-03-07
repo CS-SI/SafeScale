@@ -110,10 +110,9 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
 	}
 
-	// TODO Remove later
 	k, uperr := sshconfig.Command("which scp")
 	if uperr != nil {
-		_, uptext, _, kerr := k.Run()
+		_, uptext, _, kerr := k.Run() // FIXME It CAN lock
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
@@ -122,10 +121,9 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		}
 	}
 
-	// TODO Remove later
 	k, uperr = sshconfig.SudoCommand("which scp")
 	if uperr != nil {
-		_, uptext, _, kerr := k.Run()
+		_, uptext, _, kerr := k.Run() // FIXME It CAN lock
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
