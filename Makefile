@@ -95,10 +95,10 @@ WARN_STRING  = "[WARNING]"
 BUILD_TAGS = ""
 export BUILD_TAGS
 
-all: begin ground getdevdeps ensure generate utils system iaas safescale perform scanner err vet-light
+all: begin ground getdevdeps generate utils system iaas safescale perform scanner err vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
-common: begin ground getdevdeps ensure generate
+common: begin ground getdevdeps generate
 
 begin:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
