@@ -298,10 +298,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to find a way to install '%s'", f.DisplayName())
 	}
 
-	//if debug
-	if true {
-		log.Printf("Adding feature '%s' on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
-	}
+	log.Infof("Adding feature '%s' on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
