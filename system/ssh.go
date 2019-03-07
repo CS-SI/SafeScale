@@ -374,6 +374,10 @@ func (c *SSHCommand) Start() error {
 	return c.cmd.Start()
 }
 
+func (c *SSHCommand) Display() string {
+	return strings.Join(c.cmd.Args[:]," ")
+}
+
 // Run starts the specified command and waits for it to complete.
 //
 // The returned error is nil if the command runs, has no problems

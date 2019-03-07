@@ -317,12 +317,8 @@ func (is *step) taskRunOnHost(tr concurrency.TaskRunner, params interface{}) {
 		tr.StoreResult(stepResult{success: false, err: err})
 		return
 	}
-	//if debug {
-	if true {
-		command = fmt.Sprintf("sudo bash %s", filename)
-	} else {
-		command = fmt.Sprintf("sudo bash %s; rc=$?; sudo rm -f %s /var/tmp/options.json; exit $rc", filename, filename)
-	}
+
+	command = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then sudo rm -f %s /var/tmp/options.json; fi; exit $rc", filename, filename)
 
 	// Executes the script on the remote host
 	retcode, _, _, err := client.New().Ssh.Run(host.Name, command, client.DefaultConnectionTimeout, is.WallTime)

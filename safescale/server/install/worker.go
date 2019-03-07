@@ -361,7 +361,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 	// Now enumerate steps and execute each of them
 	var err error
 	for _, k := range order {
-		// log.Printf("executing step '%s::%s'...\n", w.action.String(), k)
+		log.Printf("executing step '%s::%s'...\n", w.action.String(), k)
 
 		stepKey := stepsKey + "." + k
 		var (

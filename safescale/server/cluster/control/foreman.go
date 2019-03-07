@@ -134,12 +134,9 @@ func (b *foreman) ExecuteScript(
 		return 0, "", "", err
 	}
 	var cmd string
-	//if debug
-	if true {
-		cmd = fmt.Sprintf("sudo bash %s", path)
-	} else {
-		cmd = fmt.Sprintf("sudo bash %s; rc=$?; rm %s; exit $rc", path, path)
-	}
+
+	cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
+
 	return client.New().Ssh.Run(hostID, cmd, client.DefaultConnectionTimeout, time.Duration(20)*time.Minute)
 }
 
