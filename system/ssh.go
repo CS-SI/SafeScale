@@ -402,14 +402,24 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 		return 0, "", "", err
 	}
 
-	msgOut, _ := ioutil.ReadAll(stdOut)
-	msgErr, _ := ioutil.ReadAll(stderr)
+	msgOut, err := ioutil.ReadAll(stdOut)
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	msgErr, err := ioutil.ReadAll(stderr)
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	defer func() {
+		nerr := c.end()
+		if nerr != nil {
+			log.Warnf("Error waiting for command end: %v", nerr)
+		}
+	}()
 
 	err = c.Wait()
-	nerr := c.end()
-	if nerr != nil {
-		log.Warnf("Error waiting for command end: %v", nerr)
-	}
 	if err != nil {
 		msgError, retCode, erro := ExtractRetCode(err)
 		if erro != nil {
@@ -557,7 +567,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 				return err
 			}
 
-			retcode, stdout, stderr, err := cmd.Run()
+			retcode, stdout, stderr, err := cmd.Run() // FIXME It CAN lock
 			if err != nil {
 				return err
 			}
@@ -581,7 +591,7 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 			return err
 		}
 
-		retcode, stdout, stderr, logErr := logCmd.Run()
+		retcode, stdout, stderr, logErr := logCmd.Run() // FIXME It CAN lock
 		if logErr == nil {
 			if retcode == 0 {
 				return fmt.Errorf("server '%s' is not ready yet: %s - log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)
@@ -645,7 +655,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		keyFile: identityfile,
 	}
 
-	return sshCommand.Run()
+	return sshCommand.Run() // FIXME It CAN lock
 }
 
 // Exec executes the cmd using ssh

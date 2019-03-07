@@ -397,7 +397,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				log.Warnf("template [%s] : Problem creating ssh command: %v", template.Name, err)
 				return err
 			}
-			_, cout, _, err := c.Run()
+			_, cout, _, err := c.Run() // FIXME It CAN lock
 			if err != nil {
 				log.Warnf("template [%s] : Problem running ssh command: %v", template.Name, err)
 				return err

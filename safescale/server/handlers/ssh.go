@@ -145,7 +145,7 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (int, 
 			retCode, stdOut, stdErr, err = handler.run(ssh, cmd)
 			return err
 		},
-		2*time.Minute,
+		2*time.Minute, // FIXME Hardcoded timeout
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
 				log.Printf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
@@ -166,7 +166,7 @@ func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, 
 	if err != nil {
 		return 0, "", "", err
 	}
-	return sshCmd.Run()
+	return sshCmd.Run() // FIXME It CAN lock
 }
 
 func extracthostName(in string) (string, error) {
