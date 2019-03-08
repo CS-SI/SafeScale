@@ -142,12 +142,9 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		cmd, stdout, stderr string
 		retcode             int
 	)
-	// if debug
-	if false {
-		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s", filename, filename)
-	} else {
-		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; rm -f %s; exit $rc", filename, filename, filename)
-	}
+
+	cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; if [[ rc -eq 0 ]]; then rm -f %s; fi; exit $rc", filename, filename, filename)
+
 	retryErr = retry.Action(
 		func() error {
 			stdout = ""

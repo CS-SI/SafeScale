@@ -252,10 +252,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to find a way to check '%s'", f.DisplayName())
 	}
 
-	//if debug
-	if false {
-		log.Printf("Checking if feature '%s' is installed on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
-	}
+	log.Debugf("Checking if feature '%s' is installed on %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
@@ -352,10 +349,8 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 	if installer == nil {
 		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", f.DisplayName())
 	}
-	//if debug
-	if false {
-		log.Printf("Removing feature '%s' from %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
-	}
+
+	log.Printf("Removing feature '%s' from %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)
@@ -381,8 +376,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 	yamlKey := "feature.requirements.features"
 	if f.specs.IsSet(yamlKey) {
-		// if debug
-		if false {
+		{
 			hostInstance, clusterInstance, nodeInstance := determineContext(t)
 			msgHead := fmt.Sprintf("Checking requirements of feature '%s'", f.DisplayName())
 			var msgTail string
@@ -395,7 +389,7 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 			if clusterInstance != nil {
 				msgTail = fmt.Sprintf("on cluster '%s'", clusterInstance.cluster.GetIdentity(f.task).Name)
 			}
-			log.Printf("%s %s...\n", msgHead, msgTail)
+			log.Debugf("%s %s...\n", msgHead, msgTail)
 		}
 		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
 			needed, err := NewFeature(f.task, requirement)

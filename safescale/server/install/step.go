@@ -232,10 +232,8 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 	if is.Serial || s.Serialize {
 		subtask := concurrency.NewTask(is.Worker.feature.task, is.taskRunOnHost)
 		for _, h := range hosts {
-			//if debug
-			if false {
-				log.Printf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
-			}
+			log.Debugf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+
 			variables := v.Clone()
 			variables["HostIP"] = h.PrivateIp
 			variables["Hostname"] = h.Name
@@ -264,12 +262,11 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 		for k, s := range subtasks {
 			s.Wait()
 			results[k] = s.GetResult().(stepResult)
-			if false {
-				if !results[k].Successful() {
-					log.Infof("%s(%s):step(%s)@%s: fail", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
-				} else {
-					log.Infof("%s(%s):step(%s)@%s: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
-				}
+
+			if !results[k].Successful() {
+				log.Debugf("%s(%s):step(%s)@%s: fail", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+			} else {
+				log.Debugf("%s(%s):step(%s)@%s: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
 			}
 		}
 	}
