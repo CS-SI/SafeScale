@@ -55,6 +55,7 @@ feature:
                             privateNodes: all
                             publicNodes: all
                         run: |
+                            which jq || sfInstall jq
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive

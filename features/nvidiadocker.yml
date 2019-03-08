@@ -63,6 +63,9 @@ feature:
                                 echo "No nVidia GPU detected. Aborting."
                                 exit 10
                             }
+
+                            which jq || sfInstall jq
+
                             NVIDIA_URL=http://developer.download.nvidia.com/compute/cuda/repos
                             case $LINUX_KIND in
                                 ubuntu)
