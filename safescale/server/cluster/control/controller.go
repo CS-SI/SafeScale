@@ -404,6 +404,9 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 		task = concurrency.RootTask()
 	}
 
+	log.Debugf(">>>{task %s} safescale.server.cluster.control.Controller::UpdateMetadata()", task.ID())
+	defer log.Debugf("<<<{task %s} safescale.server.cluster.control.Controller::UpdateMetadata()", task.ID())
+
 	c.Lock(task)
 	defer c.Unlock(task)
 
@@ -553,7 +556,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, public bool, req
 		if hostName != "" {
 			hosts = append(hosts, hostName)
 		}
-		err := s.GetError().(error)
+		err := s.GetError()
 		if err != nil {
 			errors = append(errors, err.Error())
 		}
@@ -648,45 +651,27 @@ func (c *Controller) ForceGetState(task concurrency.Task) (ClusterState.Enum, er
 
 // deleteMaster deletes the master specified by its ID
 func (c *Controller) deleteMaster(task concurrency.Task, hostID string) error {
-	if c == nil {
-		panic("Calling c.deleteMaster with c==nil!")
-	}
 	if hostID == "" {
-		panic("hostID is empty!")
+		panic("Invalid parameter 'hostID': can't be empty string!")
 	}
 	if task == nil {
 		task = concurrency.RootTask()
 	}
 
-	var (
-		found  bool
-		idx    int
-		master *clusterpropsv1.Node
-	)
-
-	c.RLock(task)
-	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
-		found, idx = contains(nodesV1.Masters, hostID)
-		if !found {
-			return resources.ResourceNotFoundError("host", hostID)
-		}
-		master = nodesV1.Masters[idx]
-		return nil
-	})
-	c.RUnlock(task)
-	if err != nil {
-		return err
-	}
-
 	// Removes master from cluster metadata
-	err = c.UpdateMetadata(task, func() error {
+	var master *clusterpropsv1.Node
+	err := c.UpdateMetadata(task, func() error {
 		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
-			if len(nodesV1.Masters) <= idx {
-				nodesV1.Masters = nodesV1.Masters[:idx]
-			} else {
+			found, idx := contains(nodesV1.Masters, hostID)
+			if !found {
+				return resources.ResourceNotFoundError("host", hostID)
+			}
+			master = nodesV1.Masters[idx]
+			if idx < len(nodesV1.Masters)-1 {
 				nodesV1.Masters = append(nodesV1.Masters[:idx], nodesV1.Masters[idx+1:]...)
+			} else {
+				nodesV1.Masters = nodesV1.Masters[:idx]
 			}
 			return nil
 		})
@@ -733,7 +718,6 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, public bool, selected
 	var (
 		node *clusterpropsv1.Node
 		err  error
-		idx  int
 	)
 
 	// Removed reference of the node from cluster metadata
@@ -741,11 +725,9 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, public bool, selected
 	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
 		if public {
-			idx = len(nodesV1.PublicNodes) - 1
-			node = nodesV1.PublicNodes[idx]
+			node = nodesV1.PublicNodes[len(nodesV1.PublicNodes)-1]
 		} else {
-			idx = len(nodesV1.PrivateNodes) - 1
-			node = nodesV1.PrivateNodes[idx]
+			node = nodesV1.PrivateNodes[len(nodesV1.PrivateNodes)-1]
 		}
 		return nil
 	})
@@ -761,7 +743,7 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, public bool, selected
 		}
 	}
 
-	return c.deleteNode(task, node, idx, public, selectedMaster)
+	return c.deleteNode(task, node, public, selectedMaster)
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
@@ -779,14 +761,13 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 
 	var (
 		foundInPublic bool
-		idx           int
 		node          *clusterpropsv1.Node
 	)
 
 	c.RLock(task)
 	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
-		foundInPublic, idx = contains(nodesV1.PublicNodes, hostID)
+		foundInPublic, idx := contains(nodesV1.PublicNodes, hostID)
 		if foundInPublic {
 			node = nodesV1.PublicNodes[idx]
 		} else {
@@ -807,13 +788,13 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 		}
 	}
 
-	return c.deleteNode(task, node, idx, foundInPublic, selectedMaster)
+	return c.deleteNode(task, node, foundInPublic, selectedMaster)
 }
 
 // deleteNode deletes the node specified by its ID
-func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, index int, public bool, selectedMaster string) error {
-	log.Debugf(">>> safescale.server.cluster.control.Controller::deleteNode(%s, %d)", node.ID, index)
-	defer log.Debugf("<<< safescale.server.cluster.control.Controller::deleteNode(%s, %d)", node.ID, index)
+func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, public bool, selectedMaster string) error {
+	log.Debugf(">>> safescale.server.cluster.control.Controller::deleteNode(%s)", node.Name)
+	defer log.Debugf("<<< safescale.server.cluster.control.Controller::deleteNode(%s)", node.Name)
 
 	if c == nil {
 		panic("Calling safescale.server.cluster.control.Controller::deleteNode() from nil pointer!")
@@ -831,18 +812,20 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
 			if public {
+				_, idx := contains(nodesV1.PublicNodes, node.ID)
 				length := len(nodesV1.PublicNodes)
-				if length <= index {
-					nodesV1.PublicNodes = nodesV1.PublicNodes[:index]
+				if idx < length-1 {
+					nodesV1.PublicNodes = append(nodesV1.PublicNodes[:idx], nodesV1.PublicNodes[idx+1:]...)
 				} else {
-					nodesV1.PublicNodes = append(nodesV1.PublicNodes[:index], nodesV1.PublicNodes[index+1:]...)
+					nodesV1.PublicNodes = nodesV1.PublicNodes[:idx]
 				}
 			} else {
 				length := len(nodesV1.PrivateNodes)
-				if length <= index {
-					nodesV1.PrivateNodes = nodesV1.PrivateNodes[:index]
+				_, idx := contains(nodesV1.PrivateNodes, node.ID)
+				if idx < length-1 {
+					nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:idx], nodesV1.PrivateNodes[idx+1:]...)
 				} else {
-					nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:index], nodesV1.PrivateNodes[index+1:]...)
+					nodesV1.PrivateNodes = nodesV1.PrivateNodes[:idx]
 				}
 			}
 			return nil

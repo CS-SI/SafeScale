@@ -130,7 +130,8 @@ func RootTask() Task {
 			return
 		}
 
-		newT := NewTask(nil, fn)
+		newT := newTask(nil, fn)
+		newT.id = "0"
 		globalTask.Store(newT)
 		anon = globalTask.Load()
 	}
@@ -144,6 +145,10 @@ func VoidTask() Task {
 
 // NewTask ...
 func NewTask(parentTask Task, fn TaskFunc) Task {
+	return newTask(parentTask, fn)
+}
+
+func newTask(parentTask Task, fn TaskFunc) *task {
 	var (
 		ctx    context.Context
 		cancel context.CancelFunc
@@ -187,6 +192,9 @@ func (t *task) ID() string {
 func (t *task) ForceID(id string) {
 	if id == "" {
 		panic("Invalid parameter 'id': can't be empty string!")
+	}
+	if id == "0" {
+		panic("Invalid parameter 'id': can't be '0': reserved for root task!")
 	}
 	t.lock.Lock()
 	defer t.lock.Unlock()
