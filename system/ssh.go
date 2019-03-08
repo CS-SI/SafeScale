@@ -455,13 +455,7 @@ func (c *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string,
 		defer close(doneCh)
 
 		clean := true
-
-		err = c.Wait()
-		closeErr := c.end()
-		if closeErr != nil {
-			log.Debugf("Error waiting for command end: %v", closeErr)
-			clean = false
-		}
+		var closeErr error
 
 		msgOut, closeErr = ioutil.ReadAll(stdOut)
 		if closeErr != nil {
@@ -472,6 +466,13 @@ func (c *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string,
 		msgErr, closeErr = ioutil.ReadAll(stderr)
 		if closeErr != nil {
 			log.Debugf("Error recovering standard error of command: %v", closeErr)
+			clean = false
+		}
+
+		err = c.Wait()
+		closeErr = c.end()
+		if closeErr != nil {
+			log.Debugf("Error waiting for command end: %v", closeErr)
 			clean = false
 		}
 
@@ -487,7 +488,7 @@ func (c *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string,
 			}
 			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
 		} else {
-			if issues {
+			if !issues {
 				log.Warnf("There have been issues running this command, please check daemon logs")
 			}
 		}
