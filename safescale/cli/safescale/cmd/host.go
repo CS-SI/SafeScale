@@ -233,8 +233,8 @@ var hostCreate = cli.Command{
 		},
 		cli.IntFlag{
 			Name:  "gpu",
-			Value: 0,
-			Usage: "Number of GPU for the host",
+			Value: -1,
+			Usage: "Number of GPU for the host (by default NO GPUs)",
 		},
 		cli.Float64Flag{
 			Name:  "cpu-freq, cpufreq",
@@ -253,6 +253,17 @@ var hostCreate = cli.Command{
 			return clitools.ExitOnInvalidArgument()
 		}
 		// hostName := c.Args().Get(1)
+
+		askedGpus := int32(c.Int("gpu"))
+		if askedGpus <= -1 {
+			askedGpus = -1
+		} else {
+			if askedGpus == 0 {
+				fmt.Println("NO GPU required")
+			} else {
+				fmt.Println("We want GPUs")
+			}
+		}
 
 		def := pb.HostDefinition{
 			Name:     c.Args().First(),

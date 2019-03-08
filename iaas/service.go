@@ -184,7 +184,8 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 		return nil, err
 	}
 
-	askedForSpecificScannerInfo := sizing.MinGPU > 0 || sizing.MinFreq != 0
+	// FIXME Prevent GPUs when user sends a 0
+	askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinFreq != 0
 	if askedForSpecificScannerInfo {
 		_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
