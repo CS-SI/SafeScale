@@ -125,6 +125,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 // GetAuthOpts returns authentification options as a Config
 func (p *provider) GetAuthOpts() (providers.Config, error) {
 	cfg := resources.ConfigMap{}
+	cfg.Set("Region", "Local")
 	return cfg, nil
 }
 
