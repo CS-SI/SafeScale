@@ -39,6 +39,7 @@ const (
 func GetTimeoutCtxDefault() time.Duration {
 	sshDefaultTimeout := int(TimeoutCtxDefault.Minutes())
 
+	// DEV ENV
 	if sshDefaultTimeoutCandidate := os.Getenv("CTX_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
 		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
 		if err == nil {
@@ -53,6 +54,7 @@ func GetTimeoutCtxDefault() time.Duration {
 func GetTimeoutCtxHost() time.Duration {
 	sshDefaultTimeout := int(TimeoutCtxHost.Minutes())
 
+	// DEV ENV
 	if sshDefaultTimeoutCandidate := os.Getenv("CTX_HOST_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
 		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
 		if err == nil {

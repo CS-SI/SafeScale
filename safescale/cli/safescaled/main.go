@@ -108,6 +108,7 @@ func work() {
 
 	safescaledPort := 50051
 
+	// DEV VAR
 	if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
 		num, err := strconv.Atoi(portCandidate)
 		if err == nil {
@@ -115,6 +116,7 @@ func work() {
 		}
 	}
 
+	// DEV VAR
 	suffix := ""
 	if suffixCandidate := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffixCandidate != "" {
 		suffix = suffixCandidate
