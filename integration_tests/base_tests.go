@@ -228,7 +228,7 @@ func Basic(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "0 users"))
+	require.True(t, strings.Contains(out, " user"))
 
 	out, err = GetOutput("safescale host delete " + names.Hosts[0])
 	fmt.Println(out)
@@ -388,7 +388,7 @@ func ShareError(t *testing.T, provider Providers.Enum) {
 
 	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "0 users"))
+	require.True(t, strings.Contains(out, " user"))
 
 	out, err = GetOutput("safescale share delete " + names.Shares[0])
 	require.Nil(t, err)
@@ -490,7 +490,7 @@ func StopStart(t *testing.T, provider Providers.Enum) {
 
 	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "0 users"))
+	require.True(t, strings.Contains(out, " user"))
 
 	out, err = GetOutput("safescale host reboot " + names.Hosts[0])
 	require.Nil(t, err)
@@ -499,7 +499,7 @@ func StopStart(t *testing.T, provider Providers.Enum) {
 
 	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "0 users"))
+	require.True(t, strings.Contains(out, " user"))
 }
 
 func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
