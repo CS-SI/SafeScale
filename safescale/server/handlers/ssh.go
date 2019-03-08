@@ -142,7 +142,8 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (int, 
 
 	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			retCode, stdOut, stdErr, err = handler.run(ssh, cmd)
+			// retCode, stdOut, stdErr, err = handler.run(ssh, cmd) // FIXME It CAN lock
+			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, 2*time.Minute) // FIXME Hardcoded timeout
 			return err
 		},
 		2*time.Minute, // FIXME Hardcoded timeout
@@ -168,6 +169,18 @@ func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, 
 	}
 	return sshCmd.Run() // FIXME It CAN lock
 }
+
+
+// run executes command on the host
+func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (int, string, string, error) {
+	// Create the command
+	sshCmd, err := ssh.Command(cmd)
+	if err != nil {
+		return 0, "", "", err
+	}
+	return sshCmd.RunWithTimeout(duration)
+}
+
 
 func extracthostName(in string) (string, error) {
 	parts := strings.Split(in, protocolSeparator)

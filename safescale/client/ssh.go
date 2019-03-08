@@ -65,8 +65,6 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 	_, cancel := utils.GetTimeoutContext(executionTimeout)
 	defer cancel()
 
-	// var timer *time.Timer
-
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			// Create the command
@@ -75,24 +73,6 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 			if err != nil {
 				return err
 			}
-
-			/*
-			started := make(chan bool)
-			timer = time.AfterFunc(executionTimeout, func() {
-				timer.Stop()
-
-				// Wait for sshCmd ready
-				<- started
-
-				// FIXME It triggers a data race
-				_ = sshCmd.Kill()
-			})
-
-			started <- true
-			close(started)
-
-			retcode, stdout, stderr, err = sshCmd.Run() // FIXME It CAN lock
-			*/
 
 			retcode, stdout, stderr, err = sshCmd.RunWithTimeout(executionTimeout) // FIXME It should NOT lock
 
