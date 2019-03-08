@@ -294,6 +294,20 @@ reset_fw() {
 
 }
 
+add_common_repos() {
+    case $LINUX_KIND in
+        debian)
+            ;;
+        ubuntu)
+            sfFinishPreviousInstall
+            add-apt-repository universe -y || return 1
+            ;;
+        rhel|centos)
+            ;;
+    esac
+    return 0
+}
+
 check_for_network() {
     case $LINUX_KIND in
         debian)
@@ -421,6 +435,8 @@ configure_as_gateway() {
         exit 1
     }
 
+    add_common_repos
+
     echo done
 }
 
@@ -524,6 +540,8 @@ EOF
 
     enable_iptables
 
+    add_common_repos
+
     echo done
 }
 
@@ -543,6 +561,8 @@ configure_gateway_redhat() {
         echo "PROVISIONING_ERROR: No network available"
         exit 1
     }
+
+    add_common_repos
 
     echo done
 }
@@ -586,6 +606,7 @@ install_drivers_nvidia() {
 install_packages() {
      case $LINUX_KIND in
         ubuntu|debian)
+            sfFinishPreviousInstall || true
             apt install -y -qq pciutils &>/dev/null
             ;;
         redhat|centos)
@@ -664,6 +685,7 @@ case $LINUX_KIND in
 esac
 
 touch /etc/cloud/cloud-init.disabled
+add_common_repos
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
