@@ -149,7 +149,7 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (int, 
 		2*time.Minute, // FIXME Hardcoded timeout
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
-				log.Printf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
+				log.Debugf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
 			}
 		},
 	)

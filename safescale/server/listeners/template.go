@@ -39,7 +39,7 @@ type TemplateListener struct{}
 
 // List available templates
 func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (*pb.TemplateList, error) {
-	log.Printf("Template List called")
+	log.Debugf("Template List called")
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

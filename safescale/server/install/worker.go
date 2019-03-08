@@ -361,7 +361,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 	// Now enumerate steps and execute each of them
 	var err error
 	for _, k := range order {
-		log.Printf("executing step '%s::%s'...\n", w.action.String(), k)
+		log.Debugf("executing step '%s::%s'...\n", w.action.String(), k)
 
 		stepKey := stepsKey + "." + k
 		var (
@@ -472,7 +472,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 		if ok {
 			wallTime, err = strconv.Atoi(anon.(string))
 			if err != nil {
-				log.Printf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlWallTimeKeyword)
+				log.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlWallTimeKeyword)
 			}
 		}
 		if wallTime == 0 {

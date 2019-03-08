@@ -18,7 +18,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"github.com/sirupsen/logrus"
 	"runtime"
 
 	"github.com/CS-SI/SafeScale/iaas/resources"
@@ -37,7 +37,7 @@ func Run() {
 	instance, err := cluster.Get(concurrency.RootTask(), clusterName)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); ok {
-			log.Printf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
+			logrus.Warnf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
 			instance, err = cluster.Create(concurrency.RootTask(), control.Request{
 				Name:       clusterName,
 				Complexity: Complexity.Small,

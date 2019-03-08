@@ -229,7 +229,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (*google_
 	if err != nil {
 		return &google_protobuf.Empty{}, grpc.Errorf(codes.Internal, fmt.Sprintf("can't delete volume '%s': %s", ref, err.Error()))
 	}
-	log.Printf("Volume '%s' successfully deleted.", ref)
+	log.Infof("Volume '%s' successfully deleted.", ref)
 	return &google_protobuf.Empty{}, nil
 }
 

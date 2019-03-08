@@ -323,7 +323,7 @@ func (svc *Service) SearchImage(osname string) (*resources.Image, error) {
 		return nil, fmt.Errorf("unable to find an image matching %s", osname)
 	}
 
-	log.Printf("Selected image: '%s' (ID='%s')", imgs[maxi].Name, imgs[maxi].ID)
+	log.Infof("Selected image: '%s' (ID='%s')", imgs[maxi].Name, imgs[maxi].ID)
 	return &imgs[maxi], nil
 }
 

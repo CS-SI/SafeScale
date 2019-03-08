@@ -71,7 +71,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (*pb.SshRespon
 
 // Copy copy file from/to an host
 func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (*pb.SshResponse, error) {
-	log.Printf("Ssh copy called '%s', '%s'", in.Source, in.Destination)
+	log.Infof("Ssh copy called '%s', '%s'", in.Source, in.Destination)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

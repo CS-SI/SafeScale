@@ -132,7 +132,7 @@ func Create(task concurrency.Task, req control.Request) (api.Cluster, error) {
 		panic("req.CIDR is empty!")
 	}
 
-	log.Printf("Creating infrastructure for cluster '%s'", req.Name)
+	log.Infof("Creating infrastructure for cluster '%s'", req.Name)
 
 	tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 	if err != nil {
@@ -175,7 +175,7 @@ func Create(task concurrency.Task, req control.Request) (api.Cluster, error) {
 		return nil, fmt.Errorf("cluster Flavor '%s' not yet implemented", req.Flavor.String())
 	}
 
-	log.Printf("Cluster '%s' created and initialized successfully", req.Name)
+	log.Infof("Cluster '%s' created and initialized successfully", req.Name)
 	return controller, nil
 }
 
