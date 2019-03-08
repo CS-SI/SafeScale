@@ -149,7 +149,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Ne
 
 // Delete a network
 func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
-	log.Printf("Delete Network called for network '%s'", in.GetName())
+	log.Infof("Delete Network called for network '%s'", in.GetName())
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

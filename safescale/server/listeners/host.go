@@ -89,7 +89,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (*google_pro
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
-	log.Printf("Host '%s' successfully started", ref)
+	log.Infof("Host '%s' successfully started", ref)
 	return &google_protobuf.Empty{}, nil
 }
 
@@ -117,7 +117,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (*google_prot
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
-	log.Printf("Host '%s' stopped", ref)
+	log.Infof("Host '%s' stopped", ref)
 	return &google_protobuf.Empty{}, nil
 }
 
@@ -145,7 +145,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (*google_pr
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
-	log.Printf("Host '%s' successfully rebooted.", ref)
+	log.Infof("Host '%s' successfully rebooted.", ref)
 	return &google_protobuf.Empty{}, nil
 }
 
@@ -341,7 +341,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
-	log.Printf("Host '%s' successfully deleted.", ref)
+	log.Infof("Host '%s' successfully deleted.", ref)
 	return &google_protobuf.Empty{}, nil
 }
 

@@ -485,7 +485,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 		time.Minute,
 		func(try retry.Try, verdict Verdict.Enum) {
 			if verdict != Verdict.Done {
-				log.Printf("Network '%s' is not in 'ACTIVE' state, retrying...", name)
+				log.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", name)
 			}
 		},
 	)

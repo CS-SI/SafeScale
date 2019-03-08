@@ -37,7 +37,7 @@ type ProcessManagerListener struct{}
 
 // Stop specified process
 func (s *ProcessManagerListener) Stop(ctx context.Context, in *pb.ProcessDefinition) (*google_protobuf.Empty, error) {
-	log.Printf("Stop process called")
+	log.Infof("Stop process called")
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -59,7 +59,7 @@ func (s *ProcessManagerListener) Stop(ctx context.Context, in *pb.ProcessDefinit
 
 // List running process
 func (s *ProcessManagerListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.ProcessList, error) {
-	log.Printf("List process called")
+	log.Infof("List process called")
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

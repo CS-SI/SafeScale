@@ -350,7 +350,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (Results, error) {
 		return nil, fmt.Errorf("failed to find a way to uninstall '%s'", f.DisplayName())
 	}
 
-	log.Printf("Removing feature '%s' from %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
+	log.Infof("Removing feature '%s' from %s '%s'...\n", f.DisplayName(), t.Type(), t.Name())
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	myV := make(Variables)

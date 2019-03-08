@@ -417,7 +417,7 @@ func getTenantsFromCfg() ([]interface{}, error) {
 
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
 		msg := fmt.Sprintf("Error reading configuration file: %s", err.Error())
-		log.Printf(msg)
+		log.Errorf(msg)
 		return nil, fmt.Errorf(msg)
 	}
 	settings := v.AllSettings()

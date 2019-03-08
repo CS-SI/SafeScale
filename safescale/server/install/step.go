@@ -225,7 +225,7 @@ type step struct {
 
 // Run executes the step on all the concerned hosts
 func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, error) {
-	log.Printf("running step '%s' on %d hosts...", is.Name, len(hosts))
+	log.Debugf("running step '%s' on %d hosts...", is.Name, len(hosts))
 
 	results := stepResults{}
 

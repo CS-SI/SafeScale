@@ -883,7 +883,7 @@ func (s *Stack) DeleteHost(id string) error {
 		3*time.Minute,
 	)
 	if outerRetryErr != nil {
-		log.Printf("failed to remove host '%s': %s", id, outerRetryErr.Error())
+		log.Errorf("failed to remove host '%s': %s", id, outerRetryErr.Error())
 		return err
 	}
 	return nil

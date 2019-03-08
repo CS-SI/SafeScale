@@ -39,7 +39,7 @@ type ImageListener struct{}
 
 // List available images
 func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (*pb.ImageList, error) {
-	log.Printf("List images called")
+	log.Infof("List images called")
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
