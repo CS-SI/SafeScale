@@ -365,10 +365,10 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						}
 						return nil
 					},
-					2*time.Minute,
+					2*time.Minute, // FIXME Hardcoded timeout
 				)
 				if retryErr != nil {
-					return logicErr(fmt.Errorf("failed to confirm the disk attachment after %s", 2*time.Minute))
+					return logicErr(fmt.Errorf("failed to confirm the disk attachment after %s", 2*time.Minute)) // FIXME Hardcoded timeout
 				}
 
 				// Recovers real device name from the system
@@ -530,10 +530,10 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 			}
 			return nil
 		},
-		2*time.Minute,
+		2*time.Minute, // FIXME Hardcoded timeout
 	)
 	if retryErr != nil {
-		return nil, logicErrf(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", 2*time.Minute))
+		return nil, logicErrf(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", 2*time.Minute)) // FIXME Hardcoded timeout
 	}
 	disks := strings.Split(stdout, "\n")
 	set := mapset.NewThreadUnsafeSet()

@@ -59,7 +59,7 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		connectionTimeout = DefaultConnectionTimeout
 	}
 	if connectionTimeout > executionTimeout {
-		connectionTimeout = executionTimeout + 1*time.Minute
+		connectionTimeout = executionTimeout + 1*time.Minute // FIXME Hardcoded timeout
 	}
 
 	_, cancel := utils.GetTimeoutContext(executionTimeout)
@@ -266,7 +266,7 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 		func() error {
 			return sshCfg.Enter()
 		},
-		2*time.Minute,
+		2*time.Minute, // FIXME Hardcoded timeout
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
 				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
@@ -310,7 +310,7 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 
 			return nil
 		},
-		2*time.Minute,
+		2*time.Minute, // FIXME Hardcoded timeout
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
 				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)

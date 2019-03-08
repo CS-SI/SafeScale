@@ -177,8 +177,8 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 			}
 			return nil
 		},
-		1*time.Second,
-		2*time.Minute,
+		1*time.Second, // FIXME Hardcoded timeout
+		2*time.Minute, // FIXME Hardcoded timeout
 	)
 	_ = os.Remove(f.Name())
 	if retryErr != nil {
@@ -218,8 +218,8 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 			}
 			return nil
 		},
-		2*time.Second,
-		1*time.Minute,
+		2*time.Second, // FIXME Hardcoded timeout
+		1*time.Minute, // FIXME Hardcoded timeout
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

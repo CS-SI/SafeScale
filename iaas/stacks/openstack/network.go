@@ -597,7 +597,7 @@ func (s *Stack) deleteSubnet(id string) error {
 			}
 			return nil
 		},
-		1*time.Minute,
+		1*time.Minute, // FIXME Hardcoded timeout
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
@@ -606,10 +606,10 @@ func (s *Stack) deleteSubnet(id string) error {
 				if _, ok := err.(resources.ErrResourceNotAvailable); ok {
 					return err
 				}
-				return fmt.Errorf("failed to delete subnet after %v: %v", 1*time.Minute, err)
+				return fmt.Errorf("failed to delete subnet after %v: %v", 1*time.Minute, err) // FIXME Hardcoded timeout
 			}
 		}
-		return fmt.Errorf("failed to delete subnet after %v: %v", 1*time.Minute, retryErr)
+		return fmt.Errorf("failed to delete subnet after %v: %v", 1*time.Minute, retryErr) // FIXME Hardcoded timeout
 	}
 	return nil
 }

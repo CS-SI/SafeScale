@@ -584,7 +584,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.HostNet
 					}
 					return fmt.Errorf("No local IP matching inteface %s found", iface.Alias)
 				},
-				5*time.Minute,
+				5*time.Minute, // FIXME Hardcoded timeout
 			)
 
 		}

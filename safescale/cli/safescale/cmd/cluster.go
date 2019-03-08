@@ -846,7 +846,7 @@ func executeCommand(command string) error {
 	}
 	safescalessh := client.New().Ssh
 	for i, m := range masters {
-		retcode, stdout, stderr, err := safescalessh.Run(m, command, client.DefaultConnectionTimeout, 5*time.Minute)
+		retcode, stdout, stderr, err := safescalessh.Run(m, command, client.DefaultConnectionTimeout, 5*time.Minute) // FIXME Hardcoded timeout
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {

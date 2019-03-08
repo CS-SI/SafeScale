@@ -134,7 +134,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) error {
 		func() error {
 			return handler.service.WaitHostState(id, HostState.STARTED, safescaleutils.GetTimeoutCtxHost())
 		},
-		5*time.Minute,
+		5*time.Minute, // FIXME Hardcoded timeout
 	)
 	if err != nil {
 		return infraErrf(err, "timeout waiting host '%s' to be rebooted", ref)
