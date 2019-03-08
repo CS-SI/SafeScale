@@ -104,7 +104,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			}
 			return nil
 		},
-		5*time.Minute,
+		5*time.Minute, // FIXME Hardcoded timeout
 	)
 	if retryErr != nil {
 		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
@@ -169,7 +169,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			}
 			return err
 		},
-		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(1*time.Minute)),
+		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(1*time.Minute)), // FIXME Hardcoded timeout
 		retry.Constant(5*time.Second),
 		nil, nil, nil,
 	)

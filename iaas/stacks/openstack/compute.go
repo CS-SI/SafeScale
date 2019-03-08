@@ -845,7 +845,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 			host.ID = server.ID
 
 			// Wait that Host is ready, not just that the build is started
-			host, err = s.WaitHostReady(host, 5*time.Minute)
+			host, err = s.WaitHostReady(host, 5*time.Minute) // FIXME Hardcoded timeout
 			if err != nil {
 				servers.Delete(s.ComputeClient, server.ID)
 				msg := ProviderErrorToString(err)
@@ -854,7 +854,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 			}
 			return nil
 		},
-		10*time.Minute,
+		10*time.Minute, // FIXME Hardcoded timeout
 	)
 	if err != nil {
 		log.Debugf("Error creating host: timeout: %+v", err)
@@ -1123,7 +1123,7 @@ func (s *Stack) DeleteHost(id string) error {
 					}
 					return err
 				},
-				1*time.Minute,
+				1*time.Minute, // FIXME Hardcoded timeout
 			)
 			if innerRetryErr != nil {
 				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
@@ -1139,7 +1139,7 @@ func (s *Stack) DeleteHost(id string) error {
 			return fmt.Errorf("host '%s' in state 'ERROR', retrying to delete", id)
 		},
 		0,
-		3*time.Minute,
+		3*time.Minute, // FIXME Hardcoded timeout
 	)
 	if outerRetryErr != nil {
 		log.Debugf("failed to remove host '%s': %s", id, outerRetryErr.Error())

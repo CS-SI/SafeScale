@@ -46,7 +46,7 @@ import (
 )
 
 var (
-	timeoutCtxHost = 10 * time.Minute
+	timeoutCtxHost = 10 * time.Minute // FIXME Hardcoded timeout
 
 	// funcMap defines the custome functions to be used in templates
 	funcMap = txttmpl.FuncMap{
@@ -137,7 +137,7 @@ func (b *foreman) ExecuteScript(
 
 	cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
 
-	return client.New().Ssh.Run(hostID, cmd, client.DefaultConnectionTimeout, time.Duration(20)*time.Minute)
+	return client.New().Ssh.Run(hostID, cmd, client.DefaultConnectionTimeout, time.Duration(20)*time.Minute) // FIXME Hardcoded timeout
 }
 
 // construct ...
@@ -980,7 +980,7 @@ func (b *foreman) taskInstallGateway(tr concurrency.TaskRunner, params interface
 		// done <- err
 		return
 	}
-	err = sshCfg.WaitServerReady(5 * time.Minute)
+	err = sshCfg.WaitServerReady(5 * time.Minute) // FIXME Hardcoded timeout
 	if err != nil {
 		// done <- err
 		return
@@ -1453,7 +1453,7 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	}
 	def.Public = publicIP
 	def.Network = b.cluster.GetNetworkConfig(tr.Task()).NetworkID
-	if timeout < 10*time.Minute {
+	if timeout < 10*time.Minute { // FIXME Hardcoded timeout
 		timeout = 10 * time.Minute
 	}
 
@@ -1490,7 +1490,7 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 		})
 	})
 	if err != nil {
-		derr := clientHost.Delete([]string{pbHost.Id}, 10*time.Minute)
+		derr := clientHost.Delete([]string{pbHost.Id}, 10*time.Minute) // FIXME Hardcoded timeout
 		if derr != nil {
 			log.Errorf("failed to delete node after failure")
 		}
