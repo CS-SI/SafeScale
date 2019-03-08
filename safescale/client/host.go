@@ -131,8 +131,6 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 		if err != nil {
 			fmt.Printf("%v\n", DecorateError(err, "deletion of host", true))
 			atomic.AddInt32(&errs, 1)
-		} else {
-			fmt.Printf("Host '%s' deleted\n", aname)
 		}
 	}
 
