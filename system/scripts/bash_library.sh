@@ -148,6 +148,30 @@ EOF
 }
 export -f sfRetry
 
+
+# sfInstall installs a packages and exits if it fails...
+sfInstall() {
+    case $LINUX_KIND in
+        debian|ubuntu)
+            export DEBIAN_FRONTEND=noninteractive
+            sfRetry 5m 3 "sfWaitForApt && apt-get update"
+            apt-get install $1 -y || exit 194
+            which $1 || exit 194
+            ;;
+        centos|rhel)
+            yum install -y $1 || exit 194
+            which $1 || exit 194
+            ;;
+        *)
+            echo "Unsupported operating system '$LINUX_KIND'"
+            exit 195
+            ;;
+    esac
+    return 0
+}
+export -f sfInstall
+
+
 # sfDownload url filename timeout delay
 sfDownload() {
     local url="$1"

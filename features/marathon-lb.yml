@@ -20,6 +20,7 @@ feature:
     install:
         dcos:
             check: |
+                which jq || sfInstall jq
                 {{.dcos}} marathon-lb plan show deploy --json | jq .status | grep COMPLETE
 
             add:

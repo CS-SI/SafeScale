@@ -124,6 +124,7 @@ feature:
                         targets:
                             masters: all
                         run: |
+                            which jq || sfInstall jq
                             sfRetry 10m 20 "sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null" || exit 193
                             sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
                             sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
