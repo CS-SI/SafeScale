@@ -23,7 +23,7 @@ func Docker(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
 	fmt.Print(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "0 users"))
+	require.True(t, strings.Contains(out, " user"))
 
 	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " docker")
 	require.NotNil(t, err)
@@ -64,7 +64,7 @@ func DockerNotGateway(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
 	fmt.Print(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "0 users"))
+	require.True(t, strings.Contains(out, " user"))
 
 	out, err = GetOutput("safescale host create " + names.Hosts[0] + " --net " + names.Networks[0])
 	require.Nil(t, err)
