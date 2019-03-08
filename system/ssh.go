@@ -429,7 +429,7 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 }
 
 func (c *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
-	log.Info("Running command with timeout")
+	log.Debugf("Running command [%s] with timeout of %s", c.Display(), timeout)
 
 	// Set up the outputs (std and err)
 	stdOut, err := c.StdoutPipe()
@@ -636,7 +636,8 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 				return err
 			}
 
-			retcode, stdout, stderr, err := cmd.Run() // FIXME It CAN lock
+			// retcode, stdout, stderr, err := cmd.Run() // FIXME It CAN lock
+			retcode, stdout, stderr, err := cmd.RunWithTimeout(timeout)
 			if err != nil {
 				return err
 			}
@@ -660,7 +661,8 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 			return err
 		}
 
-		retcode, stdout, stderr, logErr := logCmd.Run() // FIXME It CAN lock
+		// retcode, stdout, stderr, logErr := logCmd.Run() // FIXME It CAN lock
+		retcode, stdout, stderr, logErr := logCmd.RunWithTimeout(timeout)
 		if logErr == nil {
 			if retcode == 0 {
 				return fmt.Errorf("server '%s' is not ready yet: %s - log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)

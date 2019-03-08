@@ -112,7 +112,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 
 	k, uperr := sshconfig.Command("which scp")
 	if uperr != nil {
-		_, uptext, _, kerr := k.Run() // FIXME It CAN lock
+		_, uptext, _, kerr := k.RunWithTimeout(30 * time.Second) // FIXME Hardcoded timeout
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
@@ -123,7 +123,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 
 	k, uperr = sshconfig.SudoCommand("which scp")
 	if uperr != nil {
-		_, uptext, _, kerr := k.Run() // FIXME It CAN lock
+		_, uptext, _, kerr := k.RunWithTimeout(30 * time.Second) // FIXME Hardcoded timeout
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
