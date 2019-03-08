@@ -108,7 +108,7 @@ func DockerCompose(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
 	fmt.Print(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "0 users"))
+	require.True(t, strings.Contains(out, " user"))
 
 	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " docker-compose")
 	require.NotNil(t, err)
