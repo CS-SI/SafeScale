@@ -19,6 +19,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
 
@@ -257,11 +258,12 @@ var hostCreate = cli.Command{
 		askedGpus := int32(c.Int("gpu"))
 		if askedGpus <= -1 {
 			askedGpus = -1
+			logrus.Debug("No GPU parameters used")
 		} else {
 			if askedGpus == 0 {
-				fmt.Println("NO GPU required")
+				logrus.Debug("NO GPU required")
 			} else {
-				fmt.Println("We want GPUs")
+				logrus.Debugf("GPUs required: %d", askedGpus)
 			}
 		}
 
