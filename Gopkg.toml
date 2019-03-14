@@ -71,7 +71,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[constraint]]
   name = "github.com/sirupsen/logrus"
-  version = "=v1.1.1"
+  version = "=v1.3.0"
 
 [[constraint]]
   name = "github.com/nanobox-io/golang-scribble"
