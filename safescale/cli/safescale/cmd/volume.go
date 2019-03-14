@@ -146,9 +146,13 @@ var volumeCreate = cli.Command{
 		if !ok {
 			return clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid speed '%s'", speed))
 		}
+		volSize := int32(c.Int("size"))
+		if volSize <= 0 {
+			return clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid volume size '%d', should be at least 1", volSize))
+		}
 		def := pb.VolumeDefinition{
 			Name:  c.Args().First(),
-			Size:  int32(c.Int("size")),
+			Size:  volSize,
 			Speed: pb.VolumeSpeed(volSpeed),
 		}
 
