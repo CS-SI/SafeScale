@@ -16,7 +16,7 @@
 #
 # Installs and configures
 
-set -u -o pipefail
+{{.BashHeader}}
 
 function print_error {
     read line file <<<$(caller)

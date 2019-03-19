@@ -18,7 +18,7 @@
 #
 # Declares a remote share mount and mount it
 
-set -u -o pipefail
+{{.BashHeader}}
 
 function print_error {
     read line file <<<$(caller)

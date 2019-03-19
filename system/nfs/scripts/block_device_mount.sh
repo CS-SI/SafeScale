@@ -17,7 +17,7 @@
 # block_device_mount.sh
 # Creates a filesystem on a device and mounts it
 
-set -u -o pipefail
+{{.BashHeader}}
 
 function print_error {
     read line file <<<$(caller)

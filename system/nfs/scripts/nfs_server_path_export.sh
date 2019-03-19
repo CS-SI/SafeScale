@@ -18,7 +18,7 @@
 #
 # Configures the NFS export of a local path
 
-set -u -o pipefail
+{{.BashHeader}}
 
 function print_error {
     read line file <<<$(caller)
