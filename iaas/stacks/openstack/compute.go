@@ -658,27 +658,6 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 	return nil, resources.ResourceNotFoundError("host", name)
 }
 
-// userData is the structure to apply to userdata.sh template
-type userData struct {
-	// User is the name of the default user (api.DefaultUser)
-	User string
-	// Key is the private key used to create the Host
-	Key string
-	// ConfIF, if set to true, configure all interfaces to DHCP
-	ConfIF bool
-	// IsGateway, if set to true, activate IP frowarding
-	IsGateway bool
-	// AddGateway, if set to true, configure default gateway
-	AddGateway bool
-	// DNSServers contains the list of DNS servers to use
-	// Used only if IsGateway is true
-	DNSServers []string
-	// GatewayIP is the IP of the gateway
-	GatewayIP string
-	// Password for the user safescale (for troubleshoot use, useable only in console)
-	Password string
-}
-
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, error) {
 	log.Debugf(">>> stacks.openstack::CreateHost(%s)", request.ResourceName)
