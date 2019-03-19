@@ -41,6 +41,7 @@ func (provider *provider) ListAvailabilityZones(bool) (map[string]bool, error) {
 func (provider *provider) ListImages(all bool) ([]resources.Image, error) {
 	return nil, fmt.Errorf(errorStr)
 }
+
 func (provider *provider) GetImage(id string) (*resources.Image, error) {
 	return nil, fmt.Errorf(errorStr)
 }
@@ -48,6 +49,7 @@ func (provider *provider) GetImage(id string) (*resources.Image, error) {
 func (provider *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return nil, fmt.Errorf(errorStr)
 }
+
 func (provider *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	return nil, fmt.Errorf(errorStr)
 }

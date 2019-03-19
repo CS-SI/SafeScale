@@ -40,6 +40,7 @@ import (
 	_ "github.com/CS-SI/SafeScale/iaas/providers/local"          // Imported to initialize tenant local
 	_ "github.com/CS-SI/SafeScale/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekoms
 	_ "github.com/CS-SI/SafeScale/iaas/providers/ovh"            // Imported to initialize tenant ovh
+	_ "github.com/CS-SI/SafeScale/iaas/providers/erbc"           // Imported to initialise tenant erbc
 )
 
 // ServiceTester helper class to test clients
