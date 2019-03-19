@@ -27,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeState"
-	api "github.com/CS-SI/SafeScale/iaas/providers"
 
 )
 
@@ -95,99 +94,30 @@ func toVolumeState(s *string) VolumeState.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
-	v, err := c.EC2.CreateVolume(&ec2.CreateVolumeInput{
-		Size:       aws.Int64(int64(request.Size)),
-		VolumeType: aws.String(toVolumeType(request.Speed)),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	volume := api.Volume{
-		ID:    pStr(v.VolumeId),
-		Name:  request.Name,
-		Size:  int(pInt64(v.Size)),
-		Speed: toVolumeSpeed(v.VolumeType),
-		State: toVolumeState(v.State),
-	}
-	return &volume, nil
+	panic("implement me")
 }
 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
-	out, err := c.EC2.DescribeVolumes(&ec2.DescribeVolumesInput{
-		VolumeIds: []*string{aws.String(id)},
-	})
-	if err != nil {
-		return nil, err
-	}
-	v := out.Volumes[0]
-	name, err := c.getVolumeName(id)
-	if err != nil {
-		return nil, err
-	}
-	volume := api.Volume{
-		ID:    pStr(v.VolumeId),
-		Name:  name,
-		Size:  int(pInt64(v.Size)),
-		Speed: toVolumeSpeed(v.VolumeType),
-		State: toVolumeState(v.State),
-	}
-	return &volume, nil
+	panic("implement me")
 }
 
 // ListVolumes list available volumes
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
-	out, err := c.EC2.DescribeVolumes(&ec2.DescribeVolumesInput{})
-	if err != nil {
-		return nil, err
-	}
-	volumes := []api.Volume{}
-	for _, v := range out.Volumes {
-		name, err := c.getVolumeName(*v.VolumeId)
-		if err != nil {
-			return nil, err
-		}
-		volume := api.Volume{
-			ID:    pStr(v.VolumeId),
-			Name:  name,
-			Size:  int(pInt64(v.Size)),
-			Speed: toVolumeSpeed(v.VolumeType),
-			State: toVolumeState(v.State),
-		}
-		volumes = append(volumes, volume)
-	}
-
-	return volumes, nil
+	panic("implement me")
 }
 
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(id string) error {
-	_, err := c.EC2.DeleteVolume(&ec2.DeleteVolumeInput{
-		VolumeId: aws.String(id),
-	})
-	return err
+	panic("implement me")
 }
 
 // CreateVolumeAttachment attaches a volume to an host
 // - 'name' the name of the volume attachment
 // - 'volume' the volume to attach
 // - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (*resources.VolumeAttachment, error) {
-	va, err := s.EC2.AttachVolume(&ec2.AttachVolumeInput{
-		InstanceId: aws.String(request.ServerID),
-		VolumeId:   aws.String(request.VolumeID),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &api.VolumeAttachment{
-		Device:   pStr(va.Device),
-		ID:       pStr(va.VolumeId),
-		Name:     request.Name,
-		ServerID: pStr(va.InstanceId),
-		VolumeID: pStr(va.VolumeId),
-	}, nil
+func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+	panic("implement me")
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
@@ -213,36 +143,11 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
-	out, err := s.EC2.DescribeVolumes(&ec2.DescribeVolumesInput{
-		Filters: []*ec2.Filter{
-			&ec2.Filter{
-				Name:   aws.String("attachment.instance-id"),
-				Values: []*string{aws.String(serverID)},
-			},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-	vas := []api.VolumeAttachment{}
-	for _, v := range out.Volumes {
-		for _, va := range v.Attachments {
-			vas = append(vas, api.VolumeAttachment{
-				Device:   pStr(va.Device),
-				ServerID: pStr(va.InstanceId),
-				VolumeID: pStr(va.VolumeId),
-			})
-		}
-	}
-	return vas, nil
+	panic("implement me")
 
 }
 
 // DeleteVolumeAttachment deletes the volume attachment identifed by id
 func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
-	_, err := c.EC2.DetachVolume(&ec2.DetachVolumeInput{
-		InstanceId: aws.String(serverID),
-		VolumeId:   aws.String(id),
-	})
-	return err
+	panic("implement me")
 }

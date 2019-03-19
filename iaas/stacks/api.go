@@ -28,14 +28,14 @@ type Stack interface {
 	ListAvailabilityZones(bool) (map[string]bool, error)
 
 	// ListImages lists available OS images
-	ListImages() ([]resources.Image, error)
+	ListImages(all bool) ([]resources.Image, error)
 	// GetImage returns the Image referenced by id
 	GetImage(id string) (*resources.Image, error)
 
 	// GetTemplate returns the Template referenced by id
 	GetTemplate(id string) (*resources.HostTemplate, error)
 	// ListTemplates lists available host templates
-	ListTemplates() ([]resources.HostTemplate, error)
+	ListTemplates(all bool) ([]resources.HostTemplate, error)
 
 	// CreateKeyPair creates and import a key pair
 	CreateKeyPair(name string) (*resources.KeyPair, error)

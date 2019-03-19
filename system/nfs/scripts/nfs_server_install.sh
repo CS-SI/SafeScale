@@ -18,7 +18,7 @@
 #
 # Installs and configures a NFS Server service
 
-set -u -o pipefail
+{{.BashHeader}}
 
 function print_error {
     read line file <<<$(caller)

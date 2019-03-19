@@ -16,7 +16,7 @@
 #
 # Unexports and unconfigures a NFS export of a local path
 
-set -u -o pipefail
+{{.BashHeader}}
 
 function print_error {
     read line file <<<$(caller)

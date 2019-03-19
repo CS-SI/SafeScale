@@ -80,7 +80,7 @@ func (s *Stack) ListAvailabilityZones(all bool) (map[string]bool, error) {
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() ([]resources.Image, error) {
+func (s *Stack) ListImages(all bool) ([]resources.Image, error) {
 	log.Debug(">>> stacks.openstack::ListImages()")
 	defer log.Debug("<<< stacks.openstack::ListImages()")
 
@@ -170,7 +170,7 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
+func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	log.Debugf(">>> stacks.openstack::ListTemplates()")
 	defer log.Debugf("<<< stacks.openstack::ListTemplates()")
 
@@ -656,27 +656,6 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 		}
 	}
 	return nil, resources.ResourceNotFoundError("host", name)
-}
-
-// userData is the structure to apply to userdata.sh template
-type userData struct {
-	// User is the name of the default user (api.DefaultUser)
-	User string
-	// Key is the private key used to create the Host
-	Key string
-	// ConfIF, if set to true, configure all interfaces to DHCP
-	ConfIF bool
-	// IsGateway, if set to true, activate IP frowarding
-	IsGateway bool
-	// AddGateway, if set to true, configure default gateway
-	AddGateway bool
-	// DNSServers contains the list of DNS servers to use
-	// Used only if IsGateway is true
-	DNSServers []string
-	// GatewayIP is the IP of the gateway
-	GatewayIP string
-	// Password for the user safescale (for troubleshoot use, useable only in console)
-	Password string
 }
 
 // CreateHost creates an host satisfying request
