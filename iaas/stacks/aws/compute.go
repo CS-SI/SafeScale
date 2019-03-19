@@ -84,7 +84,7 @@ func createFilters() []*ec2.Filter {
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() ([]resources.Image, error) {
+func (s *Stack) ListImages(all bool) ([]resources.Image, error) {
 	images, err := s.EC2.DescribeImages(&ec2.DescribeImagesInput{
 		//Owners: []*string{aws.String("aws-marketplace"), aws.String("self")},
 		Filters: createFilters(),
@@ -360,7 +360,7 @@ func parseMemory(str string) float64 {
 
 // ListTemplates lists available host templates
 //Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
+func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	input := pricing.GetProductsInput{
 		Filters: []*pricing.Filter{
 			{

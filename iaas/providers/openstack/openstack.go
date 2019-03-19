@@ -140,7 +140,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 // ListTemplates ...
 // Value of all has no impact on the result
 func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	allTemplates, err := p.Stack.ListTemplates()
+	allTemplates, err := p.Stack.ListTemplates(all)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 // ListImages ...
 // Value of all has no impact on the result
 func (p *provider) ListImages(all bool) ([]resources.Image, error) {
-	allImages, err := p.Stack.ListImages()
+	allImages, err := p.Stack.ListImages(all)
 	if err != nil {
 		return nil, err
 	}

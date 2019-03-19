@@ -36,17 +36,31 @@ import (
 
 	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudwatt"      // Imported to initialize tenant cloudwatt
+	_ "github.com/CS-SI/SafeScale/iaas/providers/erbc"           // Imported to initialise tenant erbc
 	_ "github.com/CS-SI/SafeScale/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/iaas/providers/local"          // Imported to initialize tenant local
 	_ "github.com/CS-SI/SafeScale/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekoms
 	_ "github.com/CS-SI/SafeScale/iaas/providers/ovh"            // Imported to initialize tenant ovh
-	_ "github.com/CS-SI/SafeScale/iaas/providers/erbc"           // Imported to initialise tenant erbc
 )
 
 // ServiceTester helper class to test clients
 type ServiceTester struct {
 	Service *iaas.Service
 }
+
+/*
+func (tester *ServiceTester) VerifyStacks(t *testing.T) {
+	var stack stacks.Stack
+
+	stack = &local.Stack{}
+	stack = &huaweicloud.Stack{}
+	stack = &erbc.StackErbc{}
+	stack = &openstack.Stack{}
+	stack = &aws.Stack{}
+
+	_ = stack
+}
+*/
 
 //ListImages test
 func (tester *ServiceTester) ListImages(t *testing.T) {
