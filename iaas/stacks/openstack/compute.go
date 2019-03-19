@@ -80,7 +80,7 @@ func (s *Stack) ListAvailabilityZones(all bool) (map[string]bool, error) {
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() ([]resources.Image, error) {
+func (s *Stack) ListImages(all bool) ([]resources.Image, error) {
 	log.Debug(">>> stacks.openstack::ListImages()")
 	defer log.Debug("<<< stacks.openstack::ListImages()")
 
@@ -170,7 +170,7 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
+func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	log.Debugf(">>> stacks.openstack::ListTemplates()")
 	defer log.Debugf("<<< stacks.openstack::ListTemplates()")
 

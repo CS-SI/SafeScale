@@ -72,7 +72,7 @@ var bridgedVMs = false
 //-------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *StackErbc) ListImages() ([]resources.Image, error) {
+func (s *StackErbc) ListImages(all bool) ([]resources.Image, error) {
 	panic("implement me")
 }
 
@@ -84,7 +84,7 @@ func (s *StackErbc) GetImage(id string) (*resources.Image, error) {
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackErbc ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *StackErbc) ListTemplates() ([]resources.HostTemplate, error) {
+func (s *StackErbc) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	panic("implement me")
 }
 
