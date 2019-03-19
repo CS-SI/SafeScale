@@ -15,4 +15,5 @@ clean:
 	@(cd huaweicloud && $(MAKE) $(@))
 	@(cd openstack && $(MAKE) $(@))
 	@(cd libvirt && $(MAKE) $(@))
+	@(cd erbc && $(MAKE) $(@))
 	@$(RM) ./mocks/*.go || true

@@ -17,10 +17,8 @@
 package aws
 
 import (
-
 	// log "github.com/sirupsen/logrus"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -39,6 +37,15 @@ type Stack struct {
 	authOpts stacks.AuthenticationOptions
 	cfgOpts  stacks.ConfigurationOptions
 	//ImageOwners []string
+}
+
+
+func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+	panic("implement me")
+}
+
+func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+	panic("implement me")
 }
 
 // //Config AWS configurations
@@ -70,41 +77,15 @@ func (o Authenticator) IsExpired() bool {
 
 // New authenticates and returns a Stack instance
 func New(auth *stacks.AuthenticationOptions, cfg *stacks.ConfigurationOptions) (*Stack, error) {
-	authenticator := Authenticator{data: auth}
-
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(opts.Region),
-		Credentials: credentials.NewCredentials(authenticator),
-	})
-	if err != nil {
-		return nil, err
-	}
-	sPricing, err := session.NewSession(&aws.Config{
-		Region:      aws.String("us-east-1"),
-		Credentials: credentials.NewCredentials(authenticator),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	stack := Stack{
-		Session:  sess,
-		EC2:      ec2.New(sess),
-		Pricing:  pricing.New(sPricing),
-		AuthOpts: auth,
-		CfgOpts:  cfg,
-	}
-	//metadata.InitializeContainer(&c)
-
-	return &stack, nil
+	panic("implement me")
 }
 
 // GetAuthOpts ...
 func (s *Stack) GetAuthOpts() {
-	return s.authOpts
+	panic("implement me")
 }
 
 // GetCfgOpts return configuration parameters
 func (s *Stack) GetCfgOpts() (providers.Config, error) {
-	return s.cfgOpts
+	panic("implement me")
 }
