@@ -149,7 +149,7 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	allTemplates, err := p.Stack.ListTemplates()
+	allTemplates, err := p.Stack.ListTemplates(all)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func isBMSImage(image resources.Image) bool {
 
 // ListImages lists available OS images
 func (p *provider) ListImages(all bool) ([]resources.Image, error) {
-	images, err := p.Stack.ListImages()
+	images, err := p.Stack.ListImages(all)
 	if err != nil {
 		return nil, err
 	}

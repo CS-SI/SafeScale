@@ -19,4 +19,5 @@ clean:
 	@(cd opentelekom && $(MAKE) $(@))
 	@(cd ovh && $(MAKE) $(@))
 	@(cd local && $(MAKE) $(@))
+	@(cd erbc && $(MAKE) $(@))
 	@$(RM) ./mocks/*.go || true

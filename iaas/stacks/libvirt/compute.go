@@ -104,10 +104,6 @@ var bridgedVMs = false
 
 // ListImages lists available OS images
 func (s *Stack) ListImages(all bool) ([]resources.Image, error) {
-	if !all {
-		//TODO implement list images all
-	}
-
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
@@ -186,10 +182,6 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	if !all {
-		//TODO implement list images all
-	}
-
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.TemplatesJSONPath, err.Error())

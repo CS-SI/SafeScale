@@ -21,6 +21,7 @@ package userdata
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 	"text/template"
 
@@ -33,6 +34,8 @@ import (
 
 // userData is the structure to apply to userdata.sh template
 type userData struct {
+	// Header is the bash header for scripts
+	BashHeader string
 	// User is the name of the default user (api.DefaultUser)
 	User string
 	// PublicKey is the public key used to create the Host
@@ -108,7 +111,19 @@ func Prepare(
 		}
 	}
 
+	scriptHeader := "set -u -o pipefail"
+	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
+		if strings.EqualFold("True", strings.TrimSpace(suffixCandidate)) {
+			scriptHeader = "set -Eeuxo pipefail"
+		}
+
+		if strings.EqualFold("1", strings.TrimSpace(suffixCandidate)) {
+			scriptHeader = "set -Eeuxo pipefail"
+		}
+	}
+
 	data := userData{
+		BashHeader:     scriptHeader,
 		User:       resources.DefaultUser,
 		PublicKey:  strings.Trim(request.KeyPair.PublicKey, "\n"),
 		PrivateKey: strings.Trim(request.KeyPair.PrivateKey, "\n"),

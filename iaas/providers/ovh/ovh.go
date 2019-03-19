@@ -169,12 +169,12 @@ func addGPUCfg(tpl *resources.HostTemplate) {
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (p *provider) ListImages(all bool) ([]resources.Image, error) {
-	return p.Stack.ListImages()
+	return p.Stack.ListImages(all)
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	allTemplates, err := p.Stack.ListTemplates()
+	allTemplates, err := p.Stack.ListTemplates(all)
 	if err != nil {
 		return nil, err
 	}

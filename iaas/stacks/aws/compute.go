@@ -20,23 +20,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
-
-	log "github.com/sirupsen/logrus"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils"
 )
 
 func wrapError(msg string, err error) error {
@@ -90,7 +84,7 @@ func createFilters() []*ec2.Filter {
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() ([]resources.Image, error) {
+func (s *Stack) ListImages(all bool) ([]resources.Image, error) {
 	images, err := s.EC2.DescribeImages(&ec2.DescribeImagesInput{
 		//Owners: []*string{aws.String("aws-marketplace"), aws.String("self")},
 		Filters: createFilters(),
@@ -203,6 +197,35 @@ type Price struct {
 	ServiceCode     string  `json:"serviceCode,omitempty"`
 	Terms           Terms   `json:"terms,omitempty"`
 }
+
+
+func (s *Stack) ListAvailabilityZones(bool) (map[string]bool, error) {
+	panic("implement me")
+}
+
+
+func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
+	panic("implement me")
+}
+
+
+func (s *Stack) GetHostByName(string) (*resources.Host, error) {
+	panic("implement me")
+}
+
+func (s *Stack) GetHostState(interface{}) (HostState.Enum, error) {
+	panic("implement me")
+}
+
+
+func (s *Stack) RebootHost(id string) error {
+	panic("implement me")
+}
+
+func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
+	panic("implement me")
+}
+
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (*resources.Image, error) {
@@ -521,239 +544,22 @@ func getState(state *ec2.InstanceState) (HostState.Enum, error) {
 
 // CreateHost creates an host that fulfils the request
 func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, error) {
-
-	// If no KeyPair is supplied a temporay one is created
-	if request.KeyPair == nil {
-		kp, err := s.CreateKeyPair(request.ResourceName)
-		if err != nil {
-			return nil, err
-		}
-		request.KeyPair = kp
-	}
-	if request.Password == "" {
-		password, err := utils.GeneratePassword(16)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate password: %s", err.Error())
-		}
-		request.Password = password
-	}
-
-	// If the host is not a Gateway, get gateway of the first network
-	gwID := ""
-	var gw *resources.Host
-	if request.DefaultGateway != nil {
-		net, err := s.GetNetwork(request.Networks[0].ID)
-		if err != nil {
-			return nil, err
-		}
-		gwID = net.GatewayID
-		gw, err = s.InspectHost(gwID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// get subnet of each network
-	sns, err := s.getSubnets(request.Networks)
-
-	//Prepare user data
-	userData, err := userdata.Prepare(s.cfgOpts, request, gw.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create networks interfaces
-	networkInterfaces := []*ec2.InstanceNetworkInterfaceSpecification{}
-
-	vpcs := map[string][]*ec2.Subnet{}
-	for _, sn := range sns {
-		vpcs[*sn.VpcId] = append(vpcs[*sn.VpcId], sn)
-
-	}
-
-	i := 0
-	for _, net := range request.Networks {
-		netID := net.ID
-		if len(vpcs[netID]) < 1 {
-			continue
-		}
-		sn := vpcs[netID][0]
-		networkInterfaces = append(networkInterfaces, &ec2.InstanceNetworkInterfaceSpecification{
-			SubnetId:                 sn.SubnetId,
-			AssociatePublicIpAddress: aws.Bool(false),
-			DeleteOnTermination:      aws.Bool(true),
-			DeviceIndex:              aws.Int64(int64(i)),
-		})
-		i++
-	}
-
-	// Run instance
-	out, err := s.EC2.RunInstances(&ec2.RunInstancesInput{
-		ImageId:           aws.String(request.ImageID),
-		KeyName:           aws.String(kp.Name),
-		InstanceType:      aws.String(request.TemplateID),
-		NetworkInterfaces: networkInterfaces,
-		MaxCount:          aws.Int64(1),
-		MinCount:          aws.Int64(1),
-		UserData:          aws.String(string(userData)),
-		// TagSpecifications: []*ec2.TagSpecification{
-		// 	{
-		// 		Tags: []*ec2.Tag{
-		// 			{
-		// 				Key:   aws.String("Name"),
-		// 				Value: aws.String(request.Name),
-		// 			},
-		// 		},
-		// 	},
-		// },
-	})
-	if err != nil {
-		return nil, err
-	}
-	instance := out.Instances[0]
-
-	defer func() {
-		if err != nil {
-			derr := s.DeleteHost(*instance.InstanceId)
-			if derr != nil {
-				log.Debugf("%+v", derr)
-			}
-		}
-	}()
-
-	netIFs, err := s.EC2.DescribeNetworkInterfaces(&ec2.DescribeNetworkInterfacesInput{
-		Filters: []*ec2.Filter{
-			&ec2.Filter{
-				Name:   aws.String("attachment.instance-id"),
-				Values: []*string{instance.InstanceId},
-			},
-			&ec2.Filter{
-				Name:   aws.String("attachment.device-index"),
-				Values: []*string{aws.String(fmt.Sprintf("%d", 0))},
-			},
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	addr, err := s.EC2.AllocateAddress(&ec2.AllocateAddressInput{
-		Domain: aws.String("vpc"),
-	})
-	if err != nil {
-		s.DeleteHost(*instance.InstanceId)
-		return nil, err
-	}
-
-	// Wait that host is started
-	_, err = s.WaitHostReady(*instance.InstanceId, HostState.STARTED, 120*time.Second)
-	if err != nil {
-		return nil, err
-	}
-	_, err = s.EC2.AssociateAddress(&ec2.AssociateAddressInput{
-		NetworkInterfaceId: netIFs.NetworkInterfaces[0].NetworkInterfaceId,
-		AllocationId:       addr.AllocationId,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Create resources.Host
-	tpl, err := s.GetTemplate(*instance.InstanceType)
-	if err != nil {
-		return nil, err
-	}
-	v4IPs := []string{}
-	for _, nif := range instance.NetworkInterfaces {
-		v4IPs = append(v4IPs, *nif.PrivateIpAddress)
-	}
-	accessAddr := ""
-	if instance.PublicIpAddress != nil {
-		accessAddr = *instance.PublicIpAddress
-	}
-	state, err := getState(instance.State)
-	if err != nil {
-		return nil, err
-	}
-
-	host := resources.Host{
-		ID:           pStr(instance.InstanceId),
-		Name:         request.ResourceName,
-		Size:         tpl.HostSize,
-		PrivateIPsV4: v4IPs,
-		AccessIPv4:   accessAddr,
-		PrivateKey:   kp.PrivateKey,
-		State:        state,
-		GatewayID:    gwID,
-		Password:     request.Password,
-	}
-	return &host, nil
+	panic("implement me")
 }
 
 // GetHost returns the host identified by id
-func (s *Stack) InspectHost(id string) (*resources.Host, error) {
-
-	out, err := s.EC2.DescribeInstances(&ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(id)},
-	})
-	if err != nil {
-		return nil, err
-	}
-	instance := out.Reservations[0].Instances[0]
-	host := &resources.Host{
-		ID: *instance.InstanceId,
-	}
-
-	host.LastState, err = getState(instance.State)
-	if err != nil {
-		return nil, err
-	}
-	tpl, err := s.GetTemplate(*instance.InstanceType)
-	if err != nil {
-		return nil, err
-	}
-	host.Size = tpl.HostSize
-	v4IPs := []string{}
-	for _, nif := range instance.NetworkInterfaces {
-		v4IPs = append(v4IPs, *nif.PrivateIpAddress)
-	}
-	accessAddr := ""
-	if instance.PublicIpAddress != nil {
-		accessAddr = *instance.PublicIpAddress
-	}
-	host.PrivateIPsV4 = v4IPs
-	host.AccessIPv4 = accessAddr
-
-	return host, nil
+func (s *Stack) InspectHost(id interface{}) (*resources.Host, error) {
+	panic("implement me")
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts() ([]resources.Host, error) {
-	panic("Not Implemented")
+func (s *Stack) ListHosts() ([]*resources.Host, error) {
+	panic("implement me")
 }
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
-	s.removeHost(id)
-	ips, err := s.EC2.DescribeAddresses(&ec2.DescribeAddressesInput{
-		Filters: []*ec2.Filter{
-			&ec2.Filter{
-				Name:   aws.String("instance-id"),
-				Values: []*string{aws.String(id)},
-			},
-		},
-	})
-	if err != nil {
-		for _, ip := range ips.Addresses {
-			s.EC2.ReleaseAddress(&ec2.ReleaseAddressInput{
-				AllocationId: ip.AllocationId,
-			})
-		}
-	}
-	_, err = s.EC2.TerminateInstances(&ec2.TerminateInstancesInput{
-		InstanceIds: []*string{aws.String(id)},
-	})
-	return err
+	panic("implement me")
 
 }
 
