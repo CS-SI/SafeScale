@@ -19,6 +19,7 @@ package nfs
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -61,6 +62,20 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		return 255, "", "", err
 	}
 	data["reserved_BashLibrary"] = bashLibrary
+
+
+	scriptHeader := "set -u -o pipefail"
+	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
+		if strings.EqualFold("True", strings.TrimSpace(suffixCandidate)) {
+			scriptHeader = "set -Eeuxo pipefail"
+		}
+
+		if strings.EqualFold("1", strings.TrimSpace(suffixCandidate)) {
+			scriptHeader = "set -Eeuxo pipefail"
+		}
+	}
+
+	data["BashHeader"] = scriptHeader
 
 	tmplBox, err := getTemplateBox()
 	if err != nil {

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -u -o pipefail
+{{.BashHeader}}
 
 function print_error {
     read line file <<<$(caller)
@@ -631,6 +631,7 @@ case $LINUX_KIND in
 esac
 
 touch /etc/cloud/cloud-init.disabled
+sfWaitForApt
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 

@@ -17,7 +17,7 @@
 # block_device_unmount.sh
 # Unmount a block device and removes the corresponding entry from /etc/fstab
 
-set -u -o pipefail
+{{.BashHeader}}
 
 function print_error {
     read line file <<<$(caller)

@@ -18,7 +18,7 @@
 #
 # Unconfigures and unmounts a remote access to a NFS share
 
-set -u -o pipefail
+{{.BashHeader}}
 
 function print_error {
     read line file <<<$(caller)
