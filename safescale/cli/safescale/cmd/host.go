@@ -22,6 +22,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/urfave/cli"
 
 	pb "github.com/CS-SI/SafeScale/safescale"
@@ -233,8 +235,8 @@ var hostCreate = cli.Command{
 		},
 		cli.IntFlag{
 			Name:  "gpu",
-			Value: 0,
-			Usage: "Number of GPU for the host",
+			Value: -1,
+			Usage: "Number of GPU for the host (by default NO GPUs)",
 		},
 		cli.Float64Flag{
 			Name:  "cpu-freq, cpufreq",
@@ -254,6 +256,18 @@ var hostCreate = cli.Command{
 		}
 		// hostName := c.Args().Get(1)
 
+		askedGpus := int32(c.Int("gpu"))
+		if askedGpus <= -1 {
+			askedGpus = -1
+			logrus.Debug("No GPU parameters used")
+		} else {
+			if askedGpus == 0 {
+				logrus.Debug("NO GPU explicitly required")
+			} else {
+				logrus.Debugf("GPUs required: %d", askedGpus)
+			}
+		}
+
 		def := pb.HostDefinition{
 			Name:     c.Args().First(),
 			CpuCount: int32(c.Int("cpu")),
@@ -262,7 +276,7 @@ var hostCreate = cli.Command{
 			Network:  c.String("net"),
 			Public:   c.Bool("public"),
 			Ram:      float32(c.Float64("ram")),
-			GpuCount: int32(c.Int("gpu")),
+			GpuCount: askedGpus,
 			CpuFreq:  float32(c.Float64("cpu-freq")),
 			Force:    c.Bool("force"),
 		}
