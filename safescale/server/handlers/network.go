@@ -27,8 +27,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/safescale/server/metadata"
-	safescaleutils "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
@@ -36,6 +34,8 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/safescale/server/metadata"
+	safescaleutils "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/utils"
 )
 
@@ -137,6 +137,8 @@ func (handler *NetworkHandler) Create(
 		MinCores:    cpu,
 		MinRAMSize:  ram,
 		MinDiskSize: disk,
+		MinGPU:      -1,
+		MinFreq:     0,
 	}, false)
 	if err != nil {
 		return nil, infraErrf(err, "Error creating network: Error selecting template")

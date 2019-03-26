@@ -35,7 +35,7 @@ func TestTenants(t *testing.T) {
 	createTenantFile()
 	defer deleteTenantFile()
 
-	tenants, err := iaas.GetTenants()
+	tenants, err := iaas.GetTenantNames()
 	require.NoError(t, err)
 
 	foundOhVeHache := false
@@ -60,7 +60,7 @@ func TestTenantsWithNoTenantFile(t *testing.T) {
 	defer unhideTenantFiles()
 
 	//ACT
-	_, err := iaas.GetTenants()
+	_, err := iaas.GetTenantNames()
 
 	//ASSERT
 	require.Error(t, err)
@@ -69,7 +69,7 @@ func TestTenantsWithNoNameTenantFile(t *testing.T) {
 	createNoNameTenantFile()
 	defer deleteTenantFile()
 
-	_, err := iaas.GetTenants()
+	_, err := iaas.GetTenantNames()
 
 	require.Error(t, err)
 }
@@ -77,7 +77,7 @@ func TestTenantsWithNoClientTenantFile(t *testing.T) {
 	createNoClientTenantFile()
 	defer deleteTenantFile()
 
-	_, err := iaas.GetTenants()
+	_, err := iaas.GetTenantNames()
 
 	require.Error(t, err)
 }
