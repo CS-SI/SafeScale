@@ -54,6 +54,8 @@ type userData struct {
 	GatewayIP string
 	// Password for the user safescale (for troubleshoot use, useable only in console)
 	Password string
+	// EmulatedPublicNet is a private network which is used to emulate a public one
+	EmulatedPublicNet string
 	// HostName contains the name wanted as host name (default == name of the Cloud resource)
 	HostName string
 }
@@ -62,7 +64,7 @@ var userdataTemplate *template.Template
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func Prepare(
-	options stacks.ConfigurationOptions, request resources.HostRequest, cidr string,
+	options stacks.ConfigurationOptions, request resources.HostRequest, cidr string, defaultNetworkCIDR string,
 ) ([]byte, error) {
 
 	// Generate password for user safescale
@@ -109,16 +111,17 @@ func Prepare(
 	}
 
 	data := userData{
-		User:       resources.DefaultUser,
-		PublicKey:  strings.Trim(request.KeyPair.PublicKey, "\n"),
-		PrivateKey: strings.Trim(request.KeyPair.PrivateKey, "\n"),
-		ConfIF:     !autoHostNetworkInterfaces,
-		IsGateway:  request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking,
-		AddGateway: !request.PublicIP && !useLayer3Networking,
-		DNSServers: dnsList,
-		CIDR:       cidr,
-		GatewayIP:  ip,
-		Password:   request.Password,
+		User:              resources.DefaultUser,
+		PublicKey:         strings.Trim(request.KeyPair.PublicKey, "\n"),
+		PrivateKey:        strings.Trim(request.KeyPair.PrivateKey, "\n"),
+		ConfIF:            !autoHostNetworkInterfaces,
+		IsGateway:         request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking,
+		AddGateway:        !request.PublicIP && !useLayer3Networking,
+		DNSServers:        dnsList,
+		CIDR:              cidr,
+		GatewayIP:         ip,
+		Password:          request.Password,
+		EmulatedPublicNet: defaultNetworkCIDR,
 		//HostName:   request.Name,
 	}
 

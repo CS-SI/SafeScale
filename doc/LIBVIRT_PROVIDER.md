@@ -211,7 +211,7 @@ A List of images, each image is made up of :
         {
             "download"  : {
                 "method"    : "GoogleDrive",
-                "id"        : "1dLSWe838nEt_tAwyvSRPbfEFDrE1i7r4"
+                "id"        : "1lQbL0I08_4vkOZKnksnTpYV9XBsQTA0Q"
             },
             "imagePath" : "/home/user/SafeScale/ubuntu1804_diskimage.qcow2",
             "imageName" : "Ubuntu 18.04",

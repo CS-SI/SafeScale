@@ -557,7 +557,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	sns, err := s.getSubnets(request.Networks)
 
 	//Prepare user data
-	userData, err := userdata.Prepare(s.cfgOpts, request, gw.ID)
+	userData, err := userdata.Prepare(s.cfgOpts, request, gw.ID, "")
 	if err != nil {
 		return nil, err
 	}

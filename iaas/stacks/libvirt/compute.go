@@ -27,8 +27,6 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -37,6 +35,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
@@ -48,9 +49,9 @@ import (
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/libvirt/libvirt-go"
-	"github.com/libvirt/libvirt-go-xml"
-	"github.com/satori/go.uuid"
+	libvirt "github.com/libvirt/libvirt-go"
+	libvirtxml "github.com/libvirt/libvirt-go-xml"
+	uuid "github.com/satori/go.uuid"
 )
 
 // The createds hosts could be connected to the network with a bridge or a nat
@@ -59,6 +60,7 @@ import (
 // sudo firewall-cmd --zone=public --permanent --add-port=1000-63553/tcp
 // sudo firewall-cmd --reload
 var bridgedVMs = false
+var defaultNetworkCIDR = "192.168.122.0/24"
 
 // # Create a macvlan interface :
 // # - Script creating the macvlan
@@ -811,7 +813,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		return nil, fmt.Errorf("GetDiskFromID failled %s: ", err.Error())
 	}
 
-	userData, err := userdata.Prepare(*s.Config, request, networks[0].CIDR)
+	userData, err := userdata.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare user data content: %+v", err)
 	}
@@ -835,7 +837,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 						resources.NetworkRequest{
 							Name:      "default",
 							IPVersion: IPVersion.IPv4,
-							CIDR:      "192.168.150.0/24",
+							CIDR:      defaultNetworkCIDR,
 						},
 					)
 					if err != nil {

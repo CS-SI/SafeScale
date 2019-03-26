@@ -185,13 +185,19 @@ ip2long() {
 
 is_ip_private() {
     ip=$1
-    ipv=$(ip2long $ip)
-    for r in "192.168.0.0-192.168.255.255" "172.16.0.0-172.31.255.255" "10.0.0.0-10.255.255.255"; do
-        bv=$(ip2long $(cut -d- -f1 <<<$r))
-        ev=$(ip2long $(cut -d- -f2 <<<$r))
-        [ $ipv -ge $bv -a $ipv -le $ev ] && return 0
-    done
-    return 1
+
+    case $LINUX_KIND in
+        debian|ubuntu)
+            grepcidr -V || sfWaitForApt && apt update && apt install -y grepcidr &>/dev/null
+            ;;
+        rhel|centos)
+            grepcidr -V || yum install -y grepcidr &>dev/null
+            ;;
+    esac  
+
+    echo $ip | grepcidr "192.168.0.0/16 172.16.0.0/12 10.0.0.0/8" || return 1
+    echo $ip | grepcidr "{{.EmulatedPublicNet}}" && return 1
+    return 0
 }
 
 substring_diff() {
