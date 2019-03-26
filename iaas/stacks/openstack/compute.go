@@ -757,7 +757,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	userData, err := userdata.Prepare(s.cfgOpts, request, defaultNetwork.CIDR)
+	userData, err := userdata.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		log.Debugf(utils.Capitalize(msg))
