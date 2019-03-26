@@ -44,10 +44,19 @@ func Register(name string, provider providers.Provider) {
 	allProviders[name] = &Service{Provider: provider}
 }
 
-// GetTenants returns all known tenants
-func GetTenants() (map[string]string, error) {
+// GetTenantNames returns all known tenants names
+func GetTenantNames() (map[string]string, error) {
 	err := loadConfig()
 	return allTenants, err
+}
+
+// GetTenant returns all known tenants
+func GetTenants() ([]interface{}, error) {
+	tenants, err := getTenantsFromCfg()
+	if err != nil {
+		return nil, err
+	}
+	return tenants, err
 }
 
 // UseService return the service referenced by the given name.

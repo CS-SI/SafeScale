@@ -201,8 +201,16 @@ func RunScanner() {
 		panic(fmt.Sprintf("Unable to get Tenants %s", err.Error()))
 	}
 
-	for tenantName := range theProviders {
-		if strings.Contains(tenantName, "-scannable") {
+	for _, tenant := range theProviders {
+		isScannable, err := isTenantScannable(tenant.(map[string]interface{}))
+		if err != nil {
+			panic(fmt.Sprintf(err.Error()))
+		}
+		if isScannable {
+			tenantName, found := tenant.(map[string]interface{})["name"].(string)
+			if !found {
+				panic(fmt.Sprintf("There is a scannable tenant without name"))
+			}
 			targetedProviders = append(targetedProviders, tenantName)
 		}
 	}
@@ -236,6 +244,19 @@ func RunScanner() {
 			log.Warn(fmt.Printf("Failed to save scanned info from tenant %s", tenantName))
 		}
 	}
+}
+
+// isTenantScannable will return true if a tennant could be used by the scanner and false otherwise
+func isTenantScannable(tenant map[string]interface{}) (bool, error) {
+	tenantCompute, found := tenant["compute"].(map[string]interface{})
+	if !found {
+		return false, nil
+	}
+	isScannable, found := tenantCompute["Scannable"].(bool)
+	if !found {
+		return false, nil
+	}
+	return isScannable, nil
 }
 
 func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
