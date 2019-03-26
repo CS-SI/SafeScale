@@ -235,6 +235,11 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 						fmt.Println("Error", err)
 					}
 
+					// if the user asked explicitly no gpu
+					if int(sizing.MinGPU) == 0 && imageFound.GPU != 0 {
+						continue
+					}
+
 					if imageFound.GPU < int(sizing.MinGPU) {
 						continue
 					}
