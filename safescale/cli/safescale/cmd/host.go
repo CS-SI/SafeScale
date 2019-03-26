@@ -19,9 +19,10 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli"
 
@@ -261,7 +262,7 @@ var hostCreate = cli.Command{
 			logrus.Debug("No GPU parameters used")
 		} else {
 			if askedGpus == 0 {
-				logrus.Debug("NO GPU required")
+				logrus.Debug("NO GPU explicitly required")
 			} else {
 				logrus.Debugf("GPUs required: %d", askedGpus)
 			}
@@ -275,7 +276,7 @@ var hostCreate = cli.Command{
 			Network:  c.String("net"),
 			Public:   c.Bool("public"),
 			Ram:      float32(c.Float64("ram")),
-			GpuCount: int32(c.Int("gpu")),
+			GpuCount: askedGpus,
 			CpuFreq:  float32(c.Float64("cpu-freq")),
 			Force:    c.Bool("force"),
 		}
