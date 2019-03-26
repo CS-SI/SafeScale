@@ -26,9 +26,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
+	"github.com/CS-SI/SafeScale/iaas"
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/utils"
-	"github.com/CS-SI/SafeScale/iaas"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant
@@ -56,7 +56,7 @@ func (s *TenantListener) List(ctx context.Context, in *google_protobuf.Empty) (*
 		defer utils.ProcessDeregister(ctx)
 	}
 
-	tenants, err := iaas.GetTenants()
+	tenants, err := iaas.GetTenantNames()
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ var GetCurrentTenant = getCurrentTenant
 // getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
 func getCurrentTenant() *Tenant {
 	if currentTenant == nil {
-		tenants, err := iaas.GetTenants()
+		tenants, err := iaas.GetTenantNames()
 		if err != nil || len(tenants) != 1 {
 			return nil
 		}
