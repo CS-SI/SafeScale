@@ -281,7 +281,7 @@ func (handler *HostHandler) Create(
 		log.Infof(msg)
 	} else {
 		log.Errorf("failed to find template corresponding to requested resources")
-		return nil, logicErrf(err, "failed to find template corresponding to requested resources")
+		return nil, logicErrf(fmt.Errorf(""), "failed to find template corresponding to requested resources")
 	}
 
 	var img *resources.Image
