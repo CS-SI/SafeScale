@@ -33,10 +33,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/CS-SI/SafeScale/iaas"
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/server/listeners"
 	"github.com/CS-SI/SafeScale/safescale/utils"
-	"github.com/CS-SI/SafeScale/iaas"
 )
 
 /*
@@ -101,7 +101,7 @@ func work() {
 	}()
 
 	log.Infoln("Checking configuration")
-	_, err := iaas.GetTenants()
+	_, err := iaas.GetTenantNames()
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
