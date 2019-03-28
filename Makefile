@@ -44,6 +44,11 @@ ifeq ($(findstring :,$(GOBIN)),:)
     GOBIN=$(HOME)/go/bin
 endif
 
+# Until problems building with stringer and go 1.12 are solved...
+ifneq (, $(shell $(GO) version | awk '{print $3}' | grep 1.12))
+ $(error "Unsupported go version (1.12.x)")
+endif
+
 ifneq ($(OS),Windows_NT)
 ifneq ($(findstring $(GOBIN),$(PATH)),$(GOBIN))
  $(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
