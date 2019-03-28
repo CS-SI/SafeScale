@@ -77,8 +77,8 @@ var tenantSet = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>. For help --> safescale tenant set -h "))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		} else {
 			err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
 			if err != nil {

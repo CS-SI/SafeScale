@@ -69,8 +69,8 @@ var bucketCreate = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>. For help --> safescale bucket create -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
 		} else {
 			err := client.New().Bucket.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
 			if err != nil {
@@ -93,8 +93,8 @@ var bucketDelete = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() < 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>. For help --> safescale bucket delete -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
 		} else {
 			var bucketList []string
 			bucketList = append(bucketList, c.Args().First())
@@ -121,8 +121,8 @@ var bucketInspect = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>. For help --> safescale bucket inspect -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
 		} else {
 			resp, err := client.New().Bucket.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 			if err != nil {
@@ -154,8 +154,8 @@ var bucketMount = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 2 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>. For help --> safescale bucket mount -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
 		} else {
 			err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
 			if err != nil {
@@ -178,8 +178,8 @@ var bucketUnmount = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 2 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>. For help --> safescale bucket unmount -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
 		} else {
 			err := client.New().Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 			if err != nil {

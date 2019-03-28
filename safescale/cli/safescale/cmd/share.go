@@ -92,8 +92,8 @@ var shareCreate = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 2 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>. For help --> safescale share create -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
 		} else {
 			shareName := c.Args().Get(0)
 			def := pb.ShareDefinition{
@@ -132,8 +132,8 @@ var shareDelete = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() < 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>. For help --> safescale share delete -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
 		} else {
 			var (
 				wg        sync.WaitGroup
@@ -208,8 +208,8 @@ var shareMount = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 2 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>. For help --> safescale share mount -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
 		} else {
 			shareName := c.Args().Get(0)
 			hostName := c.Args().Get(1)
@@ -242,8 +242,8 @@ var shareUnmount = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 2 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>. For help --> safescale share unmount -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
 		} else {
 			shareName := c.Args().Get(0)
 			hostName := c.Args().Get(1)
@@ -272,8 +272,8 @@ var shareInspect = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>. For help --> safescale share inspect -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
 		} else {
 			list, err := client.New().Share.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 			if err != nil {

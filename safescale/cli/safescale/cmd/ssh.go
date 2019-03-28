@@ -62,8 +62,8 @@ var sshRun = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale ssh run -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			timeout := safescaleutils.GetTimeoutCtxHost()
 			if c.IsSet("timeout") {
@@ -108,8 +108,8 @@ var sshCopy = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 2 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required. For help --> safescale ssh copy -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
 		} else {
 			timeout := safescaleutils.GetTimeoutCtxHost()
 			if c.IsSet("timeout") {
@@ -135,8 +135,8 @@ var sshConnect = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale ssh connect -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			err := client.New().Ssh.Connect(c.Args().Get(0), 0)
 			if err != nil {
@@ -175,8 +175,8 @@ var sshTunnel = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale ssh close -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			localPort := c.Int("local")
 			if 0 > localPort || localPort > 65535 {
@@ -228,8 +228,8 @@ var sshClose = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale ssh close -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			strLocalPort := c.String("local")
 			if c.IsSet("local") {
