@@ -62,7 +62,7 @@ var volumeList = cli.Command{
 			response.Succeeded(volumes.Volumes)
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -86,7 +86,7 @@ var volumeInspect = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -114,7 +114,7 @@ var volumeDelete = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -165,7 +165,7 @@ var volumeCreate = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -211,7 +211,7 @@ var volumeAttach = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -234,7 +234,7 @@ var volumeDetach = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 

@@ -56,7 +56,7 @@ var bucketList = cli.Command{
 			response.Succeeded(resp)
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -80,7 +80,7 @@ var bucketCreate = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -108,7 +108,7 @@ var bucketDelete = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -135,7 +135,7 @@ var bucketInspect = cli.Command{
 			fmt.Println(string(out))
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -165,7 +165,7 @@ var bucketMount = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -189,6 +189,6 @@ var bucketUnmount = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }

@@ -52,6 +52,6 @@ var templateList = cli.Command{
 			response.Succeeded(templates.GetTemplates())
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }

@@ -52,6 +52,6 @@ var imageList = cli.Command{
 			response.Succeeded(images.GetImages())
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }

@@ -9,6 +9,7 @@ import (
 	urfcli "github.com/urfave/cli"
 )
 
+// CliResponse define a standard response to
 type CliResponse struct {
 	Status CmdStatus.Enum
 	Error  urfcli.ExitCoder
@@ -36,6 +37,13 @@ func NewCliResponse() CliResponse {
 
 func (cli *CliResponse) GetError() error {
 	return cli.Error
+}
+
+func (cli *CliResponse) GetErrorWithoutMessage() error {
+	if cli.Error != nil {
+		return urfcli.NewExitError("", cli.Error.ExitCode())
+	}
+	return nil
 }
 
 func (cli *CliResponse) Succeeded(result interface{}) {

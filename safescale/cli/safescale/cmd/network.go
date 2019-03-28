@@ -56,7 +56,7 @@ var networkList = cli.Command{
 			response.Succeeded(networks.GetNetworks())
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -84,7 +84,7 @@ var networkDelete = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -108,7 +108,7 @@ var networkInspect = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -176,6 +176,6 @@ var networkCreate = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
