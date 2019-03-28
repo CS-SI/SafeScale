@@ -59,7 +59,7 @@ var volumeList = cli.Command{
 		if err != nil {
 			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of volumes", false).Error())))
 		} else {
-			response.Succed(volumes.Volumes)
+			response.Succeeded(volumes.Volumes)
 		}
 
 		return response.GetError()
@@ -82,7 +82,7 @@ var volumeInspect = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of volume", false).Error())))
 			} else {
-				response.Succed(toDisplaybleVolumeInfo(volumeInfo))
+				response.Succeeded(toDisplaybleVolumeInfo(volumeInfo))
 			}
 		}
 
@@ -110,7 +110,7 @@ var volumeDelete = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of volume", false).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -161,7 +161,7 @@ var volumeCreate = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of volume", true).Error())))
 			} else {
-				response.Succed(toDisplaybleVolume(volume))
+				response.Succeeded(toDisplaybleVolume(volume))
 			}
 		}
 
@@ -207,7 +207,7 @@ var volumeAttach = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "attach of volume", true).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -230,7 +230,7 @@ var volumeDetach = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unattach of volume", true).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 

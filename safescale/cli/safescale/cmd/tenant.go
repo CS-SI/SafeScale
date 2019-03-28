@@ -46,7 +46,7 @@ var tenantList = cli.Command{
 		if err != nil {
 			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
 		} else {
-			response.Succed(tenants.GetTenants())
+			response.Succeeded(tenants.GetTenants())
 		}
 
 		return response.GetError()
@@ -63,7 +63,7 @@ var tenantGet = cli.Command{
 		if err != nil {
 			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
 		} else {
-			response.Succed(tenant)
+			response.Succeeded(tenant)
 		}
 
 		return response.GetError()
@@ -84,7 +84,7 @@ var tenantSet = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 

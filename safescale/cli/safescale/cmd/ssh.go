@@ -77,7 +77,7 @@ var sshRun = cli.Command{
 					//msg := fmt.Sprintf("stdOut: %s ---- stdErr: %s", stdout, stderr)
 					response.Failed(cli.NewExitError(stderr, retcode))
 				} else {
-					response.Succed(stdout)
+					response.Succeeded(stdout)
 				}
 			}
 		}
@@ -119,7 +119,7 @@ var sshCopy = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -142,7 +142,7 @@ var sshConnect = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh connect", false).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -195,7 +195,7 @@ var sshTunnel = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh tunnel", false).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -251,7 +251,7 @@ var sshClose = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh close", false).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 

@@ -49,7 +49,7 @@ var imageList = cli.Command{
 		if err != nil {
 			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of images", false).Error())))
 		} else {
-			response.Succed(images.GetImages())
+			response.Succeeded(images.GetImages())
 		}
 
 		return response.GetError()

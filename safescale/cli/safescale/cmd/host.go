@@ -72,7 +72,7 @@ var hostStart = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "start of host", false).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -96,7 +96,7 @@ var hostStop = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "stop of host", false).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -120,7 +120,7 @@ var hostReboot = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "reboot of host", false).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -155,7 +155,7 @@ var hostList = cli.Command{
 					delete(v, "state")
 					delete(v, "gateway_id")
 				}
-				response.Succed(result)
+				response.Succeeded(result)
 			}
 		}
 
@@ -179,7 +179,7 @@ var hostInspect = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of host", false).Error())))
 			} else {
-				response.Succed(resp)
+				response.Succeeded(resp)
 			}
 		}
 
@@ -202,7 +202,7 @@ var hostStatus = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "status of host", false).Error())))
 			} else {
-				response.Succed(resp)
+				response.Succeeded(resp)
 			}
 		}
 
@@ -295,7 +295,7 @@ var hostCreate = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 			} else {
-				response.Succed(resp)
+				response.Succeeded(resp)
 			}
 		}
 
@@ -359,7 +359,7 @@ var hostResize = cli.Command{
 				if err != nil {
 					response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 				} else {
-					response.Succed(resp)
+					response.Succeeded(resp)
 				}
 			}
 		}
@@ -388,7 +388,7 @@ var hostDelete = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of host", false).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -411,7 +411,7 @@ var hostSsh = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh config of host", false).Error())))
 			} else {
-				response.Succed(resp)
+				response.Succeeded(resp)
 			}
 		}
 
@@ -491,7 +491,7 @@ var hostAddFeatureCommand = cli.Command{
 				}
 				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -529,7 +529,7 @@ var hostListFeatureCommand = cli.Command{
 					view = ""
 				}
 			}
-			response.Succed(views)
+			response.Succeeded(views)
 		}
 
 		return response.GetError()
@@ -601,7 +601,7 @@ var hostCheckFeatureCommand = cli.Command{
 				}
 				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -674,7 +674,7 @@ var hostDeleteFeatureCommand = cli.Command{
 				}
 				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 

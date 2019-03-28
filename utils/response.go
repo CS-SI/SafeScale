@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/utils/enums/CmdStatus"
 	urfcli "github.com/urfave/cli"
@@ -37,8 +38,8 @@ func (cli *CliResponse) GetError() error {
 	return cli.Error
 }
 
-func (cli *CliResponse) Succed(result interface{}) {
-	cli.Status = CmdStatus.SUCCES
+func (cli *CliResponse) Succeeded(result interface{}) {
+	cli.Status = CmdStatus.SUCCESS
 	cli.Result = result
 	cli.Display()
 }
@@ -64,7 +65,7 @@ func (cli *CliResponse) Display() {
 
 func (cli *CliResponse) getDisplayResponse() cliResponseDisplay {
 	output := cliResponseDisplay{
-		Status: cli.Status.String(),
+		Status: strings.ToLower(cli.Status.String()),
 		Error:  nil,
 		Result: cli.Result,
 	}

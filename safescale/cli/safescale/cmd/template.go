@@ -49,7 +49,7 @@ var templateList = cli.Command{
 		if err != nil {
 			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of templates", false).Error())))
 		} else {
-			response.Succed(templates.GetTemplates())
+			response.Succeeded(templates.GetTemplates())
 		}
 
 		return response.GetError()
