@@ -52,7 +52,7 @@ var HostCmd = cli.Command{
 		hostCheckFeatureCommand,
 		hostAddFeatureCommand,
 		hostDeleteFeatureCommand,
-		hostListFeatureCommand,
+		hostListFeaturesCommand,
 	},
 }
 
@@ -499,8 +499,8 @@ var hostAddFeatureCommand = cli.Command{
 	},
 }
 
-// hostCheckFeatureCommand handles 'deploy host <host name or id> package <pkgname> check'
-var hostListFeatureCommand = cli.Command{
+// hostCheckFeaturesCommand handles 'safescale host <host name or id> list-features'
+var hostListFeaturesCommand = cli.Command{
 	Name:      "list-features",
 	Aliases:   []string{"list-available-features"},
 	Usage:     "list-features",

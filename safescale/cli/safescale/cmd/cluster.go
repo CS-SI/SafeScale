@@ -69,6 +69,7 @@ var ClusterCommand = cli.Command{
 		clusterShrinkCommand,
 		clusterDcosCommand,
 		clusterKubectlCommand,
+		clusterListFeaturesCommand,
 		clusterCheckFeatureCommand,
 		clusterAddFeatureCommand,
 		clusterDeleteFeatureCommand,
@@ -905,6 +906,34 @@ func executeCommand(command string) error {
 	}
 
 	return clitools.ExitOnRPC("failed to find an available master server to execute the command.")
+}
+
+// clusterCheckFeaturesCommand handles 'safescale cluster <cluster name or id> list-features'
+var clusterListFeaturesCommand = cli.Command{
+	Name:      "list-features",
+	Aliases:   []string{"list-available-features"},
+	Usage:     "list-features",
+	ArgsUsage: "",
+
+	Flags: []cli.Flag{
+		cli.StringSliceFlag{
+			Name:  "param, p",
+			Usage: "Allow to define content of feature parameters",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
+		features, err := install.ListFeatures("cluster")
+		if err != nil {
+			response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+		} else {
+			response.Succeeded(features)
+		}
+
+		return response.GetErrorWithoutMessage()
+	},
 }
 
 // clusterAddFeatureCommand handles 'deploy cluster add-feature CLUSTERNAME FEATURENAME'
