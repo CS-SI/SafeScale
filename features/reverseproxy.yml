@@ -71,7 +71,7 @@ feature:
                                     command: kong migrations bootstrap # up
 
                                 kong-proxy:
-                                    image: kong:latest
+                                    image: kong:1.0
                                     depends_on:
                                         kong-database:
                                             condition: service_healthy
