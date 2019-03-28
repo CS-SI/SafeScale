@@ -76,7 +76,7 @@ var hostStart = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -100,7 +100,7 @@ var hostStop = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -124,7 +124,7 @@ var hostReboot = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -159,7 +159,7 @@ var hostList = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -183,7 +183,7 @@ var hostInspect = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -206,7 +206,7 @@ var hostStatus = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -299,7 +299,7 @@ var hostCreate = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -364,7 +364,7 @@ var hostResize = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -392,7 +392,7 @@ var hostDelete = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -415,7 +415,7 @@ var hostSsh = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -495,7 +495,7 @@ var hostAddFeatureCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -532,7 +532,7 @@ var hostListFeatureCommand = cli.Command{
 			response.Succeeded(views)
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -605,7 +605,7 @@ var hostCheckFeatureCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -678,6 +678,6 @@ var hostDeleteFeatureCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }

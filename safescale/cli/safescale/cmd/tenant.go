@@ -49,7 +49,7 @@ var tenantList = cli.Command{
 			response.Succeeded(tenants.GetTenants())
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -66,7 +66,7 @@ var tenantGet = cli.Command{
 			response.Succeeded(tenant)
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -88,6 +88,6 @@ var tenantSet = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }

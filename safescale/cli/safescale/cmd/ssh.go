@@ -82,7 +82,7 @@ var sshRun = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -123,7 +123,7 @@ var sshCopy = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -146,7 +146,7 @@ var sshConnect = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -199,7 +199,7 @@ var sshTunnel = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -255,6 +255,6 @@ var sshClose = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }

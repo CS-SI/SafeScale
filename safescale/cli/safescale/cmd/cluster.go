@@ -133,7 +133,7 @@ var clusterListCommand = cli.Command{
 			response.Succeeded(formatted)
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -181,7 +181,7 @@ var clusterInspectCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -417,7 +417,7 @@ var clusterCreateCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -474,7 +474,7 @@ var clusterDeleteCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -507,7 +507,7 @@ var clusterStopCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -541,7 +541,7 @@ var clusterStartCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -577,7 +577,7 @@ var clusterStateCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -678,7 +678,7 @@ var clusterExpandCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -769,7 +769,7 @@ var clusterShrinkCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -810,7 +810,7 @@ var clusterDcosCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -845,7 +845,7 @@ var clusterKubectlCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -871,7 +871,7 @@ var clusterRunCommand = cli.Command{
 
 		response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "clusterRunCmd not yet implemented"))
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -975,7 +975,7 @@ var clusterAddFeatureCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -1040,7 +1040,7 @@ var clusterCheckFeatureCommand = cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -1106,7 +1106,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 			response.Succeeded(nil)
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -1215,7 +1215,7 @@ var clusterNodeListCommand = cli.Command{
 			response.Succeeded(formatted)
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -1257,7 +1257,7 @@ var clusterNodeInspectCommand = cli.Command{
 			response.Succeeded(host)
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -1318,7 +1318,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 			}
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -1348,7 +1348,7 @@ var clusterNodeStopCommand = cli.Command{
 		}
 		response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented"))
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -1382,7 +1382,7 @@ var clusterNodeStartCommand = cli.Command{
 		}
 		response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented"))
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -1411,7 +1411,7 @@ var clusterNodeStateCommand = cli.Command{
 		}
 		response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotImplemented, "Not yet implemented"))
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
 
@@ -1478,6 +1478,6 @@ var clusterMasterListCommand = cli.Command{
 			response.Succeeded(formatted)
 		}
 
-		return response.GetError()
+		return response.GetErrorWithoutMessage()
 	},
 }
