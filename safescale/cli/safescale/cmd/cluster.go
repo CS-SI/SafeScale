@@ -78,13 +78,13 @@ var ClusterCommand = cli.Command{
 func extractClusterArgument(c *cli.Context) error {
 	if !c.Command.HasName("list") || strings.HasSuffix(c.App.Name, " node") || strings.HasSuffix(c.App.Name, " master") {
 		if c.NArg() < 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument(fmt.Sprintf("Missing mandatory argument CLUSTERNAME. For help --> safescale cluster %s -h", c.Command.Name))
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument(fmt.Sprintf("Missing mandatory argument CLUSTERNAME.", c.Command.Name))
 		}
 		clusterName = c.Args().First()
 		if clusterName == "" {
-			//_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument(fmt.Sprintf("Invalid argument CLUSTERNAME. For help --> safescale cluster %s -h", c.Command.Name))
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.ExitOnInvalidArgument(fmt.Sprintf("Invalid argument CLUSTERNAME.", c.Command.Name))
 		}
 
 		var err error

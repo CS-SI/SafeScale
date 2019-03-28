@@ -69,8 +69,8 @@ var networkDelete = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() < 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Network_name>. For help --> safescale network delete -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Network_name>."))
 		} else {
 			var networkList []string
 			networkList = append(networkList, c.Args().First())
@@ -97,8 +97,8 @@ var networkInspect = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>. For help --> safescale network inspect -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		} else {
 			network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 			if err != nil {
@@ -153,8 +153,8 @@ var networkCreate = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>. For help --> safescale network create -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		} else {
 			netdef := pb.NetworkDefinition{
 				Cidr: c.String("cidr"),

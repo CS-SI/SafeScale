@@ -75,8 +75,8 @@ var volumeInspect = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>. For help --> safescale volume inspect -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>."))
 		} else {
 			volumeInfo, err := client.New().Volume.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 			if err != nil {
@@ -99,8 +99,8 @@ var volumeDelete = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() < 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>. For help --> safescale volume delete -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name|Volume_ID>."))
 		} else {
 			var volumeList []string
 			volumeList = append(volumeList, c.Args().First())
@@ -139,8 +139,8 @@ var volumeCreate = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name>. For help --> safescale volume create -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name>. "))
 		} else {
 			speed := c.String("speed")
 			volSpeed, ok := pb.VolumeSpeed_value[speed]
@@ -193,8 +193,8 @@ var volumeAttach = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 2 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>. For help --> safescale volume attach -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
 		} else {
 			def := pb.VolumeAttachment{
 				Format:      c.String("format"),
@@ -223,8 +223,8 @@ var volumeDetach = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 2 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>. For help --> safescale volume detach -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Volume_name> and/or <Host_name>."))
 		} else {
 			err := client.New().Volume.Detach(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 			if err != nil {

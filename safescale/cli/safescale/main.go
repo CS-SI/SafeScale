@@ -65,6 +65,7 @@ func main() {
 	}()
 
 	app := cli.NewApp()
+	app.Writer = os.Stderr
 	app.Name = "safescale"
 	app.Usage = "safescale COMMAND"
 	app.Version = VERSION + ", build " + REV + " (" + BUILD_DATE + ")"

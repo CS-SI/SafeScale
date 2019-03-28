@@ -64,8 +64,8 @@ var hostStart = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host start -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			hostRef := c.Args().First()
 			err := client.New().Host.Start(hostRef, client.DefaultExecutionTimeout)
@@ -88,8 +88,8 @@ var hostStop = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host stop -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			hostRef := c.Args().First()
 			err := client.New().Host.Stop(hostRef, client.DefaultExecutionTimeout)
@@ -112,8 +112,8 @@ var hostReboot = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host reboot -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			hostRef := c.Args().First()
 			err := client.New().Host.Reboot(hostRef, client.DefaultExecutionTimeout)
@@ -172,8 +172,8 @@ var hostInspect = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host inspect -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 			if err != nil {
@@ -195,8 +195,8 @@ var hostStatus = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host status -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			resp, err := client.New().Host.Status(c.Args().First(), client.DefaultExecutionTimeout)
 			if err != nil {
@@ -264,8 +264,8 @@ var hostCreate = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host create -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			askedGpus := int32(c.Int("gpu"))
 			if askedGpus <= -1 {
@@ -339,8 +339,8 @@ var hostResize = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host resize -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			if c.NumFlags() == 0 {
 				_ = cli.ShowSubcommandHelp(c)
@@ -377,8 +377,8 @@ var hostDelete = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() < 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host delete -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			var hostList []string
 			hostList = append(hostList, c.Args().First())
@@ -404,8 +404,8 @@ var hostSsh = cli.Command{
 		response := utils.NewCliResponse()
 
 		if c.NArg() < 1 {
-			//_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host ssh -h"))
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			resp, err := client.New().Host.SSHConfig(c.Args().First())
 			if err != nil {
