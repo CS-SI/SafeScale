@@ -27,8 +27,8 @@ func ExitOnErrorWithMessage(exitcode ExitCode.Enum, msg string) error {
 }
 
 // ExitOnInvalidArgument ...
-func ExitOnInvalidArgument() error {
-	return ExitOnErrorWithMessage(ExitCode.InvalidArgument, "")
+func ExitOnInvalidArgument(msg string) error {
+	return ExitOnErrorWithMessage(ExitCode.InvalidArgument, msg)
 }
 
 // ExitOnInvalidOption ...

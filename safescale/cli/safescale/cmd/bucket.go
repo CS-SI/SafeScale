@@ -22,8 +22,8 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/utils"
 	clitools "github.com/CS-SI/SafeScale/utils"
 )
@@ -47,14 +47,16 @@ var bucketList = cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "List buckets",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		resp, err := client.New().Bucket.List(0)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of buckets", false).Error()))
+			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of buckets", false).Error())))
+		} else {
+			response.Succed(resp)
 		}
 
-		out, _ := json.Marshal(resp)
-		fmt.Println(string(out))
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -64,16 +66,21 @@ var bucketCreate = cli.Command{
 	Usage:     "Creates a bucket",
 	ArgsUsage: "<Bucket_name>",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Bucket_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>. For help --> safescale bucket create -h"))
+		} else {
+			err := client.New().Bucket.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of bucket", true).Error())))
+			} else {
+				response.Succed(nil)
+			}
 		}
-		err := client.New().Bucket.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of bucket", true).Error()))
-		}
-		return nil
+
+		return response.GetError()
 	},
 }
 
@@ -83,21 +90,25 @@ var bucketDelete = cli.Command{
 	Usage:     "Delete a bucket",
 	ArgsUsage: "<Bucket_name> [<Bucket_name>...]",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() < 1 {
-			fmt.Println("Missing mandatory argument <Bucket_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>. For help --> safescale bucket delete -h"))
+		} else {
+			var bucketList []string
+			bucketList = append(bucketList, c.Args().First())
+			bucketList = append(bucketList, c.Args().Tail()...)
+
+			err := client.New().Bucket.Delete(bucketList, client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of bucket", true).Error())))
+			} else {
+				response.Succed(nil)
+			}
 		}
 
-		var bucketList []string
-		bucketList = append(bucketList, c.Args().First())
-		bucketList = append(bucketList, c.Args().Tail()...)
-
-		err := client.New().Bucket.Delete(bucketList, client.DefaultExecutionTimeout)
-		if err != nil {
-			return err
-		}
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -107,19 +118,24 @@ var bucketInspect = cli.Command{
 	Usage:     "Inspect a bucket",
 	ArgsUsage: "<Bucket_name>",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Bucket_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
-		}
-		resp, err := client.New().Bucket.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of bucket", false).Error()))
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>. For help --> safescale bucket inspect -h"))
+		} else {
+			resp, err := client.New().Bucket.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of bucket", false).Error())))
+			} else {
+				response.Succed(resp)
+			}
+
+			out, _ := json.Marshal(resp)
+			fmt.Println(string(out))
 		}
 
-		out, _ := json.Marshal(resp)
-		fmt.Println(string(out))
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -135,17 +151,21 @@ var bucketMount = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Bucket_name> and/or <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>. For help --> safescale bucket mount -h"))
+		} else {
+			err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "mount of bucket", true).Error())))
+			} else {
+				response.Succed(nil)
+			}
 		}
-		err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "mount of bucket", true).Error()))
-		}
-		fmt.Printf("Bucket '%s' mounted on '%s' on host '%s'\n", c.Args().Get(0), c.String("path"), c.Args().Get(1))
-		return nil
+
+		return response.GetError()
 	},
 }
 
@@ -155,16 +175,20 @@ var bucketUnmount = cli.Command{
 	Usage:     "Unmount a bucket from the filesytem of an host",
 	ArgsUsage: "<Bucket_name> <Host_name>",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 2 {
-			fmt.Println("Missing mandatory argument <Bucket_name> and/or <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>. For help --> safescale bucket unmount -h"))
+		} else {
+			err := client.New().Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unmount of bucket", true).Error())))
+			} else {
+				response.Succed(nil)
+			}
 		}
-		err := client.New().Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unmount of bucket", true).Error()))
-		}
-		fmt.Printf("Bucket '%s' unmounted from host '%s'\n", c.Args().Get(0), c.Args().Get(1))
-		return nil
+
+		return response.GetError()
 	},
 }

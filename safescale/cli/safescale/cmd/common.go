@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/CS-SI/SafeScale/safescale/client"
 	clitools "github.com/CS-SI/SafeScale/utils"
@@ -42,14 +41,12 @@ var (
 
 func extractFeatureArgument(c *cli.Context) error {
 	if c.NArg() < 2 {
-		_, _ = fmt.Fprintln(os.Stderr, "Missing mandatory argument FEATURENAME")
 		_ = cli.ShowSubcommandHelp(c)
-		return clitools.ExitOnInvalidArgument()
+		return clitools.ExitOnInvalidArgument("Missing mandatory argument FEATURENAME")
 	}
 	featureName = c.Args().Get(1)
 	if featureName == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "Invalid argument FEATURENAME")
-		return clitools.ExitOnInvalidArgument()
+		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME")
 	}
 	return nil
 }
@@ -58,8 +55,7 @@ func extractFeatureArgument(c *cli.Context) error {
 func extractHostArgument(c *cli.Context, hostnamePos int) error {
 	hostName = c.Args().Get(hostnamePos)
 	if hostName == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "argument HOSTNAME invalid")
-		return clitools.ExitOnInvalidArgument()
+		return clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
 	}
 
 	var err error

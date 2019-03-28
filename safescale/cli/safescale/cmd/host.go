@@ -19,7 +19,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -62,18 +61,22 @@ var hostStart = cli.Command{
 	Usage:     "start Host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host start -h"))
+		} else {
+			hostRef := c.Args().First()
+			err := client.New().Host.Start(hostRef, client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "start of host", false).Error())))
+			} else {
+				response.Succed(nil)
+			}
 		}
-		hostRef := c.Args().First()
-		err := client.New().Host.Start(hostRef, client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "start of host", false).Error()))
-		}
-		fmt.Printf("Host '%s' successfully started.\n", hostRef)
-		return nil
+
+		return response.GetError()
 	},
 }
 
@@ -82,19 +85,22 @@ var hostStop = cli.Command{
 	Usage:     "stop Host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
-		}
-		hostRef := c.Args().First()
-		err := client.New().Host.Stop(hostRef, client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "stop of host", false).Error()))
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host stop -h"))
+		} else {
+			hostRef := c.Args().First()
+			err := client.New().Host.Stop(hostRef, client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "stop of host", false).Error())))
+			} else {
+				response.Succed(nil)
+			}
 		}
 
-		fmt.Printf("Host '%s' successfully stopped.\n", hostRef)
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -103,19 +109,22 @@ var hostReboot = cli.Command{
 	Usage:     "reboot Host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
-		}
-		hostRef := c.Args().First()
-		err := client.New().Host.Reboot(hostRef, client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "reboot of host", false).Error()))
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host reboot -h"))
+		} else {
+			hostRef := c.Args().First()
+			err := client.New().Host.Reboot(hostRef, client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "reboot of host", false).Error())))
+			} else {
+				response.Succed(nil)
+			}
 		}
 
-		fmt.Printf("Host '%s' successfully rebooted.\n", hostRef)
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -129,27 +138,28 @@ var hostList = cli.Command{
 			Usage: "List all hosts on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		hosts, err := client.New().Host.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error()))
+			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
+		} else {
+			jsoned, _ := json.Marshal(hosts.GetHosts())
+			result := []map[string]interface{}{}
+			err = json.Unmarshal([]byte(jsoned), &result)
+			if err != nil {
+				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
+			} else {
+				for _, v := range result {
+					delete(v, "private_key")
+					delete(v, "state")
+					delete(v, "gateway_id")
+				}
+				response.Succed(result)
+			}
 		}
-		jsoned, _ := json.Marshal(hosts.GetHosts())
-		result := []map[string]interface{}{}
-		err = json.Unmarshal([]byte(jsoned), &result)
-		if err != nil {
-			return clitools.ExitOnErrorWithMessage(ExitCode.Run, utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error()))
-		}
-		for _, v := range result {
-			delete(v, "private_key")
-			delete(v, "state")
-			delete(v, "gateway_id")
-		}
-		rejsoned, err := json.Marshal(result)
-		if err != nil {
-			return clitools.ExitOnErrorWithMessage(ExitCode.Run, utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error()))
-		}
-		fmt.Println(string(rejsoned))
-		return nil
+
+		return response.GetError()
 	},
 }
 
@@ -159,20 +169,21 @@ var hostInspect = cli.Command{
 	Usage:     "inspect Host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
-		}
-		resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of host", false).Error()))
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host inspect -h"))
+		} else {
+			resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of host", false).Error())))
+			} else {
+				response.Succed(resp)
+			}
 		}
 
-		out, _ := json.Marshal(resp)
-		fmt.Println(string(out))
-
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -181,20 +192,21 @@ var hostStatus = cli.Command{
 	Usage:     "status Host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
-		}
-		resp, err := client.New().Host.Status(c.Args().First(), client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "status of host", false).Error()))
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host status -h"))
+		} else {
+			resp, err := client.New().Host.Status(c.Args().First(), client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "status of host", false).Error())))
+			} else {
+				response.Succed(resp)
+			}
 		}
 
-		out, _ := json.Marshal(resp)
-		fmt.Println(string(out))
-
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -249,46 +261,45 @@ var hostCreate = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
-		}
-		// hostName := c.Args().Get(1)
+		response := utils.NewCliResponse()
 
-		askedGpus := int32(c.Int("gpu"))
-		if askedGpus <= -1 {
-			askedGpus = -1
-			logrus.Debug("No GPU parameters used")
+		if c.NArg() != 1 {
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host create -h"))
 		} else {
-			if askedGpus == 0 {
-				logrus.Debug("NO GPU explicitly required")
+			askedGpus := int32(c.Int("gpu"))
+			if askedGpus <= -1 {
+				askedGpus = -1
+				logrus.Debug("No GPU parameters used")
 			} else {
-				logrus.Debugf("GPUs required: %d", askedGpus)
+				if askedGpus == 0 {
+					logrus.Debug("NO GPU explicitly required")
+				} else {
+					logrus.Debugf("GPUs required: %d", askedGpus)
+				}
+			}
+
+			def := pb.HostDefinition{
+				Name:     c.Args().First(),
+				CpuCount: int32(c.Int("cpu")),
+				Disk:     int32(c.Float64("disk")),
+				ImageId:  c.String("os"),
+				Network:  c.String("net"),
+				Public:   c.Bool("public"),
+				Ram:      float32(c.Float64("ram")),
+				GpuCount: askedGpus,
+				CpuFreq:  float32(c.Float64("cpu-freq")),
+				Force:    c.Bool("force"),
+			}
+			resp, err := client.New().Host.Create(def, client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
+			} else {
+				response.Succed(resp)
 			}
 		}
 
-		def := pb.HostDefinition{
-			Name:     c.Args().First(),
-			CpuCount: int32(c.Int("cpu")),
-			Disk:     int32(c.Float64("disk")),
-			ImageId:  c.String("os"),
-			Network:  c.String("net"),
-			Public:   c.Bool("public"),
-			Ram:      float32(c.Float64("ram")),
-			GpuCount: askedGpus,
-			CpuFreq:  float32(c.Float64("cpu-freq")),
-			Force:    c.Bool("force"),
-		}
-		resp, err := client.New().Host.Create(def, client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error()))
-		}
-
-		out, _ := json.Marshal(resp)
-		fmt.Println(string(out))
-
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -301,7 +312,7 @@ var hostResize = cli.Command{
 		cli.IntFlag{
 			Name:  "cpu",
 			Value: 1,
-			Usage: "Number of CPU for the host",
+			Usage: "Number of return CPU for the host",
 		},
 		cli.Float64Flag{
 			Name:  "ram",
@@ -325,36 +336,35 @@ var hostResize = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host resize -h"))
+		} else {
+			if c.NumFlags() == 0 {
+				_ = cli.ShowSubcommandHelp(c)
+				response.Failed(clitools.ExitOnInvalidArgument("Missing arguments, a resize command requires that at least one argument (cpu, ram, disk, gpu, freq) is specified"))
+			} else {
+				def := pb.HostDefinition{
+					Name:     c.Args().First(),
+					CpuCount: int32(c.Int("cpu")),
+					Disk:     int32(c.Float64("disk")),
+					Ram:      float32(c.Float64("ram")),
+					GpuCount: int32(c.Int("gpu")),
+					CpuFreq:  float32(c.Float64("cpu-freq")),
+					Force:    c.Bool("force"),
+				}
+				resp, err := client.New().Host.Resize(def, client.DefaultExecutionTimeout)
+				if err != nil {
+					response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
+				} else {
+					response.Succed(resp)
+				}
+			}
 		}
 
-		if c.NumFlags() == 0 {
-			fmt.Println("Missing arguments, a resize command requires that at least one argument (cpu, ram, disk, gpu, freq) is specified")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
-		}
-
-		def := pb.HostDefinition{
-			Name:     c.Args().First(),
-			CpuCount: int32(c.Int("cpu")),
-			Disk:     int32(c.Float64("disk")),
-			Ram:      float32(c.Float64("ram")),
-			GpuCount: int32(c.Int("gpu")),
-			CpuFreq:  float32(c.Float64("cpu-freq")),
-			Force:    c.Bool("force"),
-		}
-		resp, err := client.New().Host.Resize(def, client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error()))
-		}
-
-		out, _ := json.Marshal(resp)
-		fmt.Println(string(out))
-
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -364,22 +374,25 @@ var hostDelete = cli.Command{
 	Usage:     "Delete host",
 	ArgsUsage: "<Host_name|Host_ID> [<Host_name|Host_ID>...]",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() < 1 {
-			fmt.Println("Missing mandatory argument <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host delete -h"))
+		} else {
+			var hostList []string
+			hostList = append(hostList, c.Args().First())
+			hostList = append(hostList, c.Args().Tail()...)
+
+			err := client.New().Host.Delete(hostList, client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of host", false).Error())))
+			} else {
+				response.Succed(nil)
+			}
 		}
 
-		var hostList []string
-		hostList = append(hostList, c.Args().First())
-		hostList = append(hostList, c.Args().Tail()...)
-
-		err := client.New().Host.Delete(hostList, client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of host", false).Error()))
-		}
-
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -388,18 +401,21 @@ var hostSsh = cli.Command{
 	Usage:     "Get ssh config to connect to host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <Host_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
+		response := utils.NewCliResponse()
+
+		if c.NArg() < 1 {
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>. For help --> safescale host ssh -h"))
+		} else {
+			resp, err := client.New().Host.SSHConfig(c.Args().First())
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh config of host", false).Error())))
+			} else {
+				response.Succed(resp)
+			}
 		}
-		resp, err := client.New().Host.SSHConfig(c.Args().First())
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh config of host", false).Error()))
-		}
-		out, _ := json.Marshal(resp)
-		fmt.Println(string(out))
-		return nil
+
+		return response.GetError()
 	},
 }
 
@@ -422,24 +438,26 @@ var hostAddFeatureCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		err := extractHostArgument(c, 0)
 		if err != nil {
-			return err
+			return response.Failed(err)
 		}
 
 		err = extractFeatureArgument(c)
 		if err != nil {
-			return err
+			return response.Failed(err)
 		}
 
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
-			_, _ = fmt.Fprintln(os.Stderr, err.Error())
-			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+			//_, _ = fmt.Fprintln(os.Stderr, err.Error())
+			return response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
-			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
+			return response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 		values := install.Variables{}
 		params := c.StringSlice("param")
@@ -457,25 +475,27 @@ var hostAddFeatureCommand = cli.Command{
 		err = client.New().Ssh.WaitReady(hostInstance.Id, client.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
-			return clitools.ExitOnRPC(msg)
+			return response.Failed(clitools.ExitOnRPC(msg))
 		}
 
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
-			return clitools.ExitOnRPC(msg)
-		}
-		if !results.Successful() {
-			msg := fmt.Sprintf("Failed to add feature '%s' on host '%s'", featureName, hostName)
-			if Debug || Verbose {
-				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+			response.Failed(clitools.ExitOnRPC(msg))
+		} else {
+			if !results.Successful() {
+				msg := fmt.Sprintf("Failed to add feature '%s' on host '%s'", featureName, hostName)
+				if Debug || Verbose {
+					msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+				}
+				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+			} else {
+				response.Succed(nil)
 			}
-			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 		}
 
-		fmt.Printf("Feature '%s' added successfully on host '%s'\n", featureName, hostName)
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -494,21 +514,25 @@ var hostListFeatureCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		feats, err := install.ListFeatures()
 		if err != nil {
-			return err
-		}
-
-		for _, feat := range feats {
-			view, ok := feat.(string)
-			if ok {
-				fmt.Println(view)
-			} else {
-				view = ""
+			response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+		} else {
+			views := []string{}
+			for _, feat := range feats {
+				view, ok := feat.(string)
+				if ok {
+					views = append(views, view)
+				} else {
+					view = ""
+				}
 			}
+			response.Succed(views)
 		}
 
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -527,23 +551,25 @@ var hostCheckFeatureCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		err := extractHostArgument(c, 0)
 		if err != nil {
-			return err
+			return response.Failed(err)
 		}
 
 		err = extractFeatureArgument(c)
 		if err != nil {
-			return err
+			return response.Failed(err)
 		}
 
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
-			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+			return response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
-			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
+			return response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 
 		values := install.Variables{}
@@ -559,25 +585,27 @@ var hostCheckFeatureCommand = cli.Command{
 		err = client.New().Ssh.WaitReady(hostInstance.Id, client.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
-			return clitools.ExitOnRPC(msg)
+			return response.Failed(clitools.ExitOnRPC(msg))
 		}
 
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Check(target, values, install.Settings{})
 		if err != nil {
 			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
-			return clitools.ExitOnRPC(msg)
-		}
-		if !results.Successful() {
-			msg := fmt.Sprintf("Feature '%s' not found on host '%s'", featureName, hostName)
-			if Verbose || Debug {
-				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+			response.Failed(clitools.ExitOnRPC(msg))
+		} else {
+			if !results.Successful() {
+				msg := fmt.Sprintf("Feature '%s' not found on host '%s'", featureName, hostName)
+				if Verbose || Debug {
+					msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+				}
+				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
+			} else {
+				response.Succed(nil)
 			}
-			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
 		}
 
-		fmt.Printf("Feature '%s' found on host '%s'\n", featureName, hostName)
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -596,23 +624,25 @@ var hostDeleteFeatureCommand = cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		err := extractHostArgument(c, 0)
 		if err != nil {
-			return err
+			return response.Failed(err)
 		}
 
 		err = extractFeatureArgument(c)
 		if err != nil {
-			return err
+			return response.Failed(err)
 		}
 
 		feature, err := install.NewFeature(concurrency.RootTask(), featureName)
 		if err != nil {
-			return clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error())
+			return response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		}
 		if feature == nil {
 			msg := fmt.Sprintf("Failed to find a feature named '%s'.", featureName)
-			return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg)
+			return response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 		}
 
 		values := install.Variables{}
@@ -628,24 +658,26 @@ var hostDeleteFeatureCommand = cli.Command{
 		err = client.New().Ssh.WaitReady(hostInstance.Id, client.DefaultConnectionTimeout)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
-			return clitools.ExitOnRPC(msg)
+			return response.Failed(clitools.ExitOnRPC(msg))
 		}
 
 		target := install.NewHostTarget(hostInstance)
 		results, err := feature.Remove(target, values, install.Settings{})
 		if err != nil {
 			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
-			return clitools.ExitOnRPC(msg)
-		}
-		if !results.Successful() {
-			msg := fmt.Sprintf("Failed to delete feature '%s' from host '%s'", featureName, hostName)
-			if Verbose || Debug {
-				msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+			response.Failed(clitools.ExitOnRPC(msg))
+		} else {
+			if !results.Successful() {
+				msg := fmt.Sprintf("Failed to delete feature '%s' from host '%s'", featureName, hostName)
+				if Verbose || Debug {
+					msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
+				}
+				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+			} else {
+				response.Succed(nil)
 			}
-			return clitools.ExitOnErrorWithMessage(ExitCode.Run, msg)
 		}
 
-		fmt.Printf("Feature '%s' deleted successfully on host '%s'\n", featureName, hostName)
-		return nil
+		return response.GetError()
 	},
 }
