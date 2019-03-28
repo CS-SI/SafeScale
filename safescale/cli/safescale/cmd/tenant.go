@@ -17,9 +17,6 @@
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/safescale/client"
@@ -43,14 +40,16 @@ var tenantList = cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "List available tenants",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		tenants, err := client.New().Tenant.List(client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of tenants", false).Error()))
+			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
+		} else {
+			response.Succed(tenants.GetTenants())
 		}
-		out, _ := json.Marshal(tenants.GetTenants())
-		fmt.Println(string(out))
 
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -58,14 +57,16 @@ var tenantGet = cli.Command{
 	Name:  "get",
 	Usage: "Get current tenant",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get tenant", false).Error()))
+			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
+		} else {
+			response.Succed(tenant)
 		}
-		out, _ := json.Marshal(tenant)
-		fmt.Println(string(out))
 
-		return nil
+		return response.GetError()
 	},
 }
 
@@ -73,16 +74,20 @@ var tenantSet = cli.Command{
 	Name:  "set",
 	Usage: "Set tenant to work with",
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		if c.NArg() != 1 {
-			fmt.Println("Missing mandatory argument <tenant_name>")
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.ExitOnInvalidArgument()
+			//_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>. For help --> safescale tenant set -h "))
+		} else {
+			err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
+			} else {
+				response.Succed(nil)
+			}
 		}
-		err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
-		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error()))
-		}
-		fmt.Printf("Tenant '%s' set\n", c.Args().First())
-		return nil
+
+		return response.GetError()
 	},
 }

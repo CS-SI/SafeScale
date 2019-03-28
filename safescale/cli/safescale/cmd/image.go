@@ -17,9 +17,6 @@
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/safescale/client"
@@ -46,12 +43,15 @@ var imageList = cli.Command{
 			Usage: "List all available images in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
 		images, err := client.New().Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of images", false).Error()))
+			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of images", false).Error())))
+		} else {
+			response.Succed(images.GetImages())
 		}
-		out, _ := json.Marshal(images.GetImages())
-		fmt.Println(string(out))
-		return nil
+
+		return response.GetError()
 	},
 }
