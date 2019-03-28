@@ -516,20 +516,11 @@ var hostListFeatureCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		response := utils.NewCliResponse()
 
-		feats, err := install.ListFeatures()
+		features, err := install.ListFeatures("host")
 		if err != nil {
 			response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		} else {
-			views := []string{}
-			for _, feat := range feats {
-				view, ok := feat.(string)
-				if ok {
-					views = append(views, view)
-				} else {
-					view = ""
-				}
-			}
-			response.Succeeded(views)
+			response.Succeeded(features)
 		}
 
 		return response.GetErrorWithoutMessage()

@@ -23,8 +23,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/deckarep/golang-set"
-
 	"github.com/spf13/viper"
 
 	pb "github.com/CS-SI/SafeScale/safescale"
@@ -83,48 +81,67 @@ type Feature struct {
 	task  concurrency.Task
 }
 
-// ListFeatures lists all features suitable for hosts
-func ListFeatures() ([]interface{}, error) {
-	cfgFiles := mapset.NewSet()
+// ListFeatures lists all features suitable for hosts or clusters
+func ListFeatures(suitableFor string) ([]interface{}, error) {
+	features := allEmbeddedMap
+	cfgFiles := []interface{}{}
 
-	captured := mapset.NewSet()
+	var paths []string
+	paths = append(paths, utils.AbsPathify("$HOME/.safescale/features"))
+	paths = append(paths, utils.AbsPathify("$HOME/.config/safescale/features"))
+	paths = append(paths, utils.AbsPathify("/etc/safescale/features"))
 
-	if len(allEmbeddedMap) == 0 {
-		var paths []string
-		paths = append(paths, utils.AbsPathify("$HOME/.safescale/features"))
-		paths = append(paths, utils.AbsPathify("$HOME/.config/safescale/features"))
-		paths = append(paths, utils.AbsPathify("/etc/safescale/features"))
+	for _, path := range paths {
+		files, err := ioutil.ReadDir(path)
+		if err == nil {
+			for _, f := range files {
+				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile == true {
 
-		for _, path := range paths {
-			files, err := ioutil.ReadDir(path)
-			if err == nil {
-				for _, f := range files {
-					if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile == true {
-						cfgFiles.Add(strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+					feature, err := NewFeature(concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+					if err != nil {
+						return nil, err
+					}
+					if _, ok := allEmbeddedMap[feature.displayName]; !ok {
+						allEmbeddedMap[feature.displayName] = feature
 					}
 				}
 			}
 		}
-	} else {
-		for _, feat := range allEmbeddedMap {
-			yamlKey := "feature.suitableFor.host"
-
-			if !captured.Contains(feat.displayName) {
-				ok := false
-				if feat.Specs().IsSet(yamlKey) {
-					value := strings.ToLower(feat.Specs().GetString(yamlKey))
-					ok = value == "ok" || value == "yes" || value == "true" || value == "1"
-				}
-				if ok {
-					cfgFiles.Add(feat.fileName)
-				}
-
-				captured.Add(feat.displayName)
-			}
-		}
 	}
 
-	return cfgFiles.ToSlice(), nil
+	for _, feature := range features {
+		//TODO use an enum instead string
+		switch suitableFor {
+		case "host":
+			yamlKey := "feature.suitableFor.host"
+			if feature.Specs().IsSet(yamlKey) {
+				value := strings.ToLower(feature.Specs().GetString(yamlKey))
+				if value == "ok" || value == "yes" || value == "true" || value == "1" {
+					cfgFiles = append(cfgFiles, feature.fileName)
+				}
+			}
+		case "cluster":
+			yamlKey := "feature.suitableFor.cluster"
+			if feature.Specs().IsSet(yamlKey) {
+				values := strings.Split(strings.ToLower(feature.Specs().GetString(yamlKey)), ",")
+				if values[0] == "all" || values[0] == "dcos" || values[0] == "k8s" || values[0] == "boh" || values[0] == "swarm" || values[0] == "ohpc" {
+					cfg := struct {
+						FeatureName    string   `json:"feature"`
+						ClusterFlavors []string `json:"available-cluster-flavors"`
+					}{feature.displayName, []string{}}
+					for _, flavor := range values {
+						cfg.ClusterFlavors = append(cfg.ClusterFlavors, flavor)
+					}
+					cfgFiles = append(cfgFiles, cfg)
+				}
+			}
+		default:
+			return nil, fmt.Errorf("Unknown parameter value : %s \n (should be host or cluster)", suitableFor)
+		}
+
+	}
+
+	return cfgFiles, nil
 }
 
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
