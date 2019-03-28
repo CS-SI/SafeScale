@@ -53,7 +53,7 @@ var bucketList = cli.Command{
 		if err != nil {
 			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of buckets", false).Error())))
 		} else {
-			response.Succed(resp)
+			response.Succeeded(resp)
 		}
 
 		return response.GetError()
@@ -76,7 +76,7 @@ var bucketCreate = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of bucket", true).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -104,7 +104,7 @@ var bucketDelete = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of bucket", true).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -128,7 +128,7 @@ var bucketInspect = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of bucket", false).Error())))
 			} else {
-				response.Succed(resp)
+				response.Succeeded(resp)
 			}
 
 			out, _ := json.Marshal(resp)
@@ -161,7 +161,7 @@ var bucketMount = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "mount of bucket", true).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -185,7 +185,7 @@ var bucketUnmount = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unmount of bucket", true).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 

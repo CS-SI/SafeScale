@@ -115,7 +115,7 @@ var shareCreate = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "creation of share", true).Error()))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -163,7 +163,7 @@ var shareDelete = cli.Command{
 			if errs > 0 {
 				response.Failed(clitools.ExitOnRPC(errMessage))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -182,7 +182,7 @@ var shareList = cli.Command{
 		if err != nil {
 			response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "list of shares", false).Error()))
 		} else {
-			response.Succed(list.ShareList)
+			response.Succeeded(list.ShareList)
 		}
 
 		return response.GetError()
@@ -225,7 +225,7 @@ var shareMount = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "mount of nas", true).Error()))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -255,7 +255,7 @@ var shareUnmount = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "unmount of share", true).Error()))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -279,7 +279,7 @@ var shareInspect = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "inspection of share", false).Error()))
 			} else {
-				response.Succed(list)
+				response.Succeeded(list)
 			}
 		}
 

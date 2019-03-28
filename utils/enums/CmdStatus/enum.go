@@ -23,7 +23,7 @@ type Enum int
 
 const (
 	// Command works as intended
-	SUCCES Enum = iota
+	SUCCESS Enum = iota
 	// Command failed
 	FAILURE
 	// Unset

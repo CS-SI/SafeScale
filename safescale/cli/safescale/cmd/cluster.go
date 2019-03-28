@@ -130,7 +130,7 @@ var clusterListCommand = cli.Command{
 				}
 				formatted = append(formatted, formatClusterConfig(converted, false))
 			}
-			response.Succed(formatted)
+			response.Succeeded(formatted)
 		}
 
 		return response.GetError()
@@ -177,7 +177,7 @@ var clusterInspectCommand = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 			} else {
-				response.Succed(clusterConfig)
+				response.Succeeded(clusterConfig)
 			}
 		}
 
@@ -413,7 +413,7 @@ var clusterCreateCommand = cli.Command{
 				if !Debug {
 					delete(formatted, "defaults")
 				}
-				response.Succed(formatted)
+				response.Succeeded(formatted)
 			}
 		}
 
@@ -459,7 +459,7 @@ var clusterDeleteCommand = cli.Command{
 			force := c.Bool("force")
 
 			if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete Cluster '%s'", clusterName)) {
-				response.Succed("Aborted")
+				response.Succeeded("Aborted")
 			} else {
 				if force {
 					log.Println("'-f,--force' does nothing yet")
@@ -469,7 +469,7 @@ var clusterDeleteCommand = cli.Command{
 				if err != nil {
 					response.Failed(clitools.ExitOnRPC(err.Error()))
 				} else {
-					response.Succed(nil)
+					response.Succeeded(nil)
 				}
 			}
 		}
@@ -503,7 +503,7 @@ var clusterStopCommand = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(err.Error()))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -537,7 +537,7 @@ var clusterStartCommand = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(err.Error()))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -569,7 +569,7 @@ var clusterStateCommand = cli.Command{
 				msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
 				response.Failed(clitools.ExitOnRPC(msg))
 			} else {
-				response.Succed(map[string]interface{}{
+				response.Succeeded(map[string]interface{}{
 					"Name":       clusterName,
 					"State":      state,
 					"StateLabel": state.String(),
@@ -674,7 +674,7 @@ var clusterExpandCommand = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(err.Error()))
 			} else {
-				response.Succed(hosts)
+				response.Succeeded(hosts)
 			}
 		}
 
@@ -746,7 +746,7 @@ var clusterShrinkCommand = cli.Command{
 			if !yes {
 				msg := fmt.Sprintf("Are you sure you want to delete %d %s node%s from Cluster %s", count, nodeTypeString, countS, clusterName)
 				if !utils.UserConfirmed(msg) {
-					response.Succed("Aborted")
+					response.Succeeded("Aborted")
 				}
 			}
 
@@ -765,7 +765,7 @@ var clusterShrinkCommand = cli.Command{
 			if len(msgs) > 0 {
 				response.Failed(clitools.ExitOnRPC(strings.Join(msgs, "\n")))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -805,7 +805,7 @@ var clusterDcosCommand = cli.Command{
 				if err != nil {
 					response.Failed(err)
 				} else {
-					response.Succed(nil)
+					response.Succeeded(nil)
 				}
 			}
 		}
@@ -841,7 +841,7 @@ var clusterKubectlCommand = cli.Command{
 			if err != nil {
 				response.Failed(err)
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -971,7 +971,7 @@ var clusterAddFeatureCommand = cli.Command{
 				}
 				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -1033,10 +1033,10 @@ var clusterCheckFeatureCommand = cli.Command{
 				if Verbose || Debug {
 					msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 				}
-				response.Succed(msg)
+				response.Succeeded(msg)
 			} else {
 				msg := fmt.Sprintf("Feature '%s' found on cluster '%s'\n", featureName, clusterName)
-				response.Succed(msg)
+				response.Succeeded(msg)
 			}
 		}
 
@@ -1103,7 +1103,7 @@ var clusterDeleteFeatureCommand = cli.Command{
 			}
 			response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
 		} else {
-			response.Succed(nil)
+			response.Succeeded(nil)
 		}
 
 		return response.GetError()
@@ -1212,7 +1212,7 @@ var clusterNodeListCommand = cli.Command{
 					})
 				}
 			}
-			response.Succed(formatted)
+			response.Succeeded(formatted)
 		}
 
 		return response.GetError()
@@ -1254,7 +1254,7 @@ var clusterNodeInspectCommand = cli.Command{
 		if err != nil {
 			response.Failed(clitools.ExitOnRPC(err.Error()))
 		} else {
-			response.Succed(host)
+			response.Succeeded(host)
 		}
 
 		return response.GetError()
@@ -1304,7 +1304,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 		force := c.Bool("force")
 
 		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node '%s' of the cluster '%s'", hostName, clusterName)) {
-			response.Succed("Aborted")
+			response.Succeeded("Aborted")
 		} else {
 			if force {
 				log.Println("'-f,--force' does nothing yet")
@@ -1314,7 +1314,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(err.Error()))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -1475,7 +1475,7 @@ var clusterMasterListCommand = cli.Command{
 					"id":   host.Id,
 				})
 			}
-			response.Succed(formatted)
+			response.Succeeded(formatted)
 		}
 
 		return response.GetError()

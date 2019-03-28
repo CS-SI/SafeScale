@@ -53,7 +53,7 @@ var networkList = cli.Command{
 		if err != nil {
 			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of networks", false).Error())))
 		} else {
-			response.Succed(networks.GetNetworks())
+			response.Succeeded(networks.GetNetworks())
 		}
 
 		return response.GetError()
@@ -80,7 +80,7 @@ var networkDelete = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
 			} else {
-				response.Succed(nil)
+				response.Succeeded(nil)
 			}
 		}
 
@@ -104,7 +104,7 @@ var networkInspect = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network", false).Error())))
 			} else {
-				response.Succed(network)
+				response.Succeeded(network)
 			}
 		}
 
@@ -154,7 +154,7 @@ var networkCreate = cli.Command{
 
 		if c.NArg() != 1 {
 			//_ = cli.ShowSubcommandHelp(c)
-			response.Succed(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>. For help --> safescale network create -h"))
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>. For help --> safescale network create -h"))
 		} else {
 			netdef := pb.NetworkDefinition{
 				Cidr: c.String("cidr"),
@@ -172,7 +172,7 @@ var networkCreate = cli.Command{
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
 			} else {
-				response.Succed(network)
+				response.Succeeded(network)
 			}
 		}
 
