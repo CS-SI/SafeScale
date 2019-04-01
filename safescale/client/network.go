@@ -17,9 +17,8 @@
 package client
 
 import (
-	"fmt"
+	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/safescale"
@@ -54,8 +53,9 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 	ctx := utils.GetContext(true)
 
 	var (
-		wg   sync.WaitGroup
-		errs int32
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
 	)
 
 	networkDeleter := func(aname string) {
@@ -63,8 +63,9 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
 
 		if err != nil {
-			fmt.Println(DecorateError(err, "deletion of network", true).Error())
-			atomic.AddInt32(&errs, 1)
+			mutex.Lock()
+			errs = append(errs, err.Error())
+			mutex.Unlock()
 		}
 	}
 
@@ -74,8 +75,8 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 	}
 	wg.Wait()
 
-	if errs > 0 {
-		return clitools.ExitOnRPC("")
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 
