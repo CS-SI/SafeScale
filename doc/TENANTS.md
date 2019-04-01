@@ -66,7 +66,7 @@ Here is the JSON equivalent of the example TOML configuration file :
       "identity": {
         "DomainName": "<Domain Name>",
         "Password": "<Password>",
-        "Username": "<Username>"
+        "Username": "<Username>",
       },
       "metadata": {
         "ApplicationKey": "<Openstack Application Key>",
@@ -190,6 +190,7 @@ The valid keywords in this section are :
 > | `DomainName` | OPTIONAL, CLIENT |
 > | `ProjectName` | OPTIONAL, CLIENT |
 > | `ProjectID` | OPTIONAL, CLIENT |
+> | `Scannable` | OPTIONAL |
 
 ### Section ``[tenant.network]``
 

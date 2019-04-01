@@ -7,15 +7,17 @@ Some providers don't provide all the informations (cpu frequency, gpu, ...) abou
 To launch the scan just launch the command ```scanner```.
 
 
-To be scanned, a tenant name should be followed by scannable
+To be scanned, a tenant should have the field Scannable set to true
 
 ```
 [[tenants]]
-    name    = "ovh_tenant-scannable"
+    name    = "ovh_tenant"
     client  = "ovh"
-.
-.
-.
+    [tenants.compute]
+        Scannable = true
+        ...
+...
+
 ```
 
 A database of all templates availables will then be stored in $HOME/.safescale/ allowing SafeScale to create hosts more precisely.<br>
