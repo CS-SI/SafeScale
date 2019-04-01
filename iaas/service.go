@@ -232,7 +232,7 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 				for _, f := range imageList {
 					imageFound := resources.StoredCPUInfo{}
 					if err := json.Unmarshal([]byte(f), &imageFound); err != nil {
-						fmt.Println("Error", err)
+						log.Error(fmt.Sprintf("Error unmarsalling image %s : %v", f, err))
 					}
 
 					// if the user asked explicitly no gpu
@@ -254,9 +254,9 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 				if !force && (len(images) == 0) {
 					var noHostError string
 					if sizing.MinFreq <= 0 {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs !, problem accessing Scanner database: %v", sizing.MinGPU, err)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs !, no images matching requirements", sizing.MinGPU)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, no images matching requirements", sizing.MinGPU, sizing.MinFreq)
 					}
 					log.Error(noHostError)
 					return nil, errors.New(noHostError)

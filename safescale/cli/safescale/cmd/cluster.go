@@ -383,10 +383,11 @@ var clusterCreateCommand = cli.Command{
 		var nodesDef *resources.HostDefinition
 		if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
 			nodesDef = &resources.HostDefinition{
-				Cores:    int(cpu),
-				RAMSize:  ram,
-				DiskSize: int(disk),
-				ImageID:  los,
+				Cores:     int(cpu),
+				RAMSize:   ram,
+				DiskSize:  int(disk),
+				ImageID:   los,
+				GPUNumber: -1, // Clusters currently don't take gpus into account
 			}
 		}
 		clusterInstance, err = cluster.Create(concurrency.RootTask(), control.Request{
@@ -664,10 +665,11 @@ var clusterExpandCommand = cli.Command{
 			var nodeRequest *resources.HostDefinition
 			if los != "" || cpu > 0 || ram > 0.0 || disk > 0 {
 				nodeRequest = &resources.HostDefinition{
-					Cores:    int(cpu),
-					RAMSize:  ram,
-					DiskSize: int(disk),
-					ImageID:  los,
+					Cores:     int(cpu),
+					RAMSize:   ram,
+					DiskSize:  int(disk),
+					ImageID:   los,
+					GPUNumber: -1, // Clusters currently don't take gpus into account
 				}
 			}
 			hosts, err := clusterInstance.AddNodes(concurrency.RootTask(), count, public, nodeRequest)
