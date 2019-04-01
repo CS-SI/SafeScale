@@ -17,10 +17,8 @@
 package client
 
 import (
-	"fmt"
-	"os"
+	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/safescale"
@@ -64,8 +62,9 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 	ctx := utils.GetContext(true)
 
 	var (
-		wg   sync.WaitGroup
-		errs int32
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
 	)
 
 	volumeDeleter := func(aname string) {
@@ -73,8 +72,9 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
 
 		if err != nil {
-			_, _ = fmt.Fprintln(os.Stderr, DecorateError(err, "deletion of volume", true).Error())
-			atomic.AddInt32(&errs, 1)
+			mutex.Lock()
+			errs = append(errs, err.Error())
+			mutex.Unlock()
 		}
 	}
 
@@ -84,8 +84,8 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 	}
 	wg.Wait()
 
-	if errs > 0 {
-		return clitools.ExitOnRPC("")
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 

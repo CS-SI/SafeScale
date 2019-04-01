@@ -17,9 +17,8 @@
 package client
 
 import (
-	"fmt"
+	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/CS-SI/SafeScale/safescale/utils"
@@ -121,16 +120,18 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 	ctx := utils.GetContext(true)
 
 	var (
-		wg   sync.WaitGroup
-		errs int32
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
 	)
 
 	hostDeleter := func(aname string) {
 		defer wg.Done()
 		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
 		if err != nil {
-			fmt.Printf("%v\n", DecorateError(err, "deletion of host", true))
-			atomic.AddInt32(&errs, 1)
+			mutex.Lock()
+			errs = append(errs, err.Error())
+			mutex.Unlock()
 		}
 	}
 
@@ -140,8 +141,8 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 	}
 	wg.Wait()
 
-	if errs > 0 {
-		return clitools.ExitOnRPC("")
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 }
