@@ -124,7 +124,7 @@ The Folder that will be used by libvirt to store disk images and block storages 
 
 ### Example
 
-```
+```toml
 [[tenants]]
     name    = "Test_Local"
     client  = "local"
@@ -165,7 +165,7 @@ A List of images, each image is made up of :
 
 ### Example
 
-```
+```json
 {
     "images" : [
         {
@@ -242,7 +242,7 @@ A List of templates, each template is made up of :
 
 ### Example
 
-```
+```json
 {
     "templates" : [
         {

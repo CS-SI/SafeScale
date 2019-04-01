@@ -1,6 +1,6 @@
 # SafeScale: Features
 
-Features allow user to install various tools on a single host or a cluster depending of the feature.
+Features allow user to install various tools on a single host or a cluster.
 
 
 ## Available Features
@@ -28,7 +28,7 @@ feature | description | specificities
 `spark` |  Install and configure a spark cluster   |  Only available on a kubernetes or dcos flavored cluster
 
 
-## Commands
+## How to install a feature
 
 [cf. Usage](USAGE.md)
 
@@ -39,9 +39,12 @@ Safescale will look for foreign features in folders :
 *	$HOME/.config/safescale/features
 *	/etc/safescale/features
 
-### feature.yaml file
+Each .yaml file in one of these folder will be treated as standard feature
 
-Features are provided as a yaml file who should follow this format 
+### Feature.yaml file
+
+Features are provided as a yaml file which is detailing where, how and which code should be exectuted to check installation, install or remove the tool
+The file have to follow this struture.
 
 ```
 ---
@@ -74,6 +77,7 @@ feature:
                 pace: step1_name,step2_name,...
                 steps:
                     step1_name:
+                        serial: <true | false>
                         wallTime: time_in_sec
                         targets:
                             hosts: <true | false>
@@ -83,6 +87,7 @@ feature:
                         run: |
                             script_to_execute
                     step2_name:
+                        serial: <true | false>
                         wallTime: time_in_sec
                         targets:
                             hosts: <true | false>
@@ -136,40 +141,52 @@ feature:
 ...
 ```
 
-key | description | subkeys | values
------ | ----- | ----- | -----
-`suitableFor`    | Describe where the feature could be installed | host <br> cluster | -
-host    |  Allow the feature to be installed on a single host  | - | true <br> false
-cluster    |  Allow the feature to be installed on a cluster flavor   | - |  false (can not be installed on any flavor)<br> any (can be installed on any flavor)<br> boh <br> dcos <br> k8s <br> ohpc <br> swarm <br> *Multiples flavors can be selected separated with a comma ex: (swarm,boh)*
-`requirements`   | Describe requirements for the feature to works properly | features <br> clusterSizing | -
-features    | Features who should be installed before to start   | -  |  feature_list
-clusterSizing    | ? |  ? | ?
-`parameters` | List of parameters mandatory to launch the feature installation | - | parameter_list
-`install` | Describe how to install the feature | ansible <br> apt <br> bash <br> dcos <br> dnf <br> helm <br> yum <br> *You can specify how to install the feature with any combinaison of installation methods, just by creating a new subkey for each method* | -
-ansible <br> apt <br> bash <br> dcos <br> dnf <br> helm <br> yum | Describe how to install the feature for a specific method | check <br> add <br> remove | -
-check    | Describe the process to check if the feature is already installed <br> runs should all exit with 0 if the feature is installed | pace <br> steps | -
-add    | Describe the process to install the feature <br> runs should all return 0 if the installation works well | pace <br> steps | - 
-remove    | Describe the process to remove the feature <br> runs should all return 0 if the suppression works well | pace <br> steps | - 
-pace | List the steps needed to achieve the check/add/remove | - | step_list <br> *Separated by commas, they will be executed in the provided order*
-steps | Each steps subkey will be a step | step <br> *There could be any number of step but they have to be registerd in pace to be taken in account* | -
-step<br>*Step real name could be anything* | A sub task of check/add/remove | wallTime <br> targets <br> run | -
-wallTime | Timeout of the step (in minutes) | - | timeoutValue
-targets | Where shoud the step be executed | hosts <br> masters <br> privateNodes <br> publicNodes | -
-hosts | Shoud the step be executed on a single host | - | famse (will not be executed) <br> yes (will be executed)
-masters <br> privateNodes <br> publicNodes | Shoud the step be executed on cluster masters/privateNodes/publicNodes | - | none (will not be executed) <br> one (will be executed on only one, the same on all steps) <br> all (will be executed on each)
-run | Script to execute remotly on the device(s) targeted by the chosen method <br> An exit code different from 0 will be considered as a failure | - | script <br> *The script will be extanded by preseted functions and templated parameters, [cf. Install-step-run](###Install-step-run)*
-`proxy` | Describe the reverse-proxy modifications needed by the feature | rules | -
-rules  | Describe the reverse-proxy rules needed by the features | - | List_of_rule
-rule | Decribe a reverse-proxy rule | name <br> type <br> targets <br> content | -
-name | The rule name | - | rule_name
-type | The kind of rule to apply | - | service (https://docs.konghq.com/1.0.x/admin-api/#service-object) <br> route (https://docs.konghq.com/1.0.x/admin-api/#route-object) <br> upstream (https://docs.konghq.com/1.0.x/admin-api/#upstream-object)
-targets | Where shoud the step be executed | hosts <br> masters <br> privateNodes <br> publicNodes | -
-hosts | Shoud the step be executed on a single host | - | false (will not be executed) <br> yes (will be executed)
-masters <br> privateNodes <br> publicNodes | Shoud the step be executed on cluster masters/privateNodes/publicNodes | - | none (will not be executed) <br> one (will be executed on only one, the same 
-content | Parameters of the rule, they will depend of the rule type | - | json repesentation of a map with param_name as key and param_value as value <br> *The script will be extanded by templated parameters, [cf. Proxy-rule-content](###Proxy-rule-content)*
+key | description | subkeys | values | mandatory
+----- | ----- | ----- | ----- | -----
+`suitableFor`    | Describe where the feature could be installed | host <br> cluster | - | True
+host    |  Allow the feature to be installed on a single host  | - | true <br> false | True
+cluster    |  Allow the feature to be installed on a cluster flavor   | - |  false (can not be installed on any flavor)<br> any (can be installed on any flavor)<br> boh <br> dcos <br> k8s <br> ohpc <br> swarm <br> *Multiples flavors can be selected separated with a comma ex: (swarm,boh)* | True
+`requirements`   | Describe requirements for the feature to works properly | features <br> clusterSizing | - | False
+features    | Features who should be installed before to start   | -  |  feature_list | False
+clusterSizing    | ? |  ? | ? | False
+`parameters` | List of parameters mandatory to launch the feature installation | - | parameter_list | False
+`install` | Describe how to install the feature | ansible <br> apt <br> bash <br> dcos <br> dnf <br> helm <br> yum <br> *You can specify how to install the feature with any combinaison of installation methods, just by creating a new subkey for each method* | - | True
+ansible <br> apt <br> bash <br> dcos <br> dnf <br> helm <br> yum | Describe how to install the feature for a specific method | check <br> add <br> remove | - | True
+check    | Describe the process to check if the feature is already installed <br> runs should all exit with 0 if the feature is installed | pace <br> steps | - | True
+add    | Describe the process to install the feature <br> runs should all return 0 if the installation works well | pace <br> steps | - | True 
+remove    | Describe the process to remove the feature <br> runs should all return 0 if the suppression works well | pace <br> steps | - | True 
+pace | List the steps needed to achieve the check/add/remove | - | step_list <br> *Separated by commas, they will be executed in the provided order* | True
+steps | Each steps subkey will be a step | step <br> *There could be any number of step but they have to be registerd in pace to be taken in account* | - | True
+step<br>*Step real name could be anything* | A sub task of check/add/remove | wallTime <br> targets <br> run | - | True
+serial | Allow the step to be executed on all targets in parallel | - | true <br> false | False
+wallTime | Timeout of the step (in minutes) | - | timeoutValue | False
+targets | Where shoud the step be executed | hosts <br> masters <br> privateNodes <br> publicNodes | - | True
+hosts | Shoud the step be executed on a single host | - | famse (will not be executed) <br> yes (will be executed) | True
+masters <br> privateNodes <br> publicNodes | Shoud the step be executed on cluster masters/privateNodes/publicNodes | - | none (will not be executed) <br> one (will be executed on only one, the same on all steps) <br> all (will be executed on each) | True
+run | Script to execute remotly on the device(s) targeted by the chosen method <br> An exit code different from 0 will be considered as a failure | - | script <br> *The script will be extanded by preseted functions and templated parameters, [cf. Install-step-run](###Install-step-run)* | True
+`proxy` | Describe the reverse-proxy modifications needed by the feature | rules | - | False
+rules  | Describe the reverse-proxy rules needed by the features | - | List_of_rule | True
+rule | Decribe a reverse-proxy rule | name <br> type <br> targets <br> content | - | True
+name | The rule name | - | rule_name | True
+type | The kind of rule to apply | - | service (https://docs.konghq.com/1.0.x/admin-api/#service-object) <br> route (https://docs.konghq.com/1.0.x/admin-api/#route-object) <br> upstream (https://docs.konghq.com/1.0.x/admin-api/#upstream-object) | True
+targets | Where shoud the step be executed | hosts <br> masters <br> privateNodes <br> publicNodes | - | True
+hosts | Shoud the step be executed on a single host | - | false (will not be executed) <br> yes (will be executed) | True
+masters <br> privateNodes <br> publicNodes | Shoud the step be executed on cluster masters/privateNodes/publicNodes | - | none (will not be executed) <br> one (will be executed on only one, the same | True 
+content | Parameters of the rule, they will depend of the rule type | - | json repesentation of a map with param_name as key and param_value as value <br> *The script will be extanded by templated parameters, [cf. Proxy-rule-content](###Proxy-rule-content)* | True
 
 
 ### Install-step-run
+
+Each install step has a run field describing the commands who will be executed on the targeted host (the execution method will depend of the chosen installer). If a step exits with a return code other than 0, the installation of the components will be considered a failure and the following steps will not be executed<br>
+Several templated parameters are available : 
+*   {{.Username}} : the name of the default user of the targeted host
+*   {{.Hostname}} : the hostname of the current targeted host
+*   {{.HostIP}}   : the IP of the current targeted host
+*   {{.GatewayIP}} : The private IP of the gateway
+*   {{.PublicIP}} : the public IP of the gateway
+*   {{._parameter_}} : parameter given to the feature
+
+Several embedded functions are available (cf. system/scripts/bash_library.sh)
 
 ### Proxy-rule-content
 
