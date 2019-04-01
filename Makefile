@@ -9,7 +9,7 @@ ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
 
-VERSION := 19.03.0
+VERSION := 19.03.2
 
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
