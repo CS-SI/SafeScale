@@ -110,20 +110,4 @@ feature:
                             docker-compose -f /opt/safescale/run/reverseproxy.compose.yml -p reverseproxy rm --stop -v --force || exit 513
                             rm -rf /opt/safescale/run/reverseproxy.compose.yml /opt/safescale/data/reverseproxy
 
-    service:
-        start: |
-            docker-compose -f /opt/safescale/reverseproxy.feature.yml up -d
-
-        stop: |
-            docker-compose -f /opt/safescale/reverseproxy.feature.yml down kong-proxy
-
-        pause: |
-            docker-compose -f /opt/safescale/reverseproxy.feature.yml pause
-
-        unpause: |
-            docker-compose -f /opt/safescale/reverseproxy.feature.yml unpause
-
-        state: |
-            docker ps | grep kong-proxy &>/dev/null
-
 ...
