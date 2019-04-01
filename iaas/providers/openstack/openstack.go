@@ -66,6 +66,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 	if len(dnsServers) <= 0 {
 		dnsServers = []string{"8.8.8.8", "1.1.1.1"}
 	}
+	operatorUsername := resources.DefaultUser
+	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
+		operatorUsername = operatorUsernameIf.(string)
+	}
 
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
@@ -90,9 +94,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 			"standard":   VolumeSpeed.COLD,
 			"performant": VolumeSpeed.HDD,
 		},
-		DNSList:        dnsServers,
-		DefaultImage:   defaultImage,
-		MetadataBucket: metadataBucketName,
+		DNSList:          dnsServers,
+		DefaultImage:     defaultImage,
+		MetadataBucket:   metadataBucketName,
+		OperatorUsername: operatorUsername,
 	}
 
 	stack, err := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -133,6 +138,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("ProviderNetwork", opts.ProviderNetwork)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
+	cfg.Set("OperatorUsername", opts.OperatorUsername)
 
 	return cfg, nil
 }

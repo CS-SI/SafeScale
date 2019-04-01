@@ -4,8 +4,9 @@ package local
 
 import (
 	"fmt"
+
 	"github.com/CS-SI/SafeScale/iaas/stacks"
-	"github.com/libvirt/libvirt-go"
+	libvirt "github.com/libvirt/libvirt-go"
 )
 
 type Stack struct {
@@ -16,11 +17,11 @@ type Stack struct {
 }
 
 func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
-	panic("implement me")
+	return s.GetConfigurationOptions()
 }
 
 func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-	panic("implement me")
+	return s.GetAuthenticationOptions()
 }
 
 // Build Create and initialize a ClientAPI

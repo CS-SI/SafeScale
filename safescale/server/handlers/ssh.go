@@ -25,11 +25,11 @@ import (
 	//"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/safescale/server/metadata"
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/safescale/server/metadata"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
 
@@ -79,14 +79,23 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 		panic("param must be a string or a *resources.Host!")
 	}
 
+	cfg, err := handler.service.GetCfgOpts()
+	if err != nil {
+		return nil, infraErr(err)
+	}
+	user := resources.DefaultUser
+	if userIf, ok := cfg.Get("OperatorUsername"); ok {
+		user = userIf.(string)
+	}
+
 	sshConfig := system.SSHConfig{
 		PrivateKey: host.PrivateKey,
 		Port:       22,
 		Host:       host.GetAccessIP(),
-		User:       resources.DefaultUser,
+		User:       user,
 	}
 
-	err := host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+	err = host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		if hostNetworkV1.DefaultGatewayID != "" {
 			hostSvc := NewHostHandler(handler.service)
@@ -98,7 +107,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 				PrivateKey: gw.PrivateKey,
 				Port:       22,
 				Host:       gw.GetAccessIP(),
-				User:       resources.DefaultUser,
+				User:       user,
 			}
 			sshConfig.GatewayConfig = &GatewayConfig
 		}
@@ -170,7 +179,6 @@ func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, 
 	return sshCmd.Run() // FIXME It CAN lock
 }
 
-
 // run executes command on the host
 func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (int, string, string, error) {
 	// Create the command
@@ -180,7 +188,6 @@ func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 	}
 	return sshCmd.RunWithTimeout(duration)
 }
-
 
 func extracthostName(in string) (string, error) {
 	parts := strings.Split(in, protocolSeparator)

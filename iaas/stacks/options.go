@@ -105,6 +105,9 @@ type ConfigurationOptions struct {
 
 	// MetadataBucket contains the name of the Object Storage bucket that will store metadata
 	MetadataBucket string
+
+	//OperatorUsername contain the name of the safescale created user
+	OperatorUsername string
 }
 
 // CfgOptions configuration options
