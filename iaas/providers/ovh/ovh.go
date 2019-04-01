@@ -82,6 +82,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 	region, _ := computeParams["Region"].(string)
 	projectName, _ := computeParams["ProjectName"].(string)
 
+	operatorUsername := resources.DefaultUser
+	if operatorUsernameIf, ok := computeParams["OperatorUsername"]; ok {
+		operatorUsername = operatorUsernameIf.(string)
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         openstackID,
@@ -107,7 +112,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 			"classic":    VolumeSpeed.COLD,
 			"high-speed": VolumeSpeed.HDD,
 		},
-		MetadataBucket: metadataBucketName,
+		MetadataBucket:   metadataBucketName,
+		OperatorUsername: operatorUsername,
 	}
 
 	serviceVersions := map[string]string{"volume": "v1"}
@@ -148,6 +154,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
+	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	return cfg, nil
 }
 

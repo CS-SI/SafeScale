@@ -90,6 +90,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 
 	compute, _ := params["compute"].(map[string]interface{})
 
+	operatorUsername := resources.DefaultUser
+	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
+		operatorUsername = operatorUsernameIf.(string)
+	}
+	config.OperatorUsername = operatorUsername
+
 	uri, found := compute["uri"].(string)
 	if !found {
 		return nil, fmt.Errorf("Uri is not set")
@@ -137,6 +143,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	config.Set("UseLayer3Networking", p.Config.UseLayer3Networking)
 	config.Set("MetadataBucketName", p.Config.MetadataBucket)
 	config.Set("ProviderNetwork", p.Config.ProviderNetwork)
+	config.Set("OperatorUsername", p.Config.OperatorUsername)
 
 	return config, nil
 }

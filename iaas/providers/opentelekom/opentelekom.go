@@ -61,6 +61,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 		identityEndpoint = fmt.Sprintf(identityEndpointTemplate, region)
 	}
 
+	operatorUsername := resources.DefaultUser
+	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
+		operatorUsername = operatorUsernameIf.(string)
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -87,7 +92,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 			"SAS":  VolumeSpeed.HDD,
 			"SSD":  VolumeSpeed.SSD,
 		},
-		MetadataBucket: metadataBucketName,
+		MetadataBucket:   metadataBucketName,
+		OperatorUsername: operatorUsername,
 	}
 	stack, err := huaweicloud.New(authOptions, cfgOptions)
 	if err != nil {
@@ -144,6 +150,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
+	cfg.Set("OperatorUsername", opts.OperatorUsername)
 
 	return cfg, nil
 }

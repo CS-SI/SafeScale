@@ -76,6 +76,7 @@ func Prepare(
 		autoHostNetworkInterfaces bool
 		useLayer3Networking       = true
 		dnsList                   []string
+		operatorUsername          string
 	)
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
@@ -93,6 +94,7 @@ func Prepare(
 
 	autoHostNetworkInterfaces = options.AutoHostNetworkInterfaces
 	useLayer3Networking = options.UseLayer3Networking
+	operatorUsername = options.OperatorUsername
 	dnsList = options.DNSList
 	if len(dnsList) <= 0 {
 		dnsList = []string{"1.1.1.1"}
@@ -125,17 +127,17 @@ func Prepare(
 	}
 
 	data := userData{
-		BashHeader:     scriptHeader,
-		User:       resources.DefaultUser,
-		PublicKey:  strings.Trim(request.KeyPair.PublicKey, "\n"),
-		PrivateKey: strings.Trim(request.KeyPair.PrivateKey, "\n"),
-		ConfIF:     !autoHostNetworkInterfaces,
-		IsGateway:  request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking,
-		AddGateway: !request.PublicIP && !useLayer3Networking,
-		DNSServers: dnsList,
-		CIDR:       cidr,
-		GatewayIP:  ip,
-		Password:   request.Password,
+		BashHeader:        scriptHeader,
+		User:              operatorUsername,
+		PublicKey:         strings.Trim(request.KeyPair.PublicKey, "\n"),
+		PrivateKey:        strings.Trim(request.KeyPair.PrivateKey, "\n"),
+		ConfIF:            !autoHostNetworkInterfaces,
+		IsGateway:         request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking,
+		AddGateway:        !request.PublicIP && !useLayer3Networking,
+		DNSServers:        dnsList,
+		CIDR:              cidr,
+		GatewayIP:         ip,
+		Password:          request.Password,
 		EmulatedPublicNet: defaultNetworkCIDR,
 		//HostName:   request.Name,
 	}
