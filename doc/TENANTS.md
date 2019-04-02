@@ -191,6 +191,7 @@ The valid keywords in this section are :
 > | `ProjectName` | OPTIONAL, CLIENT |
 > | `ProjectID` | OPTIONAL, CLIENT |
 > | `Scannable` | OPTIONAL |
+> | `OperatorUsername` | OPTIONAL |
 
 ### Section ``[tenant.network]``
 
@@ -287,6 +288,10 @@ May be used in sections `tenants.objectstorage` and `tenants.metadata`, especial
 
 ### <a name="kw_OpenStackID"></a> `OpenstackID`: alias, see [`Username`](#kw_Username)
 
+### <a name="kw_OperatorUsername"></a> `OperatorUsername`
+
+Contains the username that will be used to create the default user (safescale if unset).
+
 ### <a name="kw_OpenstackPassword"></a> `OpenstackPassword`: alias, see [`Password`](#kw_Password)
 
 ### <a name="kw_Password"></a> `Password`
@@ -312,6 +317,10 @@ Is meaningful for some providers:
 
 Contains the region to connect to. Values depend on provider.<br>
 May be used in `tenants.compute`, `tenants.objectstorage` and `tenants.metadata`.
+
+### <a name="kw_Scannable"></a> `Scannable`
+
+If set to true, allow the scanner to scan the tennant ([cf. SCANNER](SCANNER.md))
 
 ### <a name="k<_SecretKey"></a> `SecretKey`: alias, see [`Password`](#kw_Password)
 
