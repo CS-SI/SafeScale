@@ -317,7 +317,7 @@ func (svc *Service) FilterImages(filter string) ([]resources.Image, error) {
 // SearchImage search an image corresponding to OS Name
 func (svc *Service) SearchImage(osname string) (*resources.Image, error) {
 	if svc == nil {
-		panic("Calling clt.SearchImage with clt==nil!")
+		panic("Calling svc.SearchImage with svc==nil!")
 	}
 
 	imgs, err := svc.ListImages(false)
