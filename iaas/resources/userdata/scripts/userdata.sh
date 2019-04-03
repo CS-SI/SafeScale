@@ -16,11 +16,16 @@
 
 {{.BashHeader}}
 
-function print_error {
+print_error() {
     read line file <<<$(caller)
     echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
 }
 trap print_error ERR
+
+fail() {
+    echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
+    exit $1
+}
 
 # Redirects outputs to /var/tmp/user_data.log
 exec 1<&-
@@ -29,9 +34,26 @@ exec 1<>/var/tmp/user_data.log
 exec 2>&1
 set -x
 
+LINUX_KIND=
+VERSION_ID=
+
 sfDetectFacts() {
-   local -g LINUX_KIND=$(cat /etc/os-release | grep "^ID=" | cut -d= -f2 | sed 's/"//g')
-   local -g VERSION_ID=$(cat /etc/os-release | grep "^VERSION_ID=" | cut -d= -f2 | sed 's/"//g')
+    [ -f /etc/os-release ] && {
+        . /etc/os-release
+        LINUX_KIND=$ID
+    } || {
+        which lsb_release &>/dev/null && {
+            LINUX_KIND=$(lsb_release -is)
+            LINUX_KIND=${LINUX_KIND,,}
+            VERSION_ID=$(lsb_release -rs | cut -d. -f1)
+        } || {
+            [ -f /etc/redhat-release ] && {
+                LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
+                LINUX_KID=${LINUX_KIND,,}
+                VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
+            }
+        }
+    }
 }
 sfDetectFacts
 
@@ -72,26 +94,72 @@ sfWaitLockfile() {
     fi
 }
 
-fw_i_accept() {
-    iptables -A INPUT -j ACCEPT $*
-}
-fw_f_accept() {
-    iptables -A FORWARD -j ACCEPT $*
-}
-
-PR_IPs=
-PR_IFs=
-PU_IP=
-PU_IF=
-i_PR_IF=
-o_PR_IF=
-
 sfSaveIptablesRules() {
    case $LINUX_KIND in
        rhel|centos) iptables-save >/etc/sysconfig/iptables;;
        debian|ubuntu) iptables-save >/etc/iptables/rules.v4;;
    esac
 }
+
+fw_i_accept() {
+    iptables -A INPUT -j ACCEPT $*
+}
+
+fw_f_accept() {
+    iptables -A FORWARD -j ACCEPT $*
+}
+
+reset_fw() {
+    case $LINUX_KIND in
+        debian|ubuntu)
+            systemctl stop ufw &>/dev/null
+            systemctl disable ufw &>/dev/null
+            sfWaitForApt && {
+                apt purge -qy ufw &>/dev/null || fail 192
+            }
+            sfWaitForApt && apt update
+            sfWaitForApt && {
+                apt install -qy iptables-persistent || {
+                    mkdir -p /etc/iptables /etc/network/if-pre-up.d
+                    cd /etc/network/if-pre-up.d
+                    cat >iptables <<-'EOF'
+#!/bin/sh
+DIR=/etc/iptables
+mkdir -p $DIR
+[ -f $DIR/rules.v4 ] && iptables-restore <$DIR/rules.v4
+EOF
+                    chmod a+rx iptables
+                }
+            }
+            ;;
+
+        rhel|centos)
+            [ $VERSION_ID ge 7 ] && {
+                systemctl disable firewalld &>/dev/null
+                systemctl stop firewalld &>/dev/null
+                systemctl mask firewalld &>/dev/null
+                yum remove -y firewalld &>/dev/null || fail 193
+                yum install -y iptables-services || fail 194
+                systemctl enable iptables
+                systemctl enable ip6tables
+                systemctl start iptables
+                systemctl start ip6tables
+            }
+            ;;
+    esac
+
+    # We flush the current firewall rules possibly introduced by iptables pkg
+    iptables -F
+    sfSaveIptablesRules
+}
+
+NICS=
+# PR_IPs=
+PR_IFs=
+PU_IP=
+PU_IF=
+i_PR_IF=
+o_PR_IF=
 
 create_user() {
     echo "Creating user {{.User}}..."
@@ -149,55 +217,122 @@ EOF
 }
 
 # Don't request dns name servers from DHCP server
-configure_dhcp_client() {
+# Don't update default route
+configure_dhclient() {
     sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf
+
+    HOOK_FILE=/etc/dhcp/dhclient-enter-hooks
+    cat >>$HOOK_FILE <<-EOF
+make_resolv_conf() {
+    :
 }
 
-# Configure network for Debian distribution
-configure_network_debian() {
-    echo "Configuring network (debian-based)..."
-    local path=/etc/network/interfaces.d
-    local cfg=$path/50-cloud-init.cfg
-    rm -f $cfg
-    mkdir -p $path
-
-    for IF in $(get_nic_names); do
-        echo "auto ${IF}" >>$cfg
-        echo "iface ${IF} inet dhcp" >>$cfg
-    done
-
-    configure_dhcp_client
-
-    /sbin/dhclient || true
-    systemctl restart networking
-    echo done
-}
-
-# search for network device names
-get_nic_names() {
-    echo $(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
+{{- if not .IsGateway }}
+unset new_routers
+{{- end}}
+EOF
+    chmod +x $HOOK_FILE
 }
 
 ip2long() {
+    local a b c d
     IFS=. read -r a b c d <<<$*
-    echo $((a * 256 ** 3 + b * 256 ** 2 + c * 256 + d))
+    echo $(((((((a << 8) | b) << 8) | c) << 8) | d))
+}
+
+long2ip() {
+    local ui32=$1
+    local ip n
+    for n in 1 2 3 4; do
+        ip=$((ui32 & 0xff))${ip:+.}$ip
+        ui32=$((ui32 >> 8))
+    done
+    echo $ip
+}
+
+cidr2netmask() {
+    local bits=${1#*/}
+    local mask=$((0xffffffff << (32-$bits)))
+    long2ip $mask
+}
+
+cidr2broadcast()
+{
+    local base=${1%%/*}
+    local bits=${1#*/}
+    local long=$(ip2long $base); shift
+    local mask=$((0xffffffff << (32-$bits))); shift
+    long2ip $((long | ~mask))
+}
+
+cidr2network()
+{
+    local base=${1%%/*}
+    local bits=${1#*/}
+    local long=$(ip2long $base); shift
+    local mask=$((0xffffffff << (32-$bits))); shift
+    long2ip $((long & mask))
+}
+
+cidr2iprange() {
+    local network=$(cidr2network $1)
+    local broadcast=$(cidr2broadcast $1)
+    echo ${network}-${broadcast}
 }
 
 is_ip_private() {
     ip=$1
+    ipv=$(ip2long $ip)
 
-    case $LINUX_KIND in
-        debian|ubuntu)
-            grepcidr -V || sfWaitForApt && apt update && apt install -y grepcidr &>/dev/null
-            ;;
-        rhel|centos)
-            grepcidr -V || yum install -y grepcidr &>dev/null
-            ;;
-    esac  
+{{ if .EmulatedPublicNet}}
+    r=$(cidr2iprange {{ .EmulatedPublicNet }})
+    bv=$(ip2long $(cut -d- -f1 <<<$r))
+    ev=$(ip2long $(cut -d- -f2 <<<$r))
+    [ $ipv -ge $bv -a $ipv -le $ev ] && return 0
+{{- end }}
+    for r in "192.168.0.0-192.168.255.255" "172.16.0.0-172.31.255.255" "10.0.0.0-10.255.255.255"; do
+        bv=$(ip2long $(cut -d- -f1 <<<$r))
+        ev=$(ip2long $(cut -d- -f2 <<<$r))
+        [ $ipv -ge $bv -a $ipv -le $ev ] && return 0
+    done
+    return 1
+}
 
-    echo $ip | grepcidr "192.168.0.0/16 172.16.0.0/12 10.0.0.0/8" || return 1
-    echo $ip | grepcidr "{{.EmulatedPublicNet}}" && return 1
-    return 0
+identify_nics() {
+    NICS=$(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
+    NICS=${NICS/[[:cntrl:]]/ }
+
+    for IF in $NICS; do
+        IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1)
+        [ ! -z $IP ] && {
+            is_ip_private $IP && {
+                PR_IFs="$PR_IFs $IF"
+                # PR_IPs="$PR_IPs $IP"
+            }
+        }
+    done
+    PR_IFs=$(echo $PR_IFs | xargs)
+    # PR_IPs=$(echo $PR_IPs | xargs)
+
+    # PU_IFs=$(substring_diff "$NICS" "$PR_IFs" )
+    # if [ -z $PU_IFs ]; then
+    #     PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
+    # else
+    #     PU_IP=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null)
+    # fi
+    PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null)
+    PU_IP=$(ip a | grep $PU_IF | grep inet | awk '{print $2}' | cut -d '/' -f1)
+    [ is_ip_private $PU_IP ] && PU_IF= && PU_IP=
+    # [ ! z $PU_IP ] && {
+    #     PU_IF=$(netstat -ie | grep -B1 $PU_IP | head -n1 | awk '{print $1}')
+    #     PU_IF=${PU_IF%%:}
+    # }
+    [ -z $PR_IFs ] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
+
+    echo "NICS identified: $NICS"
+    echo "    private NIC(s): $PR_IFs"
+    echo "    public NIC: $PU_IF"
+    echo
 }
 
 substring_diff() {
@@ -206,51 +341,202 @@ substring_diff() {
     echo ${l1[@]} ${l2[@]} | tr ' ' '\n' | sort | uniq -u
 }
 
-# Configure network using netplan
-configure_network_netplan() {
-    echo "Configuring network (netplan-based)..."
+# configure_gateway_by_service() {
+#     route del -net default &>/dev/null
 
-    mv -f /etc/netplan /etc/netplan.orig
-    mkdir -p /etc/netplan
-    NICS=$(get_nic_names)
-    fname=/etc/netplan/50-cloud-init.yaml
-    cat <<-'EOF' >$fname
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
+#     cat <<-'EOF' > /sbin/gateway
+# #!/bin/sh -
+# echo "configure default gateway"
+# /sbin/route add -net default gw {{ .GatewayIP }}
+# EOF
+#     chmod u+x /sbin/gateway
+#     cat <<-'EOF' > /etc/systemd/system/gateway.service
+# Description=create default gateway
+# After=network.target
+
+# [Service]
+# ExecStart=/sbin/gateway
+# Restart=on-failure
+# StartLimitIntervalSec=10
+
+# [Install]
+# WantedBy=multi-user.target
+# EOF
+
+#     systemctl enable gateway
+#     systemctl start gateway
+# }
+
+# Configure network for Debian distribution
+configure_network_debian() {
+    echo "Configuring network (debian-like)..."
+
+{{- if .AddGateway }}
+    # Needs to configure quickly gateway on private hosts to be able to update packages
+    route del -net default &>/dev/null
+    route add -net default gw {{ .GatewayIP }}
+{{- end}}
+
+    reset_fw
+
+    local path=/etc/network/interfaces.d
+    mkdir -p $path
+    local cfg=$path/50-cloud-init.cfg
+    rm -f $cfg
+
+    for IF in $NICS; do
+        if [ "$IF" = "$PU_IF" ]; then
+            cat <<-EOF >$path/10-$IF-public.cfg
+auto ${IF}
+iface ${IF} inet dhcp
 EOF
-    for i in $NICS; do
-        cat <<-EOF >>$fname
-    $i:
-      dhcp4: true
+        else
+            cat <<-EOF >$path/11-$IF-private.cfg
+auto ${IF}
+iface ${IF} inet dhcp
+{{- if .AddGateway }}
+  up route add -net default gw {{ .GatewayIP }} || true
+{{- end}}
 EOF
+        fi
     done
-{{- if .GatewayIP }}
-    cat <<-'EOF' >>$fname
-      gateway4: {{.GatewayIP}}
-EOF
-{{- end }}
 
-    netplan generate
-    configure_dhcp_client
-    netplan apply
+    configure_dhclient
+
+    /sbin/dhclient || true
+    systemctl restart networking
 
     echo done
 }
 
-# Configure network for redhat-like distributions (rhel, centos, ...)
+# Configure network using systemd-networkd
+configure_network_systemd_networkd() {
+    echo "Configuring network (using netplan and systemd-networkd)..."
+
+    mkdir -p /etc/netplan
+    rm -f /etc/netplan/*
+
+{{- if .AddGateway }}
+    # Needs to configure quickly gateway to be able to update packages
+    route del -net default &>/dev/null
+    route add -net default gw {{ .GatewayIP }}
+{{- end}}
+
+    # Update netplan to last available release
+    case $LINUX_KIND in
+        debian)
+            sfWaitForApt && {
+                apt update && apt install -qy netplan.io || fail 196
+            }
+            ;;
+        ubuntu)
+            echo "deb http://archive.ubuntu.com/ubuntu/ bionic-proposed main" >/etc/apt/sources.list.d/bionic-proposed.list
+            sfWaitForApt && {
+                apt update && apt install -qy netplan.io || fail 197
+            }
+            ;;
+        redhat|centos)
+            yum install -y netplan.io || fail 198
+            ;;
+        *)
+            echo "unsupported Linux distribution '$LINUX_KIND'"
+            fail 199
+            ;;
+    esac
+
+    reset_fw
+
+    # Recreate netplan configuration with last netplan version and more settings
+    for IF in $NICS; do
+        if [ "$IF" = "$PU_IF" ]; then
+            cat <<-EOF >/etc/netplan/10-$IF-public.yaml
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    $IF:
+      dhcp4: true
+      dhcp6: false
+      critical: true
+      dhcp4-overrides:
+        use-dns: false
+        use-routes: true
+EOF
+        else
+            cat <<-EOF >/etc/netplan/11-$IF-private.yaml
+network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    $IF:
+      dhcp4: true
+      dhcp6: false
+      critical: true
+      dhcp4-overrides:
+        use-dns: false
+        use-routes: false
+{{- if .AddGateway }}
+      routes:
+      - to: 0.0.0.0/0
+        via: {{ .GatewayIP }}
+        scope: global
+        on-link: true
+{{- end}}
+EOF
+        fi
+    done
+    netplan generate && netplan apply || fail 200
+
+    configure_dhclient
+
+    systemctl restart systemd-networkd
+
+    echo done
+}
+
+# Configure network for redhat7-like distributions (rhel, centos, ...)
 configure_network_redhat() {
     echo "Configuring network (redhat-like)..."
 
+    if [ -z $VERSION_ID ]; then
+        disable_svc() {
+            chkconfig $1 off
+        }
+        stop_svc() {
+            service $1 stop
+        }
+        start_svc() {
+            service $1 start
+        }
+    else
+        disable_svc() {
+            systemctl disable $1
+        }
+        stop_svc() {
+            systemctl stop $1
+        }
+        start_svc() {
+            systemct start $1
+        }
+    fi
+
+{{- if .AddGateway }}
+    # Needs to configure quickly gateway to be able to update packages
+    route del -net default &>/dev/null
+    route add -net default gw {{ .GatewayIP }}
+{{- end}}
+
+    reset_fw
+
     # We don't want NetworkManager
-    systemctl disable NetworkManager &>/dev/null
-    systemctl stop NetworkManager &>/dev/null
+    disable_svc NetworkManager &>/dev/null
+    stop_svc NetworkManager &>/dev/null
     yum remove -y NetworkManager &>/dev/null
-    #systemctl restart network
 
     # Configure all network interfaces in dhcp
-    for IF in $(ls /sys/class/net); do
+    for IF in $NICS; do
         if [ $IF != "lo" ]; then
             cat >/etc/sysconfig/network-scripts/ifcfg-$IF <<-EOF
 DEVICE=$IF
@@ -268,36 +554,19 @@ EOF
             {{- end }}
         fi
     done
-    # Disable resolv.conf by dhcp
-    mkdir -p /etc/dhcp
-    HOOK_FILE=/etc/dhcp/dhclient-enter-hooks
-    cat >>$HOOK_FILE <<EOF
-make_resolv_conf() {
-    :
-}
-EOF
-    chmod +x $HOOK_FILE
-    systemctl restart network
 
-    echo done
-}
+    configure_dhclient
 
-reset_fw() {
-    case $LINUX_KIND in
-        debian|ubuntu)
-            systemctl stop ufw &>/dev/null
-            systemctl disable ufw &>/dev/null
-            sfWaitForApt && apt purge -q ufw &>/dev/null
-            ;;
+{{- if .AddGateway }}
+    echo "GATEWAY={{ .GatewayIP }}" >/etc/sysconfig/network
+{{- end }}
 
-        rhel|centos)
-            systemctl disable firewalld &>/dev/null
-            systemctl stop firewalld &>/dev/null
-            systemctl mask firewalld &>/dev/null
-            yum remove -y firewalld &>/dev/null
-            ;;
+    case $VERSION_ID in
+        6) start_svc network;;
+        7) start_svc systemd-networkd;;
     esac
 
+    echo done
 }
 
 add_common_repos() {
@@ -329,50 +598,13 @@ check_for_network() {
     return 0
 }
 
-enable_iptables() {
-    case $LINUX_KIND in
-        debian|ubuntu)
-            sfWaitForApt && apt update
-            sfWaitForApt && apt install -y -q iptables-persistent
-            [ $? -ne 0 ] && {
-                mkdir -p /etc/iptables /etc/network/if-pre-up.d
-                cd /etc/network/if-pre-up.d
-                cat >iptables <<-'EOF'
-#!/bin/sh
-DIR=/etc/iptables
-mkdir -p $DIR
-[ -f $DIR/rules.v4 ] && iptables-restore <$DIR/rules.v4
-EOF
-                chmod a+rx iptables
-            }
-            ;;
-
-        rhel|centos)
-            yum install -y iptables-services
-            systemctl enable iptables
-            systemctl enable ip6tables
-            systemctl start iptables
-            systemctl start ip6tables
-            ;;
-    esac
-
-    # We flush the current firewall rules possibly introduced by iptables pkg
-    iptables -F
-    sfSaveIptablesRules
-}
-
 put_hostname_in_hosts() {
     HON=$(hostname)
-    ping $HON -c 5 2>/dev/null || echo "127.0.0.1 $HON" >>/etc/hosts
+    ping $HON -c 5 2>/dev/null || echo "127.0.1.1 $HON" >>/etc/hosts
 }
 
 configure_as_gateway() {
     echo "Configuring host as gateway..."
-
-    echo "removing ufw and reset fW rules"
-    reset_fw
-    echo "enabling iptables"
-    enable_iptables
 
     echo "configuring iptables"
     # Change default policy for table filter chain INPUT to be DROP (block everything)
@@ -383,28 +615,6 @@ configure_as_gateway() {
     fw_i_accept -p icmp --icmp-type 0 -s 0/0 -m state --state ESTABLISHED,RELATED
     fw_i_accept -m conntrack --ctstate ESTABLISHED,RELATED
     fw_i_accept -p tcp --dport ssh
-
-    nics=$(get_nic_names)
-    for IF in $nics; do
-        IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1)
-        [ ! -z $IP ] && {
-            is_ip_private $IP && {
-                PR_IFs="$PR_IFs $IF"
-                PR_IPs="$PR_IPs $IP"
-            }
-        }
-    done
-
-    [ -z $PR_IPs ] && echo "no private ip!" && return 1
-
-    PU_IFs=$(substring_diff "$nics" "$PR_IFs" )
-    if [ -z $PU_IFs ]; then
-        PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
-        PU_IF=$(netstat -ie | grep -B1 $PU_IP | head -n1 | awk '{print $1}')
-    else
-        PU_IP=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null)
-        PU_IF=${PU_IF%%:}
-    fi
 
     if [ ! -z $PR_IFs ]; then
         # Enable forwarding
@@ -434,14 +644,6 @@ configure_as_gateway() {
     echo "AllowTcpForwarding yes" >>/etc/ssh/sshd_config.new
     mv /etc/ssh/sshd_config.new /etc/ssh/sshd_config
     systemctl restart ssh
-
-    check_for_network
-    [ $? -ne 0 ] && {
-        echo "PROVISIONING_ERROR: No network available"
-        exit 1
-    }
-
-    add_common_repos
 
     echo done
 }
@@ -478,7 +680,7 @@ nameserver {{ . }}
 nameserver 1.1.1.1
 {{- end }}
 EOF
-    #rm -f /etc/resolvconf/resolv.conf.d/tail
+
     resolvconf -u
     echo done
 }
@@ -486,7 +688,7 @@ EOF
 configure_dns_systemd_resolved() {
     echo "Configuring systemd-resolved..."
 
-{{- if not .GatewayIP }}
+{{- if not .AddGateway }}
     rm -f /etc/resolv.conf
     ln -s /run/systemd/resolve/resolv.conf /etc
 {{- end }}
@@ -498,11 +700,6 @@ DNS={{ range .DNSServers }}{{ . }} {{ end }}
 {{- else }}
 DNS=1.1.1.1
 {{- end}}
-#FallbackDNS=
-#Domains=
-#LLMNR=no
-#MulticastDNS=no
-#DNSSEC=no
 Cache=yes
 DNSStubListener=yes
 EOF
@@ -510,101 +707,44 @@ EOF
     echo done
 }
 
-configure_gateway() {
-    echo "Configuring default route by {{ .GatewayIP }}"
-
-    reset_fw
-    route del -net default &>/dev/null
-
-    cat <<-'EOF' > /sbin/gateway
-#!/bin/sh -
-echo "configure default gateway"
-/sbin/route add -net default gw {{ .GatewayIP }}
-EOF
-    chmod u+x /sbin/gateway
-    cat <<-'EOF' > /etc/systemd/system/gateway.service
-Description=create default gateway
-After=network.target
-
-[Service]
-ExecStart=/sbin/gateway
-Restart=on-failure
-StartLimitIntervalSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    systemctl enable gateway
-    systemctl start gateway
-
-    check_for_network
-    [ $? -ne 0 ] && {
-        echo "PROVISIONING_ERROR: No network available"
-        exit 1
-    }
-
-    enable_iptables
-
-    add_common_repos
-
-    echo done
-}
-
-configure_gateway_redhat() {
-    echo "Configuring default router to {{ .GatewayIP }}"
-
-    reset_fw
-
-    route del -net default &>/dev/null
-    route add default gw {{.GatewayIP}}
-    echo "GATEWAY={{.GatewayIP}}" >/etc/sysconfig/network
-
-    enable_iptables
-
-    check_for_network
-    [ $? -ne 0 ] && {
-        echo "PROVISIONING_ERROR: No network available"
-        exit 1
-    }
-
-    add_common_repos
-
-    echo done
-}
-
 install_drivers_nvidia() {
     case $LINUX_KIND in
         ubuntu)
             add-apt-repository -y ppa:graphics-drivers &>/dev/null
-            apt update &>/dev/null
-            apt -y install nvidia-410 &>/dev/null || apt -y install nvidia-driver-410 &>/dev/null
+            sfWaitForApt && apt update &>/dev/null
+            sfWaitForApt && apt -y install nvidia-410 &>/dev/null || {
+                sfWaitForAPt && apt -y install nvidia-driver-410 &>/dev/null || fail 201
+            }
             ;;
+
         debian)
             if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
                 echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
                 rmmod nouveau
             fi
-            apt update &>/dev/null && apt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null
+            sfWaitForApt && apt update &>/dev/null
+            sfWaitForApt && apt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null || fail 202
             dpkg --add-architecture i386 &>/dev/null
-            apt update &>/dev/null && apt install -y lib32z1 lib32ncurses5 &>/dev/null
-            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null
-            bash NVIDIA-Linux-x86_64-410.78.run -s
+            sfWaitForApt && apt update &>/dev/null
+            sfWaitForApt && apt install -y lib32z1 lib32ncurses5 &>/dev/null || fail 203
+            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null || fail 204
+            bash NVIDIA-Linux-x86_64-410.78.run -s || fail 205
             ;;
-        centos)
+
+        redhat|centos)
             if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
                 echo -e "blacklist nouveau\noptions nouveau modeset=0" >>/etc/modprobe.d/blacklist-nouveau.conf
                 dracut --force
                 rmmod nouveau
             fi
-            yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null
-            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run
-            bash NVIDIA-Linux-x86_64-410.78.run -s
-            rm NVIDIA-Linux-x86_64-410.78.run
+            yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null || fail 206
+            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || fail 207
+            bash NVIDIA-Linux-x86_64-410.78.run -s || fail 208
+            rm -f NVIDIA-Linux-x86_64-410.78.run
             ;;
         *)
             echo "Unsupported Linux distribution '$LINUX_KIND'!"
-            exit 1
+            fail 209
             ;;
     esac
 }
@@ -613,14 +753,14 @@ install_packages() {
      case $LINUX_KIND in
         ubuntu|debian)
             sfFinishPreviousInstall || true
-            apt install -y -qq pciutils &>/dev/null
+            sfWaitForApt && apt install -y -qq pciutils &>/dev/null || fail 210
             ;;
         redhat|centos)
-            yum install -y -q pciutils wget &>/dev/null
+            yum install -y -q pciutils wget &>/dev/null || fail 211
             ;;
         *)
             echo "Unsupported Linux distribution '$LINUX_KIND'!"
-            exit 1
+            fail 212
             ;;
      esac
 }
@@ -634,69 +774,81 @@ disable_cloudinit_network_autoconf() {
 
 # ---- Main
 
+export DEBIAN_FRONTEND=noninteractive
+
 disable_cloudinit_network_autoconf
+add_common_repos
+identify_nics
 
 case $LINUX_KIND in
     debian|ubuntu)
-        export DEBIAN_FRONTEND=noninteractive
         systemctl stop apt-daily.service &>/dev/null
         systemctl kill --kill-who=all apt-daily.service &>/dev/null
 
         create_user
 
-        systemctl status systemd-resolved &>/dev/null && configure_dns_systemd_resolved || {
-            systemctl status resolvconf &>/dev/null && configure_dns_resolvconf || \
-            configure_dns_legacy
-        }
-
-        {{- if .ConfIF }}
-        which netplan &>/dev/null && {
-            configure_network_netplan && sleep 5
+        systemctl status systemd-resolved &>/dev/null && {
+            configure_dns_systemd_resolved
         } || {
-            systemctl status networking &>/dev/null && configure_network_debian
+            systemctl status resolvconf &>/dev/null && {
+                configure_dns_resolvconf
+            } || {
+                configure_dns_legacy
+            }
         }
-        {{- end }}
 
-        {{- if .IsGateway }}
-        configure_as_gateway
-        {{- end }}
-
-        {{- if .AddGateway }}
-        configure_gateway
-        {{- end }}
-
-        put_hostname_in_hosts
-
+        systemctl status systemd-networkd &>/dev/null && {
+            configure_network_systemd_networkd
+        } || {
+            systemctl status networking &>/dev/null && {
+                configure_network_debian
+            } || {
+                echo "PROVISIONING_ERROR: failed to determine how to configure network"
+                fail 213
+            }
+        }
         ;;
 
     redhat|centos)
         create_user
-        {{- if .ConfIF }}
-        configure_network_redhat
-        {{- end }}
-        configure_dns_legacy
-        {{- if .IsGateway }}
-        configure_as_gateway
-        {{- end }}
-        {{- if .AddGateway }}
-        configure_gateway_redhat
-        {{- end }}
 
-        put_hostname_in_hosts
+        systemctl status systemd-resolved &>/dev/null && {
+            configure_dns_systemd_resolved
+        } || {
+            systemctl status resolvconf &>/dev/null && {
+                configure_dns_resolvconf
+            } || {
+                configure_dns_legacy
+            }
+        }
+
+        systemctl status systemd-networkd &>/dev/null && {
+            configure_network_systemd_networkd
+        } || configure_network_redhat
         ;;
+
     *)
         echo "Unsupported Linux distribution '$LINUX_KIND'!"
-        exit 1
+        fail 214
         ;;
 esac
 
+{{- if .IsGateway }}
+configure_as_gateway
+{{- end }}
+
+check_for_network || {
+    echo "PROVISIONING_ERROR: no network connectivity"
+    fail 215
+}
+
+put_hostname_in_hosts
+
 touch /etc/cloud/cloud-init.disabled
-add_common_repos
-sfWaitForApt
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
-echo -n "${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
+echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/var/tmp/user_data.done
 set +x
 systemctl reboot
 exit 0
