@@ -17,6 +17,7 @@
 package ovh
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/iaas"
@@ -27,6 +28,8 @@ import (
 	filters "github.com/CS-SI/SafeScale/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/iaas/stacks"
 	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type gpuCfg struct {
@@ -59,6 +62,13 @@ var (
 	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
 )
 
+//OVH api credentials
+var (
+	apiApplicationKey    string
+	apiApplicationSecret string
+	apiConsumerKey       string
+)
+
 // provider is the providerementation of the OVH provider
 type provider struct {
 	*openstack.Stack
@@ -81,6 +91,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 	openstackPassword, _ := identityParams["OpenstackPassword"].(string)
 	region, _ := computeParams["Region"].(string)
 	projectName, _ := computeParams["ProjectName"].(string)
+
+	apiApplicationKey = identityParams["ApiApplicationKey"].(string)
+	apiApplicationSecret = identityParams["ApiApplicationSecret"].(string)
+	apiConsumerKey = identityParams["ApiConsumerKey"].(string)
 
 	operatorUsername := resources.DefaultUser
 	if operatorUsernameIf, ok := computeParams["OperatorUsername"]; ok {
@@ -137,10 +151,14 @@ func (p *provider) GetAuthOpts() (providers.Config, error) {
 
 	opts := p.Stack.GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
+	cfg.Set("TenantID", opts.TenantID)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthUrl", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
+	cfg.Set("ApiApplicationKey", apiApplicationKey)
+	cfg.Set("ApiApplicationSecret", apiApplicationSecret)
+	cfg.Set("ApiConsumerKey", apiConsumerKey)
 	return cfg, nil
 }
 
@@ -185,12 +203,48 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	if err != nil {
 		return nil, err
 	}
-	if all {
+
+	if !all {
+		//flavor["osType"].(string) == "linux" ?
+		filter := filters.NewFilter(isWindowsTemplate).Not().And(filters.NewFilter(isFlexTemplate).Not())
+		allTemplates = filters.FilterTemplates(allTemplates, filter)
+	}
+
+	//check flavor disponibilities through OVH-API
+	authOpts, err := p.GetAuthOpts()
+	if err != nil {
+		log.Warn("Failed to get Authentification options, flavors disponibility will be left uncheked : %v", err)
+		return allTemplates, nil
+	}
+	service := authOpts.GetString("TenantID")
+	region := authOpts.GetString("Region")
+
+	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
+	flavors, err := p.requestOVHAPI(restURL, "GET")
+	if err != nil {
+		log.Warn(fmt.Sprintf("Failed to request OVH API, flavors disponibility will be left uncheked : %v", err))
 		return allTemplates, nil
 	}
 
-	filter := filters.NewFilter(isWindowsTemplate).Not().And(filters.NewFilter(isFlexTemplate).Not())
-	return filters.FilterTemplates(allTemplates, filter), nil
+	flavorMap := map[string]map[string]interface{}{}
+	for _, flavor := range flavors.([]interface{}) {
+		// Elimination of all the unavailable features
+		if flavor.(map[string]interface{})["available"].(bool) {
+			flavorMap[flavor.(map[string]interface{})["id"].(string)] = flavor.(map[string]interface{})
+		}
+	}
+
+	listAvailableTeplates := []resources.HostTemplate{}
+	for _, template := range allTemplates {
+		if _, ok := flavorMap[template.ID]; ok {
+			listAvailableTeplates = append(listAvailableTeplates, template)
+		} else {
+			log.Debug(fmt.Sprintf("Flavor %s@%s is not available at the moment at is so ignored", template.Name, template.ID))
+		}
+	}
+	allTemplates = listAvailableTeplates
+
+	return allTemplates, nil
 }
 
 func isWindowsTemplate(t resources.HostTemplate) bool {
