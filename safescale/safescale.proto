@@ -15,6 +15,9 @@ service TenantService{
     rpc List (google.protobuf.Empty) returns (TenantList){}
     rpc Set (TenantName) returns (google.protobuf.Empty){}
     rpc Get (google.protobuf.Empty) returns (TenantName){}
+    rpc StorageList (google.protobuf.Empty) returns (TenantList){}
+    rpc StorageSet (TenantNameList) returns (google.protobuf.Empty){}
+    rpc StorageGet (google.protobuf.Empty) returns (TenantList){}
 }
 
 message Image{
@@ -30,6 +33,10 @@ message Reference{
 
 message TenantName{
     string name = 1;
+}
+
+message TenantNameList{
+    repeated string names = 1;
 }
 
 message ImageList{
