@@ -61,3 +61,34 @@ func (t *tenant) Set(name string, timeout time.Duration) error {
 	_, err := service.Set(ctx, &pb.TenantName{Name: name})
 	return err
 }
+
+// StorageList ...
+func (t *tenant) StorageList(timeout time.Duration) (*pb.TenantList, error) {
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTenantServiceClient(t.session.connection)
+	ctx := utils.GetContext(true)
+
+	return service.StorageList(ctx, &google_protobuf.Empty{})
+}
+
+// StorageGet ...
+func (t *tenant) StorageGet(timeout time.Duration) (*pb.TenantList, error) {
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTenantServiceClient(t.session.connection)
+	ctx := utils.GetContext(true)
+
+	return service.StorageGet(ctx, &google_protobuf.Empty{})
+}
+
+// StorageSet ...
+func (t *tenant) StorageSet(names []string, timeout time.Duration) error {
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTenantServiceClient(t.session.connection)
+	ctx := utils.GetContext(true)
+
+	_, err := service.StorageSet(ctx, &pb.TenantNameList{Names: names})
+	return err
+}

@@ -41,6 +41,29 @@ var (
 	currentTenant *Tenant
 )
 
+// GetCurrentTenant contains the current tenant
+var GetCurrentTenant = getCurrentTenant
+
+// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
+func getCurrentTenant() *Tenant {
+	if currentTenant == nil {
+		tenants, err := iaas.GetTenantNames()
+		if err != nil || len(tenants) != 1 {
+			return nil
+		}
+		// Set unique tenant as selected
+		log.Println("Unique tenant set")
+		for name := range tenants {
+			service, err := iaas.UseService(name)
+			if err != nil {
+				return nil
+			}
+			currentTenant = &Tenant{name: name, Service: service}
+		}
+	}
+	return currentTenant
+}
+
 // TenantListener server is used to implement SafeScale.safescale.
 type TenantListener struct{}
 
@@ -92,29 +115,6 @@ func (s *TenantListener) Get(ctx context.Context, in *google_protobuf.Empty) (*p
 	return &pb.TenantName{Name: currentTenant.name}, nil
 }
 
-// GetCurrentTenant contains the current tenant
-var GetCurrentTenant = getCurrentTenant
-
-// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
-func getCurrentTenant() *Tenant {
-	if currentTenant == nil {
-		tenants, err := iaas.GetTenantNames()
-		if err != nil || len(tenants) != 1 {
-			return nil
-		}
-		// Set unique tenant as selected
-		log.Println("Unique tenant set")
-		for name := range tenants {
-			service, err := iaas.UseService(name)
-			if err != nil {
-				return nil
-			}
-			currentTenant = &Tenant{name: name, Service: service}
-		}
-	}
-	return currentTenant
-}
-
 // Set the the tenant to use for each command
 func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_protobuf.Empty, error) {
 	log.Infof("Listeners: receiving \"tenant set %s\"", in.Name)
@@ -138,4 +138,32 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_pr
 	currentTenant = &Tenant{name: in.GetName(), Service: service}
 	log.Infof("Current tenant is now '%s'", in.GetName())
 	return &google_protobuf.Empty{}, nil
+}
+
+// StorageList list registerd storage tenants
+func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
+	log.Infoln("Listeners: receiving \"tenant storage-list\"")
+	log.Debugln(">>> TenantListener::StorageList()")
+	defer log.Debugln("<<< TenantListener::StorageList()")
+
+	return nil, grpc.Errorf(codes.FailedPrecondition, "Not implemented yet")
+}
+
+// StorageGet returns the name of the current storage tenants used for data related commands
+func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
+	log.Infoln("Listeners: receiving \"tenant storage-get\"")
+	log.Debugln(">>> TenantListener::StorageGet()")
+	defer log.Debugln(">>> TenantListener::StorageGet()")
+
+	return nil, grpc.Errorf(codes.FailedPrecondition, "Not implemented yet")
+}
+
+// StorageSet set the tenants to use for data related commands
+func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) (*google_protobuf.Empty, error) {
+
+	log.Infof("Listeners: receiving \"tenant storage-set %v\"", in.Names)
+	log.Debugf(">>> TenantListener::StorageSet(%v)", in.Names)
+	defer log.Debugf("<<< TenantListener::StorageSet(%v)", in.Names)
+
+	return nil, grpc.Errorf(codes.FailedPrecondition, "Not implemented yet")
 }
