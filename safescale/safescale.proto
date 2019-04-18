@@ -17,7 +17,7 @@ service TenantService{
     rpc Get (google.protobuf.Empty) returns (TenantName){}
     rpc StorageList (google.protobuf.Empty) returns (TenantList){}
     rpc StorageSet (TenantNameList) returns (google.protobuf.Empty){}
-    rpc StorageGet (google.protobuf.Empty) returns (TenantList){}
+    rpc StorageGet (google.protobuf.Empty) returns (TenantNameList){}
 }
 
 message Image{

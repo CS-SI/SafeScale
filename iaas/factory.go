@@ -50,13 +50,27 @@ func GetTenantNames() (map[string]string, error) {
 	return allTenants, err
 }
 
-// GetTenant returns all known tenants
+// GetTenants returns all known tenants
 func GetTenants() ([]interface{}, error) {
 	tenants, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
 	}
 	return tenants, err
+}
+
+//UseStorages return the storageService build around storages referenced in tenantNames
+func UseStorages(tenantNames []string) (*StorageServices, error) {
+	storageServices := NewStorageService()
+
+	for _, tenantName := range tenantNames {
+		err := storageServices.RegisterStorage(tenantName)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to register storage tenant %s : %s", tenantName, err.Error())
+		}
+	}
+
+	return &storageServices, nil
 }
 
 // UseService return the service referenced by the given name.

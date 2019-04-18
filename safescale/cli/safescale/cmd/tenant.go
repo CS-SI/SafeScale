@@ -123,7 +123,7 @@ var tenantStorageGet = cli.Command{
 		if err != nil {
 			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
 		} else {
-			response.Succeeded(tenants.GetTenants())
+			response.Succeeded(tenants.GetNames())
 		}
 
 		return response.GetErrorWithoutMessage()
