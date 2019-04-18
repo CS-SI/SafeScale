@@ -140,22 +140,91 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (*google_pr
 	return &google_protobuf.Empty{}, nil
 }
 
+//StorageTenants strcture handle tenants names and storages services for a group of storage tenants
+type StorageTenants struct {
+	names           []string
+	StorageServices *iaas.StorageServices
+}
+
+var (
+	currentStorageTenants *StorageTenants
+)
+
+// GetCurrentStorageTenants contains the current tenant
+var GetCurrentStorageTenants = getCurrentStorageTenants
+
+// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
+func getCurrentStorageTenants() *StorageTenants {
+	//TODO should we select all tenants with storage, or still auto selecting tenant only when there is only one available tenant?
+	if currentStorageTenants == nil {
+		tenants, err := iaas.GetTenantNames()
+		if err != nil || len(tenants) != 1 {
+			return nil
+		}
+		// Set unique tenant as selected
+		log.Println("Unique tenant set")
+		for name := range tenants {
+			nameSlice := []string{name}
+			storageService, err := iaas.UseStorages(nameSlice)
+			if err != nil {
+				return nil
+			}
+			currentStorageTenants = &StorageTenants{names: nameSlice, StorageServices: storageService}
+		}
+	}
+	return currentStorageTenants
+}
+
 // StorageList list registerd storage tenants
 func (s *TenantListener) StorageList(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
 	log.Infoln("Listeners: receiving \"tenant storage-list\"")
 	log.Debugln(">>> TenantListener::StorageList()")
 	defer log.Debugln("<<< TenantListener::StorageList()")
 
-	return nil, grpc.Errorf(codes.FailedPrecondition, "Not implemented yet")
+	ctx, cancelFunc := context.WithCancel(ctx)
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant StorageList"); err == nil {
+		defer utils.ProcessDeregister(ctx)
+	}
+
+	tenants, err := iaas.GetTenants()
+	if err != nil {
+		return nil, err
+	}
+
+	var tenantList []*pb.Tenant
+	for _, tenant := range tenants {
+		tenantCast, ok := tenant.(map[string]interface{})
+		if ok {
+			if _, ok := tenantCast["objectstorage"]; ok {
+				tenantList = append(tenantList, &pb.Tenant{
+					Name:     tenantCast["name"].(string),
+					Provider: tenantCast["client"].(string),
+				})
+			}
+		}
+	}
+
+	return &pb.TenantList{Tenants: tenantList}, nil
 }
 
 // StorageGet returns the name of the current storage tenants used for data related commands
-func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantList, error) {
+func (s *TenantListener) StorageGet(ctx context.Context, in *google_protobuf.Empty) (*pb.TenantNameList, error) {
 	log.Infoln("Listeners: receiving \"tenant storage-get\"")
 	log.Debugln(">>> TenantListener::StorageGet()")
 	defer log.Debugln(">>> TenantListener::StorageGet()")
 
-	return nil, grpc.Errorf(codes.FailedPrecondition, "Not implemented yet")
+	ctx, cancelFunc := context.WithCancel(ctx)
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Tenant StorageGet"); err == nil {
+		defer utils.ProcessDeregister(ctx)
+	}
+
+	getCurrentStorageTenants()
+	if currentStorageTenants == nil {
+		log.Info("Can't get storage tenants: no tenant set")
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't get storage tenants: no tenant set")
+	}
+
+	return &pb.TenantNameList{Names: currentStorageTenants.names}, nil
 }
 
 // StorageSet set the tenants to use for data related commands
@@ -165,5 +234,17 @@ func (s *TenantListener) StorageSet(ctx context.Context, in *pb.TenantNameList) 
 	log.Debugf(">>> TenantListener::StorageSet(%v)", in.Names)
 	defer log.Debugf("<<< TenantListener::StorageSet(%v)", in.Names)
 
-	return nil, grpc.Errorf(codes.FailedPrecondition, "Not implemented yet")
+	ctx, cancelFunc := context.WithCancel(ctx)
+	if err := utils.ProcessRegister(ctx, cancelFunc, fmt.Sprintf("Tenant StorageSet %v", in.GetNames())); err == nil {
+		defer utils.ProcessDeregister(ctx)
+	}
+
+	storageServices, err := iaas.UseStorages(in.GetNames())
+	if err != nil {
+		return &google_protobuf.Empty{}, fmt.Errorf("Unable to set tenants '%v': %s", in.GetNames(), err.Error())
+	}
+
+	currentStorageTenants = &StorageTenants{names: in.GetNames(), StorageServices: storageServices}
+	log.Infof("Current storage tenants are now '%v'", in.GetNames())
+	return &google_protobuf.Empty{}, nil
 }

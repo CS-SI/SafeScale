@@ -73,7 +73,7 @@ func (t *tenant) StorageList(timeout time.Duration) (*pb.TenantList, error) {
 }
 
 // StorageGet ...
-func (t *tenant) StorageGet(timeout time.Duration) (*pb.TenantList, error) {
+func (t *tenant) StorageGet(timeout time.Duration) (*pb.TenantNameList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 	service := pb.NewTenantServiceClient(t.session.connection)

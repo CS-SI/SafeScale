@@ -92,9 +92,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 	region, _ := computeParams["Region"].(string)
 	projectName, _ := computeParams["ProjectName"].(string)
 
-	apiApplicationKey = identityParams["ApiApplicationKey"].(string)
-	apiApplicationSecret = identityParams["ApiApplicationSecret"].(string)
-	apiConsumerKey = identityParams["ApiConsumerKey"].(string)
+	val1, ok1 := identityParams["ApiApplicationKey"]
+	val2, ok2 := identityParams["ApiApplicationSecret"]
+	val3, ok3 := identityParams["ApiConsumerKey"]
+	if ok1 && ok2 && ok3 {
+		apiApplicationKey = val1.(string)
+		apiApplicationSecret = val2.(string)
+		apiConsumerKey = val3.(string)
+	}
 
 	operatorUsername := resources.DefaultUser
 	if operatorUsernameIf, ok := computeParams["OperatorUsername"]; ok {
