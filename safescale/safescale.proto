@@ -51,6 +51,17 @@ service ImageService{
     rpc List(ImageListRequest) returns (ImageList){}
 }
 
+message File {
+    string localPath = 1;
+    string name = 2;
+}
+
+service DataService{
+    rpc Push (File) returns (google.protobuf.Empty){}
+    rpc Get (File) returns (google.protobuf.Empty){}
+}
+
+
 // safescale network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
 // safescale network list
 // safescale network delete net1
