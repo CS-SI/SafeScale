@@ -17,6 +17,8 @@
 package cmd
 
 import (
+	"strings"
+
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/safescale/client"
@@ -39,7 +41,7 @@ var DataCmd = cli.Command{
 var dataPush = cli.Command{
 	Name:      "push",
 	Usage:     "push a file in the storage",
-	ArgsUsage: "<file_path>",
+	ArgsUsage: "<local_file_path>",
 	Action: func(c *cli.Context) error {
 		response := utils.NewCliResponse()
 
@@ -47,8 +49,9 @@ var dataPush = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
 		} else {
-			filePath := c.Args().First()
-			err := client.New().Data.Push(filePath, client.DefaultExecutionTimeout)
+			localFilePath := utils.AbsPathify(c.Args().First())
+			fileName := strings.Split(localFilePath, "/")[len(strings.Split(localFilePath, "/"))-1]
+			err := client.New().Data.Push(localFilePath, fileName, client.DefaultExecutionTimeout)
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data push", false).Error())))
 			} else {
@@ -64,6 +67,12 @@ var dataGet = cli.Command{
 	Name:      "get",
 	Usage:     "fetch a file in the storage",
 	ArgsUsage: "<file_name>",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "folder, f",
+			Usage: "Folder where the datas will be stored",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		response := utils.NewCliResponse()
 
@@ -71,8 +80,15 @@ var dataGet = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_path>."))
 		} else {
-			filePath := c.Args().First()
-			err := client.New().Data.Get(filePath, client.DefaultExecutionTimeout)
+			fileName := c.Args().First()
+			var localFilePath string
+			if c.String("folder") != "" {
+				localFilePath = utils.AbsPathify(c.String("folder")) + "/" + fileName
+			} else {
+				localFilePath = utils.AbsPathify(fileName)
+			}
+
+			err := client.New().Data.Get(localFilePath, fileName, client.DefaultExecutionTimeout)
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data get", false).Error())))
 			} else {

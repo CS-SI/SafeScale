@@ -18,6 +18,9 @@ package client
 
 import (
 	"time"
+
+	pb "github.com/CS-SI/SafeScale/safescale"
+	"github.com/CS-SI/SafeScale/safescale/utils"
 )
 
 // bucket is the part of the safescale client handling buckets
@@ -27,11 +30,23 @@ type data struct {
 }
 
 // Push ...
-func (c *data) Push(filePath string, timeout time.Duration) error {
-	panic("not implemented yet")
+func (c *data) Push(localFilePath string, fileName string, timeout time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := pb.NewDataServiceClient(c.session.connection)
+	ctx := utils.GetContext(true)
+
+	_, err := service.Push(ctx, &pb.File{LocalPath: localFilePath, Name: fileName})
+	return err
 }
 
 // Get ...
-func (c *data) Get(filePath string, timeout time.Duration) error {
-	panic("not implemented yet")
+func (c *data) Get(localFilePath string, fileName string, timeout time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := pb.NewDataServiceClient(c.session.connection)
+	ctx := utils.GetContext(true)
+
+	_, err := service.Get(ctx, &pb.File{LocalPath: localFilePath, Name: fileName})
+	return err
 }

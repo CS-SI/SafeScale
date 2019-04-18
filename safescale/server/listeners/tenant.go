@@ -155,7 +155,7 @@ var GetCurrentStorageTenants = getCurrentStorageTenants
 
 // getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
 func getCurrentStorageTenants() *StorageTenants {
-	//TODO should we select all tenants with storage, or still auto selecting tenant only when there is only one available tenant?
+	//TODO-AJ should we select all tenants with storage, or still auto selecting tenant only when there is only one available tenant?
 	if currentStorageTenants == nil {
 		tenants, err := iaas.GetTenantNames()
 		if err != nil || len(tenants) != 1 {
