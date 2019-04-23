@@ -27,6 +27,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/server/handlers"
 	"github.com/CS-SI/SafeScale/safescale/utils"
+	conv "github.com/CS-SI/SafeScale/safescale/utils"
 )
 
 // DataHandler ...
@@ -34,6 +35,33 @@ var DataHandler = handlers.NewDataHandler
 
 // DataListener is the data service grpc server
 type DataListener struct{}
+
+// List will returns all the files from one or several ObjectStorages
+func (s *DataListener) List(ctx context.Context, in *pb.File) (*pb.FileList, error) {
+	log.Infof("safescaled receiving 'data list'")
+	log.Debugf(">>> listeners.DataListener::List()")
+	defer log.Debugf("<<< listeners.DataListener::List()")
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Data List"); err == nil {
+		defer utils.ProcessDeregister(ctx)
+	}
+
+	tenants := GetCurrentStorageTenants()
+	if tenants == nil {
+		log.Info("Can't list buckets: no storage tenants set")
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
+	}
+
+	handler := DataHandler(tenants.StorageServices)
+	fileNames, err := handler.List(ctx)
+	if err != nil {
+		return nil, grpc.Errorf(codes.Internal, err.Error())
+	}
+
+	return conv.ToPBFileList(fileNames), nil
+}
 
 // Push upload a file to one or several ObjectStorages
 func (s *DataListener) Push(ctx context.Context, in *pb.File) (*google_protobuf.Empty, error) {
@@ -82,6 +110,33 @@ func (s *DataListener) Get(ctx context.Context, in *pb.File) (*google_protobuf.E
 
 	handler := DataHandler(tenants.StorageServices)
 	err := handler.Get(ctx, in.GetLocalPath(), in.GetName())
+	if err != nil {
+		return nil, grpc.Errorf(codes.Internal, err.Error())
+	}
+
+	return &google_protobuf.Empty{}, nil
+}
+
+// Dlete remove a file from one or several ObjectStorages
+func (s *DataListener) Delete(ctx context.Context, in *pb.File) (*google_protobuf.Empty, error) {
+	log.Infof("safescaled receiving 'data delete %s'", in.GetName())
+	log.Debugf(">>> listeners.DataListener::Delete(%s)", in.GetName())
+	defer log.Debugf("<<< listeners.DataListener::Delete(%s)", in.GetName())
+
+	ctx, cancelFunc := context.WithCancel(ctx)
+
+	if err := utils.ProcessRegister(ctx, cancelFunc, "Data Delete"); err == nil {
+		defer utils.ProcessDeregister(ctx)
+	}
+
+	tenants := GetCurrentStorageTenants()
+	if tenants == nil {
+		log.Info("Can't list buckets: no storage tenants set")
+		return nil, grpc.Errorf(codes.FailedPrecondition, "can't list buckets: no storage tenants set")
+	}
+
+	handler := DataHandler(tenants.StorageServices)
+	err := handler.Delete(ctx, in.GetName())
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}

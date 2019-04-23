@@ -254,3 +254,12 @@ func ToPBNetwork(in *resources.Network) *pb.Network {
 		GatewayId: in.GatewayID,
 	}
 }
+
+//ToPBFileList convert a list of file names from api to protocolbuffer FileList format
+func ToPBFileList(fileNames []string) *pb.FileList {
+	files := []*pb.File{}
+	for _, fileName := range fileNames {
+		files = append(files, &pb.File{Name: fileName})
+	}
+	return &pb.FileList{Files: files}
+}

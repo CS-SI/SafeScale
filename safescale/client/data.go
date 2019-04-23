@@ -21,6 +21,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/utils"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // bucket is the part of the safescale client handling buckets
@@ -48,5 +49,27 @@ func (c *data) Get(localFilePath string, fileName string, timeout time.Duration)
 	ctx := utils.GetContext(true)
 
 	_, err := service.Get(ctx, &pb.File{LocalPath: localFilePath, Name: fileName})
+	return err
+}
+
+// List ...
+func (c *data) List(timeout time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := pb.NewDataServiceClient(c.session.connection)
+	ctx := utils.GetContext(true)
+
+	_, err := service.List(ctx, &google_protobuf.Empty{})
+	return err
+}
+
+// Delete ...
+func (c *data) Dlete(fileName string, timeout time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := pb.NewDataServiceClient(c.session.connection)
+	ctx := utils.GetContext(true)
+
+	_, err := service.Delete(ctx, &pb.File{Name: fileName})
 	return err
 }

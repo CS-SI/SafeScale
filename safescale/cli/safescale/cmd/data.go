@@ -33,6 +33,8 @@ var DataCmd = cli.Command{
 	Subcommands: []cli.Command{
 		dataPush,
 		dataGet,
+		dataList,
+		dataDelete,
 	},
 }
 
@@ -42,15 +44,26 @@ var dataPush = cli.Command{
 	Name:      "push",
 	Usage:     "push a file in the storage",
 	ArgsUsage: "<local_file_path>",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "file-name, f",
+			Usage: "File name on the object storage",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		response := utils.NewCliResponse()
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <local_file_path>."))
 		} else {
 			localFilePath := utils.AbsPathify(c.Args().First())
-			fileName := strings.Split(localFilePath, "/")[len(strings.Split(localFilePath, "/"))-1]
+			var fileName string
+			if c.String("file-name") != "" {
+				fileName = c.String("file-name")
+			} else {
+				fileName = strings.Split(localFilePath, "/")[len(strings.Split(localFilePath, "/"))-1]
+			}
 			err := client.New().Data.Push(localFilePath, fileName, client.DefaultExecutionTimeout)
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data push", false).Error())))
@@ -78,7 +91,7 @@ var dataGet = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_path>."))
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
 		} else {
 			fileName := c.Args().First()
 			var localFilePath string
@@ -91,6 +104,46 @@ var dataGet = cli.Command{
 			err := client.New().Data.Get(localFilePath, fileName, client.DefaultExecutionTimeout)
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data get", false).Error())))
+			} else {
+				response.Succeeded(nil)
+			}
+		}
+
+		return response.GetErrorWithoutMessage()
+	},
+}
+
+var dataList = cli.Command{
+	Name:      "list, ls",
+	Usage:     "list all files in the storage",
+	ArgsUsage: "<local_file_path>",
+	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
+		filesList, err := client.New().Data.List(client.DefaultExecutionTimeout)
+		if err != nil {
+			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
+		}
+
+		return response.GetErrorWithoutMessage()
+	},
+}
+
+var dataDelete = cli.Command{
+	Name:      "delete, del, rm",
+	Usage:     "delete a file of the storage",
+	ArgsUsage: "<file_name>",
+	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
+		} else {
+			fileName := c.Args().First()
+			err := client.New().Data.Delete(fileName, client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data delete", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
