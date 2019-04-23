@@ -53,4 +53,12 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 	fmt.Println("Get handler Not implemented yet")
 	fmt.Printf("%s !-! %s\n", fileLocalPath, fileName)
 	return nil
+// Delete ...
+func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
+	return fmt.Errorf("WIP")
+}
+
+// List ...
+func (handler *DataHandler) List(ctx context.Context) ([]string, error) {
+	return nil, fmt.Errorf("WIP")
 }

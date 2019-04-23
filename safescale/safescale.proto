@@ -56,9 +56,15 @@ message File {
     string name = 2;
 }
 
+message FileList {
+    repeated File files = 1;
+}
+
 service DataService{
     rpc Push (File) returns (google.protobuf.Empty){}
     rpc Get (File) returns (google.protobuf.Empty){}
+    rpc Delete (File) returns (google.protobuf.Empty){}
+    rpc List (google.protobuf.Empty) returns (FileList){}
 }
 
 
