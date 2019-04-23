@@ -230,7 +230,7 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 	objectstorage, _ := tenant["objectstorage"].(map[string]interface{})
 
 	if config.Type, ok = objectstorage["Type"].(string); !ok {
-		return config, fmt.Errorf("missing setting 'Type' in 'metadata' section")
+		return config, fmt.Errorf("missing setting 'Type' in 'objectstorage' section")
 	}
 
 	if config.Domain, ok = objectstorage["Domain"].(string); !ok {

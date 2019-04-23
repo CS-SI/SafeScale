@@ -24,7 +24,7 @@ import (
 
 //StorageServices ...
 type StorageServices struct {
-	storages []objectstorage.Location
+	buckets []objectstorage.Bucket
 }
 
 //NewStorageService ...
@@ -40,10 +40,11 @@ func (sts *StorageServices) RegisterStorage(tenantName string) error {
 	}
 	var tenant map[string]interface{}
 	for _, t := range tenants {
-		tenant = t.(map[string]interface{})
-		name, found := tenant["name"].(string)
-		_, found2 := tenant["objectstorage"]
+		tenantTmp := t.(map[string]interface{})
+		name, found := tenantTmp["name"].(string)
+		_, found2 := tenantTmp["objectstorage"]
 		if found && found2 && name == tenantName {
+			tenant = tenantTmp
 			break
 		}
 	}
@@ -60,12 +61,34 @@ func (sts *StorageServices) RegisterStorage(tenantName string) error {
 		return fmt.Errorf("Error connecting to Object Storage Location: %s", err.Error())
 	}
 
-	sts.storages = append(sts.storages, objectStorageLocation)
+	bucketName, err := objectstorage.BuildStorageBucketName(tenantName, objectStorageConfig.Region, objectStorageConfig.Domain, objectStorageConfig.Tenant)
+	if err != nil {
+		return fmt.Errorf("Error building the bucketName : %s", err.Error())
+	}
+
+	exists, err := objectStorageLocation.FindBucket(bucketName)
+	if err != nil {
+		return fmt.Errorf("Error finding bucket '%s' : %s", bucketName, err.Error())
+	}
+	var bucket objectstorage.Bucket
+	if !exists {
+		bucket, err = objectStorageLocation.CreateBucket(bucketName)
+		if err != nil {
+			return fmt.Errorf("Error creating bucket '%s' : %s", bucketName, err.Error())
+		}
+	} else {
+		bucket, err = objectStorageLocation.GetBucket(bucketName)
+		if err != nil {
+			return fmt.Errorf("Error getting bucket '%s' : %s", bucketName, err.Error())
+		}
+	}
+
+	sts.buckets = append(sts.buckets, bucket)
 
 	return nil
 }
 
-//GetLocations ...
-func (sts *StorageServices) GetLocations() []objectstorage.Location {
-	return sts.storages
+//GetBuckets ...
+func (sts *StorageServices) GetBuckets() []objectstorage.Bucket {
+	return sts.buckets
 }
