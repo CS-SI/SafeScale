@@ -178,6 +178,9 @@ The valid keywords in this section are :
 > | `Password` | MANDATORY, CLIENT |
 > | `SecretKey` | MANDATORY, CLIENT |
 > | `Username` | MANDATORY, CLIENT |
+> | `ApiApplicationKey` | OPTIONAL, CLIENT |
+> | `ApiApplicationSecret` | OPTIONAL, CLIENT |
+> | `ApiConsumerKey` | OPTIONAL, CLIENT |
 
 ### Section ``[tenant.compute]``
 
@@ -266,6 +269,24 @@ It defines the "driver" to communicate with the provider. Valid values are:
 > | `"ovh"` |
 
 ### <a name="kw_AccessKey"></a> `AccessKey`: alias, see [`Username`](#kw_Username)
+
+### <a name="kw_ApiApplicationKey"></a> `ApiApplicationKey`
+
+Only available on OVH.<br>
+Contains OVH api application key. 
+https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/
+
+### <a name="kw_ApiApplicationSecret"></a> `ApiApplicationSecret`
+
+Only available on OVH.<br>
+Contains OVH api application secret. 
+https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/
+
+### <a name="kw_ApiConsumerKey"></a> `ApiConsumerKey`
+
+Only available on OVH.<br>
+Contains OVH api consumer key, who have to be previously validated. 
+https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/
 
 ### `ApplicationKey`
 
