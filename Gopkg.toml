@@ -114,6 +114,9 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   version = "4.8.0"
   name = "github.com/libvirt/libvirt-go-xml"
 
+[[override]]
+  revision = "ba5adb4cf0148a3dbdbd30586f075266256a77b1"
+  name = "github.com/ovh/go-ovh/ovh"
 
 [prune]
   go-tests = true
