@@ -26,13 +26,13 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/safescale/server/metadata"
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeProperty"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/safescale/server/metadata"
 	"github.com/CS-SI/SafeScale/system/nfs"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -624,8 +624,8 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				}
 				err = nfsServer.UnmountBlockDevice(attachment.Device)
 				if err != nil {
-					err = logicErrf(err, "error unmounting block device")
-					return err
+					logicErrf(err, "error unmounting block device")
+					//return err
 				}
 
 				// ... then detach volume
