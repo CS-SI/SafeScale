@@ -218,7 +218,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	//check flavor disponibilities through OVH-API
 	authOpts, err := p.GetAuthOpts()
 	if err != nil {
-		log.Warn("Failed to get Authentification options, flavors disponibility will be left uncheked : %v", err)
+		log.Warn(fmt.Sprintf("Failed to get Authentification options, flavors disponibility will be left uncheked : %v", err))
 		return allTemplates, nil
 	}
 	service := authOpts.GetString("TenantID")
