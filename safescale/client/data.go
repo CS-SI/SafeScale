@@ -53,18 +53,18 @@ func (c *data) Get(localFilePath string, fileName string, timeout time.Duration)
 }
 
 // List ...
-func (c *data) List(timeout time.Duration) error {
+func (c *data) List(timeout time.Duration) (*pb.FileList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewDataServiceClient(c.session.connection)
 	ctx := utils.GetContext(true)
 
-	_, err := service.List(ctx, &google_protobuf.Empty{})
-	return err
+	return service.List(ctx, &google_protobuf.Empty{})
+
 }
 
 // Delete ...
-func (c *data) Dlete(fileName string, timeout time.Duration) error {
+func (c *data) Delete(fileName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := pb.NewDataServiceClient(c.session.connection)

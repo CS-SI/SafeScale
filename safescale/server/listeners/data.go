@@ -37,7 +37,7 @@ var DataHandler = handlers.NewDataHandler
 type DataListener struct{}
 
 // List will returns all the files from one or several ObjectStorages
-func (s *DataListener) List(ctx context.Context, in *pb.File) (*pb.FileList, error) {
+func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb.FileList, error) {
 	log.Infof("safescaled receiving 'data list'")
 	log.Debugf(">>> listeners.DataListener::List()")
 	defer log.Debugf("<<< listeners.DataListener::List()")
@@ -55,12 +55,12 @@ func (s *DataListener) List(ctx context.Context, in *pb.File) (*pb.FileList, err
 	}
 
 	handler := DataHandler(tenants.StorageServices)
-	fileNames, err := handler.List(ctx)
+	fileNames, uploadDates, fileSizes, err := handler.List(ctx)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
-	return conv.ToPBFileList(fileNames), nil
+	return conv.ToPBFileList(fileNames, uploadDates, fileSizes), nil
 }
 
 // Push upload a file to one or several ObjectStorages

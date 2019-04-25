@@ -61,7 +61,7 @@ func (sts *StorageServices) RegisterStorage(tenantName string) error {
 		return fmt.Errorf("Error connecting to Object Storage Location: %s", err.Error())
 	}
 
-	bucketName, err := objectstorage.BuildStorageBucketName(tenantName, objectStorageConfig.Region, objectStorageConfig.Domain, objectStorageConfig.Tenant)
+	bucketName, err := objectstorage.BuildStorageBucketName(objectStorageConfig.Type, objectStorageConfig.Region, objectStorageConfig.Domain, objectStorageConfig.Tenant)
 	if err != nil {
 		return fmt.Errorf("Error building the bucketName : %s", err.Error())
 	}
@@ -89,6 +89,10 @@ func (sts *StorageServices) RegisterStorage(tenantName string) error {
 }
 
 //GetBuckets ...
-func (sts *StorageServices) GetBuckets() []objectstorage.Bucket {
-	return sts.buckets
+func (sts *StorageServices) GetBuckets() map[string]objectstorage.Bucket {
+	buckets := map[string]objectstorage.Bucket{}
+	for _, bucket := range sts.buckets {
+		buckets[bucket.GetName()] = bucket
+	}
+	return buckets
 }
