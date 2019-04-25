@@ -19,11 +19,12 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/safescale/client"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/safescale/client"
 
 	log "github.com/sirupsen/logrus"
 
@@ -370,19 +371,21 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	if gwID != "" {
 		mh, err := metadata.LoadHost(handler.service, gwID)
 		if err != nil {
-			return infraErr(err)
-		}
-		metadataHost = mh.Get()
+			infraErr(err)
+		} else {
+			metadataHost = mh.Get()
 
-		err = handler.service.DeleteGateway(gwID)
-		// allow no gateway, but log it
-		if err != nil {
-			log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
+			err = handler.service.DeleteGateway(gwID)
+			// allow no gateway, but log it
+			if err != nil {
+				log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
+			}
+			err = mh.Delete()
+			if err != nil {
+				return infraErr(err)
+			}
 		}
-		err = mh.Delete()
-		if err != nil {
-			return infraErr(err)
-		}
+
 	}
 
 	// 2nd delete network, with tolerance
