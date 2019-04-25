@@ -54,6 +54,8 @@ service ImageService{
 message File {
     string localPath = 1;
     string name = 2;
+    string date = 3;
+    int64 size = 4;
 }
 
 message FileList {

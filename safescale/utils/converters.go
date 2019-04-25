@@ -17,6 +17,8 @@
 package utils
 
 import (
+	"math"
+
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
@@ -256,10 +258,11 @@ func ToPBNetwork(in *resources.Network) *pb.Network {
 }
 
 //ToPBFileList convert a list of file names from api to protocolbuffer FileList format
-func ToPBFileList(fileNames []string) *pb.FileList {
+func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64) *pb.FileList {
 	files := []*pb.File{}
-	for _, fileName := range fileNames {
-		files = append(files, &pb.File{Name: fileName})
+	nbFiles := int(math.Min(math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes))))
+	for i := 0; i < nbFiles; i++ {
+		files = append(files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i]})
 	}
 	return &pb.FileList{Files: files}
 }

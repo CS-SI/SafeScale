@@ -112,25 +112,9 @@ var dataGet = cli.Command{
 		return response.GetErrorWithoutMessage()
 	},
 }
-
-var dataList = cli.Command{
-	Name:      "list, ls",
-	Usage:     "list all files in the storage",
-	ArgsUsage: "<local_file_path>",
-	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
-		filesList, err := client.New().Data.List(client.DefaultExecutionTimeout)
-		if err != nil {
-			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
-		}
-
-		return response.GetErrorWithoutMessage()
-	},
-}
-
 var dataDelete = cli.Command{
-	Name:      "delete, del, rm",
+	Name:      "delete",
+	Aliases:   []string{"del", "rm"},
 	Usage:     "delete a file of the storage",
 	ArgsUsage: "<file_name>",
 	Action: func(c *cli.Context) error {
@@ -147,6 +131,24 @@ var dataDelete = cli.Command{
 			} else {
 				response.Succeeded(nil)
 			}
+		}
+
+		return response.GetErrorWithoutMessage()
+	},
+}
+var dataList = cli.Command{
+	Name:      "list",
+	Aliases:   []string{"ls"},
+	Usage:     "list all files in the storage",
+	ArgsUsage: "<local_file_path>",
+	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
+		filesList, err := client.New().Data.List(client.DefaultExecutionTimeout)
+		if err != nil {
+			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
+		} else {
+			response.Succeeded(filesList)
 		}
 
 		return response.GetErrorWithoutMessage()
