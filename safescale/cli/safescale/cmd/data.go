@@ -82,8 +82,8 @@ var dataGet = cli.Command{
 	ArgsUsage: "<file_name>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "folder, f",
-			Usage: "Folder where the datas will be stored",
+			Name:  "storage-path, s",
+			Usage: "file where the datas will be stored",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -95,8 +95,8 @@ var dataGet = cli.Command{
 		} else {
 			fileName := c.Args().First()
 			var localFilePath string
-			if c.String("folder") != "" {
-				localFilePath = utils.AbsPathify(c.String("folder")) + "/" + fileName
+			if c.String("storage-path") != "" {
+				localFilePath = utils.AbsPathify(c.String("storage-path"))
 			} else {
 				localFilePath = utils.AbsPathify(fileName)
 			}
