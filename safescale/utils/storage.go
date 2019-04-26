@@ -75,7 +75,7 @@ func loadRsaPrivateKey(keyFilePath string) (*rsa.PrivateKey, error) {
 	return x509.ParsePKCS1PrivateKey(keyBytes)
 }
 
-func hash(reader io.Reader) []byte {
+func Hash(reader io.Reader) []byte {
 	h := sha256.New()
 	if _, err := io.Copy(h, reader); err != nil {
 		log.Fatal(err)
@@ -123,7 +123,7 @@ func NewShard(reader io.Reader, position int, isData bool, bucket objectstorage.
 		if i > 10 {
 			panic("Issue on random shard name generations (or extremly++ unlucky)  : %s")
 		}
-		name, err = password.Generate(64, 10, 10, false, false)
+		name, err = password.Generate(64, 10, 0, false, true)
 		if err != nil {
 			panic(fmt.Sprintf("Failed to generate shard name : %s", err.Error()))
 		}
@@ -137,7 +137,7 @@ func NewShard(reader io.Reader, position int, isData bool, bucket objectstorage.
 		Position:   position,
 		Name:       name,
 		BucketName: bucket.GetName(),
-		CheckSum:   hash(reader),
+		CheckSum:   Hash(reader),
 	}
 	return shard
 }
@@ -164,6 +164,16 @@ func (s *Shard) GetStorageInfos() (string, string, error) {
 	return s.Name, s.BucketName, nil
 }
 
+// GetCheckSum ...
+func (s *Shard) GetCheckSum() []byte {
+	return s.CheckSum
+}
+
+// GetBucketName ...
+func (s *Shard) GetBucketName() string {
+	return s.BucketName
+}
+
 // ToString ...
 func (s *Shard) ToString() string {
 	if s == nil {
@@ -179,41 +189,53 @@ type ChunkGroup struct {
 	Date        string `json:"date,omitempty"`
 	AesPassword string `json:"aespassword,omitempty"`
 
-	Shards         []*Shard `json:"shards,omitempty"`
-	NbDataShards   int      `json:"nbDataShards,omitempty"`
-	NbParityShards int      `json:"nbParityShards,omitempty"`
-	PaddingSize    int64    `json:"paddingSize,omitempty"`
+	Shards                 []*Shard `json:"shards,omitempty"`
+	NbDataShards           int      `json:"nbdatashards,omitempty"`
+	NbParityShards         int      `json:"nbparityshards,omitempty"`
+	ChunkSize              int      `json:"chunksize,omitempty"`
+	NbDataShardsPerBatch   int      `json:"nbdatachunkperbatch,omitempty"`
+	NbParityShardsPerBatch int      `json:"nbparitychunkperbatch,omitempty"`
+	PaddingSize            int      `json:"paddingsize,omitempty"`
 
-	BucketNames []string `json:"bucketNames,omitempty"`
+	BucketNames []string `json:"bucketnames,omitempty"`
 }
 
 // NewChunkGroup ...
 func NewChunkGroup(fileName string, fileSize int64, bucketNames []string) (*ChunkGroup, error) {
-	password, err := password.Generate(64, 10, 10, false, false)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to generate the AES password : %s", err.Error())
-	}
-	date := time.Now()
 	cg := ChunkGroup{
-		AesPassword: password,
 		FileName:    fileName,
 		FileSize:    fileSize,
-		Date:        date.Format(time.UnixDate),
+		Date:        time.Now().Format(time.UnixDate),
 		BucketNames: bucketNames,
+	}
+
+	var err error
+	cg.AesPassword, err = password.Generate(64, 10, 10, false, false)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to generate the AES password : %s", err.Error())
 	}
 
 	return &cg, nil
 }
 
+// GetNbShards ...
+func (cg *ChunkGroup) GetNbShards() (int, int) {
+	return cg.NbDataShards, cg.NbParityShards
+}
+
 //InitShards ...
-func (cg *ChunkGroup) InitShards(chunkSize int, parityRatio float32) (int, int, error) {
+func (cg *ChunkGroup) InitShards(chunkSize int, nbDataShardsPerBatch int, nbParityShardsPerBatch int) (int, int, error) {
+	parityRatio := float64(nbDataShardsPerBatch) / float64(nbParityShardsPerBatch)
+	cg.NbDataShardsPerBatch = nbDataShardsPerBatch
+	cg.NbParityShardsPerBatch = nbParityShardsPerBatch
 	cg.NbDataShards = int(math.Ceil(float64(cg.FileSize) / float64(chunkSize)))
-	cg.NbParityShards = int(math.Ceil(float64(cg.NbDataShards) / float64(parityRatio)))
+	cg.NbParityShards = int(math.Ceil(float64(cg.NbDataShards) / parityRatio))
 	if cg.NbDataShards > 256 {
 		return 0, 0, fmt.Errorf("Too many datashards, you have to increase the chunk size to at least %d bytes", cg.FileSize/256+1)
 	}
 	cg.Shards = make([]*Shard, cg.NbDataShards+cg.NbParityShards)
-	cg.PaddingSize = int64(chunkSize) - (cg.FileSize % int64(chunkSize))
+	cg.ChunkSize = chunkSize
+	cg.PaddingSize = chunkSize - int(cg.FileSize%int64(chunkSize))
 
 	return cg.NbDataShards, cg.NbParityShards, nil
 }
@@ -235,6 +257,46 @@ func (cg *ChunkGroup) RegisterShards(dataReaders []io.Reader, parityReaders []io
 		shard := NewShard(parityReaders[i], firstParityNil+i, false, bucketGenerator.Next())
 		cg.Shards[cg.NbDataShards+firstParityNil+i] = &shard
 	}
+}
+
+// IsReconstructible ...
+func (cg *ChunkGroup) IsReconstructible(missingBuckets []string) bool {
+	missingBucketsMap := map[string]int{}
+	for i := range missingBuckets {
+		missingBucketsMap[missingBuckets[i]] = 0
+	}
+
+	batchNbDataShards := cg.NbDataShardsPerBatch
+	batchNbParityShards := cg.NbParityShardsPerBatch
+
+	nbLoops := int(math.Ceil(float64(cg.NbDataShards) / float64(batchNbDataShards)))
+	for i := 0; i < nbLoops; i++ {
+		if i == nbLoops-1 {
+			if cg.NbDataShards%batchNbDataShards != 0 {
+				batchNbDataShards = cg.NbDataShards % batchNbDataShards
+			}
+			if cg.NbParityShards%batchNbParityShards != 0 {
+				batchNbParityShards = cg.NbParityShards % batchNbParityShards
+			}
+		}
+		nbShardsneeded := batchNbDataShards + batchNbParityShards - int(math.Ceil(float64(batchNbDataShards)*float64(batchNbDataShards)/float64(batchNbParityShards)))
+		nbShardsAvailable := 0
+		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
+			name := ""
+			if i < batchNbDataShards {
+				name = cg.Shards[i*cg.NbDataShardsPerBatch+j].GetBucketName()
+			} else {
+				name = cg.Shards[cg.NbDataShards+i*cg.NbParityShardsPerBatch+(j-cg.NbDataShardsPerBatch)].GetBucketName()
+			}
+			if _, ok := missingBucketsMap[name]; !ok {
+				nbShardsAvailable++
+			}
+		}
+		if nbShardsneeded > nbShardsAvailable {
+			return false
+		}
+	}
+	return true
 }
 
 // GetGCM ...
@@ -281,6 +343,11 @@ func (cg *ChunkGroup) GetStorageInfos() ([]string, []string, error) {
 	return shardNames, shardBucketName, nil
 }
 
+//GetShards ...
+func (cg *ChunkGroup) GetShards() []*Shard {
+	return cg.Shards
+}
+
 // GetBucketNames ...
 func (cg *ChunkGroup) GetBucketNames() []string {
 	return cg.BucketNames
@@ -291,13 +358,23 @@ func (cg *ChunkGroup) GetFileInfos() (string, string, int64) {
 	return cg.FileName, cg.Date, cg.FileSize
 }
 
+// GetBatchSizeInfo ...
+func (cg *ChunkGroup) GetBatchSizeInfo() (int, int, int) {
+	return cg.ChunkSize, cg.NbDataShardsPerBatch, cg.NbParityShardsPerBatch
+}
+
+// GetPaddingSize ...
+func (cg *ChunkGroup) GetPaddingSize() int {
+	return cg.PaddingSize
+}
+
 //ToString ...
 func (cg *ChunkGroup) ToString() string {
 	str := fmt.Sprintf("ChunkGroup : \n fileName       : %s\n date           :%s\n fileSize       : %d\n aesPassword    : %s\n buckets        : \n", cg.FileName, cg.Date, cg.FileSize, cg.AesPassword)
-	for _, name := range cg.BucketNames {
+	for _, name := range cg.GetBucketNames() {
 		str += fmt.Sprintf(" --->%s\n", name)
 	}
-	str += fmt.Sprintf(" nbDataShards   : %d\n nbParityShards : %d\n", cg.NbDataShards, cg.NbParityShards)
+	str += fmt.Sprintf(" nbDataShards   : %d\n nbParityShards : %d\n chunkSize      : %d\n paddingSize    : %d\n", cg.NbDataShards, cg.NbParityShards, cg.ChunkSize, cg.PaddingSize)
 	for _, shard := range cg.Shards {
 		str += shard.ToString()
 		str += "\n"

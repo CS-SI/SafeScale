@@ -39,11 +39,11 @@ import (
 const (
 	//TODO-AJ manage RSA keys
 	keyFilePath_Const  = "$HOME/.safescale/rsa.key"
-	chunkSize_Const    = int(30 * (1 << (10 * 2)))
-	parityNum_Const    = 2
-	parityDen_Const    = 1
+	chunkSize_Const    = int(10 * (1 << (10 * 2)))
+	parityNum_Const    = 4
+	parityDen_Const    = 4
 	parityRatio_Const  = parityNum_Const / parityDen_Const
-	batchMaxSize_Const = 3
+	batchMaxSize_Const = 4
 )
 
 //go:generate mockgen -destination=../mocks/mock_dataapi.go -package=mocks github.com/CS-SI/SafeScale/safescale/server/handlers DataAPI
@@ -135,11 +135,6 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		return err
 	}
 
-	nbDataShards, nbParityShards, err := chunkGroup.InitShards(chunkSize_Const, parityRatio_Const)
-	if err != nil {
-		return err
-	}
-
 	//By batch :
 	batchMultiplier := 1
 	for (batchMultiplier+1)*parityNum_Const <= batchMaxSize_Const {
@@ -149,17 +144,21 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 	batchNbParityShards := parityDen_Const * batchMultiplier
 
 	shards := make([][]byte, batchNbDataShards+batchNbParityShards)
-	shardReaders := make([]io.Reader, batchNbDataShards+batchNbParityShards)
 	for i := 0; i < batchNbDataShards+batchNbParityShards; i++ {
 		//Consume memory (+- 0.05GB for a 0.01GB chunk)
 		shards[i] = make([]byte, chunkSize_Const)
 	}
+	shardReaders := make([]io.Reader, batchNbDataShards+batchNbParityShards)
 	encryptedShards := make([][]byte, batchNbDataShards+batchNbParityShards)
 	for i := 0; i < batchNbDataShards+batchNbParityShards; i++ {
 		//Consume memory (+- 0.05GB for a 0.01GB chunk)
 		encryptedShards[i] = make([]byte, (chunkSize_Const/16+1)*16)
 	}
 
+	nbDataShards, nbParityShards, err := chunkGroup.InitShards(chunkSize_Const, batchNbDataShards, batchNbParityShards)
+	if err != nil {
+		return err
+	}
 	nbLoops := int(math.Ceil(float64(nbDataShards) / float64(batchNbDataShards)))
 
 	for i := 0; i < nbLoops; i++ {
@@ -207,6 +206,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 			}
 		}
 		chunkGroup.RegisterShards(shardReaders[:batchNbDataShards], shardReaders[batchNbDataShards:], bucketGenerator)
+
 		// Encrypt shards with AES 256
 		gcm, err := chunkGroup.GetGCM()
 		if err != nil {
@@ -222,14 +222,14 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 			encryptedShards[j] = gcm.Seal(nil, nonce, shards[j], nil)
 		}
 
-		for j, encryptedShard := range encryptedShards {
+		for j := range encryptedShards {
 			shardName, shardBucketName, err := chunkGroup.GetStorageInfo(getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j))
 			if err != nil {
 				return err
 			}
 			bucket := bucketMap[shardBucketName]
 			//TODO-AJ parralelize writes !!
-			_, err = bucket.WriteObject(shardName, bytes.NewReader(encryptedShard), int64(len(encryptedShard)), nil)
+			_, err = bucket.WriteObject(shardName, bytes.NewReader(encryptedShards[j]), int64(len(encryptedShards[j])), nil)
 			if err != nil {
 				return fmt.Errorf("Failed to copy a shard on the bucket '%s' : %s", bucket.GetName(), err.Error())
 			}
@@ -269,14 +269,178 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 	log.Debugf(">>> safescale.server.handlers.DataHandler::Get(%s)", fileName)
 	defer log.Debugf("<<< safescale.server.handlers.DataHandler::Get(%s)", fileName)
 
-	// Load the related chunk group
-	// Decode it to get AES key and the shards locations
-	// Fetch the shards
-	// Decode shards
-	// Check shards integrity (with check sum) and then rebuild them if somes are missing
-	// Store file
+	if _, err := os.Stat(fileLocalPath); err == nil {
+		return fmt.Errorf("File '%s' already exists", fileLocalPath)
+	}
+	file, err := os.Create(fileLocalPath)
+	if err != nil {
+		return fmt.Errorf("Failed to create the file '%s' : %s", fileLocalPath, err.Error())
+	}
 
-	return fmt.Errorf("WIP")
+	bucketMap := handler.storageServices.GetBuckets()
+	buckets := []objectstorage.Bucket{}
+	for _, bucket := range bucketMap {
+		buckets = append(buckets, bucket)
+	}
+
+	keyInfoFileName := "key-" + getHashedName(fileName) + ".bin"
+	chunkGroupFileName := "meta-" + getHashedName(fileName) + ".bin"
+
+	var buffer bytes.Buffer
+	var keyInfo *utils.KeyInfo
+	var i int
+	for i = range buckets {
+		buffer.Reset()
+		_, err := buckets[i].ReadObject(keyInfoFileName, &buffer, 0, 0)
+		if err != nil {
+			continue
+		}
+		keyInfo, err = utils.DecryptKeyInfo(buffer.Bytes(), keyFilePath_Const)
+		if err != nil {
+			return err
+		}
+		break
+	}
+	if keyInfo == nil {
+		return fmt.Errorf("Failed to find the file '%s'", fileName)
+	}
+
+	buffer.Reset()
+	_, err = buckets[i].ReadObject(chunkGroupFileName, &buffer, 0, 0)
+	if err != nil {
+		return fmt.Errorf("Failed to read the chunkGroup from the bucket '%s' : %s", buckets[i].GetName(), err.Error())
+	}
+	chunkGroup, err := utils.DecryptChunkGroup(buffer.Bytes(), keyInfo)
+	if err != nil {
+		return err
+	}
+
+	missingBuckets := []string{}
+	for _, bucketName := range chunkGroup.GetBucketNames() {
+		if _, ok := bucketMap[bucketName]; !ok {
+			missingBuckets = append(missingBuckets, bucketName)
+		}
+	}
+	if len(missingBuckets) != 0 {
+		if !chunkGroup.IsReconstructible(missingBuckets) {
+			return fmt.Errorf("Too much shards are missing to reconstruct the file '%s'", fileName)
+		}
+	}
+
+	shardInfos := chunkGroup.GetShards()
+	nbDataShards, nbParityShards := chunkGroup.GetNbShards()
+	chunkSize, batchNbDataShards, batchNbParityShards := chunkGroup.GetBatchSizeInfo()
+	nbLoops := int(math.Ceil(float64(nbDataShards) / float64(batchNbDataShards)))
+
+	shards := make([][]byte, batchNbDataShards+batchNbParityShards)
+	for i := 0; i < batchNbDataShards+batchNbParityShards; i++ {
+		//Consume memory (+- 0.05GB for a 0.01GB chunk)
+		shards[i] = make([]byte, chunkSize)
+	}
+	shardReaders := make([]io.Reader, batchNbDataShards+batchNbParityShards)
+	encryptedShards := make([]bytes.Buffer, batchNbDataShards+batchNbParityShards)
+
+	for i := 0; i < nbLoops; i++ {
+		log.Debugf("---------Start batch %d----------", i)
+		// On the last batch the number of shards may vary
+		if i == nbLoops-1 {
+			if nbDataShards%batchNbDataShards != 0 {
+				batchNbDataShards = nbDataShards % batchNbDataShards
+			}
+			if nbParityShards%batchNbParityShards != 0 {
+				batchNbParityShards = nbParityShards % batchNbParityShards
+			}
+			shards = shards[:batchNbDataShards+batchNbParityShards]
+			shardReaders = shardReaders[:batchNbDataShards+batchNbParityShards]
+			encryptedShards = encryptedShards[:batchNbDataShards+batchNbParityShards]
+		}
+
+		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
+			shardNum := getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j)
+			shardName, shardBucktName, err := shardInfos[shardNum].GetStorageInfos()
+			if err != nil {
+				return fmt.Errorf("Failed to get shard storage infos : %s", err.Error())
+			}
+			encryptedShards[j].Reset()
+			bucket, ok := bucketMap[shardBucktName]
+			//TODO-AJ parralelize Reads !!
+			if ok {
+				_, err = bucket.ReadObject(shardName, &encryptedShards[j], 0, 0)
+				if err != nil {
+					return fmt.Errorf("Failed to copy a shard from the bucket '%s' : %s", bucket.GetName(), err.Error())
+				}
+			}
+		}
+
+		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
+			if encryptedShards[j].Len() != 0 {
+				fmt.Println("I", i)
+				fmt.Println("J", j)
+				fmt.Println("len", encryptedShards[j].Len())
+				shardNum := getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j)
+				nonce, err := shardInfos[shardNum].GetNonce(0)
+				if err != nil {
+					return fmt.Errorf("Failed to get shard nonce : %s", err.Error())
+				}
+				gcm, err := chunkGroup.GetGCM()
+				shards[j], err = gcm.Open(nil, nonce, encryptedShards[j].Bytes(), nil)
+				if err != nil {
+					return fmt.Errorf("Failed to decrypt shard : %s", err.Error())
+				}
+			} else {
+				log.Warnf("%d-th shard of the batch missing, will be reconstructed", j)
+				shards[j] = nil
+			}
+		}
+
+		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
+			if shards[j] != nil {
+				shardNum := getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j)
+				checkSum := shardInfos[shardNum].GetCheckSum()
+				computedCheckSum := utils.Hash(bytes.NewReader(shards[j]))
+				if hex.EncodeToString(checkSum) != hex.EncodeToString(computedCheckSum) {
+					log.Warnf("%d-th shard of the batch corrupted, will be reconstructed", j)
+					shards[j] = nil
+				}
+			}
+		}
+		encoder, err := reedsolomon.New(batchNbDataShards, batchNbParityShards)
+		if err != nil {
+			return fmt.Errorf("Failed to create a reedsolomon Encoder : %s", err.Error())
+		}
+		err = encoder.Reconstruct(shards)
+		if err != nil {
+			return fmt.Errorf("Failed to reconstruct the file : %s", err.Error())
+		}
+		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
+			if shards[j] != nil {
+				shardNum := getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j)
+				checkSum := shardInfos[shardNum].GetCheckSum()
+				computedCheckSum := utils.Hash(bytes.NewReader(shards[j]))
+				if hex.EncodeToString(checkSum) != hex.EncodeToString(computedCheckSum) {
+					log.Warnf("%d-th shard wrong", j)
+				}
+			} else {
+				log.Warnf("%d-th shard nil", j)
+			}
+		}
+		ok, err := encoder.Verify(shards)
+		if err != nil {
+			return fmt.Errorf("Failed to verify the file reconstrution : %s", err.Error())
+		} else if !ok {
+			return fmt.Errorf("Reconstruction verification failed")
+		}
+		for j := 0; j < batchNbDataShards; j++ {
+			if i == nbLoops-1 && j == batchNbDataShards-1 {
+				shards[j] = shards[j][:chunkSize-chunkGroup.GetPaddingSize()]
+			}
+			_, err := file.Write(shards[j])
+			if err != nil {
+				return fmt.Errorf("Failed to write a shard to the file '%s' : %s", fileLocalPath, err.Error())
+			}
+		}
+	}
+	return nil
 }
 
 // Delete ...
