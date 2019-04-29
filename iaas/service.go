@@ -37,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeState"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/crypt"
+	"github.com/xrash/smetrics"
 )
 
 // Service ...
@@ -285,6 +286,17 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	return selectedTpls, nil
 }
 
+type scoredImage struct {
+	resources.Image
+	score float64
+}
+
+type scoredImages []scoredImage
+
+func (a scoredImages) Len() int           { return len(a) }
+func (a scoredImages) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
+
 // FilterImages search an images corresponding to OS Name
 func (svc *Service) FilterImages(filter string) ([]resources.Image, error) {
 	if svc == nil {
@@ -298,18 +310,27 @@ func (svc *Service) FilterImages(filter string) ([]resources.Image, error) {
 	if len(filter) == 0 {
 		return imgs, nil
 	}
-	fimgs := []resources.Image{}
+	simgs := []scoredImage{}
 	//fields := strings.Split(strings.ToUpper(osname), " ")
 	for _, img := range imgs {
 		//score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
-		//score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
+		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(filter), 0.7, 5)
 		//score := matchScore(fields, strings.ToUpper(img.Name))
-		score := SimilarityScore(filter, img.Name)
+		//score := SimilarityScore(filter, img.Name)
 		if score > 0.5 {
-			fimgs = append(fimgs, img)
+			simgs = append(simgs, scoredImage{
+				Image: img,
+				score: score,
+			})
 		}
 
 	}
+	fimgs := []resources.Image{}
+	sort.Sort(scoredImages(simgs))
+	for _, simg := range simgs {
+		fimgs = append(fimgs, simg.Image)
+	}
+
 	return fimgs, nil
 
 }
@@ -329,9 +350,9 @@ func (svc *Service) SearchImage(osname string) (*resources.Image, error) {
 	//fields := strings.Split(strings.ToUpper(osname), " ")
 	for i, img := range imgs {
 		//score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
-		//score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
+		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
 		//score := matchScore(fields, strings.ToUpper(img.Name))
-		score := SimilarityScore(osname, img.Name)
+		//score := SimilarityScore(osname, img.Name)
 		if score > maxscore {
 			maxscore = score
 			maxi = i

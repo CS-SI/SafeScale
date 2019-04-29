@@ -19,11 +19,12 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/safescale/client"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/safescale/client"
 
 	log "github.com/sirupsen/logrus"
 
@@ -331,7 +332,9 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); !ok {
-			return infraErrf(err, "failed to load metadata of network '%s'", ref)
+			infraErrf(err, "failed to load metadata of network '%s', trying to delete network anyway", ref)
+			err = handler.service.DeleteNetwork(ref)
+
 		}
 		return err
 	}
@@ -346,7 +349,14 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 		if hostsLen > 0 {
 			list := make([]string, 0, hostsLen)
 			for k := range networkHostsV1.ByName {
-				list = append(list, k)
+				_, err = handler.service.GetHostByName(k)
+				if err == nil {
+					list = append(list, k)
+				}
+
+			}
+			if len(list) == 0 {
+				return nil
 			}
 			verb := "are"
 			if hostsLen == 1 {
@@ -370,26 +380,32 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	if gwID != "" {
 		mh, err := metadata.LoadHost(handler.service, gwID)
 		if err != nil {
-			return infraErr(err)
-		}
-		metadataHost = mh.Get()
+			infraErr(err)
+		} else {
+			metadataHost = mh.Get()
 
-		err = handler.service.DeleteGateway(gwID)
-		// allow no gateway, but log it
-		if err != nil {
-			log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
+			err = handler.service.DeleteGateway(gwID)
+			// allow no gateway, but log it
+			if err != nil {
+				log.Warnf("Failed to delete gateway: %s", openstack.ProviderErrorToString(err))
+			}
+			err = mh.Delete()
+			if err != nil {
+				return infraErr(err)
+			}
 		}
-		err = mh.Delete()
-		if err != nil {
-			return infraErr(err)
-		}
+
 	}
 
 	// 2nd delete network, with tolerance
 	err = handler.service.DeleteNetwork(network.ID)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); !ok {
-			return infraErrf(err, "can't delete network")
+			// Delete metadata,
+			infraErrf(err, "can't delete network")
+			err = mn.Delete()
+			infraErrf(err, "can't delete network metadata")
+
 		}
 		// If network doesn't exist anymore on the provider infrastructure, don't fail
 		// to cleanup the metadata
