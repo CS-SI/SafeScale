@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
@@ -119,7 +120,6 @@ func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*utils.Ch
 func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, fileName string) error {
 	log.Debugf(">>> safescale.server.handlers.DataHandler::Push(%s)", fileLocalPath)
 	defer log.Debugf("<<< safescale.server.handlers.DataHandler::Push(%s)", fileLocalPath)
-
 	//localFile inspection
 	file, err := os.Open(fileLocalPath)
 	if err != nil {
@@ -136,9 +136,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 	//Preprocess buckets info
 	bucketMap, bucketNames, buckets := handler.getBuckets()
 	bucketGenerator := utils.NewBucketGenerator(buckets)
-
-	metadataFileName, keyFileName := getFileNames(fileName)
-
+	metadataFileName, keyInfoFileName := getFileNames(fileName)
 	//Check if the file is not already present on one of the buckets
 	for i := range buckets {
 		_, err := buckets[i].GetObject(metadataFileName)
@@ -147,13 +145,11 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		}
 
 	}
-
 	//Create ChunkGroup
 	chunkGroup, err := utils.NewChunkGroup(fileName, fileSize, bucketNames)
 	if err != nil {
 		return err
 	}
-
 	//initialize
 	nbDataShards, nbParityShards, err := chunkGroup.InitShards(chunkSize_Const, batchMaxSize_Const, parityNum_Const, parityDen_Const, bucketGenerator)
 	if err != nil {
@@ -226,14 +222,20 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		}
 
 		//push encrypted shards to the storage object
+		var wg sync.WaitGroup
+		wg.Add(len(encryptedShards))
 		for j := range encryptedShards {
-			shardName, shardBucketName := chunkGroup.GetStorageInfo(chunkGroup.GetShardNum(i, j))
-			bucket := bucketMap[shardBucketName]
-			_, err = bucket.WriteObject(shardName, bytes.NewReader(encryptedShards[j]), int64(len(encryptedShards[j])), nil)
-			if err != nil {
-				return fmt.Errorf("Failed to copy a shard on the bucket '%s' : %s", bucket.GetName(), err.Error())
-			}
+			go func(j int) {
+				shardName, shardBucketName := chunkGroup.GetStorageInfo(chunkGroup.GetShardNum(i, j))
+				bucket := bucketMap[shardBucketName]
+				_, err := bucket.WriteObject(shardName, bytes.NewReader(encryptedShards[j]), int64(len(encryptedShards[j])), nil)
+				if err != nil {
+					log.Errorf("Failed to copy a shard on the bucket '%s' : %s", bucket.GetName(), err.Error())
+				}
+				wg.Done()
+			}(j)
 		}
+		wg.Wait()
 	}
 	//encrypt and push chunkGroup
 	encryptedChunkGroup, keyInfo, err := chunkGroup.Encrypt()
@@ -252,8 +254,9 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 	if err != nil {
 		return fmt.Errorf("failed to encrypt the KeyInfo : %s", err.Error())
 	}
+
 	for i := range buckets {
-		_, err = buckets[i].WriteObject(keyFileName, bytes.NewReader(encryptedKeyInfo), int64(len(encryptedKeyInfo)), nil)
+		_, err = buckets[i].WriteObject(keyInfoFileName, bytes.NewReader(encryptedKeyInfo), int64(len(encryptedKeyInfo)), nil)
 		if err != nil {
 			return fmt.Errorf("Failed to copy keyInfo on the bucket '%s' : %s", buckets[i].GetName(), err.Error())
 		}
@@ -333,17 +336,24 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 		}
 
 		//load encrypted shards
+		var wg sync.WaitGroup
+		wg.Add(batchNbDataShards + batchNbParityShards)
 		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
-			encryptedShards[j].Reset()
-			shardName, shardBucktName := chunkGroup.GetStorageInfo(chunkGroup.GetShardNum(i, j))
-			bucket, ok := bucketMap[shardBucktName]
-			if ok {
-				_, err = bucket.ReadObject(shardName, &encryptedShards[j], 0, 0)
-				if err != nil {
-					return fmt.Errorf("Failed to copy a shard from the bucket '%s' : %s", bucket.GetName(), err.Error())
+			go func(j int) {
+				encryptedShards[j].Reset()
+				shardName, shardBucktName := chunkGroup.GetStorageInfo(chunkGroup.GetShardNum(i, j))
+				bucket, ok := bucketMap[shardBucktName]
+				var err error
+				if ok {
+					_, err = bucket.ReadObject(shardName, &encryptedShards[j], 0, 0)
+					if err != nil {
+						log.Errorf("Failed to copy a shard from the bucket '%s' : %s", bucket.GetName(), err.Error())
+					}
 				}
-			}
+				wg.Done()
+			}(j)
 		}
+		wg.Wait()
 
 		//Check the encypted shards integrity with the check sum and remove corrupted ones
 		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
@@ -421,13 +431,20 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 		}
 	}
 	nbDataShards, nbParityShards := chunkGroup.GetNbShards()
+
+	var wg sync.WaitGroup
+	wg.Add(nbDataShards + nbParityShards)
 	for i := 0; i < nbDataShards+nbParityShards; i++ {
-		shardName, bucketName := chunkGroup.GetStorageInfo(i)
-		err = bucketMap[bucketName].DeleteObject(shardName)
-		if err != nil {
-			log.Warn("Failed to delete shard '%s' from bucket '%s'", shardName, bucketName)
-		}
+		go func(i int) {
+			shardName, bucketName := chunkGroup.GetStorageInfo(i)
+			err = bucketMap[bucketName].DeleteObject(shardName)
+			if err != nil {
+				log.Warn("Failed to delete shard '%s' from bucket '%s'", shardName, bucketName)
+			}
+			wg.Done()
+		}(i)
 	}
+	wg.Wait()
 	for _, bucketName := range chunkGroup.GetBucketNames() {
 		err = bucketMap[bucketName].DeleteObject(metadataFileName)
 		if err != nil {
@@ -496,7 +513,7 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 				break
 			}
 		}
-		if ok {
+		if !ok {
 			continue
 		}
 		//fulfill output arrays
