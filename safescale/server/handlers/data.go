@@ -19,8 +19,6 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -37,7 +35,6 @@ import (
 
 //Default chunk sizes that will used to spit files (in Bytes)
 const (
-	//TODO-AJ manage RSA keys
 	keyFilePath_Const  = "$HOME/.safescale/rsa.key"
 	chunkSize_Const    = int(10 * (1 << (10 * 2)))
 	parityNum_Const    = 4
@@ -66,30 +63,30 @@ func NewDataHandler(svc *iaas.StorageServices) DataAPI {
 	return &DataHandler{storageServices: svc}
 }
 
-func getShardNum(nbDataShards int, nbParityShards int, batchNbDataShards int, batchNbParityShards int, nbLoops int, batchNum int, shardBatchNum int) int {
-	var shardNum int
-	if batchNum == nbLoops-1 {
-		if shardBatchNum < batchNbDataShards {
-			shardNum = nbDataShards - batchNbDataShards + shardBatchNum
-		} else {
-			shardNum = nbDataShards + nbParityShards - batchNbParityShards + (shardBatchNum - batchNbDataShards)
-		}
-	} else {
-		if shardBatchNum < batchNbDataShards {
-			shardNum = batchNum*batchNbDataShards + shardBatchNum
-		} else {
-			shardNum = nbDataShards + batchNum*batchNbParityShards + (shardBatchNum - batchNbDataShards)
-		}
-	}
-	return shardNum
-}
+// func getShardNum(nbDataShards int, nbParityShards int, batchNbDataShards int, batchNbParityShards int, nbLoops int, batchNum int, shardBatchNum int) int {
+// 	var shardNum int
+// 	if batchNum == nbLoops-1 {
+// 		if shardBatchNum < batchNbDataShards {
+// 			shardNum = nbDataShards - batchNbDataShards + shardBatchNum
+// 		} else {
+// 			shardNum = nbDataShards + nbParityShards - batchNbParityShards + (shardBatchNum - batchNbDataShards)
+// 		}
+// 	} else {
+// 		if shardBatchNum < batchNbDataShards {
+// 			shardNum = batchNum*batchNbDataShards + shardBatchNum
+// 		} else {
+// 			shardNum = nbDataShards + batchNum*batchNbParityShards + (shardBatchNum - batchNbDataShards)
+// 		}
+// 	}
+// 	return shardNum
+// }
 
-func getHashedName(fileName string) string {
-	h := sha256.New()
-	if _, err := io.Copy(h, strings.NewReader(fileName)); err != nil {
-		log.Fatal(err)
-	}
-	return hex.EncodeToString(h.Sum(nil))
+// Return the formated (and considered unique) keyFileName and metadataFileName linked to a fileName
+func getFileNames(fileName string) (string, string) {
+	hashedFileName := utils.Hash(strings.NewReader(fileName))
+	metadataFileName := "meta-" + hashedFileName + ".bin"
+	keyFileName := "key-" + hashedFileName + ".bin"
+	return metadataFileName, keyFileName
 }
 
 //Push ...
@@ -107,9 +104,11 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 	}
 	bucketGenerator := utils.NewBucketGenerator(buckets)
 
-	//Check if onject is not already on bucket
+	metadataFileName, keyFileName := getFileNames(fileName)
+
+	//Check if the file is not already present on one of the buckets
 	for i := range buckets {
-		_, err := buckets[i].GetObject("meta-" + getHashedName(fileName) + ".bin")
+		_, err := buckets[i].GetObject(metadataFileName)
 		if err == nil {
 			return fmt.Errorf("An object named '%s' is already present in the bucket '%s'", fileName, buckets[i].GetName())
 		}
@@ -155,7 +154,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		encryptedShards[i] = make([]byte, (chunkSize_Const/16+1)*16)
 	}
 
-	nbDataShards, nbParityShards, err := chunkGroup.InitShards(chunkSize_Const, batchNbDataShards, batchNbParityShards)
+	nbDataShards, nbParityShards, err := chunkGroup.InitShards(chunkSize_Const, batchNbDataShards, batchNbParityShards, bucketGenerator)
 	if err != nil {
 		return err
 	}
@@ -199,13 +198,6 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		if err != nil {
 			return fmt.Errorf("Failed to create a encode the file : %s", err.Error())
 		}
-		for j := range shardReaders {
-			shardReaders[j] = bytes.NewReader(shards[j])
-			if err != nil {
-				return fmt.Errorf("Failed to seek the start of a shard reader : %s", err.Error())
-			}
-		}
-		chunkGroup.RegisterShards(shardReaders[:batchNbDataShards], shardReaders[batchNbDataShards:], bucketGenerator)
 
 		// Encrypt shards with AES 256
 		gcm, err := chunkGroup.GetGCM()
@@ -214,19 +206,20 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		}
 		nonceSize := gcm.NonceSize()
 		for j := range shards {
-			nonce, err := chunkGroup.GetNonce(getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j), nonceSize)
+			shardNum := chunkGroup.GetShardNum(i, j)
+			nonce, err := chunkGroup.GenerateNonce(shardNum, nonceSize)
 			if err != nil {
-				return err
+				return fmt.Errorf("Failed to generate nonce : %s", err.Error())
 			}
 			//Consume memory (+- 0.05GB for a 0.01GB chunk)
 			encryptedShards[j] = gcm.Seal(nil, nonce, shards[j], nil)
+			if _, err = chunkGroup.ComputeShardCheckSum(shardNum, bytes.NewReader(encryptedShards[j])); err != nil {
+				return fmt.Errorf("Failed to compute the check sum of a shard : %s", err.Error())
+			}
 		}
 
 		for j := range encryptedShards {
-			shardName, shardBucketName, err := chunkGroup.GetStorageInfo(getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j))
-			if err != nil {
-				return err
-			}
+			shardName, shardBucketName := chunkGroup.GetStorageInfo(chunkGroup.GetShardNum(i, j))
 			bucket := bucketMap[shardBucketName]
 			//TODO-AJ parralelize writes !!
 			_, err = bucket.WriteObject(shardName, bytes.NewReader(encryptedShards[j]), int64(len(encryptedShards[j])), nil)
@@ -240,7 +233,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		return fmt.Errorf("failed to encrypt the chunk group : %s", err.Error())
 	}
 	for i := range buckets {
-		_, err = buckets[i].WriteObject("meta-"+getHashedName(fileName)+".bin", bytes.NewReader(encryptedChunkGroup), int64(len(encryptedChunkGroup)), nil)
+		_, err = buckets[i].WriteObject(metadataFileName, bytes.NewReader(encryptedChunkGroup), int64(len(encryptedChunkGroup)), nil)
 		if err != nil {
 			return fmt.Errorf("Failed to copy chunkGroup on the bucket '%s' : %s", buckets[i].GetName(), err.Error())
 		}
@@ -251,15 +244,13 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		return fmt.Errorf("failed to encrypt the KeyInfo : %s", err.Error())
 	}
 	for i := range buckets {
-		_, err = buckets[i].WriteObject("key-"+getHashedName(fileName)+".bin", bytes.NewReader(encryptedKeyInfo), int64(len(encryptedKeyInfo)), nil)
+		_, err = buckets[i].WriteObject(keyFileName, bytes.NewReader(encryptedKeyInfo), int64(len(encryptedKeyInfo)), nil)
 		if err != nil {
 			return fmt.Errorf("Failed to copy keyInfo on the bucket '%s' : %s", buckets[i].GetName(), err.Error())
 		}
 	}
 
-	shards = nil
-	shardReaders = nil
-	encryptedShards = nil
+	fmt.Println(keyInfo.ToString())
 
 	return nil
 }
@@ -283,15 +274,14 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 		buckets = append(buckets, bucket)
 	}
 
-	keyInfoFileName := "key-" + getHashedName(fileName) + ".bin"
-	chunkGroupFileName := "meta-" + getHashedName(fileName) + ".bin"
+	metadataFileName, keyFileName := getFileNames(fileName)
 
 	var buffer bytes.Buffer
 	var keyInfo *utils.KeyInfo
 	var i int
 	for i = range buckets {
 		buffer.Reset()
-		_, err := buckets[i].ReadObject(keyInfoFileName, &buffer, 0, 0)
+		_, err := buckets[i].ReadObject(keyFileName, &buffer, 0, 0)
 		if err != nil {
 			continue
 		}
@@ -306,7 +296,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 	}
 
 	buffer.Reset()
-	_, err = buckets[i].ReadObject(chunkGroupFileName, &buffer, 0, 0)
+	_, err = buckets[i].ReadObject(metadataFileName, &buffer, 0, 0)
 	if err != nil {
 		return fmt.Errorf("Failed to read the chunkGroup from the bucket '%s' : %s", buckets[i].GetName(), err.Error())
 	}
@@ -327,7 +317,6 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 		}
 	}
 
-	shardInfos := chunkGroup.GetShards()
 	nbDataShards, nbParityShards := chunkGroup.GetNbShards()
 	chunkSize, batchNbDataShards, batchNbParityShards := chunkGroup.GetBatchSizeInfo()
 	nbLoops := int(math.Ceil(float64(nbDataShards) / float64(batchNbDataShards)))
@@ -356,11 +345,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 		}
 
 		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
-			shardNum := getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j)
-			shardName, shardBucktName, err := shardInfos[shardNum].GetStorageInfos()
-			if err != nil {
-				return fmt.Errorf("Failed to get shard storage infos : %s", err.Error())
-			}
+			shardName, shardBucktName := chunkGroup.GetStorageInfo(chunkGroup.GetShardNum(i, j))
 			encryptedShards[j].Reset()
 			bucket, ok := bucketMap[shardBucktName]
 			//TODO-AJ parralelize Reads !!
@@ -374,14 +359,18 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 
 		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
 			if encryptedShards[j].Len() != 0 {
-				fmt.Println("I", i)
-				fmt.Println("J", j)
-				fmt.Println("len", encryptedShards[j].Len())
-				shardNum := getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j)
-				nonce, err := shardInfos[shardNum].GetNonce(0)
-				if err != nil {
-					return fmt.Errorf("Failed to get shard nonce : %s", err.Error())
+				checkSum := chunkGroup.GetCheckSum(chunkGroup.GetShardNum(i, j))
+				computedCheckSum := utils.Hash(bytes.NewReader(encryptedShards[j].Bytes()))
+				if checkSum != computedCheckSum {
+					log.Warnf("%d-th shard of the batch corrupted, will be reconstructed", j)
+					encryptedShards[j].Reset()
 				}
+			}
+		}
+
+		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
+			if encryptedShards[j].Len() != 0 {
+				nonce := chunkGroup.GetNonce(chunkGroup.GetShardNum(i, j))
 				gcm, err := chunkGroup.GetGCM()
 				shards[j], err = gcm.Open(nil, nonce, encryptedShards[j].Bytes(), nil)
 				if err != nil {
@@ -393,17 +382,6 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 			}
 		}
 
-		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
-			if shards[j] != nil {
-				shardNum := getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j)
-				checkSum := shardInfos[shardNum].GetCheckSum()
-				computedCheckSum := utils.Hash(bytes.NewReader(shards[j]))
-				if hex.EncodeToString(checkSum) != hex.EncodeToString(computedCheckSum) {
-					log.Warnf("%d-th shard of the batch corrupted, will be reconstructed", j)
-					shards[j] = nil
-				}
-			}
-		}
 		encoder, err := reedsolomon.New(batchNbDataShards, batchNbParityShards)
 		if err != nil {
 			return fmt.Errorf("Failed to create a reedsolomon Encoder : %s", err.Error())
@@ -411,18 +389,6 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 		err = encoder.Reconstruct(shards)
 		if err != nil {
 			return fmt.Errorf("Failed to reconstruct the file : %s", err.Error())
-		}
-		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
-			if shards[j] != nil {
-				shardNum := getShardNum(nbDataShards, nbParityShards, batchNbDataShards, batchNbParityShards, nbLoops, i, j)
-				checkSum := shardInfos[shardNum].GetCheckSum()
-				computedCheckSum := utils.Hash(bytes.NewReader(shards[j]))
-				if hex.EncodeToString(checkSum) != hex.EncodeToString(computedCheckSum) {
-					log.Warnf("%d-th shard wrong", j)
-				}
-			} else {
-				log.Warnf("%d-th shard nil", j)
-			}
 		}
 		ok, err := encoder.Verify(shards)
 		if err != nil {
@@ -454,15 +420,14 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 		buckets = append(buckets, bucket)
 	}
 
-	keyInfoFileName := "key-" + getHashedName(fileName) + ".bin"
-	chunkGroupFileName := "meta-" + getHashedName(fileName) + ".bin"
+	metadataFileName, keyFileName := getFileNames(fileName)
 
 	var buffer bytes.Buffer
 	var keyInfo *utils.KeyInfo
 	var i int
 	for i = range buckets {
 		buffer.Reset()
-		_, err := buckets[i].ReadObject(keyInfoFileName, &buffer, 0, 0)
+		_, err := buckets[i].ReadObject(keyFileName, &buffer, 0, 0)
 		if err != nil {
 			continue
 		}
@@ -477,7 +442,7 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 	}
 
 	buffer.Reset()
-	_, err := buckets[i].ReadObject(chunkGroupFileName, &buffer, 0, 0)
+	_, err := buckets[i].ReadObject(metadataFileName, &buffer, 0, 0)
 	if err != nil {
 		return fmt.Errorf("Failed to read the chunkGroup from the bucket '%s' : %s", buckets[i].GetName(), err.Error())
 	}
@@ -491,24 +456,22 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 			return fmt.Errorf("Bucket '%s' is unknown", bucketName)
 		}
 	}
-	shardNames, shardBucketNames, err := chunkGroup.GetStorageInfos()
-	if err != nil {
-		return fmt.Errorf("Failed to get storage infos : %s", err.Error())
-	}
-	for i := range shardNames {
-		err = bucketMap[shardBucketNames[i]].DeleteObject(shardNames[i])
+	nbDataShards, nbParityShards := chunkGroup.GetNbShards()
+	for i := 0; i < nbDataShards+nbParityShards; i++ {
+		shardName, bucketName := chunkGroup.GetStorageInfo(i)
+		err = bucketMap[bucketName].DeleteObject(shardName)
 		if err != nil {
-			log.Warn("Failed to delete shard '%s' from bucket '%s'", shardNames[i], shardBucketNames[i])
+			log.Warn("Failed to delete shard '%s' from bucket '%s'", shardName, bucketName)
 		}
 	}
-	for i, bucketName := range chunkGroup.GetBucketNames() {
-		err = bucketMap[bucketName].DeleteObject(chunkGroupFileName)
+	for _, bucketName := range chunkGroup.GetBucketNames() {
+		err = bucketMap[bucketName].DeleteObject(metadataFileName)
 		if err != nil {
-			log.Warn("Failed to delete chunkGroup '%' from bucket '%s'", chunkGroupFileName, shardBucketNames[i])
+			log.Warn("Failed to delete chunkGroup '%' from bucket '%s'", metadataFileName, bucketName)
 		}
-		err = bucketMap[bucketName].DeleteObject(keyInfoFileName)
+		err = bucketMap[bucketName].DeleteObject(keyFileName)
 		if err != nil {
-			log.Warn("Failed to delete keyInfo '%s' from bucket '%s'", keyInfoFileName, shardBucketNames[i])
+			log.Warn("Failed to delete keyInfo '%s' from bucket '%s'", keyFileName, bucketName)
 		}
 	}
 
