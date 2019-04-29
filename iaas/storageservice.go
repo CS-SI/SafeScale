@@ -89,10 +89,6 @@ func (sts *StorageServices) RegisterStorage(tenantName string) error {
 }
 
 //GetBuckets ...
-func (sts *StorageServices) GetBuckets() map[string]objectstorage.Bucket {
-	buckets := map[string]objectstorage.Bucket{}
-	for _, bucket := range sts.buckets {
-		buckets[bucket.GetName()] = bucket
-	}
-	return buckets
+func (sts *StorageServices) GetBuckets() []objectstorage.Bucket {
+	return sts.buckets
 }

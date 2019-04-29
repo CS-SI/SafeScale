@@ -55,12 +55,12 @@ func (s *DataListener) List(ctx context.Context, in *google_protobuf.Empty) (*pb
 	}
 
 	handler := DataHandler(tenants.StorageServices)
-	fileNames, uploadDates, fileSizes, err := handler.List(ctx)
+	fileNames, uploadDates, fileSizes, fileBuckets, err := handler.List(ctx)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 
-	return conv.ToPBFileList(fileNames, uploadDates, fileSizes), nil
+	return conv.ToPBFileList(fileNames, uploadDates, fileSizes, fileBuckets), nil
 }
 
 // Push upload a file to one or several ObjectStorages

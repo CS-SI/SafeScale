@@ -306,28 +306,43 @@ func (cg *ChunkGroup) GetCheckSum(shardNum int) string {
 	return cg.Shards[shardNum].GetCheckSum()
 }
 
-//InitShards initalize the shard array and return the number of data shards and parity shards
-func (cg *ChunkGroup) InitShards(chunkSize int, nbDataShardsPerBatch int, nbParityShardsPerBatch int, bucketGenerator *BucketGenerator) (int, int, error) {
-	cg.NbDataShardsPerBatch = nbDataShardsPerBatch
-	cg.NbParityShardsPerBatch = nbParityShardsPerBatch
+// GetEncryptedChunkSize return the size of an encrypted chunk
+func (cg *ChunkGroup) GetEncryptedChunkSize() int {
+	return (cg.ChunkSize/16 + 1) * 16
+}
 
-	parityRatio := float64(nbDataShardsPerBatch) / float64(nbParityShardsPerBatch)
+// GetNbBatchs return the number of batchs neededs to process all the shards according to the number of shards per batch
+func (cg *ChunkGroup) GetNbBatchs() int {
+	return int(math.Ceil(float64(cg.NbDataShards) / float64(cg.NbDataShardsPerBatch)))
+}
+
+//InitShards initalize the shard array and return the number of data shards and parity shards
+func (cg *ChunkGroup) InitShards(chunkSize int, maxBatchSize int, ratioNumerator int, ratioDenominator int, bucketGenerator *BucketGenerator) (int, int, error) {
+	cg.ChunkSize = chunkSize
+	cg.PaddingSize = chunkSize - int(cg.FileSize%int64(chunkSize))
+
 	cg.NbDataShards = int(math.Ceil(float64(cg.FileSize) / float64(chunkSize)))
 	if cg.NbDataShards > 256 {
 		return 0, 0, fmt.Errorf("Too many datashards, you have to increase the chunk size to at least %d bytes", cg.FileSize/256+1)
 	}
-	cg.NbParityShards = int(math.Ceil(float64(cg.NbDataShards) / parityRatio))
-	if cg.NbParityShards > cg.NbDataShards {
-		return 0, 0, fmt.Errorf("Ratio should be inferior or equal to 1")
+	parityRatio := float64(ratioNumerator) / float64(ratioDenominator)
+	if parityRatio < 1 {
+		return 0, 0, fmt.Errorf("Ratio should be superior or equal to 1")
 	}
-
-	cg.ChunkSize = chunkSize
-	cg.PaddingSize = chunkSize - int(cg.FileSize%int64(chunkSize))
+	cg.NbParityShards = int(math.Ceil(float64(cg.NbDataShards) / parityRatio))
 
 	cg.Shards = make([]*Shard, cg.NbDataShards+cg.NbParityShards)
 	for i := range cg.Shards {
 		cg.Shards[i] = NewShard(bucketGenerator.Next())
 	}
+
+	// determine batch size:
+	batchMultiplier := 1
+	for (batchMultiplier+1)*(ratioNumerator+ratioDenominator) <= maxBatchSize {
+		batchMultiplier++
+	}
+	cg.NbDataShardsPerBatch = ratioNumerator * batchMultiplier
+	cg.NbParityShardsPerBatch = ratioDenominator * batchMultiplier
 
 	return cg.NbDataShards, cg.NbParityShards, nil
 }
@@ -348,12 +363,11 @@ func (cg *ChunkGroup) GenerateNonce(shardNum int, nonceSize int) ([]byte, error)
 	return cg.Shards[shardNum].GenerateNonce(nonceSize)
 }
 
-// GetShardNum ...
+// GetShardNum return the number of the shard in the shard arrays according to the number of the batch and the position of the shard in the batch
 func (cg *ChunkGroup) GetShardNum(batchNum int, iterationNum int) int {
 	var shardNum int
-	nbLoops := int(math.Ceil(float64(cg.NbDataShards) / float64(cg.NbDataShardsPerBatch)))
 	nbDataShardsInBatch := cg.NbDataShardsPerBatch
-	if batchNum == nbLoops-1 && cg.NbDataShards%cg.NbDataShardsPerBatch != 0 {
+	if batchNum == cg.GetNbBatchs()-1 && cg.NbDataShards%cg.NbDataShardsPerBatch != 0 {
 		nbDataShardsInBatch = cg.NbDataShards % cg.NbDataShardsPerBatch
 	}
 	if iterationNum < nbDataShardsInBatch {
@@ -365,7 +379,7 @@ func (cg *ChunkGroup) GetShardNum(batchNum int, iterationNum int) int {
 	return shardNum
 }
 
-// IsReconstructible ...
+// IsReconstructible return true if the file can be reconstructed even with the given buckets unavailable, false otherwise
 func (cg *ChunkGroup) IsReconstructible(missingBuckets []string) bool {
 	missingBucketsMap := map[string]int{}
 	for i := range missingBuckets {
@@ -374,10 +388,10 @@ func (cg *ChunkGroup) IsReconstructible(missingBuckets []string) bool {
 
 	batchNbDataShards := cg.NbDataShardsPerBatch
 	batchNbParityShards := cg.NbParityShardsPerBatch
-	nbLoops := int(math.Ceil(float64(cg.NbDataShards) / float64(batchNbDataShards)))
+	nbBatchs := cg.GetNbBatchs()
 
-	for i := 0; i < nbLoops; i++ {
-		if i == nbLoops-1 {
+	for i := 0; i < nbBatchs; i++ {
+		if i == nbBatchs-1 {
 			if cg.NbDataShards%batchNbDataShards != 0 {
 				batchNbDataShards = cg.NbDataShards % batchNbDataShards
 			}
@@ -550,6 +564,6 @@ func DecryptKeyInfo(encrypted []byte, keyFile string) (*KeyInfo, error) {
 
 //ToString return a string representation on a keyInfo ready to be displayed
 func (ki *KeyInfo) ToString() string {
-	str := fmt.Sprintf("KeyInfo : \n aesPassword       : %s\n nonce           :%x\n", ki.AesPassword, ki.Nonce)
+	str := fmt.Sprintf("KeyInfo : \n aesPassword     : %s\n nonce           :%x\n", ki.AesPassword, ki.Nonce)
 	return str
 }
