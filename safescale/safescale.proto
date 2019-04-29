@@ -56,6 +56,7 @@ message File {
     string name = 2;
     string date = 3;
     int64 size = 4;
+    repeated string buckets = 5;
 }
 
 message FileList {
