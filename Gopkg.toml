@@ -102,9 +102,9 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   branch = "master"
   source = "github.com/appscode/stow.git"
 
-# [[constraint]]
-#   name = "github.com/xrash/smetrics"
-#   branch = "master"
+[[constraint]]
+  name = "github.com/xrash/smetrics"
+  branch = "master"
 
 [[override]]
   version = "4.8.0"
@@ -116,7 +116,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[override]]
   revision = "ba5adb4cf0148a3dbdbd30586f075266256a77b1"
-  name = "github.com/ovh/go-ovh/ovh"
+  name = "github.com/ovh/go-ovh"
 
 [prune]
   go-tests = true
