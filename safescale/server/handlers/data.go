@@ -222,6 +222,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		}
 
 		//push encrypted shards to the storage object
+		var errChan chan error
 		var wg sync.WaitGroup
 		wg.Add(len(encryptedShards))
 		for j := range encryptedShards {
@@ -230,12 +231,18 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 				bucket := bucketMap[shardBucketName]
 				_, err := bucket.WriteObject(shardName, bytes.NewReader(encryptedShards[j]), int64(len(encryptedShards[j])), nil)
 				if err != nil {
+					errChan <- fmt.Errorf("Failed to copy a shard on the bucket '%s' : %s", bucket.GetName(), err.Error())
 					log.Errorf("Failed to copy a shard on the bucket '%s' : %s", bucket.GetName(), err.Error())
 				}
 				wg.Done()
 			}(j)
 		}
 		wg.Wait()
+		select {
+		case err := <-errChan:
+			return err
+		default:
+		}
 	}
 	//encrypt and push chunkGroup
 	encryptedChunkGroup, keyInfo, err := chunkGroup.Encrypt()
@@ -336,6 +343,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 		}
 
 		//load encrypted shards
+		var errChan chan error
 		var wg sync.WaitGroup
 		wg.Add(batchNbDataShards + batchNbParityShards)
 		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
@@ -347,6 +355,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 				if ok {
 					_, err = bucket.ReadObject(shardName, &encryptedShards[j], 0, 0)
 					if err != nil {
+						errChan <- fmt.Errorf("Failed to copy a shard from the bucket '%s' : %s", bucket.GetName(), err.Error())
 						log.Errorf("Failed to copy a shard from the bucket '%s' : %s", bucket.GetName(), err.Error())
 					}
 				}
@@ -354,6 +363,11 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 			}(j)
 		}
 		wg.Wait()
+		select {
+		case err := <-errChan:
+			return err
+		default:
+		}
 
 		//Check the encypted shards integrity with the check sum and remove corrupted ones
 		for j := 0; j < batchNbDataShards+batchNbParityShards; j++ {
@@ -445,6 +459,7 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 		}(i)
 	}
 	wg.Wait()
+
 	for _, bucketName := range chunkGroup.GetBucketNames() {
 		err = bucketMap[bucketName].DeleteObject(metadataFileName)
 		if err != nil {
