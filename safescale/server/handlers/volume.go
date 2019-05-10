@@ -624,7 +624,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 				}
 				err = nfsServer.UnmountBlockDevice(attachment.Device)
 				if err != nil {
-					logicErrf(err, "error unmounting block device")
+					_ = logicErrf(err, "error unmounting block device")
 					//return err
 				}
 

@@ -146,10 +146,12 @@ func (provider *provider) DeleteVolumeAttachment(serverID, id string) error {
 	return fmt.Errorf(errorStr)
 }
 
+// GetConfigurationOptions ...
 func GetConfigurationOptions() stacks.ConfigurationOptions {
 	return stacks.ConfigurationOptions{}
 }
 
+// GetAuthenticationOptions ...
 func GetAuthenticationOptions() stacks.AuthenticationOptions {
 	return stacks.AuthenticationOptions{}
 }

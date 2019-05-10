@@ -48,7 +48,7 @@ type Session struct {
 
 	safescaledHost string
 	safescaledPort int
-	connection  *grpc.ClientConn
+	connection     *grpc.ClientConn
 
 	tenantName string
 }
@@ -112,7 +112,7 @@ func (s *Session) Disconnect() {
 // DecorateError changes the error to something more comprehensible when
 // timeout occured
 func DecorateError(err error, action string, maySucceed bool) error {
-	if IsTimeout(err) {
+	if IsTimeoutError(err) {
 		msg := "%s took too long (> %v) to respond"
 		if maySucceed {
 			msg += " (may eventually succeed)"
@@ -132,11 +132,10 @@ func DecorateError(err error, action string, maySucceed bool) error {
 	return err
 }
 
-// IsTimeout tells if the err is a timeout kind
-func IsTimeout(err error) bool {
+// IsTimeoutError tells if the err is a timeout kind
+func IsTimeoutError(err error) bool {
 	return status.Code(err) == codes.DeadlineExceeded
 }
-
 
 // IsProvisioningError detects provisioning errors
 func IsProvisioningError(err error) bool {
@@ -146,5 +145,3 @@ func IsProvisioningError(err error) bool {
 	}
 	return false
 }
-
-
