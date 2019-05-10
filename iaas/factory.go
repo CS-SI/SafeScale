@@ -50,7 +50,7 @@ func GetTenantNames() (map[string]string, error) {
 	return allTenants, err
 }
 
-// GetTenant returns all known tenants
+// GetTenants returns all known tenants
 func GetTenants() ([]interface{}, error) {
 	tenants, err := getTenantsFromCfg()
 	if err != nil {
