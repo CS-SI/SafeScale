@@ -29,13 +29,16 @@ import (
 
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/stacks"
+	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils"
 )
 
 // userData is the structure to apply to userdata.sh template
 type userData struct {
+	// BashLibrary contains the basj library
+	BashLibrary string
 	// Header is the bash header for scripts
-	BashHeader string
+	Header string
 	// User is the name of the default user (api.DefaultUser)
 	User string
 	// PublicKey is the public key used to create the Host
@@ -44,7 +47,7 @@ type userData struct {
 	PrivateKey string
 	// ConfIF, if set to true, configure all interfaces to DHCP
 	ConfIF bool
-	// IsGateway, if set to true, activate IP frowarding
+	// IsGateway, if set to true, activate IP forwarding
 	IsGateway bool
 	// AddGateway, if set to true, configure default gateway
 	AddGateway bool
@@ -63,12 +66,15 @@ type userData struct {
 	HostName string
 }
 
-var userdataTemplate *template.Template
+var (
+	userdataPhase1Template *template.Template
+	userdataPhase2Template *template.Template
+)
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func Prepare(
 	options stacks.ConfigurationOptions, request resources.HostRequest, cidr string, defaultNetworkCIDR string,
-) ([]byte, error) {
+) ([]byte, []byte, error) {
 
 	// Generate password for user safescale
 	var (
@@ -77,11 +83,12 @@ func Prepare(
 		useLayer3Networking       = true
 		dnsList                   []string
 		operatorUsername          string
+		box                       *rice.Box
 	)
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate password: %s", err.Error())
+			return nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
 		}
 		request.Password = password
 	}
@@ -100,34 +107,49 @@ func Prepare(
 		dnsList = []string{"1.1.1.1"}
 	}
 
-	if userdataTemplate == nil {
-		b, err := rice.FindBox("../userdata/scripts")
+	if userdataPhase1Template == nil || userdataPhase2Template == nil {
+		box, err = rice.FindBox("../userdata/scripts")
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		tmplString, err := b.String("userdata.sh")
+	}
+	if userdataPhase1Template == nil {
+		tmplString, err := box.String("userdata.phase1.sh")
 		if err != nil {
-			return nil, fmt.Errorf("error loading script template: %s", err.Error())
+			return nil, nil, fmt.Errorf("error loading script template: %s", err.Error())
 		}
-		userdataTemplate, err = template.New("userdata").Parse(tmplString)
+		userdataPhase1Template, err = template.New("userdata.phase1").Parse(tmplString)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+			return nil, nil, fmt.Errorf("error parsing script template: %s", err.Error())
 		}
+	}
+	if userdataPhase2Template == nil {
+		tmplString, err := box.String("userdata.phase2.sh")
+		if err != nil {
+			return nil, nil, fmt.Errorf("error loading script template: %s", err.Error())
+		}
+		userdataPhase2Template, err = template.New("userdata.phase2").Parse(tmplString)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error parsing script template: %s", err.Error())
+		}
+	}
+
+	bashLibrary, err := system.GetBashLibrary()
+	if err != nil {
+		return nil, nil, err
 	}
 
 	scriptHeader := "set -u -o pipefail"
 	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
-		if strings.EqualFold("True", strings.TrimSpace(suffixCandidate)) {
-			scriptHeader = "set -Eeuxo pipefail"
-		}
-
-		if strings.EqualFold("1", strings.TrimSpace(suffixCandidate)) {
+		if strings.EqualFold("True", strings.TrimSpace(suffixCandidate)) ||
+			strings.EqualFold("1", strings.TrimSpace(suffixCandidate)) {
 			scriptHeader = "set -Eeuxo pipefail"
 		}
 	}
 
 	data := userData{
-		BashHeader:        scriptHeader,
+		BashLibrary:       bashLibrary,
+		Header:            scriptHeader,
 		User:              operatorUsername,
 		PublicKey:         strings.Trim(request.KeyPair.PublicKey, "\n"),
 		PrivateKey:        strings.Trim(request.KeyPair.PrivateKey, "\n"),
@@ -142,40 +164,20 @@ func Prepare(
 		//HostName:   request.Name,
 	}
 
-	dataBuffer := bytes.NewBufferString("")
-	err = userdataTemplate.Execute(dataBuffer, data)
+	bufPhase1 := bytes.NewBufferString("")
+	err = userdataPhase1Template.Execute(bufPhase1, data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return dataBuffer.Bytes(), nil
+	bufPhase2 := bytes.NewBufferString("")
+	err = userdataPhase2Template.Execute(bufPhase2, data)
+	if err != nil {
+		return nil, nil, err
+	}
+	return bufPhase1.Bytes(), bufPhase2.Bytes(), nil
 }
 
-//Append add some usefull code on the end of userdata.sh just before the reboot (on the label #insert_tag)
+// Append add some useful code on the end of userdata.sh just before the reboot (on the label #insert_tag)
 func Append(userdata []byte, addedPart string) []byte {
 	return bytes.Replace(userdata, []byte("#insert_tag"), []byte(addedPart+"\n\n#insert_tag"), 1)
-}
-
-func initUserdataTemplate() error {
-	if userdataTemplate != nil {
-		// Already loaded
-		return nil
-	}
-
-	var (
-		err         error
-		box         *rice.Box
-		userdataStr string
-	)
-
-	box, err = rice.FindBox("../userdata/scripts")
-	if err == nil {
-		userdataStr, err = box.String("userdata.sh")
-		if err == nil {
-			userdataTemplate, err = template.New("user_data").Parse(userdataStr)
-			if err == nil {
-				return nil
-			}
-		}
-	}
-	return err
 }

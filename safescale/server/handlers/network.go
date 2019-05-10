@@ -35,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/safescale/server/install"
 	"github.com/CS-SI/SafeScale/safescale/server/metadata"
 	safescaleutils "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/utils"
@@ -184,7 +185,7 @@ func (handler *NetworkHandler) Create(
 	}
 
 	log.Infof("Requesting the creation of a gateway '%s' using template '%s' with image '%s'", gwname, template.Name, img.Name)
-	gw, err := handler.service.CreateGateway(gwRequest)
+	gw, userDataPhase2, err := handler.service.CreateGateway(gwRequest)
 	if err != nil {
 		//defer handler.service.DeleteNetwork(network.ID)
 		return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", gwname)
@@ -260,10 +261,10 @@ func (handler *NetworkHandler) Create(
 	}
 
 	// TODO Test for failure with 15s !!!
-	err = ssh.WaitServerReady(time.Duration(sshDefaultTimeout) * time.Minute)
-	// err = ssh.WaitServerReady(time.Second * 3)
+	_, err = ssh.WaitServerReady("phase1", time.Duration(sshDefaultTimeout)*time.Minute)
+	// err = ssh.WaitServerReady("phase1", time.Second * 3)
 	if err != nil {
-		if client.IsTimeout(err) {
+		if client.IsTimeoutError(err) {
 			return nil, infraErrf(err, "Timeout creating a gateway")
 		}
 
@@ -275,6 +276,20 @@ func (handler *NetworkHandler) Create(
 		return nil, infraErr(err)
 	}
 	log.Infof("SSH service of gateway '%s' started.", gw.Name)
+
+	// Executes userdata phase2 script to finalize host installation
+	err = install.UploadStringToRemoteFile(string(userDataPhase2), safescaleutils.ToPBHost(gw), "/opt/safescale/var/tmp/user_data.phase2.sh", "", "", "")
+	if err != nil {
+		return nil, err
+	}
+	command := fmt.Sprintf("sudo bash %s; exit $?", "/opt/safescale/var/tmp/user_data.phase2.sh")
+	retcode, _, stderr, err := sshHandler.Run(ctx, gw.Name, command)
+	if err != nil {
+		return nil, err
+	}
+	if retcode != 0 {
+		return nil, fmt.Errorf("failed to finalize host installation: %s", stderr)
+	}
 
 	select {
 	case <-ctx.Done():
@@ -332,7 +347,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); !ok {
-			infraErrf(err, "failed to load metadata of network '%s', trying to delete network anyway", ref)
+			_ = infraErrf(err, "failed to load metadata of network '%s', trying to delete network anyway", ref)
 			err = handler.service.DeleteNetwork(ref)
 
 		}
@@ -380,7 +395,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	if gwID != "" {
 		mh, err := metadata.LoadHost(handler.service, gwID)
 		if err != nil {
-			infraErr(err)
+			_ = infraErr(err)
 		} else {
 			metadataHost = mh.Get()
 
@@ -402,10 +417,9 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); !ok {
 			// Delete metadata,
-			infraErrf(err, "can't delete network")
+			_ = infraErrf(err, "can't delete network")
 			err = mn.Delete()
-			infraErrf(err, "can't delete network metadata")
-
+			_ = infraErrf(err, "can't delete network metadata")
 		}
 		// If network doesn't exist anymore on the provider infrastructure, don't fail
 		// to cleanup the metadata

@@ -57,12 +57,12 @@ type Stack interface {
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
 	// CreateGateway creates a public Gateway for a private network
-	CreateGateway(req resources.GatewayRequest) (*resources.Host, error)
+	CreateGateway(req resources.GatewayRequest) (*resources.Host, []byte, error)
 	// DeleteGateway delete the public gateway of a private network
 	DeleteGateway(networkID string) error
 
 	// CreateHost creates an host that fulfils the request
-	CreateHost(request resources.HostRequest) (*resources.Host, error)
+	CreateHost(request resources.HostRequest) (*resources.Host, []byte, error)
 	// GetHost returns the host identified by id or updates content of a *resources.Host
 	InspectHost(interface{}) (*resources.Host, error)
 	// GetHostByName returns the host identified by name

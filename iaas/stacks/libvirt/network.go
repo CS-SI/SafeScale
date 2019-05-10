@@ -285,7 +285,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, error) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, []byte, error) {
 	log.Debug("local.Client.CreateGateway() called")
 	defer log.Debug("local.Client.CreateGateway() done")
 
@@ -297,12 +297,12 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, er
 
 	networkLibvirt, err := getNetworkFromRef(network.ID, s.LibvirtService)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if gwName == "" {
 		name, err := networkLibvirt.GetName()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get network name : %s", err.Error())
+			return nil, nil, fmt.Errorf("Failed to get network name : %s", err.Error())
 		}
 		gwName = "gw-" + name
 	}
@@ -316,12 +316,12 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, er
 		PublicIP:     true,
 	}
 
-	host, err := s.CreateHost(hostReq)
+	host, userDataPhase2, err := s.CreateHost(hostReq)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create gateway host : %s", err.Error())
+		return nil, nil, fmt.Errorf("Failed to create gateway host : %s", err.Error())
 	}
 
-	return host, nil
+	return host, userDataPhase2, nil
 }
 
 // DeleteGateway delete the public gateway referenced by ref (id or name)

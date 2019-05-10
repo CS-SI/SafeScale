@@ -659,7 +659,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, error) {
+func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []byte, error) {
 	log.Debugf(">>> stacks.openstack::CreateHost(%s)", request.ResourceName)
 	defer log.Debugf("<<< stacks.openstack::CreateHost(%s)", request.ResourceName)
 
@@ -671,7 +671,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if request.DefaultGateway == nil && !request.PublicIP {
-		return nil, resources.ResourceInvalidRequestError("host creation", "can't create a host without public IP or without attached network")
+		return nil, nil, resources.ResourceInvalidRequestError("host creation", "can't create a host without public IP or without attached network")
 	}
 
 	// The Default Network is the first of the provided list, by convention
@@ -689,7 +689,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 			return nil
 		})
 		if err != nil {
-			return nil, errors.Wrap(err, "")
+			return nil, nil, errors.Wrap(err, "")
 		}
 	}
 
@@ -714,7 +714,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
 			log.Debugf(utils.Capitalize(msg))
-			return nil, fmt.Errorf(msg)
+			return nil, nil, fmt.Errorf(msg)
 		}
 
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
@@ -722,13 +722,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
 			log.Debugf(utils.Capitalize(msg))
-			return nil, fmt.Errorf(msg)
+			return nil, nil, fmt.Errorf(msg)
 		}
 	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate password: %s", err.Error())
+			return nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
 		}
 		request.Password = password
 	}
@@ -736,23 +736,23 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	userData, err := userdata.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
+	userDataPhase1, userDataPhase2, err := userdata.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		log.Debugf(utils.Capitalize(msg))
-		return nil, fmt.Errorf(msg)
+		return nil, nil, fmt.Errorf(msg)
 	}
 
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image: %s", ProviderErrorToString(err))
+		return nil, nil, fmt.Errorf("failed to get image: %s", ProviderErrorToString(err))
 	}
 
 	// Select useable availability zone, the first one in the list
 	azList, err := s.ListAvailabilityZones(false)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var az string
 	for az = range azList {
@@ -767,7 +767,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		Networks:         nets,
 		FlavorRef:        request.TemplateID,
 		ImageRef:         request.ImageID,
-		UserData:         userData,
+		UserData:         userDataPhase1,
 		AvailabilityZone: az,
 	}
 
@@ -786,7 +786,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Adds Host property SizingV1
@@ -798,7 +798,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// --- query provider for host creation ---
@@ -837,7 +837,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	)
 	if err != nil {
 		log.Debugf("Error creating host: timeout: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
+		return nil, nil, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
 	log.Debugf("host resource created.")
 
@@ -860,7 +860,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		}).Extract()
 		if err != nil {
 			log.Debugf("Error creating host: floating ip: %+v", err)
-			return nil, errors.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
+			return nil, nil, errors.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
@@ -881,7 +881,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		if err != nil {
 			msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
 			log.Debugf(msg)
-			return nil, errors.Wrap(err, msg)
+			return nil, nil, errors.Wrap(err, msg)
 		}
 
 		err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
@@ -894,12 +894,12 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 			return nil
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	log.Infoln(msgSuccess)
-	return host, nil
+	return host, userDataPhase2, nil
 }
 
 // WaitHostReady waits an host achieve ready state

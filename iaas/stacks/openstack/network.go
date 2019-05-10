@@ -313,7 +313,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, error) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, []byte, error) {
 	log.Debugf(">>> stacks.openstack::CreateGateway(%s)", req.Name)
 	defer log.Debugf("<<< stacks.openstack::CreateGateway(%s)", req.Name)
 
@@ -332,7 +332,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, er
 
 	password, err := utils.GeneratePassword(16)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate password: %s", err.Error())
+		return nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
 	}
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,
@@ -343,10 +343,10 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, er
 		PublicIP:     true,
 		Password:     password,
 	}
-	host, err := s.CreateHost(hostReq)
+	host, userDataPhase2, err := s.CreateHost(hostReq)
 	if err != nil {
 		log.Errorf("Error creating gateway: creating host: %+v", err)
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
+		return nil, nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
 	}
 
 	// delete the host when found problem starting from here
@@ -366,9 +366,9 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, er
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
+		return nil, nil, errors.Wrap(err, fmt.Sprintf("Error creating gateway : %s", ProviderErrorToString(err)))
 	}
-	return host, nil
+	return host, userDataPhase2, nil
 }
 
 // DeleteGateway delete the public gateway of a private network

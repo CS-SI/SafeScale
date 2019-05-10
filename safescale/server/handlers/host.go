@@ -34,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/safescale/client"
+	"github.com/CS-SI/SafeScale/safescale/server/install"
 	"github.com/CS-SI/SafeScale/safescale/server/metadata"
 	safescaleutils "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/system"
@@ -306,7 +307,8 @@ func (handler *HostHandler) Create(
 		DefaultGateway: gw,
 	}
 
-	host, err = handler.service.CreateHost(hostRequest)
+	var userDataPhase2 []byte
+	host, userDataPhase2, err = handler.service.CreateHost(hostRequest)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceInvalidRequest); ok {
 			return nil, infraErr(err)
@@ -441,20 +443,19 @@ func (handler *HostHandler) Create(
 	}
 
 	// FIXME configurable timeout here
-	err = sshCfg.WaitServerReady(time.Duration(sshDefaultTimeout) * time.Minute)
+	_, err = sshCfg.WaitServerReady("phase1", time.Duration(sshDefaultTimeout)*time.Minute)
 	if err != nil {
-		if client.IsTimeout(err) {
+		if client.IsTimeoutError(err) {
 			return nil, infraErrf(err, "Timeout creating a host")
 		}
 
 		if client.IsProvisioningError(err) {
 			log.Errorf("%+v", err)
-			return nil, fmt.Errorf("Error creating the host [%s], error provisioning the new host, please check daemon logs", host.Name)
+			return nil, fmt.Errorf("Error creating the host [%s], error provisioning the new host, please check safescaled logs", host.Name)
 		}
 
 		return nil, infraErr(err)
 	}
-
 	log.Infof("SSH service started on host '%s'.", host.Name)
 
 	// Updates host link with networks
@@ -476,6 +477,21 @@ func (handler *HostHandler) Create(
 	}
 	// Don't want to remove host if network metadata fails...
 	err = nil
+
+	// Executes userdata phase2 script to finalize host installation
+	err = install.UploadStringToRemoteFile(string(userDataPhase2), safescaleutils.ToPBHost(host), "/opt/safescale/var/tmp/user_data.phase2.sh", "", "", "")
+	if err != nil {
+		return nil, err
+	}
+	command := fmt.Sprintf("sudo bash %s; exit $?", "/opt/safescale/var/tmp/user_data.phase2.sh")
+	// Executes the script on the remote host
+	retcode, _, stderr, err := sshHandler.Run(ctx, host.Name, command)
+	if err != nil {
+		return nil, err
+	}
+	if retcode != 0 {
+		return nil, fmt.Errorf("failed to finalize host installation: %s", stderr)
+	}
 
 	select {
 	case <-ctx.Done():

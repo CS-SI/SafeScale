@@ -624,20 +624,32 @@ func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, err
 
 // WaitServerReady waits until the SSH server is ready
 // the 'timeout' parameter is in minutes
-func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
+func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (string, error) {
+	if phase == "" {
+		panic("phase can't be empty string")
+	}
 	if ssh.Host == "" {
 		panic("SSHConfig.Host is empty!")
 	}
 	log.Debugf("Waiting for remote SSH, timeout of %d minutes", int(timeout.Minutes()))
+
+	if phase == "ready" {
+		phase = "phase2"
+	}
+
+	var (
+		retcode        int
+		stdout, stderr string
+	)
 	err := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			cmd, err := ssh.Command("sudo cat /var/tmp/user_data.done")
+			cmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
 			if err != nil {
 				return err
 			}
 
 			// retcode, stdout, stderr, err := cmd.Run() // FIXME It CAN lock
-			retcode, stdout, stderr, err := cmd.RunWithTimeout(timeout)
+			retcode, stdout, stderr, err = cmd.RunWithTimeout(timeout)
 			if err != nil {
 				return err
 			}
@@ -654,28 +666,29 @@ func (ssh *SSHConfig) WaitServerReady(timeout time.Duration) error {
 		},
 		timeout,
 	)
-	if err != nil {
-		originalErr := err
-		logCmd, err := ssh.Command("sudo cat /var/tmp/user_data.log")
-		if err != nil {
-			return err
-		}
-
-		// retcode, stdout, stderr, logErr := logCmd.Run() // FIXME It CAN lock
-		retcode, stdout, stderr, logErr := logCmd.RunWithTimeout(timeout)
-		if logErr == nil {
-			if retcode == 0 {
-				return fmt.Errorf("server '%s' is not ready yet: %s - log content of file user_data.log: %s", ssh.Host, originalErr.Error(), stdout)
-			}
-			if len(stdout) > 0 {
-				log.Error(fmt.Errorf("captured output: %s", stdout))
-			}
-			return fmt.Errorf("server '%s' is not ready yet: %s - error reading user_data.log: %s", ssh.Host, originalErr.Error(), stderr)
-		}
-
-		return fmt.Errorf("server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
+	if err == nil {
+		return stdout, nil
 	}
-	return nil
+
+	originalErr := err
+	logCmd, err := ssh.Command(fmt.Sprintf("sudo cat /opt/safescale/var/log/user_data.%s.log", phase))
+	if err != nil {
+		return "", err
+	}
+
+	// retcode, stdout, stderr, logErr := logCmd.Run() // FIXME It CAN lock
+	retcode, stdout, stderr, logErr := logCmd.RunWithTimeout(timeout)
+	if logErr == nil {
+		if retcode == 0 {
+			return "", fmt.Errorf("server '%s' is not ready yet: %s - log content of file user_data.%s.log: %s", ssh.Host, originalErr.Error(), phase, stdout)
+		}
+		if len(stdout) > 0 {
+			log.Error(fmt.Errorf("captured output: %s", stdout))
+		}
+		return "", fmt.Errorf("server '%s' is not ready yet: %s - error reading user_data.%s.log: %s", ssh.Host, originalErr.Error(), phase, stderr)
+	}
+
+	return "", fmt.Errorf("server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
 }
 
 // Copy copy a file/directory from/to local to/from remote

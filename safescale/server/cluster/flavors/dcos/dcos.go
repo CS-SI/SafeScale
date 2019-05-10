@@ -339,7 +339,7 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 		return ClusterState.Error, err
 
 	}
-	err = sshCfg.WaitServerReady(2 * time.Minute) // FIXME Hardcoded timeout
+	_, err = sshCfg.WaitServerReady("ready", 2*time.Minute) // FIXME Hardcoded timeout
 	if err == nil {
 		if err != nil {
 			return ClusterState.Error, err
