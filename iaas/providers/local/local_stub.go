@@ -98,15 +98,15 @@ func (provider *provider) ListNetworks() ([]*resources.Network, error) {
 func (provider *provider) DeleteNetwork(id string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) CreateGateway(req resources.GatewayRequest) (*resources.Host, error) {
-	return nil, fmt.Errorf(errorStr)
+func (provider *provider) CreateGateway(req resources.GatewayRequest) (*resources.Host, []byte, error) {
+	return nil, nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteGateway(string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateHost(request resources.HostRequest) (*resources.Host, error) {
-	return nil, fmt.Errorf(errorStr)
+func (provider *provider) CreateHost(request resources.HostRequest) (*resources.Host, []byte, error) {
+	return nil, nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
 	return nil, fmt.Errorf(errorStr)

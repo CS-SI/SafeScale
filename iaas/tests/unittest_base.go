@@ -200,7 +200,7 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 	var gateway *resources.Host
 
 	if withGW {
-		gateway, err = tester.Service.CreateGateway(gwRequest)
+		gateway, _, err = tester.Service.CreateGateway(gwRequest)
 		require.Nil(t, err)
 		network.GatewayID = gateway.ID
 	}
@@ -209,7 +209,7 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 }
 
 // CreateHost creates a test host
-func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *resources.Network, public bool) (*resources.Host, error) {
+func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *resources.Network, public bool) (*resources.Host, []byte, error) {
 	tpls, err := tester.Service.SelectTemplatesBySize(resources.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
@@ -245,7 +245,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, network *resources.Network) 
 		TemplateID: tpls[0].ID,
 		Network:    network,
 	}
-	gw, err := tester.Service.CreateGateway(gwRequest)
+	gw, _, err := tester.Service.CreateGateway(gwRequest)
 	if err != nil {
 		return err
 	}
@@ -365,12 +365,12 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	network, gw := tester.CreateNetwork(t, "unit_test_network_3", false, "1.1.4.0/24")
 	defer tester.Service.DeleteNetwork(network.ID)
 	assert.Nil(t, gw)
-	host1, err := tester.CreateHost(t, "host1", network, true)
+	host1, _, err := tester.CreateHost(t, "host1", network, true)
 	assert.NoError(t, err)
 	defer tester.Service.DeleteHost(host1.ID)
 
 	// ssh, err := tester.Service.GetSSHConfig(host.ID)
-	// err = ssh.WaitServerReady(1 * time.Minute)
+	// _, err = ssh.WaitServerReady("phase1", 1 * time.Minute)
 	// assert.NoError(t, err)
 	// cmd, err := ssh.Command("whoami")
 	// assert.Nil(t, err)
@@ -391,12 +391,12 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	// _, _, _, err = cmd.Run()
 	// assert.Nil(t, err)
 
-	_, err = tester.CreateHost(t, "host2", network, false)
+	_, _, err = tester.CreateHost(t, "host2", network, false)
 	assert.Error(t, err)
 	err = tester.CreateGW(t, network)
 	assert.NoError(t, err)
 	defer tester.Service.DeleteGateway(network.GatewayID)
-	host2, err := tester.CreateHost(t, "host2", network, false)
+	host2, _, err := tester.CreateHost(t, "host2", network, false)
 	assert.NoError(t, err)
 	defer tester.Service.DeleteHost(host2.ID)
 

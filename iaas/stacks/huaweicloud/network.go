@@ -614,7 +614,7 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, error) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, []byte, error) {
 	if req.Network == nil {
 		panic("req.Network is nil!")
 	}
@@ -634,16 +634,16 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, er
 		Networks:     []*resources.Network{req.Network},
 		PublicIP:     true,
 	}
-	host, err := s.CreateHost(hostReq)
+	host, userDataPhase2, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceInvalidRequest:
-			return nil, err
+			return nil, nil, err
 		default:
-			return nil, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
+			return nil, nil, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
 		}
 	}
-	return host, err
+	return host, userDataPhase2, err
 }
 
 // DeleteGateway deletes the gateway associated with network identified by ID

@@ -363,7 +363,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 			log.Printf("Checking template %s\n", template.Name)
 
 			hostName := "scanhost-" + template.Name
-			host, err := serviceProvider.CreateHost(resources.HostRequest{
+			host, _, err := serviceProvider.CreateHost(resources.HostRequest{
 				ResourceName: hostName,
 				PublicIP:     true,
 				ImageID:      img.ID,
@@ -408,7 +408,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 				log.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
 				return err
 			}
-			nerr := ssh.WaitServerReady(time.Duration(6+concurrency-1) * time.Minute)
+			_, nerr := ssh.WaitServerReady("ready", time.Duration(6+concurrency-1)*time.Minute)
 			if nerr != nil {
 				log.Warnf("template [%s] : Error waiting for server ready: %v", template.Name, nerr)
 				return nerr

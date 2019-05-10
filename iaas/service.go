@@ -370,31 +370,31 @@ func (svc *Service) SearchImage(osname string) (*resources.Image, error) {
 }
 
 // CreateHostWithKeyPair creates an host
-func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resources.Host, *resources.KeyPair, error) {
+func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resources.Host, []byte, *resources.KeyPair, error) {
 	if svc == nil {
 		panic("Calling svc.CreateHostWithKeyPair svc==nil!")
 	}
 
 	_, err := svc.GetHostByName(request.ResourceName)
 	if err == nil {
-		return nil, nil, resources.ResourceDuplicateError("Host", request.ResourceName)
+		return nil, nil, nil, resources.ResourceDuplicateError("Host", request.ResourceName)
 	}
 
 	// Create temporary key pair
 	kpNameuuid, err := uuid.NewV4()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	kpName := kpNameuuid.String()
 	kp, err := svc.CreateKeyPair(kpName)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	password, err := utils.GeneratePassword(16)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
+		return nil, nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
 	}
 
 	// Create host
@@ -409,11 +409,11 @@ func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 		TemplateID:     request.TemplateID,
 		Password:       password,
 	}
-	host, err := svc.CreateHost(hostReq)
+	host, userDataPhase2, err := svc.CreateHost(hostReq)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return host, kp, nil
+	return host, userDataPhase2, kp, nil
 }
 
 // ListHostsByName list hosts by name

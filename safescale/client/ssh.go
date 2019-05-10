@@ -368,5 +368,6 @@ func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {
 		return err
 	}
 
-	return sshCfg.WaitServerReady(timeout)
+	_, err = sshCfg.WaitServerReady("ready", timeout)
+	return err
 }

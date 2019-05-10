@@ -741,7 +741,7 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, error) {
+func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []byte, error) {
 	resourceName := request.ResourceName
 	hostName := request.HostName
 	networks := request.Networks
@@ -753,26 +753,26 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 
 	//----Check Inputs----
 	if resourceName == "" {
-		return nil, fmt.Errorf("The ResourceName is mandatory ")
+		return nil, nil, fmt.Errorf("The ResourceName is mandatory ")
 	}
 	if hostName == "" {
 		hostName = resourceName
 	}
 	if networks == nil || len(networks) == 0 {
-		return nil, fmt.Errorf("The host %s must be on at least one network (even if public)", resourceName)
+		return nil, nil, fmt.Errorf("The host %s must be on at least one network (even if public)", resourceName)
 	}
 	if defaultGateway == nil && !publicIP {
-		return nil, fmt.Errorf("The host %s must have a gateway or be public", resourceName)
+		return nil, nil, fmt.Errorf("The host %s must have a gateway or be public", resourceName)
 	}
 	if templateID == "" {
-		return nil, fmt.Errorf("The TemplateID is mandatory")
+		return nil, nil, fmt.Errorf("The TemplateID is mandatory")
 	}
 	if imageID == "" {
-		return nil, fmt.Errorf("The ImageID is mandatory")
+		return nil, nil, fmt.Errorf("The ImageID is mandatory")
 	}
 	host, _, err := s.getHostAndDomainFromRef(resourceName)
 	if err == nil && host != nil {
-		return nil, fmt.Errorf("The Host %s already exists", resourceName)
+		return nil, nil, fmt.Errorf("The Host %s already exists", resourceName)
 	}
 
 	//----Initialize----
@@ -780,34 +780,34 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		var err error
 		keyPair, err = s.CreateKeyPair(fmt.Sprintf("key_%s", resourceName))
 		if err != nil {
-			return nil, fmt.Errorf("KeyPair creation failed : %s", err.Error())
+			return nil, nil, fmt.Errorf("KeyPair creation failed : %s", err.Error())
 		}
 		request.KeyPair = keyPair
 	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate password: %s", err.Error())
+			return nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
 		}
 		request.Password = password
 	}
 
 	template, err := s.GetTemplate(templateID)
 	if err != nil {
-		return nil, fmt.Errorf("GetTemplate failed : %s", err.Error())
+		return nil, nil, fmt.Errorf("GetTemplate failed : %s", err.Error())
 	}
 	imagePath, err := getImagePathFromID(s, imageID)
 	if err != nil {
-		return nil, fmt.Errorf("GetImagePathFromID failled %s: ", err.Error())
+		return nil, nil, fmt.Errorf("GetImagePathFromID failled %s: ", err.Error())
 	}
 	imageDisk, err := getDiskFromID(s, imageID)
 	if err != nil {
-		return nil, fmt.Errorf("GetDiskFromID failled %s: ", err.Error())
+		return nil, nil, fmt.Errorf("GetDiskFromID failled %s: ", err.Error())
 	}
 
-	userData, err := userdata.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
+	userDataPhase1, userdataPhase2, err := userdata.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
 	if err != nil {
-		return nil, fmt.Errorf("failed to prepare user data content: %+v", err)
+		return nil, nil, fmt.Errorf("failed to prepare user data content: %+v", err)
 	}
 
 	//----Commands----
@@ -833,10 +833,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 						},
 					)
 					if err != nil {
-						return nil, fmt.Errorf("failure To create network default : %s ", err.Error())
+						return nil, nil, fmt.Errorf("failure To create network default : %s ", err.Error())
 					}
 				default:
-					return nil, fmt.Errorf("failure To get network default : %s ", err.Error())
+					return nil, nil, fmt.Errorf("failure To get network default : %s ", err.Error())
 				}
 			}
 
@@ -847,17 +847,17 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		cmd.Stdout = cmdOutput
 		err = cmd.Run()
 		if err != nil {
-			return nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+			return nil, nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
 		}
 		ip := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 
 		if bridgedVMs {
 			infoWaiter, err := GetInfoWaiter()
 			if err != nil {
-				return nil, fmt.Errorf("failed to get info waiter : %s", err.Error())
+				return nil, nil, fmt.Errorf("failed to get info waiter : %s", err.Error())
 			}
 
-			userData = userdata.Append(userData, fmt.Sprintf(`
+			userDataPhase1 = userdata.Append(userDataPhase1, fmt.Sprintf(`
  LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
  echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 
@@ -867,7 +867,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 			cmd.Stdout = cmdOutput
 			err = cmd.Run()
 			if err != nil {
-				return nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+				return nil, nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
 			}
 			lanIf := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 			networksCommandString += fmt.Sprintf(" --network type=direct,source=%s,source_mode=bridge", lanIf)
@@ -881,13 +881,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 	userdataFileName := s.LibvirtConfig.LibvirtStorage + "/" + resourceName + "_userdata.sh"
 	err = ioutil.WriteFile(userdataFileName, userData, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to write userData in %s_userdata.sh file : %s", resourceName, err.Error())
+		return nil, nil, fmt.Errorf("Failed to write userData in %s_userdata.sh file : %s", resourceName, err.Error())
 	}
 
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
 	err = verifyVirtResizeCanAccessKernel()
 	if err != nil {
-		return nil, fmt.Errorf("Libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
+		return nil, nil, fmt.Errorf("Libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
 	}
 
 	var commands []string
@@ -916,7 +916,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		err = cmd.Run()
 		if err != nil {
 			logrus.Errorf("Commands failed: [%s] with error [%s], stdOutput [%s] and stdError [%s]", command, err.Error(), cmdOutput.String(), cmdError.String())
-			return nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
+			return nil, nil, fmt.Errorf("Commands failed : \n%s\n%s", command, err.Error())
 		}
 	}
 
@@ -932,12 +932,12 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 
 	domain, err := s.LibvirtService.LookupDomainByName(resourceName)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Can't find domain %s : %s", resourceName, err.Error()))
+		return nil, nil, fmt.Errorf(fmt.Sprintf("Can't find domain %s : %s", resourceName, err.Error()))
 	}
 
 	host, err = s.getHostFromDomain(domain)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("Failed to get host %s from domain : %s", resourceName, err.Error()))
+		return nil, nil, fmt.Errorf(fmt.Sprintf("Failed to get host %s from domain : %s", resourceName, err.Error()))
 	}
 
 	host.PrivateKey = keyPair.PrivateKey
@@ -970,7 +970,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to update HostProperty.NetworkV1 : %s", err.Error())
+		return nil, nil, fmt.Errorf("Failed to update HostProperty.NetworkV1 : %s", err.Error())
 	}
 
 	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
@@ -986,10 +986,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, erro
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to update HostProperty.SizingV1 : %s", err.Error())
+		return nil, nil, fmt.Errorf("Failed to update HostProperty.SizingV1 : %s", err.Error())
 	}
 
-	return host, nil
+	return nil, host, nil
 }
 
 // GetHost returns the host identified by ref (name or id) or by a *resources.Host containing an id

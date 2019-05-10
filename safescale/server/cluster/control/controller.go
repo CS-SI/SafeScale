@@ -350,7 +350,7 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (string, error) 
 			log.Errorf("failed to get ssh config for master '%s': %s", masterID, err.Error())
 			continue
 		}
-		err = sshCfg.WaitServerReady(2 * time.Minute) // FIXME Hardcoded timeout
+		_, err = sshCfg.WaitServerReady("ready", 2*time.Minute) // FIXME Hardcoded timeout
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
@@ -382,7 +382,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task, public bool) (stri
 			log.Errorf("failed to get ssh config of node '%s': %s", hostID, err.Error())
 			continue
 		}
-		err = sshCfg.WaitServerReady(2 * time.Minute) // FIXME Hardcoded timeout
+		_, err = sshCfg.WaitServerReady("ready", 2*time.Minute) // FIXME Hardcoded timeout
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue

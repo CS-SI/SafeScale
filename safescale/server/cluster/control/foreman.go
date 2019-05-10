@@ -980,7 +980,7 @@ func (b *foreman) taskInstallGateway(tr concurrency.TaskRunner, params interface
 		// done <- err
 		return
 	}
-	err = sshCfg.WaitServerReady(5 * time.Minute) // FIXME Hardcoded timeout
+	_, err = sshCfg.WaitServerReady("ready", 5*time.Minute) // FIXME Hardcoded timeout
 	if err != nil {
 		// done <- err
 		return

@@ -127,7 +127,7 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 	if err != nil {
 		return logicErrf(err, "Failed to read SSH config")
 	}
-	waitErr := ssh.WaitServerReady(timeout)
+	_, waitErr := ssh.WaitServerReady("ready", timeout)
 	return infraErr(waitErr)
 }
 
@@ -152,10 +152,10 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (int, 
 	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			// retCode, stdOut, stdErr, err = handler.run(ssh, cmd) // FIXME It CAN lock
-			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, 2*time.Minute) // FIXME Hardcoded timeout
+			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, 5*time.Minute) // FIXME Hardcoded timeout
 			return err
 		},
-		2*time.Minute, // FIXME Hardcoded timeout
+		5*time.Minute, // FIXME Hardcoded timeout
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
 				log.Debugf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
