@@ -75,9 +75,9 @@ ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 REPORTER := github.com/360EntSecGroup-Skylar/goreporter
 COVERTOOL := github.com/dlespiau/covertool
+GOVENDOR := github.com/kardianos/govendor
 
-DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY)
-
+DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(GOVENDOR)
 
 # Life is better with colors
 COM_COLOR   = \033[0;34m
@@ -127,7 +127,7 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover covertool convey errcheck goreporter > /dev/null; if [ $$? -ne 0 ]; then \
+	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover covertool convey errcheck goreporter govendor > /dev/null; if [ $$? -ne 0 ]; then \
     	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(DEP); \
     fi
 
