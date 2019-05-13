@@ -28,24 +28,24 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, erro
 		return nil, err
 	}
 
-	APIApplicationKey := authOpts.GetString("ApiApplicationKey")
-	if APIApplicationKey == "" {
-		return nil, fmt.Errorf("APIApplicationKey is left unset while mandatory to acces OVH-API")
+	alternateAPIApplicationKey := authOpts.GetString("AlternateApiConsumerKey")
+	if alternateAPIApplicationKey == "" {
+		return nil, fmt.Errorf("AlternateAPIApplicationKey is left unset while mandatory to access OVH-API")
 	}
-	APIApplicationSecret := authOpts.GetString("ApiApplicationSecret")
-	if APIApplicationSecret == "" {
-		return nil, fmt.Errorf("APIApplicationSecret is left unset while mandatory to acces OVH-API")
+	alternateAPIApplicationSecret := authOpts.GetString("AlternateApiApplicationSecret")
+	if alternateAPIApplicationSecret == "" {
+		return nil, fmt.Errorf("AlternateAPIApplicationSecret is left unset while mandatory to access OVH-API")
 	}
-	APIConsumerKey := authOpts.GetString("ApiConsumerKey")
-	if APIConsumerKey == "" {
-		return nil, fmt.Errorf("APIConsumerKey is left unset while mandatory to acces OVH-API")
+	alternateAPIConsumerKey := authOpts.GetString("AlternateApiConsumerKey")
+	if alternateAPIConsumerKey == "" {
+		return nil, fmt.Errorf("AlternateAPIConsumerKey is left unset while mandatory to access OVH-API")
 	}
 
 	client, err := ovh.NewClient(
 		"ovh-eu",
-		APIApplicationKey,
-		APIApplicationSecret,
-		APIConsumerKey,
+		alternateAPIApplicationKey,
+		alternateAPIApplicationSecret,
+		alternateAPIConsumerKey,
 	)
 	if err != nil {
 		return nil, err
