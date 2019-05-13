@@ -64,9 +64,9 @@ var (
 
 //OVH api credentials
 var (
-	apiApplicationKey    string
-	apiApplicationSecret string
-	apiConsumerKey       string
+	alternateAPIApplicationKey    string
+	alternateAPIApplicationSecret string
+	alternateAPIConsumerKey       string
 )
 
 // provider is the providerementation of the OVH provider
@@ -92,13 +92,13 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, err
 	region, _ := computeParams["Region"].(string)
 	projectName, _ := computeParams["ProjectName"].(string)
 
-	val1, ok1 := identityParams["ApiApplicationKey"]
-	val2, ok2 := identityParams["ApiApplicationSecret"]
-	val3, ok3 := identityParams["ApiConsumerKey"]
+	val1, ok1 := identityParams["AlternateApiConsumerKey"]
+	val2, ok2 := identityParams["AlternateApiApplicationSecret"]
+	val3, ok3 := identityParams["AlternateApiConsumerKey"]
 	if ok1 && ok2 && ok3 {
-		apiApplicationKey = val1.(string)
-		apiApplicationSecret = val2.(string)
-		apiConsumerKey = val3.(string)
+		alternateAPIApplicationKey = val1.(string)
+		alternateAPIApplicationSecret = val2.(string)
+		alternateAPIConsumerKey = val3.(string)
 	}
 
 	operatorUsername := resources.DefaultUser
@@ -161,9 +161,9 @@ func (p *provider) GetAuthOpts() (providers.Config, error) {
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthUrl", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
-	cfg.Set("ApiApplicationKey", apiApplicationKey)
-	cfg.Set("ApiApplicationSecret", apiApplicationSecret)
-	cfg.Set("ApiConsumerKey", apiConsumerKey)
+	cfg.Set("AlternateApiConsumerKey", alternateAPIApplicationKey)
+	cfg.Set("AlternateApiApplicationSecret", alternateAPIApplicationSecret)
+	cfg.Set("AlternateApiConsumerKey", alternateAPIConsumerKey)
 	return cfg, nil
 }
 

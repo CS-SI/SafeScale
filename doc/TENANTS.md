@@ -178,9 +178,9 @@ The valid keywords in this section are :
 > | `Password` | MANDATORY, CLIENT |
 > | `SecretKey` | MANDATORY, CLIENT |
 > | `Username` | MANDATORY, CLIENT |
-> | `ApiApplicationKey` | OPTIONAL, CLIENT |
-> | `ApiApplicationSecret` | OPTIONAL, CLIENT |
-> | `ApiConsumerKey` | OPTIONAL, CLIENT |
+> | `AlternateApiApplicationKey` | OPTIONAL, CLIENT |
+> | `AlternateApiApplicationSecret` | OPTIONAL, CLIENT |
+> | `AlternateApiConsumerKey` | OPTIONAL, CLIENT |
 
 ### Section ``[tenant.compute]``
 
@@ -270,23 +270,20 @@ It defines the "driver" to communicate with the provider. Valid values are:
 
 ### <a name="kw_AccessKey"></a> `AccessKey`: alias, see [`Username`](#kw_Username)
 
-### <a name="kw_ApiApplicationKey"></a> `ApiApplicationKey`
+### <a name="kw_AlternateApiApplicationKey"></a> `AlternateApiApplicationKey`
 
 Only available on OVH.<br>
-Contains OVH api application key. 
-https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/
+Contains OVH api application key (see [First Steps with OVH API](https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/))
 
-### <a name="kw_ApiApplicationSecret"></a> `ApiApplicationSecret`
-
-Only available on OVH.<br>
-Contains OVH api application secret. 
-https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/
-
-### <a name="kw_ApiConsumerKey"></a> `ApiConsumerKey`
+### <a name="kw_AlternateApiApplicationSecret"></a> `AlternateApiApplicationSecret`
 
 Only available on OVH.<br>
-Contains OVH api consumer key, who have to be previously validated. 
-https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/
+Contains OVH api application secret (see [First Steps with OVH API](https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/))
+
+### <a name="kw_AlternateApiConsumerKey"></a> `AlternateApiConsumerKey`
+
+Only available on OVH.<br>
+Contains OVH api consumer key, who have to be previously validated (see [First Steps with OVH API](https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/))
 
 ### `ApplicationKey`
 
