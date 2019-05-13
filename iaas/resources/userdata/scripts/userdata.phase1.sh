@@ -31,7 +31,6 @@ mkdir -p /opt/safescale/var/{log,tmp,state} &>/dev/null
 chmod -R 0640 /opt/safescale
 find /opt/safescale -type d -exec chmod ug+x {} \;
 
-# Redirects outputs to /opt/safescale/user_data.log
 exec 1<&-
 exec 2<&-
 exec 1<>/opt/safescale/var/log/user_data.phase1.log
@@ -196,14 +195,8 @@ case $LINUX_KIND in
 esac
 create_user
 
-# check_for_network || {
-# 	echo "PROVISIONING_ERROR: no network connectivity"
-# 	fail 215
-# }
-
 touch /etc/cloud/cloud-init.disabled
 
 echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 set +x
-#systemctl reboot
 exit 0
