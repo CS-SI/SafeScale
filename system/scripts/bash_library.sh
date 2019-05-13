@@ -26,6 +26,12 @@ sfWaitForApt() {
 }
 export -f sfWaitForApt
 
+# sfApt does exactly what apt does, but we call sfWaitForApt first
+sfApt() {
+	sfWaitForApt
+	apt $@
+}
+
 sfWaitLockfile() {
 	local ROUNDS=600
 	name=$1

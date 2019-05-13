@@ -177,7 +177,7 @@ func Prepare(
 	return bufPhase1.Bytes(), bufPhase2.Bytes(), nil
 }
 
-// Append add some useful code on the end of userdata.sh just before the reboot (on the label #insert_tag)
+// Append add some useful code on the end of userdata.phase2.sh just before the end (on the label #insert_tag)
 func Append(userdata []byte, addedPart string) []byte {
 	return bytes.Replace(userdata, []byte("#insert_tag"), []byte(addedPart+"\n\n#insert_tag"), 1)
 }

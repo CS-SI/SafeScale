@@ -41,14 +41,6 @@ set -x
 # Includes the BashLibrary
 {{ .BashLibrary }}
 
-fw_i_accept() {
-	iptables -A INPUT -j ACCEPT $*
-}
-
-fw_f_accept() {
-	iptables -A FORWARD -j ACCEPT $*
-}
-
 reset_fw() {
 	case $LINUX_KIND in
 		debian|ubuntu)
@@ -69,6 +61,14 @@ reset_fw() {
 			;;
 	esac
 
+	# Clear interfaces attached to zones
+	for zone in $(firewall-cmd --get-active-zones | grep -v interfaces | grep -v sources); do
+		for nic in $(firewall-cmd --zone=$zone --list-interfaces); do
+			firewall-cmd --zone=trusted --remove-interface=$nic
+		done
+	done
+	# Attach inteface lo to zone trusted
+	firewall-cmd --zone=trusted --add-interface=lo
 	# Attach Internet interface or source IP to zone public
 	[ ! -z $PU_IF ] && {
 		firewall-cmd --zone=public --add-interface=$PU_IF
@@ -85,6 +85,8 @@ reset_fw() {
 	firewall-cmd --zone=trusted --add-interface=lo
 	# Allow service ssh
 	firewall-cmd --add-service=ssh
+	# Sets default zone to trusted
+	firewall-cmd --set-default-zone=trusted
 	# Save current fw settings as permanent
 	firewall-cmd --runtime-to-permanent
 }
@@ -360,18 +362,24 @@ EOF
 	echo done
 }
 
-add_common_repos() {
-	case $LINUX_KIND in
-		ubuntu)
-			sfFinishPreviousInstall
-			add-apt-repository universe -y || return 1
-			;;
-	esac
+check_for_ip() {
+	ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
+	[ -z "$ip" ] && return 1
 	return 0
 }
 
+# Checks network is set correctly
+# - DNS
+# - routes
+# - IP address on "physical" interfaces
 check_for_network() {
 	ping -n -c1 -w5 www.google.com || return 1
+	[ ! -z "$PU_IF" ] && {
+		check_for_ip $PU_IF || return 1
+	}
+	for i in $PR_IFs; do
+		check_for_ip $i || return 1
+	done
 	return 0
 }
 
@@ -388,7 +396,7 @@ configure_as_gateway() {
 		systemctl restart systemd-sysctl
 	fi
 
-	if [ ! -z $PU_IF ] && {
+	[ ! -z $PU_IF ] && {
 		# Allow ping
 		firewall-cmd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
 		# Allow masquerading on public zone
@@ -467,10 +475,11 @@ EOF
 install_drivers_nvidia() {
 	case $LINUX_KIND in
 		ubuntu)
+			sfFinishPreviousInstall
 			add-apt-repository -y ppa:graphics-drivers &>/dev/null
-			sfWaitForApt && apt update &>/dev/null
-			sfWaitForApt && apt -y install nvidia-410 &>/dev/null || {
-				sfWaitForAPt && apt -y install nvidia-driver-410 &>/dev/null || fail 199
+			sfApt update &>/dev/null
+			sfApt -y install nvidia-410 &>/dev/null || {
+				sfApt -y install nvidia-driver-410 &>/dev/null || fail 199
 			}
 			;;
 
@@ -509,7 +518,7 @@ install_drivers_nvidia() {
 install_packages() {
 	 case $LINUX_KIND in
 		ubuntu|debian)
-			sfWaitForApt && apt install -y -qq pciutils jq &>/dev/null || fail 207
+			sfApt install -y -qq pciutils jq &>/dev/null || fail 207
 			;;
 		redhat|centos)
 			yum install -y -q pciutils wget jq &>/dev/null || fail 208
@@ -519,6 +528,17 @@ install_packages() {
 			fail 209
 			;;
 	 esac
+}
+
+add_common_repos() {
+	case $LINUX_KIND in
+		ubuntu)
+			sfFinishPreviousInstall
+			add-apt-repository universe -y || return 1
+			sfApt update &>/dev/null
+			;;
+	esac
+	return 0
 }
 
 # ---- Main
@@ -533,8 +553,11 @@ identify_nics
 
 case $LINUX_KIND in
 	debian|ubuntu)
-		# Security updates ...
-		sfWaitForApt && apt update &>/dev/null && unattended-upgrade -v
+		# Force update of systemd
+		sfApt update && sfApt install -y systemd
+
+		# # Security updates ...
+		# sfApt update &>/dev/null && sfApt install -qy unattended-upgrades && unattended-upgrades -v
 
 		# DNS configuration
 		systemctl status systemd-resolved &>/dev/null && {
@@ -547,20 +570,28 @@ case $LINUX_KIND in
 			}
 		}
 
-		# Network configuration
-		systemctl status systemd-networkd &>/dev/null && {
-			configure_network_systemd_networkd
-		} || {
-			systemctl status networking &>/dev/null && {
-				configure_network_debian
+		# Network configuration for anything that is not Ubuntu 18.04
+		# [ "$LINUX_KIND" != "ubuntu" -o "$VERSION_ID" != "1804" ] && {
+			systemctl status systemd-networkd &>/dev/null && {
+				configure_network_systemd_networkd
 			} || {
-				echo "PROVISIONING_ERROR: failed to determine how to configure network"
-				fail 210
+				systemctl status networking &>/dev/null && {
+					configure_network_debian
+				} || {
+					echo "PROVISIONING_ERROR: failed to determine how to configure network"
+					fail 210
+				}
 			}
-		}
+		# }
 		;;
 
 	redhat|centos)
+		# Force update of systemd
+		yum install -qy systemd
+
+		# # install security updates
+		# yum install -y yum-plugin-security yum-plugin-changelog && yum update -y --security
+
 		# DNS configuration
 		systemctl status systemd-resolved &>/dev/null && {
 			configure_dns_systemd_resolved
@@ -589,7 +620,7 @@ configure_as_gateway
 {{- end }}
 
 check_for_network || {
-	echo "PROVISIONING_ERROR: no network connectivity"
+	echo "PROVISIONING_ERROR: no or incomplete network connectivity"
 	fail 212
 }
 
@@ -600,6 +631,8 @@ echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/s
 # For compatibility with previous user_data implementation (until v19.03.x)...
 ln -s /opt/safescale/var/state/user_data.phase2.done /var/tmp/user_data.done
 
+# !!! DON'T REMOVE !!! #insert_tag is used to allow to add something just before exiting
+#instert_tag
+
 set +x
-# systemctl reboot
 exit 0
