@@ -108,6 +108,9 @@ o_PR_IF=
 # Don't request dns name servers from DHCP server
 # Don't update default route
 configure_dhclient() {
+    # kill any dhclient process already running
+    pkill dhclient
+
     [ -f /etc/dhcp/dhclient.conf] && sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf
 
     if [ -d /etc/dhcp/ ]; then
@@ -330,25 +333,31 @@ EOF
 configure_network_redhat() {
     echo "Configuring network (redhat-like)..."
 
-    if [ -z $VERSION_ID ]; then
+    if [ -z $VERSION_ID -o $VERSION_ID -lt 7 ]; then
         disable_svc() {
             chkconfig $1 off
+        }
+        enable_svc() {
+            chkconfig $1 on
         }
         stop_svc() {
             service $1 stop
         }
-        start_svc() {
-            service $1 start
+        restart_svc() {
+            service $1 restart
         }
     else
         disable_svc() {
             systemctl disable $1
         }
+        enable_svc() {
+            systemctl enable $1
+        }
         stop_svc() {
             systemctl stop $1
         }
-        start_svc() {
-            systemctl start $1
+        restart_svc() {
+            systemctl restart $1
         }
     fi
 
@@ -384,10 +393,8 @@ EOF
     echo "GATEWAY={{ .GatewayIP }}" >/etc/sysconfig/network
     {{- end }}
 
-    case $VERSION_ID in
-        6) start_svc network;;
-        7) start_svc systemd-networkd;;
-    esac
+    enable_svc network
+    restart_svc network
 
     reset_fw || fail 200
 
@@ -459,15 +466,19 @@ configure_dns_legacy() {
     rm -f /etc/resolv.conf
     {{- if .DNSServers }}
     if [[ -e /etc/dhcp/dhclient.conf ]]; then
-        echo "prepend domain-name-servers {{range .DNSServers}}{{.}} {{end}};" >>/etc/dhcp/dhclient.conf
+        dnsservers=
+        for i in {{range .DNSServers}} {{end}}; do
+            [ ! -z $dnsservers ] && dnsservers="$dnsservers, "
+        done
+        [ ! -z $dnsservers ] && echo "prepend domain-name-servers $dnsservers;" >>/etc/dhcp/dhclient.conf
     else
-        echo "Dhclient.conf not modified";
+        echo "dhclient.conf not modified";
     fi
     {{- else }}
     if [[ -e /etc/dhcp/dhclient.conf ]]; then
         echo "prepend domain-name-servers 1.1.1.1;" >>/etc/dhcp/dhclient.conf
     else
-        echo "Dhclient.conf not modified"
+        echo "/etc/dhcp/dhclient.conf not modified"
     fi
     {{- end }}
     cat <<-'EOF' >/etc/resolv.conf

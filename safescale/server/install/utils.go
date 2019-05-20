@@ -24,7 +24,7 @@ import (
 	"text/template"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	// log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	pb "github.com/CS-SI/SafeScale/safescale"
@@ -160,7 +160,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, err := sshClt.Copy(f.Name(), to, 15*time.Second, client.DefaultExecutionTimeout)
+			retcode, _, _, err := sshClt.Copy(f.Name(), to, 15*time.Second, client.DefaultExecutionTimeout)
 			if err != nil {
 				return err
 			}
