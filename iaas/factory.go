@@ -59,6 +59,20 @@ func GetTenants() ([]interface{}, error) {
 	return tenants, err
 }
 
+//UseStorages return the storageService build around storages referenced in tenantNames
+func UseStorages(tenantNames []string) (*StorageServices, error) {
+	storageServices := NewStorageService()
+
+	for _, tenantName := range tenantNames {
+		err := storageServices.RegisterStorage(tenantName)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to register storage tenant %s : %s", tenantName, err.Error())
+		}
+	}
+
+	return &storageServices, nil
+}
+
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
 func UseService(tenantName string) (*Service, error) {
@@ -216,7 +230,7 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 	objectstorage, _ := tenant["objectstorage"].(map[string]interface{})
 
 	if config.Type, ok = objectstorage["Type"].(string); !ok {
-		return config, fmt.Errorf("missing setting 'Type' in 'metadata' section")
+		return config, fmt.Errorf("missing setting 'Type' in 'objectstorage' section")
 	}
 
 	if config.Domain, ok = objectstorage["Domain"].(string); !ok {

@@ -36,15 +36,16 @@ import (
 // Session units the different resources proposed by safescaled as safescale client
 type Session struct {
 	Bucket         *bucket
+	Data           *data
 	Host           *host
-	Share          *share
+	Image          *image
 	Network        *network
+	ProcessManager *processManager
+	Share          *share
 	Ssh            *ssh
+	Template       *template
 	Tenant         *tenant
 	Volume         *volume
-	Template       *template
-	Image          *image
-	ProcessManager *processManager
 
 	safescaledHost string
 	safescaledPort int
@@ -79,15 +80,16 @@ func New() Client {
 	}
 
 	s.Bucket = &bucket{session: s}
+	s.Data = &data{session: s}
 	s.Host = &host{session: s}
-	s.Share = &share{session: s}
+	s.Image = &image{session: s}
 	s.Network = &network{session: s}
+	s.ProcessManager = &processManager{session: s}
+	s.Share = &share{session: s}
 	s.Ssh = &ssh{session: s}
+	s.Template = &template{session: s}
 	s.Tenant = &tenant{session: s}
 	s.Volume = &volume{session: s}
-	s.Template = &template{session: s}
-	s.Image = &image{session: s}
-	s.ProcessManager = &processManager{session: s}
 	return s
 }
 
