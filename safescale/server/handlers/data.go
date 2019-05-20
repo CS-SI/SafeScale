@@ -455,7 +455,7 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 			shardName, bucketName := chunkGroup.GetStorageInfo(i)
 			err = bucketMap[bucketName].DeleteObject(shardName)
 			if err != nil {
-				log.Warn("Failed to delete shard '%s' from bucket '%s'", shardName, bucketName)
+				log.Warnf("Failed to delete shard '%s' from bucket '%s'", shardName, bucketName)
 			}
 			wg.Done()
 		}(i)
@@ -465,11 +465,11 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 	for _, bucketName := range chunkGroup.GetBucketNames() {
 		err = bucketMap[bucketName].DeleteObject(metadataFileName)
 		if err != nil {
-			log.Warn("Failed to delete chunkGroup '%' from bucket '%s'", metadataFileName, bucketName)
+			log.Warnf("Failed to delete chunkGroup '%' from bucket '%s'", metadataFileName, bucketName)
 		}
 		err = bucketMap[bucketName].DeleteObject(keyFileName)
 		if err != nil {
-			log.Warn("Failed to delete keyInfo '%s' from bucket '%s'", keyFileName, bucketName)
+			log.Warnf("Failed to delete keyInfo '%s' from bucket '%s'", keyFileName, bucketName)
 		}
 	}
 
