@@ -857,7 +857,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 				return nil, nil, fmt.Errorf("failed to get info waiter : %s", err.Error())
 			}
 
-			userDataPhase1 = userdata.Append(userDataPhase1, fmt.Sprintf(`
+			userDataPhase2 = userdata.Append(userDataPhase2, fmt.Sprintf(`
  LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
  echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 
