@@ -465,7 +465,7 @@ func (handler *DataHandler) Delete(ctx context.Context, fileName string) error {
 	for _, bucketName := range chunkGroup.GetBucketNames() {
 		err = bucketMap[bucketName].DeleteObject(metadataFileName)
 		if err != nil {
-			log.Warnf("Failed to delete chunkGroup '%' from bucket '%s'", metadataFileName, bucketName)
+			log.Warnf("Failed to delete chunkGroup '%s' from bucket '%s'", metadataFileName, bucketName)
 		}
 		err = bucketMap[bucketName].DeleteObject(keyFileName)
 		if err != nil {
