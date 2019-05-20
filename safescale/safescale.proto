@@ -15,6 +15,9 @@ service TenantService{
     rpc List (google.protobuf.Empty) returns (TenantList){}
     rpc Set (TenantName) returns (google.protobuf.Empty){}
     rpc Get (google.protobuf.Empty) returns (TenantName){}
+    rpc StorageList (google.protobuf.Empty) returns (TenantList){}
+    rpc StorageSet (TenantNameList) returns (google.protobuf.Empty){}
+    rpc StorageGet (google.protobuf.Empty) returns (TenantNameList){}
 }
 
 message Image{
@@ -32,6 +35,10 @@ message TenantName{
     string name = 1;
 }
 
+message TenantNameList{
+    repeated string names = 1;
+}
+
 message ImageList{
     repeated Image images= 1;
 }
@@ -43,6 +50,26 @@ message ImageListRequest{
 service ImageService{
     rpc List(ImageListRequest) returns (ImageList){}
 }
+
+message File {
+    string localPath = 1;
+    string name = 2;
+    string date = 3;
+    int64 size = 4;
+    repeated string buckets = 5;
+}
+
+message FileList {
+    repeated File files = 1;
+}
+
+service DataService{
+    rpc Push (File) returns (google.protobuf.Empty){}
+    rpc Get (File) returns (google.protobuf.Empty){}
+    rpc Delete (File) returns (google.protobuf.Empty){}
+    rpc List (google.protobuf.Empty) returns (FileList){}
+}
+
 
 // safescale network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
 // safescale network list

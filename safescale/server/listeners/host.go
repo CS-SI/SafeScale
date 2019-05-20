@@ -183,7 +183,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 
 // Create a new host
 func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.Host, error) {
-	log.Infof("Listeners: host create '%s' done", in.Name)
+	log.Infof("Listeners: host create '%s' called", in.Name)
 	defer log.Debugf("Listeners: host create '%s' done", in.Name)
 
 	ctx, cancelFunc := context.WithCancel(ctx)

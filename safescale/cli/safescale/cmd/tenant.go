@@ -32,6 +32,9 @@ var TenantCmd = cli.Command{
 		tenantList,
 		tenantGet,
 		tenantSet,
+		tenantStorageList,
+		tenantStorageGet,
+		tenantStorageSet,
 	},
 }
 
@@ -83,6 +86,66 @@ var tenantSet = cli.Command{
 			err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
 			if err != nil {
 				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
+			} else {
+				response.Succeeded(nil)
+			}
+		}
+
+		return response.GetErrorWithoutMessage()
+	},
+}
+
+var tenantStorageList = cli.Command{
+	Name:    "storage-list",
+	Aliases: []string{"storage-ls"},
+	Usage:   "List available storage tenants",
+	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
+		tenants, err := client.New().Tenant.StorageList(client.DefaultExecutionTimeout)
+		if err != nil {
+			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error())))
+		} else {
+			response.Succeeded(tenants.GetTenants())
+		}
+
+		return response.GetErrorWithoutMessage()
+	},
+}
+
+var tenantStorageGet = cli.Command{
+	Name:  "storage-get",
+	Usage: "Get current storage tenants",
+	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
+		tenants, err := client.New().Tenant.StorageGet(client.DefaultExecutionTimeout)
+		if err != nil {
+			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
+		} else {
+			response.Succeeded(tenants.GetNames())
+		}
+
+		return response.GetErrorWithoutMessage()
+	},
+}
+
+var tenantStorageSet = cli.Command{
+	Name:      "storage-set",
+	Usage:     "Set storage tenants to work with",
+	ArgsUsage: "<storage_tenants...>",
+	Action: func(c *cli.Context) error {
+		response := utils.NewCliResponse()
+
+		if c.NArg() < 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <storage_tenants...>."))
+		} else {
+			tenantNames := []string{c.Args().First()}
+			tenantNames = append(tenantNames, c.Args().Tail()...)
+			err := client.New().Tenant.StorageSet(tenantNames, client.DefaultExecutionTimeout)
+			if err != nil {
+				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set storage tenants", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}

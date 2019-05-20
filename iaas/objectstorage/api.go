@@ -38,7 +38,7 @@ type Location interface {
 	// WaitAllPutITemTerminated(key string, valuePattern string) error
 	// FilterByMetadata(key string, valuePattern string) (map[string][]string, error)
 
-	// ListBuckets ...
+	// ListBuckets returns all bucket prefixed by a string given as a parameter
 	ListBuckets(string) ([]string, error)
 	// FindBucket returns true of bucket exists in location
 	FindBucket(string) (bool, error)
