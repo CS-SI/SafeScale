@@ -318,53 +318,55 @@ sfMarathon() {
 }
 export -f sfMarathon
 
+sfProbeGPU() {
+	if which lspci &>/dev/null; then
+		val=$(lspci | grep nvidia 2>/dev/null)
+		[ ! -z $val ] && FACTS["nVidia GPU"]=val
+	fi
+}
+
+declare -A FACTS
+LINUX_KIND=
+VERSION_ID=
 sfDetectFacts() {
-	declare -gA FACTS
-	declare -g LINUX_KIND
-	declare -g VERSION_ID
-	[ -f /etc/os-release ] && {
-		. /etc/os-release
-		FACTS["linux kind"]=$ID
-		LINUX_KIND=$ID
-		FACTS["version id"]=$VERSION_ID
-		VERSION_ID=$VERSION_ID
-	} || {
-		which lsb_release &>/dev/null && {
-			LINUX_KIND=$(lsb_release -is)
-			LINUX_KIND=${LINUX_KIND,,}
-			VERSION_ID=$(lsb_release -rs | cut -d. -f1)
-		} || {
-			[ -f /etc/redhat-release ] && {
-				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
-				LINUX_KID=${LINUX_KIND,,}
-				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
-			}
-		}
-	}
+	if [ -f /etc/os-release ]; then
+			. /etc/os-release
+			FACTS["linux kind"]=$ID
+			LINUX_KIND=${ID,,}
+			FACTS["linux version"]=$VERSION_ID
+			VERSION_ID=$VERSION_ID
+			[ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux codename"]=${VERSION_CODENAME,,}
+	else
+			if which lsb_release &>/dev/null; then
+					LINUX_KIND=$(lsb_release -is)
+					LINUX_KIND=${LINUX_KIND,,}
+					VERSION_ID=$(lsb_release -rs | cut -d. -f1)
+			else
+					[ -f /etc/redhat-release ] && {
+							LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
+							LINUX_KID=${LINUX_KIND,,}
+							VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
+					}
+			fi
+			FACTS["linux kind"]=${LINUX_KIND,,}
+			FACTS["linux version"]=$VERSION_ID
+	fi
 
-	FACTS["sockets"]=$(LANG=C lscpu | grep "Socket(s)" | cut -d: -f2 | sed 's/"//g')
-	FACTS["cores per socket"]=$(LANG=C lscpu | grep "Core(s) per socket" | cut -d: -f2 | sed 's/"//g')
-	FACTS["cores"]=$(( ${FACTS["sockets"]} * ${FACTS["cores per socket"]} ))
-	FACTS["threads per core"]=$(LANG=C lscpu | grep "Thread(s) per core" | cut -d: -f2 | sed 's/"//g')
-	FACTS["threads"]=$(( ${FACTS["cores"]} * ${FACTS["threads per core"]} ))
-	FACTS["2 3rd of threads"]=$(( ${FACTS["threads"]} * 2 / 3 ))
 
-	which lspci &>/dev/null || {
-		case $LINUX_KIND in
-			debian|ubuntu)
-				sfWaitForApt && apt install -y pciutils
-				;;
-			centos|redhat)
-				yum install -y pciutils
-				;;
-			dnf)
-				dnf install -y pciutils
-				;;
-		esac
-	}
-	which lspci &>/dev/null && {
-		FACTS["nVidia GPU"]=$(lspci | grep nvidia 2>/dev/null)
-	}
+	val=$(LANG=C lscpu | grep "Socket(s)" | cut -d: -f2 | sed 's/"//g')
+	FACTS["sockets"]=${val//[[:blank:]]/}
+	val=$(LANG=C lscpu | grep "Core(s) per socket" | cut -d: -f2 | sed 's/"//g')
+	FACTS["cores/socket"]=${val//[[:blank:]]/}
+	FACTS["cores"]=$(( ${FACTS["sockets"]} * ${FACTS["cores/socket"]} ))
+	val=$(LANG=C lscpu | grep "Thread(s) per core" | cut -d: -f2 | sed 's/"//g')
+	FACTS["threads/core"]=${val//[[:blank:]]/}
+	FACTS["threads"]=$(( ${FACTS["cores"]} * ${FACTS["threads/core"]} ))
+	val=$(( ${FACTS["threads"]} * 2 / 3 ))
+	[ $val -le 0 ] && val=1
+	FACTS["2/3 of threads"]=val
+
+	sfProbeGPU
+
 	return 0
 }
 
