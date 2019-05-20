@@ -94,3 +94,17 @@ func InvalidRequestError(msg string) ErrInvalidRequest {
 		},
 	}
 }
+
+// ErrOverflow ...
+type ErrOverflow struct {
+	errCore
+}
+
+// OverflowError creates a ErrOverflow error
+func OverflowError(msg string) ErrOverflow {
+	return ErrOverflow{
+		errCore: errCore{
+			message: msg,
+		},
+	}
+}
