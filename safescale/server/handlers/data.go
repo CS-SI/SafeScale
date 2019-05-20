@@ -125,7 +125,9 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 	if err != nil {
 		return fmt.Errorf("Failed to open '%s' : %s", fileLocalPath, err.Error())
 	}
-	defer file.Close()
+	defer func() { // FIXME: Catch error later
+		_ = file.Close()
+	}
 
 	fileStats, err := file.Stat()
 	if err != nil {
@@ -292,7 +294,7 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 				log.Errorf("Failed to delete file '%s': %s", fileLocalPath, derr.Error())
 			}
 		} else {
-			file.Close()
+			_ = file.Close() // FIXME: Catch error later
 		}
 	}()
 
