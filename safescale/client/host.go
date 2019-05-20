@@ -26,12 +26,11 @@ import (
 	pb "github.com/CS-SI/SafeScale/safescale"
 	conv "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/system"
-	cache "github.com/CS-SI/SafeScale/utils"
 
 	clitools "github.com/CS-SI/SafeScale/utils"
 )
 
-var sshCfgCache = cache.NewMapCache()
+// var sshCfgCache = cache.NewMapCache()
 
 // host is the safescale client part handling hosts
 type host struct {
@@ -149,9 +148,9 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 
 // SSHConfig ...
 func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
-	if anon, ok := sshCfgCache.Get(name); ok {
-		return anon.(*system.SSHConfig), nil
-	}
+	// if anon, ok := sshCfgCache.Get(name); ok {
+	// 	return anon.(*system.SSHConfig), nil
+	// }
 
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -163,12 +162,12 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 		return nil, err
 	}
 	sshCfg := conv.ToSystemSSHConfig(pbSSHCfg)
-	if err == nil {
-		nerr := sshCfgCache.Set(name, sshCfg)
-		if nerr != nil {
-			return sshCfg, nerr
-		}
-	}
+	// if err == nil {
+	// 	nerr := sshCfgCache.Set(name, sshCfg)
+	// 	if nerr != nil {
+	// 		return sshCfg, nerr
+	// 	}
+	// }
 	return sshCfg, err
 }
 
