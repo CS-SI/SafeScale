@@ -456,7 +456,6 @@ func (handler *HostHandler) Create(
 
 		return nil, infraErr(err)
 	}
-	log.Infof("SSH service started on host '%s'.", host.Name)
 
 	// Updates host link with networks
 	for _, i := range networks {
@@ -475,15 +474,14 @@ func (handler *HostHandler) Create(
 			log.Errorf(err.Error())
 		}
 	}
-	// Don't want to remove host if network metadata fails...
-	err = nil
 
 	// Executes userdata phase2 script to finalize host installation
-	err = install.UploadStringToRemoteFile(string(userDataPhase2), safescaleutils.ToPBHost(host), "/opt/safescale/var/tmp/user_data.phase2.sh", "", "", "")
+	filepath := "/opt/safescale/var/tmp/user_data.phase2.sh"
+	err = install.UploadStringToRemoteFile(string(userDataPhase2), safescaleutils.ToPBHost(host), filepath, "", "", "")
 	if err != nil {
 		return nil, err
 	}
-	command := fmt.Sprintf("sudo bash %s; exit $?", "/opt/safescale/var/tmp/user_data.phase2.sh")
+	command := fmt.Sprintf("sudo bash %s; exit $?", filepath)
 	// Executes the script on the remote host
 	retcode, _, stderr, err := sshHandler.Run(ctx, host.Name, command)
 	if err != nil {
@@ -492,6 +490,29 @@ func (handler *HostHandler) Create(
 	if retcode != 0 {
 		return nil, fmt.Errorf("failed to finalize host installation: %s", stderr)
 	}
+
+	// Reboot host
+	command = "sudo systemctl reboot"
+	retcode, _, stderr, err = sshHandler.Run(ctx, host.Name, command)
+	if err != nil {
+		return nil, err
+	}
+
+	// FIXME configurable timeout here
+	_, err = sshCfg.WaitServerReady("ready", time.Duration(sshDefaultTimeout)*time.Minute)
+	if err != nil {
+		if client.IsTimeoutError(err) {
+			return nil, infraErrf(err, "Timeout creating a host")
+		}
+
+		if client.IsProvisioningError(err) {
+			log.Errorf("%+v", err)
+			return nil, fmt.Errorf("Error creating the host [%s], error provisioning the new host, please check safescaled logs", host.Name)
+		}
+
+		return nil, infraErr(err)
+	}
+	log.Infof("SSH service started on host '%s'.", host.Name)
 
 	select {
 	case <-ctx.Done():

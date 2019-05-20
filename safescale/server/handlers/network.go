@@ -278,6 +278,7 @@ func (handler *NetworkHandler) Create(
 	log.Infof("SSH service of gateway '%s' started.", gw.Name)
 
 	// Executes userdata phase2 script to finalize host installation
+	log.Infof("Starting initial configuration of the gateway '%s'", gw.Name)
 	err = install.UploadStringToRemoteFile(string(userDataPhase2), safescaleutils.ToPBHost(gw), "/opt/safescale/var/tmp/user_data.phase2.sh", "", "", "")
 	if err != nil {
 		return nil, err
@@ -289,6 +290,31 @@ func (handler *NetworkHandler) Create(
 	}
 	if retcode != 0 {
 		return nil, fmt.Errorf("failed to finalize host installation: %s", stderr)
+	}
+	log.Infof("Gateway '%s' successfully configured.", gw.Name)
+
+	// Reboot gateway
+	log.Debugf("Rebooting gateway '%s'", gw.Name)
+	command = "sudo systemctl reboot"
+	retcode, _, stderr, err = sshHandler.Run(ctx, gw.Name, command)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO Test for failure with 15s !!!
+	_, err = ssh.WaitServerReady("ready", time.Duration(sshDefaultTimeout)*time.Minute)
+	// err = ssh.WaitServerReady("ready", time.Second * 3)
+	if err != nil {
+		if client.IsTimeoutError(err) {
+			return nil, infraErrf(err, "Timeout creating a gateway")
+		}
+
+		if client.IsProvisioningError(err) {
+			log.Errorf("%+v", err)
+			return nil, logicErr(fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name))
+		}
+
+		return nil, infraErr(err)
 	}
 
 	select {
