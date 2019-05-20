@@ -1152,7 +1152,12 @@ func (s *Stack) RebootHost(id string) error {
 	if s == nil {
 		panic("Calling s.RebootHost with s==nil!")
 	}
-	err := servers.Reboot(s.ComputeClient, id, servers.RebootOpts{Type: "HARD"}).ExtractErr()
+
+	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
+	err := servers.Reboot(s.ComputeClient, id, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
+	if err != nil {
+		err = servers.Reboot(s.ComputeClient, id, servers.RebootOpts{Type: servers.HardReboot}).ExtractErr()
+	}
 	if err != nil {
 		ftErr := fmt.Errorf("Error rebooting host [%s]: %s", id, ProviderErrorToString(err))
 		log.Debug(ftErr)
