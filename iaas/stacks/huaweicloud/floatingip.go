@@ -217,7 +217,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	fip, err := r.Extract()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create Floating IP: %s", err)
+		return nil, fmt.Errorf("failed to create Floating IP: %s", err)
 	}
 	return fip, nil
 }

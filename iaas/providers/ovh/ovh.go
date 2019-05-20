@@ -218,7 +218,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	//check flavor disponibilities through OVH-API
 	authOpts, err := p.GetAuthOpts()
 	if err != nil {
-		log.Warn(fmt.Sprintf("Failed to get Authentification options, flavors disponibility will be left uncheked : %v", err))
+		log.Warn(fmt.Sprintf("Failed to get Authentication options, flavors availability won't be checked: %v", err))
 		return allTemplates, nil
 	}
 	service := authOpts.GetString("TenantID")
@@ -227,7 +227,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
 	flavors, err := p.requestOVHAPI(restURL, "GET")
 	if err != nil {
-		log.Warn(fmt.Sprintf("Failed to request OVH API, flavors disponibility will be left uncheked : %v", err))
+		log.Warnf("Unable to request OVH API, flavors availability won't be checked: %v", err)
 		return allTemplates, nil
 	}
 
