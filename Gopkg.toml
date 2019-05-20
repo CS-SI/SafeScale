@@ -25,8 +25,14 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   version = "=v1.2.0"
 
 [[override]]
+  name = "google.golang.org/genproto"
+  revision = "e7d98fc518a78c9f8b5ee77be7b0b317475d89e1"
+
+[[override]]
   name = "github.com/gophercloud/gophercloud"
-  branch = "master"
+  revision = "7892efa714f10951c5483a28c7471d8051b12975"
+
+#  branch = "master"
 # source = "github.com/oscarpicas/gophercloud.git"
 
 [[constraint]]
@@ -73,9 +79,9 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   name = "github.com/sirupsen/logrus"
   version = "=v1.3.0"
 
-[[constraint]]
+[[override]]
   name = "github.com/nanobox-io/golang-scribble"
-  branch = "master"
+  revision = "aa3e7c118975babb5ab3bc2a221b9d5a420b625b"
 
 [[override]]
   name = "golang.org/x/crypto"
@@ -95,7 +101,7 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[constraint]]
   name = "github.com/dlespiau/covertool"
-  branch = "master"
+  revision = "b0c4c6d0583aae4e3b5d12b6ec47767670548cc4"
 
 [[constraint]]
   name = "github.com/graymeta/stow"
@@ -104,19 +110,19 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 
 [[constraint]]
   name = "github.com/xrash/smetrics"
-  branch = "master"
+  revision = "a3153f7040e90324c58c6287535e26a0ac5c1cc1"
 
 [[override]]
-  version = "4.8.0"
   name = "github.com/libvirt/libvirt-go"
-
-[[override]]
   version = "4.8.0"
-  name = "github.com/libvirt/libvirt-go-xml"
 
 [[override]]
-  revision = "ba5adb4cf0148a3dbdbd30586f075266256a77b1"
+  name = "github.com/libvirt/libvirt-go-xml"
+  version = "4.8.0"
+
+[[override]]
   name = "github.com/ovh/go-ovh"
+  revision = "ba5adb4cf0148a3dbdbd30586f075266256a77b1"
 
 [prune]
   go-tests = true

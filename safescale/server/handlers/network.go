@@ -373,9 +373,11 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); !ok {
-			_ = infraErrf(err, "failed to load metadata of network '%s', trying to delete network anyway", ref)
-			err = handler.service.DeleteNetwork(ref)
-
+			err = infraErrf(err, "failed to load metadata of network '%s', trying to delete network anyway", ref)
+			cleanErr := handler.service.DeleteNetwork(ref)
+			if cleanErr != nil {
+				_ = infraErrf(cleanErr, "error deleting network on cleanup after failure to load metadata '%s'", ref)
+			}
 		}
 		return err
 	}
@@ -443,9 +445,11 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); !ok {
 			// Delete metadata,
-			_ = infraErrf(err, "can't delete network")
+			log.Error("can't delete network")
 			err = mn.Delete()
-			_ = infraErrf(err, "can't delete network metadata")
+			if err != nil {
+				log.Errorf("can't delete network metadata: %s", err)
+			}
 		}
 		// If network doesn't exist anymore on the provider infrastructure, don't fail
 		// to cleanup the metadata
