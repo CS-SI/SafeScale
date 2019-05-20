@@ -427,6 +427,23 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		Name:       name,
 		EnableDHCP: &dhcp,
 	}
+
+	// // Try to reserve IP addresses as static reserve at the beginning of the CIDR, and adapt DHCP allocation pool
+	// dhcpPoolStart, dhcpPoolEnd, err := calcDhcpAllocationPool(cidr)
+	// var ok bool
+	// if err != nil {
+	// 	if _, ok = err.(utils.ErrOverflow); !ok {
+	// 		return nil, err
+	// 	}
+	// }
+	// if err == nil || ok {
+	// 	dhcpAllocationPool := subnets.AllocationPool{
+	// 		Start: dhcpPoolStart,
+	// 		End:   dhcpPoolEnd,
+	// 	}
+	// 	opts.AllocationPools = []subnets.AllocationPool{dhcpAllocationPool}
+	// }
+
 	if len(dnsServers) > 0 {
 		opts.DNSNameservers = dnsServers
 	}
@@ -497,6 +514,29 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		Mask:      subnet.CIDR,
 		NetworkID: subnet.NetworkID,
 	}, nil
+}
+
+// calcDhcpAllocationPool calculates the start and the end of the DHCP allocation pool based on cidr
+// Keeps 10 IP addresses out of the pool to allow static and VIP addresses
+func calcDhcpAllocationPool(cidr string) (string, string, error) {
+	_, _, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return "", "", fmt.Errorf("Invalid cidr '%s'", cidr)
+	}
+
+	start, end, err := utils.CIDRToLongRange(cidr)
+	if err != nil {
+		return "", "", err
+	}
+	start += 11
+	if start >= end {
+		return "", "", utils.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr))
+	}
+	end -= 3
+	if end <= start {
+		return "", "", utils.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr))
+	}
+	return utils.LongToIPv4(start), utils.LongToIPv4(end), nil
 }
 
 // getSubnet returns the sub network identified by id
