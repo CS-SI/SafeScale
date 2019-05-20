@@ -216,7 +216,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			retcode, stdout, stderr, err = sshCfg.Copy(remotePath, localPath, upload)
-			// If an error occured, stop the loop and propagates this error
+			// If an error occurred, stop the loop and propagates this error
 			if err != nil {
 				retcode = -1
 				return nil
@@ -297,7 +297,7 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
 
-			tunnels, _, err := sshCfg.CreateTunnels()
+			tunnels, _, err := sshCfg.CreateTunneling()
 			if err != nil {
 				for _, t := range tunnels {
 					nerr := t.Close()

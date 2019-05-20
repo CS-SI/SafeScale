@@ -518,11 +518,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 	return host, userDataPhase2, nil
 }
 
-// // ResizeHost creates an host satisfying request
-// func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-// 	return s.Stack.ResizeHost(id, request)
-// }
-
 // validatehostName validates the name of an host based on known FlexibleEngine requirements
 func validatehostName(req resources.HostRequest) (bool, error) {
 	s := check.Struct{
@@ -768,16 +763,6 @@ func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[IPVersion.
 	}
 	return networks, addrs, AcccessIPv4, AcccessIPv6, nil
 }
-
-// // GetHostByName ...
-// func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
-// 	return s.Stack.GetHostByName(name)
-// }
-
-// // GetHostState ...
-// func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
-// 	return s.Stack.GetHostState(hostParam)
-// }
 
 // ListHosts lists available hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
@@ -1067,66 +1052,6 @@ func toHostState(status string) HostState.Enum {
 		return HostState.ERROR
 	}
 }
-
-// // CreateKeyPair creates and import a key pair
-// func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-// 	return s.osclt.CreateKeyPair(name)
-// }
-
-// // GetKeyPair returns the key pair identified by id
-// func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-// 	return s.osclt.GetKeyPair(id)
-// }
-
-// // ListKeyPairs lists available key pairs
-// func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-// 	return s.osclt.ListKeyPairs()
-// }
-
-// // DeleteKeyPair deletes the key pair identified by id
-// func (s *Stack) DeleteKeyPair(id string) error {
-// 	return s.osclt.DeleteKeyPair(id)
-// }
-
-// // ListAvailabilityZones lists the usable Availability Zones
-// func (s *Stack) ListAvailabilityZones(all bool) (map[string]bool, error) {
-// 	return s.osclt.ListAvailabilityZones(all)
-// }
-
-// // GetImage returns the Image referenced by id
-// func (s *Stack) GetImage(id string) (*resources.Image, error) {
-// 	return s.osclt.GetImage(id)
-// }
-
-// // GetTemplate returns the Template referenced by id
-// func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
-// 	return s.osclt.GetTemplate(id)
-// }
-
-// // func isBlacklistedTemplate(tpl resources.HostTemplate) bool {
-// // 	return strings.HasPrefix(strings.ToUpper(tpl.Name), "t2.")
-// // }
-
-// // ListTemplates lists available host templates
-// // Host templates are sorted using Dominant Resource Fairness Algorithm
-// func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
-// 	return s.osclt.ListTemplates()
-// }
-
-// // StopHost stops the host identified by id
-// func (s *Stack) StopHost(id string) error {
-// 	return s.osclt.StopHost(id)
-// }
-
-// // StartHost starts the host identified by id
-// func (s *Stack) StartHost(id string) error {
-// 	return s.osclt.StartHost(id)
-// }
-
-// // RebootHost ...
-// func (s *Stack) RebootHost(id string) error {
-// 	return s.osclt.RebootHost(id)
-// }
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic

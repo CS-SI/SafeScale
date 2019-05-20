@@ -30,15 +30,15 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, erro
 
 	alternateAPIApplicationKey := authOpts.GetString("AlternateApiConsumerKey")
 	if alternateAPIApplicationKey == "" {
-		return nil, fmt.Errorf("AlternateAPIApplicationKey is left unset while mandatory to access OVH-API")
+		return nil, fmt.Errorf("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
 	}
 	alternateAPIApplicationSecret := authOpts.GetString("AlternateApiApplicationSecret")
 	if alternateAPIApplicationSecret == "" {
-		return nil, fmt.Errorf("AlternateAPIApplicationSecret is left unset while mandatory to access OVH-API")
+		return nil, fmt.Errorf("AlternateApiApplicationSecret is not set (mandatory to access native OVH API)")
 	}
 	alternateAPIConsumerKey := authOpts.GetString("AlternateApiConsumerKey")
 	if alternateAPIConsumerKey == "" {
-		return nil, fmt.Errorf("AlternateAPIConsumerKey is left unset while mandatory to access OVH-API")
+		return nil, fmt.Errorf("AlternateApiConsumerKey is not set (mandatory to access native OVH API)")
 	}
 
 	client, err := ovh.NewClient(
