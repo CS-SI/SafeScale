@@ -24,6 +24,7 @@ import (
 	"text/template"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	pb "github.com/CS-SI/SafeScale/safescale"
@@ -155,11 +156,11 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 		return fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
 	to := fmt.Sprintf("%s:%s", host.Name, filename)
-	safescale := client.New().Ssh
+	sshClt := client.New().Ssh
+	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			var retcode int
-			retcode, _, _, err = safescale.Copy(f.Name(), to, 15*time.Second, client.DefaultExecutionTimeout)
+			retcode, stdout, stderr, err := sshClt.Copy(f.Name(), to, 15*time.Second, client.DefaultExecutionTimeout)
 			if err != nil {
 				return err
 			}
@@ -167,8 +168,13 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = safescale.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), 15*time.Second, client.DefaultExecutionTimeout)
-					return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
+					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), 15*time.Second, client.DefaultExecutionTimeout)
+					if err == nil {
+						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
+					}
+					// If submission of removal of remote file fails, stop the retry and consider this as an unrecoverable network error
+					networkError = true
+					return nil
 				}
 				if system.IsSCPRetryable(retcode) {
 					err = fmt.Errorf("failed to copy temporary file to '%s' (retcode: %d=%s)", to, retcode, system.SCPErrorString(retcode))
@@ -181,6 +187,9 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 		2*time.Minute, // FIXME Hardcoded timeout
 	)
 	_ = os.Remove(f.Name())
+	if networkError {
+		return fmt.Errorf("An unrecoverable network error has occurred")
+	}
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
@@ -208,7 +217,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = safescale.Run(host.Name, cmd, 15*time.Second, client.DefaultExecutionTimeout)
+			retcode, _, _, err = sshClt.Run(host.Name, cmd, 15*time.Second, client.DefaultExecutionTimeout)
 			if err != nil {
 				return err
 			}
