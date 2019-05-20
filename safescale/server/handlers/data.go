@@ -127,7 +127,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 	}
 	defer func() { // FIXME: Catch error later
 		_ = file.Close()
-	}
+	}()
 
 	fileStats, err := file.Stat()
 	if err != nil {
