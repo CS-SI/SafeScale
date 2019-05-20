@@ -233,9 +233,9 @@ func isTunnelReady(port int) bool {
 
 }
 
-// createTunnel create SSH from local host to remote host through gateway
+// buildTunnel create SSH from local host to remote host through gateway
 // if localPort is set to 0 then it's  automatically choosed
-func createTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
+func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
 		return nil, err
@@ -249,7 +249,7 @@ func createTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 	}
 
 	options := "-q -oServerAliveInterval=60 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
-	cmdString := fmt.Sprintf("ssh -i %s -NL %d:%s:%d %s@%s %s -p %d",
+	cmdString := fmt.Sprintf("ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -p %d",
 		f.Name(),
 		localPort,
 		cfg.Host,
@@ -284,14 +284,16 @@ type SSHCommand struct {
 	keyFile *os.File
 }
 
-func (c *SSHCommand) closeTunnels() error {
+func (sc *SSHCommand) closeTunneling() error {
 	var err error
-	for _, t := range c.tunnels {
+	for _, t := range sc.tunnels {
 		err = t.Close()
 	}
-	//Tunnels are imbricated only last error is significant
+	sc.tunnels = []*SSHTunnel{}
+
+	// Tunnels are imbricated only last error is significant
 	if err != nil {
-		log.Errorf("closeTunnels: %s\n", reflect.TypeOf(err).String())
+		log.Errorf("closeTunneling: %s\n", reflect.TypeOf(err).String())
 	}
 	return err
 }
@@ -302,66 +304,69 @@ func (c *SSHCommand) closeTunnels() error {
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
 // Wait releases any resources associated with the cmd.
-func (c *SSHCommand) Wait() error {
-	err := c.cmd.Wait()
-	nerr := c.end()
-	if nerr != nil {
-		log.Warnf("Error waiting for command end: %v", nerr)
+func (sc *SSHCommand) Wait() error {
+	err := sc.cmd.Wait()
+	nerr := sc.cleanup()
+	if err != nil {
+		return err
 	}
-	return err
-
+	if nerr != nil {
+		log.Warnf("Error waiting for command cleanup: %v", nerr)
+	}
+	return nerr
 }
 
 // Kill kills SSHCommand process and releases any resources associated with the SSHCommand.
-func (c *SSHCommand) Kill() error {
-	err := c.cmd.Process.Kill()
-	nerr := c.end()
-	if nerr != nil {
-		log.Warnf("Error waiting for command end: %v", nerr)
-	}
-	return err
+func (sc *SSHCommand) Kill() error {
+	return sc.cmd.Process.Kill()
 }
 
 // StdoutPipe returns a pipe that will be connected to the command's standard output when the command starts.
 // Wait will close the pipe after seeing the command exit, so most callers need not close the pipe themselves; however, an implication is that it is incorrect to call Wait before all reads from the pipe have completed.
 // For the same reason, it is incorrect to call Run when using StdoutPipe.
-func (c *SSHCommand) StdoutPipe() (io.ReadCloser, error) {
-	return c.cmd.StdoutPipe()
+func (sc *SSHCommand) StdoutPipe() (io.ReadCloser, error) {
+	return sc.cmd.StdoutPipe()
 }
 
 // StderrPipe returns a pipe that will be connected to the command's standard error when the command starts.
 // Wait will close the pipe after seeing the command exit, so most callers need not close the pipe themselves; however, an implication is that it is incorrect to call Wait before all reads from the pipe have completed. For the same reason, it is incorrect to use Run when using StderrPipe.
-func (c *SSHCommand) StderrPipe() (io.ReadCloser, error) {
-	return c.cmd.StderrPipe()
+func (sc *SSHCommand) StderrPipe() (io.ReadCloser, error) {
+	return sc.cmd.StderrPipe()
 }
 
 // StdinPipe returns a pipe that will be connected to the command's standard input when the command starts.
 // The pipe will be closed automatically after Wait sees the command exit.
 // A caller need only call Close to force the pipe to close sooner.
 // For example, if the command being run will not exit until standard input is closed, the caller must close the pipe.
-func (c *SSHCommand) StdinPipe() (io.WriteCloser, error) {
-	return c.cmd.StdinPipe()
+func (sc *SSHCommand) StdinPipe() (io.WriteCloser, error) {
+	return sc.cmd.StdinPipe()
 }
 
 // Output runs the command and returns its standard output.
 // Any returned error will usually be of type *ExitError.
 // If c.Stderr was nil, Output populates ExitError.Stderr.
-func (c *SSHCommand) Output() ([]byte, error) {
-	content, err := c.cmd.Output()
-	nerr := c.end()
+func (sc *SSHCommand) Output() ([]byte, error) {
+	content, err := sc.cmd.Output()
+	nerr := sc.cleanup()
+	if err != nil {
+		return nil, err
+	}
 	if nerr != nil {
-		log.Warnf("Error waiting for command end: %v", nerr)
+		log.Warnf("Error waiting for command cleanup: %v", nerr)
 	}
 	return content, err
 }
 
 // CombinedOutput runs the command and returns its combined standard
 // output and standard error.
-func (c *SSHCommand) CombinedOutput() ([]byte, error) {
-	content, err := c.cmd.CombinedOutput()
-	nerr := c.end()
+func (sc *SSHCommand) CombinedOutput() ([]byte, error) {
+	content, err := sc.cmd.CombinedOutput()
+	nerr := sc.cleanup()
+	if err != nil {
+		return nil, err
+	}
 	if nerr != nil {
-		log.Warnf("Error waiting for command end: %v", nerr)
+		log.Warnf("Error waiting for command cleanup: %v", nerr)
 	}
 	return content, err
 }
@@ -370,12 +375,13 @@ func (c *SSHCommand) CombinedOutput() ([]byte, error) {
 //
 // The Wait method will return the exit code and release associated resources
 // once the command exits.
-func (c *SSHCommand) Start() error {
-	return c.cmd.Start()
+func (sc *SSHCommand) Start() error {
+	return sc.cmd.Start()
 }
 
-func (c *SSHCommand) Display() string {
-	return strings.Join(c.cmd.Args[:], " ")
+// Display ...
+func (sc *SSHCommand) Display() string {
+	return strings.Join(sc.cmd.Args[:], " ")
 }
 
 // Run starts the specified command and waits for it to complete.
@@ -386,19 +392,19 @@ func (c *SSHCommand) Display() string {
 //
 // If the command starts but does not complete successfully, the error is of
 // type *ExitError. Other error types may be returned for other situations.
-func (c *SSHCommand) Run() (int, string, string, error) {
+func (sc *SSHCommand) Run() (int, string, string, error) {
 	// Set up the outputs (std and err)
-	stdOut, err := c.StdoutPipe()
+	stdOut, err := sc.StdoutPipe()
 	if err != nil {
 		return 0, "", "", err
 	}
-	stderr, err := c.StderrPipe()
+	stderr, err := sc.StderrPipe()
 	if err != nil {
 		return 0, "", "", err
 	}
 
 	// Launch the command and wait for its execution
-	if err = c.Start(); err != nil {
+	if err = sc.Start(); err != nil {
 		return 0, "", "", err
 	}
 
@@ -412,10 +418,9 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 		return 0, "", "", err
 	}
 
-	err = c.Wait()
-	nerr := c.end()
-	if nerr != nil {
-		log.Warnf("Error waiting for command end: %v", nerr)
+	err = sc.Wait()
+	if err != nil {
+		log.Warnf("Error waiting for command: %v", err)
 	}
 	if err != nil {
 		msgError, retCode, erro := ExtractRetCode(err)
@@ -428,21 +433,22 @@ func (c *SSHCommand) Run() (int, string, string, error) {
 	return 0, string(msgOut[:]), string(msgErr[:]), nil
 }
 
-func (c *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
-	log.Debugf("Running command [%s] with timeout of %s", c.Display(), timeout)
+// RunWithTimeout ...
+func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string, error) {
+	log.Debugf("Running command [%s] with timeout of %s", sc.Display(), timeout)
 
 	// Set up the outputs (std and err)
-	stdOut, err := c.StdoutPipe()
+	stdOut, err := sc.StdoutPipe()
 	if err != nil {
 		return 0, "", "", err
 	}
-	stderr, err := c.StderrPipe()
+	stderr, err := sc.StderrPipe()
 	if err != nil {
 		return 0, "", "", err
 	}
 
 	// Launch the command and wait for its execution
-	if err = c.Start(); err != nil {
+	if err = sc.Start(); err != nil {
 		return 0, "", "", err
 	}
 
@@ -469,10 +475,9 @@ func (c *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string,
 			clean = false
 		}
 
-		err = c.Wait()
-		closeErr = c.end()
-		if closeErr != nil {
-			log.Debugf("Error waiting for command end: %v", closeErr)
+		err = sc.Wait()
+		if err != nil {
+			log.Debugf("Error waiting for command: %v", err)
 			clean = false
 		}
 
@@ -487,10 +492,9 @@ func (c *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string,
 				return 0, "", "", err
 			}
 			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
-		} else {
-			if !issues {
-				log.Warnf("There have been issues running this command, please check daemon logs")
-			}
+		}
+		if !issues {
+			log.Warnf("There have been issues running this command, please check daemon logs")
 		}
 	case <-time.After(timeout):
 		errMsg := fmt.Sprintf("Timeout of (%s) waiting for the command to end", timeout)
@@ -501,15 +505,15 @@ func (c *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string,
 	return 0, string(msgOut[:]), string(msgErr[:]), nil
 }
 
-func (c *SSHCommand) end() error {
-	err1 := c.closeTunnels()
-	err2 := utils.LazyRemove(c.keyFile.Name())
+func (sc *SSHCommand) cleanup() error {
+	err1 := sc.closeTunneling()
+	err2 := utils.LazyRemove(sc.keyFile.Name())
 	if err1 != nil {
-		log.Errorf("closeTunnels() failed: %s\n", reflect.TypeOf(err1).String())
-		return fmt.Errorf("Unable to close ssh tunnels: %s", err1.Error())
+		log.Errorf("closeTunneling() failed: %s\n", reflect.TypeOf(err1).String())
+		return fmt.Errorf("Unable to close SSH tunnels: %s", err1.Error())
 	}
 	if err2 != nil {
-		return fmt.Errorf("Unable to close ssh tunnels: %s", err2.Error())
+		return fmt.Errorf("Unable to close SSH tunnels: %s", err2.Error())
 	}
 	return nil
 }
@@ -528,20 +532,19 @@ func recCreateTunnels(ssh *SSHConfig, tunnels *[]*SSHTunnel) (*SSHTunnel, error)
 			cfg.GatewayConfig = &gateway
 		}
 		if cfg.GatewayConfig != nil {
-			tunnel, err = createTunnel(cfg)
+			tunnel, err = buildTunnel(cfg)
 			if err != nil {
 				return nil, err
 			}
 			*tunnels = append(*tunnels, tunnel)
 			return tunnel, err
 		}
-		return nil, nil
 	}
 	return nil, nil
-
 }
 
-func (ssh *SSHConfig) CreateTunnels() ([]*SSHTunnel, *SSHConfig, error) {
+// CreateTunneling ...
+func (ssh *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, error) {
 	var tunnels []*SSHTunnel
 	tunnel, err := recCreateTunnels(ssh, &tunnels)
 	if err != nil {
@@ -560,7 +563,6 @@ func (ssh *SSHConfig) CreateTunnels() ([]*SSHTunnel, *SSHConfig, error) {
 		}
 		sshConfig.Port = tunnel.port
 		sshConfig.Host = "127.0.0.1"
-		tunnels = append(tunnels, tunnel)
 	}
 	return tunnels, &sshConfig, nil
 }
@@ -570,7 +572,7 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 	if err != nil {
 		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
-	//defer os.Remove(f.Name())
+
 	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 
 	sshCmdString := fmt.Sprintf("ssh -i %s %s -p %d %s@%s",
@@ -605,7 +607,7 @@ func (ssh *SSHConfig) SudoCommand(cmdString string) (*SSHCommand, error) {
 }
 
 func (ssh *SSHConfig) command(cmdString string, withSudo bool) (*SSHCommand, error) {
-	tunnels, sshConfig, err := ssh.CreateTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create command : %s", err.Error())
 	}
@@ -691,9 +693,9 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (stri
 	return "", fmt.Errorf("server '%s' is not ready yet: %s", ssh.Host, originalErr.Error())
 }
 
-// Copy copy a file/directory from/to local to/from remote
+// Copy copies a file/directory from/to local to/from remote
 func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, string, string, error) {
-	tunnels, sshConfig, err := ssh.CreateTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
 		return 0, "", "", fmt.Errorf("unable to create tunnels : %s", err.Error())
 	}
@@ -702,6 +704,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	if err != nil {
 		return 0, "", "", fmt.Errorf("unable to create temporary key file: %s", err.Error())
 	}
+	log.Debugf("SSH Identity file: %s", identityfile.Name())
 
 	cmdTemplate, err := template.New("Command").Parse("scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}'{{.LocalPath}}' {{.User}}@{{.Host}}:'{{.RemotePath}}'{{else}}{{.User}}@{{.Host}}:'{{.RemotePath}}' '{{.LocalPath}}'{{end}}")
 	if err != nil {
@@ -732,6 +735,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	}
 
 	sshCmdString := copyCommand.String()
+	log.Debugf("cmd: %s", sshCmdString)
 	cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
 		cmd:     cmd,
@@ -744,7 +748,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 
 // Exec executes the cmd using ssh
 func (ssh *SSHConfig) Exec(cmdString string) error {
-	tunnels, sshConfig, err := ssh.CreateTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
 		for _, t := range tunnels {
 			nerr := t.Close()
@@ -802,7 +806,7 @@ func (ssh *SSHConfig) Exec(cmdString string) error {
 
 // Enter Enter to interactive shell
 func (ssh *SSHConfig) Enter() error {
-	tunnels, sshConfig, err := ssh.CreateTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
 		for _, t := range tunnels {
 			nerr := t.Close()
@@ -865,7 +869,7 @@ func (ssh *SSHConfig) Enter() error {
 // os.Process.Kill) if the context becomes done before the command
 // completes on its own.
 func (ssh *SSHConfig) CommandContext(ctx context.Context, cmdString string) (*SSHCommand, error) {
-	tunnels, sshConfig, err := ssh.CreateTunnels()
+	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create command : %s", err.Error())
 	}
