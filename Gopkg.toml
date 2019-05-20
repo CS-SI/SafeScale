@@ -121,6 +121,10 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   version = "4.8.0"
 
 [[override]]
+  version = "v1.9.1"
+  name = "github.com/klauspost/reedsolomon"
+
+[[override]]
   name = "github.com/ovh/go-ovh"
   revision = "ba5adb4cf0148a3dbdbd30586f075266256a77b1"
 
