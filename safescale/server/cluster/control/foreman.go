@@ -170,14 +170,15 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 
 	// Determine Gateway sizing
 	gatewayDef := resources.HostDefinition{
-		Cores:    2,
-		RAMSize:  7.0,
-		DiskSize: 60,
-		ImageID:  imageID,
+		Cores:     2,
+		RAMSize:   7.0,
+		DiskSize:  60,
+		ImageID:   imageID,
+		GPUNumber: -1,
 	}
 	if b.makers.DefaultGatewaySizing != nil {
-		gatewayDef = b.makers.DefaultGatewaySizing(task, b)
-		gatewayDef.ImageID = imageID
+		gatewayDef = complementHostDefinition(&gatewayDef, b.makers.DefaultGatewaySizing(task, b))
+		// gatewayDef.ImageID = imageID
 	}
 	//Note: no way yet to define gateway sizing from cli...
 	// gatewayDef = complementHostDefinition(req.NodesDef, gatewayDef)
@@ -185,14 +186,15 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 
 	// Determine master sizing
 	masterDef := resources.HostDefinition{
-		Cores:    4,
-		RAMSize:  15.0,
-		DiskSize: 100,
-		ImageID:  imageID,
+		Cores:     4,
+		RAMSize:   15.0,
+		DiskSize:  100,
+		ImageID:   imageID,
+		GPUNumber: -1,
 	}
 	if b.makers.DefaultMasterSizing != nil {
-		masterDef = b.makers.DefaultMasterSizing(task, b)
-		masterDef.ImageID = imageID
+		masterDef = complementHostDefinition(&masterDef, b.makers.DefaultMasterSizing(task, b))
+		// masterDef.ImageID = imageID
 	}
 	// Note: no way yet to define master sizing from cli...
 	masterDef = complementHostDefinition(req.NodesDef, masterDef)
@@ -200,19 +202,20 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 
 	// Determine node sizing
 	nodeDef := resources.HostDefinition{
-		Cores:    4,
-		RAMSize:  15.0,
-		DiskSize: 100,
-		ImageID:  imageID,
+		Cores:     4,
+		RAMSize:   15.0,
+		DiskSize:  100,
+		ImageID:   imageID,
+		GPUNumber: -1,
 	}
 	if b.makers.DefaultNodeSizing != nil {
-		nodeDef = b.makers.DefaultNodeSizing(task, b)
-		nodeDef.ImageID = imageID
+		nodeDef = complementHostDefinition(&nodeDef, b.makers.DefaultNodeSizing(task, b))
+		// nodeDef.ImageID = imageID
 	}
 	nodeDef = complementHostDefinition(req.NodesDef, nodeDef)
-	if nodeDef.ImageID == "" {
-		nodeDef.ImageID = imageID
-	}
+	// if nodeDef.ImageID == "" {
+	// 	nodeDef.ImageID = imageID
+	// }
 	pbNodeDef := *pbutils.ToPBHostDefinition(&nodeDef)
 
 	// Creates network
@@ -532,13 +535,12 @@ func complementHostDefinition(req *resources.HostDefinition, def resources.HostD
 		if finalDef.DiskSize <= 0 && def.DiskSize > 0 {
 			finalDef.DiskSize = def.DiskSize
 		}
-		//VPL: no enforcement on GPUNumber and Freq ?
-		// if finalDef.GPUNumber == 0 && def.GPUNumber > 0 {
-		// 	finalDef.GPUNumber = def.GPUNumber
-		// }
-		// if finalDef.Freq == 0 && def.Freq >0 {
-		// 	finalDef.Freq = def.Freq
-		// }
+		if finalDef.GPUNumber == 0 && def.GPUNumber != 0 {
+			finalDef.GPUNumber = def.GPUNumber
+		}
+		if finalDef.CPUFreq == 0 && def.CPUFreq > 0 {
+			finalDef.CPUFreq = def.CPUFreq
+		}
 		if finalDef.ImageID == "" {
 			finalDef.ImageID = def.ImageID
 		}

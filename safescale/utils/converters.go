@@ -211,10 +211,12 @@ func ToPBHostDefinition(in *resources.HostDefinition) *pb.HostDefinition {
 // ToPBGatewayDefinition ...
 func ToPBGatewayDefinition(in *resources.HostDefinition) *pb.GatewayDefinition {
 	return &pb.GatewayDefinition{
-		Cpu:     int32(in.Cores),
-		Ram:     in.RAMSize,
-		Disk:    int32(in.DiskSize),
-		ImageId: in.ImageID,
+		Cpu:      int32(in.Cores),
+		Ram:      in.RAMSize,
+		Disk:     int32(in.DiskSize),
+		ImageId:  in.ImageID,
+		GpuCount: int32(in.GPUNumber),
+		GpuType:  in.GPUType,
 	}
 }
 

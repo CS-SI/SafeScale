@@ -108,3 +108,5 @@ safescale/cli/safescaled/safescaled
 safescale/cli/safescaled/safescaled-cover
 
 Test Results - client_test_go\.html
+
+cli/safescale/

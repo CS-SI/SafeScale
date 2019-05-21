@@ -196,9 +196,9 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 			} else {
 				var noHostError string
 				if sizing.MinFreq <= 0 {
-					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs !, problem accessing Scanner database: %v", sizing.MinGPU, err)
+					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
 				} else {
-					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+					noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 				}
 				log.Error(noHostError)
 				return nil, errors.New(noHostError)
@@ -223,7 +223,7 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 					if sizing.MinFreq <= 0 {
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs !, problem accessing Scanner database: %v", sizing.MinGPU, err)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 					}
 					log.Error(noHostError)
 					return nil, errors.New(noHostError)
@@ -255,9 +255,9 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 				if !force && (len(images) == 0) {
 					var noHostError string
 					if sizing.MinFreq <= 0 {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs !, no images matching requirements", sizing.MinGPU)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, no images matching requirements", sizing.MinGPU)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, no images matching requirements", sizing.MinGPU, sizing.MinFreq)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency, no images matching requirements", sizing.MinGPU, sizing.MinFreq)
 					}
 					log.Error(noHostError)
 					return nil, errors.New(noHostError)
