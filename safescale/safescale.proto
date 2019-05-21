@@ -88,6 +88,8 @@ message GatewayDefinition{
     int32 disk = 3;
     string image_id = 5;
     string name = 6;
+    int32 gpu_count = 7;
+    string gpu_type = 8;
 }
 
 message Network{
