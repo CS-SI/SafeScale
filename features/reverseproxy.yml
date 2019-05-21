@@ -35,7 +35,7 @@ feature:
                             curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep "HTTP/1.1 200 OK" &>/dev/null
 
             add:
-                pace: compose
+                pace: compose,firewall
                 steps:
                     compose:
                         wallTime: 10
@@ -97,12 +97,28 @@ feature:
                             EOF
                             docker-compose -f /opt/safescale/run/reverseproxy.compose.yml -p reverseproxy up -d
                             RETRY=0; until docker ps --all | grep reverseproxy_kong-migration_1 | grep Exited || ((RETRY++ >= 60)); do sleep 5; done && sleep 5
-                            iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
-                            sfSaveIptablesRules
+                    
+                    firewall:
+                        targets:
+                            hosts: yes
+                        run: |
+                            # iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+                            # sfSaveIptablesRules
+                            firewall-cmd --zone=trusted --add-service=https && \
+                            firewall-cmd --zone=public --add-service=https && \
+                            firewall-cmd --runtime-to-permanent
 
             remove:
-                pace: compose
+                pace: firewall,compose
                 steps:
+                    firewall:
+                        targets:
+                            hosts: yes
+                        run: |
+                            firewall-cmd --zone=trusted --remove-service=https && \
+                            firewall-cmd --zone=public --remove-service=https && \
+                            firewall-cmd --runtime-to-permanent
+
                     compose:
                         targets:
                             hosts: yes

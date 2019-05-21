@@ -45,7 +45,7 @@ feature:
                             esac
 
             add:
-                pace: docker-ce,ready
+                pace: docker-ce,firewall,ready
                 steps:
                     docker-ce:
                         serial: true
@@ -92,6 +92,17 @@ feature:
                                     ;;
                             esac
                             exit 0
+
+                    firewall:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            privateNodes: all
+                            publicNodes: all
+                        run: |
+                            firewall-cmd --zone=trusted --add-interface=docker0
+                            firewall-cmd --zone=trusted --add-service docker-swarm
+                            firewall-cmd --runtime-to-permanent
 
                     ready:
                         targets:
