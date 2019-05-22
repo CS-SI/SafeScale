@@ -108,6 +108,8 @@ type ConfigurationOptions struct {
 
 	//OperatorUsername contain the name of the safescale created user
 	OperatorUsername string
+
+	Customizations map[string]string
 }
 
 // CfgOptions configuration options
