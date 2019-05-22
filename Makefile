@@ -30,6 +30,7 @@ endif
 
 GOPATH?=$(HOME)/go
 GOBIN?=$(GOPATH)/bin
+CIBIN?=/tmp
 
 ifeq (, $(shell which git))
  $(error "No git in your PATH: [$(PATH)], you must have git installed and available through your PATH")
@@ -56,7 +57,7 @@ EXECS=safescale/cli/safescale/safescale safescale/cli/safescale/safescale-cover 
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v /cli/ | grep -v /lib/ | grep -v /vendor/)
 # List of packages to test
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v stacks/aws | grep -v /cli/ | grep -v /lib/)
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v stacks/aws | grep -v /cli/ | grep -v /lib/ | grep -v sandbox)
 
 
 # DEPENDENCIES MANAGEMENT
@@ -66,6 +67,7 @@ PROTOC := github.com/golang/protobuf
 PROTOBUF := github.com/golang/protobuf/protoc-gen-go
 
 # Build tools
+CONVEY := github.com/smartystreets/goconvey
 MOCKGEN := github.com/golang/mock/gomock github.com/golang/mock/mockgen
 COVER := golang.org/x/tools/cmd/cover
 LINTER := golang.org/x/lint/golint
@@ -74,9 +76,9 @@ ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 REPORTER := github.com/360EntSecGroup-Skylar/goreporter
 COVERTOOL := github.com/dlespiau/covertool
+GOVENDOR := github.com/kardianos/govendor
 
-DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL)
-
+DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(GOVENDOR)
 
 # Life is better with colors
 COM_COLOR   = \033[0;34m
@@ -126,8 +128,8 @@ ground:
 
 getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover covertool errcheck goreporter > /dev/null; if [ $$? -ne 0 ]; then \
-    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(DEP); \
+	@which dep rice stringer protoc-gen-go golint mockgen go2xunit cover covertool convey errcheck goreporter govendor > /dev/null; if [ $$? -ne 0 ]; then \
+    	  $(GO) get -u $(STRINGER) $(RICE) $(PROTOBUF) $(COVER) $(LINTER) $(MOCKGEN) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(DEP) $(GOVENDOR); \
     fi
 
 ensure:
@@ -138,6 +140,8 @@ ensure:
 	@(dep ensure -update "github.com/gophercloud/gophercloud")
 	@(dep ensure -update "github.com/graymeta/stow")
 	@$(GO) version | grep 1.10 > /dev/null || dep ensure -update "golang.org/x/tools"
+	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which stringer` && rm -rf ./vendor/golang.org/x/tools/cmd && govendor fetch golang.org/x/tools/cmd/stringer@release-branch.go1.10 && cd vendor/golang.org/x/tools/cmd/stringer && $(GO) build && mv ./stringer $(GOPATH)/bin || true
+	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which errcheck` && rm -rf ./vendor/github.com/kisielk && govendor fetch github.com/kisielk/errcheck@v1.0.1 && cd vendor/github.com/kisielk/errcheck && $(GO) build && mv ./errcheck $(GOPATH)/bin || true
 
 utils: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -182,6 +186,9 @@ perform/perform: perform
 
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
+
+installci:
+	@($(CP) -f $(EXECS) $(CIBIN) || true)
 
 godocs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
