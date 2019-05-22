@@ -31,7 +31,7 @@ gensrc:
 	@$(RM) $(VERSIONFILE) || true
 	@echo "package main" > $(VERSIONFILE)
 	@echo "const (" >> $(VERSIONFILE)
-	@echo "  VERSION = \"19.03.0\"" >> $(VERSIONFILE)
+	@echo "  VERSION = \"19.06.0-alpha\"" >> $(VERSIONFILE)
 	@echo "  BUILD_DATE = \"$(BUILD_DATE)\"" >> $(VERSIONFILE)
 	@echo "  REV = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
