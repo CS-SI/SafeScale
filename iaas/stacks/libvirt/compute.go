@@ -805,7 +805,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 		return nil, nil, fmt.Errorf("GetDiskFromID failled %s: ", err.Error())
 	}
 
-	userDataPhase1, userdataPhase2, err := userdata.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
+	userDataPhase1, userDataPhase2, err := userdata.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to prepare user data content: %+v", err)
 	}
@@ -816,6 +816,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 	for _, network := range networks {
 		networksCommandString += fmt.Sprintf(" --network network=%s", network.Name)
 	}
+	var userData []byte
 	if publicIP {
 		command := ""
 		if bridgedVMs {
@@ -856,8 +857,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to get info waiter : %s", err.Error())
 			}
+			userData = append(userData, userDataPhase1...)
+			// userData = append(userData, userDataPhase2...)
 
-			userDataPhase2 = userdata.Append(userDataPhase2, fmt.Sprintf(`
+			userData = userdata.Append(userData, fmt.Sprintf(`
  LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
  echo -n "%s|$LANIP" > /dev/tcp/%s/%d`, hostName, ip, infoWaiter.port))
 
@@ -989,7 +992,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 		return nil, nil, fmt.Errorf("Failed to update HostProperty.SizingV1 : %s", err.Error())
 	}
 
-	return nil, host, nil
+	return host, userDataPhase2, nil
 }
 
 // GetHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
