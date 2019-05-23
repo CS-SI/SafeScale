@@ -241,6 +241,7 @@ configure_network_redhat() {
     systemctl disable NetworkManager &>/dev/null
     systemctl stop NetworkManager &>/dev/null
     yum remove -y NetworkManager &>/dev/null
+    chkconfig network on
     #systemctl restart network
 
     # Configure all network interfaces in dhcp
@@ -271,7 +272,8 @@ make_resolv_conf() {
 }
 EOF
     chmod +x $HOOK_FILE
-    systemctl restart network
+    #systemctl restart network
+    service network start
 
     echo done
 }
@@ -612,9 +614,9 @@ case $LINUX_KIND in
     redhat|centos)
         create_user
         {{- if .ConfIF }}
+        configure_dns_legacy
         configure_network_redhat
         {{- end }}
-        configure_dns_legacy
         {{- if .IsGateway }}
         configure_as_gateway
         {{- end }}
