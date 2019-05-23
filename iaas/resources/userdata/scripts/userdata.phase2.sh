@@ -565,7 +565,10 @@ install_drivers_nvidia() {
             fi
             yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null || fail 206
             wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || fail 207
-            bash NVIDIA-Linux-x86_64-410.78.run -s || fail 208
+            # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
+            if [ $(uname -r) == $(yum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
+                bash NVIDIA-Linux-x86_64-410.78.run -s || fail 208
+            fi
             rm -f NVIDIA-Linux-x86_64-410.78.run
             ;;
         *)
