@@ -44,6 +44,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+const sshOptions = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
+
 var (
 	sshErrorMap = map[int]string{
 		1:  "Malformed configuration or invalid cli options",
@@ -248,7 +250,7 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 		}
 	}
 
-	options := "-q -oServerAliveInterval=60 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
+	options := sshOptions + " -oServerAliveInterval=60"
 	cmdString := fmt.Sprintf("ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -p %d",
 		f.Name(),
 		localPort,
@@ -573,7 +575,7 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 		return "", nil, fmt.Errorf("Unable to create temporary key file: %s", err.Error())
 	}
 
-	options := "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
+	options := sshOptions + " -oLogLevel=error"
 
 	sshCmdString := fmt.Sprintf("ssh -i %s %s -p %d %s@%s",
 		f.Name(),
@@ -711,6 +713,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 		return 0, "", "", fmt.Errorf("error parsing command template: %s", err.Error())
 	}
 
+	options := sshOptions + " -oLogLevel=error"
 	var copyCommand bytes.Buffer
 	if err := cmdTemplate.Execute(&copyCommand, struct {
 		IdentityFile string
@@ -724,7 +727,7 @@ func (ssh *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, st
 	}{
 		IdentityFile: identityfile.Name(),
 		Port:         sshConfig.Port,
-		Options:      "-q -oLogLevel=error -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no",
+		Options:      options,
 		User:         sshConfig.User,
 		Host:         sshConfig.Host,
 		RemotePath:   remotePath,
