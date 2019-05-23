@@ -248,7 +248,7 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 		}
 	}
 
-	options := "-q -oServerAliveInterval=60 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
+	options := "-q -oIdentitiesOnly=yes -oServerAliveInterval=60 -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 	cmdString := fmt.Sprintf("ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -p %d",
 		f.Name(),
 		localPort,
