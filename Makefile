@@ -30,6 +30,7 @@ endif
 
 GOPATH?=$(HOME)/go
 GOBIN?=$(GOPATH)/bin
+CIBIN?=/tmp
 
 ifeq (, $(shell which git))
  $(error "No git in your PATH: [$(PATH)], you must have git installed and available through your PATH")
@@ -185,6 +186,10 @@ perform/perform: perform
 
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
+
+installci:
+	@(mkdir -p $(CIBIN) || true)
+	@($(CP) -f $(EXECS) $(CIBIN) || true)
 
 godocs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
