@@ -179,8 +179,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		gatewayDef = complementHostDefinition(&gatewayDef, b.makers.DefaultGatewaySizing(task, b))
 		// gatewayDef.ImageID = imageID
 	}
-	//Note: no way yet to define gateway sizing from cli...
-	// gatewayDef = complementHostDefinition(req.NodesDef, gatewayDef)
+	gatewayDef = complementHostDefinition(req.NodesDef, gatewayDef)
 	pbGatewayDef := *pbutils.ToPBGatewayDefinition(&gatewayDef)
 
 	// Determine master sizing
@@ -218,7 +217,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	pbNodeDef := *pbutils.ToPBHostDefinition(&nodeDef)
 
 	// Creates network
-	log.Debugf("[cluster %s] creating Network 'net-%s'", req.Name, req.Name)
+	log.Debugf("[cluster %s] creating network 'net-%s'", req.Name, req.Name)
 	req.Name = strings.ToLower(req.Name)
 	networkName := "net-" + req.Name
 	def := pb.NetworkDefinition{
