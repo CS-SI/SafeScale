@@ -168,9 +168,10 @@ func NewFeature(task concurrency.Task, name string) (*Feature, error) {
 			var ok bool
 			if _, ok = allEmbeddedMap[name]; !ok {
 				err = fmt.Errorf("failed to find a feature named '%s'", name)
+			} else {
+				feat = *allEmbeddedMap[name]
+				feat.task = task
 			}
-			feat = *allEmbeddedMap[name]
-			feat.task = task
 		default:
 			err = fmt.Errorf("failed to read the specification file of feature called '%s': %s", name, err.Error())
 		}
