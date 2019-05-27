@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export SF_BASEDIR=/opt/safescale
+export SF_VARDIR=${SF_BASEDIR}/var
+export SF_TMPDIR=${SF_VARDIR}/tmp
+export SF_LOGDIR=${SF_VARDIR}/log
+
 sfFinishPreviousInstall() {
 	local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
 	if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
@@ -129,7 +134,7 @@ sfAsyncStart() {
 	local duration=$2
 	shift 2
 	#/usr/bin/tim is only set on ubuntu (not debian)
-	timeout $duration /usr/bin/time -p $* &>/var/tmp/$log &
+	timeout $duration /usr/bin/time -p $* &>${SF_LOGDIR}/$log &
 	eval "$pid=$!"
 }
 export -f sfAsyncStart
@@ -142,12 +147,12 @@ sfAsyncWait() {
 	eval "wait \$$pid"
 	rc=$?
 	eval "unset $pid"
-	[ -f "/var/tmp/$log" ] && cat "/var/tmp/$log"
+	[ -f "${SF_LOGDIR}/$log" ] && cat "${SF_LOGDIR}/$log"
 	[ $rc -ne 0 ] && {
 		[ $rc -eq 124 ] && echo "timeout"
 		return $rc
 	}
-	rm -f /var/tmp/$log
+	rm -f ${SF_LOGDIR}/$log
 	return 0
 }
 export -f sfAsyncWait
@@ -321,7 +326,7 @@ export -f sfMarathon
 sfProbeGPU() {
 	if which lspci &>/dev/null; then
 		val=$(lspci | grep nvidia 2>/dev/null)
-		[ ! -z $val ] && FACTS["nVidia GPU"]=val
+		[ ! -z $val ] && FACTS["nVidia GPU"]=$val
 	fi
 }
 

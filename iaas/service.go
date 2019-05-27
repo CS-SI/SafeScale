@@ -31,10 +31,11 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	api "github.com/CS-SI/SafeScale/iaas/providers"
+	"github.com/CS-SI/SafeScale/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/crypt"
 	"github.com/xrash/smetrics"
@@ -370,7 +371,7 @@ func (svc *Service) SearchImage(osname string) (*resources.Image, error) {
 }
 
 // CreateHostWithKeyPair creates an host
-func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resources.Host, []byte, *resources.KeyPair, error) {
+func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resources.Host, *userdata.Content, *resources.KeyPair, error) {
 	if svc == nil {
 		panic("Calling svc.CreateHostWithKeyPair svc==nil!")
 	}
@@ -409,11 +410,11 @@ func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 		TemplateID:     request.TemplateID,
 		Password:       password,
 	}
-	host, userDataPhase2, err := svc.CreateHost(hostReq)
+	host, userData, err := svc.CreateHost(hostReq)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return host, userDataPhase2, kp, nil
+	return host, userData, kp, nil
 }
 
 // ListHostsByName list hosts by name

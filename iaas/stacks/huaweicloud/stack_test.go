@@ -25,13 +25,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/iaas/tests"
 )
 
 var tester *tests.ServiceTester
 var service *iaas.Service
-var provider providers.Provider
+var provider providerapi.Provider
 
 func getTester() (*tests.ServiceTester, error) {
 	if tester == nil {

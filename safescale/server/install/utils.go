@@ -29,16 +29,17 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/client"
+	srvutils "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils/retry"
 )
 
 const (
 	featureScriptTemplateContent = `
-rm -f /var/tmp/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 1<&-
 exec 2<&-
-exec 1<>/var/tmp/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}
@@ -241,14 +242,15 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	return nil
 }
 
-// normalizeScript envelops the script with log redirection to /var/tmp/feature.<name>.<action>.log
+// normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
 func normalizeScript(params map[string]interface{}) (string, error) {
 	var err error
 
 	if featureScriptTemplate == nil {
 		// parse then execute the template
-		featureScriptTemplate, err = template.New("normalize_script").Parse(featureScriptTemplateContent)
+		tmpl := fmt.Sprintf(featureScriptTemplateContent, srvutils.LogFolder, srvutils.LogFolder)
+		featureScriptTemplate, err = template.New("normalize_script").Parse(tmpl)
 		if err != nil {
 			return "", fmt.Errorf("error parsing bash template: %s", err.Error())
 		}

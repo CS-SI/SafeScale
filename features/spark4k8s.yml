@@ -32,7 +32,6 @@ feature:
     install:
         dcos:
             check: |
-                which jq || sfInstall jq
                 {{.dcos}} spark plan show deploy --json | jq .status | grep COMPLETE
 
             add:

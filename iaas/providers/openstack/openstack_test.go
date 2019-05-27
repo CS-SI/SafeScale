@@ -90,8 +90,12 @@ func Test_Template(t *testing.T) {
 		ResolvConf: "dskjfdshjjkdhsksdhhkjs\nsfdsfsdq\ndfsqdfqsdfq",
 		GatewayIP:  "172.1.2.1",
 	}
-	output, err := userdata.Prepare("phase1", client, dataBuffer, data)
+	userData := userdata.NewContent()
+	err := userData.Prepare(client, dataBuffer, data)
 	assert.Nil(t, err)
+	output := userData.Generate("phase1")
+	fmt.Println(output.String())
+	output = userData.Generate("phase2")
 	fmt.Println(output.String())
 }*/
 

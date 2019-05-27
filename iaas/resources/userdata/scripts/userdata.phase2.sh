@@ -25,7 +25,7 @@ trap print_error ERR
 fail() {
     echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
     # For compatibility with previous user_data implementation (until v19.03.x)...
-    ln -s /opt/safescale/var/state/user_data.phase2.done /var/tmp/user_data.done
+    ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done
     exit $1
 }
 
@@ -76,7 +76,7 @@ reset_fw() {
     [ ! -z $PU_IF ] && {
         firewall-cmd --zone=public --add-interface=$PU_IF || return 1
     }
-    {{- if not .GatewayIP }}
+    {{- if or .PublicIP .IsGateway }}
     [ -z $PU_IF ] && {
         firewall-cmd --zone=public --add-source=${PU_IP}/32 || return 1
     }
@@ -111,7 +111,7 @@ configure_dhclient() {
     # kill any dhclient process already running
     pkill dhclient
 
-    [ -f /etc/dhcp/dhclient.conf] && sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf
+    [ -f /etc/dhcp/dhclient.conf ] && sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf
 
     if [ -d /etc/dhcp/ ]; then
         HOOK_FILE=/etc/dhcp/dhclient-enter-hooks
@@ -162,7 +162,7 @@ identify_nics() {
             PU_IF=
             # Works with FlexibleEngine and potentially with AWS (not tested yet)
             PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null)
-            [ -z $PU_IP] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
+            [ -z $PU_IP ] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
         fi
     fi
     [ -z $PR_IFs ] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
@@ -251,7 +251,7 @@ EOF
             cat <<-EOF >$path/11-$IF-private.cfg
 auto ${IF}
 iface ${IF} inet dhcp
-{{- if .GatewayIP }}
+{{- if .AddGateway }}
   up route add -net default gw {{ .GatewayIP }} || true
 {{- end}}
 EOF
@@ -305,7 +305,7 @@ network:
       critical: true
       dhcp4-overrides:
         use-dns: false
-{{- if .GatewayIP }}
+{{- if .AddGateway }}
         use-routes: false
       routes:
       - to: 0.0.0.0/0
@@ -389,7 +389,7 @@ EOF
 
     configure_dhclient
 
-    {{- if .GatewayIP }}
+    {{- if .AddGateway }}
     echo "GATEWAY={{ .GatewayIP }}" >/etc/sysconfig/network
     {{- end }}
 
@@ -607,7 +607,7 @@ early_packages_update() {
 
         redhat|centos)
             # Force update of systemd and pciutils
-            yum install -qy systemd pciutils netplan.io || fail 211
+            yum install -qy systemd pciutils || fail 211
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
@@ -624,7 +624,7 @@ install_packages() {
             sfApt install -y -qq jq &>/dev/null || fail 213
             ;;
         redhat|centos)
-            yum install -y -q wget jq &>/dev/null || fail 214
+            yum install --enablerepo=epel -y -q wget jq time &>/dev/null || fail 214
             ;;
         *)
             echo "Unsupported Linux distribution '$LINUX_KIND'!"
@@ -640,6 +640,12 @@ add_common_repos() {
             add-apt-repository universe -y || return 1
             codename=$(sfGetFact "linux codename")
             echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
+            ;;
+        redhat|centos)
+            # Install EPEL repo ...
+            yum install -y epel-release
+            # ... but don't enable it by default
+            yum-config-manager --disablerepo=epel &>/dev/null
             ;;
     esac
 }

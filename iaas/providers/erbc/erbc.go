@@ -19,22 +19,23 @@ package erbc
 import (
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/stacks"
+	stackapi "github.com/CS-SI/SafeScale/iaas/stacks/api"
 )
 
 // provider is the providerementation of the Erbc provider
 type provider struct {
-	stacks.Stack
+	stackapi.Stack
 }
 
 // New creates a new instance of erbc provider
-func New() providers.Provider {
+func New() providerapi.Provider {
 	return &provider{}
 }
 
 // Build build a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (providers.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
 	panic("Not Implemented")
 }
 

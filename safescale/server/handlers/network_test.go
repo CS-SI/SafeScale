@@ -16,19 +16,7 @@
 
 package handlers
 
-import (
-	"fmt"
-	"os"
-	"strconv"
-	"testing"
-
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/mocks"
-)
-
+/*
 func TestNetworkHandler_List_with_safescaled_running(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -80,3 +68,4 @@ func TestNetworkHandler_List_with_NO_safescaled_running(t *testing.T) {
 
 	assert.Nil(t, result)
 }
+*/

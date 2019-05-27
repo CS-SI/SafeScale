@@ -659,7 +659,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []byte, error) {
+func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
 	log.Debugf(">>> stacks.openstack::CreateHost(%s)", request.ResourceName)
 	defer log.Debugf("<<< stacks.openstack::CreateHost(%s)", request.ResourceName)
 
@@ -667,11 +667,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 		panic("Calling s.CreateHost with s==nil!")
 	}
 
+	userData := userdata.NewContent()
+
 	msgFail := "Failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if request.DefaultGateway == nil && !request.PublicIP {
-		return nil, nil, resources.ResourceInvalidRequestError("host creation", "can't create a host without public IP or without attached network")
+		return nil, userData, resources.ResourceInvalidRequestError("host creation", "can't create a host without public IP or without attached network")
 	}
 
 	// The Default Network is the first of the provided list, by convention
@@ -689,7 +691,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 			return nil
 		})
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "")
+			return nil, userData, errors.Wrap(err, "")
 		}
 	}
 
@@ -714,7 +716,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
 			log.Debugf(utils.Capitalize(msg))
-			return nil, nil, fmt.Errorf(msg)
+			return nil, userData, fmt.Errorf(msg)
 		}
 
 		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
@@ -722,13 +724,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 		if err != nil {
 			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
 			log.Debugf(utils.Capitalize(msg))
-			return nil, nil, fmt.Errorf(msg)
+			return nil, userData, fmt.Errorf(msg)
 		}
 	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
+			return nil, userData, fmt.Errorf("failed to generate password: %s", err.Error())
 		}
 		request.Password = password
 	}
@@ -736,23 +738,23 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	userDataPhase1, userDataPhase2, err := userdata.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
+	err := userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		log.Debugf(utils.Capitalize(msg))
-		return nil, nil, fmt.Errorf(msg)
+		return nil, userData, fmt.Errorf(msg)
 	}
 
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get image: %s", ProviderErrorToString(err))
+		return nil, userData, fmt.Errorf("failed to get image: %s", ProviderErrorToString(err))
 	}
 
 	// Select useable availability zone, the first one in the list
 	azList, err := s.ListAvailabilityZones(false)
 	if err != nil {
-		return nil, nil, err
+		return nil, userData, err
 	}
 	var az string
 	for az = range azList {
@@ -761,6 +763,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 	log.Debugf("Selected Availability Zone: '%s'", az)
 
 	// Sets provider parameters to create host
+	userDataPhase1, err := userData.Generate("phase2")
+	if err != nil {
+		return nil, userData, err
+	}
 	srvOpts := servers.CreateOpts{
 		Name:             request.ResourceName,
 		SecurityGroups:   []string{s.SecurityGroup.Name},
@@ -786,7 +792,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 		return nil
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, userData, err
 	}
 
 	// Adds Host property SizingV1
@@ -798,7 +804,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 		return nil
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, userData, err
 	}
 
 	// --- query provider for host creation ---
@@ -837,7 +843,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 	)
 	if err != nil {
 		log.Debugf("Error creating host: timeout: %+v", err)
-		return nil, nil, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
+		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
 	log.Debugf("host resource created.")
 
@@ -860,7 +866,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 		}).Extract()
 		if err != nil {
 			log.Debugf("Error creating host: floating ip: %+v", err)
-			return nil, nil, errors.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
+			return nil, userData, errors.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
@@ -881,7 +887,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 		if err != nil {
 			msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
 			log.Debugf(msg)
-			return nil, nil, errors.Wrap(err, msg)
+			return nil, userData, errors.Wrap(err, msg)
 		}
 
 		err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
@@ -891,15 +897,16 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, []by
 			} else if IPVersion.IPv6.Is(ip.IP) {
 				hostNetworkV1.PublicIPv6 = ip.IP
 			}
+			userData.PublicIP = ip.IP
 			return nil
 		})
 		if err != nil {
-			return nil, nil, err
+			return nil, userData, err
 		}
 	}
 
 	log.Infoln(msgSuccess)
-	return host, userDataPhase2, nil
+	return host, userData, nil
 }
 
 // WaitHostReady waits an host achieve ready state

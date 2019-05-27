@@ -188,6 +188,7 @@ install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
 
 installci:
+	@(mkdir -p $(CIBIN) || true)
 	@($(CP) -f $(EXECS) $(CIBIN) || true)
 
 godocs:

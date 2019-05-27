@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/iaas/providers"
+	"github.com/CS-SI/SafeScale/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/utils/crypt"
 )
@@ -36,7 +36,7 @@ var (
 
 // Register a Client referenced by the provider name. Ex: "ovh", ovh.New()
 // This function shoud be called by the init function of each provider to be registered in SafeScale
-func Register(name string, provider providers.Provider) {
+func Register(name string, provider api.Provider) {
 	// if already registered, leave
 	if _, ok := allProviders[name]; ok {
 		return
