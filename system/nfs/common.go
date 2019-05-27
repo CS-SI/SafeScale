@@ -63,7 +63,6 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	}
 	data["reserved_BashLibrary"] = bashLibrary
 
-
 	scriptHeader := "set -u -o pipefail"
 	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
 		if strings.EqualFold("True", strings.TrimSpace(suffixCandidate)) {
@@ -105,7 +104,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	if err != nil {
 		return 255, "", "", fmt.Errorf("failed to create temporary file: %s", err.Error())
 	}
-	filename := "/var/tmp/" + name
+	filename := "/opt/safescale/var/tmp/" + name
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			retcode, stdout, stderr, err := sshconfig.Copy(filename, f.Name(), true)

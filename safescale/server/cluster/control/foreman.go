@@ -55,7 +55,6 @@ var (
 			return i + 1
 		},
 	}
-	tempFolder = "/var/tmp/"
 
 	// // systemTemplateBox ...
 	// systemTemplateBox *rice.Box
@@ -180,8 +179,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		gatewayDef = complementHostDefinition(&gatewayDef, b.makers.DefaultGatewaySizing(task, b))
 		// gatewayDef.ImageID = imageID
 	}
-	//Note: no way yet to define gateway sizing from cli...
-	// gatewayDef = complementHostDefinition(req.NodesDef, gatewayDef)
+	gatewayDef = complementHostDefinition(req.NodesDef, gatewayDef)
 	pbGatewayDef := *pbutils.ToPBGatewayDefinition(&gatewayDef)
 
 	// Determine master sizing
@@ -219,7 +217,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	pbNodeDef := *pbutils.ToPBHostDefinition(&nodeDef)
 
 	// Creates network
-	log.Debugf("[cluster %s] creating Network 'net-%s'", req.Name, req.Name)
+	log.Debugf("[cluster %s] creating network 'net-%s'", req.Name, req.Name)
 	req.Name = strings.ToLower(req.Name)
 	networkName := "net-" + req.Name
 	def := pb.NetworkDefinition{
@@ -671,7 +669,7 @@ func uploadTemplateToFile(
 		return "", fmt.Errorf("failed to realize template: %s", err.Error())
 	}
 	cmd := dataBuffer.String()
-	remotePath := tempFolder + fileName
+	remotePath := pbutils.TempFolder + "/" + fileName
 
 	err = install.UploadStringToRemoteFile(cmd, host, remotePath, "", "", "")
 	if err != nil {

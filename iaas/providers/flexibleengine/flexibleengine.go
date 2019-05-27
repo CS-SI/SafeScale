@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
 	imagefilters "github.com/CS-SI/SafeScale/iaas/resources/filters/images"
@@ -66,12 +67,12 @@ type provider struct {
 }
 
 // New creates a new instance of flexibleengine provider
-func New() providers.Provider {
+func New() providerapi.Provider {
 	return &provider{}
 }
 
 // Build initializes a new FlexibleEngine instance from parameters
-func (p *provider) Build(params map[string]interface{}) (providers.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
 
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})

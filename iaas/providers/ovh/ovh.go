@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
 	filters "github.com/CS-SI/SafeScale/iaas/resources/filters/templates"
@@ -76,12 +77,12 @@ type provider struct {
 }
 
 // New creates a new instance of cloudferro provider
-func New() providers.Provider {
+func New() providerapi.Provider {
 	return &provider{}
 }
 
 // Build build a new instance of Ovh using configuration parameters
-func (p *provider) Build(params map[string]interface{}) (providers.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
 	identityParams, _ := params["identity"].(map[string]interface{})
 	computeParams, _ := params["compute"].(map[string]interface{})
 	// networkParams, _ := params["network"].(map[string]interface{})

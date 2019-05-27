@@ -124,7 +124,6 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            which jq || sfInstall jq
                             sfRetry 10m 20 "sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null" || exit 193
                             sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
                             sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
@@ -162,7 +161,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            mkdir -p /opt/safescale/k8s/ssl /opt/safescale/k8s/config
+                            mkdir -p ${SF_TMPDIR}/k8s/ssl ${SF_TMPDIR}/k8s/config
 
                     common-tools:
                         targets:
@@ -182,7 +181,7 @@ feature:
                             chmod 755 kubeadm kubelet kubectl
                             mv kubeadm kubelet kubectl /usr/local/bin
 
-                            cd /var/tmp
+                            cd $SF_TMPDIR
                             VERSION=v1.13.0
                             URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/${VERSION}/crictl-${VERSION}-linux-amd64.tar.gz"
                             sfDownload "$URL" crictl.tgz 5m 5 || exit 192
@@ -281,7 +280,7 @@ feature:
                             RELEASE=v1.12.6
                             [ $? -ne 0 ] && exit 192
 
-                            cd /opt/safescale/k8s/config
+                            cd ${SF_BASEDIR}/k8s/config
 
                             #untested api version !!
                             cat >kubeadm-bootstrap.config.yaml <<-EOF
@@ -353,19 +352,19 @@ feature:
                             cp /etc/kubernetes/pki/front-proxy-ca.key ../ssl
                             cp /etc/kubernetes/pki/etcd/ca.crt ../ssl/etcd-ca.crt
                             cp /etc/kubernetes/pki/etcd/ca.key ../ssl/etcd-ca.key
-                            ( cd .. ; tar zcvf /var/tmp/files.tgz . )
-                            sfDropzonePush /var/tmp/files.tgz || exit 194
-                            rm /var/tmp/files.tgz
+                            ( cd .. ; tar zcvf ${SF_TMPDIR}/files.tgz . )
+                            sfDropzonePush ${SF_TMPDIR}/files.tgz || exit 194
+                            rm ${SF_TMPDIR}/files.tgz
 
                             for ip in {{range .MasterIPs}}{{.}} {{end}}; do
                                 [ "$ip" = "{{.HostIP}}" ] && continue
-                                sed -e "s:{{.HostIP}}:${ip}:g" /etc/kubernetes/admin.conf >/var/tmp/admin.conf
+                                sed -e "s:{{.HostIP}}:${ip}:g" /etc/kubernetes/admin.conf >${SF_TMPDIR}/admin.conf
                                 sed -e "s:##HOSTIP##:${ip}:g" kubeadm-k8s-cpx.config.yaml.template >/tmp/kubeadm-k8s-cpx.config.yaml
-                                sfDropzonePush /tmp/admin.conf && \
-                                sfDropzonePush /tmp/kubeadm-k8s-cpx.config.yaml && \
+                                sfDropzonePush ${SF_TMPDIR}/admin.conf && \
+                                sfDropzonePush ${SF_TMPDIR}/kubeadm-k8s-cpx.config.yaml && \
                                 sfDropzonePush etcd-join.sh.template && \
                                 sfDropzoneSync $ip || exit 195
-                                rm -f /var/tmp/admin.conf /tmp/kubeadm-k8s-cpx.config.yaml
+                                rm -f ${SF_TMPDIR}/admin.conf ${SF_TMPDIR}/kubeadm-k8s-cpx.config.yaml
                             done
                             sfDropzoneClean
 

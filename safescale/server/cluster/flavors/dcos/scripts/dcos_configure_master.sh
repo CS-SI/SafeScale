@@ -17,11 +17,11 @@
 # Installs and configure a master node
 # This script must be executed on server to configure as master node
 
-# Redirects outputs to /var/tmp/configure_master.log
-rm -f /var/tmp/configure_master.log
+# Redirects outputs to boh_configure_master.log
+rm -f /opt/safescale/var/log/boh_configure_master.log
 exec 1<&-
 exec 2<&-
-exec 1<>/var/tmp/configure_master.log
+exec 1<>/opt/safescale/var/log/boh_configure_master.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}

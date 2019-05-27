@@ -18,11 +18,12 @@
 #
 # This script has to be executed on the bootstrap/upgrade server
 
-# Redirects outputs to /var/tmp/prepare_bootstrap.log
-rm -f /var/tmp/prepare_bootstrap.log
+
+# Redirects outputs to dcos_prepare_bootstrap.log
+rm -f /opt/safescale/var/log/dcos_prepare_bootstrap.log
 exec 1<&-
 exec 2<&-
-exec 1<>/var/tmp/prepare_bootstrap.log
+exec 1<>/opt/safescale/var/log/dcos_prepare_bootstrap.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}

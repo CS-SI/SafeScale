@@ -33,10 +33,11 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/safescale/server/install"
 	"github.com/CS-SI/SafeScale/safescale/server/metadata"
-	safescaleutils "github.com/CS-SI/SafeScale/safescale/utils"
+	srvutils "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils"
 	"github.com/CS-SI/SafeScale/utils/retry"
@@ -90,7 +91,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) error {
 	if err != nil {
 		return infraErr(err)
 	}
-	return infraErr(handler.service.WaitHostState(id, HostState.STARTED, safescaleutils.GetTimeoutCtxHost()))
+	return infraErr(handler.service.WaitHostState(id, HostState.STARTED, srvutils.GetTimeoutCtxHost()))
 }
 
 // Stop stops a host
@@ -111,7 +112,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) error {
 	if err != nil {
 		return infraErr(err)
 	}
-	return infraErr(handler.service.WaitHostState(id, HostState.STOPPED, safescaleutils.GetTimeoutCtxHost()))
+	return infraErr(handler.service.WaitHostState(id, HostState.STOPPED, srvutils.GetTimeoutCtxHost()))
 }
 
 // Reboot reboots a host
@@ -133,7 +134,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) error {
 	}
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			return handler.service.WaitHostState(id, HostState.STARTED, safescaleutils.GetTimeoutCtxHost())
+			return handler.service.WaitHostState(id, HostState.STARTED, srvutils.GetTimeoutCtxHost())
 		},
 		5*time.Minute, // FIXME Hardcoded timeout
 	)
@@ -307,8 +308,8 @@ func (handler *HostHandler) Create(
 		DefaultGateway: gw,
 	}
 
-	var userDataPhase2 []byte
-	host, userDataPhase2, err = handler.service.CreateHost(hostRequest)
+	var userData *userdata.Content
+	host, userData, err = handler.service.CreateHost(hostRequest)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceInvalidRequest); ok {
 			return nil, infraErr(err)
@@ -433,7 +434,7 @@ func (handler *HostHandler) Create(
 	if err != nil {
 		return nil, infraErr(err)
 	}
-	sshDefaultTimeout := int(safescaleutils.GetTimeoutCtxHost().Minutes())
+	sshDefaultTimeout := int(srvutils.GetTimeoutCtxHost().Minutes())
 	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
 		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
 		if err == nil {
@@ -476,8 +477,13 @@ func (handler *HostHandler) Create(
 	}
 
 	// Executes userdata phase2 script to finalize host installation
-	filepath := "/opt/safescale/var/tmp/user_data.phase2.sh"
-	err = install.UploadStringToRemoteFile(string(userDataPhase2), safescaleutils.ToPBHost(host), filepath, "", "", "")
+	userDataPhase2, err := userData.Generate("phase2")
+	if err != nil {
+		return nil, err
+	}
+
+	filepath := srvutils.TempFolder + "/user_data.phase2.sh"
+	err = install.UploadStringToRemoteFile(string(userDataPhase2), srvutils.ToPBHost(host), filepath, "", "", "")
 	if err != nil {
 		return nil, err
 	}

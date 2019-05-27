@@ -34,12 +34,12 @@ import (
 
 //Default chunk sizes that will used to spit files (in Bytes)
 const (
-	keyFilePath_Const  = "$HOME/.safescale/rsa.key"
-	chunkSize_Const    = int(10 * (1 << (10 * 2)))
-	parityNum_Const    = 4
-	parityDen_Const    = 4
-	parityRatio_Const  = parityNum_Const / parityDen_Const
-	batchMaxSize_Const = 4
+	keyFilePathConst  = "$HOME/.safescale/rsa.key"
+	chunkSizeConst    = int(10 * (1 << (10 * 2)))
+	parityNumConst    = 4
+	parityDenConst    = 4
+	parityRatioConst  = parityNumConst / parityDenConst
+	batchMaxSizeConst = 4
 )
 
 //go:generate mockgen -destination=../mocks/mock_dataapi.go -package=mocks github.com/CS-SI/SafeScale/safescale/server/handlers DataAPI
@@ -94,7 +94,7 @@ func fetchChunkGroup(fileName string, buckets []objectstorage.Bucket) (*utils.Ch
 		if err != nil {
 			continue
 		}
-		keyInfo, err = utils.DecryptKeyInfo(buffer.Bytes(), keyFilePath_Const)
+		keyInfo, err = utils.DecryptKeyInfo(buffer.Bytes(), keyFilePathConst)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +153,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 		return err
 	}
 	//initialize
-	nbDataShards, nbParityShards, err := chunkGroup.InitShards(chunkSize_Const, batchMaxSize_Const, parityNum_Const, parityDen_Const, bucketGenerator)
+	nbDataShards, nbParityShards, err := chunkGroup.InitShards(chunkSizeConst, batchMaxSizeConst, parityNumConst, parityDenConst, bucketGenerator)
 	if err != nil {
 		return err
 	}
@@ -259,7 +259,7 @@ func (handler *DataHandler) Push(ctx context.Context, fileLocalPath string, file
 	}
 
 	//encrypt and push keyInfo
-	encryptedKeyInfo, err := keyInfo.Encrypt(keyFilePath_Const)
+	encryptedKeyInfo, err := keyInfo.Encrypt(keyFilePathConst)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt the KeyInfo : %s", err.Error())
 	}
@@ -509,7 +509,7 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("Failed to read the keyInfo from the bucket '%s' : %s", bucketNames[0], err.Error())
 		}
-		keyInfo, err := utils.DecryptKeyInfo(buffer.Bytes(), keyFilePath_Const)
+		keyInfo, err := utils.DecryptKeyInfo(buffer.Bytes(), keyFilePathConst)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}

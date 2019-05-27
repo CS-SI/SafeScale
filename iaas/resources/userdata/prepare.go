@@ -28,13 +28,13 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/stacks"
+	stacks "github.com/CS-SI/SafeScale/iaas/stacks"
 	"github.com/CS-SI/SafeScale/system"
 	"github.com/CS-SI/SafeScale/utils"
 )
 
-// userData is the structure to apply to userdata.sh template
-type userData struct {
+// Content is the structure to apply to userdata.sh template
+type Content struct {
 	// BashLibrary contains the basj library
 	BashLibrary string
 	// Header is the bash header for scripts
@@ -49,6 +49,8 @@ type userData struct {
 	ConfIF bool
 	// IsGateway, if set to true, activate IP forwarding
 	IsGateway bool
+	// PublicIP contains a public IP binded to the host
+	PublicIP string
 	// AddGateway, if set to true, configure default gateway
 	AddGateway bool
 	// DNSServers contains the list of DNS servers to use
@@ -64,6 +66,8 @@ type userData struct {
 	EmulatedPublicNet string
 	// HostName contains the name wanted as host name (default == name of the Cloud resource)
 	HostName string
+	// Tags contains tags and their content(s); a tag is named #<tag> in the template
+	Tags map[string]map[string][]string
 }
 
 var (
@@ -71,10 +75,17 @@ var (
 	userdataPhase2Template *template.Template
 )
 
+// NewContent ...
+func NewContent() *Content {
+	return &Content{
+		Tags: map[string]map[string][]string{},
+	}
+}
+
 // Prepare prepares the initial configuration script executed by cloud compute resource
-func Prepare(
+func (ud *Content) Prepare(
 	options stacks.ConfigurationOptions, request resources.HostRequest, cidr string, defaultNetworkCIDR string,
-) ([]byte, []byte, error) {
+) error {
 
 	// Generate password for user safescale
 	var (
@@ -83,12 +94,11 @@ func Prepare(
 		useLayer3Networking       = true
 		dnsList                   []string
 		operatorUsername          string
-		box                       *rice.Box
 	)
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
+			return fmt.Errorf("failed to generate password: %s", err.Error())
 		}
 		request.Password = password
 	}
@@ -107,36 +117,9 @@ func Prepare(
 		dnsList = []string{"1.1.1.1"}
 	}
 
-	if userdataPhase1Template == nil || userdataPhase2Template == nil {
-		box, err = rice.FindBox("../userdata/scripts")
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	if userdataPhase1Template == nil {
-		tmplString, err := box.String("userdata.phase1.sh")
-		if err != nil {
-			return nil, nil, fmt.Errorf("error loading script template: %s", err.Error())
-		}
-		userdataPhase1Template, err = template.New("userdata.phase1").Parse(tmplString)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error parsing script template: %s", err.Error())
-		}
-	}
-	if userdataPhase2Template == nil {
-		tmplString, err := box.String("userdata.phase2.sh")
-		if err != nil {
-			return nil, nil, fmt.Errorf("error loading script template: %s", err.Error())
-		}
-		userdataPhase2Template, err = template.New("userdata.phase2").Parse(tmplString)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error parsing script template: %s", err.Error())
-		}
-	}
-
 	bashLibrary, err := system.GetBashLibrary()
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	scriptHeader := "set -u -o pipefail"
@@ -147,37 +130,93 @@ func Prepare(
 		}
 	}
 
-	data := userData{
-		BashLibrary:       bashLibrary,
-		Header:            scriptHeader,
-		User:              operatorUsername,
-		PublicKey:         strings.Trim(request.KeyPair.PublicKey, "\n"),
-		PrivateKey:        strings.Trim(request.KeyPair.PrivateKey, "\n"),
-		ConfIF:            !autoHostNetworkInterfaces,
-		IsGateway:         request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking,
-		AddGateway:        !request.PublicIP && !useLayer3Networking,
-		DNSServers:        dnsList,
-		CIDR:              cidr,
-		GatewayIP:         ip,
-		Password:          request.Password,
-		EmulatedPublicNet: defaultNetworkCIDR,
-		//HostName:   request.Name,
-	}
+	ud.BashLibrary = bashLibrary
+	ud.Header = scriptHeader
+	ud.User = operatorUsername
+	ud.PublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
+	ud.PrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
+	ud.ConfIF = !autoHostNetworkInterfaces
+	ud.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking
+	ud.AddGateway = !request.PublicIP && !useLayer3Networking && ip != ""
+	ud.DNSServers = dnsList
+	ud.CIDR = cidr
+	ud.GatewayIP = ip
+	ud.Password = request.Password
+	ud.EmulatedPublicNet = defaultNetworkCIDR
+	//ud.HostName = request.Name
 
-	bufPhase1 := bytes.NewBufferString("")
-	err = userdataPhase1Template.Execute(bufPhase1, data)
-	if err != nil {
-		return nil, nil, err
-	}
-	bufPhase2 := bytes.NewBufferString("")
-	err = userdataPhase2Template.Execute(bufPhase2, data)
-	if err != nil {
-		return nil, nil, err
-	}
-	return bufPhase1.Bytes(), bufPhase2.Bytes(), nil
+	return nil
 }
 
-// Append add some useful code on the end of userdata.phase2.sh just before the end (on the label #insert_tag)
-func Append(userdata []byte, addedPart string) []byte {
-	return bytes.Replace(userdata, []byte("#insert_tag"), []byte(addedPart+"\n\n#insert_tag"), 1)
+// Generate generates the script file corresponding to the phase
+func (ud *Content) Generate(phase string) ([]byte, error) {
+	var (
+		box    *rice.Box
+		result []byte
+		err    error
+	)
+
+	switch phase {
+	case "phase1":
+		if userdataPhase1Template == nil {
+			box, err = rice.FindBox("../userdata/scripts")
+			if err != nil {
+				return nil, err
+			}
+
+			tmplString, err := box.String("userdata.phase1.sh")
+			if err != nil {
+				return nil, fmt.Errorf("error loading script template: %s", err.Error())
+			}
+			userdataPhase1Template, err = template.New("userdata.phase1").Parse(tmplString)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+			}
+		}
+		buf := bytes.NewBufferString("")
+		err = userdataPhase1Template.Execute(buf, ud)
+		if err != nil {
+			return nil, err
+		}
+		result = buf.Bytes()
+	case "phase2":
+		if userdataPhase2Template == nil {
+			box, err = rice.FindBox("../userdata/scripts")
+			if err != nil {
+				return nil, err
+			}
+
+			tmplString, err := box.String("userdata.phase2.sh")
+			if err != nil {
+				return nil, fmt.Errorf("error loading script template: %s", err.Error())
+			}
+			userdataPhase2Template, err = template.New("userdata.phase2").Parse(tmplString)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+			}
+		}
+		buf := bytes.NewBufferString("")
+		err = userdataPhase2Template.Execute(buf, ud)
+		if err != nil {
+			return nil, err
+		}
+		result = buf.Bytes()
+		for tagname, tagcontent := range ud.Tags[phase] {
+			for _, str := range tagcontent {
+				bytes.Replace(result, []byte("#"+tagname), []byte(str+"\n\n#"+tagname), 1)
+			}
+		}
+	default:
+		return nil, fmt.Errorf("phase '%s' not managed", phase)
+	}
+
+	return result, nil
+}
+
+// AddInTag adds some useful code on the end of userdata.phase2.sh just before the end (on the label #insert_tag)
+func (ud Content) AddInTag(phase string, tagname string, content string) {
+	if _, ok := ud.Tags[phase]; !ok {
+		ud.Tags[tagname] = map[string][]string{}
+	}
+	ud.Tags[phase][tagname] = append(ud.Tags[phase][tagname], content)
 }

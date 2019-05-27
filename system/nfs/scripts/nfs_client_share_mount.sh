@@ -27,6 +27,6 @@ function print_error {
 trap print_error ERR
 
 mkdir -p "{{.MountPoint}}" && \
-echo mount.nfs -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" > /var/tmp/moco.txt && \
+echo mount.nfs -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" > /opt/safescale/var/tmp/moco.txt && \
 mount.nfs -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" && \
 echo "{{.Export}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,{{ .cacheOption }} 0   0" >>/etc/fstab
