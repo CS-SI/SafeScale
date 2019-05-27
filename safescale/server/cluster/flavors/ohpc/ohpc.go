@@ -48,8 +48,6 @@ const (
 	shortTimeoutSSH = time.Minute
 	longTimeoutSSH  = 5 * time.Minute
 
-	tempFolder = "/var/tmp/"
-
 	centos = "CentOS 7.4"
 )
 

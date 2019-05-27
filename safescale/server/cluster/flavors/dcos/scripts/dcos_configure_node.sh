@@ -17,11 +17,12 @@
 # Installs and configure a DCOS agent node
 # This script must be executed on agent node.
 
-# Redirects outputs to /var/tmp/install_node.log
-rm -f /var/tmp/install_node.log
+
+# Redirects outputs to dcos_install_node.log
+rm -f /opt/safescale/var/log/dcos_install_node.log
 exec 1<&-
 exec 2<&-
-exec 1<>/var/tmp/configure_node.log
+exec 1<>/opt/safescale/var/log/dcos_configure_node.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}
@@ -33,12 +34,12 @@ else
 fi
 
 # Get install script from bootstrap server
-mkdir /tmp/dcos && cd /tmp/dcos
+mkdir ${SF_TMPDIR}/dcos && cd ${SF_TMPDIR}/dcos
 curl -qkSsL -O http://{{.BootstrapIP}}:{{.BootstrapPort}}/dcos_install.sh || exit 192
 
 # Launch installation
 bash dcos_install.sh $MODE || exit 193
-rm -rf /tmp/dcos
+rm -rf ${SF_TMPDIR}/dcos
 
 echo
 echo "Node configured successfully."

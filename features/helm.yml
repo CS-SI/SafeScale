@@ -36,7 +36,7 @@ feature:
                         hosts: none
                         masters: all
                     run: |
-                        cd /var/tmp
+                        cd $SF_TMPDIR
                         wget -O get_helm.sh https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get && \
                         bash ./get_helm.sh || exit 192
                         rm -f get_helm.sh

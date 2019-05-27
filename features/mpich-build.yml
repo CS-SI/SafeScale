@@ -52,7 +52,7 @@ feature:
                                     exit 1
                                     ;;
                             esac
-                            cd /var/tmp
+                            cd ${SF_TMPDIR}
                             wget http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz || exit 2
                             tar -zxvf mpich-3.2.1.tar.gz
                             cd mpich-3.2.1

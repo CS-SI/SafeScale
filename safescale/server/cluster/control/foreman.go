@@ -55,7 +55,6 @@ var (
 			return i + 1
 		},
 	}
-	tempFolder = "/var/tmp/"
 
 	// // systemTemplateBox ...
 	// systemTemplateBox *rice.Box
@@ -671,7 +670,7 @@ func uploadTemplateToFile(
 		return "", fmt.Errorf("failed to realize template: %s", err.Error())
 	}
 	cmd := dataBuffer.String()
-	remotePath := tempFolder + fileName
+	remotePath := pbutils.TempFolder + "/" + fileName
 
 	err = install.UploadStringToRemoteFile(cmd, host, remotePath, "", "", "")
 	if err != nil {

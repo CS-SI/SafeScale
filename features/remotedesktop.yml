@@ -144,7 +144,7 @@ feature:
                             # tar --exclude .config/g* -Jcvf xfce_conf.tar.xz .config
                             # base64 xfce_conf.tar.xz >xfce_conf.tar.xz.encoded
                             # Then copy between HEREDOCs the content of the .encoded file
-                            cat >/var/tmp/xfce_conf.encoded <<'EOF'
+                            cat >${SF_TMPDIR}/xfce_conf.encoded <<'EOF'
                             /Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4O//FW9dABcYyecMYYgb8tkd/QwXnBEBYq7o9K5cz3Dw
                             IsSonUkO6IaHvO+YS5nNHN2/lJlax4FCiWhkmwiAJRTWbQy6nFQuCNTNR5RdGaujqV44zxFE5CBR
                             FiN6bl2NP2uZ5T48K9Q83bcLDuMSi1aQGYaj9hyFQp0aO1Emt7tMgDStsEebG1Wm2YSx0d8STDbe
@@ -244,8 +244,8 @@ feature:
                             6DxAL5QxcUg11XgF202lp4xtaGE6Ztp54kOJl0q2WnF0147fJuLhKZ6xH4C3AAAAnOC4P8r+AxMA
                             AYsrgOADAIsbpW6xxGf7AgAAAAAEWVo=
                             EOF
-                            cat /var/tmp/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
-                            rm -f /var/tmp/xfce_conf.encoded
+                            cat ${SF_TMPDIR}/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
+                            rm -f ${SF_TMPDIR}/xfce_conf.encoded
                             chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 195
 
                             systemctl daemon-reload && \
@@ -259,8 +259,8 @@ feature:
                             hosts: yes
                             masters: all
                         run: |
-                            mkdir -p /var/tmp/remotedesktop.image
-                            cd /var/tmp/remotedesktop.image
+                            mkdir -p ${SF_TMPDIR}/remotedesktop.image
+                            cd ${SF_TMPDIR}/remotedesktop.image
 
                             VERSION=1.0.0
                             APACHE="http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${VERSION}"
@@ -273,7 +273,7 @@ feature:
                             masters: all
                         wallTime: 10
                         run: |
-                            cd /var/tmp/remotedesktop.image
+                            cd ${SF_TMPDIR}/remotedesktop.image
 
                             cat >supervisord.conf <<-'EOF'
                             [supervisord]
@@ -472,7 +472,7 @@ feature:
                             ls -la
                             # build image
                             docker build -t remotedesktop:latest . || exit 192
-                            cd /var/tmp && rm -rf remotedesktop.image
+                            cd ${SF_TMPDIR} && rm -rf remotedesktop.image
 
                     start:
                         targets:

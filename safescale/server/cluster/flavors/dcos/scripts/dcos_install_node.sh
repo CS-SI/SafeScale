@@ -17,11 +17,11 @@
 # Installs and configure a DCOS agent node
 # This script must be executed on agent node.
 
-# Redirects outputs to /var/tmp/install_node.log
-rm -f /var/tmp/install_node.log
+# Redirects outputs to dcos_install_node.log
+rm -f /opt/safescale/var/log/dcos_install_node.log
 exec 1<&-
 exec 2<&-
-exec 1<>/var/tmp/install_node.log
+exec 1<>/opt/safescale/var/log/dcos_install_node.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}
