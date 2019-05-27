@@ -46,8 +46,6 @@ feature:
                             masters: all
                         wallTime: 15
                         run: |
-                            which jq || sfInstall jq
-
                             ###########################################################
                             # Install xfce + tigervnc                                 #
                             ###########################################################
