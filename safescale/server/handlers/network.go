@@ -192,6 +192,12 @@ func (handler *NetworkHandler) Create(
 		return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", gwname)
 	}
 
+	// Reloads the host to be sure all the properties are updated
+	gw, err = handler.service.InspectHost(gw)
+	if err != nil {
+		return nil, infraErr(err)
+	}
+
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
 		if err != nil {
@@ -203,12 +209,6 @@ func (handler *NetworkHandler) Create(
 			log.Infof("Gateway '%s' deleted", gw.Name)
 		}
 	}()
-
-	// Reloads the host to be sure all the properties are updated
-	gw, err = handler.service.InspectHost(gw)
-	if err != nil {
-		return nil, infraErr(err)
-	}
 
 	// Updates requested sizing in gateway property propsv1.HostSizing
 	err = gw.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {

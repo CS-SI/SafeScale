@@ -439,11 +439,15 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 			})
 			server, err := r.Extract()
 			if err != nil {
-				if server != nil && httpResp.StatusCode != 400 {
+				if server != nil {
 					servers.Delete(s.Stack.ComputeClient, server.ID)
 				}
-				return fmt.Errorf("query to create host '%s' failed: %s (HTTP return code: %d)",
-					request.ResourceName, openstack.ProviderErrorToString(err), httpResp.StatusCode)
+				var codeStr string
+				if httpResp != nil {
+					codeStr = fmt.Sprintf(" (HTTP return code: %d)", httpResp.StatusCode)
+				}
+				return fmt.Errorf("query to create host '%s' failed: %s%s",
+					request.ResourceName, openstack.ProviderErrorToString(err), codeStr)
 			}
 			host.ID = server.ID
 
