@@ -763,7 +763,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	log.Debugf("Selected Availability Zone: '%s'", az)
 
 	// Sets provider parameters to create host
-	userDataPhase1, err := userData.Generate("phase2")
+	userDataPhase1, err := userData.Generate("phase1")
 	if err != nil {
 		return nil, userData, err
 	}
