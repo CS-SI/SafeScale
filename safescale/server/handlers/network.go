@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/safescale/client"
+	srvutils "github.com/CS-SI/SafeScale/safescale/utils"
 
 	log "github.com/sirupsen/logrus"
 
@@ -185,7 +186,7 @@ func (handler *NetworkHandler) Create(
 	}
 
 	log.Infof("Requesting the creation of a gateway '%s' using template '%s' with image '%s'", gwname, template.Name, img.Name)
-	gw, userDataPhase2, err := handler.service.CreateGateway(gwRequest)
+	gw, userData, err := handler.service.CreateGateway(gwRequest)
 	if err != nil {
 		//defer handler.service.DeleteNetwork(network.ID)
 		return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", gwname)
@@ -279,11 +280,15 @@ func (handler *NetworkHandler) Create(
 
 	// Executes userdata phase2 script to finalize host installation
 	log.Infof("Starting initial configuration of the gateway '%s'", gw.Name)
-	err = install.UploadStringToRemoteFile(string(userDataPhase2), safescaleutils.ToPBHost(gw), "/opt/safescale/var/tmp/user_data.phase2.sh", "", "", "")
+	userDataPhase2, err := userData.Generate("phase2")
 	if err != nil {
 		return nil, err
 	}
-	command := fmt.Sprintf("sudo bash %s; exit $?", "/opt/safescale/var/tmp/user_data.phase2.sh")
+	err = install.UploadStringToRemoteFile(string(userDataPhase2), safescaleutils.ToPBHost(gw), srvutils.TempFolder+"/user_data.phase2.sh", "", "", "")
+	if err != nil {
+		return nil, err
+	}
+	command := fmt.Sprintf("sudo bash %s/%s; exit $?", srvutils.TempFolder, "user_data.phase2.sh")
 	retcode, _, stderr, err := sshHandler.Run(ctx, gw.Name, command)
 	if err != nil {
 		return nil, err

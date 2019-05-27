@@ -23,8 +23,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
 )
 
 var errorStr = "Libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"
@@ -42,7 +44,7 @@ type AuthOptions struct {
 type CfgOptions struct {
 }
 
-func (provider *provider) Build(params map[string]interface{}) (providers.Provider, error) {
+func (provider *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) GetAuthOpts() (providers.Config, error) {
@@ -98,14 +100,14 @@ func (provider *provider) ListNetworks() ([]*resources.Network, error) {
 func (provider *provider) DeleteNetwork(id string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) CreateGateway(req resources.GatewayRequest) (*resources.Host, []byte, error) {
+func (provider *provider) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
 	return nil, nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteGateway(string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateHost(request resources.HostRequest) (*resources.Host, []byte, error) {
+func (provider *provider) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
 	return nil, nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {

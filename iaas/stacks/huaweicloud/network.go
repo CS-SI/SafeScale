@@ -34,6 +34,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/utils/retry"
 	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
@@ -614,7 +615,7 @@ func fromIntIPVersion(v int) IPVersion.Enum {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, []byte, error) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
 	if req.Network == nil {
 		panic("req.Network is nil!")
 	}
@@ -626,6 +627,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, []
 	log.Debugf(">>> huaweicloud.Stack::CreateGateway(%s)", gwname)
 	defer log.Debugf("<<< huaweicloud.Stack::CreateGateway(%s)", gwname)
 
+	userData := userdata.NewContent()
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
@@ -634,16 +636,16 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, []
 		Networks:     []*resources.Network{req.Network},
 		PublicIP:     true,
 	}
-	host, userDataPhase2, err := s.CreateHost(hostReq)
+	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
 		case resources.ErrResourceInvalidRequest:
-			return nil, nil, err
+			return nil, userData, err
 		default:
-			return nil, nil, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
+			return nil, userData, fmt.Errorf("Error creating gateway : %s", openstack.ProviderErrorToString(err))
 		}
 	}
-	return host, userDataPhase2, err
+	return host, userData, err
 }
 
 // DeleteGateway deletes the gateway associated with network identified by ID
