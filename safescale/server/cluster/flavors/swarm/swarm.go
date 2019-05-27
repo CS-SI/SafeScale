@@ -48,7 +48,7 @@ const (
 	shortTimeoutSSH = time.Minute
 	longTimeoutSSH  = 5 * time.Minute
 
-	tempFolder = "/var/tmp/"
+	// tempFolder = "/opt/safescale/var/tmp/"
 )
 
 var (

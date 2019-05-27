@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/safescale/server/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/safescale/server/install/enums/Action"
 	"github.com/CS-SI/SafeScale/safescale/server/install/enums/Method"
+	srvutils "github.com/CS-SI/SafeScale/safescale/utils"
 )
 
 const (
@@ -461,7 +462,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 			}
 			if ok {
 				optionsFileContent = content.(string)
-				v["options"] = "--options=/var/tmp/options.json"
+				v["options"] = fmt.Sprintf("--options=%s/options.json", srvutils.TempFolder)
 			}
 		} else {
 			v["options"] = ""

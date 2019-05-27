@@ -26,6 +26,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/safescale"
 	"github.com/CS-SI/SafeScale/safescale/client"
 	"github.com/CS-SI/SafeScale/safescale/server/install/enums/Action"
+	srvutils "github.com/CS-SI/SafeScale/safescale/utils"
 	"github.com/CS-SI/SafeScale/utils/concurrency"
 )
 
@@ -300,7 +301,7 @@ func (is *step) taskRunOnHost(tr concurrency.TaskRunner, params interface{}) {
 
 	// If options file is defined, upload it to the remote host
 	if is.OptionsFileContent != "" {
-		err := UploadStringToRemoteFile(is.OptionsFileContent, host, "/var/tmp/options.json", "cladm", "safescale", "ug+rw-x,o-rwx")
+		err := UploadStringToRemoteFile(is.OptionsFileContent, host, srvutils.TempFolder+"/options.json", "cladm", "safescale", "ug+rw-x,o-rwx")
 		if err != nil {
 			tr.StoreResult(stepResult{success: false, err: err})
 			return
@@ -308,14 +309,14 @@ func (is *step) taskRunOnHost(tr concurrency.TaskRunner, params interface{}) {
 	}
 
 	// Uploads then executes command
-	filename := fmt.Sprintf("/var/tmp/feature.%s.%s_%s.sh", is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
+	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", srvutils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
 	if err != nil {
 		tr.StoreResult(stepResult{success: false, err: err})
 		return
 	}
 
-	command = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then sudo rm -f %s /var/tmp/options.json; fi; exit $rc", filename, filename)
+	command = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then sudo rm -f %s %s/options.json; fi; exit $rc", filename, filename, srvutils.TempFolder)
 
 	// Executes the script on the remote host
 	retcode, _, _, err := client.New().Ssh.Run(host.Name, command, client.DefaultConnectionTimeout, is.WallTime)

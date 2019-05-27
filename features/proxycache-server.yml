@@ -42,8 +42,8 @@ feature:
                             hosts: yes
                         wallTime: 10
                         run: |
-                            mkdir -p /opt/safescale/data/proxycache/cache /opt/safescale/run /var/tmp/proxycache.image
-                            cd /var/tmp/proxycache.image
+                            mkdir -p ${SF_BASEDIR}/data/proxycache/cache ${SF_VARDIR}/run ${SF_TMPDIR}/proxycache.image
+                            cd ${SF_TMPDIR}/proxycache.image
 
                             cat >entrypoint.sh <<'EOF'
                             #!/bin/sh
@@ -161,9 +161,9 @@ feature:
                             EOF
 
                             sfRetry 5m 5 docker build --rm --no-cache -t proxycache:latest . && \
-                            cd /var/tmp && rm -rf proxycache.image || exit 192
+                            cd ${SF_TMPDIR} && rm -rf proxycache.image || exit 192
 
-                            docker-compose -f /opt/safescale/run/proxycache.compose.yml -p proxycache up -d || exit 514
+                            docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml -p proxycache up -d || exit 514
 
             remove:
                 pace: container
@@ -172,21 +172,21 @@ feature:
                         targets:
                             host: yes
                         run: |
-                            docker-compose -f /opt/safescale/run/proxycache.compose.yml rm -f
+                            docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml rm -f
                             docker image rm -f proxycache:latest
 
     service:
         start: |
-            docker-compose -f /opt/safescale/run/proxycache.feature.yml up -d
+            docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml up -d
 
         stop: |
-            docker-compose -f /opt/safescale/run/proxycache.feature.yml down
+            docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml down
 
         pause: |
-            docker-compose -f /opt/safescale/run/proxycache.feature.yml pause
+            docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml pause
 
         unpause: |
-            docker-compose -f /opt/safescale/run/proxycache.feature.yml unpause
+            docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml unpause
 
         state: |
             docker ps | grep proxycache &>/dev/null
