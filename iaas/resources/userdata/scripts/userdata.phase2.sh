@@ -604,7 +604,7 @@ early_packages_update() {
 
         redhat|centos)
             # Force update of systemd and pciutils
-            yum install -qy systemd pciutils netplan.io || fail 211
+            yum install -qy systemd pciutils || fail 211
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
@@ -621,7 +621,7 @@ install_packages() {
             sfApt install -y -qq jq &>/dev/null || fail 213
             ;;
         redhat|centos)
-            yum install -y -q wget jq &>/dev/null || fail 214
+            yum install --enablerepo=epel -y -q wget jq time &>/dev/null || fail 214
             ;;
         *)
             echo "Unsupported Linux distribution '$LINUX_KIND'!"
@@ -637,6 +637,12 @@ add_common_repos() {
             add-apt-repository universe -y || return 1
             codename=$(sfGetFact "linux codename")
             echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
+            ;;
+        redhat|centos)
+            # Install EPEL repo ...
+            yum install -y epel-release
+            # ... but don't enable it by default
+            yum-config-manager --disablerepo=epel &>/dev/null
             ;;
     esac
 }
