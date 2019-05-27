@@ -219,7 +219,7 @@ sfDownload() {
 		$fn() {
 			while true; do
 				#wget -q -nc -O "$filename" "$url"
-				curl -k -SsL -o "$filename" "$url"
+				curl -L -k -SsL -o "$filename" "$url"
 				rc=\$?
 				# if $filename exists, remove it and restart without delay
 				[ \$rc -eq 1 ] && rm -f $filename && continue
