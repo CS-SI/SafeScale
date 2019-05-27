@@ -15,6 +15,7 @@
  */
 package ovh_test
 
+/*
 import (
 	"errors"
 	"fmt"
@@ -23,9 +24,8 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/mocks"
@@ -540,3 +540,4 @@ func TestMock_GetCfgOpts(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object
 }
+*/

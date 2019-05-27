@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/stacks"
 	libStack "github.com/CS-SI/SafeScale/iaas/stacks/libvirt"
@@ -35,7 +36,7 @@ type provider struct {
 }
 
 // New creates a new instance of local provider
-func New() providers.Provider {
+func New() providerapi.Provider {
 	return &provider{}
 }
 
@@ -71,7 +72,7 @@ type CfgOptions struct {
 // }
 
 // Build Create and initialize a ClientAPI
-func (p *provider) Build(params map[string]interface{}) (providers.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
 	authOptions := stacks.AuthenticationOptions{}
 	localConfig := stacks.LocalConfiguration{}
 	config := stacks.ConfigurationOptions{}

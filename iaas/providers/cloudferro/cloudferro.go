@@ -20,9 +20,11 @@ import (
 	"github.com/CS-SI/SafeScale/iaas"
 	"github.com/CS-SI/SafeScale/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/iaas/stacks"
+	stackapi "github.com/CS-SI/SafeScale/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
 )
 
@@ -34,16 +36,16 @@ var (
 
 // provider is the providerementation of the CloudFerro provider
 type provider struct {
-	stacks.Stack
+	stackapi.Stack
 }
 
 // New creates a new instance of cloudferro provider
-func New() providers.Provider {
+func New() providerapi.Provider {
 	return &provider{}
 }
 
 // Build build a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (providers.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
 	// tenantName, _ := params["name"].(string)
 
 	identity, _ := params["identity"].(map[string]interface{})

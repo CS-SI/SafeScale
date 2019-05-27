@@ -14,28 +14,35 @@
  * limitations under the License.
  */
 
-package stacks
+package api
 
 import (
+	"github.com/CS-SI/SafeScale/iaas/providers"
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
 )
 
-// Stack is the interface to cloud stack
-// It same interface has to be satisfied in Provider interface
-type Stack interface {
+//go:generate mockgen -destination=../mocks/mock_providerapi.go -package=mocks github.com/CS-SI/SafeScale/iaas/providers/api Provider
+
+// Provider is the interface to cloud stack
+// It has to recall Stack api, to serve as Provider AND as Stack
+type Provider interface {
+	Build(map[string]interface{}) (Provider, error)
+
 	// ListAvailabilityZones lists the usable Availability Zones
 	ListAvailabilityZones(bool) (map[string]bool, error)
 
 	// ListImages lists available OS images
-	ListImages(all bool) ([]resources.Image, error)
+	ListImages(bool) ([]resources.Image, error)
 	// GetImage returns the Image referenced by id
 	GetImage(id string) (*resources.Image, error)
 
 	// GetTemplate returns the Template referenced by id
 	GetTemplate(id string) (*resources.HostTemplate, error)
 	// ListTemplates lists available host templates
-	ListTemplates(all bool) ([]resources.HostTemplate, error)
+	// Host templates are sorted using Dominant Resource Fairness Algorithm
+	ListTemplates(bool) ([]resources.HostTemplate, error)
 
 	// CreateKeyPair creates and import a key pair
 	CreateKeyPair(name string) (*resources.KeyPair, error)
@@ -57,12 +64,12 @@ type Stack interface {
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
 	// CreateGateway creates a public Gateway for a private network
-	CreateGateway(req resources.GatewayRequest) (*resources.Host, []byte, error)
+	CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error)
 	// DeleteGateway delete the public gateway of a private network
 	DeleteGateway(networkID string) error
 
 	// CreateHost creates an host that fulfils the request
-	CreateHost(request resources.HostRequest) (*resources.Host, []byte, error)
+	CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error)
 	// GetHost returns the host identified by id or updates content of a *resources.Host
 	InspectHost(interface{}) (*resources.Host, error)
 	// GetHostByName returns the host identified by name
@@ -83,6 +90,9 @@ type Stack interface {
 	ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error)
 
 	// CreateVolume creates a block volume
+	// - name is the name of the volume
+	// - size is the size of the volume in GB
+	// - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 	CreateVolume(request resources.VolumeRequest) (*resources.Volume, error)
 	// GetVolume returns the volume identified by id
 	GetVolume(id string) (*resources.Volume, error)
@@ -92,6 +102,9 @@ type Stack interface {
 	DeleteVolume(id string) error
 
 	// CreateVolumeAttachment attaches a volume to an host
+	//- name of the volume attachment
+	//- volume to attach
+	//- host on which the volume is attached
 	CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error)
 	// GetVolumeAttachment returns the volume attachment identified by id
 	GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error)
@@ -100,8 +113,10 @@ type Stack interface {
 	// DeleteVolumeAttachment deletes the volume attachment identifed by id
 	DeleteVolumeAttachment(serverID, id string) error
 
-	// Returns a read-only struct containing configuration options
-	GetConfigurationOptions() ConfigurationOptions
-	// Returns a read-only struct containing authentication options
-	GetAuthenticationOptions() AuthenticationOptions
+	// GetAuthOpts returns authentification options as a Config
+	GetAuthOpts() (providers.Config, error)
+	// GetCfgOpts returns configuration options as a Config
+	GetCfgOpts() (providers.Config, error)
+	// GetName returns the providerName
+	GetName() string
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeState"
 	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
 
 	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudwatt"      // Imported to initialize tenant cloudwatt
@@ -209,7 +210,7 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 }
 
 // CreateHost creates a test host
-func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *resources.Network, public bool) (*resources.Host, []byte, error) {
+func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *resources.Network, public bool) (*resources.Host, *userdata.Content, error) {
 	tpls, err := tester.Service.SelectTemplatesBySize(resources.SizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,

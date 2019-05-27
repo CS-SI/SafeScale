@@ -27,7 +27,9 @@ fail() {
 	exit $1
 }
 
-mkdir -p /opt/safescale/var/{log,tmp,state} &>/dev/null
+mkdir -p /opt/safescale/etc} &>/dev/null
+mkdir -p /opt/safescale/var/log
+mkdir -p /opt/safescale/var/run /opt/safescale/var/state /opt/safescale/var/tmp &>/dev/null
 chmod -R 0640 /opt/safescale
 find /opt/safescale -type d -exec chmod ug+x {} \;
 

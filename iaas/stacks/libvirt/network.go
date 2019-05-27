@@ -31,6 +31,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
@@ -285,7 +286,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, []byte, error) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
 	log.Debug("local.Client.CreateGateway() called")
 	defer log.Debug("local.Client.CreateGateway() done")
 
@@ -316,12 +317,12 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, []
 		PublicIP:     true,
 	}
 
-	host, userDataPhase2, err := s.CreateHost(hostReq)
+	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to create gateway host : %s", err.Error())
 	}
 
-	return host, userDataPhase2, nil
+	return host, userData, nil
 }
 
 // DeleteGateway delete the public gateway referenced by ref (id or name)
