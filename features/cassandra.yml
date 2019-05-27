@@ -21,7 +21,6 @@ feature:
     install:
         dcos:
             check: |
-                which jq || sfInstall jq
                 {{.dcos}} cassandra plan show deploy --json | jq .status | grep COMPLETE
 
             add: |
