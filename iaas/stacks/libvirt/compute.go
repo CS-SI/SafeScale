@@ -807,7 +807,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		return nil, userData, fmt.Errorf("GetDiskFromID failled %s: ", err.Error())
 	}
 
-	err := userData.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
+	err = userData.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
 	if err != nil {
 		return nil, userData, fmt.Errorf("failed to prepare user data content: %+v", err)
 	}
@@ -818,7 +818,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	for _, network := range networks {
 		networksCommandString += fmt.Sprintf(" --network network=%s", network.Name)
 	}
-	var userData []byte
+
 	if publicIP {
 		command := ""
 		if bridgedVMs {
@@ -859,8 +859,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 			if err != nil {
 				return nil, userData, fmt.Errorf("failed to get info waiter : %s", err.Error())
 			}
-			userData = append(userData, userDataPhase1...)
-			// userData = append(userData, userDataPhase2...)
 
 			userData.AddInTag("phase2", "insert_tag", fmt.Sprintf(`
  LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
