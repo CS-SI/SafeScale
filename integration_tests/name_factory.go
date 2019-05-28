@@ -52,27 +52,27 @@ func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHo
 func (names *Names) TearDown() {
 	//TODO is it possible to suppress a non empty bucket?
 	for _, bucketName := range names.Buckets {
-		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale bucket delete %s", bucketName))
+		_, _ = GetTaggedOutput(fmt.Sprintf("safescale bucket delete %s", bucketName), "Teardown: ")
 	}
 	for _, volumeName := range names.Volumes {
 		for _, hostName := range names.Hosts {
-			_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale volume detach %s %s", volumeName, hostName))
+			_, _ = GetTaggedOutput(fmt.Sprintf("safescale volume detach %s %s", volumeName, hostName), "Teardown: ")
 		}
-		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale volume delete %s", volumeName))
+		_, _ = GetTaggedOutput(fmt.Sprintf("safescale volume delete %s", volumeName), "Teardown: ")
 	}
 	for _, shareName := range names.Shares {
 		for _, hostName := range names.Hosts {
-			_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale share umount %s %s", shareName, hostName))
+			_, _ = GetTaggedOutput(fmt.Sprintf("safescale share umount %s %s", shareName, hostName), "Teardown: ")
 		}
-		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale share delete %s", shareName))
+		_, _ = GetTaggedOutput(fmt.Sprintf("safescale share delete %s", shareName), "Teardown: ")
 	}
 	for _, hostName := range names.Hosts {
-		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale host delete %s", hostName))
+		_, _ = GetTaggedOutput(fmt.Sprintf("safescale host delete %s", hostName), "Teardown: ")
 	}
 	for _, networkName := range names.Networks {
-		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale network delete %s", networkName))
+		_, _ = GetTaggedOutput(fmt.Sprintf("safescale network delete %s", networkName), "Teardown: ")
 	}
 	for _, clusterName := range names.Clusters {
-		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale cluster delete --yes %s", clusterName))
+		_, _ = GetTaggedOutput(fmt.Sprintf("safescale cluster delete --yes %s", clusterName), "Teardown: ")
 	}
 }
