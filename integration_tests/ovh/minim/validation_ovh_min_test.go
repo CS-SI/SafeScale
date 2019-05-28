@@ -7,6 +7,6 @@ import (
 	"github.com/CS-SI/SafeScale/integration_tests/enums/Providers"
 )
 
-func Test_ReadyToSsh(t *testing.T) {
-	integration_tests.ReadyToSsh(t, Providers.OVH)
+func Test_Basic(t *testing.T) {
+	integration_tests.Basic(t, Providers.OVH)
 }
