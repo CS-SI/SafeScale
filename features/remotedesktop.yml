@@ -486,11 +486,8 @@ feature:
                             systemctl reload sshd
 
                             # Allow only gateway to connect to port 9080
-                            # iptables -A INPUT -p tcp -s {{.GatewayIP}} --dport 9080 -j ACCEPT
-                            # iptables -A INPUT -p tcp ! -s {{.GatewayIP}} --dport 9080 -j REJECT
-                            # sfSaveIptablesRules
-                            firewall-cmd --zone=trusted --add-rich-rule='rule family="ipv4" source not address="{{.GatewayIP}}" port protocol="tcp" port="9080" reject'
-                            firewall-cmd --runtime-to-permanent
+                            sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source not address="{{.GatewayIP}}" port protocol="tcp" port="9080" reject'
+                            sfFirewallReload
                             ###########################################################
                             # Starts remotedesktop container                          #
                             ###########################################################

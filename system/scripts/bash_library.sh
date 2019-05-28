@@ -188,6 +188,30 @@ EOF
 }
 export -f sfRetry
 
+# sfFirewall sets a runtime firewall rule (using firewall-cmd, so arguments are firewall-cmd ones)
+# rule doesn't need sfFirewallReload to be applied, but isn't save as permanent (except if you add --permanent parameter,
+# but you may use sfFirewallAdd in this case)
+sfFirewall() {
+	[ $# -eq 0 ] && return 0
+	which firewall-cmd &>/dev/null || return 1
+	firewall-cmd $@
+}
+export -f sfFirewall
+
+# sfFirewallAdd sets a permanent firewall rule (using firewall-cmd, so arguments are firewall-cmd ones)
+# sfFirewallReload needed to apply rule
+sfFirewallAdd() {
+	sfFirewall --permanent $@
+}
+export -f sfFirewallAdd
+
+# sfFirewallReload reloads firewall rules
+sfFirewallReload() {
+	which firewall-cmd &>/dev/null || return 1
+	firewall-cmd --reload
+}
+export -f sfFirewallReload
+
 # sfInstall installs a package and exits if it fails...
 sfInstall() {
 	case $LINUX_KIND in
@@ -209,7 +233,6 @@ sfInstall() {
 	return 0
 }
 export -f sfInstall
-
 
 # sfDownload url filename timeout delay
 sfDownload() {

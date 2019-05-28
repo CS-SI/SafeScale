@@ -67,34 +67,34 @@ reset_fw() {
     esac
 
     # Clear interfaces attached to zones
-    for zone in $(firewall-cmd --get-active-zones | grep -v interfaces | grep -v sources); do
-        for nic in $(firewall-cmd --zone=$zone --list-interfaces); do
-            firewall-cmd --zone=$zone --remove-interface=$nic || return 1
+    for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
+        for nic in $(sfFirewall --zone=$zone --list-interfaces); do
+            sfFirewallAdd --zone=$zone --remove-interface=$nic || return 1
         done
     done
     # Attach Internet interface or source IP to zone public if host is gateway
     [ ! -z $PU_IF ] && {
-        firewall-cmd --zone=public --add-interface=$PU_IF || return 1
+        sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
     }
     {{- if or .PublicIP .IsGateway }}
     [ -z $PU_IF ] && {
-        firewall-cmd --zone=public --add-source=${PU_IP}/32 || return 1
+        sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
     }
     {{- end }}
     # Attach LAN interfaces to zone trusted
     [ ! -z $PR_IFs ] && {
         for i in $PR_IFs; do
-            firewall-cmd --zone=trusted --add-interface=$PR_IFs || return 1
+            sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
         done
     }
     # Attach lo interface to zone trusted
-    firewall-cmd --zone=trusted --add-interface=lo || return 1
+    sfFirewallAdd --zone=trusted --add-interface=lo || return 1
     # Allow service ssh on public zone
-    firewall-cmd --zone=public --add-service=ssh
+    sfFirewallAdd --zone=public --add-service=ssh
     # Sets default zone to trusted
-    firewall-cmd --set-default-zone=trusted
+    sfFirewallAdd --set-default-zone=trusted
     # Save current fw settings as permanent
-    firewall-cmd --runtime-to-permanent
+    sfFirewallReload
 }
 
 NICS=
@@ -438,20 +438,20 @@ configure_as_gateway() {
         # Dedicated public interface available
 
         # Allow ping
-        firewall-cmd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
+        sfFirewallAdd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
         # Allow masquerading on public zone
-        firewall-cmd --zone=public --add-masquerade
+        sfFirewallAdd --zone=public --add-masquerade
     } || {
         # No dedicated public interface...
 
         # Allow masquerading on trusted zone
-        firewall-cmd --zone=trusted --add-masquerade
+        sfFirewallAdd --zone=trusted --add-masquerade
     }
 
     # Allows default services on public zone
-    firewall-cmd --zone=public --add-service=ssh 2>/dev/null
+    sfFirewallAdd --zone=public --add-service=ssh 2>/dev/null
     # Save current fw settings as permanent
-    firewall-cmd --runtime-to-permanent
+    sfFirewallReload
 
     grep -vi AllowTcpForwarding /etc/ssh/sshd_config >/etc/ssh/sshd_config.new
     echo "AllowTcpForwarding yes" >>/etc/ssh/sshd_config.new
