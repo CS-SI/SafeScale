@@ -50,29 +50,29 @@ func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHo
 }
 
 func (names *Names) TearDown() {
-	//TODO is it possible to supress a non empty bucket?
+	//TODO is it possible to suppress a non empty bucket?
 	for _, bucketName := range names.Buckets {
-		_, _ = GetOutput(fmt.Sprintf("safescale bucket delete %s", bucketName))
+		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale bucket delete %s", bucketName))
 	}
 	for _, volumeName := range names.Volumes {
 		for _, hostName := range names.Hosts {
-			_, _ = GetOutput(fmt.Sprintf("safescale volume detach %s %s", volumeName, hostName))
+			_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale volume detach %s %s", volumeName, hostName))
 		}
-		_, _ = GetOutput(fmt.Sprintf("safescale volume delete %s", volumeName))
+		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale volume delete %s", volumeName))
 	}
 	for _, shareName := range names.Shares {
 		for _, hostName := range names.Hosts {
-			_, _ = GetOutput(fmt.Sprintf("safescale share umount %s %s", shareName, hostName))
+			_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale share umount %s %s", shareName, hostName))
 		}
-		_, _ = GetOutput(fmt.Sprintf("safescale share delete %s", shareName))
+		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale share delete %s", shareName))
 	}
 	for _, hostName := range names.Hosts {
-		_, _ = GetOutput(fmt.Sprintf("safescale host delete %s", hostName))
+		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale host delete %s", hostName))
 	}
 	for _, networkName := range names.Networks {
-		_, _ = GetOutput(fmt.Sprintf("safescale network delete %s", networkName))
+		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale network delete %s", networkName))
 	}
 	for _, clusterName := range names.Clusters {
-		_, _ = GetOutput(fmt.Sprintf("safescale cluster delete --yes %s", clusterName))
+		_, _ = GetTaggedOutput("Teardown: ", fmt.Sprintf("safescale cluster delete --yes %s", clusterName))
 	}
 }
