@@ -104,9 +104,9 @@ feature:
                         run: |
                             # iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
                             # sfSaveIptablesRules
-                            firewall-cmd --zone=trusted --add-service=https && \
-                            firewall-cmd --zone=public --add-service=https && \
-                            firewall-cmd --runtime-to-permanent
+                            sfFirewallAdd --zone=trusted --add-service=https && \
+                            sfFirewallAdd --zone=public --add-service=https && \
+                            sfFirewallReload
 
             remove:
                 pace: firewall,compose
@@ -115,9 +115,9 @@ feature:
                         targets:
                             hosts: yes
                         run: |
-                            firewall-cmd --zone=trusted --remove-service=https && \
-                            firewall-cmd --zone=public --remove-service=https && \
-                            firewall-cmd --runtime-to-permanent
+                            sfFirewallAdd --zone=trusted --remove-service=https && \
+                            sfFirewallAdd --zone=public --remove-service=https && \
+                            sfFirewallReload
 
                     compose:
                         targets:
