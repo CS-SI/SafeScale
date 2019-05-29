@@ -8,5 +8,5 @@ import (
 )
 
 func Test_Basic(t *testing.T) {
-	integration_tests.Basic(t, Providers.OVH)
+	integration_tests.BasicPrivate(t, Providers.OVH)
 }
