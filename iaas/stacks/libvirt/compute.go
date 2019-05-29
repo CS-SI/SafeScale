@@ -807,7 +807,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		return nil, userData, fmt.Errorf("GetDiskFromID failled %s: ", err.Error())
 	}
 
-	err := userData.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
+	err = userData.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
 	if err != nil {
 		return nil, userData, fmt.Errorf("failed to prepare user data content: %+v", err)
 	}
@@ -818,6 +818,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	for _, network := range networks {
 		networksCommandString += fmt.Sprintf(" --network network=%s", network.Name)
 	}
+
 	if publicIP {
 		command := ""
 		if bridgedVMs {
