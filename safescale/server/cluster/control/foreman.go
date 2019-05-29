@@ -357,7 +357,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		}
 	}()
 
-	masterCount, privateNodeCount, publicNodeCount := b.determineRequiredNodes(task)
+	masterCount, privateNodeCount, _ := b.determineRequiredNodes(task)
 	var (
 		// gatewayCh          chan error
 		// mastersCh          chan error
@@ -366,7 +366,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		gatewayStatus      error
 		mastersStatus      error
 		privateNodesStatus error
-		publicNodesStatus  error
+		// publicNodesStatus  error
 	)
 
 	// Step 1: starts gateway installation and masters and nodes creation
@@ -392,14 +392,14 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		"nodeDef": pbNodeDef,
 	})
 
-	// publicNodesCh = make(chan error)
-	// go b.taskCreateNodes(publicNodeCount, true, pbNodeDef, publicNodesCh)
-	publicNodesTask := concurrency.NewTask(task, b.taskCreateNodes)
-	publicNodesTask.Start(map[string]interface{}{
-		"count":   publicNodeCount,
-		"public":  true,
-		"nodeDef": pbNodeDef,
-	})
+	// // publicNodesCh = make(chan error)
+	// // go b.taskCreateNodes(publicNodeCount, true, pbNodeDef, publicNodesCh)
+	// publicNodesTask := concurrency.NewTask(task, b.taskCreateNodes)
+	// publicNodesTask.Start(map[string]interface{}{
+	// 	"count":   publicNodeCount,
+	// 	"public":  true,
+	// 	"nodeDef": pbNodeDef,
+	// })
 
 	// Step 2: awaits master creations and gateway installation finish
 	// gatewayStatus = <-gatewayCh
@@ -436,12 +436,11 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		mastersStatus = mastersTask.Run(nil)
 	}
 
-	// privateNodesStatus = <-privateNodesCh
 	privateNodesTask.Wait()
 	privateNodesStatus = privateNodesTask.GetError()
-	// publicNodesStatus = <-publicNodesCh
-	publicNodesTask.Wait()
-	publicNodesStatus = publicNodesTask.GetError()
+	// // publicNodesStatus = <-publicNodesCh
+	// publicNodesTask.Wait()
+	// publicNodesStatus = publicNodesTask.GetError()
 
 	// Starting from here, delete nodes on failure if exits with error and req.KeepOnFailure is false
 	defer func() {
@@ -451,10 +450,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 			if derr != nil {
 				log.Debugf("failed to remove private nodes on failure")
 			}
-			derr = clientHost.Delete(b.cluster.ListNodeIDs(task, true), client.DefaultExecutionTimeout)
-			if derr != nil {
-				log.Debugf("failed to remove public nodes on failure")
-			}
+			// derr = clientHost.Delete(b.cluster.ListNodeIDs(task, true), client.DefaultExecutionTimeout)
+			// if derr != nil {
+			// 	log.Debugf("failed to remove public nodes on failure")
+			// }
 		}
 	}()
 
@@ -467,22 +466,22 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 			privateNodesTask = concurrency.NewTask(task, b.taskConfigureNodes)
 			privateNodesTask.Start(false)
 		}
-		if publicNodesStatus == nil {
-			// publicNodesCh = make(chan error)
-			// go b.taskConfigureNodes(true, publicNodesCh)
-			publicNodesTask = concurrency.NewTask(task, b.taskConfigureNodes)
-			publicNodesTask.Start(true)
-		}
+		// if publicNodesStatus == nil {
+		// 	// publicNodesCh = make(chan error)
+		// 	// go b.taskConfigureNodes(true, publicNodesCh)
+		// 	publicNodesTask = concurrency.NewTask(task, b.taskConfigureNodes)
+		// 	publicNodesTask.Start(true)
+		// }
 		if privateNodesStatus == nil {
 			// privateNodesStatus = <-privateNodesCh
 			privateNodesTask.Wait()
 			privateNodesStatus = privateNodesTask.GetError()
 		}
-		if publicNodesStatus == nil {
-			// publicNodesStatus = <-publicNodesCh
-			publicNodesTask.Wait()
-			publicNodesStatus = publicNodesTask.GetError()
-		}
+		// if publicNodesStatus == nil {
+		// 	// publicNodesStatus = <-publicNodesCh
+		// 	publicNodesTask.Wait()
+		// 	publicNodesStatus = publicNodesTask.GetError()
+		// }
 	}
 
 	if gatewayStatus != nil {
@@ -497,10 +496,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		err = privateNodesStatus // value of err may trigger defer calls, don't change anything here
 		return err
 	}
-	if publicNodesStatus != nil {
-		err = publicNodesStatus // value of err may trigger defer calls, don't change anything here
-		return err
-	}
+	// if publicNodesStatus != nil {
+	// 	err = publicNodesStatus // value of err may trigger defer calls, don't change anything here
+	// 	return err
+	// }
 
 	// At the end, configure cluster as a whole
 	err = b.configureCluster(task)

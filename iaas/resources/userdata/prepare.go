@@ -89,11 +89,11 @@ func (ud *Content) Prepare(
 
 	// Generate password for user safescale
 	var (
-		err                       error
-		autoHostNetworkInterfaces bool
-		useLayer3Networking       = true
-		dnsList                   []string
-		operatorUsername          string
+		err error
+		// autoHostNetworkInterfaces bool
+		useLayer3Networking = true
+		dnsList             []string
+		operatorUsername    string
 	)
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
@@ -109,7 +109,7 @@ func (ud *Content) Prepare(
 		ip = request.DefaultGateway.GetPrivateIP()
 	}
 
-	autoHostNetworkInterfaces = options.AutoHostNetworkInterfaces
+	// autoHostNetworkInterfaces = options.AutoHostNetworkInterfaces
 	useLayer3Networking = options.UseLayer3Networking
 	operatorUsername = options.OperatorUsername
 	dnsList = options.DNSList
@@ -135,7 +135,7 @@ func (ud *Content) Prepare(
 	ud.User = operatorUsername
 	ud.PublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
 	ud.PrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
-	ud.ConfIF = !autoHostNetworkInterfaces
+	// ud.ConfIF = !autoHostNetworkInterfaces
 	ud.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking
 	ud.AddGateway = !request.PublicIP && !useLayer3Networking && ip != ""
 	ud.DNSServers = dnsList

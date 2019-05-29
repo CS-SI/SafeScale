@@ -18,14 +18,15 @@ package erbc
 
 import (
 	"fmt"
+
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
 )
 
 // The createds hosts could be connected to the network with a bridge or a nat
 // CAUTION the bridged VMs needs the default route to be a macVlan interface!
-// On centos the firewall bloks all ports by default so the vm will not be alble to send back usefull infos
-// sudo firewall-cmd --zone=public --permanent --add-port=1000-63553/tcp
+// On centos the firewall bloks all ports by default so the vm will not be alble to send back useful infos
+// sudo firewall-cmd --permanent --zone=public --add-port=1000-63553/tcp
 // sudo firewall-cmd --reload
 var bridgedVMs = false
 
