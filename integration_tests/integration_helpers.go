@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 //HostInfo ...
@@ -41,8 +42,24 @@ func CanBeRun(command string) (bool, error) {
 }
 
 //GetOutput ...
+func GetTaggedOutput(command string, tag string) (string, error) {
+	fmt.Printf("%sRunning [%s]\n", tag, command)
+	out, err := exec.Command("bash", "-c", command).CombinedOutput()
+	if err != nil {
+		return string(out), err
+	}
+
+	return string(out), nil
+}
+
+//GetOutput ...
 func GetOutput(command string) (string, error) {
-	fmt.Printf("Running [%s]\n", command)
+	t := time.Now()
+	formatted := fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d",
+		t.Year(), t.Month(), t.Day(),
+		t.Hour(), t.Minute(), t.Second())
+
+	fmt.Printf("[%s] Running [%s]\n", formatted, command)
 	out, err := exec.Command("bash", "-c", command).CombinedOutput()
 	if err != nil {
 		return string(out), err

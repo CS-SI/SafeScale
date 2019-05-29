@@ -18,6 +18,7 @@ package flexibleengine
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/iaas"
@@ -27,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/iaas/resources"
 	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
 	imagefilters "github.com/CS-SI/SafeScale/iaas/resources/filters/images"
+	templatefilters "github.com/CS-SI/SafeScale/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/iaas/stacks"
 	"github.com/CS-SI/SafeScale/iaas/stacks/huaweicloud"
 )
@@ -91,6 +93,12 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 	}
+	whitelistTemplatePattern, _ := compute["WhitelistTemplateRegexp"].(string)
+	blacklistTemplatePattern, _ := compute["BlacklistTemplateRegexp"].(string)
+	whitelistImagePattern, _ := compute["WhitelistImageRegexp"].(string)
+	blacklistImagePattern, _ := compute["BlacklistImageRegexp"].(string)
+
+
 
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
@@ -119,6 +127,12 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		},
 		MetadataBucket:   metadataBucketName,
 		OperatorUsername: operatorUsername,
+		Customizations: map[string]string{
+			"WhitelistTemplateRegexp": whitelistTemplatePattern,
+			"BlacklistTemplateRegexp": blacklistTemplatePattern,
+			"WhitelistImageRegexp": whitelistImagePattern,
+			"BlacklistImageRegexp": blacklistImagePattern,
+		},
 	}
 
 	stack, err := huaweicloud.New(authOptions, cfgOptions)
@@ -152,6 +166,50 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 // 	return strings.HasPrefix(strings.ToUpper(tpl.Name), "t2.")
 // }
 
+func isS3Template(tpl resources.HostTemplate) bool {
+ 	return strings.HasPrefix(strings.ToUpper(tpl.Name), "S3.")
+}
+
+func templateFromWhite(regr string) templatefilters.Predicate {
+	return func(tpl resources.HostTemplate) bool {
+		re, err := regexp.Compile(regr)
+		if err != nil || len(regr) == 0 {
+			return true
+		}
+		return re.Match([]byte(tpl.Name))
+	}
+}
+
+func templateFromBlack(regr string) templatefilters.Predicate {
+	return func(tpl resources.HostTemplate) bool {
+		re, err := regexp.Compile(regr)
+		if err != nil || len(regr) == 0 {
+			return false
+		}
+		return re.Match([]byte(tpl.Name))
+	}
+}
+
+func imageFromWhite(regr string) imagefilters.Predicate {
+	return func(image resources.Image) bool {
+		re, err := regexp.Compile(regr)
+		if err != nil || len(regr) == 0 {
+			return true
+		}
+		return re.Match([]byte(image.Name))
+	}
+}
+
+func imageFromBlack(regr string) imagefilters.Predicate {
+	return func(image resources.Image) bool {
+		re, err := regexp.Compile(regr)
+		if err != nil || len(regr) == 0 {
+			return false
+		}
+		return re.Match([]byte(image.Name))
+	}
+}
+
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
@@ -166,13 +224,17 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 		tpls = append(tpls, tpl)
 	}
 
-	// if all {
-	// 	return tpls, nil
-	// }
-	// templateFilter := templatefilters.NewFilter(isBlacklistedTemplate).Not()
-	// return templatefilters.FilterTemplates(tpls, templateFilter), nil
+	if all {
+	 	return tpls, nil
+	}
 
-	return tpls, nil
+	cfgopts := p.Stack.GetConfigurationOptions()
+
+	whiteFilterRegexp := cfgopts.Customizations["WhitelistTemplateRegexp"]
+	blackFilterRegexp := cfgopts.Customizations["BlacklistTemplateRegexp"]
+
+	templateFilter := templatefilters.NewFilter(templateFromWhite(whiteFilterRegexp)).And(templatefilters.NewFilter(templateFromBlack(blackFilterRegexp)).Not())
+	return templatefilters.FilterTemplates(tpls, templateFilter), nil
 }
 
 func isWindowsImage(image resources.Image) bool {
@@ -194,7 +256,12 @@ func (p *provider) ListImages(all bool) ([]resources.Image, error) {
 		return images, nil
 	}
 
-	imageFilter := imagefilters.NewFilter(isWindowsImage).Not().And(imagefilters.NewFilter(isBMSImage).Not())
+	cfgopts := p.Stack.GetConfigurationOptions()
+
+	whiteFilterRegexp := cfgopts.Customizations["WhitelistImageRegexp"]
+	blackFilterRegexp := cfgopts.Customizations["BlacklistImageRegexp"]
+
+	imageFilter := imagefilters.NewFilter(isWindowsImage).Not().And(imagefilters.NewFilter(isBMSImage).Not()).And(imagefilters.NewFilter(imageFromWhite(whiteFilterRegexp))).And(imagefilters.NewFilter(imageFromBlack(blackFilterRegexp)).Not())
 	return imagefilters.FilterImages(images, imageFilter), nil
 }
 
@@ -224,6 +291,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
+	cfg.Set("Customizations", opts.Customizations)
 
 	return cfg, nil
 }
