@@ -91,8 +91,8 @@ reset_fw() {
     sfFirewallAdd --zone=trusted --add-interface=lo || return 1
     # Allow service ssh on public zone
     sfFirewallAdd --zone=public --add-service=ssh
-    # Sets default zone to trusted
-    sfFirewallAdd --set-default-zone=trusted
+    # Sets default zone to trusted (--set-default-zone doesn't like --permanent)
+    sfFirewall --set-default-zone=trusted
     # Save current fw settings as permanent
     sfFirewallReload
 }
@@ -181,9 +181,9 @@ substring_diff() {
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
-    {{- if .GatewayIP }}
-    route del -net default &>/dev/null
-    route add -net default gw {{ .GatewayIP }}
+    {{- if .AddGateway }}
+        route del -net default &>/dev/null
+        route add -net default gw {{ .GatewayIP }}
     {{- else }}
     :
     {{- end}}
@@ -230,6 +230,11 @@ configure_network() {
     {{- if .IsGateway }}
     configure_as_gateway
     {{- end }}
+
+    check_for_network || {
+        echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
+        fail 217
+    }
 }
 
 # Configure network for Debian distribution
@@ -607,7 +612,7 @@ early_packages_update() {
 
         redhat|centos)
             # Force update of systemd and pciutils
-            yum install -qy systemd pciutils || fail 211
+            yum install -qy systemd pciutils yum-utils || fail 211
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
@@ -663,15 +668,13 @@ configure_locale() {
 export DEBIAN_FRONTEND=noninteractive
 
 configure_locale
-add_common_repos
 configure_dns
 early_packages_update
+add_common_repos
+
 identify_nics
 configure_network
-check_for_network || {
-    echo "PROVISIONING_ERROR: no or incomplete network connectivity"
-    fail 217
-}
+
 
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
