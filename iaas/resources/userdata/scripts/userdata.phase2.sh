@@ -69,9 +69,10 @@ reset_fw() {
     # Clear interfaces attached to zones
     for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
         for nic in $(sfFirewall --zone=$zone --list-interfaces); do
-            sfFirewallAdd --zone=$zone --remove-interface=$nic || return 1
+            sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null
         done
     done
+
     # Attach Internet interface or source IP to zone public if host is gateway
     [ ! -z $PU_IF ] && {
         sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
@@ -91,8 +92,6 @@ reset_fw() {
     sfFirewallAdd --zone=trusted --add-interface=lo || return 1
     # Allow service ssh on public zone
     sfFirewallAdd --zone=public --add-service=ssh
-    # Sets default zone to trusted (--set-default-zone doesn't like --permanent)
-    sfFirewall --set-default-zone=trusted
     # Save current fw settings as permanent
     sfFirewallReload
 }
@@ -120,7 +119,7 @@ make_resolv_conf() {
     :
 }
 
-{{- if not .IsGateway }}
+{{- if .AddGateway }}
 unset new_routers
 {{- end}}
 EOF
@@ -440,22 +439,22 @@ configure_as_gateway() {
     fi
 
     [ ! -z $PU_IF ] && {
-        # Dedicated public interface available
+        # Dedicated public interface available...
 
-        # Allow ping
+        # Allows ping
         sfFirewallAdd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
-        # Allow masquerading on public zone
+        # Allow smasquerading on public zone
         sfFirewallAdd --zone=public --add-masquerade
     } || {
         # No dedicated public interface...
 
-        # Allow masquerading on trusted zone
+        # Enables masquerading on trusted zone
         sfFirewallAdd --zone=trusted --add-masquerade
     }
 
     # Allows default services on public zone
     sfFirewallAdd --zone=public --add-service=ssh 2>/dev/null
-    # Save current fw settings as permanent
+    # Applies fw rules
     sfFirewallReload
 
     grep -vi AllowTcpForwarding /etc/ssh/sshd_config >/etc/ssh/sshd_config.new
@@ -683,8 +682,8 @@ echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/s
 # For compatibility with previous user_data implementation (until v19.03.x)...
 ln -s /opt/safescale/var/state/user_data.phase2.done /var/tmp/user_data.done
 
-# !!! DON'T REMOVE !!! #insert_tag allows to add something just before exiting after the template
-#                      has been realized(cf. libvirt Stack)
+# !!! DON'T REMOVE !!! #insert_tag allows to add something just before exiting,
+#                      but after the template has been realized (cf. libvirt Stack)
 #insert_tag
 
 set +x
