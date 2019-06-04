@@ -51,12 +51,8 @@ case $LINUX_KIND in
         touch /var/log/lastlog
         chgrp utmp /var/log/lastlog
         chmod 664 /var/log/lastlog
-        sfWaitForApt
-        finishPreviousInstall
-        sfWaitForApt
-        apt-get update
-        sfWaitForApt
-        apt-get install -qqy nfs-common nfs-kernel-server
+        sfApt update
+        sfApt install -qqy nfs-common nfs-kernel-server
         ;;
 
     rhel|centos)
@@ -66,19 +62,17 @@ case $LINUX_KIND in
         systemctl enable nfs-server
         systemctl enable nfs-lock
         systemctl enable nfs-idmap
-        systemctl start rpcbind
-        systemctl start nfs-server
-        systemctl start nfs-lock
-        systemctl start nfs-idmap
 
         setsebool -P use_nfs_home_dirs 1
-        firewall-cmd --permanent --add-service=nfs
-        firewall-cmd --permanent --add-service=mountd
-        firewall-cmd --permanent --add-service=rpc-bind
-        firewall-cmd --reload
+        sfFirewallAdd --zone=trusted --add-service=nfs
+        sfFirewallAdd --zone=trusted --add-service=mountd
+        sfFirewallAdd --zone=trusted --add-service=rpc-bind
+        sfFirewallReload
         systemctl restart rpcbind
         systemctl restart nfs-server
         systemctl restart nfs
+        systemctl restart nfs-lock
+        systemctl restart nfs-idmap
         ;;
 
     *)

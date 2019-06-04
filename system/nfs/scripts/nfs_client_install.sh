@@ -59,10 +59,10 @@ case $LINUX_KIND in
         yum makecache fast
         yum install -y nfs-utils
         setsebool -P use_nfs_home_dirs 1
-        firewall-cmd --permanent --add-service=nfs
-        firewall-cmd --permanent --add-service=mountd
-        firewall-cmd --permanent --add-service=rpc-bind
-        firewall-cmd --reload
+        sfFirewallAdd --add-service=nfs
+        sfFirewallAdd --add-service=mountd
+        sfFirewallAdd --add-service=rpc-bind
+        sfFirewallReload
         systemctl restart rpcbind
         systemctl restart nfs-server
         systemctl restart nfs
