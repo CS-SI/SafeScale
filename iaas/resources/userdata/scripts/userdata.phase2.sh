@@ -67,34 +67,33 @@ reset_fw() {
     esac
 
     # Clear interfaces attached to zones
-    for zone in $(firewall-cmd --get-active-zones | grep -v interfaces | grep -v sources); do
-        for nic in $(firewall-cmd --zone=$zone --list-interfaces); do
-            firewall-cmd --zone=$zone --remove-interface=$nic || return 1
+    for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
+        for nic in $(sfFirewall --zone=$zone --list-interfaces); do
+            sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null
         done
     done
+
     # Attach Internet interface or source IP to zone public if host is gateway
     [ ! -z $PU_IF ] && {
-        firewall-cmd --zone=public --add-interface=$PU_IF || return 1
+        sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
     }
     {{- if or .PublicIP .IsGateway }}
     [ -z $PU_IF ] && {
-        firewall-cmd --zone=public --add-source=${PU_IP}/32 || return 1
+        sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
     }
     {{- end }}
     # Attach LAN interfaces to zone trusted
     [ ! -z $PR_IFs ] && {
         for i in $PR_IFs; do
-            firewall-cmd --zone=trusted --add-interface=$PR_IFs || return 1
+            sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
         done
     }
     # Attach lo interface to zone trusted
-    firewall-cmd --zone=trusted --add-interface=lo || return 1
+    sfFirewallAdd --zone=trusted --add-interface=lo || return 1
     # Allow service ssh on public zone
-    firewall-cmd --zone=public --add-service=ssh
-    # Sets default zone to trusted
-    firewall-cmd --set-default-zone=trusted
+    sfFirewallAdd --zone=public --add-service=ssh
     # Save current fw settings as permanent
-    firewall-cmd --runtime-to-permanent
+    sfFirewallReload
 }
 
 NICS=
@@ -120,7 +119,7 @@ make_resolv_conf() {
     :
 }
 
-{{- if not .IsGateway }}
+{{- if .AddGateway }}
 unset new_routers
 {{- end}}
 EOF
@@ -181,9 +180,9 @@ substring_diff() {
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
-    {{- if .GatewayIP }}
-    route del -net default &>/dev/null
-    route add -net default gw {{ .GatewayIP }}
+    {{- if .AddGateway }}
+        route del -net default &>/dev/null
+        route add -net default gw {{ .GatewayIP }}
     {{- else }}
     :
     {{- end}}
@@ -230,6 +229,11 @@ configure_network() {
     {{- if .IsGateway }}
     configure_as_gateway
     {{- end }}
+
+    check_for_network || {
+        echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
+        fail 217
+    }
 }
 
 # Configure network for Debian distribution
@@ -435,23 +439,23 @@ configure_as_gateway() {
     fi
 
     [ ! -z $PU_IF ] && {
-        # Dedicated public interface available
+        # Dedicated public interface available...
 
-        # Allow ping
-        firewall-cmd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
-        # Allow masquerading on public zone
-        firewall-cmd --zone=public --add-masquerade
+        # Allows ping
+        sfFirewallAdd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
+        # Allow smasquerading on public zone
+        sfFirewallAdd --zone=public --add-masquerade
     } || {
         # No dedicated public interface...
 
-        # Allow masquerading on trusted zone
-        firewall-cmd --zone=trusted --add-masquerade
+        # Enables masquerading on trusted zone
+        sfFirewallAdd --zone=trusted --add-masquerade
     }
 
     # Allows default services on public zone
-    firewall-cmd --zone=public --add-service=ssh 2>/dev/null
-    # Save current fw settings as permanent
-    firewall-cmd --runtime-to-permanent
+    sfFirewallAdd --zone=public --add-service=ssh 2>/dev/null
+    # Applies fw rules
+    sfFirewallReload
 
     grep -vi AllowTcpForwarding /etc/ssh/sshd_config >/etc/ssh/sshd_config.new
     echo "AllowTcpForwarding yes" >>/etc/ssh/sshd_config.new
@@ -607,7 +611,7 @@ early_packages_update() {
 
         redhat|centos)
             # Force update of systemd and pciutils
-            yum install -qy systemd pciutils || fail 211
+            yum install -qy systemd pciutils yum-utils || fail 211
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
@@ -663,15 +667,13 @@ configure_locale() {
 export DEBIAN_FRONTEND=noninteractive
 
 configure_locale
-add_common_repos
 configure_dns
 early_packages_update
+add_common_repos
+
 identify_nics
 configure_network
-check_for_network || {
-    echo "PROVISIONING_ERROR: no or incomplete network connectivity"
-    fail 217
-}
+
 
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
@@ -680,8 +682,8 @@ echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/s
 # For compatibility with previous user_data implementation (until v19.03.x)...
 ln -s /opt/safescale/var/state/user_data.phase2.done /var/tmp/user_data.done
 
-# !!! DON'T REMOVE !!! #insert_tag allows to add something just before exiting after the template
-#                      has been realized(cf. libvirt Stack)
+# !!! DON'T REMOVE !!! #insert_tag allows to add something just before exiting,
+#                      but after the template has been realized (cf. libvirt Stack)
 #insert_tag
 
 set +x

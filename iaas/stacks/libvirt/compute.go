@@ -57,7 +57,7 @@ import (
 // The createds hosts could be connected to the network with a bridge or a nat
 // CAUTION the bridged VMs needs the default route to be a macVlan interface!
 // On centos the firewall bloks all ports by default so the vm will not be alble to send back usefull infos
-// sudo firewall-cmd --zone=public --permanent --add-port=1000-63553/tcp
+// sudo firewall-cmd --permanent --zone=public --add-port=1000-63553/tcp
 // sudo firewall-cmd --reload
 var bridgedVMs = false
 var defaultNetworkCIDR = "192.168.122.0/24"
@@ -807,7 +807,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		return nil, userData, fmt.Errorf("GetDiskFromID failled %s: ", err.Error())
 	}
 
-	err := userData.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
+	err = userData.Prepare(*s.Config, request, networks[0].CIDR, defaultNetworkCIDR)
 	if err != nil {
 		return nil, userData, fmt.Errorf("failed to prepare user data content: %+v", err)
 	}
@@ -818,7 +818,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	for _, network := range networks {
 		networksCommandString += fmt.Sprintf(" --network network=%s", network.Name)
 	}
-	var userData []byte
+
 	if publicIP {
 		command := ""
 		if bridgedVMs {
@@ -859,8 +859,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 			if err != nil {
 				return nil, userData, fmt.Errorf("failed to get info waiter : %s", err.Error())
 			}
-			userData = append(userData, userDataPhase1...)
-			// userData = append(userData, userDataPhase2...)
 
 			userData.AddInTag("phase2", "insert_tag", fmt.Sprintf(`
  LANIP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')

@@ -249,7 +249,7 @@ func ToPBImage(in *resources.Image) *pb.Image {
 	}
 }
 
-//ToPBNetwork convert a network from api to protocolbuffer format
+// ToPBNetwork convert a network from api to protocolbuffer format
 func ToPBNetwork(in *resources.Network) *pb.Network {
 	return &pb.Network{
 		Id:        in.ID,
@@ -259,7 +259,7 @@ func ToPBNetwork(in *resources.Network) *pb.Network {
 	}
 }
 
-//ToPBFileList convert a list of file names from api to protocolbuffer FileList format
+// ToPBFileList convert a list of file names from api to protocolbuffer FileList format
 func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, fileBuckets [][]string) *pb.FileList {
 	files := []*pb.File{}
 	nbFiles := int(math.Min(math.Min(math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes))), float64(len(fileBuckets))))

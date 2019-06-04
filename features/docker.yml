@@ -98,9 +98,9 @@ feature:
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            firewall-cmd --zone=trusted --add-interface=docker0
-                            firewall-cmd --zone=trusted --add-service docker-swarm
-                            firewall-cmd --runtime-to-permanent
+                            sfFirewallAdd --zone=trusted --add-interface=docker0
+                            sfFirewallAdd --zone=trusted --add-service docker-swarm
+                            sfFirewallReload
 
                     ready:
                         targets:

@@ -253,6 +253,181 @@ func Basic(t *testing.T, provider Providers.Enum) {
 	fmt.Println("Test OK")
 }
 
+func BasicPrivate(t *testing.T, provider Providers.Enum) {
+	Setup(t, provider)
+
+	names := GetNames("BasicTest", 0, 1, 1, 2, 1, 0)
+	names.TearDown()
+	defer names.TearDown()
+
+	out, err := GetOutput("safescale network list")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	fmt.Println("Creating network " + names.Networks[0])
+
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.70.0/24")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.70.0/24")
+	fmt.Println(out)
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "already exist"))
+
+	fmt.Println("Creating VM " + names.Hosts[0])
+
+	out, err = GetOutput("safescale host create " + names.Hosts[0] + " --net " + names.Networks[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale host create " + names.Hosts[0] + " --net " + names.Networks[0])
+	fmt.Println(out)
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
+
+	out, err = GetOutput("safescale host inspect " + names.Hosts[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	host0 := HostInfo{}
+	json.Unmarshal([]byte(out), &host0)
+
+	fmt.Println("Creating VM ", names.Hosts[1])
+
+	out, err = GetOutput("safescale host create " + names.Hosts[1] + " --net " + names.Networks[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale host create " + names.Hosts[1] + " --net " + names.Networks[0])
+	fmt.Println(out)
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
+
+	out, err = GetOutput("safescale share list")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	fmt.Println("Creating Share " + names.Shares[0])
+
+	out, err = GetOutput("safescale share create " + names.Shares[0] + " " + names.Hosts[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale share mount " + names.Shares[0] + " " + names.Hosts[1])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale share list")
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, names.Shares[0]))
+
+	out, err = GetOutput("safescale share inspect " + names.Shares[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	require.True(t, strings.Contains(out, names.Shares[0]))
+	require.True(t, strings.Contains(out, names.Hosts[0]))
+	require.True(t, strings.Contains(out, names.Hosts[1]))
+
+	out, err = GetOutput("safescale share umount " + names.Shares[0] + " " + names.Hosts[1])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale share inspect " + names.Shares[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	require.True(t, strings.Contains(out, names.Shares[0]))
+	require.True(t, strings.Contains(out, names.Hosts[0]))
+	require.False(t, strings.Contains(out, names.Hosts[1]))
+
+	out, err = GetOutput("safescale share delete " + names.Shares[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale share list")
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.False(t, strings.Contains(out, names.Shares[0]))
+
+	out, err = GetOutput("safescale volume list")
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "null"))
+
+	fmt.Println("Creating Volume " + names.Volumes[0])
+
+	out, err = GetOutput("safescale volume create " + names.Volumes[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale volume list")
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, names.Volumes[0]))
+
+	out, err = GetOutput("safescale volume attach " + names.Volumes[0] + " " + names.Hosts[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
+	fmt.Println(out)
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "still attached"))
+
+	out, err = GetOutput("safescale volume inspect " + names.Volumes[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, host0.ID) || strings.Contains(out, names.Hosts[0]))
+
+	out, err = GetOutput("safescale volume  detach " + names.Volumes[0] + " " + names.Hosts[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale volume inspect " + names.Volumes[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.False(t, strings.Contains(out, host0.ID) || strings.Contains(out, names.Hosts[0]))
+
+	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = GetOutput("safescale volume list")
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "null"))
+
+	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"uptime\"")
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, " user"))
+
+	out, err = GetOutput("safescale host delete " + names.Hosts[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "deleted"))
+
+	out, err = GetOutput("safescale host delete " + names.Hosts[1])
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "deleted"))
+
+	out, err = GetOutput("safescale host delete gw-" + names.Networks[0])
+	fmt.Println(out)
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "gateway"))
+
+	out, err = GetOutput("safescale network delete " + names.Networks[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "deleted"))
+
+	fmt.Println("Test OK")
+}
+
 func ReadyToSsh(t *testing.T, provider Providers.Enum) {
 	Setup(t, provider)
 
