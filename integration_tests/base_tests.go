@@ -233,12 +233,12 @@ func Basic(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale host delete " + names.Hosts[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale host delete " + names.Hosts[1])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale host delete gw-" + names.Networks[0])
 	fmt.Println(out)
@@ -248,7 +248,7 @@ func Basic(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale network delete " + names.Networks[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	fmt.Println("Test OK")
 }
@@ -408,12 +408,12 @@ func BasicPrivate(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale host delete " + names.Hosts[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale host delete " + names.Hosts[1])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale host delete gw-" + names.Networks[0])
 	fmt.Println(out)
@@ -423,7 +423,7 @@ func BasicPrivate(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale network delete " + names.Networks[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	fmt.Println("Test OK")
 }
@@ -492,11 +492,11 @@ func SharePartialError(t *testing.T, provider Providers.Enum) {
 		fmt.Println(out)
 	}
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale network delete " + names.Networks[0])
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 }
 
 func ShareError(t *testing.T, provider Providers.Enum) {
@@ -574,11 +574,11 @@ func ShareError(t *testing.T, provider Providers.Enum) {
 		fmt.Println(out)
 	}
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale network delete " + names.Networks[0])
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 }
 
 func VolumeError(t *testing.T, provider Providers.Enum) {
