@@ -389,7 +389,7 @@ func BasicPrivate(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale volume inspect " + names.Volumes[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.False(t, strings.Contains(out, host0.ID) || strings.Contains(out, names.Hosts[0]))
+	require.False(t, strings.Contains(out, names.Hosts[0]))
 
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	fmt.Println(out)
