@@ -61,17 +61,17 @@ type worker struct {
 	node    bool
 	cluster clusterapi.Cluster
 
-	availableMaster      *pb.Host
-	availablePrivateNode *pb.Host
-	availablePublicNode  *pb.Host
+	availableMaster  *pb.Host
+	availableNode    *pb.Host
+	availableGateway *pb.Host
 
-	allMasters      []*pb.Host
-	allPrivateNodes []*pb.Host
-	allPublicNodes  []*pb.Host
+	allMasters  []*pb.Host
+	allNodes    []*pb.Host
+	allGateways []*pb.Host
 
-	concernedMasters      []*pb.Host
-	concernedPrivateNodes []*pb.Host
-	concernedPublicNodes  []*pb.Host
+	concernedMasters  []*pb.Host
+	concernedNodes    []*pb.Host
+	concernedGateways []*pb.Host
 
 	rootKey string
 	// function to alter the content of 'run' key of specification file
@@ -128,11 +128,29 @@ func (w *worker) CanProceed(s Settings) error {
 	return w.validateContextForHost()
 }
 
-func (w *worker) Host() (*pb.Host, error) {
+func (w *worker) GetHost() (*pb.Host, error) {
 	if w.host != nil {
 		return w.host, nil
 	}
 	return nil, fmt.Errorf("target of worker isn't a host")
+}
+
+// identifyAvailableGateway finds a gateway available, and keep track of it
+// for all the life of the action (prevent to request too often)
+// For now, only one gateway is allowed, but in the future we may have 2 for High Availability
+func (w *worker) identifyAvailableGateway() (*pb.Host, error) {
+	if w.cluster == nil {
+		return gatewayFromHost(w.host), nil
+	}
+	if w.availableGateway == nil {
+		var err error
+		netCfg := w.cluster.GetNetworkConfig(w.feature.task)
+		w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, client.DefaultExecutionTimeout)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return w.availableGateway, nil
 }
 
 // identifyAvailableMaster finds a master available, and keep track of it
@@ -155,18 +173,12 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 }
 
 // identifyAvailableNode finds a node available and will use this one during all the install session
-func (w *worker) identifyAvailableNode(public bool) (*pb.Host, error) {
+func (w *worker) identifyAvailableNode() (*pb.Host, error) {
 	if w.cluster == nil {
 		return nil, resources.ResourceNotAvailableError("cluster", "")
 	}
-	found := false
-	if public {
-		found = w.availablePublicNode != nil
-	} else {
-		found = w.availablePrivateNode != nil
-	}
-	if !found {
-		hostID, err := w.cluster.FindAvailableNode(w.feature.task, public)
+	if w.availableNode == nil {
+		hostID, err := w.cluster.FindAvailableNode(w.feature.task, false)
 		if err != nil {
 			return nil, err
 		}
@@ -174,16 +186,9 @@ func (w *worker) identifyAvailableNode(public bool) (*pb.Host, error) {
 		if err != nil {
 			return nil, err
 		}
-		if public {
-			w.availablePublicNode = host
-		} else {
-			w.availablePrivateNode = host
-		}
+		w.availableNode = host
 	}
-	if public {
-		return w.availablePublicNode, nil
-	}
-	return w.availablePrivateNode, nil
+	return w.availableNode, nil
 }
 
 // identifyConcernedMasters returns a list of all the hosts acting as masters and keep this list
@@ -265,18 +270,13 @@ func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 
 // identifyConcernedNodes returns a list of all the hosts acting as public of private nodes and keep this list
 // during all the install session
-func (w *worker) identifyConcernedNodes(public bool) ([]*pb.Host, error) {
+func (w *worker) identifyConcernedNodes() ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
-	found := false
-	if public {
-		found = w.concernedPublicNodes != nil && len(w.concernedPublicNodes) > 0
-	} else {
-		found = w.concernedPrivateNodes != nil && len(w.concernedPrivateNodes) > 0
-	}
-	if !found {
-		hosts, err := w.identifyAllNodes(public)
+
+	if w.concernedNodes == nil {
+		hosts, err := w.identifyAllNodes()
 		if err != nil {
 			return nil, err
 		}
@@ -284,50 +284,66 @@ func (w *worker) identifyConcernedNodes(public bool) ([]*pb.Host, error) {
 		if err != nil {
 			return nil, err
 		}
-		if public {
-			w.concernedPublicNodes = concernedHosts
-		} else {
-			w.concernedPrivateNodes = concernedHosts
-		}
+		w.concernedNodes = concernedHosts
 	}
-	if public {
-		return w.concernedPublicNodes, nil
-	}
-	return w.concernedPrivateNodes, nil
+	return w.concernedNodes, nil
 }
 
 // identifyAllNodes returns a list of all the hosts acting as public of private nodes and keep this list
 // during all the install session
-func (w *worker) identifyAllNodes(public bool) ([]*pb.Host, error) {
+func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
 	if w.cluster == nil {
 		return []*pb.Host{}, nil
 	}
-	found := false
-	if public {
-		found = w.allPublicNodes != nil && len(w.allPublicNodes) > 0
-	} else {
-		found = w.allPrivateNodes != nil && len(w.allPrivateNodes) > 0
-	}
-	if !found {
-		safescalehost := client.New().Host
+
+	if w.allNodes == nil {
+		hostClt := client.New().Host
 		allHosts := []*pb.Host{}
-		for _, i := range w.cluster.ListNodeIDs(w.feature.task, public) {
-			host, err := safescalehost.Inspect(i, client.DefaultExecutionTimeout)
+		for _, i := range w.cluster.ListNodeIDs(w.feature.task, false) {
+			host, err := hostClt.Inspect(i, client.DefaultExecutionTimeout)
 			if err != nil {
 				return nil, err
 			}
 			allHosts = append(allHosts, host)
 		}
-		if public {
-			w.allPublicNodes = allHosts
-		} else {
-			w.allPrivateNodes = allHosts
+		w.allNodes = allHosts
+	}
+	return w.allNodes, nil
+}
+
+// identifyConcernedGateways returns a list of all the hosts acting as gateway that can accept the action
+//  and keep this list during all the install session
+func (w *worker) identifyConcernedGateways() ([]*pb.Host, error) {
+	var hosts []*pb.Host
+
+	if w.host != nil {
+		host := gatewayFromHost(w.host)
+		hosts = []*pb.Host{host}
+	} else if w.cluster != nil {
+		var err error
+		hosts, err = w.identifyAllGateways()
+		if err != nil {
+			return nil, err
 		}
 	}
-	if public {
-		return w.allPublicNodes, nil
+
+	concernedHosts, err := w.extractHostsFailingCheck(hosts)
+	if err != nil {
+		return nil, err
 	}
-	return w.allPrivateNodes, nil
+	w.concernedGateways = concernedHosts
+	return w.concernedGateways, nil
+}
+
+// identifyAllGateways returns a list of all the hosts acting as gatewaysand keep this list
+// during all the install session
+// For now, it's exactly the same than identifyAvailableGateway(), there is only one gateway authorized
+func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
+	host, err := w.identifyAvailableGateway()
+	if err != nil {
+		return nil, err
+	}
+	return []*pb.Host{host}, nil
 }
 
 // Proceed executes the action
@@ -604,17 +620,10 @@ func (w *worker) setReverseProxy() error {
 		gw  *pb.Host
 	)
 
-	if w.cluster != nil {
-		host, err := w.identifyAvailableMaster()
-		if err != nil {
-			return fmt.Errorf("failed to set reverse proxy: %s", err.Error())
-		}
-		gw = gatewayFromHost(host)
-	} else {
-		gw = gatewayFromHost(w.host)
-	}
-	if gw == nil {
-		return fmt.Errorf("failed to set reverse proxy, unable to determine gateway")
+	gw, err = w.identifyAvailableGateway()
+	if err != nil {
+		return fmt.Errorf("failed to set reverse proxy: %s", err.Error())
+
 	}
 
 	kc, err := NewKongController(gw)
@@ -669,7 +678,7 @@ func (w *worker) setReverseProxy() error {
 
 // identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts
 func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
-	hostT, masterT, privnodeT, pubnodeT, err := targets.parse()
+	hostT, masterT, nodeT, gwT, err := targets.parse()
 	if err != nil {
 		return nil, err
 	}
@@ -705,18 +714,18 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		hostsList = append(hostsList, all...)
 	}
 
-	switch privnodeT {
+	switch nodeT {
 	case "1":
-		host, err := w.identifyAvailableNode(false)
+		host, err := w.identifyAvailableNode()
 		if err != nil {
 			return nil, err
 		}
 		hostsList = append(hostsList, host)
 	case "*":
 		if w.action == Action.Add {
-			all, err = w.identifyConcernedNodes(false)
+			all, err = w.identifyConcernedNodes()
 		} else {
-			all, err = w.identifyAllNodes(false)
+			all, err = w.identifyAllNodes()
 		}
 		if err != nil {
 			return nil, err
@@ -724,25 +733,18 @@ func (w *worker) identifyHosts(targets stepTargets) ([]*pb.Host, error) {
 		hostsList = append(hostsList, all...)
 	}
 
-	switch pubnodeT {
+	switch gwT {
 	case "1":
-		host, err := w.identifyAvailableNode(true)
+		host, err := w.identifyAvailableGateway()
 		if err != nil {
 			return nil, err
 		}
-		nodeTarget := NewNodeTarget(host)
-		results, err := w.feature.Check(nodeTarget, w.variables, w.settings)
-		if err != nil {
-			return nil, err
-		}
-		if !results.Successful() {
-			hostsList = append(hostsList, host)
-		}
+		hostsList = append(hostsList, host)
 	case "*":
 		if w.action == Action.Add {
-			all, err = w.identifyConcernedNodes(true)
+			all, err = w.identifyConcernedGateways()
 		} else {
-			all, err = w.identifyAllNodes(true)
+			all, err = w.identifyAllGateways()
 		}
 		if err != nil {
 			return nil, err

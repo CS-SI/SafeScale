@@ -31,10 +31,10 @@ import (
 )
 
 const (
-	targetHosts        = "hosts"
-	targetMasters      = "masters"
-	targetPublicNodes  = "publicnodes"
-	targetPrivateNodes = "privatenodes"
+	targetHosts    = "hosts"
+	targetMasters  = "masters"
+	targetNodes    = "nodes"
+	targetGateways = "gateways"
 )
 
 type stepResult struct {
@@ -89,8 +89,8 @@ type stepTargets map[string]string
 // standardized values (0, 1 or *)
 func (st stepTargets) parse() (string, string, string, string, error) {
 	var (
-		hostT, masterT, privnodeT, pubnodeT string
-		ok                                  bool
+		hostT, masterT, nodeT, gwT string
+		ok                         bool
 	)
 
 	if hostT, ok = st[targetHosts]; ok {
@@ -143,8 +143,8 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		}
 	}
 
-	if privnodeT, ok = st[targetPrivateNodes]; ok {
-		switch strings.ToLower(privnodeT) {
+	if nodeT, ok = st[targetNodes]; ok {
+		switch strings.ToLower(nodeT) {
 		case "":
 			fallthrough
 		case "false":
@@ -152,24 +152,24 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "no":
 			fallthrough
 		case "none":
-			privnodeT = "0"
+			nodeT = "0"
 		case "any":
 			fallthrough
 		case "one":
 			fallthrough
 		case "1":
-			privnodeT = "1"
+			nodeT = "1"
 		case "all":
 			fallthrough
 		case "*":
-			privnodeT = "*"
+			nodeT = "*"
 		default:
-			return "", "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", privnodeT, targetPrivateNodes)
+			return "", "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", nodeT, targetNodes)
 		}
 	}
 
-	if pubnodeT, ok = st[targetPublicNodes]; ok {
-		switch strings.ToLower(pubnodeT) {
+	if gwT, ok = st[targetGateways]; ok {
+		switch strings.ToLower(gwT) {
 		case "":
 			fallthrough
 		case "false":
@@ -179,26 +179,26 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "none":
 			fallthrough
 		case "0":
-			pubnodeT = "0"
+			gwT = "0"
 		case "any":
 			fallthrough
 		case "one":
 			fallthrough
 		case "1":
-			pubnodeT = "1"
+			gwT = "1"
 		case "all":
 			fallthrough
 		case "*":
-			pubnodeT = "*"
+			gwT = "*"
 		default:
-			return "", "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", pubnodeT, targetPublicNodes)
+			return "", "", "", "", fmt.Errorf("invalid value '%s' for target '%s'", gwT, targetGateways)
 		}
 	}
 
-	if hostT == "0" && masterT == "0" && privnodeT == "0" && pubnodeT == "0" {
+	if hostT == "0" && masterT == "0" && nodeT == "0" && gwT == "0" {
 		return "", "", "", "", fmt.Errorf("no targets identified")
 	}
-	return hostT, masterT, privnodeT, pubnodeT, nil
+	return hostT, masterT, nodeT, gwT, nil
 }
 
 // step is a struct containing the needed information to apply the installation
