@@ -32,9 +32,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/sethvargo/go-password/password"
 	log "github.com/sirupsen/logrus"
 )

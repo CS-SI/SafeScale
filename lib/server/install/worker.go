@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 
 	log "github.com/sirupsen/logrus"
 
@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
-	srvutils "github.com/CS-SI/SafeScale/lib/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 const (

@@ -17,14 +17,14 @@
 package api
 
 import (
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/lib"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
-	"github.com/CS-SI/SafeScale/utils/concurrency"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 //go:generate mockgen -destination=../mocks/mock_cluster.go -package=mocks github.com/CS-SI/SafeScale/lib/server/cluster/api Cluster

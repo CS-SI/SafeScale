@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 func init() {

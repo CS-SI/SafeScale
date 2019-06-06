@@ -26,16 +26,16 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeProperty"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
-	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
-	"github.com/CS-SI/SafeScale/system/nfs"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/system/nfs"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 //go:generate mockgen -destination=../mocks/mock_volumeapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers VolumeAPI

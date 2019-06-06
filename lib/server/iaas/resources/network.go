@@ -17,8 +17,8 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // GatewayRequest to create a Gateway into a network

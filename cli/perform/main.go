@@ -28,13 +28,13 @@ import (
 
 	"github.com/CS-SI/SafeScale/perform/cmds"
 
-	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudferro"     // Imported to initialise provider cloudferro
-	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudwatt"      // Imported to initialise provider cloudwatt
-	_ "github.com/CS-SI/SafeScale/iaas/providers/flexibleengine" // Imported to initialise provider flexibleengine
-	_ "github.com/CS-SI/SafeScale/iaas/providers/local"          // Imported to initialise provider local
-	_ "github.com/CS-SI/SafeScale/iaas/providers/opentelekom" // Imported to initialise provider opentelekom
-	_ "github.com/CS-SI/SafeScale/iaas/providers/ovh"         // Imported to initialise provider ovh
-	_ "github.com/CS-SI/SafeScale/iaas/providers/erbc"        // Imported to initialise provider erbc
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialise provider cloudferro
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudwatt"      // Imported to initialise provider cloudwatt
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialise provider flexibleengine
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialise provider local
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom" // Imported to initialise provider opentelekom
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/ovh"         // Imported to initialise provider ovh
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/erbc"        // Imported to initialise provider erbc
 )
 
 func main() {

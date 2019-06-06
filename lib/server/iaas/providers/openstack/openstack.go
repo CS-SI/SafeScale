@@ -19,14 +19,14 @@ package openstack
 import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/iaas/providers"
-	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/iaas/stacks"
-	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 )
 
 const (

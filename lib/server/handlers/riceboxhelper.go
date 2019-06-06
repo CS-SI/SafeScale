@@ -21,7 +21,7 @@ import (
 	"context"
 	"text/template"
 
-	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	rice "github.com/GeertJohan/go.rice"
 )
 

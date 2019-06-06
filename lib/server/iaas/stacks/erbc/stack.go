@@ -1,7 +1,7 @@
 package erbc
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
 type StackErbc struct {

@@ -28,7 +28,7 @@ import (
 	"syscall"
 
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 

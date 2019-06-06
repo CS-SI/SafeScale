@@ -26,7 +26,7 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
@@ -36,10 +36,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/lib/server/install"
-	"github.com/CS-SI/SafeScale/utils"
-	clitools "github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/concurrency"
-	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/enums/ExitCode"
 )
 
 var (

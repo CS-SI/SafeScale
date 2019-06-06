@@ -28,12 +28,12 @@ import (
 	uuid "github.com/satori/go.uuid"
 
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
-	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/system/nfs"
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/system/nfs"
+	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 //go:generate mockgen -destination=../mocks/mock_nasapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ShareAPI

@@ -27,8 +27,8 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
@@ -38,11 +38,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	providermetadata "github.com/CS-SI/SafeScale/lib/server/metadata"
-	pbutils "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/concurrency"
-	"github.com/CS-SI/SafeScale/utils/template"
+	pbutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
 var (

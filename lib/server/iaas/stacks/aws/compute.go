@@ -28,9 +28,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/system"
 )
 
 func wrapError(msg string, err error) error {

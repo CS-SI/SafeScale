@@ -22,10 +22,10 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/utils"
-	clitools "github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // BucketCmd bucket command

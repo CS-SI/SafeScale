@@ -28,7 +28,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 
-	"github.com/CS-SI/SafeScale/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
 // ProviderErrorToString creates an error string from openstack api error

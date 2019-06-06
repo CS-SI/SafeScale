@@ -19,11 +19,11 @@ package utils
 import (
 	"math"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
-	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/lib/system"
 )
 
 // ToPBSshConfig converts a system.SSHConfig into a SshConfig

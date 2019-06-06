@@ -21,8 +21,8 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	conv "github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
+	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"

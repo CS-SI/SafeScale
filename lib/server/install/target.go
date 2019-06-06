@@ -18,7 +18,7 @@ package install
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Method"
-	"github.com/CS-SI/SafeScale/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 
 	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"

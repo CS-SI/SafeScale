@@ -21,10 +21,10 @@ package local
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
 )
 
 var errorStr = "Libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"

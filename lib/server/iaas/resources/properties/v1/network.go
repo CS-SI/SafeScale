@@ -19,8 +19,8 @@ package propertiesv1
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/NetworkProperty"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkProperty"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // NetworkDescription contains additional information describing the network, in V1

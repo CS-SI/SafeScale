@@ -24,9 +24,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/iaas/tests"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/tests"
 )
 
 var tester *tests.ServiceTester

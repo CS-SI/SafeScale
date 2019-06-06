@@ -21,7 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 )
 
 // CreateNetwork creates a network

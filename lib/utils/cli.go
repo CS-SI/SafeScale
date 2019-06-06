@@ -17,7 +17,7 @@
 package utils
 
 import (
-	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/enums/ExitCode"
 	"github.com/urfave/cli"
 )
 

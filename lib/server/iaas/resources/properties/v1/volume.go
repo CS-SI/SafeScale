@@ -19,8 +19,8 @@ package propertiesv1
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeProperty"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeProperty"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // VolumeDescription contains additional information describing the volume, in V1

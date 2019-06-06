@@ -17,10 +17,10 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
-	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // KeyPair represents a SSH key pair

@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -29,8 +29,8 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	convert "github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
+	convert "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // ShareHandler ...

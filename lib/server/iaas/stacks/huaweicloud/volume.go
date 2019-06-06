@@ -26,10 +26,10 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeState"
-	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 )
 
 // // DeleteVolume deletes the volume identified by id

@@ -17,8 +17,8 @@
 package huaweicloud
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/providers"
-	"github.com/CS-SI/SafeScale/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
 // GetAuthOpts returns the auth options

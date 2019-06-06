@@ -25,23 +25,23 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeState"
-	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 
-	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
-	_ "github.com/CS-SI/SafeScale/iaas/providers/cloudwatt"      // Imported to initialize tenant cloudwatt
-	_ "github.com/CS-SI/SafeScale/iaas/providers/erbc"           // Imported to initialise tenant erbc
-	_ "github.com/CS-SI/SafeScale/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
-	_ "github.com/CS-SI/SafeScale/iaas/providers/local"          // Imported to initialize tenant local
-	_ "github.com/CS-SI/SafeScale/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekoms
-	_ "github.com/CS-SI/SafeScale/iaas/providers/ovh"            // Imported to initialize tenant ovh
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudwatt"      // Imported to initialize tenant cloudwatt
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/erbc"           // Imported to initialise tenant erbc
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialize tenant local
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekoms
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/ovh"            // Imported to initialize tenant ovh
 )
 
 // ServiceTester helper class to test clients

@@ -30,14 +30,14 @@ import (
 	// log "github.com/sirupsen/logrus"
 	rice "github.com/GeertJohan/go.rice"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/ohpc/enums/ErrorCode"
 	"github.com/CS-SI/SafeScale/lib/server/install"
-	"github.com/CS-SI/SafeScale/utils/concurrency"
-	"github.com/CS-SI/SafeScale/utils/template"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
 //go:generate rice embed-go

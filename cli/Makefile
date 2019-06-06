@@ -1,8 +1,8 @@
 GO?=go
 
-.PHONY:	safescale safescaled clean vet
+.PHONY:	safescale safescaled perform scanner clean vet
 
-all:	safescale safescaled
+all:	safescale safescaled perform scanner
 
 vet:
 	@(cd safescale && $(MAKE) $@)

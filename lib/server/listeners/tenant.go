@@ -26,9 +26,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant

@@ -26,9 +26,9 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/lib/client"
-	safescaleutils "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/utils"
-	clitools "github.com/CS-SI/SafeScale/utils"
+	safescaleutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // SSHCmd ssh command

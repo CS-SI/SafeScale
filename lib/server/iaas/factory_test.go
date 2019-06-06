@@ -27,8 +27,8 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 func TestTenants(t *testing.T) {

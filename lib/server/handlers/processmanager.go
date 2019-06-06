@@ -19,8 +19,8 @@ package handlers
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 )
 
 // ProcessManagerAPI defines API to manipulate process

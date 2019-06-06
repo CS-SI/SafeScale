@@ -27,10 +27,10 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	stacks "github.com/CS-SI/SafeScale/iaas/stacks"
-	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	stacks "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // Content is the structure to apply to userdata.sh template

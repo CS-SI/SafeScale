@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/system/firewall/Policy"
+	"github.com/CS-SI/SafeScale/lib/system/firewall/Policy"
 )
 
 // Table defines a table of the firewall
