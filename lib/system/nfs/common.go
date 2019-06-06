@@ -30,9 +30,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	rice "github.com/GeertJohan/go.rice"
 )
 

@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/satori/go.uuid"
 )
 

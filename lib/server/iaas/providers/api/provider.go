@@ -17,13 +17,13 @@
 package api
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/providers"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 )
 
-//go:generate mockgen -destination=../mocks/mock_providerapi.go -package=mocks github.com/CS-SI/SafeScale/iaas/providers/api Provider
+//go:generate mockgen -destination=../mocks/mock_providerapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/providers/api Provider
 
 // Provider is the interface to cloud stack
 // It has to recall Stack api, to serve as Provider AND as Stack

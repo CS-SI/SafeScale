@@ -25,12 +25,12 @@ import (
 	//log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 
 	"github.com/CS-SI/SafeScale/perform/enums/ExitCode"
 	"github.com/CS-SI/SafeScale/lib/server/cluster"
 	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
-	"github.com/CS-SI/SafeScale/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 var (

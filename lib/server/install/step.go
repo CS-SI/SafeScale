@@ -26,8 +26,8 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/Action"
-	srvutils "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/utils/concurrency"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 const (

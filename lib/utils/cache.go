@@ -20,7 +20,7 @@ import (
 	"sync"
 )
 
-//go:generate mockgen -destination=../mocks/mock_cache.go -package=mocks github.com/CS-SI/SafeScale/utils Cache
+//go:generate mockgen -destination=../mocks/mock_cache.go -package=mocks github.com/CS-SI/SafeScale/lib/utils Cache
 
 // Cache is an interface for caching elements
 type Cache interface {

@@ -16,7 +16,7 @@
 
 package stacks
 
-import "github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
+import "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
 
 // AuthenticationOptions fields are the union of those recognized by each identity implementation and provider
 // to be able to carry different but necessary information to stack implementations

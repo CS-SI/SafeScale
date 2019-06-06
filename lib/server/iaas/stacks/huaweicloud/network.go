@@ -32,12 +32,12 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/utils/retry"
-	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/Verdict"
 )
 
 // VPCRequest defines a request to create a VPC

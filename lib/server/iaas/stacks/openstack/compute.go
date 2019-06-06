@@ -40,15 +40,15 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
-	converters "github.com/CS-SI/SafeScale/iaas/resources/properties"
-	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	converters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 // ListAvailabilityZones lists the usable AvailabilityZones

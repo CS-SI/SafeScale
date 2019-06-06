@@ -17,7 +17,7 @@
 package firewall
 
 import (
-	"github.com/CS-SI/SafeScale/system/firewall/Action"
+	"github.com/CS-SI/SafeScale/lib/system/firewall/Action"
 )
 
 // Rule defines a firewall rule

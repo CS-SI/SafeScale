@@ -27,11 +27,11 @@ import (
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	conv "github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
+	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // NetworkHandler ...

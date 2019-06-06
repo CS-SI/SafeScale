@@ -17,9 +17,9 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeState"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // VolumeRequest represents a volume request

@@ -22,13 +22,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	//"github.com/CS-SI/SafeScale/iaas/providers/aws"
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/providers/cloudferro"
-	"github.com/CS-SI/SafeScale/iaas/providers/cloudwatt"
-	"github.com/CS-SI/SafeScale/iaas/providers/flexibleengine"
-	"github.com/CS-SI/SafeScale/iaas/providers/opentelekom"
-	"github.com/CS-SI/SafeScale/iaas/providers/ovh"
+	//"github.com/CS-SI/SafeScale/lib/server/iaas/providers/aws"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudwatt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/ovh"
 )
 
 func TestCompare(t *testing.T) {

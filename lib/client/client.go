@@ -30,7 +30,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // Session units the different resources proposed by safescaled as safescale client

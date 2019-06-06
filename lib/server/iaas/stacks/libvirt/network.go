@@ -29,9 +29,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )

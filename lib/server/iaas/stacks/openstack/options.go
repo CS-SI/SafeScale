@@ -16,7 +16,7 @@
 
 package openstack
 
-import "github.com/CS-SI/SafeScale/iaas/stacks"
+import "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 // GetConfigurationOptions ...
 func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {

@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // State contains the bare minimum information about a cluster

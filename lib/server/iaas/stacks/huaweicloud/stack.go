@@ -25,8 +25,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 
-	"github.com/CS-SI/SafeScale/iaas/stacks"
-	"github.com/CS-SI/SafeScale/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 )
 
 // Stack is the implementation for huaweicloud cloud stack

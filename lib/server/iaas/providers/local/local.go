@@ -21,13 +21,13 @@ package local
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/iaas/providers"
-	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/stacks"
-	libStack "github.com/CS-SI/SafeScale/iaas/stacks/libvirt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	libStack "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 )
 
 // provider is the providerementation of the local provider

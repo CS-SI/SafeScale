@@ -27,8 +27,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/tests"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/tests"
 )
 
 var (

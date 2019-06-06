@@ -23,10 +23,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 )
 
 // Folder describes a metadata folder

@@ -27,8 +27,8 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	safescale "github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 const (

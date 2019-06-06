@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"

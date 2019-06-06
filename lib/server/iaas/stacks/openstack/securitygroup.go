@@ -19,7 +19,7 @@ package openstack
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/gophercloud/gophercloud/pagination"
 )

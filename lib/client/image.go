@@ -20,7 +20,7 @@ import (
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // host is the safescale client part handling hosts

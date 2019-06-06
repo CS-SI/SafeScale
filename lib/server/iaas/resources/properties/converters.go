@@ -1,8 +1,8 @@
 package properties
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 )
 
 // ModelHostTemplateToPropertyHostSize ...

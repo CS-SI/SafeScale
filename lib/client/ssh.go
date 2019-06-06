@@ -27,11 +27,11 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	conv "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils/retry"
-	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
+	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/Verdict"
 )
 
 // ssh is the part of the safescale client that handles SSH stuff

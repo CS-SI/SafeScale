@@ -17,11 +17,11 @@
 package erbc
 
 import (
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/providers"
-	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	stackapi "github.com/CS-SI/SafeScale/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	stackapi "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 )
 
 // provider is the providerementation of the Erbc provider

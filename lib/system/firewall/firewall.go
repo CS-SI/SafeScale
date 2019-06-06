@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/lib/system"
 )
 
 // Firewall implements a Firewall based on iptables

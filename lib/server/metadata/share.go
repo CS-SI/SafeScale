@@ -22,11 +22,11 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/metadata"
-	"github.com/CS-SI/SafeScale/utils/retry"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/metadata"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 const (

@@ -18,7 +18,7 @@ package propertiesv1
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Composite ...

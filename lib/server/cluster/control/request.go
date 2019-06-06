@@ -17,7 +17,7 @@
 package control
 
 import (
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
 )

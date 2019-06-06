@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 )
 
 //go:generate mockgen -destination=../mocks/mock_bucketapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers BucketAPI

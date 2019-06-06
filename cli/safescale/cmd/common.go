@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/client"
-	clitools "github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/enums/ExitCode"
+	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/enums/ExitCode"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 

@@ -5,7 +5,7 @@ package local
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	libvirt "github.com/libvirt/libvirt-go"
 )
 

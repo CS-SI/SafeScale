@@ -24,8 +24,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
 
-	"github.com/CS-SI/SafeScale/iaas/providers"
-	"github.com/CS-SI/SafeScale/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
 // Stack implements AWS stack

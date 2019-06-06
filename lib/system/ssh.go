@@ -39,8 +39,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"golang.org/x/crypto/ssh"
 )
 

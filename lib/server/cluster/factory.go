@@ -21,8 +21,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
@@ -30,8 +30,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/boh"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/k8s"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/swarm"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // Get returns the Cluster instance corresponding to the cluster named 'name'

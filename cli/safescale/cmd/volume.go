@@ -21,12 +21,12 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	safescaleutils "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/utils"
-	clitools "github.com/CS-SI/SafeScale/utils"
+	safescaleutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 //VolumeCmd volume command

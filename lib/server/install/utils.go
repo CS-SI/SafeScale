@@ -29,9 +29,9 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	srvutils "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils/retry"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 const (

@@ -19,7 +19,7 @@ package iaas
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 )
 
 //StorageServices ...

@@ -33,10 +33,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/CS-SI/SafeScale/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/listeners"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 /*

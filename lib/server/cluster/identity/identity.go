@@ -19,8 +19,8 @@ package identity
 import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Identity contains the bare minimum information about a cluster

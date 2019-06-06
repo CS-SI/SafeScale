@@ -21,13 +21,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-	conv "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/system"
+	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/system"
 
-	clitools "github.com/CS-SI/SafeScale/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // var sshCfgCache = cache.NewMapCache()

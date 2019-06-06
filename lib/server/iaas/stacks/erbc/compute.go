@@ -19,8 +19,8 @@ package erbc
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
 )
 
 // The createds hosts could be connected to the network with a bridge or a nat

@@ -21,16 +21,16 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/iaas/providers"
-	providerapi "github.com/CS-SI/SafeScale/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
-	imagefilters "github.com/CS-SI/SafeScale/iaas/resources/filters/images"
-	templatefilters "github.com/CS-SI/SafeScale/iaas/resources/filters/templates"
-	"github.com/CS-SI/SafeScale/iaas/stacks"
-	"github.com/CS-SI/SafeScale/iaas/stacks/huaweicloud"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	imagefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/images"
+	templatefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 )
 
 const (

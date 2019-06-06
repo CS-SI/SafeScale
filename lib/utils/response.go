@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/utils/enums/CmdStatus"
+	"github.com/CS-SI/SafeScale/lib/utils/enums/CmdStatus"
 	urfcli "github.com/urfave/cli"
 )
 

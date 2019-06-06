@@ -19,7 +19,7 @@ package retry
 import (
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/utils/retry/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/Verdict"
 )
 
 // Notify ...

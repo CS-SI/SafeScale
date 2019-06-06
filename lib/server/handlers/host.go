@@ -26,21 +26,21 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostProperty"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/HostState"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/NetworkProperty"
-	propsv1 "github.com/CS-SI/SafeScale/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkProperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
-	srvutils "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/system"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/retry"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 //go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers HostAPI

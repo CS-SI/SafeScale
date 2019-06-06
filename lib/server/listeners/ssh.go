@@ -20,14 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/system"
+	"github.com/CS-SI/SafeScale/lib/system"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // SSHHandler exists to ease integration tests

@@ -30,10 +30,10 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/iaas/resources"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeSpeed"
-	"github.com/CS-SI/SafeScale/iaas/resources/enums/VolumeState"
-	"github.com/CS-SI/SafeScale/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum

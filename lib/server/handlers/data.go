@@ -24,9 +24,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 
 	"github.com/klauspost/reedsolomon"
 	log "github.com/sirupsen/logrus"

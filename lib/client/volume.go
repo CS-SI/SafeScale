@@ -22,8 +22,8 @@ import (
 	"time"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	clitools "github.com/CS-SI/SafeScale/utils"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // volume is the part of safescale client handing volumes

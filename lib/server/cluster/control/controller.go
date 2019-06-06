@@ -23,8 +23,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/iaas"
-	"github.com/CS-SI/SafeScale/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
@@ -32,11 +32,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
-	pbutils "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/utils"
-	"github.com/CS-SI/SafeScale/utils/concurrency"
-	"github.com/CS-SI/SafeScale/utils/retry"
-	"github.com/CS-SI/SafeScale/utils/serialize"
+	pbutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Controller contains the information about a cluster

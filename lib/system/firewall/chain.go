@@ -19,7 +19,7 @@ package firewall
 import (
 	"sync"
 
-	"github.com/CS-SI/SafeScale/system/firewall/Policy"
+	"github.com/CS-SI/SafeScale/lib/system/firewall/Policy"
 )
 
 // Chain ...
