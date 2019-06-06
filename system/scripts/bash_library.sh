@@ -14,7 +14,7 @@
 # limitations under the License.
 
 export SF_BASEDIR=/opt/safescale
-export SF_ETCDIR=${SF_BASEDIR}/etc:wait
+export SF_ETCDIR=${SF_BASEDIR}/etc
 export SF_VARDIR=${SF_BASEDIR}/var
 export SF_TMPDIR=${SF_VARDIR}/tmp
 export SF_LOGDIR=${SF_VARDIR}/log
