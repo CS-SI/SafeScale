@@ -415,7 +415,7 @@ check_for_ip() {
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
 check_for_network() {
-    ping -n -c1 -w5 www.google.com || return 1
+    ping -n -c1 -w30 -i5 www.google.com || return 1
     [ ! -z "$PU_IF" ] && {
         check_for_ip $PU_IF || return 1
     }
