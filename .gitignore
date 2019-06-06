@@ -32,31 +32,8 @@ rice-box.go
 mock_*.go
 gomock_reflect*
 
-#ignore results from scanner
-scanner/Test*
-scanner/scanner
-
-# ignore binaries from broker
-broker/cli/broker/broker
-broker/cli/broker/broker-cover
-broker/cli/brokerd/brokerd
-broker/cli/brokerd/brokerd-cover
-
 # ignore pipfile.lock
-broker/Pipfile.lock
-
-# ignore binaries from perform
-perform/perform
-perform/perform-cover
-perform/cluster/tests/deploy
-perform/cluster/tests/deploy-cover
-
-# ignore binaries from deploy
-deploy/deploy
-deploy/deploy-cover
-safescale/server/cluster/tests/create_cluster
-deploy/cli/deploy
-deploy/cli/deploy-cover
+lib/Pipfile.lock
 
 *.code-workspace
 !sample-settings/*.code-workspace
@@ -90,23 +67,22 @@ docs/.nojekyll
 docs/Other
 
 # ignore version info
-broker/cli/broker/version\.go
-broker/cli/brokerd/version\.go
-deploy/cli/version\.go
-perform/version\.go
-scanner/version\.go
-safescale/cli/safescale/version\.go
-safescale/cli/safescaled/version\.go
-
+cli/safescale/version\.go
+cli/safescaled/version\.go
+cli/perform/version\.go
+cli/scanner/version\.go
 
 # ignore binaries from safescale
 cli/safescale/safescale
 cli/safescale/safescale-cover
-safescale/cli/safescale/safescale
-safescale/cli/safescale/safescale-cover
-safescale/cli/safescaled/safescaled
-safescale/cli/safescaled/safescaled-cover
+cli/safescaled/safescaled
+cli/safescaled/safescaled
+cli/perform/perform-cover
+cli/perform/perform-cover
+lib/server/cluster/tests/create_cluster
+
+#ignore results from scanner
+cli/scanner/Test*
 
 Test Results - client_test_go\.html
 
-cli/safescale/

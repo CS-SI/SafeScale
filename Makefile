@@ -9,7 +9,7 @@ ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
 
-VERSION := 19.03.0
+VERSION := 19.06.0-alpha
 
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
@@ -52,12 +52,12 @@ endif
 endif
 
 # Binaries generated
-EXECS=safescale/cli/safescale/safescale safescale/cli/safescale/safescale-cover safescale/cli/safescaled/safescaled safescale/cli/safescaled/safescaled-cover perform/perform perform/perform-cover scanner/scanner
+EXECS=cli/safescale/safescale /cli/safescale/safescale-cover cli/safescaled/safescaled cli/safescaled/safescaled-cover cli/perform/perform cli/perform/perform-cover cli/scanner/scanner
 
 # List of packages
-PKG_LIST := $(shell $(GO) list ./... | grep -v /cli/ | grep -v /lib/ | grep -v /vendor/)
+PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
 # List of packages to test
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v stacks/aws | grep -v /cli/ | grep -v /lib/ | grep -v sandbox)
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v stacks/aws | grep -v sandbox)
 
 
 # DEPENDENCIES MANAGEMENT
@@ -97,7 +97,7 @@ WARN_STRING  = "[WARNING]"
 BUILD_TAGS = ""
 export BUILD_TAGS
 
-all: begin ground getdevdeps ensure generate utils system iaas safescale perform scanner err vet-light
+all: begin ground getdevdeps ensure generate utils system iaas lib perform scanner err vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps ensure generate
@@ -143,46 +143,44 @@ ensure:
 	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which stringer` && rm -rf ./vendor/golang.org/x/tools/cmd && govendor fetch golang.org/x/tools/cmd/stringer@release-branch.go1.10 && cd vendor/golang.org/x/tools/cmd/stringer && $(GO) build && mv ./stringer $(GOPATH)/bin || true
 	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which errcheck` && rm -rf ./vendor/github.com/kisielk && govendor fetch github.com/kisielk/errcheck@v1.0.1 && cd vendor/github.com/kisielk/errcheck && $(GO) build && mv ./errcheck $(GOPATH)/bin || true
 
-utils: common
+lib/utils: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd utils && $(MAKE) all)
+	@(cd lib/utils && $(MAKE) all)
 
-iaas: common
+lib/server/iaas: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building iaas, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd iaas && $(MAKE) all)
+	@(cd lib/server/iaas && $(MAKE) all)
 
-system: common
+lib/system: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building system, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd system && $(MAKE) all)
 
-safescale: common utils system iaas
+lib: lib/utils lib/system lib/server/iaas
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd safescale && $(MAKE) all)
-
-perform: common utils system iaas safescale
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd perform && $(MAKE) all)
-
-scanner: common
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building scanner, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd scanner && $(MAKE) all)
+	@(cd lib && $(MAKE) all)
 
 clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd iaas && $(MAKE) $@)
-	@(cd system && $(MAKE) $@)
-	@(cd safescale && $(MAKE) $@)
-	@(cd perform && $(MAKE) $@)
-	@(cd utils && $(MAKE) $@)
+	@(cd cli && $(MAKE) $@)
+	@(cd lib && $(MAKE) $@)
+#	@(cd system && $(MAKE) $@)
+#	@(cd safescale && $(MAKE) $@)
+#	@(cd perform && $(MAKE) $@)
+#	@(cd utils && $(MAKE) $@)
 
-safescale/client/safescale: safescale
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale (client) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+cli/safescale: utils system iaas lib
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building binary safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
-safescale/server/safescaled: safescale
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale (daemon) , $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+cli/safescaled: utils system iaas lib
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building binary safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
-perform/perform: perform
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+cli/perform: utils system iaas lib
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building binary perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd perform && $(MAKE) all)
+
+cli/scanner: utils system iaas lib
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building scanner, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd scanner && $(MAKE) all)
 
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
