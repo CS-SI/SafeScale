@@ -51,7 +51,7 @@ var (
 // ClusterCommand command
 var ClusterCommand = cli.Command{
 	Name:      "cluster",
-	Aliases:   []string{"datacenter", "dc"},
+	Aliases:   []string{"datacenter", "dc", "platform"},
 	Usage:     "create and manage cluster",
 	ArgsUsage: "COMMAND",
 	Subcommands: []cli.Command{
