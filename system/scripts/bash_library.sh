@@ -14,6 +14,7 @@
 # limitations under the License.
 
 export SF_BASEDIR=/opt/safescale
+export SF_ETCDIR=${SF_BASEDIR}/etc:wait
 export SF_VARDIR=${SF_BASEDIR}/var
 export SF_TMPDIR=${SF_VARDIR}/tmp
 export SF_LOGDIR=${SF_VARDIR}/log
@@ -358,6 +359,17 @@ sfReverseProxyReload() {
 	[ ! -z "$id" ] && docker exec -ti $id kong reload >/dev/null
 }
 export -f sfReverseProxyReload
+
+# echoes a random string
+# $1 is the size of the result (optional)
+# $2 is the characters to choose from (optional); use preferably [:xxx:] notation (like [:alnum:] for all letters and digits)
+sfRandomString() {
+	local count=16
+	[ $# -ge 1 ] && count=$1
+	local characters="[:graph:]"
+	[ $# -ge 2 ] && characters="$2"
+	</dev/urandom tr -dc "$characters" | head -c${count}
+}
 
 declare -A FACTS
 LINUX_KIND=
