@@ -317,8 +317,12 @@ func checkParameters(f *Feature, v Variables) error {
 	if f.specs.IsSet("feature.parameters") {
 		params := f.specs.GetStringSlice("feature.parameters")
 		for _, k := range params {
-			if _, ok := v[k]; !ok {
-				return fmt.Errorf("missing value for parameter '%s'", k)
+			splitted := strings.Split(k, "=")
+			if _, ok := v[splitted[0]]; !ok {
+				if len(splitted) == 1 {
+					return fmt.Errorf("missing value for parameter '%s'", k)
+				}
+				v[splitted[0]] = strings.Join(splitted[1:], "=")
 			}
 		}
 	}
