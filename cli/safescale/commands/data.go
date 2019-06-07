@@ -55,7 +55,7 @@ var dataPush = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <local_file_path>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <local_file_path>."))
 		} else {
 			localFilePath := utils.AbsPathify(c.Args().First())
 			var fileName string
@@ -66,7 +66,7 @@ var dataPush = cli.Command{
 			}
 			err := client.New().Data.Push(localFilePath, fileName, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data push", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data push", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -91,7 +91,7 @@ var dataGet = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
 		} else {
 			fileName := c.Args().First()
 			var localFilePath string
@@ -103,7 +103,7 @@ var dataGet = cli.Command{
 
 			err := client.New().Data.Get(localFilePath, fileName, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data get", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data get", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -122,12 +122,12 @@ var dataDelete = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
 		} else {
 			fileName := c.Args().First()
 			err := client.New().Data.Delete(fileName, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data delete", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data delete", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -146,7 +146,7 @@ var dataList = cli.Command{
 
 		filesList, err := client.New().Data.List(client.DefaultExecutionTimeout)
 		if err != nil {
-			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
+			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
 		} else {
 			response.Succeeded(filesList)
 		}

@@ -93,7 +93,7 @@ var shareCreate = cli.Command{
 
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
 		} else {
 			shareName := c.Args().Get(0)
 			def := pb.ShareDefinition{
@@ -113,7 +113,7 @@ var shareCreate = cli.Command{
 			}
 			err := client.New().Share.Create(def, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "creation of share", true).Error()))
+				_ = response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "creation of share", true).Error()))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -133,7 +133,7 @@ var shareDelete = cli.Command{
 
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
 		} else {
 			var (
 				wg        sync.WaitGroup
@@ -161,7 +161,7 @@ var shareDelete = cli.Command{
 			wg.Wait()
 
 			if errs > 0 {
-				response.Failed(clitools.ExitOnRPC(errMessage))
+				_ = response.Failed(clitools.ExitOnRPC(errMessage))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -180,7 +180,7 @@ var shareList = cli.Command{
 
 		list, err := client.New().Share.List(0)
 		if err != nil {
-			response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "list of shares", false).Error()))
+			_ = response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "list of shares", false).Error()))
 		} else {
 			response.Succeeded(list.ShareList)
 		}
@@ -209,7 +209,7 @@ var shareMount = cli.Command{
 
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
 		} else {
 			shareName := c.Args().Get(0)
 			hostName := c.Args().Get(1)
@@ -223,7 +223,7 @@ var shareMount = cli.Command{
 			}
 			err := client.New().Share.Mount(def, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "mount of nas", true).Error()))
+				_ = response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "mount of nas", true).Error()))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -243,7 +243,7 @@ var shareUnmount = cli.Command{
 
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
 		} else {
 			shareName := c.Args().Get(0)
 			hostName := c.Args().Get(1)
@@ -253,7 +253,7 @@ var shareUnmount = cli.Command{
 			}
 			err := client.New().Share.Unmount(def, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "unmount of share", true).Error()))
+				_ = response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "unmount of share", true).Error()))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -273,11 +273,11 @@ var shareInspect = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
 		} else {
 			list, err := client.New().Share.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "inspection of share", false).Error()))
+				_ = response.Failed(clitools.ExitOnRPC(client.DecorateError(err, "inspection of share", false).Error()))
 			} else {
 				response.Succeeded(list)
 			}

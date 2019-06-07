@@ -59,7 +59,7 @@ xunit_tests.xml
 SafeScale-*.html
 test_output.html
 
-#ignore wiki files
+# ignore wiki files
 docs/img
 docs/*.md
 docs/*.html
@@ -76,13 +76,16 @@ cli/scanner/version\.go
 cli/safescale/safescale
 cli/safescale/safescale-cover
 cli/safescaled/safescaled
-cli/safescaled/safescaled
+cli/safescaled/safescaled-cover
+cli/perform/perform
 cli/perform/perform-cover
-cli/perform/perform-cover
+cli/scanner/scanner
+cli/scanner/scanner-cover
 lib/server/cluster/tests/create_cluster
 
 #ignore results from scanner
 cli/scanner/Test*
 
 Test Results - client_test_go\.html
+
 
