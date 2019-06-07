@@ -55,16 +55,18 @@ feature:
                                     yum makecache fast && \
                                     yum groupinstall -y -t "X Window system" && \
                                     yum groupinstall -y -t Xfce && \
-                                    yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl jq || exit $?
+                                    yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || exit $?
                                     ;;
                                 debian|ubuntu)
-                                    sfApt update && apt-mark hold xscreensaver 
-                                    sfApt install -y perl xfce4 firefox jq
+                                    sfApt update && apt-mark hold xscreensaver
+                                    sfApt install -y perl xfce4 firefox
                                     ;;
                                 *)
                                     echo "unsupported OS type '$LINUX_KIND'"
-                                    exit 1;;
+                                    exit 1
+                                    ;;
                             esac
+                            exit 0
 
                     tigervnc:
                         targets:
@@ -251,6 +253,7 @@ feature:
                             systemctl enable vncconfig\@:0.service && \
                             systemctl restart vncserver\@:0.service || exit 196
                             systemctl restart vncconfig\@:0.service || exit 197
+                            exit 0
 
                     deps:
                         targets:
@@ -264,6 +267,7 @@ feature:
                             APACHE="http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${VERSION}"
                             sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || exit 192
                             sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || exit 193
+                            exit 0
 
                     guacamole:
                         targets:
@@ -471,6 +475,7 @@ feature:
                             # build image
                             docker build -t remotedesktop:latest . || exit 192
                             cd ${SF_TMPDIR} && rm -rf remotedesktop.image
+                            exit 0
 
                     start:
                         targets:
@@ -492,6 +497,7 @@ feature:
                             # Starts remotedesktop container                          #
                             ###########################################################
                             docker run -d --hostname remotedesktop --name remotedesktop -p "9080:8080" -p "9009:8009" remotedesktop:latest
+                            exit 0
 
             remove:
                 pace: image
