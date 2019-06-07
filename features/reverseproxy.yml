@@ -113,17 +113,19 @@ feature:
                                         - KONG_ADMIN_ACCESS_LOG=/dev/stdout
                                         - KONG_PROXY_ERROR_LOG=/dev/stderr
                                         - KONG_ADMIN_ERROR_LOG=/dev/stderr
-                                        - KONG_ADMIN_LISTEN={{.HostIP}}:8444 ssl
+                                        - KONG_ADMIN_LISTEN=0.0.0.0:8444 ssl
                                         - KONG_PROXY_LISTEN=0.0.0.0:443 ssl
                                         - KONG_PLUGINS=oidc,prometheus
                                     ports:
                                         - "443:443"
-                                        - "{{.HostIP}}:8444:8444"
+                                        - "127.0.0.1:8444:8444"
                                     restart: always
                                     healthcheck:
                                         test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
                                         interval: 5s
                                         retries: 10
+                                    sysctls:
+                                        net.ipv4.ip_unprivileged_port_start: 0
 
                                 gui:
                                     image: pantsel/konga
@@ -146,7 +148,7 @@ feature:
                                         db:
                                             condition: service_healthy
                                         proxy:
-                                            condition: service_srated
+                                            condition: service_started
 
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/kong/reverseproxy.compose.yml
@@ -166,7 +168,7 @@ feature:
                         run: |
                             # iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
                             # sfSaveIptablesRules
-                            sfFirewallAdd --zone=trusted --add-service=https && \
+                            #sfFirewallAdd --zone=trusted --add-service=https && \
                             sfFirewallAdd --zone=public --add-service=https && \
                             sfFirewallReload
 
@@ -177,7 +179,7 @@ feature:
                         targets:
                             hosts: yes
                         run: |
-                            sfFirewallAdd --zone=trusted --remove-service=https && \
+                            #sfFirewallAdd --zone=trusted --remove-service=https && \
                             sfFirewallAdd --zone=public --remove-service=https && \
                             sfFirewallReload
 
