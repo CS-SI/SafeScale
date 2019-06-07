@@ -22,8 +22,8 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils"
 )
@@ -51,7 +51,7 @@ var bucketList = cli.Command{
 
 		resp, err := client.New().Bucket.List(0)
 		if err != nil {
-			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of buckets", false).Error())))
+			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of buckets", false).Error())))
 		} else {
 			response.Succeeded(resp)
 		}
@@ -70,11 +70,11 @@ var bucketCreate = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
 		} else {
 			err := client.New().Bucket.Create(c.Args().Get(0), client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of bucket", true).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of bucket", true).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -94,7 +94,7 @@ var bucketDelete = cli.Command{
 
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
 		} else {
 			var bucketList []string
 			bucketList = append(bucketList, c.Args().First())
@@ -102,7 +102,7 @@ var bucketDelete = cli.Command{
 
 			err := client.New().Bucket.Delete(bucketList, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of bucket", true).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of bucket", true).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -122,11 +122,11 @@ var bucketInspect = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
 		} else {
 			resp, err := client.New().Bucket.Inspect(c.Args().Get(0), client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of bucket", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of bucket", false).Error())))
 			} else {
 				response.Succeeded(resp)
 			}
@@ -155,11 +155,11 @@ var bucketMount = cli.Command{
 
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
 		} else {
 			err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "mount of bucket", true).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "mount of bucket", true).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -179,11 +179,11 @@ var bucketUnmount = cli.Command{
 
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
 		} else {
 			err := client.New().Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unmount of bucket", true).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "unmount of bucket", true).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
