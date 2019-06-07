@@ -65,12 +65,12 @@ var hostStart = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			hostRef := c.Args().First()
 			err := client.New().Host.Start(hostRef, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "start of host", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "start of host", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -89,12 +89,12 @@ var hostStop = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			hostRef := c.Args().First()
 			err := client.New().Host.Stop(hostRef, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "stop of host", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "stop of host", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -113,12 +113,12 @@ var hostReboot = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			hostRef := c.Args().First()
 			err := client.New().Host.Reboot(hostRef, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "reboot of host", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "reboot of host", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -142,13 +142,13 @@ var hostList = cli.Command{
 
 		hosts, err := client.New().Host.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
+			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
 		} else {
 			jsoned, _ := json.Marshal(hosts.GetHosts())
 			result := []map[string]interface{}{}
 			err = json.Unmarshal([]byte(jsoned), &result)
 			if err != nil {
-				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
+				_ = response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, utils.Capitalize(client.DecorateError(err, "list of hosts", false).Error())))
 			} else {
 				for _, v := range result {
 					delete(v, "private_key")
@@ -173,11 +173,11 @@ var hostInspect = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			resp, err := client.New().Host.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of host", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of host", false).Error())))
 			} else {
 				response.Succeeded(resp)
 			}
@@ -196,11 +196,11 @@ var hostStatus = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			resp, err := client.New().Host.Status(c.Args().First(), client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "status of host", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "status of host", false).Error())))
 			} else {
 				response.Succeeded(resp)
 			}
@@ -265,7 +265,7 @@ var hostCreate = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			askedGpus := int32(c.Int("gpu"))
 			if askedGpus <= -1 {
@@ -293,7 +293,7 @@ var hostCreate = cli.Command{
 			}
 			resp, err := client.New().Host.Create(def, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 			} else {
 				response.Succeeded(resp)
 			}
@@ -340,11 +340,11 @@ var hostResize = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			if c.NumFlags() == 0 {
 				_ = cli.ShowSubcommandHelp(c)
-				response.Failed(clitools.ExitOnInvalidArgument("Missing arguments, a resize command requires that at least one argument (cpu, ram, disk, gpu, freq) is specified"))
+				_ = response.Failed(clitools.ExitOnInvalidArgument("Missing arguments, a resize command requires that at least one argument (cpu, ram, disk, gpu, freq) is specified"))
 			} else {
 				def := pb.HostDefinition{
 					Name:     c.Args().First(),
@@ -357,7 +357,7 @@ var hostResize = cli.Command{
 				}
 				resp, err := client.New().Host.Resize(def, client.DefaultExecutionTimeout)
 				if err != nil {
-					response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
+					_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 				} else {
 					response.Succeeded(resp)
 				}
@@ -378,7 +378,7 @@ var hostDelete = cli.Command{
 
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			var hostList []string
 			hostList = append(hostList, c.Args().First())
@@ -386,7 +386,7 @@ var hostDelete = cli.Command{
 
 			err := client.New().Host.Delete(hostList, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of host", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of host", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -405,11 +405,11 @@ var hostSsh = cli.Command{
 
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
 			resp, err := client.New().Host.SSHConfig(c.Args().First())
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh config of host", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh config of host", false).Error())))
 			} else {
 				response.Succeeded(resp)
 			}
@@ -482,14 +482,14 @@ var hostAddFeatureCommand = cli.Command{
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
 			msg := fmt.Sprintf("Error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
-			response.Failed(clitools.ExitOnRPC(msg))
+			_ = response.Failed(clitools.ExitOnRPC(msg))
 		} else {
 			if !results.Successful() {
 				msg := fmt.Sprintf("Failed to add feature '%s' on host '%s'", featureName, hostName)
 				if Debug || Verbose {
 					msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 				}
-				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+				_ = response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -518,7 +518,7 @@ var hostListFeaturesCommand = cli.Command{
 
 		features, err := install.ListFeatures("host")
 		if err != nil {
-			response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
+			_ = response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, err.Error()))
 		} else {
 			response.Succeeded(features)
 		}
@@ -583,14 +583,14 @@ var hostCheckFeatureCommand = cli.Command{
 		results, err := feature.Check(target, values, install.Settings{})
 		if err != nil {
 			msg := fmt.Sprintf("Error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
-			response.Failed(clitools.ExitOnRPC(msg))
+			_ = response.Failed(clitools.ExitOnRPC(msg))
 		} else {
 			if !results.Successful() {
 				msg := fmt.Sprintf("Feature '%s' not found on host '%s'", featureName, hostName)
 				if Verbose || Debug {
 					msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 				}
-				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
+				_ = response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.NotFound, msg))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -656,14 +656,14 @@ var hostDeleteFeatureCommand = cli.Command{
 		results, err := feature.Remove(target, values, install.Settings{})
 		if err != nil {
 			msg := fmt.Sprintf("Error uninstalling feature '%s' on '%s': %s\n", featureName, hostName, err.Error())
-			response.Failed(clitools.ExitOnRPC(msg))
+			_ = response.Failed(clitools.ExitOnRPC(msg))
 		} else {
 			if !results.Successful() {
 				msg := fmt.Sprintf("Failed to delete feature '%s' from host '%s'", featureName, hostName)
 				if Verbose || Debug {
 					msg += fmt.Sprintf(":\n%s", results.AllErrorMessages())
 				}
-				response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
+				_ = response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, msg))
 			} else {
 				response.Succeeded(nil)
 			}

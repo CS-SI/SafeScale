@@ -47,7 +47,7 @@ var tenantList = cli.Command{
 
 		tenants, err := client.New().Tenant.List(client.DefaultExecutionTimeout)
 		if err != nil {
-			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
+			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
 		} else {
 			response.Succeeded(tenants.GetTenants())
 		}
@@ -64,7 +64,7 @@ var tenantGet = cli.Command{
 
 		tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 		if err != nil {
-			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
+			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
 		} else {
 			response.Succeeded(tenant)
 		}
@@ -81,11 +81,11 @@ var tenantSet = cli.Command{
 
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		} else {
 			err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}
@@ -104,7 +104,7 @@ var tenantStorageList = cli.Command{
 
 		tenants, err := client.New().Tenant.StorageList(client.DefaultExecutionTimeout)
 		if err != nil {
-			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error())))
+			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error())))
 		} else {
 			response.Succeeded(tenants.GetTenants())
 		}
@@ -121,7 +121,7 @@ var tenantStorageGet = cli.Command{
 
 		tenants, err := client.New().Tenant.StorageGet(client.DefaultExecutionTimeout)
 		if err != nil {
-			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
+			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
 		} else {
 			response.Succeeded(tenants.GetNames())
 		}
@@ -139,13 +139,13 @@ var tenantStorageSet = cli.Command{
 
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <storage_tenants...>."))
+			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <storage_tenants...>."))
 		} else {
 			tenantNames := []string{c.Args().First()}
 			tenantNames = append(tenantNames, c.Args().Tail()...)
 			err := client.New().Tenant.StorageSet(tenantNames, client.DefaultExecutionTimeout)
 			if err != nil {
-				response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set storage tenants", false).Error())))
+				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set storage tenants", false).Error())))
 			} else {
 				response.Succeeded(nil)
 			}

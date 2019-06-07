@@ -5,8 +5,8 @@ ndef = $(if $(value $(1)),,$(error $(1) not set))
 .PHONY: default
 default: help ;
 
-ROOTDIR:=$(shell ROOTDIR='$(ROOTDIR)' bash -c "dirname $(realpath $(lastword $(MAKEFILE_LIST)))")
-export ROOTDIR
+#ROOTDIR:=$(shell ROOTDIR='$(ROOTDIR)' bash -c "dirname $(realpath $(lastword $(MAKEFILE_LIST)))")
+#export ROOTDIR
 
 include ./common.mk
 
@@ -14,9 +14,9 @@ include ./common.mk
 EXECS=cli/safescale/safescale /cli/safescale/safescale-cover cli/safescaled/safescaled cli/safescaled/safescaled-cover cli/perform/perform cli/perform/perform-cover cli/scanner/scanner
 
 # List of packages
-PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
+PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v /vendor/)
 # List of packages to test
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v providers/aws | grep -v stacks/aws | grep -v sandbox)
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v lib/security/ | grep -v providers/aws | grep -v stacks/aws | grep -v sandbox)
 
 
 # DEPENDENCIES MANAGEMENT
@@ -94,8 +94,8 @@ lib: common
 
 clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd cli && $(MAKE) $@)
-	@(cd lib && $(MAKE) $@)
+	@(cd cli && $(MAKE) $(@))
+	@(cd lib && $(MAKE) $(@))
 
 cli: common lib
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building SafeScale binaries, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
