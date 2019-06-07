@@ -91,11 +91,11 @@ func Basic(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.40.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.40.0/24")
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.40.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.40.0/24")
 	fmt.Println(out)
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
@@ -233,12 +233,12 @@ func Basic(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale host delete " + names.Hosts[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale host delete " + names.Hosts[1])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale host delete gw-" + names.Networks[0])
 	fmt.Println(out)
@@ -248,7 +248,7 @@ func Basic(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale network delete " + names.Networks[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	fmt.Println("Test OK")
 }
@@ -266,11 +266,11 @@ func BasicPrivate(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.70.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.70.0/24")
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.70.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.70.0/24")
 	fmt.Println(out)
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
@@ -389,7 +389,7 @@ func BasicPrivate(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale volume inspect " + names.Volumes[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.False(t, strings.Contains(out, host0.ID) || strings.Contains(out, names.Hosts[0]))
+	require.False(t, strings.Contains(out, names.Hosts[0]))
 
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	fmt.Println(out)
@@ -408,12 +408,12 @@ func BasicPrivate(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale host delete " + names.Hosts[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale host delete " + names.Hosts[1])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale host delete gw-" + names.Networks[0])
 	fmt.Println(out)
@@ -423,7 +423,7 @@ func BasicPrivate(t *testing.T, provider Providers.Enum) {
 	out, err = GetOutput("safescale network delete " + names.Networks[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	fmt.Println("Test OK")
 }
@@ -438,9 +438,9 @@ func ReadyToSsh(t *testing.T, provider Providers.Enum) {
 	out, err := GetOutput("safescale network list")
 	require.Nil(t, err)
 
-	fmt.Println("Creating network " + names.Networks[0] + " --cidr 168.192.41.0/24")
+	fmt.Println("Creating network " + names.Networks[0] + " --cidr 192.168.41.0/24")
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.41.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.41.0/24")
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM " + names.Hosts[0])
@@ -467,7 +467,7 @@ func SharePartialError(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.49.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.49.0/24")
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM " + names.Hosts[0])
@@ -492,11 +492,11 @@ func SharePartialError(t *testing.T, provider Providers.Enum) {
 		fmt.Println(out)
 	}
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale network delete " + names.Networks[0])
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 }
 
 func ShareError(t *testing.T, provider Providers.Enum) {
@@ -511,7 +511,7 @@ func ShareError(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.42.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.42.0/24")
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM " + names.Hosts[0])
@@ -574,11 +574,11 @@ func ShareError(t *testing.T, provider Providers.Enum) {
 		fmt.Println(out)
 	}
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale network delete " + names.Networks[0])
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, "deleted"))
+	require.True(t, strings.Contains(out, "success"))
 }
 
 func VolumeError(t *testing.T, provider Providers.Enum) {
@@ -593,7 +593,7 @@ func VolumeError(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.43.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.43.0/24")
 	require.Nil(t, err)
 
 	fmt.Println("Creating VM " + names.Hosts[0])
@@ -638,10 +638,10 @@ func StopStart(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.44.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.44.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.44.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.44.0/24")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
@@ -689,10 +689,10 @@ func DeleteVolumeMounted(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.45.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.45.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.45.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.45.0/24")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
@@ -795,10 +795,10 @@ func UntilShare(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.46.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.46.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.46.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.46.0/24")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
@@ -844,10 +844,10 @@ func UntilVolume(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.47.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.47.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.47.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.47.0/24")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 
@@ -898,10 +898,10 @@ func ShareVolumeMounted(t *testing.T, provider Providers.Enum) {
 
 	fmt.Println("Creating network " + names.Networks[0])
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.38.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.38.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.38.0/24")
+	out, err = GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.38.0/24")
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist"))
 

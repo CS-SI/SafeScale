@@ -17,7 +17,7 @@ func Docker(t *testing.T, provider Providers.Enum) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.100.0/24")
+	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.100.0/24")
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
@@ -58,7 +58,7 @@ func DockerNotGateway(t *testing.T, provider Providers.Enum) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.101.0/24")
+	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.101.0/24")
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
@@ -102,7 +102,7 @@ func DockerCompose(t *testing.T, provider Providers.Enum) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.102.0/24")
+	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.102.0/24")
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
@@ -141,7 +141,7 @@ func RemoteDesktop(t *testing.T, provider Providers.Enum) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.103.0/24")
+	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.103.0/24")
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
@@ -183,7 +183,7 @@ func ReverseProxy(t *testing.T, provider Providers.Enum) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 168.192.104.0/24")
+	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.104.0/24")
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " reverseproxy")
