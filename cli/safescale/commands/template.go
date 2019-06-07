@@ -47,7 +47,7 @@ var templateList = cli.Command{
 
 		templates, err := client.New().Template.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of templates", false).Error())))
+			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of templates", false).Error())))
 		} else {
 			response.Succeeded(templates.GetTemplates())
 		}

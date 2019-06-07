@@ -1,8 +1,19 @@
+VERSION=19.06.0-alpha
+export VERSION
+
+ifeq ($(MAKE_LEVEL),)
+MAKE_LEVEL=-1
+MAKE_TRACE=""
+else
+MAKE_LEVEL+=1
+MAKE_TRACE=$(shell printf '    %.0s' {1..$(MAKE_LEVEL)})
+endif
+export MAKE_LEVEL
+
+
 ifndef VERBOSE
 MAKEFLAGS += --no-print-directory
 endif
-
-VERSION := 19.06.0-alpha
 
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
@@ -17,8 +28,8 @@ RM?=rm
 BROWSER?=firefox
 
 ifeq ($(OS),Windows_NT)
-	HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)
-	RM = del /Q
+HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)
+RM = del /Q
 endif
 
 GOPATH?=$(HOME)/go
@@ -26,21 +37,21 @@ GOBIN?=$(GOPATH)/bin
 CIBIN?=/tmp
 
 ifeq (, $(shell which git))
- $(error "No git in your PATH: [$(PATH)], you must have git installed and available through your PATH")
+$(error "No git in your PATH: [$(PATH)], you must have git installed and available through your PATH")
 endif
 
 ifeq (, $(GOPATH))
- $(error "No GOPATH defined")
+$(error "No GOPATH defined")
 endif
 
 # Handling multiple gopath: use ~/go by default
 ifeq ($(findstring :,$(GOBIN)),:)
-    GOBIN=$(HOME)/go/bin
+GOBIN=$(HOME)/go/bin
 endif
 
 ifneq ($(OS),Windows_NT)
 ifneq ($(findstring $(GOBIN),$(PATH)),$(GOBIN))
- $(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
+$(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
 endif
 endif
 

@@ -1,8 +1,8 @@
-GO?=go
+include ../../common.mk
 
-.PHONY:	cluster handlers iaas install clean vet
+.PHONY:	lib/server/cluster lib/server/handlers lib/server/iaas lib/server/install clean vet
 
-all:	iaas cluster handlers install
+all:	lib/server/iaas lib/server/cluster lib/server/handlers lib/server/install
 
 generate:
 	@(cd iaas && $(MAKE) $@)
@@ -12,16 +12,20 @@ generate:
 vet:
 	@$(GO) vet ./...
 
-iaas:
+lib/server/iaas:
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building component iaas, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd iaas && $(MAKE))
 
-cluster:
+lib/server/cluster:
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building component cluster, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd cluster && $(MAKE))
 
-handlers:
+lib/server/handlers:
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building component handlers, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd handlers && $(MAKE))
 
-install:
+lib/server/install:
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building component install, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd install && $(MAKE))
 
 clean:
