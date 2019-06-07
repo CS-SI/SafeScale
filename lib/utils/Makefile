@@ -1,14 +1,18 @@
 GO?=go
 
-.PHONY: clean retry
+.PHONY: clean generate retry vet
 
-all: utils retry
-
-utils: *.go
-	@$(GO) generate ./...
+all: retry
 
 retry:
-	@(cd retry && $(MAKE))
+	@(cd retry && $(MAKE) all)
+
+generate:
+	@(cd retry && $(MAKE) $(@))
+
+vet:
+	@$(GO) vet ./...
 
 clean:
-	@(cd retry && $(MAKE) $@)
+	@(cd retry && $(MAKE) $(@))
+

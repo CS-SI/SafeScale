@@ -2,7 +2,7 @@ GO?=go
 
 .PHONY: all clean generate vet
 
-DIRECTORIES := $(sort $(dir $(wildcard */)))
+all: generate
 
 generate:
 	@$(GO) generate -run stringer ./...

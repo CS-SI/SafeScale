@@ -1,4 +1,4 @@
-GO?=go
+include ../common.mk
 
 .PHONY:	safescale safescaled perform scanner clean vet
 
@@ -21,6 +21,9 @@ scanner:
 
 perform:
 	@(cd safescaled && $(MAKE))
+
+generate:
+	@(cd perform && $(MAKE) $(@))
 
 clean:
 	@(cd safescale && $(MAKE) $@)

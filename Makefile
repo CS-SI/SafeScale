@@ -5,51 +5,10 @@ ndef = $(if $(value $(1)),,$(error $(1) not set))
 .PHONY: default
 default: help ;
 
-ifndef VERBOSE
-MAKEFLAGS += --no-print-directory
-endif
+ROOTDIR:=$(shell ROOTDIR='$(ROOTDIR)' bash -c "dirname $(realpath $(lastword $(MAKEFILE_LIST)))")
+export ROOTDIR
 
-VERSION := 19.06.0-alpha
-
-FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
-BUILD := $(shell git rev-parse HEAD)
-UPSTREAM := $(shell git rev-parse origin/develop)
-LOCAL := $(shell git rev-parse HEAD)
-REMOTE := $(shell git rev-parse $(UPSTREAM))
-BASE := $(shell git merge-base HEAD $(UPSTREAM))
-
-GO?=go
-CP?=cp
-RM?=rm
-BROWSER?=firefox
-
-ifeq ($(OS),Windows_NT)
-	HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)
-	RM = del /Q
-endif
-
-GOPATH?=$(HOME)/go
-GOBIN?=$(GOPATH)/bin
-CIBIN?=/tmp
-
-ifeq (, $(shell which git))
- $(error "No git in your PATH: [$(PATH)], you must have git installed and available through your PATH")
-endif
-
-ifeq (, $(GOPATH))
- $(error "No GOPATH defined")
-endif
-
-# Handling multiple gopath: use ~/go by default
-ifeq ($(findstring :,$(GOBIN)),:)
-    GOBIN=$(HOME)/go/bin
-endif
-
-ifneq ($(OS),Windows_NT)
-ifneq ($(findstring $(GOBIN),$(PATH)),$(GOBIN))
- $(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
-endif
-endif
+include ./common.mk
 
 # Binaries generated
 EXECS=cli/safescale/safescale /cli/safescale/safescale-cover cli/safescaled/safescaled cli/safescaled/safescaled-cover cli/perform/perform cli/perform/perform-cover cli/scanner/scanner
@@ -57,7 +16,7 @@ EXECS=cli/safescale/safescale /cli/safescale/safescale-cover cli/safescaled/safe
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/)
 # List of packages to test
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v /iaas/providers/aws | grep -v stacks/aws | grep -v sandbox)
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v providers/aws | grep -v stacks/aws | grep -v sandbox)
 
 
 # DEPENDENCIES MANAGEMENT
@@ -80,24 +39,10 @@ GOVENDOR := github.com/kardianos/govendor
 
 DEVDEPSLIST := $(STRINGER) $(RICE) $(PROTOBUF) $(DEP) $(MOCKGEN) $(COVER) $(LINTER) $(XUNIT) $(ERRCHECK) $(REPORTER) $(COVERTOOL) $(CONVEY) $(GOVENDOR)
 
-# Life is better with colors
-COM_COLOR   = \033[0;34m
-OBJ_COLOR   = \033[0;36m
-OK_COLOR    = \033[0;32m
-GOLD_COLOR  = \033[0;93m
-ERROR_COLOR = \033[0;31m
-WARN_COLOR  = \033[0;33m
-NO_COLOR    = \033[m
-
-OK_STRING    = "[OK]"
-INFO_STRING  = "[INFO]"
-ERROR_STRING = "[ERROR]"
-WARN_STRING  = "[WARNING]"
-
 BUILD_TAGS = ""
 export BUILD_TAGS
 
-all: begin ground getdevdeps ensure generate utils system iaas lib perform scanner err vet-light
+all: begin ground getdevdeps ensure generate lib cli err vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps ensure generate
@@ -143,44 +88,18 @@ ensure:
 	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which stringer` && rm -rf ./vendor/golang.org/x/tools/cmd && govendor fetch golang.org/x/tools/cmd/stringer@release-branch.go1.10 && cd vendor/golang.org/x/tools/cmd/stringer && $(GO) build && mv ./stringer $(GOPATH)/bin || true
 	@$(GO) version | grep 1.10 > /dev/null && rm -rf `which errcheck` && rm -rf ./vendor/github.com/kisielk && govendor fetch github.com/kisielk/errcheck@v1.0.1 && cd vendor/github.com/kisielk/errcheck && $(GO) build && mv ./errcheck $(GOPATH)/bin || true
 
-lib/utils: common
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd lib/utils && $(MAKE) all)
-
-lib/server/iaas: common
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building iaas, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd lib/server/iaas && $(MAKE) all)
-
-lib/system: common
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building system, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd system && $(MAKE) all)
-
-lib: lib/utils lib/system lib/server/iaas
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building service safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+lib: common
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building SafeScale libraries, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd lib && $(MAKE) all)
 
 clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd cli && $(MAKE) $@)
 	@(cd lib && $(MAKE) $@)
-#	@(cd system && $(MAKE) $@)
-#	@(cd safescale && $(MAKE) $@)
-#	@(cd perform && $(MAKE) $@)
-#	@(cd utils && $(MAKE) $@)
 
-cli/safescale: utils system iaas lib
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building binary safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-
-cli/safescaled: utils system iaas lib
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building binary safescale, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-
-cli/perform: utils system iaas lib
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building binary perform, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd perform && $(MAKE) all)
-
-cli/scanner: utils system iaas lib
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building scanner, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd scanner && $(MAKE) all)
+cli: common lib
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building SafeScale binaries, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd cli && $(MAKE) all)
 
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
@@ -209,10 +128,8 @@ depclean: begin
 
 generate: begin # Run generation
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@cd safescale && $(MAKE) sdk
-	@$(GO) generate -run stringer ./... 2>&1 | tee generation_results.log
-	@$(GO) generate -run rice ./... 2>&1 | tee -a generation_results.log
-	@$(GO) generate -run stringer ./... 2>&1 | tee -a generation_results.log
+	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
+	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@$(GO) generate -run mockgen ./...  2>&1 | tee -a generation_results.log
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warning generating code, if RICE related, then is a false warning !$(NO_COLOR)\n";fi;
 

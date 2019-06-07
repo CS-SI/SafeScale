@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/retry/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
 )
 
 // Try keeps track of the number of tries, starting from 1. Action is valid only when Err is nil.

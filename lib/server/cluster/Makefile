@@ -1,25 +1,25 @@
 GO?=go
 
-.PHONY: generate flavors tests clean
+.PHONY: clean flavors generate tests vet
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
-all: api flavors tests
+all: flavors tests
 
 vet:
 	@$(GO) vet ./...
 
-generate:
-	@$(GO) generate ./...
-
 flavors: generate
-	@(cd flavors && $(MAKE))
+	@(cd flavors && $(MAKE) all)
 
-tests: generate flavors
-	@(cd tests && $(MAKE))
+generate:
+	@(cd enums && $(MAKE) $(@))
+	@(cd flavors && $(MAKE) $(@))
+
+tests: flavors
+	@(cd tests && $(MAKE) all)
 
 clean:
-	@(cd api && $(MAKE) $@)
 	@(cd flavors && $(MAKE) $@)
 	@(cd tests && $(MAKE) $@)
 	@(cd enums && $(MAKE) $@)

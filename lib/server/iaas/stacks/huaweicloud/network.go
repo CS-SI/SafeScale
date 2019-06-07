@@ -37,7 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
 )
 
 // VPCRequest defines a request to create a VPC

@@ -12,9 +12,7 @@ BUILD_DATE := `date +%Y/%m/%d-%H:%M`
 VERSIONFILE := version.go
 REV := `git rev-parse HEAD 2>/dev/null || echo ""`
 
-.PHONY: clean vet
-
-DIRECTORIES := $(sort $(dir $(wildcard */)))
+.PHONY: clean generate vet
 
 default: all
 
@@ -28,7 +26,10 @@ all: clean gensrc
 clean:
 	@$(RM) $(EXEC) || true
 	@$(RM) $(EXEC-COVER) || true
-	@(for d in $(DIRECTORIES); do (cd $$d; $(RM) *_string.go || true); done)
+	@(cd enums && $(MAKE) $(@))
+
+generate:
+	@(cd enums && $(MAKE) $(@))
 
 gensrc:
 	@$(RM) $(VERSIONFILE) || true

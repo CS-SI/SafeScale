@@ -31,7 +31,7 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 )

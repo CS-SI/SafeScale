@@ -31,7 +31,7 @@ import (
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
 )
 
 // ssh is the part of the safescale client that handles SSH stuff

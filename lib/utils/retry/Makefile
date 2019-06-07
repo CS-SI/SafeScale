@@ -1,15 +1,15 @@
 GO?=go
   
-.PHONY: generate clean
+.PHONY: clean generate vet
 
 all:    generate
+
+generate:
+	@(cd enums && $(MAKE) $(@))
 
 vet:
 	@$(GO) vet ./...
 
-generate:
-	@$(GO) generate ./...
-
 clean:
-	@$(RM) ./Verdict/enum_string.go || true
+	@$(RM) ./enums/Verdict/enum_string.go || true
 

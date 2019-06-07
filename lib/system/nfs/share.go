@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/system/nfs/SecurityFlavor"
+	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/SecurityFlavor"
 )
 
 // ExportOptions ...

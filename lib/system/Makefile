@@ -1,19 +1,19 @@
 GO?=go
 
-.PHONY: nfs clean
+.PHONY: clean generate nfs
 
-all: generate nfs
-
-generate:
-	@$(GO) generate ./...
+all: nfs
 
 vet:
 	@$(GO) vet ./...
 
 nfs:
-	@(cd nfs && $(MAKE))
+	@(cd nfs && $(MAKE) all)
+
+generate:
+	@(cd nfs && $(MAKE) $(@))
 
 clean:
-	@(cd firewall && $(MAKE) $@)
-	@(cd nfs && $(MAKE) $@)
+	@(cd firewall && $(MAKE) $(@)
+	@(cd nfs && $(MAKE) $(@)
 	@$(RM) rice-box.go || true

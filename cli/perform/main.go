@@ -25,9 +25,7 @@ import (
 	"time"
 
 	"github.com/urfave/cli"
-
-	"github.com/CS-SI/SafeScale/perform/cmds"
-
+	"github.com/CS-SI/SafeScale/cli/perform/commands"
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialise provider cloudferro
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudwatt"      // Imported to initialise provider cloudwatt
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialise provider flexibleengine
@@ -82,24 +80,24 @@ func main() {
 	}
 
 	app.Commands = []cli.Command{
-		cmds.ClusterListCommand,
-		cmds.ClusterCreateCommand,
-		cmds.ClusterInspectCommand,
-		cmds.ClusterDeleteCommand,
-		cmds.ClusterStartCommand,
-		cmds.ClusterStopCommand,
-		cmds.ClusterStateCommand,
-		cmds.ClusterExpandCommand,
-		cmds.ClusterShrinkCommand,
-		cmds.ClusterCallCommand,
-		cmds.ClusterInspectNodeCommand,
-		cmds.ClusterDeleteNodeCommand,
-		cmds.ClusterStartNodeCommand,
-		cmds.ClusterStopNodeCommand,
-		cmds.ClusterProbeNodeCommand,
-		cmds.ClusterAddFeatureCommand,
-		cmds.ClusterDeleteFeatureCommand,
-		cmds.ClusterProbeFeatureCommand,
+		commands.ClusterListCommand,
+		commands.ClusterCreateCommand,
+		commands.ClusterInspectCommand,
+		commands.ClusterDeleteCommand,
+		commands.ClusterStartCommand,
+		commands.ClusterStopCommand,
+		commands.ClusterStateCommand,
+		commands.ClusterExpandCommand,
+		commands.ClusterShrinkCommand,
+		commands.ClusterCallCommand,
+		commands.ClusterInspectNodeCommand,
+		commands.ClusterDeleteNodeCommand,
+		commands.ClusterStartNodeCommand,
+		commands.ClusterStopNodeCommand,
+		commands.ClusterProbeNodeCommand,
+		commands.ClusterAddFeatureCommand,
+		commands.ClusterDeleteFeatureCommand,
+		commands.ClusterProbeFeatureCommand,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 

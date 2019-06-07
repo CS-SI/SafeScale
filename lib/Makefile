@@ -1,6 +1,8 @@
-.PHONY:	sdk clean vet
+ifeq (VERSION,)
+	include ../common.mk
+endif
 
-GO?=go
+.PHONY:	sdk client server utils system clean vet
 
 # Handling multiple gopath: use $(HOME)/go by default
 ifeq ($(findstring :,$(GOPATH)),:)
@@ -17,13 +19,34 @@ ifneq ($(OS),Windows_NT)
 PATH = $(HOME)/.local/bin:$(shell printenv PATH)
 endif
 
-all:	cli
+all:	sdk system utils server client
 
 vet:
 	@$(GO) vet ./...
 
+generate: sdk
+	@(cd server && $(MAKE) $@)
+	@(cd system && $(MAKE) $@)
+	@(cd utils && $(MAKE) $@)
+
+client:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building library client, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd utils && $(MAKE) all)
+
+server:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building server libraries, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd server && $(MAKE) all)
+
+system:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building library system, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd system && $(MAKE) all)
+
 sdk:
 	@protoc -I. -I$(GOINCLUDEPATH)/src --go_out=plugins=grpc:. safescale.proto
+
+utils:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building library utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd utils && $(MAKE) all)
 
 has_python:
 	@which python3 > /dev/null; if [ $$? -ne 0 ]; then echo "No python installed !"; exit 1; fi
@@ -45,10 +68,7 @@ sdk_python: has_python sdk
 
 force_sdk_python: prepare_python sdk_python
 
-cli:	sdk
-	@(cd cli && $(MAKE))
-
 clean:
-	@(cd cli && $(MAKE) $@)
 	@($(RM) safescale_pb2.py || true)
 	@(cd server && $(MAKE) $@)
+	@(cd system && $(MAKE) $@)
