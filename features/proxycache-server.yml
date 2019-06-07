@@ -160,7 +160,7 @@ feature:
                                     tty: true
                             EOF
 
-                            sfRetry 5m 5 docker build --rm --no-cache -t proxycache:latest . && \
+                            sfRetry 5m 5 docker build --rm --no-cache -t proxycache:latest --network=host . && \
                             cd ${SF_TMPDIR} && rm -rf proxycache.image || exit 192
 
                             docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml -p proxycache up -d || exit 514

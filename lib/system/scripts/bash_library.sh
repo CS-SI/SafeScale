@@ -195,14 +195,14 @@ export -f sfRetry
 sfFirewall() {
 	[ $# -eq 0 ] && return 0
 	which firewall-cmd &>/dev/null || return 1
-	firewall-cmd $@
+	firewall-cmd "$@"
 }
 export -f sfFirewall
 
 # sfFirewallAdd sets a permanent firewall rule (using firewall-cmd, so arguments are firewall-cmd ones)
 # sfFirewallReload needed to apply rule
 sfFirewallAdd() {
-	sfFirewall --permanent $@
+	sfFirewall --permanent "$@"
 }
 export -f sfFirewallAdd
 
