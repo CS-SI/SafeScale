@@ -16,7 +16,7 @@ func ClusterK8S(t *testing.T, provider Providers.Enum) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := GetOutput("safescale -v -d cluster create + --cidr 168.192.200.0/24 --disable remotedesktop " + names.Clusters[0])
+	out, err := GetOutput("safescale -v -d cluster create + --cidr 192.168.200.0/24 --disable remotedesktop " + names.Clusters[0])
 	require.Nil(t, err)
 
 	command := "sudo -u cladm -i kubectl run hello-world-za --image=gcr.io/google-samples/node-hello:1.0  --port=8080"
@@ -42,7 +42,7 @@ func ClusterSwarm(t *testing.T, provider Providers.Enum) {
 	names.TearDown()
 	defer names.TearDown()
 
-	out, err := GetOutput("safescale -v -d cluster create + --cidr 168.192.201.0/24 --disable remotedesktop --flavor SWARM " + names.Clusters[0])
+	out, err := GetOutput("safescale -v -d cluster create + --cidr 192.168.201.0/24 --disable remotedesktop --flavor SWARM " + names.Clusters[0])
 	require.Nil(t, err)
 
 	command := "docker service create --name webtest --publish 8118:80 httpd"
