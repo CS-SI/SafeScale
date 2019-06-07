@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/system/nfs/SecurityFlavor"
+	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/SecurityFlavor"
 )
 
 // Server structure

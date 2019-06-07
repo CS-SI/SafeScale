@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package cmds
+package commands
 
 import (
 
@@ -22,7 +22,7 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/perform/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/cli/perform/enums/ExitCode"
 )
 
 // ClusterProbeFeatureCommand ...

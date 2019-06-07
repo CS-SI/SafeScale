@@ -27,12 +27,12 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/urfave/cli"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
-
-	"github.com/CS-SI/SafeScale/lib/cli/safescale/cmd"
+	"github.com/CS-SI/SafeScale/cli/safescale/commands"
 )
 
 func cleanup() {
@@ -118,38 +118,38 @@ func main() {
 		return nil
 	}
 
-	app.Commands = append(app.Commands, cmd.NetworkCmd)
-	sort.Sort(cli.CommandsByName(cmd.NetworkCmd.Subcommands))
+	app.Commands = append(app.Commands, commands.NetworkCmd)
+	sort.Sort(cli.CommandsByName(commands.NetworkCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.TenantCmd)
-	sort.Sort(cli.CommandsByName(cmd.TenantCmd.Subcommands))
+	app.Commands = append(app.Commands, commands.TenantCmd)
+	sort.Sort(cli.CommandsByName(commands.TenantCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.HostCmd)
-	sort.Sort(cli.CommandsByName(cmd.HostCmd.Subcommands))
+	app.Commands = append(app.Commands, commands.HostCmd)
+	sort.Sort(cli.CommandsByName(commands.HostCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.VolumeCmd)
-	sort.Sort(cli.CommandsByName(cmd.VolumeCmd.Subcommands))
+	app.Commands = append(app.Commands, commands.VolumeCmd)
+	sort.Sort(cli.CommandsByName(commands.VolumeCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.SSHCmd)
-	sort.Sort(cli.CommandsByName(cmd.SSHCmd.Subcommands))
+	app.Commands = append(app.Commands, commands.SSHCmd)
+	sort.Sort(cli.CommandsByName(commands.SSHCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.BucketCmd)
-	sort.Sort(cli.CommandsByName(cmd.BucketCmd.Subcommands))
+	app.Commands = append(app.Commands, commands.BucketCmd)
+	sort.Sort(cli.CommandsByName(commands.BucketCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.DataCmd)
-	sort.Sort(cli.CommandsByName(cmd.DataCmd.Subcommands))
+	app.Commands = append(app.Commands, commands.DataCmd)
+	sort.Sort(cli.CommandsByName(commands.DataCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.ShareCmd)
-	sort.Sort(cli.CommandsByName(cmd.ShareCmd.Subcommands))
+	app.Commands = append(app.Commands, commands.ShareCmd)
+	sort.Sort(cli.CommandsByName(commands.ShareCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.ImageCmd)
-	sort.Sort(cli.CommandsByName(cmd.ImageCmd.Subcommands))
+	app.Commands = append(app.Commands, commands.ImageCmd)
+	sort.Sort(cli.CommandsByName(commands.ImageCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.TemplateCmd)
-	sort.Sort(cli.CommandsByName(cmd.TemplateCmd.Subcommands))
+	app.Commands = append(app.Commands, commands.TemplateCmd)
+	sort.Sort(cli.CommandsByName(commands.TemplateCmd.Subcommands))
 
-	app.Commands = append(app.Commands, cmd.ClusterCommand)
-	sort.Sort(cli.CommandsByName(cmd.ClusterCommand.Subcommands))
+	app.Commands = append(app.Commands, commands.ClusterCommand)
+	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
 
 	sort.Sort(cli.CommandsByName(app.Commands))
 

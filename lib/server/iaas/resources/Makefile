@@ -4,12 +4,14 @@ GO?=go
 
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
-all:	generate
+generate:
+	@(cd enums && $(MAKE) $(@))
+	@(cd userdata && $(MAKE) $(@))
 
 vet:
 	@$(GO) vet ./...
 
-generate:
-	@$(GO) generate ./...
-
-clean: ;
+clean: 
+	@(cd enums && $(MAKE) $(@))
+	@(cd userdata && $(MAKE) $(@))
+	@$(RM) rice-box.go enums/*/enum_string.go

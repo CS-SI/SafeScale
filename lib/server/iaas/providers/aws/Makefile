@@ -1,14 +1,11 @@
 GO?=go
 
-.PHONY:	generate clean test
-
-all:	generate
-
-vet:
-	@$(GO) vet ./...
+.PHONY:	clean generate test vet
 
 generate:
-	@$(GO) generate
+	@$(GO) generate ./...
+vet:
+	@$(GO) vet ./...
 
 test:
 	@$(GO) test

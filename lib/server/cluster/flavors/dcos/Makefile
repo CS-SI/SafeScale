@@ -1,16 +1,16 @@
 GO?=go
 
-.PHONY: generate clean
+.PHONY: all clean generate vet
+
 
 all: generate
+
+generate:
+	@$(GO) generate -run rice
 
 vet:
 	@$(GO) vet ./...
 
-generate: dcos.go scripts/*.sh
-	@$(GO) generate ./...
-
 clean:
-	@(cd enums && $(MAKE) $@)
 	@($(RM) -f rice-box.go || true)
 

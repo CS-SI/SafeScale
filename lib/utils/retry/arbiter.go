@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/Verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
 )
 
 // Arbiter sleeps or selects any amount of time for each attempt.

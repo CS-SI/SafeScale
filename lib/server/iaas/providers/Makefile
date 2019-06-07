@@ -1,11 +1,17 @@
 GO?=go
 
-.PHONY:	generate
-
-all:	generate
+.PHONY:	clean generate vet
 
 generate:
-	@$(GO) generate ./...
+	@(cd aws && $(MAKE) $(@))
+	@(cd cloudferro && $(MAKE) $(@))
+	@(cd cloudwatt && $(MAKE) $(@))
+	@(cd flexibleengine && $(MAKE) $(@))
+	@(cd openstack && $(MAKE) $(@))
+	@(cd opentelekom && $(MAKE) $(@))
+	@(cd ovh && $(MAKE) $(@))
+	@(cd local && $(MAKE) $(@))
+	@(cd erbc && $(MAKE) $(@))
 
 vet:
 	@$(GO) vet ./...

@@ -128,7 +128,7 @@ When SafeScale commands are invoked, they search for a tenant configuration file
 
 - ./ (current dir)
 - $HOME/.safescale/
-- $HOME/.config/.safescale/
+- $HOME/.config/safescale/
 - /etc/safescale/
 
 Thanks to [viper](https://github.com/spf13/viper), the file can be named ``tenants.toml`` (encoded in TOML), ``tenants.json`` (encoded in JSON) or ``tenants.yaml`` (encoded in YAML), allowing you to use the format you are the most comfortable with.

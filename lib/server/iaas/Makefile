@@ -1,11 +1,12 @@
 GO?=go
 
-.PHONY:	generate
+.PHONY:	clean generate vet
 
-all:	generate
+all: generate
 
 generate:
-	@$(GO) generate ./...
+	@(cd resources && $(MAKE) $(@))
+	@(cd providers && $(MAKE) $(@))
 
 vet:
 	@$(GO) vet ./...

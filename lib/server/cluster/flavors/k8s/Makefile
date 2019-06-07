@@ -1,16 +1,16 @@
 GO?=go
 
-.PHONY: generate clean mrproper
+.PHONY: all clean generate vet
+
 
 all: generate
+
+generate:
+	@$(GO) generate -run rice
 
 vet:
 	@$(GO) vet ./...
 
-generate: k8s.go scripts/*.sh
-	@$(GO) generate
-
 clean:
-	@($(RM) -f rice-box.go)
+	@($(RM) -f rice-box.go || true)
 
-mrproper: clean

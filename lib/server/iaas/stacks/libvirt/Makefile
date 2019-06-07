@@ -1,16 +1,10 @@
 GO?=go
 
-.PHONY:	generate clean test
-
-all:	generate 
+.PHONY:	clean generate test vet
 
 vet:
 	@$(GO) vet ./...
 
-generate:
-	@$(GO) generate -tags libvirt
-	
 test:
-	$(GO) test
-
+	@$(GO) test
 

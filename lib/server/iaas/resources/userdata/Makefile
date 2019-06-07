@@ -1,14 +1,12 @@
 GO?=go
 
-.PHONY: generate clean
-
-all: generate
-
-vet:
-	@$(GO) vet ./...
+.PHONY: clean generate vet
 
 generate:
 	@$(GO) generate
 
+vet:
+	@$(GO) vet ./...
+
 clean:
-	@($(RM) rice-box.go || true)
+	@($(RM) rice-box.go enums/*/enum_string.go || true)
