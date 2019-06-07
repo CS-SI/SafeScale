@@ -42,17 +42,42 @@ feature:
                         targets:
                             hosts: yes
                         run: |
-                            mkdir -p /opt/safescale/data/reverseproxy/postgresql /opt/safescale/run
-                            cat >/opt/safescale/run/reverseproxy.compose.yml <<-'EOF'
+                            mkdir -p ${SF_VARDIR}/reverseproxy/postgresql ${SF_ETCDIR}/kong/includes
+
+                            cat >${SF_TMPDIR}/Dockerfile_reverseproxy <<-'EOF'
+                            FROM kong:1.1
+                            RUN apk update && apk add git unzip
+                            RUN luarocks install kong-oidc
+                            RUN luarocks install kong-prometheus-plugin
+                            EOF
+
+                            cat >${SF_ETCDIR}/kong/konga.userdb.data <<-EOF
+                            module.exports = [
+                                {
+                                    "username": "cladm",
+                                    "email": "cladm@safescale",
+                                    "firstName": "Cluster",
+                                    "lastName": "Administrator",
+                                    "node_id": "https://127.0.0.1:8444",
+                                    "admin": true,
+                                    "active" : true,
+                                    "password": "{{.Password}}"
+                                }
+                            ]
+                            EOF
+                            chmod go-rwx ${SF_ETCDIR}/kong/konga.userdb.data
+
+                            cat >${SF_ETCDIR}/kong/reverseproxy.compose.yml <<-EOF
                             version: '2.1'
                             services:
-                                kong-database:
+                                db:
                                     image: postgres:9
                                     environment:
                                         - POSTGRES_USER=kong
                                         - POSTGRES_DB=kong
                                     volumes:
-                                        - /opt/safescale/data/reverseproxy/postgresql:/var/lib/postgresql/data
+                                        - ${SF_BASEDIR}/etc/kong/kong.conf:/etc/kong/kong.conf:ro
+                                        - ${SF_VARDIR}/reverseproxy/postgresql:/var/lib/postgresql/data
                                     restart: always
                                     healthcheck:
                                         test: ["CMD", "pg_isready", "-U", "kong"]
@@ -60,51 +85,90 @@ feature:
                                         timeout: 5s
                                         retries: 5
 
-                                kong-migration:
-                                    image: kong:1.0
+                                migration:
+                                    image: kong:1.1
                                     depends_on:
-                                        kong-database:
+                                        db:
                                             condition: service_healthy
                                     environment:
                                         - KONG_DATABASE=postgres
-                                        - KONG_PG_HOST=kong-database
+                                        - KONG_PG_HOST=db
                                     command: kong migrations bootstrap # up
 
-                                kong-proxy:
-                                    image: kong:1.0
+                                proxy:
+                                    build:
+                                        context: ${SF_TMPDIR}
+                                        dockerfile: Dockerfile_reverseproxy
+                                    image: kong4safescale
                                     depends_on:
-                                        kong-database:
+                                        db:
                                             condition: service_healthy
-                                        kong-migration:
+                                        migration:
                                             condition: service_started
                                     environment:
                                         - KONG_DATABASE=postgres
-                                        - KONG_PG_HOST=kong-database
+                                        - KONG_PG_HOST=db
                                         - KONG_PG_DATABASE=kong
                                         - KONG_PROXY_ACCESS_LOG=/dev/stdout
                                         - KONG_ADMIN_ACCESS_LOG=/dev/stdout
                                         - KONG_PROXY_ERROR_LOG=/dev/stderr
                                         - KONG_ADMIN_ERROR_LOG=/dev/stderr
                                         - KONG_ADMIN_LISTEN=0.0.0.0:8444 ssl
+                                        - KONG_PROXY_LISTEN=0.0.0.0:443 ssl
+                                        - KONG_PLUGINS=oidc,prometheus
                                     ports:
-                                        - "443:8443"
+                                        - "443:443"
                                         - "127.0.0.1:8444:8444"
                                     restart: always
                                     healthcheck:
                                         test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
                                         interval: 5s
                                         retries: 10
+                                    sysctls:
+                                        net.ipv4.ip_unprivileged_port_start: 0
+
+                                gui:
+                                    image: pantsel/konga
+                                    ports:
+                                        - "{{.HostIP}}:1337:1337"
+                                    volumes:
+                                        - ${SF_ETCDIR}/kong/konga.userdb.data:/usr/local/etc/userdb.data:ro
+                                    environment:
+                                        - TOKEN_SECRET=$(sfRandomString 32 [:alnum:])
+                                        - DB_ADAPTER=postgres
+                                        - DB_HOST=db
+                                        - DB_PORT=5432
+                                        - DB_USER=kong
+                                        #- DB_PASSWORD=DgmY4vh6H6fm
+                                        - DB_DATABASE=kong-gui
+                                        - NODE_ENV=production
+                                        - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
+                                    restart: always
+                                    depends_on:
+                                        db:
+                                            condition: service_healthy
+                                        proxy:
+                                            condition: service_started
+
                             EOF
-                            docker-compose -f /opt/safescale/run/reverseproxy.compose.yml -p reverseproxy up -d
-                            RETRY=0; until docker ps --all | grep reverseproxy_kong-migration_1 | grep Exited || ((RETRY++ >= 60)); do sleep 5; done && sleep 5
-                    
+                            chmod go-rwx ${SF_ETCDIR}/kong/reverseproxy.compose.yml
+
+                            cat >${SF_ETCDIR}/kong/kong.conf <<-EOF
+                            http_proxy_include '${SF_ETCDIR}/kong/includes/*.conf';
+                            EOF
+
+                            sudo docker-compose -f ${SF_ETCDIR}/kong/reverseproxy.compose.yml -p reverseproxy up -d
+                            RETRY=0; until docker ps --all | grep reverseproxy_migration_1 | grep Exited || ((RETRY++ >= 60)); do sleep 5; done && sleep 5
+                            rm -f ${SF_TMPDIR}/Dockerfile_reverseproxy
+                            exit 0
+
                     firewall:
                         targets:
                             hosts: yes
                         run: |
                             # iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
                             # sfSaveIptablesRules
-                            sfFirewallAdd --zone=trusted --add-service=https && \
+                            #sfFirewallAdd --zone=trusted --add-service=https && \
                             sfFirewallAdd --zone=public --add-service=https && \
                             sfFirewallReload
 
@@ -115,7 +179,7 @@ feature:
                         targets:
                             hosts: yes
                         run: |
-                            sfFirewallAdd --zone=trusted --remove-service=https && \
+                            #sfFirewallAdd --zone=trusted --remove-service=https && \
                             sfFirewallAdd --zone=public --remove-service=https && \
                             sfFirewallReload
 
@@ -123,7 +187,7 @@ feature:
                         targets:
                             hosts: yes
                         run: |
-                            docker-compose -f /opt/safescale/run/reverseproxy.compose.yml -p reverseproxy rm --stop -v --force || exit 513
-                            rm -rf /opt/safescale/run/reverseproxy.compose.yml /opt/safescale/data/reverseproxy
+                            sudo docker-compose -f ${SF_ETCDIR}/reverseproxy.compose.yml -p reverseproxy rm --stop -v --force || exit 513
+                            rm -rf ${SF_ETCDIR}/reverseproxy.compose.yml ${SF_VARDIR}/reverseproxy
 
 ...
