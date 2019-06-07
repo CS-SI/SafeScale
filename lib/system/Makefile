@@ -14,6 +14,6 @@ generate:
 	@(cd nfs && $(MAKE) $(@))
 
 clean:
-	@(cd firewall && $(MAKE) $(@)
-	@(cd nfs && $(MAKE) $(@)
+	@(cd firewall && $(MAKE) $(@))
+	@(cd nfs && $(MAKE) $(@))
 	@$(RM) rice-box.go || true

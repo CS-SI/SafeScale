@@ -1,25 +1,23 @@
-ifeq (VERSION,)
-	include ../common.mk
-endif
+include ../common.mk
 
 .PHONY:	sdk client server utils system clean vet
 
 # Handling multiple gopath: use $(HOME)/go by default
 ifeq ($(findstring :,$(GOPATH)),:)
-	GOINCLUDEPATH=$(HOME)/go
+GOINCLUDEPATH=$(HOME)/go
 else
-	GOINCLUDEPATH=$(GOPATH)
+GOINCLUDEPATH=$(GOPATH)
 endif
 
 ifeq ($(strip $(GOPATH)),)
-	GOINCLUDEPATH=$(HOME)/go
+GOINCLUDEPATH=$(HOME)/go
 endif
 
 ifneq ($(OS),Windows_NT)
 PATH = $(HOME)/.local/bin:$(shell printenv PATH)
 endif
 
-all:	sdk system utils server client
+all:	sdk lib/system lib/utils lib/server lib/client
 
 vet:
 	@$(GO) vet ./...
@@ -29,24 +27,24 @@ generate: sdk
 	@(cd system && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
 
-client:
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building library client, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+lib/client:
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building library client, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd utils && $(MAKE) all)
 
-server:
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building server libraries, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+lib/server:
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building library server, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd server && $(MAKE) all)
 
-system:
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building library system, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+lib/system:
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building library system, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd system && $(MAKE) all)
+
+lib/utils:
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building library utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd utils && $(MAKE) all)
 
 sdk:
 	@protoc -I. -I$(GOINCLUDEPATH)/src --go_out=plugins=grpc:. safescale.proto
-
-utils:
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building library utils, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(cd utils && $(MAKE) all)
 
 has_python:
 	@which python3 > /dev/null; if [ $$? -ne 0 ]; then echo "No python installed !"; exit 1; fi
