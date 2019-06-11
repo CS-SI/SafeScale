@@ -355,10 +355,49 @@ sfProbeGPU() {
 }
 
 sfReverseProxyReload() {
-	id=$(docker ps --filter "name=reverseproxy_proxy_1" {{ "--format \"{{.ID}}\"" }})
+	id=$(docker ps --filter "name=reverseproxy_proxy_1" {{ "--format '{{.ID}}'" }})
 	[ ! -z "$id" ] && docker exec -ti $id kong reload >/dev/null
 }
 export -f sfReverseProxyReload
+
+# sfService abstracts the command to use to manipulate services
+sfService() {
+	[ $# -ne 2 ] && return 1
+
+	# Preventively run daemon-reload in case of changes
+	[ "$(sfGetFact 'use systemd')" = "1"] && systemctl daemon-reload
+
+	case $1 in
+		enable)
+			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl enable $2 && return $?
+			[ "$(sfGetFact 'redhat like')" = "1" ] && chkconfig $2 on && return $?
+			;;
+		disable)
+			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl disable $2 && return $?
+			[ "$(sfGetFact 'redhat like')" = "1" ] && chkconfig $2 off && return $?
+			;;
+		start)
+			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl start $2 && return $?
+			[ "$(sfGetFact 'use systemd')" = "1" ] && service $2 start && return $?
+			;;
+		stop)
+			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl stop $2 && return $?
+			[ "$(sfGetFact 'use systemd')" = "1" ] && service $2 stop && return $?
+			;;
+		restart)
+			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl restart $2 && return $?
+			[ "$(sfGetFact 'use systemd')" = "1" ] && service $2 restart && return $?
+			;;
+		reload)
+			[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl reload $2 && return $?
+			[ "$(sfGetFact 'use systemd')" = "1" ] && service $2 reload && return $?
+			;;
+		*)
+			echo "sfService(): unhandle command '$1'"
+			;;
+	esac
+	return 1
+}
 
 # echoes a random string
 # $1 is the size of the result (optional)
@@ -398,7 +437,20 @@ sfDetectFacts() {
 			FACTS["linux version"]=$VERSION_ID
 	fi
 
+	# Some facts about system
+	case $FACTS["linux kind"] in
+		redhat|centos)
+			FACTS["redhat like"]=1
+			FACTS["debian like"]=0
+			;;
+		debian|ubuntu)
+			FACTS["redhat like"]=0
+			FACTS["debian like"]=1
+			;;
+	esac
+	[[ $(systemctl) =~ -\.mount ]] && FACTS["use systemd"]=1 || FACTS["use systemd"]=0
 
+	# Some facts about hardware
 	val=$(LANG=C lscpu | grep "Socket(s)" | cut -d: -f2 | sed 's/"//g')
 	FACTS["sockets"]=${val//[[:blank:]]/}
 	val=$(LANG=C lscpu | grep "Core(s) per socket" | cut -d: -f2 | sed 's/"//g')
