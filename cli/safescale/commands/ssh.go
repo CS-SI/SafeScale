@@ -109,20 +109,21 @@ var sshCopy = cli.Command{
 
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
-		} else {
-			timeout := safescaleutils.GetTimeoutCtxHost()
-			if c.IsSet("timeout") {
-				timeout = time.Duration(c.Float64("timeout")) * time.Minute
-			}
-			_, _, _, err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), client.DefaultConnectionTimeout, timeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
-			} else {
-				response.Succeeded(nil)
-			}
+			return response.Failed(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
 		}
 
+		timeout := safescaleutils.GetTimeoutCtxHost()
+		if c.IsSet("timeout") {
+			timeout = time.Duration(c.Float64("timeout")) * time.Minute
+		}
+		retcode, _, _, err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), client.DefaultConnectionTimeout, timeout)
+		if err != nil {
+			return response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
+		}
+		if retcode != 0 {
+			return response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, ssh.SSHErrorString(retcode)))
+		}
+		response.Succeeded(nil)
 		return response.GetErrorWithoutMessage()
 	},
 }
