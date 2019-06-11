@@ -155,11 +155,11 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	// Try extract host
 	hostFrom, err := extracthostName(from)
 	if err != nil {
-		return 0, "", "", err
+		return -1, "", "", err
 	}
 	hostTo, err := extracthostName(to)
 	if err != nil {
-		return 0, "", "", err
+		return -1, "", "", err
 	}
 
 	// Host checks
@@ -193,7 +193,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 
 	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {
-		return 0, "", "", err
+		return -1, "", "", err
 	}
 
 	if executionTimeout < utils.GetTimeoutCtxHost() {
