@@ -8,11 +8,11 @@ retry:
 	@(cd retry && $(MAKE) all)
 
 generate:
-	@(cd retry && $(MAKE) $(@))
+	@$(GO) generate -run stringer ./...
 
 vet:
 	@$(GO) vet ./...
 
 clean:
-	@(cd retry && $(MAKE) $(@))
+	@(find . | grep _string | xargs rm 2>/dev/null || true)
 
