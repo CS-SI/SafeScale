@@ -17,23 +17,23 @@
 package system
 
 import (
-	"bytes"
 	"fmt"
 	"os/exec"
+	"sync/atomic"
 	"syscall"
-	"text/template"
 
-	"github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 )
 
 //go:generate rice embed-go
 
 // bashLibrayContent contains the content of the script bash_library.sh, that will be injected inside scripts through parameter {{.reserved_BashLibrary}}
-var bashLibraryContent string
+var bashLibraryContent atomic.Value
 
 // GetBashLibrary generates the content of {{.reserved_BashLibrary}}
 func GetBashLibrary() (string, error) {
-	if bashLibraryContent == "" {
+	anon := bashLibraryContent.Load()
+	if anon == nil {
 		box, err := rice.FindBox("../system/scripts")
 		if err != nil {
 			return "", err
@@ -44,20 +44,22 @@ func GetBashLibrary() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		// Prepare the template for execution
-		tmplPrepared, err := template.New("bash_lbrary").Parse(tmplContent)
-		if err != nil {
-			return "", err
-		}
+		// // Prepare the template for execution
+		// tmplPrepared, err := template.New("bash_library").Parse(tmplContent)
+		// if err != nil {
+		// 	return "", err
+		// }
 
-		var buffer bytes.Buffer
-		if err := tmplPrepared.Execute(&buffer, map[string]interface{}{}); err != nil {
-			// TODO Use more explicit error
-			return "", err
-		}
-		bashLibraryContent = buffer.String()
+		// var buffer bytes.Buffer
+		// if err := tmplPrepared.Execute(&buffer, map[string]interface{}{}); err != nil {
+		// 	// TODO Use more explicit error
+		// 	return "", err
+		// }
+		// bashLibraryContent = buffer.String()
+		bashLibraryContent.Store(tmplContent)
+		anon = bashLibraryContent.Load()
 	}
-	return bashLibraryContent, nil
+	return anon.(string), nil
 }
 
 // ExtractRetCode extracts info from the error

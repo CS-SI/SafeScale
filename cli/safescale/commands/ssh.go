@@ -27,8 +27,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	safescaleutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/enums/ExitCode"
 )
 
 // SSHCmd ssh command
@@ -121,7 +123,7 @@ var sshCopy = cli.Command{
 			return response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
 		}
 		if retcode != 0 {
-			return response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, ssh.SSHErrorString(retcode)))
+			return response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, system.SSHErrorString(retcode))))
 		}
 		response.Succeeded(nil)
 		return response.GetErrorWithoutMessage()
