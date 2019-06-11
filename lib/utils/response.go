@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/enums/CmdStatus"
+	log "github.com/sirupsen/logrus"
 	urfcli "github.com/urfave/cli"
+
+	"github.com/CS-SI/SafeScale/lib/utils/enums/CmdStatus"
 )
 
 // CliResponse define a standard response to
@@ -27,6 +29,7 @@ type cliResponseDisplay struct {
 	Result interface{} `json:"result"`
 }
 
+// NewCliResponse ...
 func NewCliResponse() CliResponse {
 	return CliResponse{
 		Status: CmdStatus.UNKNOWN,
@@ -35,10 +38,12 @@ func NewCliResponse() CliResponse {
 	}
 }
 
+// GetError ...
 func (cli *CliResponse) GetError() error {
 	return cli.Error
 }
 
+// GetErrorWithoutMessage ...
 func (cli *CliResponse) GetErrorWithoutMessage() error {
 	if cli.Error != nil {
 		return urfcli.NewExitError("", cli.Error.ExitCode())
@@ -46,29 +51,36 @@ func (cli *CliResponse) GetErrorWithoutMessage() error {
 	return nil
 }
 
+// Succeeded ...
 func (cli *CliResponse) Succeeded(result interface{}) {
 	cli.Status = CmdStatus.SUCCESS
 	cli.Result = result
 	cli.Display()
 }
 
+// Failed ...
 func (cli *CliResponse) Failed(err error) error {
-	cli.Status = CmdStatus.FAILURE
-	if exitCoder, ok := err.(urfcli.ExitCoder); ok {
-		cli.Error = exitCoder
-	} else {
-		panic("err is not an urfave/cli.ExitCoder")
+	if err != nil {
+		cli.Status = CmdStatus.FAILURE
+		if exitCoder, ok := err.(urfcli.ExitCoder); ok {
+			cli.Error = exitCoder
+			cli.Display()
+			return cli.GetError()
+		}
+		log.Error("lib/utils/response.go: CliResponse.Failed(): err is not an urfave/cli.ExitCoder")
+		return err
 	}
-	cli.Display()
-	return cli.GetError()
+	return nil
 }
 
+// Display ...
 func (cli *CliResponse) Display() {
 	out, err := json.Marshal(cli.getDisplayResponse())
-	if err != nil {
-		panic("Failed to marshal the CliResponse")
+	if err == nil {
+		fmt.Println(string(out))
+	} else {
+		log.Error("lib/utils/response.go: CliResponse.Display(): failed to marshal the CliResponse")
 	}
-	fmt.Println(string(out))
 }
 
 func (cli *CliResponse) getDisplayResponse() cliResponseDisplay {
