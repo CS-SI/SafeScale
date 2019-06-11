@@ -356,7 +356,7 @@ sfProbeGPU() {
 
 sfReverseProxyReload() {
 	id=$(docker ps --filter "name=reverseproxy_proxy_1" {{ "--format '{{.ID}}'" }})
-	[ ! -z "$id" ] && docker exec -ti $id kong reload >/dev/null
+	[ ! -z "$id" ] && docker exec $id kong reload >/dev/null
 }
 export -f sfReverseProxyReload
 
@@ -438,7 +438,7 @@ sfDetectFacts() {
 	fi
 
 	# Some facts about system
-	case $FACTS["linux kind"] in
+	case ${FACTS["linux kind"]} in
 		redhat|centos)
 			FACTS["redhat like"]=1
 			FACTS["debian like"]=0
