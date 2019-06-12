@@ -39,15 +39,6 @@ import (
 
 //go:generate rice embed-go
 
-// const (
-// 	timeoutCtxHost = 10 * time.Minute
-
-// 	shortTimeoutSSH = time.Minute
-// 	longTimeoutSSH  = 5 * time.Minute
-
-// 	tempFolder = "/opt/safescale/var/tmp/"
-// )
-
 var (
 	// templateBox is the rice box to use in this package
 	templateBox atomic.Value

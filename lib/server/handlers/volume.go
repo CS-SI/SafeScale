@@ -19,12 +19,10 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
-
 	mapset "github.com/deckarep/golang-set"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
@@ -365,10 +363,10 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 						}
 						return nil
 					},
-					2*time.Minute, // FIXME Hardcoded timeout
+					utils.GetContextTimeout(),
 				)
 				if retryErr != nil {
-					return logicErr(fmt.Errorf("failed to confirm the disk attachment after %s", 2*time.Minute)) // FIXME Hardcoded timeout
+					return logicErr(fmt.Errorf("failed to confirm the disk attachment after %s", utils.GetContextTimeout()))
 				}
 
 				// Recovers real device name from the system
@@ -530,10 +528,10 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 			}
 			return nil
 		},
-		2*time.Minute, // FIXME Hardcoded timeout
+		utils.GetContextTimeout(),
 	)
 	if retryErr != nil {
-		return nil, logicErrf(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", 2*time.Minute)) // FIXME Hardcoded timeout
+		return nil, logicErrf(retryErr, fmt.Sprintf("failed to get list of connected disks after %s", utils.GetContextTimeout()))
 	}
 	disks := strings.Split(stdout, "\n")
 	set := mapset.NewThreadUnsafeSet()

@@ -18,8 +18,6 @@ package metadata
 
 import (
 	"fmt"
-	"time"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -242,7 +240,7 @@ func LoadHost(svc *iaas.Service, ref string) (*Host, error) {
 			// }
 			return nil
 		},
-		10*time.Second,
+		2*utils.GetDefaultDelay(),
 	)
 	// If retry timed out, log it and return error ErrNotFound
 	if err != nil {

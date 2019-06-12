@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -112,7 +113,7 @@ func runTestService() {
 					now := time.Now()
 					text, _ := now.MarshalText()
 					conn.WriteMessage(websocket.TextMessage, text)
-					time.Sleep(1 * time.Second)
+					time.Sleep(utils.GetMinDelay())
 				}
 
 			}()

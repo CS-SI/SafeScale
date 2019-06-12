@@ -18,8 +18,7 @@ package openstack
 
 import (
 	"fmt"
-	"time"
-
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -223,7 +222,7 @@ func (s *Stack) DeleteVolume(id string) error {
 
 	var (
 		err     error
-		timeout = 30 * time.Second
+		timeout = utils.GetBigDelay()
 	)
 
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(

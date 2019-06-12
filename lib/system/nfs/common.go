@@ -19,14 +19,12 @@ package nfs
 import (
 	"bytes"
 	"fmt"
+	"github.com/pkg/errors"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 	"text/template"
-	"time"
-
-	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
 
@@ -118,7 +116,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			}
 			return nil
 		},
-		5*time.Minute, // FIXME Hardcoded timeout
+		utils.GetHostTimeout(),
 	)
 	if retryErr != nil {
 		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
@@ -126,7 +124,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 
 	k, uperr := sshconfig.Command("which scp")
 	if uperr != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(30 * time.Second) // FIXME Hardcoded timeout
+		_, uptext, _, kerr := k.RunWithTimeout(utils.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
@@ -137,7 +135,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 
 	k, uperr = sshconfig.SudoCommand("which scp")
 	if uperr != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(30 * time.Second) // FIXME Hardcoded timeout
+		_, uptext, _, kerr := k.RunWithTimeout(utils.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
@@ -184,8 +182,8 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			}
 			return err
 		},
-		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(1*time.Minute)), // FIXME Hardcoded timeout
-		retry.Constant(5*time.Second),
+		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout( utils.GetContextTimeout() )),
+		retry.Constant(utils.GetDefaultDelay()),
 		nil, nil, nil,
 	)
 	if retryErr != nil {

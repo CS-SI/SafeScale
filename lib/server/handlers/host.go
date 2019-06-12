@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"os"
 	"os/user"
-	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
@@ -34,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkProperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
@@ -91,7 +90,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) error {
 	if err != nil {
 		return infraErr(err)
 	}
-	return infraErr(handler.service.WaitHostState(id, HostState.STARTED, srvutils.GetTimeoutCtxHost()))
+	return infraErr(handler.service.WaitHostState(id, HostState.STARTED, utils.GetHostTimeout()))
 }
 
 // Stop stops a host
@@ -112,7 +111,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) error {
 	if err != nil {
 		return infraErr(err)
 	}
-	return infraErr(handler.service.WaitHostState(id, HostState.STOPPED, srvutils.GetTimeoutCtxHost()))
+	return infraErr(handler.service.WaitHostState(id, HostState.STOPPED, utils.GetHostTimeout()))
 }
 
 // Reboot reboots a host
@@ -134,9 +133,9 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) error {
 	}
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			return handler.service.WaitHostState(id, HostState.STARTED, srvutils.GetTimeoutCtxHost())
+			return handler.service.WaitHostState(id, HostState.STARTED, utils.GetHostTimeout())
 		},
-		5*time.Minute, // FIXME Hardcoded timeout
+		utils.GetHostTimeout(),
 	)
 	if err != nil {
 		return infraErrf(err, "timeout waiting host '%s' to be rebooted", ref)
@@ -293,7 +292,7 @@ func (handler *HostHandler) Create(
 			img, innerErr = handler.service.SearchImage(los)
 			return innerErr
 		},
-		10*time.Second,
+		2*utils.GetDefaultDelay(),
 	)
 	if err != nil {
 		return nil, infraErrf(err, "failed to find image to use on compute resource")
@@ -348,7 +347,6 @@ func (handler *HostHandler) Create(
 	if err != nil {
 		return nil, infraErr(err)
 	}
-	// TODO OPP Unsafe
 
 	// Sets host extension DescriptionV1
 	creator := ""
@@ -434,17 +432,10 @@ func (handler *HostHandler) Create(
 	if err != nil {
 		return nil, infraErr(err)
 	}
-	sshDefaultTimeout := int(srvutils.GetTimeoutCtxHost().Minutes())
-	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
-		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
-		if err == nil {
-			log.Debugf("Using custom timeout of %d minutes", num)
-			sshDefaultTimeout = num
-		}
-	}
 
-	// FIXME configurable timeout here
-	_, err = sshCfg.WaitServerReady("phase1", time.Duration(sshDefaultTimeout)*time.Minute)
+	sshDefaultTimeout := utils.GetHostTimeout() // FIXME SSH_TIMEOUT
+
+	_, err = sshCfg.WaitServerReady("phase1", sshDefaultTimeout)
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, infraErrf(err, "Timeout creating a host")
@@ -505,7 +496,7 @@ func (handler *HostHandler) Create(
 	}
 
 	// FIXME configurable timeout here
-	_, err = sshCfg.WaitServerReady("ready", time.Duration(sshDefaultTimeout)*time.Minute)
+	_, err = sshCfg.WaitServerReady("ready", sshDefaultTimeout)
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, infraErrf(err, "Timeout creating a host")

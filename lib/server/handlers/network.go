@@ -19,13 +19,9 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/CS-SI/SafeScale/lib/client"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -252,18 +248,8 @@ func (handler *NetworkHandler) Create(
 		return nil, infraErrf(err, "error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
 	}
 
-	sshDefaultTimeout := int(safescaleutils.GetTimeoutCtxHost().Minutes())
-	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
-		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
-		if err == nil {
-			log.Debugf("Using custom timeout of %d minutes", num)
-			sshDefaultTimeout = num
-		}
-	}
-
-	// TODO Test for failure with 15s !!!
-	_, err = ssh.WaitServerReady("phase1", time.Duration(sshDefaultTimeout)*time.Minute)
-	// err = ssh.WaitServerReady("phase1", time.Second * 3)
+	sshDefaultTimeout := utils.GetHostTimeout()
+	_, err = ssh.WaitServerReady("phase1", sshDefaultTimeout) // FIXME Phase1
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, infraErrf(err, "Timeout creating a gateway")
@@ -307,8 +293,7 @@ func (handler *NetworkHandler) Create(
 	}
 
 	// TODO Test for failure with 15s !!!
-	_, err = ssh.WaitServerReady("ready", time.Duration(sshDefaultTimeout)*time.Minute)
-	// err = ssh.WaitServerReady("ready", time.Second * 3)
+	_, err = ssh.WaitServerReady("ready", sshDefaultTimeout)
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, infraErrf(err, "Timeout creating a gateway")

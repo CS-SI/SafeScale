@@ -18,8 +18,6 @@ package metadata
 
 import (
 	"fmt"
-	"time"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -205,7 +203,7 @@ func LoadVolume(svc *iaas.Service, ref string) (*Volume, error) {
 			}
 			return nil
 		},
-		10*time.Second,
+		2*utils.GetDefaultDelay(),
 	)
 	if err != nil {
 		if _, ok := err.(retry.ErrTimeout); ok {

@@ -27,6 +27,8 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -34,10 +36,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
@@ -49,7 +47,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"golang.org/x/crypto/ssh"
 
-	libvirt "github.com/libvirt/libvirt-go"
+	"github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	uuid "github.com/satori/go.uuid"
 )
@@ -578,7 +576,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propsv1.HostNet
 					}
 					return fmt.Errorf("No local IP matching inteface %s found", iface.Alias)
 				},
-				5*time.Minute, // FIXME Hardcoded timeout
+				utils.GetHostTimeout(),
 			)
 
 		}

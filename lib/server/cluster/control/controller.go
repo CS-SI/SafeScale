@@ -350,7 +350,7 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (string, error) 
 			log.Errorf("failed to get ssh config for master '%s': %s", masterID, err.Error())
 			continue
 		}
-		_, err = sshCfg.WaitServerReady("ready", 2*time.Minute) // FIXME Hardcoded timeout
+		_, err = sshCfg.WaitServerReady("ready", utils.GetConnectSSHTimeout())
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
@@ -382,7 +382,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task, public bool) (stri
 			log.Errorf("failed to get ssh config of node '%s': %s", hostID, err.Error())
 			continue
 		}
-		_, err = sshCfg.WaitServerReady("ready", 2*time.Minute) // FIXME Hardcoded timeout
+		_, err = sshCfg.WaitServerReady("ready", utils.GetConnectSSHTimeout())
 		if err != nil {
 			if _, ok := err.(retry.ErrTimeout); ok {
 				continue
@@ -697,7 +697,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) error {
 	}()
 
 	// Finally delete host
-	err = client.New().Host.Delete([]string{master.ID}, 10*time.Minute) // FIXME Hardcoded timeout
+	err = client.New().Host.Delete([]string{master.ID}, utils.GetLongOperationTimeout())
 	if err != nil {
 		return err
 	}
@@ -870,7 +870,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	}
 
 	// Finally delete host
-	err = client.New().Host.Delete([]string{node.ID}, 10*time.Minute) // FIXME Hardcoded timeout
+	err = client.New().Host.Delete([]string{node.ID}, utils.GetLongOperationTimeout())
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); ok {
 			// host seems already deleted, so it's a success (handles the case where )
@@ -970,7 +970,7 @@ func (c *Controller) Delete(task concurrency.Task) error {
 		func() error {
 			return clientNetwork.Delete([]string{networkID}, client.DefaultExecutionTimeout)
 		},
-		3*time.Minute, // FIXME Hardcoded timeout
+		utils.GetHostTimeout(),
 	)
 	if err != nil {
 		return err

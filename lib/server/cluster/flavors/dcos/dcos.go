@@ -19,15 +19,13 @@ package dcos
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"sync/atomic"
-	"time"
-
 	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
@@ -35,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos/enums/ErrorCode"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
@@ -339,7 +338,7 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 		return ClusterState.Error, err
 
 	}
-	_, err = sshCfg.WaitServerReady("ready", 2*time.Minute) // FIXME Hardcoded timeout
+	_, err = sshCfg.WaitServerReady("ready", utils.GetContextTimeout())
 	if err == nil {
 		if err != nil {
 			return ClusterState.Error, err

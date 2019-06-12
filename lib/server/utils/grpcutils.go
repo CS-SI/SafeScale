@@ -18,52 +18,11 @@ package utils
 
 import (
 	"fmt"
-	"log"
-	"os"
-	"strconv"
-	"strings"
-	"time"
-
 	pb "github.com/CS-SI/SafeScale/lib"
 	"google.golang.org/grpc"
+	"log"
+	"strings"
 )
-
-const (
-	// TimeoutCtxDefault default timeout for grpc command invocation
-	TimeoutCtxDefault = 1 * time.Minute
-	// TimeoutCtxHost timeout for grpc command relative to host creation
-	TimeoutCtxHost = 5 * time.Minute
-)
-
-// GetTimeoutCtxDefault ...
-func GetTimeoutCtxDefault() time.Duration {
-	sshDefaultTimeout := int(TimeoutCtxDefault.Minutes())
-
-	// DEV ENV
-	if sshDefaultTimeoutCandidate := os.Getenv("CTX_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
-		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
-		if err == nil {
-			sshDefaultTimeout = num
-		}
-	}
-
-	return time.Duration(sshDefaultTimeout) * time.Minute
-}
-
-// GetTimeoutCtxHost ...
-func GetTimeoutCtxHost() time.Duration {
-	sshDefaultTimeout := int(TimeoutCtxHost.Minutes())
-
-	// DEV ENV
-	if sshDefaultTimeoutCandidate := os.Getenv("CTX_HOST_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
-		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
-		if err == nil {
-			sshDefaultTimeout = num
-		}
-	}
-
-	return time.Duration(sshDefaultTimeout) * time.Minute
-}
 
 // GetConnection returns a connection to GRPC server
 func GetConnection(host string, port int) *grpc.ClientConn {

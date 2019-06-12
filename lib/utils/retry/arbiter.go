@@ -27,7 +27,7 @@ import (
 type Arbiter func(Try) (Verdict.Enum, error)
 
 // DefaultArbiter allows 10 retries, with a maximum duration of 30 seconds
-var DefaultArbiter = PrevailDone(Max(10), Timeout(30*time.Second))
+var DefaultArbiter = PrevailDone(Max(10), Timeout(utils.GetBigDelay()))
 
 // PrevailRetry aggregates verdicts from Arbiters for a try :
 // - Returns Abort and the error as soon as an arbiter decides for an Abort.
