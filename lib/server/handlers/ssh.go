@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"strings"
 	"time"
 
@@ -152,10 +153,10 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string) (int, 
 	err = retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			// retCode, stdOut, stdErr, err = handler.run(ssh, cmd) // FIXME It CAN lock
-			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, 5*time.Minute) // FIXME Hardcoded timeout
+			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, utils.GetHostTimeout())
 			return err
 		},
-		5*time.Minute, // FIXME Hardcoded timeout
+		utils.GetHostTimeout(),
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
 				log.Debugf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)

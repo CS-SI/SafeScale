@@ -18,13 +18,11 @@ package openstack
 
 import (
 	"fmt"
-	"net"
-	"strings"
-	"time"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"net"
+	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
@@ -640,7 +638,7 @@ func (s *Stack) deleteSubnet(id string) error {
 			}
 			return nil
 		},
-		1*time.Minute, // FIXME Hardcoded timeout
+		utils.GetContextTimeout(),
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
@@ -649,10 +647,10 @@ func (s *Stack) deleteSubnet(id string) error {
 				if _, ok := err.(resources.ErrResourceNotAvailable); ok {
 					return err
 				}
-				return fmt.Errorf("failed to delete subnet after %v: %v", 1*time.Minute, err) // FIXME Hardcoded timeout
+				return fmt.Errorf("failed to delete subnet after %v: %v", utils.GetContextTimeout(), err)
 			}
 		}
-		return fmt.Errorf("failed to delete subnet after %v: %v", 1*time.Minute, retryErr) // FIXME Hardcoded timeout
+		return fmt.Errorf("failed to delete subnet after %v: %v", utils.GetContextTimeout(), retryErr)
 	}
 	return nil
 }

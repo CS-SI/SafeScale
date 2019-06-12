@@ -18,8 +18,6 @@ package control
 
 import (
 	"fmt"
-	"time"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -146,7 +144,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 			}
 			return nil
 		},
-		5*time.Second,
+		utils.GetDefaultDelay(),
 	)
 	if err != nil {
 		if _, ok := err.(retry.ErrTimeout); ok && innerErr != nil {

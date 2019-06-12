@@ -19,11 +19,10 @@ package install
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"os"
 	"strings"
 	"text/template"
-	"time"
-
 	// log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -162,7 +161,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, err := sshClt.Copy(f.Name(), to, 15*time.Second, client.DefaultExecutionTimeout)
+			retcode, _, _, err := sshClt.Copy(f.Name(), to, utils.GetDefaultDelay(), client.DefaultExecutionTimeout) // FIXME File operations
 			if err != nil {
 				return err
 			}
@@ -170,7 +169,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), 15*time.Second, client.DefaultExecutionTimeout)
+					_, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("sudo rm -f %s", filename), utils.GetBigDelay(), client.DefaultExecutionTimeout)
 					if err == nil {
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
@@ -185,8 +184,8 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 			}
 			return nil
 		},
-		1*time.Second, // FIXME Hardcoded timeout
-		2*time.Minute, // FIXME Hardcoded timeout
+		utils.GetDefaultDelay(),
+		2*utils.GetContextTimeout(),
 	)
 	_ = os.Remove(f.Name())
 	if networkError {
@@ -219,7 +218,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			var retcode int
-			retcode, _, _, err = sshClt.Run(host.Name, cmd, 15*time.Second, client.DefaultExecutionTimeout)
+			retcode, _, _, err = sshClt.Run(host.Name, cmd, utils.GetDefaultDelay(), client.DefaultExecutionTimeout)
 			if err != nil {
 				return err
 			}
@@ -229,8 +228,8 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 			}
 			return nil
 		},
-		2*time.Second, // FIXME Hardcoded timeout
-		1*time.Minute, // FIXME Hardcoded timeout
+		utils.GetMinDelay(),
+		utils.GetContextTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

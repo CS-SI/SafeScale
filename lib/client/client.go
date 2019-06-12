@@ -31,6 +31,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	common "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // Session units the different resources proposed by safescaled as safescale client
@@ -58,9 +59,9 @@ type Session struct {
 type Client *Session
 
 // DefaultTimeout tells to use the timeout by default depending on context
-const (
-	DefaultConnectionTimeout = 30 * time.Second
-	DefaultExecutionTimeout  = 5 * time.Minute
+var (
+	DefaultConnectionTimeout = common.GetVariableTimeout("SAFESCALE_CONNECTION_TIMEOUT", 30 * time.Second)
+	DefaultExecutionTimeout  = common.GetVariableTimeout("SAFESCALE_EXECUTION_TIMEOUT", 5 * time.Minute)
 )
 
 // New returns an instance of safescale Client

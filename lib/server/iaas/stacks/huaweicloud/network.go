@@ -18,13 +18,12 @@ package huaweicloud
 
 import (
 	"fmt"
-	"net"
-	"strings"
-	"time"
-
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	log "github.com/sirupsen/logrus"
+	"net"
+	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
@@ -483,7 +482,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 			}
 			return err
 		},
-		time.Minute,
+		utils.GetContextTimeout(),
 		func(try retry.Try, verdict Verdict.Enum) {
 			if verdict != Verdict.Done {
 				log.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", name)
@@ -556,16 +555,16 @@ func (s *Stack) deleteSubnet(id string) error {
 			}
 			return fmt.Errorf("%d", r.StatusCode)
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(time.Minute*5)),
-		retry.Constant(time.Second*3),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(utils.GetHostTimeout())),
+		retry.Constant(utils.GetDefaultDelay()),
 		nil, nil,
 		func(t retry.Try, verdict Verdict.Enum) {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
-					log.Debugln("network still owns host(s), retrying in 3s...")
+					log.Debugf("network still owns host(s), retrying in %s...", utils.GetDefaultDelay())
 				default:
-					log.Debugf("error submitting network deletion (status=%s), retrying in 3s...", t.Err.Error())
+					log.Debugf("error submitting network deletion (status=%s), retrying in %s...", t.Err.Error(), utils.GetDefaultDelay())
 				}
 			}
 		},

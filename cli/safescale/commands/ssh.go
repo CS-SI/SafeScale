@@ -26,7 +26,6 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/lib/client"
-	safescaleutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils"
@@ -67,7 +66,7 @@ var sshRun = cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		} else {
-			timeout := safescaleutils.GetTimeoutCtxHost()
+			timeout := utils.GetHostTimeout()
 			if c.IsSet("timeout") {
 				timeout = time.Duration(c.Float64("timeout")) * time.Minute
 			}
@@ -114,7 +113,7 @@ var sshCopy = cli.Command{
 			return response.Failed(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
 		}
 
-		timeout := safescaleutils.GetTimeoutCtxHost()
+		timeout := utils.GetHostTimeout()
 		if c.IsSet("timeout") {
 			timeout = time.Duration(c.Float64("timeout")) * time.Minute
 		}

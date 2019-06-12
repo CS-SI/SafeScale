@@ -246,24 +246,17 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            cat >/opt/safescale/etc/kong/includes/kubernetes.conf <<-'EOF'
-                            upstream kubernetes-api-cluster {
-                                {{range .MasterIPs}}server {{.}}:6443;
-                                {{end}} 
-                            }
+                            cat >${SF_ETCDIR}/kong/includes/kubernetes.conf <<-'EOF'
+                            stream {
+                                upstream kubernetes-api-cluster {
+                                    {{range .MasterIPs}}server {{.}}:6443;
+                                    {{end}} 
+                                }
 
-                            server { 
-                                listen {{.GatewayIP}}:6443;
-                                ssl_certificate /etc/nginx/ssl/kube-apiserver.pem;
-                                ssl_certificate_key /etc/nginx/ssl/private/kube-apiserver.key;
-                                ssl_prefer_server_ciphers on;
-                                ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
-                                ssl_ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+3DES:!aNULL:!MD5:!DSS;
-                                proxy_pass kubernetes-api-cluster; 
-
-                                #forward incoming client certificate
-                                ssl_verify_client optional; # requests the client certificate and verifies it if the certificate is present
-                                proxy_set_header X-SSL-CERT $ssl_client_escaped_cert;
+                                server { 
+                                    listen 6443;
+                                    proxy_pass kubernetes-api-cluster; 
+                                }
                             }
                             EOF
                             sfReverseProxyReload

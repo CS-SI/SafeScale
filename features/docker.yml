@@ -45,7 +45,7 @@ feature:
                             esac
 
             add:
-                pace: docker-ce,firewall,ready
+                pace: docker-ce,config,firewall,ready
                 steps:
                     docker-ce:
                         serial: true
@@ -66,29 +66,57 @@ feature:
                                     sfRetry 5m 3 "sfWaitForApt && apt-get update"
                                     sfRetry 5m 3 "sfWaitForApt && apt-get install -qqy docker-ce"
                                     [ $? -ne 0 ] && exit 194
-                                    mkdir /etc/docker
-                                    echo -e "{\n\t\"iptables\": false\n}" > ~/daemon.json && mv ~/daemon.json /etc/docker/daemon.json
-
-                                    systemctl enable docker
-                                    systemctl start docker
-                                    [ $? -ne 0 ] && exit 194
                                     ;;
                                 centos|rhel)
                                     yum install -y yum-utils device-mapper-persistent-data lvm2 || exit 192
                                     yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || exit 193
                                     yum install -y docker-ce || exit 194
-                                    mkdir /etc/docker
-                                    echo -e "{\n\t\"iptables\": false\n}" > ~/daemon.json && mv ~/daemon.json /etc/docker/daemon.json
-
-                                    systemctl enable docker
-                                    systemctl start docker
-                                    [ $? -ne 0 ] && exit 194
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
                                     exit 195
                                     ;;
                             esac
+                            exit 0
+
+                    config:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            mkdir /etc/docker
+                            if [ "$(sfGetFact 'use systemd')" = "1" ]; then
+                                DRIVER=systemd
+                            else
+                                DRIVER=cgroupfs
+                            fi
+                            if [ "$(sfGetFact 'redhat like')" = "1" ]; then
+                                cat > /etc/docker/daemon.json <<-EOF
+                                    {
+                                        "exec-opts": ["native.cgroupdriver=${DRIVER}"],
+                                        "log-driver": "json-file",
+                                        "log-opts": {
+                                            "max-size": "100m"
+                                        },
+                                        "storage-driver": "overlay2",
+                                        "storage-opts": [
+                                            "overlay2.override_kernel_check=true"
+                                        ]
+                                    }
+                            EOF
+                            else
+                                cat > /etc/docker/daemon.json <<-EOF
+                                    {
+                                        "exec-opts": ["native.cgroupdriver=${DRIVER}"],
+                                        "log-driver": "json-file",
+                                        "log-opts": {
+                                            "max-size": "100m"
+                                        },
+                                        "storage-driver": "overlay2"
+                                    }
+                            EOF
+                            fi
                             exit 0
 
                     firewall:
@@ -109,11 +137,10 @@ feature:
                             privateNodes: all
                             publicNodes: all
                         run: |
-                            while true; do
-                                systemctl status docker &>/dev/null
-                                [ $? -eq 0 ] && break
-                                sleep 5
-                            done
+                            sfService enable docker || exit 195
+                            sfService restart docker || exit 196
+                            sfRetry 5m 5 sfService status docker &>/dev/null
+                            [ $? -ne 0 ] && exit 197
                             exit 0
 
             remove:
@@ -126,15 +153,13 @@ feature:
                             privateNodes: all
                             publicNodes: all
                         run: |
+                            sfService disable docker
+                            sfService stop docker
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    systemctl disable docker
-                                    systemctl stop docker
                                     sfWaitForApt && apt-get purge -y docker-ce*
                                     ;;
                                 centos|rhel)
-                                    systemctl disable docker
-                                    systemctl stop docker
                                     yum remove -y docker-ce*
                                     ;;
                                 *)
@@ -145,12 +170,12 @@ feature:
 
     service:
         start: |
-            systemctl start docker-ce
+            sfService start docker
 
         stop: |
-            systemctl stop docker-ce
+            sfService stop docker
 
         state: |
-            systemctl status docker-ce
+            sfService status docker
 
 ...

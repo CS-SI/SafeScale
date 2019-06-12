@@ -23,21 +23,20 @@ package swarm
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"strings"
 	"sync/atomic"
-	"time"
-
 	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
 	// log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
@@ -45,9 +44,6 @@ import (
 //go:generate rice embed-go
 
 const (
-	shortTimeoutSSH = time.Minute
-	longTimeoutSSH  = 5 * time.Minute
-
 	// tempFolder = "/opt/safescale/var/tmp/"
 )
 
@@ -354,12 +350,12 @@ func unconfigureNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.
 			}
 			return nil
 		},
-		time.Minute*5,
+		utils.GetHostTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state after %v", pbHost.Name, time.Minute*5)
+			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state after %v", pbHost.Name, utils.GetHostTimeout())
 		default:
 			return fmt.Errorf("Swarm worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
 		}

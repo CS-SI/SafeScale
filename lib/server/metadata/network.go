@@ -18,8 +18,6 @@ package metadata
 
 import (
 	"fmt"
-	"time"
-
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -291,7 +289,7 @@ func LoadNetwork(svc *iaas.Service, ref string) (*Network, error) {
 			}
 			return nil
 		},
-		10*time.Second,
+		2*utils.GetDefaultDelay(),
 	)
 	// If retry timed out, log it and return error ErrNotFound
 	if _, ok := err.(retry.ErrTimeout); ok {
@@ -434,7 +432,7 @@ func LoadGateway(svc *iaas.Service, networkID string) (*Gateway, error) {
 			}
 			return nil
 		},
-		10*time.Second,
+		2*utils.GetDefaultDelay(),
 	)
 	if err != nil {
 		if _, ok := err.(retry.ErrTimeout); ok {

@@ -30,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
+	common "github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/Verdict"
 )
@@ -52,14 +53,14 @@ func (s *ssh) Run(hostName, command string, connectionTimeout, executionTimeout 
 		return 0, "", "", err
 	}
 
-	if executionTimeout < utils.GetTimeoutCtxHost() {
-		executionTimeout = utils.GetTimeoutCtxHost()
+	if executionTimeout < common.GetHostTimeout() {
+		executionTimeout = common.GetHostTimeout()
 	}
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
 	}
 	if connectionTimeout > executionTimeout {
-		connectionTimeout = executionTimeout + 1*time.Minute // FIXME Hardcoded timeout
+		connectionTimeout = executionTimeout + common.GetContextTimeout()
 	}
 
 	_, cancel := utils.GetTimeoutContext(executionTimeout)
@@ -196,8 +197,8 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 		return -1, "", "", err
 	}
 
-	if executionTimeout < utils.GetTimeoutCtxHost() {
-		executionTimeout = utils.GetTimeoutCtxHost()
+	if executionTimeout < common.GetHostTimeout() {
+		executionTimeout = common.GetHostTimeout()
 	}
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
@@ -228,7 +229,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 			}
 			return nil
 		},
-		1*time.Second,
+		common.GetMinDelay(),
 		connectionTimeout,
 	)
 	if retryErr != nil {
@@ -266,7 +267,7 @@ func (s *ssh) Connect(name string, timeout time.Duration) error {
 		func() error {
 			return sshCfg.Enter()
 		},
-		2*time.Minute, // FIXME Hardcoded timeout
+		common.GetConnectSSHTimeout(),
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
 				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
@@ -310,7 +311,7 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 
 			return nil
 		},
-		2*time.Minute, // FIXME Hardcoded timeout
+		common.GetConnectSSHTimeout(),
 		func(t retry.Try, v Verdict.Enum) {
 			if v == Verdict.Retry {
 				log.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
@@ -360,8 +361,8 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 
 // WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
 func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {
-	if timeout < utils.GetTimeoutCtxHost() {
-		timeout = utils.GetTimeoutCtxHost()
+	if timeout < common.GetHostTimeout() {
+		timeout = common.GetHostTimeout()
 	}
 	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {

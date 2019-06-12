@@ -18,11 +18,9 @@ package commands
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"strings"
-	"time"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli"
 
@@ -886,7 +884,7 @@ func executeCommand(command string) error {
 	}
 	safescalessh := client.New().Ssh
 	for i, m := range masters {
-		retcode, stdout, stderr, err := safescalessh.Run(m, command, client.DefaultConnectionTimeout, 5*time.Minute) // FIXME Hardcoded timeout
+		retcode, stdout, stderr, err := safescalessh.Run(m, command, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "Failed to execute command on master #%d: %s", i+1, err.Error())
 			if i+1 < len(masters) {
