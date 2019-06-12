@@ -31,8 +31,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu|centos|rhel|fedora)
@@ -51,8 +50,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r")
                             [ $? -ne 0 ] && exit 192
@@ -68,8 +66,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             rm /usr/bin/docker-compose || rm -f /usr/local/bin/docker-compose
 ...

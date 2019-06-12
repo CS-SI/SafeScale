@@ -173,9 +173,9 @@ rules  | Describe the reverse-proxy rules needed by the features | - | List_of_r
 rule | Decribe a reverse-proxy rule | name <br> type <br> targets <br> content | - | True
 name | The rule name | - | rule_name | True
 type | The kind of rule to apply | - | service (https://docs.konghq.com/1.0.x/admin-api/#service-object) <br> route (https://docs.konghq.com/1.0.x/admin-api/#route-object) <br> upstream (https://docs.konghq.com/1.0.x/admin-api/#upstream-object) | True
-targets | Where shoud the step be executed | hosts <br> masters <br> privateNodes <br> publicNodes | - | True
+targets | Where shoud the step be executed | hosts <br> masters <br> nodes | - | True
 hosts | Shoud the step be executed on a single host | - | false (will not be executed) <br> yes (will be executed) | True
-masters <br> privateNodes <br> publicNodes | Shoud the step be executed on cluster masters/privateNodes/publicNodes | - | none (will not be executed) <br> one (will be executed on only one, the same | True 
+masters <br> nodes | Shoud the step be executed on cluster masters/nodes | - | none (will not be executed) <br> one (will be executed on only one, the same | True 
 content | Parameters of the rule, they will depend of the rule type | - | json repesentation of a map with param_name as key and param_value as value <br> *The script will be extanded by templated parameters, [cf. Proxy-rule-content](###Proxy-rule-content)* | True
 
 

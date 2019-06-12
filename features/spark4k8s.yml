@@ -24,11 +24,11 @@ feature:
             - kubernetes
         cluster:
             small:
-                privateNodes: 1
+                nodes: 1
             normal:
-                privateNodes: 1
+                nodes: 1
             large:
-                privateNodes: 1
+                nodes: 1
     install:
         dcos:
             check: |

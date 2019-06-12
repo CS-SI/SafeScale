@@ -32,8 +32,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: no
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -56,8 +55,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: no
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             lspci | grep -i nvidia &>/dev/null || {
                                 echo "No nVidia GPU detected. Aborting."
@@ -123,8 +121,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: no
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
