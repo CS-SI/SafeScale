@@ -47,8 +47,9 @@ feature:
                             cat >${SF_TMPDIR}/Dockerfile_reverseproxy <<-'EOF'
                             FROM kong:1.1
                             RUN apk update && apk add git unzip
-                            RUN luarocks install kong-oidc
-                            RUN luarocks install kong-prometheus-plugin
+                            RUN luarocks install kong-oidc \
+                             && luarocks install kong-prometheus-plugin
+                            RUN mkdir -p /etc/kong/includes
                             EOF
 
                             cat >${SF_ETCDIR}/kong/konga.userdb.data <<-EOF
@@ -76,7 +77,6 @@ feature:
                                         - POSTGRES_USER=kong
                                         - POSTGRES_DB=kong
                                     volumes:
-                                        - ${SF_BASEDIR}/etc/kong/kong.conf:/etc/kong/kong.conf:ro
                                         - ${SF_VARDIR}/reverseproxy/postgresql:/var/lib/postgresql/data
                                     restart: always
                                     healthcheck:
@@ -100,11 +100,6 @@ feature:
                                         context: ${SF_TMPDIR}
                                         dockerfile: Dockerfile_reverseproxy
                                     image: kong4safescale
-                                    depends_on:
-                                        db:
-                                            condition: service_healthy
-                                        migration:
-                                            condition: service_started
                                     environment:
                                         - KONG_DATABASE=postgres
                                         - KONG_PG_HOST=db
@@ -116,9 +111,18 @@ feature:
                                         - KONG_ADMIN_LISTEN=0.0.0.0:8444 ssl
                                         - KONG_PROXY_LISTEN=0.0.0.0:443 ssl
                                         - KONG_PLUGINS=oidc,prometheus
+                                    volumes:
+                                        - ${SF_ETCDIR}/kong/kong.conf:/etc/kong/kong.conf:ro
+                                        - ${SF_ETCDIR}/kong/includes:/etc/kong/includes:ro
                                     ports:
                                         - "443:443"
                                         - "127.0.0.1:8444:8444"
+                                        - "{{.GatewayIP}}:6443:6443"
+                                    depends_on:
+                                        db:
+                                            condition: service_healthy
+                                        migration:
+                                            condition: service_started
                                     restart: always
                                     healthcheck:
                                         test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
@@ -154,7 +158,9 @@ feature:
                             chmod go-rwx ${SF_ETCDIR}/kong/reverseproxy.compose.yml
 
                             cat >${SF_ETCDIR}/kong/kong.conf <<-EOF
-                            http_proxy_include '${SF_ETCDIR}/kong/includes/*.conf';
+                            stream_listen = 0.0.0.0:6442
+                            nginx_stream_include = /etc/kong/includes/*.conf
+                            anonymous_reports = off
                             EOF
 
                             sudo docker-compose -f ${SF_ETCDIR}/kong/reverseproxy.compose.yml -p reverseproxy up -d
@@ -166,9 +172,6 @@ feature:
                         targets:
                             hosts: yes
                         run: |
-                            # iptables -t filter -A INPUT -p tcp --dport https -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
-                            # sfSaveIptablesRules
-                            #sfFirewallAdd --zone=trusted --add-service=https && \
                             sfFirewallAdd --zone=public --add-service=https && \
                             sfFirewallReload
 
@@ -179,7 +182,6 @@ feature:
                         targets:
                             hosts: yes
                         run: |
-                            #sfFirewallAdd --zone=trusted --remove-service=https && \
                             sfFirewallAdd --zone=public --remove-service=https && \
                             sfFirewallReload
 
