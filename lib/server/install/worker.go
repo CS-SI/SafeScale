@@ -128,13 +128,6 @@ func (w *worker) CanProceed(s Settings) error {
 	return w.validateContextForHost()
 }
 
-func (w *worker) GetHost() (*pb.Host, error) {
-	if w.host != nil {
-		return w.host, nil
-	}
-	return nil, fmt.Errorf("target of worker isn't a host")
-}
-
 // identifyAvailableGateway finds a gateway available, and keep track of it
 // for all the life of the action (prevent to request too often)
 // For now, only one gateway is allowed, but in the future we may have 2 for High Availability
