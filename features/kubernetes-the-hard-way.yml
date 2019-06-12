@@ -32,16 +32,14 @@ feature:
                     dir:
                         targets:
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             mkdir -p /opt/safescale/k8s/ssl /opt/safescale/k8s/config
 
                     tools:
                         targets:
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             cd /usr/local/bin
                             wget -q --https-only --timestamping \
@@ -226,8 +224,7 @@ feature:
 
                     workercerts:
                         targets:
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             cat > {{.Hostname}}-csr.json <<EOF
                             {
@@ -276,8 +273,7 @@ feature:
 
                     workerconf:
                         targets:
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             export PATH=~cladm/.local/bin:PATH
                             cd /opt/safescale/k8s/config

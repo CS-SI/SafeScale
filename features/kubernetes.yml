@@ -148,14 +148,13 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            [ $(sfKubectl get nodes &>/dev/null | wc -l) -gt 1 ]
+                            [ -f /etc/kubernetes/.joined ] && [ $(sfKubectl get nodes &>/dev/null | wc -l) -gt 1 ]
 
                     nodes:
                         targets:
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
-                            pidof kubelet &>/dev/null
+                            [ -f /etc/kubernetes/.joined ] && pidof kubelet &>/dev/null
 
             add:
                 # pace: cp-dir,common-tools,sysconf,kubelet,cp1-init,cpx-init,join,weavenet,final
@@ -164,8 +163,7 @@ feature:
                     common-tools:
                         targets:
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             [ -f /etc/kubernetes/.joined ] && exit 0
 
@@ -203,8 +201,7 @@ feature:
                     sysconf:
                         targets:
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             [ -f /etc/kubernetes/.joined ] && exit 0
 
@@ -368,8 +365,7 @@ feature:
 
                     join:
                         targets:
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             [ -f /etc/kubernetes/.joined ] && exit 0
 
@@ -422,8 +418,7 @@ feature:
                     clean:
                         targets:
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -433,6 +428,7 @@ feature:
                                     yum remove -y kubectl kubeadm kubelet || exit 193
                                     ;;
                             esac
+                            rm -f /etc/kubernetes/.joined
                             exit 0
 
     # proxy:
