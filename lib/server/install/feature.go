@@ -110,7 +110,6 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 	}
 
 	for _, feature := range features {
-		//TODO use an enum instead string
 		switch suitableFor {
 		case "host":
 			yamlKey := "feature.suitableFor.host"
