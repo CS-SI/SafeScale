@@ -34,32 +34,36 @@ install_common_requirements() {
 
     mkdir -p ~cladm/.local/bin && find ~cladm/.local -exec chmod 0770 {} \;
     cat >>~cladm/.bashrc <<-'EOF'
-pathremove() {
-        local IFS=':'
-        local NEWPATH
-        local DIR
-        local PATHVARIABLE=${2:-PATH}
-        for DIR in ${!PATHVARIABLE} ; do
-                if [ "$DIR" != "$1" ] ; then
-                  NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
-                fi
-        done
-        export $PATHVARIABLE="$NEWPATH"
-}
-pathprepend() {
-        pathremove $1 $2
-        local PATHVARIABLE=${2:-PATH}
-        export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
-}
-pathappend() {
-        pathremove $1 $2
-        local PATHVARIABLE=${2:-PATH}
-        export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
-}
-pathprepend $HOME/.local/bin
-pathappend /opt/mesosphere/bin
+        pathremove() {
+            local IFS=':'
+            local NEWPATH
+            local DIR
+            local PATHVARIABLE=${2:-PATH}
+            for DIR in ${!PATHVARIABLE} ; do
+                [ "$DIR" != "$1" ] && NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
+            done
+            export $PATHVARIABLE="$NEWPATH"
+        }
+        pathprepend() {
+            pathremove $1 $2
+            local PATHVARIABLE=${2:-PATH}
+            export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
+        }
+        pathappend() {
+            pathremove $1 $2
+            local PATHVARIABLE=${2:-PATH}
+            export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
+        }
+        pathprepend $HOME/.local/bin
+        pathappend /opt/mesosphere/bin
 EOF
     chown -R cladm:cladm ~cladm
+
+    for i in ~cladm/.hushlogin ~cladm/.cloud-warnings.skip; do
+        touch $i
+        chown root:cladm $i
+        chmod ug+r-wx,o-rwx $i
+    done
 }
 export -f install_common_requirements
 
@@ -69,8 +73,8 @@ case $LINUX_KIND in
         yum install -y curl wget time jq rclone unzip
         ;;
     debian|ubuntu)
-        sfWaitForApt && apt update && \
-        sfWaitForApt && apt install -y curl wget time jq unzip
+        sfApt update && \
+        sfApt install -y curl wget time jq unzip
         curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
         cd rclone-*-linux-amd64 && \

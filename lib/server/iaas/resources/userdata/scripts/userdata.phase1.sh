@@ -118,12 +118,6 @@ EOF
 	chmod 0700 /home/{{.User}}/.ssh
 	chmod -R 0600 /home/{{.User}}/.ssh/*
 
-	for i in /home/{{.User}}/.hushlogin /home/{{.User}}/.cloud-warnings.skip; do
-		touch $i
-		chown root:{{.User}} $i
-		chmod ug+r-wx,o-rwx $i
-	done
-
 	cat >>/home/{{.User}}/.bashrc <<-'EOF'
 pathremove() {
 		local IFS=':'
@@ -153,6 +147,12 @@ EOF
 	chown -R {{.User}}:{{.User}} /home/{{.User}}
 	chown -R root:{{.User}} /opt/safescale
 	chmod 1777 /opt/safescale/var/tmp
+
+	for i in /home/{{.User}}/.hushlogin /home/{{.User}}/.cloud-warnings.skip; do
+		touch $i
+		chown root:{{.User}} $i
+		chmod ug+r-wx,o-rwx $i
+	done
 
 	echo done
 }

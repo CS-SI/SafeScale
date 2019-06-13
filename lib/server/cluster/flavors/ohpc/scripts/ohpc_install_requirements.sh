@@ -23,10 +23,6 @@ install_common_requirements() {
     setenforce 0
     sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
 
-    # Configure Firewall to accept all traffic from/to the private network
-    iptables -t filter -A INPUT -s {{ .CIDR }} -j ACCEPT
-    sfSaveIptablesRules
-
     # Upgrade to last CentOS revision
     yum upgrade --assumeyes --tolerant && \
     yum update --assumeyes
@@ -49,32 +45,36 @@ install_common_requirements() {
 
     mkdir -p ~cladm/.local/bin && find ~cladm/.local -exec chmod 0770 {} \;
     cat >>~cladm/.bashrc <<-'EOF'
-pathremove() {
-        local IFS=':'
-        local NEWPATH
-        local DIR
-        local PATHVARIABLE=${2:-PATH}
-        for DIR in ${!PATHVARIABLE} ; do
-                if [ "$DIR" != "$1" ] ; then
-                  NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
-                fi
-        done
-        export $PATHVARIABLE="$NEWPATH"
-}
-pathprepend() {
-        pathremove $1 $2
-        local PATHVARIABLE=${2:-PATH}
-        export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
-}
-pathappend() {
-        pathremove $1 $2
-        local PATHVARIABLE=${2:-PATH}
-        export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
-}
-pathprepend $HOME/.local/bin
-pathappend /opt/mesosphere/bin
+        pathremove() {
+            local IFS=':'
+            local NEWPATH
+            local DIR
+            local PATHVARIABLE=${2:-PATH}
+            for DIR in ${!PATHVARIABLE} ; do
+                [ "$DIR" != "$1" ] && NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
+            done
+            export $PATHVARIABLE="$NEWPATH"
+        }
+        pathprepend() {
+            pathremove $1 $2
+            local PATHVARIABLE=${2:-PATH}
+            export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
+        }
+        pathappend() {
+            pathremove $1 $2
+            local PATHVARIABLE=${2:-PATH}
+            export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
+        }
+        pathprepend $HOME/.local/bin
+        pathappend /opt/mesosphere/bin
 EOF
     chown -R cladm:cladm ~cladm
+
+    for i in ~cladm/.hushlogin ~cladm/.cloud-warnings.skip; do
+        touch $i
+        chown root:cladm $i
+        chmod ug+r-wx,o-rwx $i
+    done
 
     # Enable overlay module
     echo overlay >/etc/modules-load.d/10-overlay.conf
