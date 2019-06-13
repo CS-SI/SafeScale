@@ -127,6 +127,7 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 		if _, ok := err.(utils.ErrNotFound); ok {
 			return err
 		}
+		
 		return fmt.Errorf("failed to search in Metadata Storage: %v", err)
 	}
 
