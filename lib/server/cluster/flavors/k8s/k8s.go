@@ -26,10 +26,10 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
@@ -126,9 +126,7 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, n
 	case NodeType.Gateway:
 	case NodeType.Master:
 		script = "k8s_install_master.sh"
-	case NodeType.PrivateNode:
-		fallthrough
-	case NodeType.PublicNode:
+	case NodeType.Node:
 		script = "k8s_install_node.sh"
 	}
 	return script, data
