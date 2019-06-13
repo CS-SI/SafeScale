@@ -80,7 +80,7 @@ feature:
                 steps:
                     step1_name:
                         serial: <true | false>
-                        wallTime: time_in_sec
+                        timeout: time_in_minutes
                         targets:
                             hosts: <true (default) | false>
                             masters: <none (default) | one | all>
@@ -90,7 +90,7 @@ feature:
                             script_to_execute
                     step2_name:
                         serial: <true | false>
-                        wallTime: time_in_sec
+                        timeout: time_in_minutes
                         targets:
                             hosts: <true (default) | false>
                             masters: <none (default) | one | all>
@@ -160,9 +160,9 @@ add    | Describe the process to install the feature <br> runs should all return
 remove    | Describe the process to remove the feature <br> runs should all return 0 if the suppression works well | pace <br> steps | - | True 
 pace | List the steps needed to achieve the check/add/remove | - | step_list <br> *Separated by commas, they will be executed in the provided order* | True
 steps | Each steps subkey will be a step | step <br> *There could be any number of step but they have to be registerd in pace to be taken in account* | - | True
-step<br>*Step real name could be anything* | A sub task of check/add/remove | wallTime <br> targets <br> run | - | True
+step<br>*Step real name could be anything* | A sub task of check/add/remove | timeout <br> targets <br> run | - | True
 serial | Allow the step to be executed on all targets in parallel | - | true (default) <br> false | False
-wallTime | Timeout of the step (in minutes) | - | timeoutValue | False
+timeout | Timeout of the step (in minutes) | - | timeoutValue | False
 targets | Where shoud the step be executed | hosts <br> masters <br> nodes <br> gateways | - | True
 hosts | Should the step be executed on a single host | - | false (will not be executed) <br> yes (will be executed) | True
 gateways | Shoud the step be executed on gateway(s) | - | none (will not be executed on gateways; default) <br> one (will be executed on only one, the same on all steps) <br> all (will be executed on all gateways) | False
@@ -188,7 +188,7 @@ Several templated parameters are useable (using GO text template syntax) :
 *   `{{.HostIP}}`   : the IP of the current targeted host
 *   `{{.GatewayIP}}` : The private IP of the gateway
 *   `{{.PublicIP}}` : the public IP of the gateway
-*   `{{._parameter_}}` : parameter given to the feature
+*   `{{.parameter}}` : value of parameter define in the feature
 
 Several embedded functions are available to be use in scripts (cf. system/scripts/bash_library.sh in SafeScale code)
 
