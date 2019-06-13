@@ -155,27 +155,15 @@ func configureMaster(task concurrency.Task, foreman control.Foreman, index int, 
 	return nil
 }
 
-func configureNode(
-	task concurrency.Task,
-	foreman control.Foreman,
-	index int, host *pb.Host, nodeType NodeType.Enum, nodeTypeStr string,
-) error {
+func configureNode(task concurrency.Task, foreman control.Foreman, index int, host *pb.Host) error {
 
-	var publicStr string
-	if nodeType == NodeType.PublicNode {
-		publicStr = "yes"
-	} else {
-		publicStr = "no"
-	}
-
-	hostLabel := fmt.Sprintf("%s node #%d (%s)", nodeTypeStr, index, host.Name)
+	hostLabel := fmt.Sprintf("node #%d (%s)", index, host.Name)
 
 	box, err := getTemplateBox()
 	if err != nil {
 		return err
 	}
 	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_node.sh", map[string]interface{}{
-		"PublicNode":    publicStr,
 		"BootstrapIP":   foreman.Cluster().GetNetworkConfig(task).GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
 	}, host.Id)
@@ -207,9 +195,7 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, h
 		script = "dcos_prepare_bootstrap.sh"
 	case NodeType.Master:
 		script = "dcos_install_master.sh"
-	case NodeType.PrivateNode:
-		fallthrough
-	case NodeType.PublicNode:
+	case NodeType.Node:
 		script = "dcos_install_node.sh"
 	}
 	return script, data

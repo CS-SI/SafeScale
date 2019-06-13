@@ -28,11 +28,11 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/boh/enums/ErrorCode"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
@@ -171,9 +171,7 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, n
 	switch nodeType {
 	case NodeType.Master:
 		script = "boh_install_master.sh"
-	case NodeType.PrivateNode:
-		fallthrough
-	case NodeType.PublicNode:
+	case NodeType.Node:
 		script = "boh_install_node.sh"
 	}
 	return script, data
