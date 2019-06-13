@@ -127,7 +127,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            sfRetry 10m 20 "sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null" || exit 192
+                            sfRetry 10m 20 sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null || exit 192
                             sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
                             sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
 
@@ -208,7 +208,7 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
-                                    sfRetry 5m 5 sfAapt install -y ebtables socat || exit 194
+                                    sfRetry 5m 5 sfApt install -y ebtables socat || exit 194
                                     ;;
                                 redhat|centos)
                                     sfRetry 5m 5 yum install -y ebtables socat || exit 195
@@ -237,6 +237,17 @@ feature:
 
                             echo "net.ipv4.ip_forward=1" >>/etc/sysctl.d/99-sysctl.conf
                             sysctl --system
+
+                            # Disable swap if enabled
+                            SWAPS=$(grep "swap[[:space:]]*sw[[:space:]]*" /etc/fstab | column -t | cut -d' ' -f1)
+                            if [ $? -eq 0 ]; then
+                                cp /etc/fstab /etc/fstab.before_swap_disable
+                                for s in $SWAPS; do
+                                    swapoff $s &>/dev/null
+                                    grep -v "$s" /etc/fstab >>/etc/fstab.new && mv /etc/fstab.new /etc/fstab
+                                done
+                            fi
+                            exit 
 
                     reverseproxy:
                         targets:
@@ -273,13 +284,15 @@ feature:
                             EOF
 
                             sfRetry 5m 5 kubeadm config images pull || exit 197
-                            cp_join_cmd=$(kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml --experimental-upload-certs) || exit 198
+                            kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || exit 198
+                            cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || exit 199
+                            cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -1) || exit 200
 
                             cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'                            
-                            mkdir -p ~{{.Username}}/.kube
-                            cp -i /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
-                            chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
-                            chmod -R go-rwx ~{{.Username}}/.kube
+                                mkdir -p ~{{.Username}}/.kube
+                                cp -f /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
+                                chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
+                                chmod -R go-rwx ~{{.Username}}/.kube
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
@@ -287,7 +300,7 @@ feature:
                             # Starting from here, any kubectl command must be changed to sfKubectl
 
                             # Push control-plane join command to all the other masters
-                            echo $cp_join_cmd | head -1 >${SF_TMPDIR}/cp_join_cmd.sh
+                            echo "$cp_join_cmd --experimental-control-plane --certificate-key $cert_key" >${SF_TMPDIR}/cp_join_cmd.sh
                             cat ${SF_TMPDIR}/cp_join_cmd.sh
                             sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || exit 200
                             sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || exit 201
@@ -299,9 +312,9 @@ feature:
                             sfDropzoneClean
 
                             # waits availability of key pods
-                            sfRetry 5m 10 sh -c "sfKubectl get -n kube-system pod kube-apiserver-{{.Hostname}} -o {{ "'jsonpath={..status.conditions[?(@.type==\"Ready\")].status}'" }} == \"True\"" || exit 203
-                            sfRetry 5m 10 sh -c "sfKubectl get -n kube-system pod kube-controller-manager-{{.Hostname}} -o {{ "'jsonpath={..status.conditions[?(@.type==\"Ready\")].status}'" }} == \"True\"" || exit 204
-                            sfRetry 5m 10 sh -c "sfKubectl get -n kube-system pod kube-scheduler-{{.Hostname}} -o {{ "'jsonpath={..status.conditions[?(@.type==\"Ready\")].status}'" }} == \"True\"" || exit 205
+                            sfRetry 5m 10 "[ $(sfKubectl get -n kube-system pod kube-apiserver-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 213
+                            sfRetry 5m 10 "[ $(sfKubectl get -n kube-system pod kube-controller-manager-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 214
+                            sfRetry 5m 10 "[ $(sfKubectl get -n kube-system pod kube-scheduler-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 215
 
                             touch /etc/kubernetes/.joined
                             echo "init done"
@@ -319,6 +332,9 @@ feature:
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
                                     sfFirewallReload
                                     ;;
+                                calico)
+                                    sfKubectl apply -f https://gist.githubusercontent.com/joshrosso/ed1f5ea5a2f47d86f536e9eee3f1a2c2/raw/dfd95b9230fb3f75543706f3a95989964f36b154/calico-3.5.yaml
+                                    ;;
                                 canal)
                                     # Untested yet...
                                     sfKubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/canal/canal.yaml || exit 207
@@ -335,18 +351,18 @@ feature:
                             # Don't try to init a kubernetes cluster already running
                             [ -f /etc/kubernetes/.joined ] && exit 0
 
-                            sfDropzonePop "*" ${SF_TMPDIR} || exit 208
+                            sfDropzonePop ${SF_TMPDIR} || exit 208
                             sfDropzoneClean
 
-                            [ ! -f ${SF_TMPDIR}/cp_join_cmd.sh ] && exit 209
+                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || exit 209
                             bash ${SF_TMPDIR}/cp_join_cmd.sh || exit 210
-                            [ ! -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] && exit 211
+                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || exit 211
                             bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || exit 212
 
                             # waits availability of key pods
-                            sfRetry 5m 10 sh -c "sfKubectl get -n kube-system pod kube-apiserver-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type==\"Ready\")].status}') == \"True\"" || exit 213
-                            sfRetry 5m 10 sh -c "sfKubectl get -n kube-system pod kube-controller-manager-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type==\"Ready\")].status}') == \"True\"" || exit 214
-                            sfRetry 5m 10 sh -c "sfKubectl get -n kube-system pod kube-scheduler-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type==\"Ready\")].status}') == \"True\"" || exit 215
+                            sfRetry 5m 10 "[ $(sfKubectl get -n kube-system pod kube-apiserver-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 213
+                            sfRetry 5m 10 "[ $(sfKubectl get -n kube-system pod kube-controller-manager-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 214
+                            sfRetry 5m 10 "[ $(sfKubectl get -n kube-system pod kube-scheduler-{{.Hostname}} -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == 'True' ]" || exit 215
 
                             # Configure firewall
                             case {{.CNI}} in
@@ -411,9 +427,10 @@ feature:
 
                     reset:
                         targets:
-                            masters: one
+                            masters: all
+                            nodes: all
                         run: |
-                            kubeadm reset
+                            kubeadm reset -f
 
                     clean:
                         targets:
@@ -428,6 +445,7 @@ feature:
                                     yum remove -y kubectl kubeadm kubelet || exit 193
                                     ;;
                             esac
+                            sfFirewallReload
                             rm -f /etc/kubernetes/.joined
                             exit 0
 
