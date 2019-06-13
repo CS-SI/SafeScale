@@ -46,15 +46,7 @@ and in an object named with its name in subfolder `byName`.
 
 The metadata for Cluster informations are stored in `<SAFESCALE>/clusters`.
 
-Inside this folder, the metadata of a cluster is stored in a folder named as the Cluster Name submitted at its creation.
-
-Inside this subfolder is stored :
-
-* an object called `config` containing cluster configuration
-* a subfolder named `masters` containing metadata of the hosts acting as Cluster controllers
-* a subfolder named `nodes` containing :
-  * a subfolder named `private` containing metadata of private nodes
-  * a subfolder named `public` containing metadata of public nodes
+Inside this folder, the metadata are stored in an object named as the cluster name.
 
 ## Example
 
@@ -119,7 +111,7 @@ Inside this subfolder is stored :
 |
 +- clusters
    |
-   +- mycluster (dir)
+   +- mycluster (obj)
    |
    + ...
    ```
