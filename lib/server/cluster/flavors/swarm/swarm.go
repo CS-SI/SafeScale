@@ -32,12 +32,12 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	// log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
@@ -162,19 +162,7 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	}
 
 	// Join private node in Docker Swarm as workers
-	for _, hostID := range cluster.ListNodeIDs(task, false) {
-		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
-		if err != nil {
-			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
-		}
-		retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd,
-			client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
-		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
-		}
-	}
-	// Join public nodes in Docker Swarm as workers
-	for _, hostID := range cluster.ListNodeIDs(task, true) {
+	for _, hostID := range cluster.ListNodeIDs(task) {
 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
