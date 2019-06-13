@@ -261,7 +261,7 @@ func (w *worker) identifyAllMasters() ([]*pb.Host, error) {
 	return w.allMasters, nil
 }
 
-// identifyConcernedNodes returns a list of all the hosts acting as public of private nodes and keep this list
+// identifyConcernedNodes returns a list of all the hosts acting nodes and keep this list
 // during all the install session
 func (w *worker) identifyConcernedNodes() ([]*pb.Host, error) {
 	if w.cluster == nil {

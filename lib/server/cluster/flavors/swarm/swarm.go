@@ -195,7 +195,7 @@ func joinMaster(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host)
 }
 
 // joinNode is the code to use join a new node to the cluster
-func joinNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr string) error {
+func joinNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host) error {
 	clientSSH := client.New().Ssh
 
 	joinCmd, err := getSwarmJoinCommand(task, foreman, true)
@@ -374,9 +374,7 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, h
 		script = "swarm_install_gateway.sh"
 	case NodeType.Master:
 		script = "swarm_install_master.sh"
-	case NodeType.PrivateNode:
-		fallthrough
-	case NodeType.PublicNode:
+	case NodeType.Node:
 		script = "swarm_install_node.sh"
 	}
 	return script, data
