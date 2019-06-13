@@ -269,24 +269,23 @@ EOF
 }
 export -f sfDownload
 
-create_dropzone() {
+__create_dropzone() {
 	mkdir -p ~cladm/.dropzone
 	chown cladm:cladm ~cladm/.dropzone
 	chmod ug+s ~cladm/.dropzone
 }
 
 sfDownloadInDropzone() {
-	create_dropzone &>/dev/null
-	cd ~cladm/.dropzone
-	sfDownload $@
+	__create_dropzone &>/dev/null
+	( cd ~cladm/.dropzone && sfDownload $@)
 }
 export -f sfDownloadInDropzone
 
 # Copy local file to drop zone in remote
 sfDropzonePush() {
 	local file="$1"
-	create_dropzone &>/dev/null
-	cp -f $file ~cladm/.dropzone/
+	__create_dropzone &>/dev/null
+	cp -rf "$file" ~cladm/.dropzone/
 	chown -R cladm:cladm ~cladm/.dropzone
 }
 export -f sfDropzonePush
@@ -294,19 +293,23 @@ export -f sfDropzonePush
 # Copy content of local dropzone to remote dropzone (parameter can be IP or name)
 sfDropzoneSync() {
 	local remote="$1"
-	create_dropzone &>/dev/null
-	scp -i ~cladm/.ssh/id_rsa -r ~cladm/.dropzone cladm@${remote}:~/
+	__create_dropzone &>/dev/null
+	scp -i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error -r ~cladm/.dropzone cladm@${remote}:~/
 }
 export -f sfDropzoneSync
 
-# Moves file (1st parameter) from drop zone to folder (2nd parameter)
-# Dropzone shall be empty after the operation
+# Moves all files in drop zone to folder (1st parameter)
+# if 2nd parameter is set, moves only the file on folder
 sfDropzonePop() {
-	local file="$1"
-	local dest="$2"
-	create_dropzone &>/dev/null
+	local dest="$1"
+	local file="$2"
+	__create_dropzone &>/dev/null
 	mkdir -p "$dest" &>/dev/null
-	mv -f ~cladm/.dropzone/$file "$dest"
+	if [ $# -eq 1 ]; then 
+		mv -f ~cladm/.dropzone/* "$dest"
+	else
+		mv -f ~cladm/.dropzone/"$file" "$dest"
+	fi
 }
 export -f sfDropzonePop
 
@@ -314,7 +317,7 @@ sfDropzoneUntar() {
 	local file="$1"
 	local dest="$2"
 	shift 2
-	create_dropzone &>/dev/null
+	__create_dropzone &>/dev/null
 	tar zxvf ~cladm/.dropzone/"$file" -C "$dest"
 }
 export -f sfDropzoneUntar
@@ -328,7 +331,7 @@ export -f sfDropzoneClean
 sfRemoteExec() {
 	local remote=$1
 	shift
-	ssh -i ~cladm/.ssh/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no cladm@$remote $*
+	ssh -i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error cladm@$remote $*
 }
 export -f sfRemoteExec
 

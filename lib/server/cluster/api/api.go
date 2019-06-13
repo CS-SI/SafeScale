@@ -17,12 +17,12 @@
 package api
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/lib"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -47,11 +47,11 @@ type Cluster interface {
 	// GetState returns the current state of the cluster
 	GetState(concurrency.Task) (ClusterState.Enum, error)
 	// AddNode adds a node
-	AddNode(concurrency.Task, bool, *resources.HostDefinition) (string, error)
+	AddNode(concurrency.Task, *resources.HostDefinition) (string, error)
 	// AddNodes adds several nodes
-	AddNodes(concurrency.Task, int, bool, *resources.HostDefinition) ([]string, error)
+	AddNodes(concurrency.Task, int, *resources.HostDefinition) ([]string, error)
 	// DeleteLastNode deletes a node
-	DeleteLastNode(concurrency.Task, bool, string) error
+	DeleteLastNode(concurrency.Task, string) error
 	// DeleteSpecificNode deletes a node identified by its ID
 	DeleteSpecificNode(concurrency.Task, string, string) error
 	// ListMasterIDs lists the IDs of masters (if there is such masters in the flavor...)
@@ -61,17 +61,17 @@ type Cluster interface {
 	// FindAvailableMaster returns ID of the first master available to execute order
 	FindAvailableMaster(concurrency.Task) (string, error)
 	// ListNodeIDs lists IDs of the nodes in the cluster
-	ListNodeIDs(concurrency.Task, bool) []string
+	ListNodeIDs(concurrency.Task) []string
 	// ListNodeIPs lists the IPs of the nodes in the cluster
-	ListNodeIPs(concurrency.Task, bool) []string
+	ListNodeIPs(concurrency.Task) []string
 	// FindAvailableNode returns ID of the first node available to execute order
-	FindAvailableNode(concurrency.Task, bool) (string, error)
+	FindAvailableNode(concurrency.Task) (string, error)
 	// SearchNode tells if the ID of the host passed as parameter is a node
-	SearchNode(concurrency.Task, string, bool) bool
+	SearchNode(concurrency.Task, string) bool
 	// GetNode returns a node based on its ID
 	GetNode(concurrency.Task, string) (*pb.Host, error)
 	// CountNodes counts the nodes of the cluster
-	CountNodes(concurrency.Task, bool) uint
+	CountNodes(concurrency.Task) uint
 
 	// Delete allows to destroy infrastructure of cluster
 	Delete(concurrency.Task) error

@@ -158,19 +158,7 @@ func configureCluster(task concurrency.Task, foreman control.Foreman) error {
 	}
 
 	// Join private node in Docker Swarm as workers
-	for _, hostID := range cluster.ListNodeIDs(task, false) {
-		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
-		if err != nil {
-			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
-		}
-		retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd,
-			client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
-		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
-		}
-	}
-	// Join public nodes in Docker Swarm as workers
-	for _, hostID := range cluster.ListNodeIDs(task, true) {
+	for _, hostID := range cluster.ListNodeIDs(task) {
 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata of host: %s", err.Error())

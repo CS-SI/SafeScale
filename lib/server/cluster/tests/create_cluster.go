@@ -18,14 +18,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"runtime"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/cluster"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
@@ -64,7 +65,7 @@ func Run() {
 	fmt.Printf("Cluster state: %s\n", state.String())
 
 	// Creates a Private Agent Node
-	_, err = instance.AddNode(concurrency.RootTask(), false, &resources.HostDefinition{
+	_, err = instance.AddNode(concurrency.RootTask(), &resources.HostDefinition{
 		Cores:    2,
 		RAMSize:  7.0,
 		DiskSize: 60,

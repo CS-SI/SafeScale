@@ -31,8 +31,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -56,8 +55,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -83,8 +81,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             mkdir -p /etc/metricbeat
                             cat >/etc/metricbeat/metricbeat.yml << 'EOF'
@@ -147,8 +144,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             systemctl daemon-reload
                             systemctl start metricbeat || exit 196
@@ -161,8 +157,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                            privateNodes: all
-                            publicNodes: all
+                            nodes: all
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)

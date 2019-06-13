@@ -239,9 +239,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	err = properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
 		result["nodes"] = map[string]interface{}{
-			"masters":       nodesV1.Masters,
-			"private_nodes": nodesV1.PrivateNodes,
-			"public_nodes":  nodesV1.PublicNodes,
+			"masters": nodesV1.Masters,
+			"nodes":   nodesV1.PrivateNodes,
 		}
 		return nil
 	})
@@ -612,10 +611,6 @@ var clusterExpandCommand = cli.Command{
 			Usage: "Define the number of nodes wanted (default: 1)",
 			Value: 1,
 		},
-		cli.BoolFlag{
-			Name:  "public, p",
-			Usage: "If used, the node(s) will have public IP address (default: no)",
-		},
 		cli.StringFlag{
 			Name:  "os",
 			Usage: "Define the Operating System wanted",
@@ -652,7 +647,6 @@ var clusterExpandCommand = cli.Command{
 			if count == 0 {
 				count = 1
 			}
-			public := c.Bool("public")
 			los := c.String("os")
 			cpu := int32(c.Uint("cpu"))
 			ram := float32(c.Float64("ram"))
@@ -671,7 +665,7 @@ var clusterExpandCommand = cli.Command{
 					GPUNumber: -1, // Clusters currently don't take gpus into account
 				}
 			}
-			hosts, err := clusterInstance.AddNodes(concurrency.RootTask(), count, public, nodeRequest)
+			hosts, err := clusterInstance.AddNodes(concurrency.RootTask(), count, nodeRequest)
 			if err != nil {
 				_ = response.Failed(clitools.ExitOnRPC(err.Error()))
 			} else {
@@ -708,10 +702,6 @@ var clusterShrinkCommand = cli.Command{
 			Value: 1,
 		},
 		cli.BoolFlag{
-			Name:  "public, p",
-			Usage: "Tell if the node(s) to remove has(ve) to be public; default: no",
-		},
-		cli.BoolFlag{
 			Name:  "assume-yes, yes, y",
 			Usage: "Don't ask deletion confirmation",
 		},
@@ -725,40 +715,33 @@ var clusterShrinkCommand = cli.Command{
 			_ = response.Failed(err)
 		} else {
 			count := c.Uint("count")
-			public := c.Bool("public")
 			yes := c.Bool("yes")
 
-			var nodeTypeString string
-			if public {
-				nodeTypeString = "public"
-			} else {
-				nodeTypeString = "private"
-			}
 			var countS string
 			if count > 1 {
 				countS = "s"
 			}
-			present := clusterInstance.CountNodes(concurrency.RootTask(), public)
+			present := clusterInstance.CountNodes(concurrency.RootTask())
 			if count > present {
-				msg := fmt.Sprintf("can't delete %d %s node%s, the cluster contains only %d of them", count, nodeTypeString, countS, present)
+				msg := fmt.Sprintf("can't delete %d node%s, the cluster contains only %d of them", count, countS, present)
 				return response.Failed(clitools.ExitOnInvalidOption(msg))
 			}
 
 			if !yes {
-				msg := fmt.Sprintf("Are you sure you want to delete %d %s node%s from Cluster %s", count, nodeTypeString, countS, clusterName)
+				msg := fmt.Sprintf("Are you sure you want to delete %d node%s from Cluster %s", count, countS, clusterName)
 				if !utils.UserConfirmed(msg) {
 					response.Succeeded("Aborted")
 				}
 			}
 
-			fmt.Printf("Deleting %d %s node%s from Cluster '%s' (this may take a while)...\n", count, nodeTypeString, countS, clusterName)
+			fmt.Printf("Deleting %d node%s from Cluster '%s' (this may take a while)...\n", count, countS, clusterName)
 			var msgs []string
 			availableMaster, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
 			if err != nil {
 				return response.Failed(err)
 			}
 			for i := uint(0); i < count; i++ {
-				err := clusterInstance.DeleteLastNode(concurrency.RootTask(), public, availableMaster)
+				err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster)
 				if err != nil {
 					msgs = append(msgs, fmt.Sprintf("Failed to delete node #%d: %s", i+1, err.Error()))
 				}
@@ -1184,17 +1167,6 @@ var clusterNodeListCommand = cli.Command{
 	// List nodes in the clusters.`,
 	// 	},
 
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "public, p",
-			Usage: "If set, list public nodes. Otherwise list private nodes.",
-		},
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "If set, list all nodes, being private or public. Take precedence over --public",
-		},
-	},
-
 	Action: func(c *cli.Context) error {
 		response := utils.NewCliResponse()
 
@@ -1202,44 +1174,21 @@ var clusterNodeListCommand = cli.Command{
 		if err != nil {
 			_ = response.Failed(err)
 		} else {
-			public := c.Bool("public")
-			all := c.Bool("all")
-
-			safescale := client.New().Host
+			hostClt := client.New().Host
 			formatted := []map[string]interface{}{}
 
-			if all || !public {
-				listPriv := clusterInstance.ListNodeIDs(concurrency.RootTask(), false)
-				for _, i := range listPriv {
-					host, err := safescale.Inspect(i, client.DefaultExecutionTimeout)
-					if err != nil {
-						msg := fmt.Sprintf("Failed to get data for node '%s': %s. Ignoring.", i, err.Error())
-						//fmt.Println(msg)
-						log.Warnln(msg)
-						continue
-					}
-					formatted = append(formatted, map[string]interface{}{
-						"name":   host.Name,
-						"public": false,
-					})
+			list := clusterInstance.ListNodeIDs(concurrency.RootTask())
+			for _, i := range list {
+				host, err := hostClt.Inspect(i, client.DefaultExecutionTimeout)
+				if err != nil {
+					msg := fmt.Sprintf("Failed to get data for node '%s': %s. Ignoring.", i, err.Error())
+					//fmt.Println(msg)
+					log.Warnln(msg)
+					continue
 				}
-			}
-
-			if all || public {
-				listPub := clusterInstance.ListNodeIDs(concurrency.RootTask(), true)
-				for _, i := range listPub {
-					host, err := safescale.Inspect(i, client.DefaultExecutionTimeout)
-					if err != nil {
-						msg := fmt.Sprintf("failed to get data for node '%s': %s. Ignoring.", i, err.Error())
-						//fmt.Println(msg)
-						log.Warnln(msg)
-						continue
-					}
-					formatted = append(formatted, map[string]interface{}{
-						"name":   host.Name,
-						"public": true,
-					})
-				}
+				formatted = append(formatted, map[string]interface{}{
+					"name": host.Name,
+				})
 			}
 			response.Succeeded(formatted)
 		}
@@ -1469,17 +1418,6 @@ var clusterMasterListCommand = cli.Command{
 	// List nodes in the clusters.`,
 	// 	},
 
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "public, p",
-			Usage: "If set, list public nodes. Otherwise list private nodes.",
-		},
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "If set, list all nodes, being private or public. Take precedence over --public",
-		},
-	},
-
 	Action: func(c *cli.Context) error {
 		response := utils.NewCliResponse()
 
@@ -1487,12 +1425,12 @@ var clusterMasterListCommand = cli.Command{
 		if err != nil {
 			_ = response.Failed(err)
 		} else {
-			clientHost := client.New().Host
+			hostClt := client.New().Host
 			formatted := []map[string]interface{}{}
 
 			list := clusterInstance.ListMasterIDs(concurrency.RootTask())
 			for _, i := range list {
-				host, err := clientHost.Inspect(i, client.DefaultExecutionTimeout)
+				host, err := hostClt.Inspect(i, client.DefaultExecutionTimeout)
 				if err != nil {
 					msg := fmt.Sprintf("Failed to get data for master '%s': %s. Ignoring.", i, err.Error())
 					fmt.Println(msg)
