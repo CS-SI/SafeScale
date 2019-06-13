@@ -29,10 +29,19 @@ feature:
                 nodes: 1
             large:
                 nodes: 1
+    parameters:
+        - SparkVersion=2.3.3
+
     install:
         dcos:
-            check: |
-                {{.dcos}} spark plan show deploy --json | jq .status | grep COMPLETE
+            check:
+                pace: deploy
+                targets:
+                    masters: one
+                run: |
+                    STATUS=$(sfDcos spark plan show deploy --json | jq .status
+                    echo $STATUS | grep COMPLETE || exit 192
+                    exit 0
 
             add:
                 pace: package,cli
@@ -41,12 +50,12 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            {{.dcos}} package install --yes spark
+                            sfDcos package install --yes spark
                     cli:
                         targets:
                             masters: all
                         run: |
-                            {{.dcos}} package install --yes --cli spark
+                            sfDcos package install --yes --cli spark
 
             remove: |
                 pace: package
@@ -55,29 +64,50 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            {{.dcos}} package remove --yes spark
+                            sfDcos package remove --yes spark
 
         bash:
             check:
-                run: |
-                    :
+                pace: distrib
+                steps:
+                    distrib:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            [ -l /usr/local/spark ] || exit 192
+                            VERSION=$(echo $(basename $(readlink -f /usr/local/spark)) | cut -d- -f2)
+                            [ "$VERSION" = "{{.SparkVersion}}" ] || exit 193
+                            [ -x /usr/local/spark/bin/spark ] || exit 194
+                            exit 0
+
 
             add:
                 pace: distrib
                 steps:
-                    targets:
-                        host: yes
-                        cluster:
-                            master: all
                     distrib:
-                        cd /usr/local
-                        wget -q http://www-eu.apache.org/dist/spark/spark-2.3.1/spark-2.3.1-bin-hadoop2.7.tgz && \
-                        tar zxvf spark-2.3.1-bin-hadoop2.7.tgz || exit $?
-                        rm -f spark-2.3.1-bin-hadoop2.7.tgz
-                        ln -s /usr/local/spark-2.3.1-bin-hadoop2.7 /usr/local/spark
-                        ln -s /usr/local/spark/bin/spark-submit /usr/local/bin
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            cd /usr/local
+                            wget -q http://www-eu.apache.org/dist/spark/spark-{{.SparkVersion}}/spark-{{.SparkVersion}}-bin-hadoop2.7.tgz && \
+                            tar zxvf spark-{{.SparkVersion}-bin-hadoop2.7.tgz || exit 195
+                            rm -f spark-{{.SparkVersion}}-bin-hadoop2.7.tgz
+                            ln -s /usr/local/spark-{{.SparkVersion}}-bin-hadoop2.7 /usr/local/spark
+                            ln -s /usr/local/spark/bin/spark-submit /usr/local/bin
 
             remove:
-                pace:
+                pace: distrib
                 steps:
+                    distrib:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            rm -rf /usr/local/spark-{{.SparkVersion}}-bin-hadoop* 
+                            rm -f /usr/local/spark
 ...

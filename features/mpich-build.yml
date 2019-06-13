@@ -29,7 +29,7 @@ feature:
                 pace: fromsrc
                 steps:
                     fromsrc:
-                        wallTime: 15
+                        timeout: 15
                         targets:
                             host: yes
                             clusters:

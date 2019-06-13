@@ -49,7 +49,7 @@ feature:
 
             add:
                 pace: fromdist
-                wallTime: 15
+                timeout: 15
                 steps:
                     fromdist:
                         targets:

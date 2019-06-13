@@ -37,14 +37,14 @@ feature:
                             docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'remotedesktop:latest' &>/dev/null
 
             add:
-                #pace: desktop+tigervnc+guacamole,start
+                #pace: desktop+deps,tigervnc+guacamole,start
                 pace: desktop,tigervnc,deps,guacamole,start
                 steps:
                     desktop:
                         targets:
                             hosts: yes
                             masters: all
-                        wallTime: 15
+                        timeout: 15
                         run: |
                             ###########################################################
                             # Install xfce + tigervnc                                 #
@@ -72,7 +72,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                        wallTime: 15
+                        timeout: 15
                         run: |
                             URL="https://bintray.com/tigervnc/stable/download_file?file_path=tigervnc-1.9.0.x86_64.tar.gz"
                             sfDownload "$URL" tigervnc.tgz 3m 5 || exit 192
@@ -273,7 +273,7 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                        wallTime: 10
+                        timeout: 10
                         run: |
                             cd ${SF_TMPDIR}/remotedesktop.image
 
