@@ -162,9 +162,15 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	}
 
 	// Determine default image
-	imageID := "Ubuntu 18.04"
-	if b.makers.DefaultImage != nil {
+	var imageID string
+	if req.NodesDef != nil {
+		imageID = req.NodesDef.ImageID
+	}
+	if imageID == "" && b.makers.DefaultImage != nil {
 		imageID = b.makers.DefaultImage(task, b)
+	}
+	if imageID == "" {
+		imageID = "Ubuntu 18.04"
 	}
 
 	// Determine Gateway sizing
@@ -177,7 +183,6 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	}
 	if b.makers.DefaultGatewaySizing != nil {
 		gatewayDef = complementHostDefinition(&gatewayDef, b.makers.DefaultGatewaySizing(task, b))
-		// gatewayDef.ImageID = imageID
 	}
 	gatewayDef = complementHostDefinition(req.NodesDef, gatewayDef)
 	pbGatewayDef := *pbutils.ToPBGatewayDefinition(&gatewayDef)
@@ -192,7 +197,6 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	}
 	if b.makers.DefaultMasterSizing != nil {
 		masterDef = complementHostDefinition(&masterDef, b.makers.DefaultMasterSizing(task, b))
-		// masterDef.ImageID = imageID
 	}
 	// Note: no way yet to define master sizing from cli...
 	masterDef = complementHostDefinition(req.NodesDef, masterDef)
@@ -208,12 +212,8 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	}
 	if b.makers.DefaultNodeSizing != nil {
 		nodeDef = complementHostDefinition(&nodeDef, b.makers.DefaultNodeSizing(task, b))
-		// nodeDef.ImageID = imageID
 	}
 	nodeDef = complementHostDefinition(req.NodesDef, nodeDef)
-	// if nodeDef.ImageID == "" {
-	// 	nodeDef.ImageID = imageID
-	// }
 	pbNodeDef := *pbutils.ToPBHostDefinition(&nodeDef)
 
 	// Creates network
