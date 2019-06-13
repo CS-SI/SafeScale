@@ -21,7 +21,7 @@ feature:
         cluster: ohpc
     install:
         bash:
-            wallTime: 15
+            timeout: 15
             check: |
                 rpm -qa | grep ohpc-slurm-server &>/dev/null
 

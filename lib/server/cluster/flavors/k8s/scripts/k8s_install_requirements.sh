@@ -23,10 +23,6 @@ install_common_requirements() {
     setenforce 0 &>/dev/null
     sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config &>/dev/null
 
-    # Configure Firewall to accept all traffic from/to the private network
-    iptables -t filter -A INPUT -s {{ .CIDR }} -j ACCEPT
-    sfSaveIptablesRules
-
     # Creates user cladm
     useradd -s /bin/bash -m -d /home/cladm cladm
     groupadd -r -f docker &>/dev/null
@@ -41,31 +37,35 @@ install_common_requirements() {
 
     mkdir -p ~cladm/.local/bin && find ~cladm/.local -exec chmod 0770 {} \;
     cat >>~cladm/.bashrc <<-'EOF'
-pathremove() {
-        local IFS=':'
-        local NEWPATH
-        local DIR
-        local PATHVARIABLE=${2:-PATH}
-        for DIR in ${!PATHVARIABLE} ; do
-                if [ "$DIR" != "$1" ] ; then
-                  NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
-                fi
-        done
-        export $PATHVARIABLE="$NEWPATH"
-}
-pathprepend() {
-        pathremove $1 $2
-        local PATHVARIABLE=${2:-PATH}
-        export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
-}
-pathappend() {
-        pathremove $1 $2
-        local PATHVARIABLE=${2:-PATH}
-        export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
-}
-pathprepend $HOME/.local/bin
+        pathremove() {
+            local IFS=':'
+            local NEWPATH
+            local DIR
+            local PATHVARIABLE=${2:-PATH}
+            for DIR in ${!PATHVARIABLE} ; do
+                [ "$DIR" != "$1" ] && NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
+            done
+            export $PATHVARIABLE="$NEWPATH"
+        }
+        pathprepend() {
+            pathremove $1 $2
+            local PATHVARIABLE=${2:-PATH}
+            export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
+        }
+        pathappend() {
+            pathremove $1 $2
+            local PATHVARIABLE=${2:-PATH}
+            export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
+        }
+        pathprepend $HOME/.local/bin
 EOF
     chown -R cladm:cladm ~cladm
+
+    for i in ~cladm/.hushlogin ~cladm/.cloud-warnings.skip; do
+        touch $i
+        chown root:cladm $i
+        chmod ug+r-wx,o-rwx $i
+    done
 
     # Enable overlay module
     echo overlay >/etc/modules-load.d/10-overlay.conf
@@ -79,8 +79,8 @@ export -f install_common_requirements
 
 case $(sfGetFact "linux kind") in
     debian|ubuntu)
-        sfRetry 3m 5 "sfWaitForApt && apt update"
-        sfRetry 5m 5 "sfWaitForApt && apt install -y wget curl time jq unzip"
+        sfRetry 3m 5 "sfApt update"
+        sfRetry 5m 5 "sfApt install -y wget curl time jq unzip"
         curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
         cd rclone-*-linux-amd64 && \

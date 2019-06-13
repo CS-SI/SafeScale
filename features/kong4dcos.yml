@@ -109,7 +109,7 @@ feature:
                 pace: pkg
                 steps:
                     pkg:
-                        wallTime: 15
+                        timeout: 15
                         run: |
                             cd $SF_TMPDIR
                             git clone git@github.com:Kong/kong-dist-dcos.git && \
@@ -120,7 +120,7 @@ feature:
                 pace: pkg
                 steps:
                     pkg:
-                        {{.dcos}} package remove --yes kong
+                        sfDcos package remove --yes kong
 
     service:
         start: |

@@ -40,7 +40,7 @@ feature:
                     squid:
                         targets:
                             hosts: yes
-                        wallTime: 10
+                        timeout: 10
                         run: |
                             mkdir -p ${SF_BASEDIR}/data/proxycache/cache ${SF_VARDIR}/run ${SF_TMPDIR}/proxycache.image
                             cd ${SF_TMPDIR}/proxycache.image

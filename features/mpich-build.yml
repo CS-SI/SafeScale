@@ -29,13 +29,12 @@ feature:
                 pace: fromsrc
                 steps:
                     fromsrc:
-                        wallTime: 15
+                        timeout: 15
                         targets:
                             host: yes
                             clusters:
                                 masters: all
-                                privateNodes: all
-                                publicNodes: all
+                                nodes: all
                         run: |
                             case $LINUX_KIND in
                                 redhat|centos)
@@ -70,7 +69,6 @@ feature:
                             hosts: all
                             clusters:
                                 masters: all
-                                privateNodes: all
-                                publicNodes: all
+                                nodes: all
                         run: |
                             rm -rf /usr/local/bin/mpiexec &>/dev/null

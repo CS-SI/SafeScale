@@ -59,6 +59,8 @@ type Settings struct {
 	SkipFeatureRequirements bool
 	// SkipSizingRequirements tells not to check sizing requirements
 	SkipSizingRequirements bool
+	// AddUnconditionally tells to not check before addition (no effect for check or removal)
+	AddUnconditionally bool
 }
 
 // Feature contains the information about an installable feature
@@ -110,7 +112,6 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 	}
 
 	for _, feature := range features {
-		//TODO use an enum instead string
 		switch suitableFor {
 		case "host":
 			yamlKey := "feature.suitableFor.host"
@@ -330,13 +331,15 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 		return nil, err
 	}
 
-	results, err := f.Check(t, v, s)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check feature '%s': %s", f.DisplayName(), err.Error())
-	}
-	if results.Successful() {
-		log.Infof("Feature '%s' is already installed.", f.DisplayName())
-		return results, nil
+	if !s.AddUnconditionally {
+		results, err := f.Check(t, v, s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check feature '%s': %s", f.DisplayName(), err.Error())
+		}
+		if results.Successful() {
+			log.Infof("Feature '%s' is already installed.", f.DisplayName())
+			return results, nil
+		}
 	}
 
 	if !s.SkipFeatureRequirements {
@@ -345,7 +348,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (Results, error) {
 			return nil, fmt.Errorf("failed to install requirements: %s", err.Error())
 		}
 	}
-	results, err = installer.Add(f, t, myV, s)
+	results, err := installer.Add(f, t, myV, s)
 	if err == nil {
 		_ = checkCache.ForceSet(f.DisplayName()+"@"+t.Name(), results)
 	}
