@@ -37,14 +37,14 @@ import (
 )
 
 const (
-	yamlPaceKeyword     = "pace"
-	yamlStepsKeyword    = "steps"
-	yamlTargetsKeyword  = "targets"
-	yamlRunKeyword      = "run"
-	yamlPackageKeyword  = "package"
-	yamlOptionsKeyword  = "options"
-	yamlWallTimeKeyword = "wallTime"
-	yamlSerialKeyword   = "serialized"
+	yamlPaceKeyword    = "pace"
+	yamlStepsKeyword   = "steps"
+	yamlTargetsKeyword = "targets"
+	yamlRunKeyword     = "run"
+	yamlPackageKeyword = "package"
+	yamlOptionsKeyword = "options"
+	yamlTimeoutKeyword = "timeout"
+	yamlSerialKeyword  = "serialized"
 )
 
 type alterCommandCB func(string) string
@@ -171,7 +171,7 @@ func (w *worker) identifyAvailableNode() (*pb.Host, error) {
 		return nil, resources.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
-		hostID, err := w.cluster.FindAvailableNode(w.feature.task, false)
+		hostID, err := w.cluster.FindAvailableNode(w.feature.task)
 		if err != nil {
 			return nil, err
 		}
@@ -292,7 +292,7 @@ func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
 	if w.allNodes == nil {
 		hostClt := client.New().Host
 		allHosts := []*pb.Host{}
-		for _, i := range w.cluster.ListNodeIDs(w.feature.task, false) {
+		for _, i := range w.cluster.ListNodeIDs(w.feature.task) {
 			host, err := hostClt.Inspect(i, client.DefaultExecutionTimeout)
 			if err != nil {
 				return nil, err
@@ -478,11 +478,15 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 		}
 
 		wallTime := 0
-		anon, ok = stepMap[yamlWallTimeKeyword]
+		anon, ok = stepMap[yamlTimeoutKeyword]
 		if ok {
-			wallTime, err = strconv.Atoi(anon.(string))
-			if err != nil {
-				log.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlWallTimeKeyword)
+			if _, ok := anon.(int); ok {
+				wallTime = anon.(int)
+			} else {
+				wallTime, err = strconv.Atoi(anon.(string))
+				if err != nil {
+					log.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
+				}
 			}
 		}
 		if wallTime == 0 {
@@ -525,6 +529,9 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 		results[k], err = step.Run(hostsList, w.variables, w.settings)
 		// If an error occured, don't do the remaining steps, fail immediately
 		if err != nil {
+			break
+		}
+		if !results[k].Successful() {
 			break
 		}
 	}
@@ -584,20 +591,14 @@ func (w *worker) validateClusterSizing() error {
 			return fmt.Errorf("cluster doesn't meet the minimum number of masters (%d < %d)", curMasters, minMasters)
 		}
 	}
-	if anon, ok := sizing["minPrivateNodes"]; ok {
+	if anon, ok := sizing["minNodes"]; ok {
 		minNodes := anon.(int)
-		curNodes := len(w.cluster.ListNodeIDs(w.feature.task, false))
+		curNodes := len(w.cluster.ListNodeIDs(w.feature.task))
 		if curNodes < minNodes {
-			return fmt.Errorf("cluster doesn't meet the minimum number of private nodes (%d < %d)", curNodes, minNodes)
+			return fmt.Errorf("cluster doesn't meet the minimum number of nodes (%d < %d)", curNodes, minNodes)
 		}
 	}
-	if anon, ok := sizing["minPublicNodes"]; ok {
-		minNodes := anon.(int)
-		curNodes := len(w.cluster.ListNodeIDs(w.feature.task, true))
-		if curNodes < minNodes {
-			return fmt.Errorf("cluster doesn't meet the minimum number of public nodes (%d < %d)", curNodes, minNodes)
-		}
-	}
+
 	return nil
 }
 
