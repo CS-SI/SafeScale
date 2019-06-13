@@ -27,8 +27,6 @@ import (
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
@@ -36,6 +34,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	providermetadata "github.com/CS-SI/SafeScale/lib/server/metadata"
 	pbutils "github.com/CS-SI/SafeScale/lib/server/utils"
@@ -375,16 +375,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	gatewayTask := concurrency.NewTask(task, b.taskInstallGateway)
 	gatewayTask.Start(pbutils.ToPBHost(gw))
 
-	// mastersCh = make(chan error)
-	// go b.taskCreateMasters(masterCount, pbMasterDef, mastersCh)
 	mastersTask := concurrency.NewTask(task, b.taskCreateMasters)
 	mastersTask.Start(map[string]interface{}{
 		"count":     masterCount,
 		"masterDef": pbMasterDef,
 	})
 
-	// privateNodesCh = make(chan error)
-	// go b.taskCreateNodes(privateNodeCount, false, pbNodeDef, privateNodesCh)
 	privateNodesTask := concurrency.NewTask(task, b.taskCreateNodes)
 	privateNodesTask.Start(map[string]interface{}{
 		"count":   privateNodeCount,
@@ -392,20 +388,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		"nodeDef": pbNodeDef,
 	})
 
-	// // publicNodesCh = make(chan error)
-	// // go b.taskCreateNodes(publicNodeCount, true, pbNodeDef, publicNodesCh)
-	// publicNodesTask := concurrency.NewTask(task, b.taskCreateNodes)
-	// publicNodesTask.Start(map[string]interface{}{
-	// 	"count":   publicNodeCount,
-	// 	"public":  true,
-	// 	"nodeDef": pbNodeDef,
-	// })
-
 	// Step 2: awaits master creations and gateway installation finish
 	// gatewayStatus = <-gatewayCh
 	gatewayTask.Wait()
 	gatewayStatus = gatewayTask.GetError()
-	// mastersStatus = <-mastersCh
 	mastersTask.Wait()
 	mastersStatus = mastersTask.GetError()
 
@@ -420,40 +406,28 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	}()
 
 	if gatewayStatus == nil && mastersStatus == nil {
-		// gatewayCh = make(chan error)
-		// go func() { b.taskConfigureGateway(pbutils.ToPBHost(gw), gatewayCh) }()
-		// gatewayStatus = <-gatewayCh
 		gatewayTask = concurrency.NewTask(task, b.taskConfigureGateway)
 		gatewayStatus = gatewayTask.Run(pbutils.ToPBHost(gw))
 	}
 
 	// Step 5: configure masters
 	if gatewayStatus == nil && mastersStatus == nil {
-		// mastersCh = make(chan error)
-		// go b.taskConfigureMasters(mastersCh)
-		// mastersStatus = <-mastersCh
 		mastersTask = concurrency.NewTask(task, b.taskConfigureMasters)
 		mastersStatus = mastersTask.Run(nil)
 	}
 
 	privateNodesTask.Wait()
 	privateNodesStatus = privateNodesTask.GetError()
-	// // publicNodesStatus = <-publicNodesCh
-	// publicNodesTask.Wait()
-	// publicNodesStatus = publicNodesTask.GetError()
 
 	// Starting from here, delete nodes on failure if exits with error and req.KeepOnFailure is false
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
 			clientHost := clientInstance.Host
-			derr := clientHost.Delete(b.cluster.ListNodeIDs(task, false), client.DefaultExecutionTimeout)
+			derr := clientHost.Delete(b.cluster.ListNodeIDs(task), client.DefaultExecutionTimeout)
 			if derr != nil {
 				log.Debugf("failed to remove private nodes on failure")
 			}
-			// derr = clientHost.Delete(b.cluster.ListNodeIDs(task, true), client.DefaultExecutionTimeout)
-			// if derr != nil {
-			// 	log.Debugf("failed to remove public nodes on failure")
-			// }
+
 		}
 	}()
 
@@ -466,22 +440,13 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 			privateNodesTask = concurrency.NewTask(task, b.taskConfigureNodes)
 			privateNodesTask.Start(false)
 		}
-		// if publicNodesStatus == nil {
-		// 	// publicNodesCh = make(chan error)
-		// 	// go b.taskConfigureNodes(true, publicNodesCh)
-		// 	publicNodesTask = concurrency.NewTask(task, b.taskConfigureNodes)
-		// 	publicNodesTask.Start(true)
-		// }
+
 		if privateNodesStatus == nil {
 			// privateNodesStatus = <-privateNodesCh
 			privateNodesTask.Wait()
 			privateNodesStatus = privateNodesTask.GetError()
 		}
-		// if publicNodesStatus == nil {
-		// 	// publicNodesStatus = <-publicNodesCh
-		// 	publicNodesTask.Wait()
-		// 	publicNodesStatus = publicNodesTask.GetError()
-		// }
+
 	}
 
 	if gatewayStatus != nil {
@@ -496,10 +461,6 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		err = privateNodesStatus // value of err may trigger defer calls, don't change anything here
 		return err
 	}
-	// if publicNodesStatus != nil {
-	// 	err = publicNodesStatus // value of err may trigger defer calls, don't change anything here
-	// 	return err
-	// }
 
 	// At the end, configure cluster as a whole
 	err = b.configureCluster(task)
@@ -678,18 +639,13 @@ func uploadTemplateToFile(
 }
 
 // configureNodesFromList ...
-func (b *foreman) configureNodesFromList(task concurrency.Task, public bool, hosts []string) error {
+func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) error {
 	var (
 		nodeType    NodeType.Enum
 		nodeTypeStr string
 	)
-	if public {
-		nodeType = NodeType.PrivateNode
-		nodeTypeStr = "public"
-	} else {
-		nodeType = NodeType.PublicNode
-		nodeTypeStr = "private"
-	}
+	nodeType = NodeType.PrivateNode
+	nodeTypeStr = "private"
 
 	log.Debugf("Configuring %s Nodes...", nodeTypeStr)
 
@@ -743,7 +699,7 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, public bool, hos
 }
 
 // joinNodesFromList ...
-func (b *foreman) joinNodesFromList(task concurrency.Task, public bool, hosts []string) error {
+func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error {
 	if b.makers.JoinNodeToCluster == nil {
 		return nil
 	}
@@ -752,13 +708,8 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, public bool, hosts []
 		nodeType    NodeType.Enum
 		nodeTypeStr string
 	)
-	if public {
-		nodeType = NodeType.PrivateNode
-		nodeTypeStr = "public"
-	} else {
-		nodeType = NodeType.PublicNode
-		nodeTypeStr = "private"
-	}
+	nodeType = NodeType.PublicNode
+	nodeTypeStr = "private"
 
 	log.Debugf("Joining %s Nodes to cluster...", nodeTypeStr)
 
@@ -805,7 +756,7 @@ func (b *foreman) leaveMastersFromList(task concurrency.Task, public bool, hosts
 }
 
 // leaveNodesFromList ...
-func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, public bool, selectedMasterID string) error {
+func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, selectedMasterID string) error {
 	if b.makers.LeaveNodeFromCluster == nil {
 		return nil
 	}
@@ -814,13 +765,8 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, publ
 		nodeType    NodeType.Enum
 		nodeTypeStr string
 	)
-	if public {
-		nodeType = NodeType.PrivateNode
-		nodeTypeStr = "public"
-	} else {
-		nodeType = NodeType.PublicNode
-		nodeTypeStr = "private"
-	}
+	nodeType = NodeType.PublicNode
+	nodeTypeStr = "private"
 
 	log.Debugf("Making %s Nodes leaving cluster...", nodeTypeStr)
 
@@ -1206,7 +1152,7 @@ func (b *foreman) taskCreateMaster(tr concurrency.TaskRunner, params interface{}
 		return
 	}
 
-	log.Debugf("[%s] host rsource creation successful.", hostLabel)
+	log.Debugf("[%s] host resource creation successful.", hostLabel)
 	// done <- nil
 }
 
@@ -1400,9 +1346,6 @@ func (b *foreman) taskCreateNodes(tr concurrency.TaskRunner, params interface{})
 
 // taskCreateNode creates a Node in the Cluster
 // This function is intended to be call as a goroutine
-// func (b *Foreman) taskCreateNode(
-// 	index int, nodeType NodeType.Enum, def pb.HostDefinition, timeout time.Duration,
-// 	result chan string, done chan error,
 func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) {
 	// Convert parameters
 	p := params.(map[string]interface{})
@@ -1429,16 +1372,10 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	}()
 
 	var (
-		publicIP    bool
 		nodeTypeStr string
 	)
-	if nodeType == NodeType.PublicNode {
-		nodeTypeStr = "public"
-		publicIP = true
-	} else {
-		nodeTypeStr = "private"
-		publicIP = false
-	}
+	nodeTypeStr = "private"
+
 	hostLabel := fmt.Sprintf("%s node #%d", nodeTypeStr, index)
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
 
@@ -1450,7 +1387,6 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 		// done <- err
 		return
 	}
-	def.Public = publicIP
 	def.Network = b.cluster.GetNetworkConfig(tr.Task()).NetworkID
 	if timeout < 10*time.Minute { // FIXME Hardcoded timeout
 		timeout = 10 * time.Minute
@@ -1503,7 +1439,7 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	// Starting from here, delete node from cluster if exiting with error
 	defer func() {
 		if err != nil {
-			derr := b.cluster.deleteNode(tr.Task(), node, publicIP, "")
+			derr := b.cluster.deleteNode(tr.Task(), node, "")
 			if derr != nil {
 				log.Errorf("failed to delete node after failure")
 			}
@@ -1554,22 +1490,17 @@ func (b *foreman) taskConfigureNodes(tr concurrency.TaskRunner, params interface
 		}
 	}()
 
-	if public {
-		nodeType = NodeType.PrivateNode
-		nodeTypeStr = "public"
-	} else {
-		nodeType = NodeType.PublicNode
-		nodeTypeStr = "private"
-	}
+	nodeType = NodeType.PrivateNode
+	nodeTypeStr = "private"
 	clusterName := b.cluster.GetIdentity(tr.Task()).Name
-	list := b.cluster.ListNodeIDs(tr.Task(), public)
+	list := b.cluster.ListNodeIDs(tr.Task())
 	if len(list) <= 0 {
-		log.Debugf("[cluster %s] no %s nodes to configure.", clusterName, nodeTypeStr)
+		log.Debugf("[cluster %s] no nodes to configure.", clusterName)
 		// done <- nil
 		return
 	}
 
-	log.Debugf("[cluster %s] configuring %s nodes...", clusterName, nodeTypeStr)
+	log.Debugf("[cluster %s] configuring nodes...", clusterName)
 
 	var (
 		pbHost *pb.Host
@@ -1602,9 +1533,7 @@ func (b *foreman) taskConfigureNodes(tr concurrency.TaskRunner, params interface
 		errors = append(errors, "failed to get metadata of host '%s': %s", hostID, err.Error())
 	}
 
-	// for i = range dones {
 	for _, s := range subtasks {
-		// 	err = <-dones[i]
 		s.Wait()
 		err = s.GetError()
 		if err != nil {
@@ -1612,13 +1541,11 @@ func (b *foreman) taskConfigureNodes(tr concurrency.TaskRunner, params interface
 		}
 	}
 	if len(errors) > 0 {
-		// done <- fmt.Errorf(strings.Join(errors, "\n"))
 		err = fmt.Errorf(strings.Join(errors, "\n"))
 		return
 	}
 
-	log.Debugf("[cluster %s] %s nodes configuration successful.", clusterName, nodeTypeStr)
-	// done <- nil
+	log.Debugf("[cluster %s] nodes configuration successful.", clusterName)
 }
 
 // taskConfigureNode ...

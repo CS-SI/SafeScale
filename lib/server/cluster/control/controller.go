@@ -23,8 +23,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
@@ -32,6 +30,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	pbutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -164,8 +164,8 @@ func (c *Controller) GetNetworkConfig(task concurrency.Task) (config clusterprop
 	return config
 }
 
-// CountNodes returns the number of public or private nodes in the cluster
-func (c *Controller) CountNodes(task concurrency.Task, public bool) uint {
+// CountNodes returns the number of nodes in the cluster
+func (c *Controller) CountNodes(task concurrency.Task) uint {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -174,11 +174,7 @@ func (c *Controller) CountNodes(task concurrency.Task, public bool) uint {
 
 	c.RLock(task)
 	err := c.GetProperties(task).LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		if public {
-			count = uint(len(v.(*clusterpropsv1.Nodes).PublicNodes))
-		} else {
-			count = uint(len(v.(*clusterpropsv1.Nodes).PrivateNodes))
-		}
+		count = uint(len(v.(*clusterpropsv1.Nodes).PrivateNodes))
 		return nil
 	})
 	c.RUnlock(task)
@@ -233,7 +229,7 @@ func (c *Controller) ListMasterIPs(task concurrency.Task) []string {
 }
 
 // ListNodeIDs lists the IDs of the nodes in the Cluster
-func (c *Controller) ListNodeIDs(task concurrency.Task, public bool) []string {
+func (c *Controller) ListNodeIDs(task concurrency.Task) []string {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -243,11 +239,7 @@ func (c *Controller) ListNodeIDs(task concurrency.Task, public bool) []string {
 	var list []string
 	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		var nodesV1 []*clusterpropsv1.Node
-		if public {
-			nodesV1 = v.(*clusterpropsv1.Nodes).PublicNodes
-		} else {
-			nodesV1 = v.(*clusterpropsv1.Nodes).PrivateNodes
-		}
+		nodesV1 = v.(*clusterpropsv1.Nodes).PrivateNodes
 		for _, v := range nodesV1 {
 			list = append(list, v.ID)
 		}
@@ -261,7 +253,7 @@ func (c *Controller) ListNodeIDs(task concurrency.Task, public bool) []string {
 }
 
 // ListNodeIPs lists the IP addresses of the nodes in the Cluster
-func (c *Controller) ListNodeIPs(task concurrency.Task, public bool) []string {
+func (c *Controller) ListNodeIPs(task concurrency.Task) []string {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -271,11 +263,7 @@ func (c *Controller) ListNodeIPs(task concurrency.Task, public bool) []string {
 	var list []string
 	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		var nodesV1 []*clusterpropsv1.Node
-		if public {
-			nodesV1 = v.(*clusterpropsv1.Nodes).PublicNodes
-		} else {
-			nodesV1 = v.(*clusterpropsv1.Nodes).PrivateNodes
-		}
+		nodesV1 = v.(*clusterpropsv1.Nodes).PrivateNodes
 		for _, v := range nodesV1 {
 			list = append(list, v.PrivateIP)
 		}
@@ -314,7 +302,7 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (*pb.Host, er
 }
 
 // SearchNode tells if an host ID corresponds to a node of the Cluster
-func (c *Controller) SearchNode(task concurrency.Task, hostID string, public bool) bool {
+func (c *Controller) SearchNode(task concurrency.Task, hostID string) bool {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -323,12 +311,7 @@ func (c *Controller) SearchNode(task concurrency.Task, hostID string, public boo
 
 	found := false
 	_ = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
-		nodesV1 := v.(*clusterpropsv1.Nodes)
-		if public {
-			found, _ = contains(nodesV1.PublicNodes, hostID)
-		} else {
-			found, _ = contains(nodesV1.PrivateNodes, hostID)
-		}
+		found, _ = contains(v.(*clusterpropsv1.Nodes).PrivateNodes, hostID)
 		return nil
 	})
 	return found
@@ -367,7 +350,7 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (string, error) 
 }
 
 // FindAvailableNode returns the ID of a node available
-func (c *Controller) FindAvailableNode(task concurrency.Task, public bool) (string, error) {
+func (c *Controller) FindAvailableNode(task concurrency.Task) (string, error) {
 	if task == nil {
 		task = concurrency.RootTask()
 	}
@@ -375,7 +358,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task, public bool) (stri
 	hostID := ""
 	found := false
 	clientHost := client.New().Host
-	list := c.ListNodeIDs(task, public)
+	list := c.ListNodeIDs(task)
 	for _, hostID = range list {
 		sshCfg, err := clientHost.SSHConfig(hostID)
 		if err != nil {
@@ -470,8 +453,8 @@ func (c *Controller) Deserialize(buf []byte) error {
 }
 
 // AddNode adds one node
-func (c *Controller) AddNode(task concurrency.Task, public bool, req *resources.HostDefinition) (string, error) {
-	hosts, err := c.AddNodes(task, 1, public, req)
+func (c *Controller) AddNode(task concurrency.Task, req *resources.HostDefinition) (string, error) {
+	hosts, err := c.AddNodes(task, 1, req)
 	if err != nil {
 		return "", err
 	}
@@ -479,9 +462,9 @@ func (c *Controller) AddNode(task concurrency.Task, public bool, req *resources.
 }
 
 // AddNodes adds <count> nodes
-func (c *Controller) AddNodes(task concurrency.Task, count int, public bool, req *resources.HostDefinition) ([]string, error) {
-	log.Debugf(">>> safescale.server.cluster.control.Controller::AddNodes(%d, %v)", count, public)
-	defer log.Debugf("<<< safescale.server.cluster.control.Controller::AddNodes(%d, %v)", count, public)
+func (c *Controller) AddNodes(task concurrency.Task, count int, req *resources.HostDefinition) ([]string, error) {
+	log.Debugf(">>> safescale.server.cluster.control.Controller::AddNodes(%d)", count)
+	defer log.Debugf("<<< safescale.server.cluster.control.Controller::AddNodes(%d)", count)
 
 	if task == nil {
 		task = concurrency.RootTask()
@@ -516,31 +499,16 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, public bool, req
 		nodeType    NodeType.Enum
 		nodeTypeStr string
 	)
-	if public {
-		nodeType = NodeType.PublicNode
-		nodeTypeStr = "public"
-	} else {
-		nodeType = NodeType.PrivateNode
-		nodeTypeStr = "private"
-	}
-	pbNodeDef.Public = public
 	pbNodeDef.Network = c.GetNetworkConfig(task).NetworkID
 
 	var (
 		hosts  []string
 		errors []string
-		// dones   []chan error
-		// results []chan string
 	)
 	timeout := client.DefaultExecutionTimeout + time.Duration(count)*time.Minute
 
 	var subtasks []concurrency.Task
 	for i := 0; i < count; i++ {
-		// r := make(chan string)
-		// results = append(results, r)
-		// d := make(chan error)
-		// dones = append(dones, d)
-		// go c.foreman.asyncCreateNode(acntasks[i], i+1, nodeType, *pbNodeDef, timeout, r, d)
 		subtask := concurrency.NewTask(task, c.foreman.taskCreateNode).Start(map[string]interface{}{
 			"index":   i + 1,
 			"type":    nodeType,
@@ -549,7 +517,6 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, public bool, req
 		})
 		subtasks = append(subtasks, subtask)
 	}
-	// for i := range dones {
 	for _, s := range subtasks {
 		s.Wait()
 		hostName := s.GetResult().(string)
@@ -561,13 +528,13 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, public bool, req
 			errors = append(errors, err.Error())
 		}
 	}
-	clientHost := client.New().Host
+	hostClt := client.New().Host
 
 	// Starting from here, delete nodes if exiting with error
 	defer func() {
 		if err != nil {
 			if len(hosts) > 0 {
-				derr := clientHost.Delete(hosts, client.DefaultExecutionTimeout)
+				derr := hostClt.Delete(hosts, client.DefaultExecutionTimeout)
 				if derr != nil {
 					log.Errorf("failed to delete nodes after failure to expand cluster")
 				}
@@ -581,13 +548,13 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, public bool, req
 	}
 
 	// Now configure new nodes
-	err = c.foreman.configureNodesFromList(task, public, hosts)
+	err = c.foreman.configureNodesFromList(task, hosts)
 	if err != nil {
 		return nil, err
 	}
 
 	// At last join nodes to cluster
-	err = c.foreman.joinNodesFromList(task, public, hosts)
+	err = c.foreman.joinNodesFromList(task, hosts)
 	if err != nil {
 		return nil, err
 	}
@@ -706,7 +673,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) error {
 }
 
 // DeleteLastNode deletes the last Agent node added
-func (c *Controller) DeleteLastNode(task concurrency.Task, public bool, selectedMaster string) error {
+func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string) error {
 	if c == nil {
 		panic("Calling c.DeleteLastNode with c==nil!")
 	}
@@ -724,11 +691,7 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, public bool, selected
 	c.RLock(task)
 	err = c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
-		if public {
-			node = nodesV1.PublicNodes[len(nodesV1.PublicNodes)-1]
-		} else {
-			node = nodesV1.PrivateNodes[len(nodesV1.PrivateNodes)-1]
-		}
+		node = nodesV1.PrivateNodes[len(nodesV1.PrivateNodes)-1]
 		return nil
 	})
 	c.RUnlock(task)
@@ -743,7 +706,7 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, public bool, selected
 		}
 	}
 
-	return c.deleteNode(task, node, public, selectedMaster)
+	return c.deleteNode(task, node, selectedMaster)
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
@@ -760,20 +723,20 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 	}
 
 	var (
-		foundInPublic bool
-		node          *clusterpropsv1.Node
+		node *clusterpropsv1.Node
 	)
 
 	c.RLock(task)
 	err := c.Properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
-		foundInPublic, idx := contains(nodesV1.PublicNodes, hostID)
-		if foundInPublic {
-			node = nodesV1.PublicNodes[idx]
-		} else {
-			_, idx = contains(nodesV1.PrivateNodes, hostID)
-			node = nodesV1.PrivateNodes[idx]
+		var (
+			idx   int
+			found bool
+		)
+		if found, idx = contains(nodesV1.PrivateNodes, hostID); !found {
+			return utils.NotFoundError(fmt.Sprintf("failed to find node '%s'", hostID))
 		}
+		node = nodesV1.PrivateNodes[idx]
 		return nil
 	})
 	c.RUnlock(task)
@@ -788,11 +751,11 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 		}
 	}
 
-	return c.deleteNode(task, node, foundInPublic, selectedMaster)
+	return c.deleteNode(task, node, selectedMaster)
 }
 
 // deleteNode deletes the node specified by its ID
-func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, public bool, selectedMaster string) error {
+func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, selectedMaster string) error {
 	log.Debugf(">>> safescale.server.cluster.control.Controller::deleteNode(%s)", node.Name)
 	defer log.Debugf("<<< safescale.server.cluster.control.Controller::deleteNode(%s)", node.Name)
 
@@ -811,22 +774,12 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	err := c.UpdateMetadata(task, func() error {
 		return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 			nodesV1 := v.(*clusterpropsv1.Nodes)
-			if public {
-				_, idx := contains(nodesV1.PublicNodes, node.ID)
-				length := len(nodesV1.PublicNodes)
-				if idx < length-1 {
-					nodesV1.PublicNodes = append(nodesV1.PublicNodes[:idx], nodesV1.PublicNodes[idx+1:]...)
-				} else {
-					nodesV1.PublicNodes = nodesV1.PublicNodes[:idx]
-				}
+			length := len(nodesV1.PrivateNodes)
+			_, idx := contains(nodesV1.PrivateNodes, node.ID)
+			if idx < length-1 {
+				nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:idx], nodesV1.PrivateNodes[idx+1:]...)
 			} else {
-				length := len(nodesV1.PrivateNodes)
-				_, idx := contains(nodesV1.PrivateNodes, node.ID)
-				if idx < length-1 {
-					nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:idx], nodesV1.PrivateNodes[idx+1:]...)
-				} else {
-					nodesV1.PrivateNodes = nodesV1.PrivateNodes[:idx]
-				}
+				nodesV1.PrivateNodes = nodesV1.PrivateNodes[:idx]
 			}
 			return nil
 		})
@@ -841,11 +794,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 			derr := c.UpdateMetadata(task, func() error {
 				return c.Properties.LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
 					nodesV1 := v.(*clusterpropsv1.Nodes)
-					if public {
-						nodesV1.PublicNodes = append(nodesV1.PublicNodes, node)
-					} else {
-						nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
-					}
+					nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
 					return nil
 				})
 			})
@@ -857,7 +806,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 
 	// Leave node from cluster (ie leave Docker swarm), if selectedMaster isn't empty
 	if selectedMaster != "" {
-		err = c.foreman.leaveNodesFromList(task, []string{node.ID}, public, selectedMaster)
+		err = c.foreman.leaveNodesFromList(task, []string{node.ID}, selectedMaster)
 		if err != nil {
 			return err
 		}
@@ -912,23 +861,9 @@ func (c *Controller) Delete(task concurrency.Task) error {
 		_ = c.deleteMaster(tr.Task(), params.(string))
 	}
 
-	// Deletes the public nodes
-	list := c.ListNodeIDs(task, true)
+	// Deletes the nodes
+	list := c.ListNodeIDs(task)
 	length := len(list)
-	if length > 0 {
-		var subtasks []concurrency.Task
-		for i := 0; i < length; i++ {
-			subtask := concurrency.NewTask(task, deleteNodeFunc).Start(list[i])
-			subtasks = append(subtasks, subtask)
-		}
-		for _, s := range subtasks {
-			s.Wait()
-		}
-	}
-
-	// Deletes the private nodes
-	list = c.ListNodeIDs(task, false)
-	length = len(list)
 	if length > 0 {
 		var subtasks []concurrency.Task
 		for i := 0; i < length; i++ {
