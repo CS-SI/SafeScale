@@ -23,10 +23,6 @@ install_common_requirements() {
     setenforce 0
     sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config
 
-    # Configure Firewall to accept all traffic from/to the private network
-    iptables -t filter -A INPUT -s {{ .CIDR }} -j ACCEPT
-    sfSaveIptablesRules
-
     # Upgrade to last CentOS revision
     rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info && \
     yum install -y python-backports-ssl_match_hostname && \
@@ -51,32 +47,36 @@ install_common_requirements() {
 
     mkdir -p ~cladm/.local/bin && find ~cladm/.local -exec chmod 0770 {} \;
     cat >>~cladm/.bashrc <<-'EOF'
-pathremove() {
-        local IFS=':'
-        local NEWPATH
-        local DIR
-        local PATHVARIABLE=${2:-PATH}
-        for DIR in ${!PATHVARIABLE} ; do
-                if [ "$DIR" != "$1" ] ; then
-                  NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
-                fi
-        done
-        export $PATHVARIABLE="$NEWPATH"
-}
-pathprepend() {
-        pathremove $1 $2
-        local PATHVARIABLE=${2:-PATH}
-        export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
-}
-pathappend() {
-        pathremove $1 $2
-        local PATHVARIABLE=${2:-PATH}
-        export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
-}
-pathprepend $HOME/.local/bin
-pathappend /opt/mesosphere/bin
+        pathremove() {
+            local IFS=':'
+            local NEWPATH
+            local DIR
+            local PATHVARIABLE=${2:-PATH}
+            for DIR in ${!PATHVARIABLE} ; do
+                [ "$DIR" != "$1" ] && NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
+            done
+            export $PATHVARIABLE="$NEWPATH"
+        }
+        pathprepend() {
+            pathremove $1 $2
+            local PATHVARIABLE=${2:-PATH}
+            export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
+        }
+        pathappend() {
+            pathremove $1 $2
+            local PATHVARIABLE=${2:-PATH}
+            export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
+        }
+        pathprepend $HOME/.local/bin
+        pathappend /opt/mesosphere/bin
 EOF
     chown -R cladm:cladm ~cladm
+
+    for i in ~cladm/.hushlogin ~cladm/.cloud-warnings.skip; do
+        touch $i
+        chown root:cladm $i
+        chmod ug+r-wx,o-rwx $i
+    done
 
     # Disables installation of docker-python from yum and adds some requirements
     yum remove -y python-docker-py &>/dev/null
