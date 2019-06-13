@@ -24,9 +24,8 @@ feature:
         host: yes
         cluster:
             master: all
-            node:
-                private: all
-                public: all
+            node: all
+
     install:
         yum:
             package: mpich
