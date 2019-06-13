@@ -156,12 +156,9 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, n
 	script := ""
 	data := map[string]interface{}{}
 	switch nodeType {
-	case NodeType.Gateway:
 	case NodeType.Master:
 		script = "ohpc_install_master.sh"
-	case NodeType.PrivateNode:
-		fallthrough
-	case NodeType.PublicNode:
+	case NodeType.Node:
 		script = "ohpc_install_node.sh"
 	}
 

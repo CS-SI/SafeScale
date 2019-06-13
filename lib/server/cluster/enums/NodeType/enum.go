@@ -26,8 +26,6 @@ const (
 	Gateway Enum = iota
 	// Master to represent a master node
 	Master
-	// PrivateNode to represent a private agent
-	PrivateNode
-	// PublicNode to represent a public agent
-	PublicNode
+	// Node to represent a working node
+	Node
 )
