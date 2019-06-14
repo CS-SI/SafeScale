@@ -106,7 +106,8 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	if operatorUsernameIf, ok := computeParams["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
-			panic("OperatorUsername is empty !")
+			log.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+			operatorUsername = resources.DefaultUser
 		}
 	}
 
