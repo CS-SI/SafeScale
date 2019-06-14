@@ -26,3 +26,23 @@ func Test_RemoteDesktop(t *testing.T) {
 func Test_ReverseProxy(t *testing.T) {
 	integration_tests.ReverseProxy(t, Providers.OVH)
 }
+
+func Test_Metricbeat(t *testing.T) {
+	integration_tests.Metricbeat(t, Providers.OVH)
+}
+
+func Test_Filebeat(t *testing.T) {
+	integration_tests.Filebeat(t, Providers.OVH)
+}
+
+func Test_NvidiaDocker(t *testing.T) {
+	integration_tests.NvidiaDocker(t, Providers.OVH)
+}
+
+func Test_ProxyCacheClient(t *testing.T) {
+	integration_tests.ProxyCacheClient(t, Providers.OVH)
+}
+
+func Test_ProxyCacheServer(t *testing.T) {
+	integration_tests.ProxyCacheServer(t, Providers.OVH)
+}
