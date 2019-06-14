@@ -49,6 +49,21 @@ ifeq ($(findstring :,$(GOBIN)),:)
 GOBIN=$(HOME)/go/bin
 endif
 
+# Handling multiple gopath: use $(HOME)/go by default
+ifeq ($(findstring :,$(GOPATH)),:)
+GOINCLUDEPATH=$(HOME)/go
+else
+GOINCLUDEPATH=$(GOPATH)
+endif
+
+ifeq ($(strip $(GOPATH)),)
+GOINCLUDEPATH=$(HOME)/go
+endif
+
+ifneq ($(OS),Windows_NT)
+PATH = $(HOME)/.local/bin:$(shell printenv PATH)
+endif
+
 ifneq ($(OS),Windows_NT)
 ifneq ($(findstring $(GOBIN),$(PATH)),$(GOBIN))
 $(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
