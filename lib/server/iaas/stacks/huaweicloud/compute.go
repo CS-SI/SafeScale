@@ -201,7 +201,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 		} else {
 			userData = string(opts.UserData)
 		}
-		log.Debugf("Base64 encoded userdata size = %d bytes", len(userData))
+		// log.Debugf("Base64 encoded userdata size = %d bytes", len(userData))
 		b["user_data"] = &userData
 	}
 
@@ -349,16 +349,11 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		diskSize = 400
 	}
 
-	// Select useable availability zone, the first one in the list
-	azList, err := s.ListAvailabilityZones(false)
+	// Select useable availability zone
+	az, err := s.SelectedAvailabilityZone()
 	if err != nil {
 		return nil, userData, err
 	}
-	var az string
-	for az = range azList {
-		break
-	}
-	log.Debugf("Selected Availability Zone: '%s'", az)
 
 	// Defines boot disk
 	bootdiskOpts := blockDevice{

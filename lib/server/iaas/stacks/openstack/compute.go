@@ -752,15 +752,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	}
 
 	// Select useable availability zone, the first one in the list
-	azList, err := s.ListAvailabilityZones(false)
+	az, err := s.SelectedAvailabilityZone()
 	if err != nil {
 		return nil, userData, err
 	}
-	var az string
-	for az = range azList {
-		break
-	}
-	log.Debugf("Selected Availability Zone: '%s'", az)
 
 	// Sets provider parameters to create host
 	userDataPhase1, err := userData.Generate("phase1")
@@ -907,6 +902,23 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 
 	log.Infoln(msgSuccess)
 	return host, userData, nil
+}
+
+// SelectedAvailabilityZone returns the selected availability zone
+func (s *Stack) SelectedAvailabilityZone() (string, error) {
+	if s.selectedAvailabilityZone == "" {
+		azList, err := s.ListAvailabilityZones(false)
+		if err != nil {
+			return "", err
+		}
+		var az string
+		for az = range azList {
+			break
+		}
+		s.selectedAvailabilityZone = az
+		log.Debugf("Selected Availability Zone: '%s'", az)
+	}
+	return s.selectedAvailabilityZone, nil
 }
 
 // WaitHostReady waits an host achieve ready state
