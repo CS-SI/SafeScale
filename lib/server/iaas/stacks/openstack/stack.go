@@ -107,6 +107,9 @@ type Stack struct {
 
 	// versions contains the last version supported for each service
 	versions map[string]string
+
+	// selectedAvailabilityZone contains the last selected availability zone chosen
+	selectedAvailabilityZone string
 }
 
 // New authenticates and returns a Stack pointer
