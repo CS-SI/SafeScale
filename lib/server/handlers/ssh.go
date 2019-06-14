@@ -88,7 +88,8 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	if userIf, ok := cfg.Get("OperatorUsername"); ok {
 		user = userIf.(string)
 		if user == "" {
-			panic("OperatorUsername is empty !")
+			log.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+			user = resources.DefaultUser
 		}
 	}
 

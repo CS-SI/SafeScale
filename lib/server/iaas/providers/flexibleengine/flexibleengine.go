@@ -18,6 +18,7 @@ package flexibleengine
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"regexp"
 	"strings"
 
@@ -93,7 +94,8 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
-			panic("OperatorUsername is empty !")
+			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+			operatorUsername = resources.DefaultUser
 		}
 	}
 	whitelistTemplatePattern, _ := compute["WhitelistTemplateRegexp"].(string)
