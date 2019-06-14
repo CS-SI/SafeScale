@@ -50,6 +50,7 @@ feature:
                             RUN luarocks install kong-oidc \
                              && luarocks install kong-prometheus-plugin
                             RUN mkdir -p /etc/kong/includes
+                            RUN setcap CAP_NET_BIND_SERVICE=+ep /usr/local/openresty/nginx/sbin/nginx
                             EOF
 
                             cat >${SF_ETCDIR}/kong/konga.userdb.data <<-EOF
@@ -128,8 +129,6 @@ feature:
                                         test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
                                         interval: 5s
                                         retries: 10
-                                    sysctls:
-                                        net.ipv4.ip_unprivileged_port_start: 0
 
                                 gui:
                                     image: pantsel/konga
