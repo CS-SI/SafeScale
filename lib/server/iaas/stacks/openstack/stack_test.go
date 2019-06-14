@@ -91,66 +91,99 @@ func Test_Template(t *testing.T) {
 
 func Test_ListImages(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.ListImages(t)
 }
 
 func Test_ListHostTemplates(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.ListHostTemplates(t)
 }
 
 func Test_CreateKeyPair(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.CreateKeyPair(t)
 }
 
 func Test_GetKeyPair(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.GetKeyPair(t)
 }
 
 func Test_ListKeyPairs(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.ListKeyPairs(t)
 }
 
 func Test_Networks(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.Networks(t)
 }
 
 func Test_Hosts(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.Hosts(t)
 }
 
 func Test_StartStopHost(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.StartStopHost(t)
 }
 
 func Test_Volume(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.Volume(t)
 }
 
 func Test_VolumeAttachment(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.VolumeAttachment(t)
 }
 
 func Test_Containers(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.Containers(t)
 }

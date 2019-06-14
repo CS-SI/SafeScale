@@ -37,6 +37,8 @@ func getTester() (*tests.ServiceTester, error) {
 	if tester == nil {
 		the_service, err := getService()
 		if err != nil {
+			tester = nil
+			the_service = nil
 			return nil, err
 		}
 		tester = &tests.ServiceTester{
@@ -49,12 +51,12 @@ func getTester() (*tests.ServiceTester, error) {
 
 func getService() (*iaas.Service, error) {
 	if service == nil {
-		tenant_name := "TestLocal"
+		tenant_name := ""
 		if tenant_override := os.Getenv("TEST_LOCAL"); tenant_override != "" {
 			tenant_name = tenant_override
 		}
 		service, err := iaas.UseService(tenant_name)
-		if err != nil {
+		if err != nil || service == nil {
 			return nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name))
 		}
 		tester = &tests.ServiceTester{
@@ -67,18 +69,27 @@ func getService() (*iaas.Service, error) {
 
 func Test_ListImages(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.ListImages(t)
 }
 
 func Test_ListHostTemplates(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.ListHostTemplates(t)
 }
 
 func Test_CreateKeyPair(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.CreateKeyPair(t)
 }
@@ -99,30 +110,45 @@ func Test_CreateKeyPair(t *testing.T) {
 
 func Test_Networks(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.Networks(t)
 }
 
 func Test_Hosts(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.Hosts(t)
 }
 
 func Test_StartStopHost(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.StartStopHost(t)
 }
 
 func Test_Volume(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.Volume(t)
 }
 
 func Test_VolumeAttachment(t *testing.T) {
 	tt, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tt.VolumeAttachment(t)
 }

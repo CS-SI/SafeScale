@@ -52,10 +52,18 @@ func GetMockService(t *testing.T, tenant string) (*iaas.Service, error) {
 
 func getMockableService(t *testing.T) (*tests.ServiceTester, *mocks.MockProvider, error) {
 	if mock_tester == nil {
-		tenant_name := "TestOvh"
+		skip := false
+		tenant_name := ""
 		if tenant_override := os.Getenv("TEST_OVH"); tenant_override != "" {
 			tenant_name = tenant_override
+		} else {
+			skip = true
 		}
+
+		if skip {
+			t.Skip("Not ready yet")
+		}
+
 		service, err := GetMockService(t, tenant_name)
 		if err != nil {
 			return nil, nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name))
