@@ -5,7 +5,7 @@ Features allow user to install various tools on a single host or a cluster.
 The engine analyzes the feature .yaml file and cuts the action in steps. It tries to parallelize as much as possible the execution of these steps.<br>
 For example, when all the masters of a cluster are targeted, the engine executes each step on all hosts in parallel.
 
-## Embededd Features
+## Embedded Features
 
 Here is a list of features that are embedded with Safescale :
 
@@ -21,7 +21,7 @@ feature | description | specificities
 `nvidiadocker` |  Install nvidia-docker, allowing nvidia driver to works in a docker container   |  On a cluster it will only be applied to nodes
 `proxycache-client` |  Install a squid proxyCache client    |  Only available for hosts 
 `proxycache-server` |  Install a squid proxyCache server    |  Only available for hosts
-`remotedesktop` |  Install a remotedesktop using guacamole with tigerVNC and xfce desktop   |  On a cluster a remote desktop will be installed on all masters <br>Need parameters: <br> `Username="existing_user"` <br> `Password="user_password"`
+`remotedesktop` |  Install a remote desktop using guacamole with tigerVNC and xfce desktop   |  On a cluster a remote desktop will be installed on all masters <br>Need parameters: <br> `Username="existing_user"` <br> `Password="user_password"`
 `reverseproxy` |  Install a kong reverse proxy  | Only available for hosts (usually a gateway)
 `spark` |  Install and configure a spark cluster   |  Only available on a kubernetes or dcos flavored cluster
 
