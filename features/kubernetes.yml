@@ -171,7 +171,7 @@ feature:
                                 debian|ubuntu)
                                     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
                                     cat >/etc/apt/sources.list.d/kubernetes.list <<-EOF
-                                        deb https://apt.kubernetes.io/ kubernetes-xenial main
+                            deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
                                     sfApt update && sfApt install -y kubelet kubeadm kubectl || exit 192
                                     apt-mark hold kubelet kubeadm kubectl
@@ -179,14 +179,14 @@ feature:
 
                                 centos|redhat)
                                     cat >/etc/yum.repos.d/kubernetes.repo <<-EOF
-                                        [kubernetes]
-                                        name=Kubernetes
-                                        baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
-                                        enabled=1
-                                        gpgcheck=1
-                                        repo_gpgcheck=1
-                                        gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
-                                        exclude=kube*
+                            [kubernetes]
+                            name=Kubernetes
+                            baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+                            enabled=1
+                            gpgcheck=1
+                            repo_gpgcheck=1
+                            gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+                            exclude=kube*
                             EOF
 
                                     yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes || exit 192
@@ -213,8 +213,8 @@ feature:
                                 redhat|centos)
                                     sfRetry 5m 5 yum install -y ebtables socat || exit 195
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
-                                        net.bridge.bridge-nf-call-ip6tables = 1
-                                        net.bridge.bridge-nf-call-iptables = 1
+                            net.bridge.bridge-nf-call-ip6tables = 1
+                            net.bridge.bridge-nf-call-iptables = 1
                             EOF
                                     modprobe br_netfilter &>/dev/null
                                     sysctl --system
@@ -288,11 +288,11 @@ feature:
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || exit 199
                             cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -1) || exit 200
 
-                            cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'                            
-                                mkdir -p ~{{.Username}}/.kube
-                                cp -f /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
-                                chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
-                                chmod -R go-rwx ~{{.Username}}/.kube
+                            cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'
+                            mkdir -p ~{{.Username}}/.kube
+                            cp -f /etc/kubernetes/admin.conf ~{{.Username}}/.kube/config
+                            chown -R {{.Username}}:{{.Username}} ~{{.Username}}/.kube && \
+                            chmod -R go-rwx ~{{.Username}}/.kube
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
@@ -332,11 +332,10 @@ feature:
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
                                     sfFirewallReload
                                     ;;
-                                calico)
+                                calico) # Untested yet...
                                     sfKubectl apply -f https://gist.githubusercontent.com/joshrosso/ed1f5ea5a2f47d86f536e9eee3f1a2c2/raw/dfd95b9230fb3f75543706f3a95989964f36b154/calico-3.5.yaml
                                     ;;
-                                canal)
-                                    # Untested yet...
+                                canal) # Untested yet...
                                     sfKubectl apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/canal/canal.yaml || exit 207
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
                                     sfFirewallReload
@@ -405,7 +404,28 @@ feature:
                             # Allows pods to start on master if there is only one master or if it's explicitely requested
                             [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master-
                             # adds Kubernetes Dashboard
-                            sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/src/deploy/recommended/kubernetes-dashboard.yaml || exit 218
+                            sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml || exit 218
+
+                            # cat <<EOF | kubectl apply -f -
+                            # apiVersion: v1
+                            # kind: ServiceAccount
+                            # metadata:
+                            #   name: cladm
+                            #   namespace: kube-system
+                            # ---
+                            # apiVersion: rbac.authorization.k8s.io/v1
+                            # kind: ClusterRoleBinding
+                            # metadata:
+                            #   name: cladm
+                            # roleRef:
+                            #   apiGroup: rbac.authorization.k8s.io
+                            #   kind: ClusterRole
+                            #   name: cluster-admin
+                            # subjects:
+                            #   - kind: ServiceAccount
+                            #     name: cladm
+                            #     namespace: kube-system
+                            # EOF
                             exit 0
 
             remove:
