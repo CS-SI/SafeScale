@@ -40,6 +40,8 @@ func getTester() (*tests.ServiceTester, error) {
 	if tester == nil {
 		the_service, err := getService()
 		if err != nil {
+			tester = nil
+			the_service = nil
 			return nil, err
 		}
 		tester = &tests.ServiceTester{
@@ -52,14 +54,14 @@ func getTester() (*tests.ServiceTester, error) {
 
 func getService() (*iaas.Service, error) {
 	if service == nil {
-		tenant_name := "TestOvh"
+		tenant_name := ""
 		if tenant_override := os.Getenv("TEST_OVH"); tenant_override != "" {
 			tenant_name = tenant_override
 		}
 		var err error
 		service, err = iaas.UseService(tenant_name)
-		if err != nil {
-			return nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%s], check your environment variables and your Safescale configuration files", tenant_name))
+		if err != nil || service == nil {
+			return nil, errors.New(fmt.Sprintf("You must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenant_name))
 		}
 	}
 	return service, nil
@@ -68,6 +70,9 @@ func getService() (*iaas.Service, error) {
 // Test that we have templates, and each template has 1 or more cores
 func Test_GetTemplates(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tpls, err := cli.Service.ListTemplates(false)
 	assert.NoError(t, err)
@@ -82,6 +87,9 @@ func Test_GetTemplates(t *testing.T) {
 // Test that we have templates with GPUs
 func Test_GetGpuTemplates(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tpls, err := cli.Service.ListTemplates(true)
 	assert.NoError(t, err)
@@ -114,6 +122,9 @@ func TemplateExists(name string) bool {
 
 func Test_GetGpuTemplate(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	tpls, err := cli.Service.ListTemplates(false)
 	assert.NoError(t, err)
@@ -133,12 +144,18 @@ func Test_GetGpuTemplate(t *testing.T) {
 
 func Test_ListImages(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.ListImages(t)
 }
 
 func Test_ListHostTemplates(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.ListHostTemplates(t)
 	tpls, err := cli.Service.ListTemplates(false)
@@ -152,66 +169,99 @@ func Test_ListHostTemplates(t *testing.T) {
 
 func Test_CreateKeyPair(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.CreateKeyPair(t)
 }
 
 func Test_CreateKeyPairAndLeave(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.CreateKeyPairAndLeaveItThere(t)
 }
 
 func Test_GetKeyPair(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.GetKeyPair(t)
 }
 
 func Test_ListKeyPairs(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.ListKeyPairs(t)
 }
 
 func Test_Networks(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.Networks(t)
 }
 
 func Test_NetworkCreation(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.CreateNetworkTest(t)
 }
 
 func Test_Hosts(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.Hosts(t)
 }
 
 func Test_StartStopHost(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.StartStopHost(t)
 }
 
 func Test_Volume(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.Volume(t)
 }
 
 func Test_VolumeAttachment(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.VolumeAttachment(t)
 }
 
 func Test_Containers(t *testing.T) {
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.Containers(t)
 }
@@ -226,6 +276,9 @@ func Test_Containers(t *testing.T) {
 func Test_GetImage(t *testing.T) {
 	// TODO Implement Test
 	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
 	require.Nil(t, err)
 	cli.GetImage(t)
 }

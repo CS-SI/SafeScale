@@ -44,7 +44,10 @@ func EnvSetup(t *testing.T, provider Providers.Enum) {
 	key := keyFromProvider(provider)
 	require.NotEmpty(t, key)
 
-	RunOnlyInIntegrationTest(key)
+	err := RunOnlyInIntegrationTest(key)
+	if err != nil {
+		t.Skip(err)
+	}
 
 	safescaledLaunched, err := IsSafescaledLaunched()
 	if !safescaledLaunched {

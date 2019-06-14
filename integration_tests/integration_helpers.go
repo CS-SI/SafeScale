@@ -69,8 +69,9 @@ func GetOutput(command string) (string, error) {
 }
 
 //RunOnlyInIntegrationTest ...
-func RunOnlyInIntegrationTest(key string) {
+func RunOnlyInIntegrationTest(key string) error {
 	if tenant_override := os.Getenv(key); tenant_override == "" {
-		panic("This only runs as an integration test")
+		return fmt.Errorf("This only runs as an integration test")
 	}
+	return nil
 }
