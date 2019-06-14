@@ -60,6 +60,9 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	operatorUsername := resources.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
+		if operatorUsername == "" {
+			panic("OperatorUsername is empty !")
+		}
 	}
 
 	authOptions := stacks.AuthenticationOptions{
