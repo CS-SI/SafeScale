@@ -43,6 +43,7 @@ func init() {
 		filebeatFeature(),
 		helmFeature(),
 		sparkFeature(),
+		keycloakFeature(),
 	}
 
 	for _, item := range allEmbedded {
