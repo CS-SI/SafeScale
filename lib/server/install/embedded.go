@@ -360,6 +360,21 @@ func filebeatFeature() *Feature {
 	}
 }
 
+// keycloakFeature ...
+func keycloakFeature() *Feature {
+	name := "keycloak"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
 // ListAvailables returns an array of availables features with the useable installers
 // func ListAvailables() []string {
 // 	var output []string
