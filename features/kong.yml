@@ -18,11 +18,12 @@
 feature:
     suitableFor:
         host: yes
-        cluster: no
+        cluster: all
     requirements:
         features:
             - docker
             - docker-compose
+
     install:
         bash:
             check:
@@ -30,7 +31,10 @@ feature:
                 steps:
                     curl:
                         targets:
-                            hosts: yes
+                            gateways: all
+                            hosts: no
+                            masters: no
+                            nodes: no
                         run: |
                             curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep "HTTP/1.1 200 OK" &>/dev/null
 
@@ -40,11 +44,14 @@ feature:
                     compose:
                         timeout: 10
                         targets:
-                            hosts: yes
+                            gateways: all
+                            hosts: no
+                            masters: no
+                            nodes: no
                         run: |
-                            mkdir -p ${SF_VARDIR}/reverseproxy/postgresql ${SF_ETCDIR}/kong/includes
+                            mkdir -p ${SF_VARDIR}/kong/postgresql ${SF_ETCDIR}/kong/includes
 
-                            cat >${SF_TMPDIR}/Dockerfile_reverseproxy <<-'EOF'
+                            cat >${SF_ETCDIR}/kong/Dockerfile <<-'EOF'
                             FROM kong:1.1
                             RUN apk update && apk add git unzip
                             RUN luarocks install kong-oidc \
@@ -52,6 +59,13 @@ feature:
                             RUN mkdir -p /etc/kong/includes
                             RUN setcap CAP_NET_BIND_SERVICE=+ep /usr/local/openresty/nginx/sbin/nginx
                             EOF
+
+                            {{ if .ClusterFlavor }}
+                            TAG=kong4safescale
+                            {{ else }}
+                            TAG=kong
+                            {{ end }}
+                            docker build -t $TAG ${SF_ETCDIR}/kong 
 
                             cat >${SF_ETCDIR}/kong/konga.userdb.data <<-EOF
                             module.exports = [
@@ -69,16 +83,28 @@ feature:
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/kong/konga.userdb.data
 
-                            cat >${SF_ETCDIR}/kong/reverseproxy.compose.yml <<-EOF
+                            DB_PASSWORD=$(sfRandomString 16 "[:alnum:]")
+
+                            {{ if .ClusterFlavor }}
+                            IMAGE=kong4safescale
+                            NET_PREFIX=kong4safescale
+                            {{ else }}
+                            IMAGE=kong
+                            NET_PREFIX=kong
+                            {{ end}}
+                            cat >${SF_ETCDIR}/kong/docker-compose.yml <<-EOF
                             version: '2.1'
                             services:
                                 db:
                                     image: postgres:9
                                     environment:
-                                        - POSTGRES_USER=kong
                                         - POSTGRES_DB=kong
+                                        - POSTGRES_USER=kong
+                                        - POSTGRES_PASSWORD="${DB_PASSWORD}"
                                     volumes:
-                                        - ${SF_VARDIR}/reverseproxy/postgresql:/var/lib/postgresql/data
+                                        - ${SF_VARDIR}/kong/postgresql:/var/lib/postgresql/data
+                                    networks:
+                                        db_net:
                                     restart: always
                                     healthcheck:
                                         test: ["CMD", "pg_isready", "-U", "kong"]
@@ -88,23 +114,26 @@ feature:
 
                                 migration:
                                     image: kong:1.1
-                                    depends_on:
-                                        db:
-                                            condition: service_healthy
                                     environment:
                                         - KONG_DATABASE=postgres
                                         - KONG_PG_HOST=db
+                                        - KONG_PG_USER=kong
+                                        - KONG_PG_PASSWORD="${DB_PASSWORD}"
                                     command: kong migrations bootstrap # up
+                                    networks:
+                                        db_net:
+                                    depends_on:
+                                        db:
+                                            condition: service_healthy
 
                                 proxy:
-                                    build:
-                                        context: ${SF_TMPDIR}
-                                        dockerfile: Dockerfile_reverseproxy
-                                    image: kong4safescale
+                                    image: ${IMAGE}
                                     environment:
                                         - KONG_DATABASE=postgres
                                         - KONG_PG_HOST=db
                                         - KONG_PG_DATABASE=kong
+                                        - KONG_PG_USER=kong
+                                        - KONG_PG_PASSWORD="${DB_PASSWORD}"
                                         - KONG_PROXY_ACCESS_LOG=/dev/stdout
                                         - KONG_ADMIN_ACCESS_LOG=/dev/stdout
                                         - KONG_PROXY_ERROR_LOG=/dev/stderr
@@ -115,6 +144,10 @@ feature:
                                     volumes:
                                         - ${SF_ETCDIR}/kong/kong.conf:/etc/kong/kong.conf:ro
                                         - ${SF_ETCDIR}/kong/includes:/etc/kong/includes:ro
+                                    networks:
+                                        external_net:
+                                        db_net:
+                                        svc_net:
                                     ports:
                                         - "443:443"
                                         - "127.0.0.1:8444:8444"
@@ -132,20 +165,21 @@ feature:
 
                                 gui:
                                     image: pantsel/konga
-                                    ports:
-                                        - "{{.HostIP}}:1337:1337"
                                     volumes:
                                         - ${SF_ETCDIR}/kong/konga.userdb.data:/usr/local/etc/userdb.data:ro
                                     environment:
-                                        - TOKEN_SECRET=$(sfRandomString 32 [:alnum:])
+                                        - TOKEN_SECRET="$(sfRandomString 32 [:alnum:])"
                                         - DB_ADAPTER=postgres
-                                        - DB_HOST=db
-                                        - DB_PORT=5432
-                                        - DB_USER=kong
-                                        #- DB_PASSWORD=DgmY4vh6H6fm
                                         - DB_DATABASE=kong-gui
+                                        - DB_USER=kong
+                                        - DB_PASSWORD="${DB_PASSWORD}"
                                         - NODE_ENV=production
                                         - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
+                                    networks:
+                                        external_net:
+                                        db_net:
+                                    ports:
+                                        - "{{.HostIP}}:1337:1337"
                                     restart: always
                                     depends_on:
                                         db:
@@ -153,8 +187,18 @@ feature:
                                         proxy:
                                             condition: service_started
 
+                            networks:
+                                external_net:
+                                    name: "${NET_PREFIX}_external_net"
+                                    driver: bridge
+                                db_net:
+                                    name: "${NET_PREFIX}_db_net"
+                                    internal: true
+                                svc_net:
+                                    name: "${NET_PREFIX}_svc_net"
+                                    internal: true
                             EOF
-                            chmod go-rwx ${SF_ETCDIR}/kong/reverseproxy.compose.yml
+                            chmod go-rwx ${SF_ETCDIR}/kong/docker-compose.yml
 
                             cat >${SF_ETCDIR}/kong/kong.conf <<-EOF
                             stream_listen = 0.0.0.0:6442
@@ -162,9 +206,13 @@ feature:
                             anonymous_reports = off
                             EOF
 
-                            sudo docker-compose -f ${SF_ETCDIR}/kong/reverseproxy.compose.yml -p reverseproxy up -d
-                            RETRY=0; until docker ps --all | grep reverseproxy_migration_1 | grep Exited || ((RETRY++ >= 60)); do sleep 5; done && sleep 5
-                            rm -f ${SF_TMPDIR}/Dockerfile_reverseproxy
+                            {{ if .ClusterFlavor }}
+                            OPTIONS="-p long4safescale"
+                            {{ else }}
+                            OPTIONS=
+                            {{ end }}
+                            sudo docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS up -d
+                            sfRetry 5m 5 "docker ps --all | grep ${NET_PREFIX}_migration_1 | grep Exited" || exit 
                             exit 0
 
                     firewall:
@@ -188,7 +236,12 @@ feature:
                         targets:
                             hosts: yes
                         run: |
-                            sudo docker-compose -f ${SF_ETCDIR}/reverseproxy.compose.yml -p reverseproxy rm --stop -v --force || exit 513
-                            rm -rf ${SF_ETCDIR}/reverseproxy.compose.yml ${SF_VARDIR}/reverseproxy
+                            {{ if .ClusterFlavor }}
+                            OPTIONS="-p long4safescale"
+                            {{ else }}
+                            OPTIONS=
+                            {{ end }}
+                            sudo docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS rm --stop -v --force || exit 513
+                            rm -rf ${SF_ETCDIR}/kong/docker-compose.yml ${SF_VARDIR}/kong
 
 ...
