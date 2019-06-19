@@ -19,8 +19,15 @@ feature:
     suitableFor:
         host: yes
         cluster: all
+    requirements:
+        features:
+            - elassandra
+            - kibana
     parameters:
-        - LogstashSocket
+        - ElasticsearchPort=9200
+        - ElasticsearchHost=localhost
+        - KibanaURL=http://localhost:5601/
+    
     install:
         bash:
             check:
@@ -32,19 +39,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            case $LINUX_KIND in
-                                debian|ubuntu)
-                                    systemctl status filebeat.service
-                                    ;;
-                                centos|rhel)
-                                    echo "TODO"
-                                    exit 4224
-                                    ;;
-                                *)
-                                    echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
-                                    ;;
-                            esac
+                            sfService status filebeat
 
             add:
                 pace: install,config,start
@@ -58,20 +53,33 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
-                                    sfWaitForApt && apt-get install -y apt-transport-https
-                                    grep "deb https://artifacts.elastic.co/packages/6.x/apt stable main" /etc/apt/sources.list.d/elastic-6.x.list >/dev/null 2>&1 || \
-                                    echo "deb https://artifacts.elastic.co/packages/6.x/apt stable main" | tee -a /etc/apt/sources.list.d/elastic-6.x.list
-                                    sfWaitForApt && apt-get update
-                                    sfWaitForApt && apt-get install -y filebeat
+                                    if [ ! -f /etc/apt/sources.list.d/elastic-7.list ]; then
+                                        wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+                                        sfApt install -qy apt-transport-https
+                                        echo "deb https://artifacts.elastic.co/packages/oss-7.x/apt stable main" >/etc/apt/sources.list.d/elastic-7.list
+                                    fi
+                                    sfApt update
+                                    sfApt install -y filebeat || exit 192
                                     ;;
                                 centos|rhel)
-                                    echo "TODO"
-                                    exit 4224
+                                    if [ ! -f /etc/yum.repos.d/elastic-7.repo ]; then
+                                        cat >/etc/yum.repos.d/elastic-7.repo <<-'EOF'
+                            [elastic-7.x]
+                            name=Elastic repository for 7.x OSS packages
+                            baseurl=https://artifacts.elastic.co/packages/oss-7.x/yum
+                            gpgcheck=1
+                            gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+                            enabled=1
+                            autorefresh=1
+                            type=rpm-md
+                            EOF
+                                        rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
+                                    fi
+                                    yum install -y filebeat || exit 192
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 195
+                                    exit 193
                                     ;;
                             esac
                             exit 0
@@ -82,40 +90,42 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            HOSTNAME=$(hostname)
-                            IFS='-' read -ra hostname_parts <<< ${HOSTNAME}
-                            function join_by { local IFS="$1"; shift; echo "$*"; }
+                            mkdir -p /etc/filebeat/modules.d
+                            cat >/etc/filebeat/filebeat.yml <<-EOF
+                            setup.dashboards:
+                              enabled: true
+                            setup.kibana:
+                            {{- if .ClusterFlavor }}
+                                host: "https://{{.GatewayIP}/services/kibana/"
+                            {{ else }}
+                                host: "http://{{.KibanaUrl}}"
+                            {{ end -}}
 
-                            CLUSTER_NAME=$(join_by - ${hostname_parts[@]:1:${#hostname_parts[@]}-3})
-                            case "${hostname_parts[-2]}" in
-                                master)
-                                    DOCKER_NAME="master-${hostname_parts[-1]}"
-                                    ;;
-                                node)
-                                    DOCKER_NAME="worker-${hostname_parts[-1]}"
-                                    ;;
-                                *)
-                                    CLUSTER_NAME="???"
-                                    DOCKER_NAME="???"
-                                    ;;
-                            esac
+                            filebeat.config.modules:
+                              path: ${path.config}/modules.d/*.yml
+                              reload.enabled: true
+                              reload.period: 10s
 
-                            mkdir -p /etc/filebeat
-                            cat >/etc/filebeat/filebeat.yml << 'EOF'
                             filebeat.inputs:
                               - type: log
                                 paths:
-                                  - /democo3d/local/logs/spark3d.log
+                                  - /var/log/*.log
+                                  - /var/log/*/*.log
 
-                            output.logstash:
-                              hosts: ["{{.LogstashSocket}}"]
+                            output.elasticsearch:
+                            {{- if .ClusterFlavor }}
+                              hosts:
+                              {{- range .MasterIPs }}
+                                - "{{.}}"
+                              {{ end -}}
+                            {{ else }}
+                              hosts:
+                                - "{{.HostIP}}"
+                            {{ end -}}
+                              protocol: http
+                              port: {{.ElasticsearchPort}}
 
-                            fields:
-                              cluster_name: ${CLUSTER_NAME}
-                              docker_name: ${DOCKER_NAME}
-                              hostname: ${HOSTNAME}
-
-                            tags: ["democo3d"]
+                            tags: ["safescale"]
 
                             logging.to_files: true
                             logging.files:
@@ -124,10 +134,6 @@ feature:
                             logging.selectors: ["*"]
                             logging.to_syslog: false
                             EOF
-                            sed -i -e "s/\${CLUSTER_NAME}/$CLUSTER_NAME/g" /etc/filebeat/filebeat.yml
-                            sed -i -e "s/\${DOCKER_NAME}/$DOCKER_NAME/g" /etc/filebeat/filebeat.yml
-                            sed -i -e "s/\${HOSTNAME}/$HOSTNAME/g" /etc/filebeat/filebeat.yml
-
                             exit 0
 
                     start:
@@ -136,14 +142,23 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            systemctl daemon-reload
-                            systemctl start filebeat || exit 196
+                            sfService enable filebeat
+                            sfService start filebeat || exit 196
                             exit 0
 
             remove:
-                pace: filebeat
+                pace: stop,remove
                 steps:
-                    filebeat:
+                    stop:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            sfService stop filebeat
+                            sfService disable filebeat
+
+                    remove:
                         targets:
                             hosts: yes
                             masters: all
@@ -151,30 +166,27 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    systemctl stop filebeat
-                                    systemctl disable filebeats
-                                    sfWaitForApt && apt remove -y filebeat
-                                    sfWaitForApt && apt purge -y filebeat
-                                    rm -r /etc/systemd/system/filebeat.service.d/
+                                    sfApt remove -y filebeat
+                                    sfApt purge -y filebeat
                                     ;;
                                 centos|rhel)
-                                    echo "TODO"
-                                    exit 4224
+                                    yum remove -y filebeat
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
                                     exit 4224
                                     ;;
                             esac
+                            rm -rf /etc/filebeat
 
     service:
         start: |
-            systemctl start filebeat
+            sfService start filebeat
 
         stop: |
-            systemctl stop filebeat
+            sfService stop filebeat
 
         state: |
-            systemctl status filebeat
+            sfService status filebeat
 
 ...

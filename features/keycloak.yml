@@ -18,7 +18,7 @@
 feature:
     suitableFor:
         host: yes
-        cluster: no
+        cluster: all
     requirements:
         features:
             - docker
@@ -30,17 +30,23 @@ feature:
                 steps:
                     curl:
                         targets:
+                            gateways: any
                             hosts: yes
+                            masters: no
+                            nodes: no
                         run: |
                             curl -Ssl -I -k https://{{ .HostIP }}:8443/auth/ 2>&1 | grep "HTTP/2 200" &>/dev/null
 
             add:
-                pace: compose
+                pace: config,build,compose,ready
                 steps:
-                    compose:
+                    config:
                         timeout: 10
                         targets:
+                            gateways: all
                             hosts: yes
+                            masters: no
+                            nodes: no
                         run: |
                             mkdir -p ${SF_ETCDIR}/keycloak ${SF_VARDIR}/keycloak/postgresql
 
@@ -702,6 +708,14 @@ feature:
                             </server>
                             EOF
 
+                    build:
+                        timeout: 10
+                        targets:
+                            gateways: all
+                            hosts: yes
+                            masters: no
+                            nodes: no
+                        run: |
                             cat >${SF_ETCDIR}/keycloak/Dockerfile <<-'EOF'
                             FROM jboss/keycloak:4.8.3.Final
 
@@ -710,8 +724,8 @@ feature:
 
                             # Generates SSL certificates
                             RUN openssl req -x509 -newkey rsa:4096 -keyout safescale_key.pem -out safescale_cert.pem -days 90 -nodes -subj "/C=FR/ST=France/O=CS-SI/CN={{ .HostIP }}" \
-                              && openssl pkcs12 -export -name server-cert -in safescale_cert.pem -inkey safescale_key.pem -out safescale_keystore.p12 -password pass:safescale \
-                              && keytool -importkeystore -destkeystore safescale.jks -srckeystore safescale_keystore.p12 -srcstoretype pkcs12 -alias server-cert -storepass safescale -keypass safescale -srcstorepass safescale
+                             && openssl pkcs12 -export -name server-cert -in safescale_cert.pem -inkey safescale_key.pem -out safescale_keystore.p12 -password pass:safescale \
+                             && keytool -importkeystore -destkeystore safescale.jks -srckeystore safescale_keystore.p12 -srcstoretype pkcs12 -alias server-cert -storepass safescale -keypass safescale -srcstorepass safescale
 
                             # Updates configuration
                             COPY standalone-ha.xml keycloak/standalone/configuration/
@@ -720,25 +734,45 @@ feature:
                              && chown jboss:jboss keycloak/standalone/configuration/safescale.jks
                             EOF
 
-                            DB_PASSWORD=$(sfRandomString 16)
-                            KEYCLOAK_PASSWORD=$(sfRandomString 16)
+                            {{ if .ClusterFlavor }}
+                            TAG=keycloak4safescale
+                            {{ else }}
+                            TAG=keycloak
+                            {{ end }}
+                            docker build -t $TAG ${SF_ETCDIR}/keycloak
 
-                            cat >${ETCDIR}/keycloak/keycloak.compose.yml <<-EOF
+                    compose:
+                        targets:
+                            gateways: all
+                            hosts: yes
+                            masters: no
+                            nodes: no
+                        run: |
+                            DB_PASSWORD=$(sfRandomString 16 "[:alnum:]")
+                            KEYCLOAK_PASSWORD=$(sfRandomString 16 "[:alnum:]")
+
+                            {{ if .ClusterFlavor }}
+                            IMAGE=keycloak4safescale
+                            KONG_PUB_NET=kong4s_pubnet
+                            {{ else }}
+                            IMAGE=keycloak
+                            KONG_PUB_NET=kong_pubnet
+                            {{ end }}
+
+                            cat >${SF_ETCDIR}/keycloak/docker-compose.yml <<-EOF
                             version: '2.1'
                             services:
-                                keycloak-database:
-                                    image: postgres:9.6
-                                    container_name: 'keycloak-database'
-                                    hostname: 'keycloak-database'
+                                db:
+                                    image: postgres:9
                                     environment:
                                         - POSTGRES_DB=keycloak
                                         - POSTGRES_USER=keycloak
-                                        - POSTGRES_PASSWORD=${DB_PASSWORD}
+                                        - POSTGRES_PASSWORD="${DB_PASSWORD}"
                                     volumes:
                                         - ${SF_VARDIR}/keycloak/postgresql:/var/lib/postgresql/data
-                                    restart: always
                                     networks:
-                                        - keycloak_to_db
+                                        dbnet:
+                                    restart: always
                                     healthcheck:
                                         test: ["CMD", "pg_isready", "-U", "keycloak"]
                                         interval: 10s
@@ -746,72 +780,75 @@ feature:
                                         retries: 5
 
                                 keycloak:
-                                    build:
-                                        context: ${SF_ETCDIR}/keycloak
-                                        dockerfile: Dockerfile
-                                    image: keycloak4safescale:latest
+                                    image: $IMAGE
                                     depends_on:
-                                        keycloak-database:
+                                        db:
                                             condition: service_healthy
-                                    container_name: 'keycloak'
-                                    hostname: 'keycloak'
                                     environment:
                                         - DB_VENDOR=POSTGRES
-                                        - DB_ADDR=keycloak-database
-                                        - DB_PORT=5432
+                                        - DB_ADDR=db
                                         - DB_DATABASE=keycloak
                                         - DB_USER=keycloak
-                                        - DB_PASSWORD=${DB_PASSWORD}
+                                        - DB_PASSWORD="${DB_PASSWORD}"
                                         - KEYCLOAK_USER=admin
-                                        - KEYCLOAK_PASSWORD=${KEYCLOAK_PASSWORD}
-                                        - KEYCLOAK_LOGLEVEL=DEBUG
-                                        - ROOT_LOGLEVEL=DEBUG
+                                        - KEYCLOAK_PASSWORD="${KEYCLOAK_PASSWORD}"
                                         - PROXY_ADDRESS_FORWARDING=true
+                                        # - KEYCLOAK_LOGLEVEL=DEBUG
+                                        # - ROOT_LOGLEVEL=DEBUG
+                                    networks:
+                                        ${KONG_PUB_NET}:
+                                        #${KONG_NET_PREFIX}svc_net:
+                                        dbnet:
                                     ports:
                                         - '{{ .HostIP }}:8443:8443'
                                     restart: always
-                                    networks:
-                                        keycloak_to_db:
-                                        kong_to_services:
+
                             networks:
-                                keycloak_to_db:
-                                    name: "keycloak_to_db"
-                                    internal: true
-                                kong_to_services:
+                                ${KONG_PUB_NET}:
                                     external: true
+                                # ${KONG_NET_PREFIX}svc_net:
+                                #     external: true
+                                dbnet:
+                                    internal: true
                             EOF
-                            docker-compose -f ${SF_ETCDIR}/keycloak/keycloak.compose.yml up -d
-                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} keycloak | grep running
+                            docker-compose -f ${SF_ETCDIR}/keycloak/docker-compose.yml -p ${IMAGE} up -d
+
+                    ready:
+                        targets:
+                            gateways: all
+                            hosts: yes
+                            masters: no
+                            nodes: no
+                        run: |
+                            {{ if .ClusterFlavor }}
+                            PREFIX=keycloak4safescale
+                            {{ else }}
+                            PREFIX=keycloak
+                            {{ end }}
+
+                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_keycloak_1 | grep running
 
             remove:
                 pace: compose
                 steps:
                     compose:
                         targets:
+                            gateways: all
                             hosts: yes
+                            masters: no
+                            nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/keycloak/keycloak.compose.yml rm --stop -v --force || exit 513
-                            rm -drf ${SF_ETCDIR}/keycloak/keycloak.compose.yml ${SF_ETCDIR}/keycloak/Dockerfile ${SF_VARDIR}/keycloak
+                            {{ if .ClusterFlavor }}
+                            OPTIONS="-p keycloak4safescale"
+                            {{ else }}
+                            OPTIONS=
+                            {{ end }}
+                            docker-compose -f ${SF_ETCDIR}/keycloak/docker-compose.yml $OPTIONS rm --stop -v --force || exit 192
+                            rm -drf ${SF_ETCDIR}/keycloak ${SF_VARDIR}/keycloak
 
-    service:
-        start: |
-            docker-compose -f /opt/safescale/keycloak.feature.yml up -d
-
-        stop: |
-            docker-compose -f /opt/safescale/keycloak.feature.yml down keycloak
-
-        pause: |
-            docker-compose -f /opt/safescale/keycloak.feature.yml pause
-
-        unpause: |
-            docker-compose -f /opt/safescale/keycloak.feature.yml unpause
-
-        state: |
-            docker ps | grep keycloak &>/dev/null
-    
     proxy:
         rules:
-            - name: keycloak_service
+            - name: keycloak_svc
               type: service
               targets:
                   hosts: true
@@ -819,7 +856,7 @@ feature:
               content: |
                   {
                         "name": "keycloak",
-                        "url": "https://keycloak:8443/auth/"
+                        "url": "https://{{.GatewayIP}}:8443/auth/"
                   }
 
             - name: keycloak_route
@@ -829,8 +866,9 @@ feature:
                   masters: all
               content: |
                   {
-                        "paths": ["/auth"],
+                        "paths": [ "/auth/" ],
+                        "strip_path": true,
                         "protocols":["https"],
-                        "service": { "id": "{{.keycloak_service}}" }
+                        "service": { "id": "{{.keycloak_svc}}" }
                   }
 ...

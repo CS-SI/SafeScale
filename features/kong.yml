@@ -87,11 +87,13 @@ feature:
 
                             {{ if .ClusterFlavor }}
                             IMAGE=kong4safescale
-                            NET_PREFIX=kong4safescale
+                            KONG_BRIDGE=br_kong4s
                             {{ else }}
                             IMAGE=kong
-                            NET_PREFIX=kong
+                            KONG_BRIDGE=br_kong
                             {{ end}}
+                            KONG_PUB_NET="${IMAGE}_pubnet"
+
                             cat >${SF_ETCDIR}/kong/docker-compose.yml <<-EOF
                             version: '2.1'
                             services:
@@ -104,7 +106,7 @@ feature:
                                     volumes:
                                         - ${SF_VARDIR}/kong/postgresql:/var/lib/postgresql/data
                                     networks:
-                                        db_net:
+                                        dbnet:
                                     restart: always
                                     healthcheck:
                                         test: ["CMD", "pg_isready", "-U", "kong"]
@@ -121,7 +123,7 @@ feature:
                                         - KONG_PG_PASSWORD="${DB_PASSWORD}"
                                     command: kong migrations bootstrap # up
                                     networks:
-                                        db_net:
+                                        dbnet:
                                     depends_on:
                                         db:
                                             condition: service_healthy
@@ -145,9 +147,9 @@ feature:
                                         - ${SF_ETCDIR}/kong/kong.conf:/etc/kong/kong.conf:ro
                                         - ${SF_ETCDIR}/kong/includes:/etc/kong/includes:ro
                                     networks:
-                                        external_net:
-                                        db_net:
-                                        svc_net:
+                                        ${KONG_PUB_NET}:
+                                        dbnet:
+                                        #svc_net:
                                     ports:
                                         - "443:443"
                                         - "127.0.0.1:8444:8444"
@@ -176,8 +178,8 @@ feature:
                                         - NODE_ENV=production
                                         - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
                                     networks:
-                                        external_net:
-                                        db_net:
+                                        ${KONG_PUB_NET}:
+                                        dbnet:
                                     ports:
                                         - "{{.HostIP}}:1337:1337"
                                     restart: always
@@ -188,15 +190,14 @@ feature:
                                             condition: service_started
 
                             networks:
-                                external_net:
-                                    name: "${NET_PREFIX}_external_net"
-                                    driver: bridge
-                                db_net:
-                                    name: "${NET_PREFIX}_db_net"
+                                ${KONG_PUB_NET}:
+                                    external: true
+                                dbnet:
+                                    name: "${IMAGE}_dbnet"
                                     internal: true
-                                svc_net:
-                                    name: "${NET_PREFIX}_svc_net"
-                                    internal: true
+                                # svc_net:
+                                #     name: "${NET_PREFIX}_svc_net"
+                                #     internal: true
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/kong/docker-compose.yml
 
@@ -207,29 +208,42 @@ feature:
                             EOF
 
                             {{ if .ClusterFlavor }}
-                            OPTIONS="-p long4safescale"
+                            OPTIONS="-p ${IMAGE}"
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            sudo docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS up -d
-                            sfRetry 5m 5 "docker ps --all | grep ${NET_PREFIX}_migration_1 | grep Exited" || exit 
+                            docker network create --driver bridge --opt "com.docker.network.bridge.name=${KONG_BRIDGE}" ${KONG_PUB_NET}
+                            docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS up -d
+                            sfRetry 5m 5 "docker ps --all | grep ${IMAGE}_migration_1 | grep Exited" || exit 
                             exit 0
 
                     firewall:
                         targets:
                             hosts: yes
                         run: |
+                            {{ if .ClusterFlavor }}
+                            BRIDGE=br_kong4s
+                            {{ else }}
+                            BRIDGE=br_kong
+                            {{ end}}
+                            sfFirewallAdd --zone=trusted --add-interface=${BRIDGE} && \
                             sfFirewallAdd --zone=public --add-service=https && \
                             sfFirewallReload
 
             remove:
-                pace: firewall,compose
+                pace: firewall,compose,network
                 steps:
                     firewall:
                         targets:
                             hosts: yes
                         run: |
+                            {{ if .ClusterFlavor }}
+                            BRIDGE=br_kong4s
+                            {{ else }}
+                            BRIDGE=br_kong
+                            {{ end}}
                             sfFirewallAdd --zone=public --remove-service=https && \
+                            sfFirewallAdd --zone=trusted --remove-interface=${BRIDGE} && \
                             sfFirewallReload
 
                     compose:
@@ -238,10 +252,24 @@ feature:
                         run: |
                             {{ if .ClusterFlavor }}
                             OPTIONS="-p long4safescale"
+                            NET_PREFIX=kong4safescale
                             {{ else }}
                             OPTIONS=
+                            NET_PREFIX=kong
                             {{ end }}
-                            sudo docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS rm --stop -v --force || exit 513
+                            docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS rm --stop -v --force || exit 192
+                            docker network rm ${NET_PREFIX}_external_net
                             rm -rf ${SF_ETCDIR}/kong/docker-compose.yml ${SF_VARDIR}/kong
+
+                    network:
+                        targets:
+                            hosts: yes
+                        run: |
+                            {{ if .ClusterFlavor }}
+                            NET_PREFIX=kong4safescale
+                            {{ else }}
+                            NET_PREFIX=kong
+                            {{ end }}
+                            docker network rm ${NET_PREFIX}_external_net
 
 ...
