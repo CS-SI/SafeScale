@@ -579,7 +579,13 @@ func (b *foreman) configureCluster(task concurrency.Task) error {
 		}
 	}()
 
-	// Installs remotedesktop feature on all masters
+	// Installs reverseproxy feature on cluster (gateways)
+	err = b.installReverseProxy(task)
+	if err != nil {
+		return err
+	}
+
+	// Installs remotedesktop feature on cluster (all masters)
 	err = b.installRemoteDesktop(task)
 	if err != nil {
 		return err
@@ -826,50 +832,6 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType Node
 	return "", map[string]interface{}{}
 }
 
-// installRemoteDesktop installs feature remotedesktop on all masters of the cluster
-func (b *foreman) installRemoteDesktop(task concurrency.Task) error {
-	identity := b.cluster.GetIdentity(task)
-	clusterName := identity.Name
-
-	disabled := false
-	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
-		return nil
-	})
-	if err != nil {
-		log.Errorf("[cluster %s] failed to install 'remotedesktop' feature: %v", clusterName, err)
-		return err
-	}
-	if !disabled {
-		log.Debugf("[cluster %s] adding feature 'remotedesktop'", clusterName)
-
-		adminPassword := identity.AdminPassword
-		target := install.NewClusterTarget(task, b.cluster)
-
-		// Adds remotedesktop feature on master
-		feat, err := install.NewEmbeddedFeature(task, "remotedesktop")
-		if err != nil {
-			log.Debugf("[cluster %s] failed to instanciate feature 'remotedesktop': %s\n", clusterName, err.Error())
-			return err
-		}
-		results, err := feat.Add(target, install.Variables{
-			"Username": "cladm",
-			"Password": adminPassword,
-		}, install.Settings{})
-		if err != nil {
-			log.Errorf("[cluster %s] failed to add feature '%s': %s", clusterName, feat.DisplayName(), err.Error())
-			return err
-		}
-		if !results.Successful() {
-			msg := results.AllErrorMessages()
-			log.Errorf("[cluster %s] failed to add '%s' failed: %s\n", clusterName, feat.DisplayName(), msg)
-			return fmt.Errorf(msg)
-		}
-		log.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
-	}
-	return nil
-}
-
 // taskInstallGateway installs necessary components on the gateway
 // Designed to work in goroutine
 // func (b *Foreman) taskInstallGateway(pbGateway *pb.Host, done chan error) {
@@ -907,12 +869,6 @@ func (b *foreman) taskInstallGateway(tr concurrency.TaskRunner, params interface
 
 	// Installs requirements as defined by cluster Flavor (if it exists)
 	err = b.installNodeRequirements(tr.Task(), NodeType.Gateway, pbGateway, "gateway")
-	if err != nil {
-		return
-	}
-
-	// Installs reverseproxy
-	err = b.installReverseProxy(tr.Task(), pbGateway, hostLabel)
 	if err != nil {
 		return
 	}
@@ -1466,41 +1422,89 @@ func (b *foreman) taskConfigureNode(tr concurrency.TaskRunner, params interface{
 	log.Debugf("[%s] configuration successful.", hostLabel)
 }
 
-func (b *foreman) installReverseProxy(task concurrency.Task, pbHost *pb.Host, hostLabel string) error {
-	// Installs reverseproxy
+// Installs reverseproxy
+func (b *foreman) installReverseProxy(task concurrency.Task) error {
+	identity := b.cluster.GetIdentity(task)
+	clusterName := identity.Name
+
 	disabled := false
-	b.cluster.RLock(task)
 	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["kong"]
+		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
+		if !disabled {
+			_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
+		}
 		return nil
 	})
-	b.cluster.RUnlock(task)
 	if err != nil {
-		log.Debugf("[%s] adding feature 'kong'...", hostLabel)
-		log.Errorf("[%s] feature 'kong' installation failed: %s", hostLabel, err.Error())
+		log.Errorf("[cluster %s] failed to install 'kong' feature: %v", clusterName, err)
 		return err
 	}
 	if !disabled {
-		log.Debugf("[%s] adding feature 'kong'...", hostLabel)
-		feature, err := install.NewFeature(task, "kong")
+		log.Debugf("[cluster %s] adding feature 'kong'", clusterName)
+		feat, err := install.NewEmbeddedFeature(task, "kong")
 		if err != nil {
-			msg := fmt.Sprintf("[%s] failed to prepare feature 'kong': %s", hostLabel, err.Error())
-			log.Errorf(msg)
-			return fmt.Errorf(msg)
+			log.Errorf("[cluster %s] failed to instanciate feature 'kong': %s\n", clusterName, err.Error())
+			return err
 		}
-		target := install.NewHostTarget(pbHost)
-		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		target := install.NewClusterTarget(task, b.cluster)
+		results, err := feat.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
-			msg := fmt.Sprintf("[%s] failed to install feature 'kong': %s", hostLabel, err.Error())
-			log.Errorf(msg)
-			return fmt.Errorf(msg)
+			log.Errorf("[cluster %s] failed to add feature '%s': %s", clusterName, feat.DisplayName(), err.Error())
+			return err
 		}
 		if !results.Successful() {
-			msg := fmt.Sprintf("[%s] failed to install feature 'kong': %s", hostLabel, results.AllErrorMessages())
-			log.Errorf(msg)
+			msg := results.AllErrorMessages()
+			log.Errorf("[cluster %s] failed to add '%s' failed: %s\n", clusterName, feat.DisplayName(), msg)
 			return fmt.Errorf(msg)
 		}
-		log.Debugf("[%s] feature 'kong' addition successful.", hostLabel)
+		log.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
+	}
+	return nil
+}
+
+// installRemoteDesktop installs feature remotedesktop on all masters of the cluster
+func (b *foreman) installRemoteDesktop(task concurrency.Task) error {
+	identity := b.cluster.GetIdentity(task)
+	clusterName := identity.Name
+
+	disabled := false
+	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
+		_, disabled = v.(*clusterpropsv1.Features).Disabled["remotedesktop"]
+		if !disabled {
+			_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
+		}
+		return nil
+	})
+	if err != nil {
+		log.Errorf("[cluster %s] failed to install 'remotedesktop' feature: %v", clusterName, err)
+		return err
+	}
+	if !disabled {
+		log.Debugf("[cluster %s] adding feature 'remotedesktop'", clusterName)
+
+		adminPassword := identity.AdminPassword
+		target := install.NewClusterTarget(task, b.cluster)
+
+		// Adds remotedesktop feature on master
+		feat, err := install.NewEmbeddedFeature(task, "remotedesktop")
+		if err != nil {
+			log.Errorf("[cluster %s] failed to instanciate feature 'remotedesktop': %s\n", clusterName, err.Error())
+			return err
+		}
+		results, err := feat.Add(target, install.Variables{
+			"Username": "cladm",
+			"Password": adminPassword,
+		}, install.Settings{})
+		if err != nil {
+			log.Errorf("[cluster %s] failed to add feature '%s': %s", clusterName, feat.DisplayName(), err.Error())
+			return err
+		}
+		if !results.Successful() {
+			msg := results.AllErrorMessages()
+			log.Errorf("[cluster %s] failed to add '%s' failed: %s\n", clusterName, feat.DisplayName(), msg)
+			return fmt.Errorf(msg)
+		}
+		log.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	}
 	return nil
 }
