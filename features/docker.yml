@@ -27,6 +27,7 @@ feature:
                     pkg:
                         targets:
                             hosts: yes
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
@@ -50,6 +51,7 @@ feature:
                         serial: true
                         targets:
                             hosts: yes
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
@@ -80,6 +82,7 @@ feature:
                     config:
                         targets:
                             hosts: yes
+                            gateways: all
                             masters: all
                             nodes: all
                         run: |
@@ -119,6 +122,7 @@ feature:
 
                     firewall:
                         targets:
+                            gateways: all
                             hosts: yes
                             masters: all
                             nodes: all
@@ -129,6 +133,7 @@ feature:
 
                     ready:
                         targets:
+                            gateways: all
                             hosts: yes
                             masters: all
                             nodes: all
@@ -144,6 +149,7 @@ feature:
                 steps:
                     docker-ce:
                         targets:
+                            gateways: all
                             hosts: yes
                             masters: all
                             nodes: all
@@ -162,15 +168,5 @@ feature:
                                     exit 1
                                     ;;
                             esac
-
-    service:
-        start: |
-            sfService start docker
-
-        stop: |
-            sfService stop docker
-
-        state: |
-            sfService status docker
 
 ...
