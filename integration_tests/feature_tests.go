@@ -186,23 +186,23 @@ func ReverseProxy(t *testing.T, provider Providers.Enum) {
 	out, err := GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.104.0/24")
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " reverseproxy")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " kong")
 	require.NotNil(t, err)
 
-	out, err = GetOutput("safescale host add-feature gw-" + names.Networks[0] + " reverseproxy")
+	out, err = GetOutput("safescale host add-feature gw-" + names.Networks[0] + " kong")
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep \\\"HTTP/1.1 200 OK\\\"\"")
 	fmt.Print(out)
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " reverseproxy")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " kong")
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale host delete-feature gw-" + names.Networks[0] + " reverseproxy")
+	out, err = GetOutput("safescale host delete-feature gw-" + names.Networks[0] + " kong")
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " reverseproxy")
+	out, err = GetOutput("safescale host check-feature gw-" + names.Networks[0] + " kong")
 	require.NotNil(t, err)
 
 	out, err = GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep \\\"HTTP/1.1 200 OK\\\"\"")
