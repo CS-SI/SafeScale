@@ -51,9 +51,9 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 	}
 
 	// Check if reverseproxy feature is installed on host
-	rp, err := NewFeature(concurrency.VoidTask(), "reverseproxy")
+	rp, err := NewEmbeddedFeature(concurrency.VoidTask(), "kong")
 	if err != nil {
-		return nil, fmt.Errorf("failed to find a feature called 'reverseproxy'")
+		return nil, fmt.Errorf("failed to find a feature called 'kong'")
 	}
 	present := false
 	if anon, ok := kongProxyCheckedCache.Get(host.Name); ok {
@@ -66,7 +66,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 			}
 			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
-				return nil, fmt.Errorf("failed to check if feature 'reverseproxy' is installed on gateway: %s", err.Error())
+				return nil, fmt.Errorf("failed to check if feature 'kong' is installed on gateway: %s", err.Error())
 			}
 			return results.Successful(), nil
 		})
@@ -76,7 +76,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 		present = true
 	}
 	if !present {
-		return nil, fmt.Errorf("'reverseproxy' feature isn't installed on gateway")
+		return nil, fmt.Errorf("'kong' feature isn't installed on gateway")
 	}
 
 	return &KongController{

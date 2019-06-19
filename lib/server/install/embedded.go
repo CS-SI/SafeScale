@@ -197,7 +197,7 @@ func sparkFeature() *Feature {
 
 // reverseProxyFeature ...
 func reverseProxyFeature() *Feature {
-	name := "reverseproxy"
+	name := "kong"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
@@ -363,6 +363,36 @@ func filebeatFeature() *Feature {
 // keycloakFeature ...
 func keycloakFeature() *Feature {
 	name := "keycloak"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// kibanaFeature ...
+func kibanaFeature() *Feature {
+	name := "kibana"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// elassandraFeature ...
+func elassandraFeature() *Feature {
+	name := "elassandra"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())

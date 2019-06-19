@@ -44,6 +44,8 @@ func init() {
 		helmFeature(),
 		sparkFeature(),
 		keycloakFeature(),
+		kibanaFeature(),
+		elassandraFeature(),
 	}
 
 	for _, item := range allEmbedded {
