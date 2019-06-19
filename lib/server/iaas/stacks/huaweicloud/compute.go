@@ -349,7 +349,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		diskSize = 400
 	}
 
-	// Select useable availability zone
+	// Select usable availability zone
 	az, err := s.SelectedAvailabilityZone()
 	if err != nil {
 		return nil, userData, err

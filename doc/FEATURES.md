@@ -14,18 +14,18 @@ feature | description | specificities
 `apache-ignite` |  Install apache ignite on all the devices of a cluster   |  Only available for clusters
 `docker` |  Install docker     | -
 `docker-compose` |  Install docker-compose   | -
-`filebeat` |  Install filebeat who send logs to a remote Logstash    |  Need parameters: <br>`LogstashSocket="IP_logstash:PORT_logstash"` 
+`filebeat` |  Install filebeat on all hosts and links it to elassandra | For single host installation, will need parameters: <br>`KibanaURL="(http|https)://<host>:<port>/[...]"` <br> `ElasticsearchIP="IP_elasticsearch"`<br>`ElasticsearchPort="PORT_elasticsearch"`
 `helm` |   Install helm packet manager  |  Only available on a kubernetes flavored cluster (or a dcos with kubernetes installed)
 `kubernetes` |  Install and configure a kubernetes cluster   |  Only available for clusters
-`metricbeat` |  Install metricbeat who send metrics to a remote Elasticsearch/Kibana   | Need parameters: <br> `KibanaSocket="IP_kibana:PORT_kibana"` <br> `ElasticsearchSocket="IP_elasticsearch:PORT_elasticsearch "`
+`metricbeat` |  Install metricbeat on all hosts and links it to elassandra | For single host installation, will need parameters: <br> `KibanaURL="(http|https)://<host>:<port>/[...]"` <br> `ElasticsearchIP="IP_elasticsearch"`<br>`ElasticsearchPort="PORT_elasticsearch"`
 `nvidiadocker` |  Install nvidia-docker, allowing nvidia driver to works in a docker container   |  On a cluster it will only be applied to nodes
-`proxycache-client` |  Install a squid proxyCache client    |  Only available for hosts 
-`proxycache-server` |  Install a squid proxyCache server    |  Only available for hosts
-`remotedesktop` |  Install a remote desktop using guacamole with tigerVNC and xfce desktop   |  On a cluster a remote desktop will be installed on all masters <br>Need parameters: <br> `Username="existing_user"` <br> `Password="user_password"`
-`reverseproxy` |  Install a kong reverse proxy  | Only available for hosts (usually a gateway)
+`remotedesktop` |  Install a remote desktop using guacamole with tigerVNC and xfce desktop   |  On a cluster a remote desktop will be installed on all masters <br>When installed on single host, will need to set these parameters: <br> `Username="existing_user"` <br> `Password="user_password"`
+`kong` |  Install a Kong reverse proxy for SafeScale use  | Only available for cluster (installed on gateway)
+`kibana` | Installs Kibana for SafeScale use and links it with `elassandra` | Only available for cluster
+`elassandra` | Install Elassandra on masters | Only available for cluster
 `spark` |  Install and configure a spark cluster   |  Only available on a kubernetes or dcos flavored cluster
 
-_Note_: the `reverseproxy` feature is automatically installed on the gateway when a network is created by SafeScale (included a host acting as a gateway for the network).
+_Note_: the `kong` feature is automatically installed on the gateway when a cluster is created by SafeScale.
 
 ## How to install a feature
 

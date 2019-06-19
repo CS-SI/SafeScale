@@ -442,7 +442,7 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            rm -f /opt/safescale/etc/kong/includes/kubernetes.conf
+                            rm -f ${SF_ETCDIR}/kong/includes/kubernetes.conf
                             sfReverseProxyReload
 
                     reset:

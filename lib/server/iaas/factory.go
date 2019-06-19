@@ -289,6 +289,10 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 		config.Region, _ = compute["Region"].(string)
 	}
 
+	if config.AvailabilityZone, ok = objectstorage["AvailabilityZone"].(string); !ok {
+		config.AvailabilityZone, _ = compute["AvailabilityZone"].(string)
+	}
+
 	return config, nil
 }
 
@@ -402,6 +406,12 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 	if config.Region, ok = metadata["Region"].(string); !ok {
 		if config.Region, ok = objectstorage["Region"].(string); !ok {
 			config.Region, _ = compute["Region"].(string)
+		}
+	}
+
+	if config.AvailabilityZone, ok = metadata["AvailabilityZone"].(string); !ok {
+		if config.AvailabilityZone, ok = objectstorage["AvailabilityZone"].(string); !ok {
+			config.AvailabilityZone, _ = compute["AvailabilityZone"].(string)
 		}
 	}
 

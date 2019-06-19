@@ -847,25 +847,25 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) error {
 		target := install.NewClusterTarget(task, b.cluster)
 
 		// Adds remotedesktop feature on master
-		feature, err := install.NewFeature(task, "remotedesktop")
+		feat, err := install.NewEmbeddedFeature(task, "remotedesktop")
 		if err != nil {
 			log.Debugf("[cluster %s] failed to instanciate feature 'remotedesktop': %s\n", clusterName, err.Error())
 			return err
 		}
-		results, err := feature.Add(target, install.Variables{
+		results, err := feat.Add(target, install.Variables{
 			"Username": "cladm",
 			"Password": adminPassword,
 		}, install.Settings{})
 		if err != nil {
-			log.Errorf("[cluster %s] failed to add feature '%s': %s", clusterName, feature.DisplayName(), err.Error())
+			log.Errorf("[cluster %s] failed to add feature '%s': %s", clusterName, feat.DisplayName(), err.Error())
 			return err
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			log.Errorf("[cluster %s] failed to add '%s' failed: %s\n", clusterName, feature.DisplayName(), msg)
+			log.Errorf("[cluster %s] failed to add '%s' failed: %s\n", clusterName, feat.DisplayName(), msg)
 			return fmt.Errorf(msg)
 		}
-		log.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feature.DisplayName())
+		log.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	}
 	return nil
 }
@@ -1471,36 +1471,36 @@ func (b *foreman) installReverseProxy(task concurrency.Task, pbHost *pb.Host, ho
 	disabled := false
 	b.cluster.RLock(task)
 	err := b.cluster.GetProperties(task).LockForRead(Property.FeaturesV1).ThenUse(func(v interface{}) error {
-		_, disabled = v.(*clusterpropsv1.Features).Disabled["reverseproxy"]
+		_, disabled = v.(*clusterpropsv1.Features).Disabled["kong"]
 		return nil
 	})
 	b.cluster.RUnlock(task)
 	if err != nil {
-		log.Debugf("[%s] adding feature 'reverseproxy'...", hostLabel)
-		log.Errorf("[%s] feature 'reverseproxy' installation failed: %s", hostLabel, err.Error())
+		log.Debugf("[%s] adding feature 'kong'...", hostLabel)
+		log.Errorf("[%s] feature 'kong' installation failed: %s", hostLabel, err.Error())
 		return err
 	}
 	if !disabled {
-		log.Debugf("[%s] adding feature 'reverseproxy'...", hostLabel)
-		feature, err := install.NewFeature(task, "reverseproxy")
+		log.Debugf("[%s] adding feature 'kong'...", hostLabel)
+		feature, err := install.NewFeature(task, "kong")
 		if err != nil {
-			msg := fmt.Sprintf("[%s] failed to prepare feature 'reverseproxy': %s", hostLabel, err.Error())
+			msg := fmt.Sprintf("[%s] failed to prepare feature 'kong': %s", hostLabel, err.Error())
 			log.Errorf(msg)
 			return fmt.Errorf(msg)
 		}
 		target := install.NewHostTarget(pbHost)
 		results, err := feature.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
-			msg := fmt.Sprintf("[%s] failed to install feature 'reverseproxy': %s", hostLabel, err.Error())
+			msg := fmt.Sprintf("[%s] failed to install feature 'kong': %s", hostLabel, err.Error())
 			log.Errorf(msg)
 			return fmt.Errorf(msg)
 		}
 		if !results.Successful() {
-			msg := fmt.Sprintf("[%s] failed to install feature 'reverseproxy': %s", hostLabel, results.AllErrorMessages())
+			msg := fmt.Sprintf("[%s] failed to install feature 'kong': %s", hostLabel, results.AllErrorMessages())
 			log.Errorf(msg)
 			return fmt.Errorf(msg)
 		}
-		log.Debugf("[%s] feature 'reverseproxy' addition successful.", hostLabel)
+		log.Debugf("[%s] feature 'kong' addition successful.", hostLabel)
 	}
 	return nil
 }
@@ -1559,13 +1559,13 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 	if !disabled {
 		log.Debugf("[%s] adding feature 'proxycache-server'...", hostLabel)
 
-		feature, err := install.NewFeature(task, "proxycache-server")
+		feat, err := install.NewEmbeddedFeature(task, "proxycache-server")
 		if err != nil {
 			log.Errorf("[%s] failed to prepare feature 'proxycache-server': %s", hostLabel, err.Error())
 			return fmt.Errorf("failed to install feature 'proxycache-server': %s", err.Error())
 		}
 		target := install.NewHostTarget(pbHost)
-		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		results, err := feat.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
 			log.Errorf("[%s] failed to install feature 'proxycache-server': %s", hostLabel, err.Error())
 			return fmt.Errorf("failed to install feature 'proxycache-server' on host '%s': %s", pbHost.Name, err.Error())
@@ -1582,12 +1582,12 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabel string) error {
 	// install docker feature
 	log.Debugf("[%s] adding feature 'docker'...\n", hostLabel)
-	feature, err := install.NewFeature(task, "docker")
+	feat, err := install.NewEmbeddedFeature(task, "docker")
 	if err != nil {
 		log.Errorf("[%s] failed to prepare feature 'docker': %s", hostLabel, err.Error())
 		return fmt.Errorf("failed to add feature 'docker' on host '%s': %s", pbHost.Name, err.Error())
 	}
-	results, err := feature.Add(install.NewHostTarget(pbHost), install.Variables{}, install.Settings{})
+	results, err := feat.Add(install.NewHostTarget(pbHost), install.Variables{}, install.Settings{})
 	if err != nil {
 		log.Errorf("[%s] failed to add feature 'docker': %s", hostLabel, err.Error())
 		return fmt.Errorf("failed to add feature 'docker' on host '%s': %s", pbHost.Name, err.Error())

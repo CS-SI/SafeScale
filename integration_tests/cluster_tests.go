@@ -58,7 +58,7 @@ func ClusterSwarm(t *testing.T, provider Providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, "It works!"))
 
-	out, err = GetOutput("safescale host check-feature gw-net-" + names.Clusters[0] + " reverseproxy")
+	out, err = GetOutput("safescale host check-feature gw-net-" + names.Clusters[0] + " kong")
 	require.Nil(t, err)
 
 	//need --param Password=

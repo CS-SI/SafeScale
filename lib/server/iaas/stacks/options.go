@@ -66,8 +66,10 @@ type AuthenticationOptions struct {
 	// authentication token ID.
 	TokenID string
 
-	//Openstack region (data center) where the infrstructure will be created
-	Region string
+	//Openstack region (data center) where the infrastructure will be created
+	Region string `valid:"alphanum,required"`
+
+	AvailabilityZone string `valid:"alphanum,required"`
 
 	//FloatingIPPool name of the floating IP pool
 	//Necessary only if UseFloatingIP is true

@@ -44,18 +44,6 @@ func GetBashLibrary() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		// // Prepare the template for execution
-		// tmplPrepared, err := template.New("bash_library").Parse(tmplContent)
-		// if err != nil {
-		// 	return "", err
-		// }
-
-		// var buffer bytes.Buffer
-		// if err := tmplPrepared.Execute(&buffer, map[string]interface{}{}); err != nil {
-		// 	// TODO Use more explicit error
-		// 	return "", err
-		// }
-		// bashLibraryContent = buffer.String()
 		bashLibraryContent.Store(tmplContent)
 		anon = bashLibraryContent.Load()
 	}

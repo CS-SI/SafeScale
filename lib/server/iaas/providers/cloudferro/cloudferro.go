@@ -17,6 +17,7 @@
 package cloudferro
 
 import (
+	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
@@ -27,6 +28,7 @@ import (
 	stackapi "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/sirupsen/logrus"
+    "github.com/asaskevich/govalidator"
 )
 
 var (
@@ -58,6 +60,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	domainName, _ := identity["DomainName"].(string)
 
 	region, _ := compute["Region"].(string)
+	zone, _ := compute["AvailabilityZone"].(string)
 	projectName, _ := compute["ProjectName"].(string)
 	// projectID, _ := compute["ProjectID"].(string)
 	defaultImage, _ := compute["DefaultImage"].(string)
@@ -80,8 +83,14 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		DomainName:       domainName,
 		TenantName:       projectName,
 		Region:           region,
+		AvailabilityZone: zone,
 		FloatingIPPool:   "external",
 		AllowReauth:      true,
+	}
+
+	_, err := govalidator.ValidateStruct(authOptions)
+	if err != nil {
+		return nil, err
 	}
 
 	metadataBucketName, err := objectstorage.BuildMetadataBucketName("huaweicloud", region, domainName, projectName)
@@ -112,6 +121,48 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	if err != nil {
 		return nil, err
 	}
+
+	validRegions, err := stack.ListRegions()
+	if err != nil {
+		if len(validRegions) != 0 {
+			return nil, err
+		}
+	}
+	if len(validRegions) != 0 {
+		regionIsValidInput := false
+		for _, vr := range validRegions {
+			if region == vr {
+				regionIsValidInput = true
+			}
+		}
+		if !regionIsValidInput {
+			return nil, fmt.Errorf("invalid Region: '%s'", region)
+		}
+	}
+
+	validAvailabilityZones, err := stack.ListAvailabilityZones(true)
+	if err != nil {
+		if len(validAvailabilityZones) != 0 {
+			return nil, err
+		}
+	}
+
+	if len(validAvailabilityZones) != 0 {
+		var validZones []string
+		zoneIsValidInput := false
+		for az, valid := range validAvailabilityZones {
+			if valid {
+				if az == zone {
+					zoneIsValidInput = true
+				}
+				validZones = append(validZones, az)
+			}
+		}
+		if !zoneIsValidInput {
+			return nil, fmt.Errorf("invalid Availability zone: '%s', valid zones are %v", zone, validZones)
+		}
+	}
+
 	return &provider{Stack: stack}, nil
 }
 

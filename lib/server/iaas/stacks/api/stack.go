@@ -23,11 +23,16 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
+//go:generate mockgen -destination=../mocks/mock_stack.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api Stack
+
 // Stack is the interface to cloud stack
 // It same interface has to be satisfied in Provider interface
 type Stack interface {
 	// ListAvailabilityZones lists the usable Availability Zones
 	ListAvailabilityZones(bool) (map[string]bool, error)
+
+	// ListRegions returns a list with the regions available
+    ListRegions() ([]string, error)
 
 	// ListImages lists available OS images
 	ListImages(all bool) ([]resources.Image, error)

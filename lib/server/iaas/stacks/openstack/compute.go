@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"strings"
 	"time"
 
@@ -50,6 +51,37 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
+
+func (s *Stack) ListRegions() ([]string, error) {
+	log.Debug(">>> openstack.Client.ListRegions()")
+	defer log.Debug("<<< openstack.Client.ListRegions()")
+
+	var results []string
+
+	if s == nil {
+		panic("Calling method ListRegions from nil!")
+	}
+
+	listOpts := regions.ListOpts{
+		ParentRegionID: "RegionOne",
+	}
+
+	allPages, err := regions.List(s.ComputeClient, listOpts).AllPages()
+	if err != nil {
+		return results, err
+	}
+
+	allRegions, err := regions.ExtractRegions(allPages)
+	if err != nil {
+		return results, err
+	}
+
+	for _, reg := range allRegions {
+		results = append(results, reg.ID)
+	}
+
+	return results, nil
+}
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones(all bool) (map[string]bool, error) {
