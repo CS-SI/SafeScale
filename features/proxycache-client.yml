@@ -19,6 +19,9 @@ feature:
     suitableFor:
         host: yes
         cluster: no
+    requirements:
+        feature:
+            - docker
     install:
         bash:
             check:
@@ -28,7 +31,7 @@ feature:
                         targets:
                             hosts: yes
                         run: |
-                            docker image ls | grep proxycache &>/dev/null
+                            [ -f /etc/systemd/system/docker.service.d/proxy.conf ]
 
             add:
                 pace: env,docker
@@ -91,28 +94,12 @@ feature:
                                     exit 1
                             esac
                             grep -vi proxy /etc/environment >/etc/environment.new
+                            mv /etc/environment.new /etc/environment
 
                     docker:
                         targets:
                             hosts: yes
                         run: |
-                            mv /etc/environment.new /etc/environment
                             rm -f /etc/systemd/system/docker.service.d/proxy.conf
-
-    service:
-        start: |
-            docker-compose -f /opt/safescale/run/proxycache.feature.yml up -d
-
-        stop: |
-            docker-compose -f /opt/safescale/run/proxycache.feature.yml down
-
-        pause: |
-            docker-compose -f /opt/safescale/run/proxycache.feature.yml pause
-
-        unpause: |
-            docker-compose -f /opt/safescale/run/proxycache.feature.yml unpause
-
-        state: |
-            docker ps | grep proxycache &>/dev/null
 
 ...
