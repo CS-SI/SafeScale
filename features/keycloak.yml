@@ -753,7 +753,7 @@ feature:
 
                             {{ if .ClusterFlavor }}
                             IMAGE=keycloak4safescale
-                            KONG_PUB_NET=kong4s_pubnet
+                            KONG_PUB_NET=kong4safescale_pubnet
                             {{ else }}
                             IMAGE=keycloak
                             KONG_PUB_NET=kong_pubnet

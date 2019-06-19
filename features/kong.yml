@@ -31,8 +31,8 @@ feature:
                 steps:
                     curl:
                         targets:
-                            gateways: all
                             hosts: no
+                            gateways: all
                             masters: no
                             nodes: no
                         run: |
@@ -44,8 +44,8 @@ feature:
                     compose:
                         timeout: 10
                         targets:
-                            gateways: all
                             hosts: no
+                            gateways: all
                             masters: no
                             nodes: no
                         run: |
@@ -220,6 +220,9 @@ feature:
                     firewall:
                         targets:
                             hosts: yes
+                            gateways: all
+                            masters: no
+                            nodes: no
                         run: |
                             {{ if .ClusterFlavor }}
                             BRIDGE=br_kong4s
