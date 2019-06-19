@@ -29,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/cli/perform/commands"
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialise provider cloudferro
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudwatt"      // Imported to initialise provider cloudwatt
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/erbc"           // Imported to initialise provider erbc
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialise provider flexibleengine
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialise provider local
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom"    // Imported to initialise provider opentelekom

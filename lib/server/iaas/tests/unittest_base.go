@@ -38,7 +38,6 @@ import (
 
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudwatt"      // Imported to initialize tenant cloudwatt
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/erbc"           // Imported to initialise tenant erbc
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialize tenant local
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekoms
