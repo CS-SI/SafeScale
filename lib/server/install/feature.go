@@ -189,6 +189,26 @@ func NewFeature(task concurrency.Task, name string) (*Feature, error) {
 	return &feat, err
 }
 
+// NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
+// with its content
+func NewEmbeddedFeature(task concurrency.Task, name string) (*Feature, error) {
+	if name == "" {
+		panic("name is empty!")
+	}
+
+	var (
+		feat Feature
+		err  error
+	)
+	if _, ok := allEmbeddedMap[name]; !ok {
+		err = fmt.Errorf("failed to find a feature named '%s'", name)
+	} else {
+		feat = *allEmbeddedMap[name]
+		feat.task = task
+	}
+	return &feat, err
+}
+
 // installerOfMethod instanciates the right installer corresponding to the method
 func (f *Feature) installerOfMethod(method Method.Enum) Installer {
 	var installer Installer

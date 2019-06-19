@@ -1164,3 +1164,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 func (s *Stack) ListAvailabilityZones(all bool) (map[string]bool, error) {
 	return map[string]bool{"local": true}, nil
 }
+
+func (s *Stack) ListRegions() ([]string, error) {
+	return []string{"local"}, nil
+}

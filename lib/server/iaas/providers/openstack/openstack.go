@@ -17,6 +17,7 @@
 package openstack
 
 import (
+	"fmt"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"
 
@@ -58,6 +59,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	password, _ := identity["Password"].(string)
 	tenantName, _ := compute["TenantName"].(string)
 	region, _ := compute["Region"].(string)
+	zone, _ := compute["AvailabilityZone"].(string)
 	floatingIPPool, _ := network["FloatingIPPool"].(string)
 	providerNetwork, _ := network["ExternalNetwork"].(string)
 	if providerNetwork == "" {
@@ -83,6 +85,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		Password:         password,
 		TenantName:       tenantName,
 		Region:           region,
+		AvailabilityZone: zone,
 		FloatingIPPool:   floatingIPPool,
 	}
 
@@ -116,6 +119,48 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	if err != nil {
 		return nil, err
 	}
+
+	validRegions, err := stack.ListRegions()
+	if err != nil {
+		if len(validRegions) != 0 {
+			return nil, err
+		}
+	}
+	if len(validRegions) != 0 {
+		regionIsValidInput := false
+		for _, vr := range validRegions {
+			if region == vr {
+				regionIsValidInput = true
+			}
+		}
+		if !regionIsValidInput {
+			return nil, fmt.Errorf("invalid Region: '%s'", region)
+		}
+	}
+
+	validAvailabilityZones, err := stack.ListAvailabilityZones(true)
+	if err != nil {
+		if len(validAvailabilityZones) != 0 {
+			return nil, err
+		}
+	}
+
+	if len(validAvailabilityZones) != 0 {
+		var validZones []string
+		zoneIsValidInput := false
+		for az, valid := range validAvailabilityZones {
+			if valid {
+				if az == zone {
+					zoneIsValidInput = true
+				}
+				validZones = append(validZones, az)
+			}
+		}
+		if !zoneIsValidInput {
+			return nil, fmt.Errorf("invalid Availability zone: '%s', valid zones are %v", zone, validZones)
+		}
+	}
+
 	return newP, nil
 }
 

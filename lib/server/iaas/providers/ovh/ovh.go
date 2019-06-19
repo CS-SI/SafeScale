@@ -18,6 +18,7 @@ package ovh
 
 import (
 	"fmt"
+	"github.com/asaskevich/govalidator"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -84,14 +85,15 @@ func New() providerapi.Provider {
 // Build build a new instance of Ovh using configuration parameters
 func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
 	identityParams, _ := params["identity"].(map[string]interface{})
-	computeParams, _ := params["compute"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
 	// networkParams, _ := params["network"].(map[string]interface{})
 
 	applicationKey, _ := identityParams["ApplicationKey"].(string)
 	openstackID, _ := identityParams["OpenstackID"].(string)
 	openstackPassword, _ := identityParams["OpenstackPassword"].(string)
-	region, _ := computeParams["Region"].(string)
-	projectName, _ := computeParams["ProjectName"].(string)
+	region, _ := compute["Region"].(string)
+	zone, _ := compute["AvailabilityZone"].(string)
+	projectName, _ := compute["ProjectName"].(string)
 
 	val1, ok1 := identityParams["AlternateApiConsumerKey"]
 	val2, ok2 := identityParams["AlternateApiApplicationSecret"]
@@ -103,7 +105,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	}
 
 	operatorUsername := resources.DefaultUser
-	if operatorUsernameIf, ok := computeParams["OperatorUsername"]; ok {
+	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			log.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
@@ -118,8 +120,17 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		TenantID:         applicationKey,
 		TenantName:       projectName,
 		Region:           region,
+		AvailabilityZone: zone,
 		AllowReauth:      true,
 	}
+
+	_, err := govalidator.ValidateStruct(authOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	// FIXME ZONE Validate Region exists
+	// FIXME ZONE Validate Zone exists
 
 	metadataBucketName, err := objectstorage.BuildMetadataBucketName("openstack", region, applicationKey, projectName)
 	if err != nil {
@@ -145,6 +156,47 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	stack, err := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
 	if err != nil {
 		return nil, err
+	}
+
+	validRegions, err := stack.ListRegions()
+	if err != nil {
+		if len(validRegions) != 0 {
+			return nil, err
+		}
+	}
+	if len(validRegions) != 0 {
+		regionIsValidInput := false
+		for _, vr := range validRegions {
+			if region == vr {
+				regionIsValidInput = true
+			}
+		}
+		if !regionIsValidInput {
+			return nil, fmt.Errorf("invalid Region: '%s'", region)
+		}
+	}
+
+	validAvailabilityZones, err := stack.ListAvailabilityZones(true)
+	if err != nil {
+		if len(validAvailabilityZones) != 0 {
+			return nil, err
+		}
+	}
+
+	if len(validAvailabilityZones) != 0 {
+		var validZones []string
+		zoneIsValidInput := false
+		for az, valid := range validAvailabilityZones {
+			if valid {
+				if az == zone {
+					zoneIsValidInput = true
+				}
+				validZones = append(validZones, az)
+			}
+		}
+		if !zoneIsValidInput {
+			return nil, fmt.Errorf("invalid Availability zone: '%s', valid zones are %v", zone, validZones)
+		}
 	}
 
 	newP := &provider{Stack: stack}

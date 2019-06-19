@@ -84,11 +84,11 @@ feature:
                             nodes: all
                         run: |
                             mkdir /etc/docker
-                            if [ "$(sfGetFact 'use systemd')" = "1" ]; then
-                                DRIVER=systemd
-                            else
+                            # if [ "$(sfGetFact 'use systemd')" = "1" ]; then
+                            #     DRIVER=systemd
+                            # else
                                 DRIVER=cgroupfs
-                            fi
+                            # fi
                             if [ "$(sfGetFact 'redhat like')" = "1" ]; then
                                 cat > /etc/docker/daemon.json <<-EOF
                                     {

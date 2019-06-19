@@ -18,6 +18,7 @@ package opentelekom
 
 import (
 	"fmt"
+	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -55,6 +56,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	domainName, _ := identity["DomainName"].(string)
 	projectID, _ := compute["ProjectID"].(string)
 	region, _ := compute["Region"].(string)
+	zone, _ := compute["AvailabilityZone"].(string)
 	vpcName, _ := network["VPCName"].(string)
 	vpcCIDR, _ := network["VPCCIDR"].(string)
 
@@ -79,9 +81,15 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		DomainName:       domainName,
 		ProjectID:        projectID,
 		Region:           region,
+		AvailabilityZone: zone,
 		AllowReauth:      true,
 		VPCName:          vpcName,
 		VPCCIDR:          vpcCIDR,
+	}
+
+	_, err := govalidator.ValidateStruct(authOptions)
+	if err != nil {
+		return nil, err
 	}
 
 	metadataBucketName, err := objectstorage.BuildMetadataBucketName("huaweicloud", region, domainName, projectID)
@@ -109,6 +117,48 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	if err != nil {
 		return nil, err
 	}
+
+	validRegions, err := stack.ListRegions()
+	if err != nil {
+		if len(validRegions) != 0 {
+			return nil, err
+		}
+	}
+	if len(validRegions) != 0 {
+		regionIsValidInput := false
+		for _, vr := range validRegions {
+			if region == vr {
+				regionIsValidInput = true
+			}
+		}
+		if !regionIsValidInput {
+			return nil, fmt.Errorf("invalid Region: '%s'", region)
+		}
+	}
+
+	validAvailabilityZones, err := stack.ListAvailabilityZones(true)
+	if err != nil {
+		if len(validAvailabilityZones) != 0 {
+			return nil, err
+		}
+	}
+
+	if len(validAvailabilityZones) != 0 {
+		var validZones []string
+		zoneIsValidInput := false
+		for az, valid := range validAvailabilityZones {
+			if valid {
+				if az == zone {
+					zoneIsValidInput = true
+				}
+				validZones = append(validZones, az)
+			}
+		}
+		if !zoneIsValidInput {
+			return nil, fmt.Errorf("invalid Availability zone: '%s', valid zones are %v", zone, validZones)
+		}
+	}
+
 	return &provider{Stack: stack}, nil
 }
 
