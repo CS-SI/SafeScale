@@ -77,7 +77,7 @@ feature:
                             URL="https://bintray.com/tigervnc/stable/download_file?file_path=tigervnc-1.9.0.x86_64.tar.gz"
                             sfDownload "$URL" tigervnc.tgz 3m 5 || exit 192
                             tar --strip-components=1 -zxvf tigervnc.tgz -C / || exit 193
-                            rm -rf tigervnc.tar.gz
+                            rm -rf tigervnc.tgz
 
                             if [ ! -d ~{{.Username}} ]; then
                                 echo "Homedir of user {{.Username}} not found"
@@ -508,22 +508,6 @@ feature:
                         run: |
                             docker rm -f remotedesktop
                             docker image rm remotedesktop:latest
-
-    service:
-        start: |
-            docker run --rm -d --hostname remotedesktop --name remotedesktop  -p "9080:8080" -p "9009:8009" remotedesktop:latest
-
-        pause: |
-            docker stop remotedesktop
-
-        resume: |
-            docker start remotedesktop
-
-        stop: |
-            docker rm -f remotedesktop
-
-        status: |
-            docker ps | grep remotedesktop &>/dev/null
 
     proxy:
         rules:

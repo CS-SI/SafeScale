@@ -25,6 +25,7 @@ feature:
     parameters:
         - KibanaPort=5601
         - KibanaHost={{.HostIP}}
+        - ElasticsearchURL=http://localhost:9200/
 
     install:
         bash:
@@ -62,12 +63,16 @@ feature:
                             version: '2'
 
                             services:
-                                kibana:
+                                server:
                                     image: 'bitnami/kibana:7'
                                     ports:
                                         - {{.HostIP}}:{{.KibanaPort}}:5601
                                     environment:
+                                    {{ if .ClusterFlavor }}
                                         - KIBANA_ELASTICSEARCH_URL="https://{{.GatewayIP}}/services/elasticsearch/
+                                    {{ else }}
+                                        - KIBANA_ELASTICSEARCH_URL="{{ .ElasticsearchURL }}
+                                    {{ end }}
                                     volumes:
                                         - ${SF_VARDIR}/kibana:/bitnami
                             EOF
@@ -79,7 +84,12 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml up -d
+                            {{ if .ClusterFlavor }}
+                            OPTIONS="-p kibana4safescale"
+                            {{ else }}
+                            OPTIONS=
+                            {{ end }}
+                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d
 
             remove:
                 pace: stop,remove
@@ -88,41 +98,24 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
-                            sfService stop filebeat
-                            sfService disable filebeat
+                            {{ if .ClusterFlavor }}
+                            OPTIONS="-p kibana4safescale"
+                            {{ else }}
+                            OPTIONS=
+                            {{ end }}
+                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d
 
                     remove:
                         targets:
                             hosts: yes
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
-                            case $LINUX_KIND in
-                                debian|ubuntu)
-                                    sfApt remove -y filebeat
-                                    sfApt purge -y filebeat
-                                    ;;
-                                centos|rhel)
-                                    yum remove -y filebeat
-                                    ;;
-                                *)
-                                    echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 4224
-                                    ;;
-                            esac
-                            rm -rf /etc/filebeat
-
-    service:
-        start: |
-            sfService start kibana
-
-        stop: |
-            sfService stop kibana
-
-        state: |
-            sfService status kibana
+                            docker image rm -f bitnami/kibana:7
+                            rm -rf ${SF_ETCDIR}/kibana ${SF_VARDIR}/kibana
+                            exit 0
 
     proxy:
         rules:
