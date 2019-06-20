@@ -27,12 +27,8 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/cli/perform/commands"
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialise provider cloudferro
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudwatt"      // Imported to initialise provider cloudwatt
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialise provider flexibleengine
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialise provider local
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom"    // Imported to initialise provider opentelekom
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/ovh"            // Imported to initialise provider ovh
+
+	_ "github.com/CS-SI/SafeScale/lib/server"
 )
 
 func main() {

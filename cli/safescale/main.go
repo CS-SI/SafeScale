@@ -27,12 +27,15 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/urfave/cli"
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 
+	"github.com/CS-SI/SafeScale/cli/safescale/commands"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/cli/safescale/commands"
+
+	// Autoload embedded provider drivers
+	_ "github.com/CS-SI/SafeScale/lib/server"
 )
 
 func cleanup() {
