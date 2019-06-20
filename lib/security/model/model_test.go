@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/security/model"
+	"github.com/CS-SI/SafeScale/lib/security/model"
 	"github.com/stretchr/testify/assert"
 )
 

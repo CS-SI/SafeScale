@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/security/model"
+	"github.com/CS-SI/SafeScale/lib/security/model"
 	oidc "github.com/coreos/go-oidc"
 	"github.com/gorilla/websocket"
 	"golang.org/x/oauth2"
 
-	"github.com/CS-SI/SafeScale/security/gateway"
+	"github.com/CS-SI/SafeScale/lib/security/gateway"
 	"github.com/stretchr/testify/assert"
 )
 
