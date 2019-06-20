@@ -18,6 +18,8 @@ package stacks
 
 import "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
 
+const AlphanumericWithDashesAndUnderscores   string = "^[-a-zA-Z0-9-_]+$"
+
 // AuthenticationOptions fields are the union of those recognized by each identity implementation and provider
 // to be able to carry different but necessary information to stack implementations
 type AuthenticationOptions struct {
@@ -67,9 +69,9 @@ type AuthenticationOptions struct {
 	TokenID string
 
 	//Openstack region (data center) where the infrastructure will be created
-	Region string `valid:"alphanum,required"`
+	Region string `valid:"alphanumwithdashesandunderscores,required"`
 
-	AvailabilityZone string `valid:"alphanum,required"`
+	AvailabilityZone string `valid:"alphanumwithdashesandunderscores,required"`
 
 	//FloatingIPPool name of the floating IP pool
 	//Necessary only if UseFloatingIP is true
