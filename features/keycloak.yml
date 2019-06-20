@@ -23,6 +23,8 @@ feature:
         features:
             - docker
             - docker-compose
+    parameters:
+        - KeycloakAdminPassword
     install:
         bash:
             check:
@@ -749,7 +751,6 @@ feature:
                             nodes: no
                         run: |
                             DB_PASSWORD=$(sfRandomString 16 "[:alnum:]")
-                            KEYCLOAK_PASSWORD=$(sfRandomString 16 "[:alnum:]")
 
                             {{ if .ClusterFlavor }}
                             IMAGE=keycloak4safescale
@@ -791,7 +792,7 @@ feature:
                                         - DB_USER=keycloak
                                         - DB_PASSWORD="${DB_PASSWORD}"
                                         - KEYCLOAK_USER=admin
-                                        - KEYCLOAK_PASSWORD="${KEYCLOAK_PASSWORD}"
+                                        - KEYCLOAK_PASSWORD="{{ .KeycloakAdminPasword }}"
                                         - PROXY_ADDRESS_FORWARDING=true
                                         # - KEYCLOAK_LOGLEVEL=DEBUG
                                         # - ROOT_LOGLEVEL=DEBUG
