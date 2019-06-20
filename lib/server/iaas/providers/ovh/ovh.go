@@ -19,6 +19,7 @@ package ovh
 import (
 	"fmt"
 	"github.com/asaskevich/govalidator"
+	"regexp"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -124,13 +125,15 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		AllowReauth:      true,
 	}
 
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
+		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
+		return rxp.Match([]byte(str))
+	})
+
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
 		return nil, err
 	}
-
-	// FIXME ZONE Validate Region exists
-	// FIXME ZONE Validate Zone exists
 
 	metadataBucketName, err := objectstorage.BuildMetadataBucketName("openstack", region, applicationKey, projectName)
 	if err != nil {

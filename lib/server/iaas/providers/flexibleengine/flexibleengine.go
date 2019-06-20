@@ -118,6 +118,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		VPCCIDR:          vpcCIDR,
 	}
 
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
+		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
+		return rxp.Match([]byte(str))
+	})
+
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
 		return nil, err

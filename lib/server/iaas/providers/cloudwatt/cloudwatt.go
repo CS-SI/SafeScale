@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
+	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -78,6 +79,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		AvailabilityZone: zone,
 		FloatingIPPool:   "public",
 	}
+
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
+		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
+		return rxp.Match([]byte(str))
+	})
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
