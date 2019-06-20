@@ -18,9 +18,10 @@ package ovh
 
 import (
 	"fmt"
-	"github.com/asaskevich/govalidator"
 	"regexp"
 	"strings"
+
+	"github.com/asaskevich/govalidator"
 
 	log "github.com/sirupsen/logrus"
 
@@ -93,7 +94,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	openstackID, _ := identityParams["OpenstackID"].(string)
 	openstackPassword, _ := identityParams["OpenstackPassword"].(string)
 	region, _ := compute["Region"].(string)
-	zone, _ := compute["AvailabilityZone"].(string)
+	zone, ok := compute["AvailabilityZone"].(string)
+	if !ok {
+		zone = "nova"
+	}
+
 	projectName, _ := compute["ProjectName"].(string)
 
 	val1, ok1 := identityParams["AlternateApiConsumerKey"]
