@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 
-	"github.com/CS-SI/SafeScale/security/model"
+	"github.com/CS-SI/SafeScale/lib/security/model"
 )
 
 var ctx = context.Background()

@@ -115,6 +115,10 @@ godocs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(godoc -http=:6060 &)
 
+convey:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running goconvey in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(cd lib && goconvey -port 8082 &)
+
 devdeps:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Getting dev dependencies, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(GO) get -u $(DEVDEPSLIST))
@@ -228,6 +232,7 @@ help: with_git
 	@echo '  err-light    - Looks for unhandled errors (with restrictions)'
 	@echo '  test         - Runs all tests'
 	@echo '  test-light   - Runs all tests (with restrictions)'
+	@echo '  convey       - Runs goconvey in lib dir'
 	@echo '  coverage     - Collects coverage info from unit tests'
 	@echo '  show-cov     - Displays coverage info in firefox'
 	@echo '  report       - Generates and displays a report'
