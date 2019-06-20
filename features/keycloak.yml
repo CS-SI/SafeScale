@@ -792,7 +792,7 @@ feature:
                                         - DB_USER=keycloak
                                         - DB_PASSWORD="${DB_PASSWORD}"
                                         - KEYCLOAK_USER=admin
-                                        - KEYCLOAK_PASSWORD="{{ .KeycloakAdminPasword }}"
+                                        - KEYCLOAK_PASSWORD="{{ .KeycloakAdminPassword }}"
                                         - PROXY_ADDRESS_FORWARDING=true
                                         # - KEYCLOAK_LOGLEVEL=DEBUG
                                         # - ROOT_LOGLEVEL=DEBUG
