@@ -398,36 +398,33 @@ func (sc *SSHCommand) Run() (int, string, string, error) {
 	// Set up the outputs (std and err)
 	stdOut, err := sc.StdoutPipe()
 	if err != nil {
-		return 0, "", "", err
+		return -1, "", "", err
 	}
 	stderr, err := sc.StderrPipe()
 	if err != nil {
-		return 0, "", "", err
+		return -1, "", "", err
 	}
 
 	// Launch the command and wait for its execution
 	if err = sc.Start(); err != nil {
-		return 0, "", "", err
+		return -1, "", "", err
 	}
 
 	msgOut, err := ioutil.ReadAll(stdOut)
 	if err != nil {
-		return 0, "", "", err
+		return -1, "", "", err
 	}
 
 	msgErr, err := ioutil.ReadAll(stderr)
 	if err != nil {
-		return 0, "", "", err
+		return -1, "", "", err
 	}
 
 	err = sc.Wait()
 	if err != nil {
-		log.Warnf("Error waiting for command: %v", err)
-	}
-	if err != nil {
 		msgError, retCode, erro := ExtractRetCode(err)
 		if erro != nil {
-			return 0, "", "", err
+			return -1, "", "", err
 		}
 		return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
 	}
