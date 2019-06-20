@@ -134,7 +134,8 @@ func (b *foreman) ExecuteScript(
 	}
 	var cmd string
 
-	cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
+	// cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
+	cmd = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", path)
 
 	return client.New().Ssh.Run(hostID, cmd, client.DefaultConnectionTimeout, 2*utils.GetLongOperationTimeout())
 }
@@ -691,7 +692,10 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 // joinNodesFromList ...
 func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error {
 	if b.makers.JoinNodeToCluster == nil {
-		return nil
+		// configure what has to be done cluster-wide
+		if b.makers.ConfigureCluster != nil {
+			return b.makers.ConfigureCluster(task, b)
+		}
 	}
 
 	log.Debugf("Joining nodes to cluster...")
