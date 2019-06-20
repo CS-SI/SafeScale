@@ -79,8 +79,7 @@ export -f install_common_requirements
 
 case $(sfGetFact "linux kind") in
     debian|ubuntu)
-        sfRetry 3m 5 "sfApt update"
-        sfRetry 5m 5 "sfApt install -y wget curl time jq unzip"
+        sfRetry 3m 5 "sfApt update && sfApt install -y wget curl time jq unzip"
         curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
         cd rclone-*-linux-amd64 && \

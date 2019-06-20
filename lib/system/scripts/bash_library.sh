@@ -37,6 +37,7 @@ sfApt() {
 	sfWaitForApt
 	apt $@
 }
+export -f sfApt
 
 sfWaitLockfile() {
 	local ROUNDS=600
