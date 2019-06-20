@@ -22,9 +22,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"strings"
 	"time"
+
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
@@ -939,16 +940,19 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 // SelectedAvailabilityZone returns the selected availability zone
 func (s *Stack) SelectedAvailabilityZone() (string, error) {
 	if s.selectedAvailabilityZone == "" {
-		azList, err := s.ListAvailabilityZones(false)
-		if err != nil {
-			return "", err
+		s.selectedAvailabilityZone = s.GetAuthenticationOptions().AvailabilityZone
+		if s.selectedAvailabilityZone == "" {
+			azList, err := s.ListAvailabilityZones(false)
+			if err != nil {
+				return "", err
+			}
+			var az string
+			for az = range azList {
+				break
+			}
+			s.selectedAvailabilityZone = az
 		}
-		var az string
-		for az = range azList {
-			break
-		}
-		s.selectedAvailabilityZone = az
-		log.Debugf("Selected Availability Zone: '%s'", az)
+		log.Debugf("Selected Availability Zone: '%s'", s.selectedAvailabilityZone)
 	}
 	return s.selectedAvailabilityZone, nil
 }

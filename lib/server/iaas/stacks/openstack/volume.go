@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"fmt"
+
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
@@ -103,14 +104,20 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
 	}
 
+	az, err := s.SelectedAvailabilityZone()
+	if err != nil {
+		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
+	}
+
 	var v resources.Volume
 	switch s.versions["volume"] {
 	case "v1":
 		var vol *volumesv1.Volume
 		vol, err = volumesv1.Create(s.VolumeClient, volumesv1.CreateOpts{
-			Name:       request.Name,
-			Size:       request.Size,
-			VolumeType: s.getVolumeType(request.Speed),
+			AvailabilityZone: az,
+			Name:             request.Name,
+			Size:             request.Size,
+			VolumeType:       s.getVolumeType(request.Speed),
 		}).Extract()
 		v = resources.Volume{
 			ID:    vol.ID,
@@ -122,9 +129,10 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	case "v2":
 		var vol *volumesv2.Volume
 		vol, err = volumesv2.Create(s.VolumeClient, volumesv2.CreateOpts{
-			Name:       request.Name,
-			Size:       request.Size,
-			VolumeType: s.getVolumeType(request.Speed),
+			AvailabilityZone: az,
+			Name:             request.Name,
+			Size:             request.Size,
+			VolumeType:       s.getVolumeType(request.Speed),
 		}).Extract()
 		v = resources.Volume{
 			ID:    vol.ID,

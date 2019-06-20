@@ -90,10 +90,15 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		return nil, fmt.Errorf("volume '%s' already exists", request.Name)
 	}
 
+	az, err := s.SelectedAvailabilityZone()
+	if err != nil {
+		return nil, err
+	}
 	opts := volumes.CreateOpts{
-		Name:       request.Name,
-		Size:       request.Size,
-		VolumeType: s.getVolumeType(request.Speed),
+		AvailabilityZone: az,
+		Name:             request.Name,
+		Size:             request.Size,
+		VolumeType:       s.getVolumeType(request.Speed),
 	}
 	vol, err := volumes.Create(s.Stack.VolumeClient, opts).Extract()
 	if err != nil {
