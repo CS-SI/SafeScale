@@ -26,29 +26,25 @@ feature:
             - kong
     parameters:
         - KeepDataOnRemoval=yes
+        - ClusterName=safescale
     
     install:
         bash:
             check:
-                pace: image,running
+                pace: present
                 steps:
-                    image:
+                    present:
                         targets:
                             hosts: yes
                             masters: all
                             nodes: no
                         run: |
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'strapdata/elassandra:6' &>/dev/null
-                    running:
-                        targets:
-                            hosts: yes
-                            masters: all
-                            nodes: no
-                        run: |
-                            docker image ls {{ "--format '{{.Image}}:{{.Status}}'" }} | grep 'strapdata/elassandra:6' &>/dev/null
+                            [ -d ${SF_ETC_DIR}/elassandra ] || exit 192
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'strapdata/elassandra:6' &>/dev/null || exit 193
+                            exit 0
 
             add:
-                pace: image,start,ready
+                pace: image,config,start,ready
                 steps:
                     image:
                         targets:
@@ -74,7 +70,7 @@ feature:
                             version: '2.1'
 
                             services:
-                                elassandra:
+                                server:
                                     image: 'strapdata/elassandra:6'
                                     ports:
                                         - {{.HostIP}}:7000:7000
@@ -86,12 +82,10 @@ feature:
                                         - {{.HostIP}}:9200:9200
                                         - {{.HostIP}}:9300:9300
                                     environment:
-                                    {{- if .ClusterFlavor }}
+                                    {{ if .ClusterFlavor }}
                                         - CASSANDRA_SEEDS=${seeds}
-                                    {{ end -}}
-                                        - CASSANDRA__listen_address={{.HostIP}}
                                         - CASSANDRA__cluster_name=safescale
-                                        - CASSANDRA__rpc_address={{.HostIP}}
+                                    {{ end }}
                                     volumes:
                                         - ${SF_VARDIR}/elassandra:/var/lib/cassandra
                                     restart: always
@@ -118,13 +112,12 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            PREFIX=
                             {{ if .ClusterFlavor }}
                             PREFIX="elassandra4safescale"
                             {{ else }}
                             PREFIX="elassandra"
                             {{ end }}
-                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_elassandra_1 | grep running
+                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep running
 
             remove:
                 pace: stop,remove
@@ -135,8 +128,12 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfService stop filebeat
-                            sfService disable filebeat
+                            {{ if .ClusterFlavor }}
+                            OPTIONS="-p elassandra4safescale"
+                            {{ else }}
+                            OPTIONS=
+                            {{ end }}
+                            docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS rm --stop -v --force || exit 192
 
                     remove:
                         targets:
@@ -144,7 +141,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            docker image rm strapdata/elassandra:6
+                            docker image rm -f strapdata/elassandra:6
                             purge={{.KeepDataOnRemoval}}
                             purge=${purge,,}
                             [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/elassandra ${SF_VARDIR}/elassandra
