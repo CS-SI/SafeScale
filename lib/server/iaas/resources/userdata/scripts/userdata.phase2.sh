@@ -624,11 +624,14 @@ early_packages_update() {
 
 install_packages() {
      case $LINUX_KIND in
-        ubuntu|debian)
+        ubuntu)
             sfApt install -y -qq jq &>/dev/null || fail 213
             ;;
+        debian)
+            sfApt install -y -qq jq time &>/dev/null || fail 214
+            ;;
         redhat|centos)
-            yum install --enablerepo=epel -y -q wget jq time &>/dev/null || fail 214
+            yum install --enablerepo=epel -y -q wget jq time &>/dev/null || fail 215
             ;;
         *)
             echo "Unsupported Linux distribution '$LINUX_KIND'!"
