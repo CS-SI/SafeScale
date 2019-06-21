@@ -14,6 +14,7 @@
         - [host](#safescale_host)
         - [volume](#safescale_volume)
         - [share](#safescale_share)
+        - [data](#safecale_data)
         - [bucket](#safescale_bucket)
         - [ssh](#safescale_ssh)
         - [cluster](#cluster)
@@ -191,7 +192,8 @@ $ safescale -v network create mynetwork --cidr 192.168.1.0/24
 #### <a name="safescale_cmds"></a>Commands
 
 #### <a name="safescale_tenant"></a>tenant
-A tenant must be set before using any other command as it indicates to SafeScale which tenant the command must be executed on. _Note that if only one tenant is defined in the `tenants.toml`, it will be automatically selected while invoking any other command._
+A tenant must be set before using any other command as it indicates to SafeScale which tenant the command must be executed on. _Note that if only one tenant is defined in the `tenants.toml`, it will be automatically selected while invoking any other command.<br>
+A storage tenant represents the credentials needed to connect an object storage they are used to select one or several object storage for [data](#safecale_data) commands<br>
 The following actions are proposed:
 
 action | description
@@ -199,6 +201,9 @@ action | description
 `safescale tenant list` | List available tenants i.e. those found in the `tenants.toml` file.<br><br>example:<br><br>`$ safescale tenant list`<br>`[{"Name":"TestOvh","Provider":"ovh"}]`
 `safescale tenant get` | Display the current tenant used for action commands.<br><br>example:<br><br>`$ safescale tenant get`<br>`{"Name":"TestOvh"}`
 `safescale tenant set <tenant_name>` | Set the tenant to use by the next commands. The 'tenant_name' must match one of those present in the `tenants.toml` file (key 'name'). The name is case sensitive.<br><br>example:<br><br> `$ safescale tenant set TestOvh`<br>`Tenant 'TestOvh' set`<br>or<br>`Unable to set tenant 'testovh': Tenant 'testovh' not found in configuration`
+`safescale tenant storage-list` | List available storage-tenants i.e. those found in the `tenants.toml` file.<br><br>example:<br><br>`$ safescale tenant storage-list`<br>`[{"name":"TestOpenTelekom", "provider": "opentelekom"}, {"name": "TestOVH", "provider": "ovh"}, {"name": "TestFlexibleEngine", "provider": "flexibleengine"}]`
+`safescale tenant storage-get` | Display the current storage-tenant(s) used for data commands.<br><br>example:<br><br>`$ safescale tenant storage-get`<br>`["TestOVH","TestFlexibleEngine"]`
+`safescale tenant storage-set <storage_tenant_names ...>` | Set the storage-tenant(s) to use by the next data commands. The 'storage_tenant_names' must match some of those sent by 'safescale tenant storage-list'. The name is case sensitive.<br><br>example:<br><br> `$ safescale tenant storage-set TestOvh TestFlexibleEngine`<br>`null (if successful)`<br>or<br>`Unable to set tenants '[TestOvh TestFlexibleEngine]': Failed to register storage tenant TestOvh : Tenant TestOvh not found, or is not matching requirements`
 
 <br><br>
 
@@ -263,6 +268,19 @@ action | description
 `safescale [global_options] share delete <share_name>`|Delete a nfs server by unexposing directory<br><br>success response: _empty_<br><br>failure response: `Failed to find share 'share-1'`
 
 <br><br>
+
+#### <a name="safescale_data"></a>data
+This command familly aims to push data on object storage on a secured way with data encryption (AES-256/RSA-2048) and & data replication(erasure coding/ several object storage).<br>
+As we want to push datas on several object storage we fist have to set [tenantStorage](#safescale_tenant)<br>
+All the files are crypted with a key stored on $HOME/.safescale/rsa.key (if the key didn't exists, pushing a file will generate one)<br>
+The following actions are proposed:
+
+action | description
+--- | ---
+`safescale [global_options] data push [command-options] <file_path>`| Push a file on several object storage with encryption and erasure coding<br>`command_options`:<ul><li>`--file-name value`File name on the object storage</li></ul>
+`safescale [global_options] data get [command-options] <file_name>`| Get a file pushed by 'safescale data push'<br>`command_options`:<ul><li>`--storage-path value` File where the datas will be stored</li></ul>
+`safescale [global_options] data delete <file_name>`| Delete a files pushed by 'safescale data push'
+`safescale [global_options] data list`| List all files pushed by 'safescale data push'
 
 #### <a name="safescale_bucket"></a>bucket
 This command familly deals with object storage management: creation, list, mounting as filesystem, deleting...

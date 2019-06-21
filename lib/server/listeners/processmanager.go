@@ -47,8 +47,8 @@ func (s *ProcessManagerListener) Stop(ctx context.Context, in *pb.ProcessDefinit
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't create share: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create share: no tenant set")
+		log.Info("Can't stop process: no tenant set")
+		return nil, grpc.Errorf(codes.FailedPrecondition, "Can't stop process: no tenant set")
 	}
 
 	handler := ProcessManagerHandler(tenant.Service)
@@ -69,8 +69,8 @@ func (s *ProcessManagerListener) List(ctx context.Context, in *google_protobuf.E
 
 	tenant := GetCurrentTenant()
 	if tenant == nil {
-		log.Info("Can't create share: no tenant set")
-		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create share: no tenant set")
+		log.Info("Can't list process : no tenant set")
+		return nil, grpc.Errorf(codes.FailedPrecondition, "Can't list process: no tenant set")
 	}
 
 	handler := ProcessManagerHandler(tenant.Service)
