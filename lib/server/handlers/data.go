@@ -511,7 +511,8 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 		}
 		keyInfo, err := utils.DecryptKeyInfo(buffer.Bytes(), keyFilePathConst)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			continue
+			//return nil, nil, nil, nil, err
 		}
 		//Load & decrypt ChunkGroup
 		buffer.Reset()
@@ -521,7 +522,8 @@ func (handler *DataHandler) List(ctx context.Context) ([]string, []string, []int
 		}
 		chunkGroup, err := utils.DecryptChunkGroup(buffer.Bytes(), keyInfo)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			continue
+			//return nil, nil, nil, nil, err
 		}
 		//Check if all needed buckets are known
 		ok := true
