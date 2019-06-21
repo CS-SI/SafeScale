@@ -27,8 +27,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/CmdStatus"
 )
 
-// Response define a standard response to
-type Response struct {
+// response define a standard response for most safescale commands
+type response struct {
 	Status CmdStatus.Enum
 	Error  urfcli.ExitCoder
 	Result interface{}
@@ -40,16 +40,16 @@ type jsonError struct {
 	ExitCode int    `json:"exitcode"`
 }
 
-// ResponseDisplay ...
-type ResponseDisplay struct {
+// responseDisplay ...
+type responseDisplay struct {
 	Status string      `json:"status"`
 	Error  *jsonError  `json:"error"`
 	Result interface{} `json:"result"`
 }
 
-// NewResponse ...
-func NewResponse() Response {
-	return Response{
+// newResponse ...
+func newResponse() response {
+	return response{
 		Status: CmdStatus.UNKNOWN,
 		Error:  nil,
 		Result: nil,
@@ -57,50 +57,54 @@ func NewResponse() Response {
 }
 
 // GetError ...
-func (r *Response) GetError() error {
+func (r *response) GetError() error {
 	return r.Error
 }
 
-// GetErrorWithoutMessage ...
-func (r *Response) GetErrorWithoutMessage() error {
-	if r.Error != nil {
-		return urfcli.NewExitError("", r.Error.ExitCode())
-	}
-	return nil
-}
+// // GetErrorWithoutMessage ...
+// func (r *response) GetErrorWithoutMessage() error {
+// 	if r.Error != nil {
+// 		return urfcli.NewExitError("", r.Error.ExitCode())
+// 	}
+// 	return nil
+// }
 
-// Succeeded ...
-func (r *Response) Succeeded(result interface{}) {
+// Success ...
+func (r *response) Success(result interface{}) error {
 	r.Status = CmdStatus.SUCCESS
 	r.Result = result
 	r.Display()
+	return nil
 }
 
-// Failed ...
-func (r *Response) Failed(err error) error {
-	r.Status = CmdStatus.FAILURE
-	if exitCoder, ok := err.(urfcli.ExitCoder); ok {
-		r.Error = exitCoder
-		r.Display()
-		return r.GetError()
+// Failure ...
+func (r *response) Failure(err error) error {
+	if err != nil {
+		r.Status = CmdStatus.FAILURE
+		if exitCoder, ok := err.(urfcli.ExitCoder); ok {
+			r.Error = exitCoder
+			r.Display()
+			return r.GetError()
+		}
+		log.Error("err is not an urfave/cli.ExitCoder")
+		return err
 	}
-	log.Error("err is not an urfave/cli.ExitCoder")
 	return nil
 }
 
 // Display ...
-func (r *Response) Display() {
+func (r *response) Display() {
 	out, err := json.Marshal(r.getDisplayResponse())
 	if err == nil {
 		fmt.Println(string(out))
 	} else {
-		log.Error("Failed to marshal the Response")
+		log.Error("lib/utils/response.go: Response.Display(): failed to marshal the Response")
 	}
 }
 
 // getDisplayResponse ...
-func (r *Response) getDisplayResponse() ResponseDisplay {
-	output := ResponseDisplay{
+func (r *response) getDisplayResponse() responseDisplay {
+	output := responseDisplay{
 		Status: strings.ToLower(r.Status.String()),
 		Error:  nil,
 		Result: r.Result,
@@ -112,4 +116,21 @@ func (r *Response) getDisplayResponse() ResponseDisplay {
 		}
 	}
 	return output
+}
+
+// FailureResponse ...
+func FailureResponse(err error) error {
+	r := newResponse()
+	_ = r.Failure(err)
+	if r.Error != nil {
+		return urfcli.NewExitError("", r.Error.ExitCode())
+	}
+	return nil
+}
+
+// SuccessResponse ...
+func SuccessResponse(result interface{}) error {
+	r := newResponse()
+	_ = r.Success(result)
+	return nil
 }

@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
 // TenantCmd command
@@ -43,16 +43,11 @@ var tenantList = cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "List available tenants",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		tenants, err := client.New().Tenant.List(client.DefaultExecutionTimeout)
 		if err != nil {
-			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
-		} else {
-			response.Succeeded(tenants.GetTenants())
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of tenants", false).Error())))
 		}
-
-		return response.GetErrorWithoutMessage()
+		return clitools.SuccessResponse(tenants.GetTenants())
 	},
 }
 
@@ -60,16 +55,11 @@ var tenantGet = cli.Command{
 	Name:  "get",
 	Usage: "Get current tenant",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
 		if err != nil {
-			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
-		} else {
-			response.Succeeded(tenant)
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get tenant", false).Error())))
 		}
-
-		return response.GetErrorWithoutMessage()
+		return clitools.SuccessResponse(tenant)
 	},
 }
 
@@ -77,21 +67,16 @@ var tenantSet = cli.Command{
 	Name:  "set",
 	Usage: "Set tenant to work with",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-		} else {
-			err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
-			} else {
-				response.Succeeded(nil)
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		}
 
-		return response.GetErrorWithoutMessage()
+		err := client.New().Tenant.Set(c.Args().First(), client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set tenant", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -100,16 +85,11 @@ var tenantStorageList = cli.Command{
 	Aliases: []string{"storage-ls"},
 	Usage:   "List available storage tenants",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		tenants, err := client.New().Tenant.StorageList(client.DefaultExecutionTimeout)
 		if err != nil {
-			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error())))
-		} else {
-			response.Succeeded(tenants.GetTenants())
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of storage tenants", false).Error())))
 		}
-
-		return response.GetErrorWithoutMessage()
+		return clitools.SuccessResponse(tenants.GetTenants())
 	},
 }
 
@@ -117,16 +97,11 @@ var tenantStorageGet = cli.Command{
 	Name:  "storage-get",
 	Usage: "Get current storage tenants",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		tenants, err := client.New().Tenant.StorageGet(client.DefaultExecutionTimeout)
 		if err != nil {
-			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
-		} else {
-			response.Succeeded(tenants.GetNames())
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "get storage tenants", false).Error())))
 		}
-
-		return response.GetErrorWithoutMessage()
+		return clitools.SuccessResponse(tenants.GetNames())
 	},
 }
 
@@ -135,22 +110,16 @@ var tenantStorageSet = cli.Command{
 	Usage:     "Set storage tenants to work with",
 	ArgsUsage: "<storage_tenants...>",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <storage_tenants...>."))
-		} else {
-			tenantNames := []string{c.Args().First()}
-			tenantNames = append(tenantNames, c.Args().Tail()...)
-			err := client.New().Tenant.StorageSet(tenantNames, client.DefaultExecutionTimeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set storage tenants", false).Error())))
-			} else {
-				response.Succeeded(nil)
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <storage_tenants...>."))
 		}
-
-		return response.GetErrorWithoutMessage()
+		tenantNames := []string{c.Args().First()}
+		tenantNames = append(tenantNames, c.Args().Tail()...)
+		err := client.New().Tenant.StorageSet(tenantNames, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "set storage tenants", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }

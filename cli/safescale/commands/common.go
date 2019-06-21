@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	clitools "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/enums/ExitCode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
 
 	pb "github.com/CS-SI/SafeScale/lib"
 
