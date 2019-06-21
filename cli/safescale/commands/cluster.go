@@ -18,9 +18,10 @@ package commands
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli"
 
@@ -729,27 +730,28 @@ var clusterShrinkCommand = cli.Command{
 
 			if !yes {
 				msg := fmt.Sprintf("Are you sure you want to delete %d node%s from Cluster %s", count, countS, clusterName)
-				if !utils.UserConfirmed(msg) {
-					response.Succeeded("Aborted")
-				}
+				yes = utils.UserConfirmed(msg)
 			}
-
-			fmt.Printf("Deleting %d node%s from Cluster '%s' (this may take a while)...\n", count, countS, clusterName)
-			var msgs []string
-			availableMaster, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
-			if err != nil {
-				return response.Failed(err)
-			}
-			for i := uint(0); i < count; i++ {
-				err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster)
+			if yes {
+				fmt.Printf("Deleting %d node%s from Cluster '%s' (this may take a while)...\n", count, countS, clusterName)
+				var msgs []string
+				availableMaster, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
 				if err != nil {
-					msgs = append(msgs, fmt.Sprintf("Failed to delete node #%d: %s", i+1, err.Error()))
+					return response.Failed(err)
 				}
-			}
-			if len(msgs) > 0 {
-				_ = response.Failed(clitools.ExitOnRPC(strings.Join(msgs, "\n")))
+				for i := uint(0); i < count; i++ {
+					err := clusterInstance.DeleteLastNode(concurrency.RootTask(), availableMaster)
+					if err != nil {
+						msgs = append(msgs, fmt.Sprintf("Failed to delete node #%d: %s", i+1, err.Error()))
+					}
+				}
+				if len(msgs) > 0 {
+					_ = response.Failed(clitools.ExitOnRPC(strings.Join(msgs, "\n")))
+				} else {
+					response.Succeeded(nil)
+				}
 			} else {
-				response.Succeeded(nil)
+				response.Succeeded("Aborted")
 			}
 		}
 
