@@ -23,7 +23,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
 // DataCmd command
@@ -51,28 +51,23 @@ var dataPush = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <local_file_path>."))
-		} else {
-			localFilePath := utils.AbsPathify(c.Args().First())
-			var fileName string
-			if c.String("file-name") != "" {
-				fileName = c.String("file-name")
-			} else {
-				fileName = strings.Split(localFilePath, "/")[len(strings.Split(localFilePath, "/"))-1]
-			}
-			err := client.New().Data.Push(localFilePath, fileName, client.DefaultExecutionTimeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data push", false).Error())))
-			} else {
-				response.Succeeded(nil)
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <local_file_path>."))
 		}
 
-		return response.GetErrorWithoutMessage()
+		localFilePath := utils.AbsPathify(c.Args().First())
+		var fileName string
+		if c.String("file-name") != "" {
+			fileName = c.String("file-name")
+		} else {
+			fileName = strings.Split(localFilePath, "/")[len(strings.Split(localFilePath, "/"))-1]
+		}
+		err := client.New().Data.Push(localFilePath, fileName, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data push", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -87,29 +82,24 @@ var dataGet = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
-		} else {
-			fileName := c.Args().First()
-			var localFilePath string
-			if c.String("storage-path") != "" {
-				localFilePath = utils.AbsPathify(c.String("storage-path"))
-			} else {
-				localFilePath = utils.AbsPathify(fileName)
-			}
-
-			err := client.New().Data.Get(localFilePath, fileName, client.DefaultExecutionTimeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data get", false).Error())))
-			} else {
-				response.Succeeded(nil)
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
 		}
 
-		return response.GetErrorWithoutMessage()
+		fileName := c.Args().First()
+		var localFilePath string
+		if c.String("storage-path") != "" {
+			localFilePath = utils.AbsPathify(c.String("storage-path"))
+		} else {
+			localFilePath = utils.AbsPathify(fileName)
+		}
+
+		err := client.New().Data.Get(localFilePath, fileName, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data get", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 var dataDelete = cli.Command{
@@ -118,22 +108,17 @@ var dataDelete = cli.Command{
 	Usage:     "delete a file of the storage",
 	ArgsUsage: "<file_name>",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
-		} else {
-			fileName := c.Args().First()
-			err := client.New().Data.Delete(fileName, client.DefaultExecutionTimeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data delete", false).Error())))
-			} else {
-				response.Succeeded(nil)
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <file_name>."))
 		}
 
-		return response.GetErrorWithoutMessage()
+		fileName := c.Args().First()
+		err := client.New().Data.Delete(fileName, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data delete", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 var dataList = cli.Command{
@@ -142,15 +127,10 @@ var dataList = cli.Command{
 	Usage:     "list all files in the storage",
 	ArgsUsage: "<local_file_path>",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		filesList, err := client.New().Data.List(client.DefaultExecutionTimeout)
 		if err != nil {
-			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
-		} else {
-			response.Succeeded(filesList)
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "data list", false).Error())))
 		}
-
-		return response.GetErrorWithoutMessage()
+		return clitools.SuccessResponse(filesList)
 	},
 }
