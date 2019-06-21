@@ -19,9 +19,10 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/CS-SI/SafeScale/lib/client"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -83,6 +84,15 @@ func (handler *NetworkHandler) Create(
 		}
 	} else {
 		return nil, logicErr(fmt.Errorf("network '%s' already exists", name))
+	}
+
+	// Verify the CIDR is not routable
+	routable, err := utils.IsCIDRRoutable(cidr)
+	if err != nil {
+		return nil, logicErr(fmt.Errorf("failed to determine if CIDR is not routable: %v", err))
+	}
+	if routable {
+		return nil, logicErr(fmt.Errorf("can't create such a network, CIDR must be not routable; please choose an appropriate CIDR (RFC1918)"))
 	}
 
 	// Create the network

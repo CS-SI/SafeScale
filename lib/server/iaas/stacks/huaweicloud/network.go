@@ -18,12 +18,13 @@ package huaweicloud
 
 import (
 	"fmt"
+	"net"
+	"strings"
+
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	log "github.com/sirupsen/logrus"
-	"net"
-	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
@@ -83,6 +84,14 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 	// Only one VPC allowed by client instance
 	if s.vpc != nil {
 		return nil, fmt.Errorf("failed to create VPC '%s', a VPC with this name already exists", req.Name)
+	}
+
+	routable, err := utils.IsCIDRRoutable(req.CIDR)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create VPC '%s': can't determine if CIDR is not routable: %v", req.Name, err)
+	}
+	if routable {
+		return nil, fmt.Errorf("failed to create VPC '%s': CIDR '%s' is routable", req.Name, req.CIDR)
 	}
 
 	b, err := gophercloud.BuildRequestBody(req, "vpc")
