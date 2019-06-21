@@ -34,7 +34,7 @@ download_dcos_config_generator() {
         echo "-------------------------------"
         echo "download_dcos_config_generator:"
         echo "-------------------------------"
-        local URL=https://downloads.dcos.io/dcos/stable/{{ .DCOSVersion }}/dcos_generate_config.sh
+        local URL=https://downloads.dcos.io/dcos/stable/dcos_generate_config.sh
         sfRetry 14m 5 "curl -qkSsL -o dcos_generate_config.sh $URL" || exit 200
     }
     echo "dcos_generate_config.sh successfully downloaded."
@@ -60,7 +60,8 @@ download_kubectl_bin() {
         echo "---------------------"
         echo "download_kubectl_bin:"
         echo "---------------------"
-        local URL=https://storage.googleapis.com/kubernetes-release/release/v1.10.4/bin/linux/amd64/kubectl
+        local VERSION=(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
+        local URL=https://storage.googleapis.com/kubernetes-release/release/${VERSION}/bin/linux/amd64/kubectl
         sfRetry 2m 5 "curl -qkSsL -o /usr/local/dcos/genconf/serve/kubectl.bin $URL" || exit 202
     }
     echo "kubectl successfully downloaded."
@@ -77,11 +78,10 @@ download_nginx_image() {
 }
 export -f download_nginx_image
 
-mkdir -p /usr/local/dcos/genconf/serve/docker && \
-cd /usr/local/dcos && \
+mkdir -p ${SF_VARDIR}/dcos/genconf/serve/docker && \
+cd ${SF_VARDIR}/dcos && \
 yum makecache fast && \
-yum install -y wget curl time jq unzip
-[ $? -ne 0 ] && exit 204
+yum install -y wget curl time jq unzip || exit 204
 
 # Lauch downloads in parallel
 sfAsyncStart DDCG 15m bash -c download_dcos_config_generator
@@ -96,17 +96,43 @@ sfAsyncStart DNI 10m bash -c download_nginx_image
 echo "Waiting for download_dcos_config_generator..."
 sfAsyncWait DDCG || exit 205
 
+cat >${SF_VARDIR}/dcos/ip-detect-public <<-EOF
+#!/bin/sh
+#
+# Detects the IP address on the LAN for each DCOS host, using the first master IP
+IP=$(ip route show to match {{ index .MasterIPs 0 }} | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -1)
+[ ! -z "$IP" ] && echo $IP && exit 0
+
+exit 1
+EOF
+
+cat >${SF_VARDIR}/dcos/genconf/config.yaml >>-EOF
+bootstrap_url: http://{{.GatewayIP}}:80
+cluster_name: {{ .ClusterName }}
+exhibitor_storage_backend: static
+master_discovery: static
+ip_detect_public_filename: ${SF_VARDIR}/dcos/ip-detect-public
+master_list:
+{{ range .MasterIPs }}
+- {{.}}
+{{ end }}
+# resolvers:
+# - 169.254.169.253
+use_proxy: 'false'
+EOF
+( cd /usr/local/dcos/genconf ; bash /usr/local/dcos/dcos_generate_config.sh ) || exit 206
+
 # Awaits pull of docker nginx image
 echo "Waiting for docker nginx image..."
-sfAsyncWait DNI || exit 206
+sfAsyncWait DNI || exit 207
 
 # Awaits the download of DCOS binary
 echo "Waiting for download_dcos_binary..."
-sfAsyncWait DDB || exit 207
+sfAsyncWait DDB || exit 208
 
 # Awaits the download of kubectl binary
 echo "Waiting for download_kubectl_binary..."
-sfAsyncWait DKB || exit 208
+sfAsyncWait DKB || exit 209
 
 echo
 echo "Bootstrap prepared successfully."
