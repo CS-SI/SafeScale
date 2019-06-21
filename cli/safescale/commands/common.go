@@ -19,13 +19,12 @@ package commands
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/client"
-	clitools "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
+	"github.com/urfave/cli"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-
-	"github.com/urfave/cli"
+	"github.com/CS-SI/SafeScale/lib/client"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
 )
 
 var (
