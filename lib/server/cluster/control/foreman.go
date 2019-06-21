@@ -42,22 +42,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
 var (
 	timeoutCtxHost = utils.GetLongOperationTimeout()
-
-	// funcMap defines the custome functions to be used in templates
-	funcMap = txttmpl.FuncMap{
-		// The name "inc" is what the function will be called in the template text.
-		"inc": func(i int) int {
-			return i + 1
-		},
-	}
-
-	// // systemTemplateBox ...
-	// systemTemplateBox *rice.Box
 
 	// bashLibraryContent contains the script containing bash library
 	bashLibraryContent *string
@@ -93,7 +81,7 @@ type Makers struct {
 // Foreman interface, exposes public method
 type Foreman interface {
 	Cluster() api.Cluster
-	ExecuteScript(*rice.Box, map[string]interface{}, string, map[string]interface{}, string) (int, string, string, error)
+	ExecuteScript(*rice.Box /*map[string]interface{}, */, string, map[string]interface{}, string) (int, string, string, error)
 }
 
 // foreman is the private side of Foreman...
@@ -117,7 +105,7 @@ func (b *foreman) Cluster() api.Cluster {
 
 // ExecuteScript executes the script template with the parameters on tarGetHost
 func (b *foreman) ExecuteScript(
-	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
+	box *rice.Box, tmplName string, data map[string]interface{},
 	hostID string,
 ) (int, string, string, error) {
 
@@ -128,7 +116,7 @@ func (b *foreman) ExecuteScript(
 	}
 	data["reserved_BashLibrary"] = bashLibrary
 
-	path, err := uploadTemplateToFile(box, funcMap, tmplName, data, hostID, tmplName)
+	path, err := uploadTemplateToFile(box, tmplName, data, hostID, tmplName)
 	if err != nil {
 		return 0, "", "", err
 	}
@@ -610,7 +598,7 @@ func (b *foreman) determineRequiredNodes(task concurrency.Task) (int, int, int) 
 
 // uploadTemplateToFile uploads a template named 'tmplName' coming from rice 'box' in a file to a remote host
 func uploadTemplateToFile(
-	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
+	box *rice.Box, tmplName string, data map[string]interface{},
 	hostID string, fileName string,
 ) (string, error) {
 
@@ -626,7 +614,7 @@ func uploadTemplateToFile(
 	if err != nil {
 		return "", fmt.Errorf("failed to load template: %s", err.Error())
 	}
-	tmplCmd, err := txttmpl.New(fileName).Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
+	tmplCmd, err := txttmpl.New(fileName).Parse(tmplString)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %s", err.Error())
 	}
@@ -814,7 +802,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	params["MasterIPs"] = b.cluster.ListMasterIPs(task)
 	params["CladmPassword"] = identity.AdminPassword
 
-	retcode, _, _, err := b.ExecuteScript(box, funcMap, script, params, pbHost.Id)
+	retcode, _, _, err := b.ExecuteScript(box, script, params, pbHost.Id)
 	if err != nil {
 		log.Errorf("[%s] system requirements installation failed: %s", hostLabel, err.Error())
 		return err
