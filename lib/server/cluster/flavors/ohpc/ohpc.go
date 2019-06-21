@@ -25,17 +25,16 @@ import (
 	"fmt"
 	"sync/atomic"
 	txttmpl "text/template"
+
 	// log "github.com/sirupsen/logrus"
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/ohpc/enums/ErrorCode"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
 //go:generate rice embed-go
@@ -47,20 +46,6 @@ const (
 var (
 	// templateBox is the rice box to use in this package
 	templateBox atomic.Value
-
-	// funcMap defines the custome functions to be used in templates
-	funcMap = txttmpl.FuncMap{
-		// The name "inc" is what the function will be called in the template text.
-		"inc": func(i int) int {
-			return i + 1
-		},
-		"errcode": func(msg string) int {
-			if code, ok := ErrorCode.StringMap[msg]; ok {
-				return int(code)
-			}
-			return 1023
-		},
-	}
 
 	globalSystemRequirementsContent atomic.Value
 
@@ -195,7 +180,7 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		}
 
 		// parse then execute the template
-		tmplPrepared, err := txttmpl.New("install_requirements").Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
+		tmplPrepared, err := txttmpl.New("install_requirements").Parse(tmplString)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
 		}
