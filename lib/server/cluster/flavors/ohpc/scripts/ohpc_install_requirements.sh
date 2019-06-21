@@ -26,7 +26,7 @@ install_common_requirements() {
     # Upgrade to last CentOS revision
     yum upgrade --assumeyes --tolerant && \
     yum update --assumeyes
-    [ $? -ne 0 ] && exit {{ errcode "SystemUpdate" }}
+    [ $? -ne 0 ] && exit 192
 
     # Create group nogroup
     groupadd nogroup &>/dev/null
