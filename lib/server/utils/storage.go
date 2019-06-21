@@ -77,17 +77,20 @@ func loadRsaPrivateKey(keyFilePath string) (*rsa.PrivateKey, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to save the rsa key on file '%s' : %s", keyFilePath, err.Error())
 		}
+		err = file.Close()
+		if err != nil {
+			return nil, fmt.Errorf("Failed to close the rsa key file '%s' : %s", keyFilePath, err.Error())
+		}
 	} else if err != nil {
 		return nil, fmt.Errorf("Failed to chek if file '%s' exists : %s", keyFilePath, err.Error())
-	} else {
-		file, err = os.Open(keyFilePath)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to open '%s' : %s", keyFilePath, err.Error())
-		}
 	}
 
 	var keyBytes bytes.Buffer
-	_, err := keyBytes.ReadFrom(file)
+	file, err := os.Open(keyFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to open '%s' : %s", keyFilePath, err.Error())
+	}
+	_, err = keyBytes.ReadFrom(file)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to read the keyFile : %s", err.Error())
 	}
