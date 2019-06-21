@@ -16,6 +16,51 @@
 
 package utils
 
+import (
+	"fmt"
+	"path/filepath"
+	"runtime"
+	"runtime/debug"
+	"strings"
+	"sync/atomic"
+	"time"
+
+	"github.com/pkg/errors"
+
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+var removePart atomic.Value
+
+// DecorateError changes the error to something more comprehensible when
+// timeout occured
+func DecorateError(err error, action string, timeout time.Duration) error {
+	if IsTimeout(err) {
+		if timeout > 0 {
+			return fmt.Errorf("%s took too long (> %v) to respond", action, timeout)
+		}
+		return fmt.Errorf("%s took too long to respond", action)
+	}
+	msg := err.Error()
+	if strings.Index(msg, "desc = ") != -1 {
+		pos := strings.Index(msg, "desc = ") + 7
+		msg = msg[pos:]
+
+		if strings.Index(msg, " :") == 0 {
+			msg = msg[2:]
+		}
+		return errors.New(msg)
+	}
+	return err
+}
+
+// IsTimeout tells if the err is a timeout kind
+func IsTimeout(err error) bool {
+	return status.Code(err) == codes.DeadlineExceeded
+}
+
 // errCore ...
 type errCore struct {
 	message string
@@ -95,6 +140,20 @@ func InvalidRequestError(msg string) ErrInvalidRequest {
 	}
 }
 
+// ErrAborted ...
+type ErrAborted struct {
+	errCore
+}
+
+// AbortedError creates a ErrAborted error
+func AbortedError() ErrAborted {
+	return ErrAborted{
+		errCore: errCore{
+			message: "aborted",
+		},
+	}
+}
+
 // ErrOverflow ...
 type ErrOverflow struct {
 	errCore
@@ -107,4 +166,99 @@ func OverflowError(msg string) ErrOverflow {
 			message: msg,
 		},
 	}
+}
+
+// ErrNotImplemented ...
+type ErrNotImplemented struct {
+	errCore
+}
+
+// NotImplementedError creates a ErrNotImplemented error
+func NotImplementedError(what string) ErrNotImplemented {
+	var msg string
+	if pc, file, line, ok := runtime.Caller(1); ok {
+		if f := runtime.FuncForPC(pc); f != nil {
+			filename := strings.Replace(file, getPartToRemove(), "", 1)
+			msg = fmt.Sprintf("not implemented yet: %s [%s:%d]", filepath.Base(f.Name()), filename, line)
+		}
+	}
+	if msg == "" {
+		msg = "not implemented yet!"
+	}
+
+	log.Error(Capitalize(msg))
+	return ErrNotImplemented{
+		errCore: errCore{
+			message: msg,
+		},
+	}
+}
+
+// ErrInvalidInstance ...
+type ErrInvalidInstance struct {
+	errCore
+}
+
+// InvalidInstanceError creates a ErrInvalidInstance error
+func InvalidInstanceError() ErrInvalidInstance {
+	var msg string
+	if pc, file, line, ok := runtime.Caller(2); ok {
+		if f := runtime.FuncForPC(pc); f != nil {
+			filename := strings.Replace(file, getPartToRemove(), "", 1)
+			msg = fmt.Sprintf("invalid instance: calling %s() from a nil pointer [%s:%d]\n%s", filepath.Base(f.Name()), filename, line, debug.Stack())
+		}
+	}
+	if msg == "" {
+		msg = fmt.Sprintf("invalid instance: calling from a nil pointer")
+	}
+
+	log.Error(Capitalize(msg))
+	return ErrInvalidInstance{
+		errCore: errCore{
+			message: msg,
+		},
+	}
+}
+
+// ErrInvalidParameter ...
+type ErrInvalidParameter struct {
+	errCore
+}
+
+// InvalidParameterError creates a ErrInvalidParameter error
+func InvalidParameterError(what, why string) ErrInvalidParameter {
+	var msg string
+	if pc, file, line, ok := runtime.Caller(1); ok {
+		if f := runtime.FuncForPC(pc); f != nil {
+			filename := strings.Replace(file, getPartToRemove(), "", 1)
+			msg = fmt.Sprintf("invalid parameter '%s' in %s: %s [%s:%d]\n%s", what, filepath.Base(f.Name()), why, filename, line, debug.Stack())
+		}
+	}
+	if msg == "" {
+		msg = fmt.Sprintf("nvalid parameter '%s': %s", what, why)
+	}
+
+	log.Error(Capitalize(msg))
+	return ErrInvalidParameter{
+		errCore: errCore{
+			message: msg,
+		},
+	}
+}
+
+func getPartToRemove() string {
+	if anon := removePart.Load(); anon != nil {
+		return anon.(string)
+	}
+	return "github.com/CS-SI/SafeScale/"
+}
+
+func init() {
+	var rootPath string
+	if pc, _, _, ok := runtime.Caller(0); ok {
+		if f := runtime.FuncForPC(pc); f != nil {
+			rootPath = strings.Split(f.Name(), "lib/utils/")[0]
+		}
+	}
+	removePart.Store(rootPath)
 }
