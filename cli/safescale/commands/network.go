@@ -22,7 +22,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
 // NetworkCmd command
@@ -47,16 +47,11 @@ var networkList = cli.Command{
 			Usage: "List all Networks on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		networks, err := client.New().Network.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of networks", false).Error())))
-		} else {
-			response.Succeeded(networks.GetNetworks())
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of networks", false).Error())))
 		}
-
-		return response.GetErrorWithoutMessage()
+		return clitools.SuccessResponse(networks.GetNetworks())
 	},
 }
 
@@ -66,25 +61,20 @@ var networkDelete = cli.Command{
 	Usage:     "delete Network",
 	ArgsUsage: "<Network_name> [<Network_name>...]",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Network_name>."))
-		} else {
-			var networkList []string
-			networkList = append(networkList, c.Args().First())
-			networkList = append(networkList, c.Args().Tail()...)
-
-			err := client.New().Network.Delete(networkList, client.DefaultExecutionTimeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
-			} else {
-				response.Succeeded(nil)
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Network_name>."))
 		}
 
-		return response.GetErrorWithoutMessage()
+		var networkList []string
+		networkList = append(networkList, c.Args().First())
+		networkList = append(networkList, c.Args().Tail()...)
+
+		err := client.New().Network.Delete(networkList, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "deletion of network", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -94,21 +84,16 @@ var networkInspect = cli.Command{
 	Usage:     "inspect NETWORK",
 	ArgsUsage: "<network_name>",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
-		} else {
-			network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network", false).Error())))
-			} else {
-				response.Succeeded(network)
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		return response.GetErrorWithoutMessage()
+		network, err := client.New().Network.Inspect(c.Args().First(), client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "inspection of network", false).Error())))
+		}
+		return clitools.SuccessResponse(network)
 	},
 }
 
@@ -150,32 +135,27 @@ var networkCreate = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
-		} else {
-			netdef := pb.NetworkDefinition{
-				Cidr: c.String("cidr"),
-				Name: c.Args().Get(0),
-				Gateway: &pb.GatewayDefinition{
-					Cpu:  int32(c.Int("cpu")),
-					Disk: int32(c.Int("disk")),
-					Ram:  float32(c.Float64("ram")),
-					// CpuFreq: ??,
-					ImageId: c.String("os"),
-					Name:    c.String("gwname"),
-				},
-			}
-			network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
-			} else {
-				response.Succeeded(network)
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		return response.GetErrorWithoutMessage()
+		netdef := pb.NetworkDefinition{
+			Cidr: c.String("cidr"),
+			Name: c.Args().Get(0),
+			Gateway: &pb.GatewayDefinition{
+				Cpu:  int32(c.Int("cpu")),
+				Disk: int32(c.Int("disk")),
+				Ram:  float32(c.Float64("ram")),
+				// CpuFreq: ??,
+				ImageId: c.String("os"),
+				Name:    c.String("gwname"),
+			},
+		}
+		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
+		}
+		return clitools.SuccessResponse(network)
 	},
 }
