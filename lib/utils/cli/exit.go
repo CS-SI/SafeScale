@@ -41,3 +41,8 @@ func ExitOnInvalidOption(msg string) error {
 func ExitOnRPC(msg string) error {
 	return ExitOnErrorWithMessage(ExitCode.RPC, msg)
 }
+
+// ExitOnNotFound ...
+func ExitOnNotFound(msg string) error {
+	return ExitOnErrorWithMessage(ExitCode.NotFound, msg)
+}

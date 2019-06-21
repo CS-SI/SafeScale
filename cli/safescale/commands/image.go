@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
 // ImageCmd command
@@ -43,15 +43,10 @@ var imageList = cli.Command{
 			Usage: "List all available images in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		images, err := client.New().Image.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of images", false).Error())))
-		} else {
-			response.Succeeded(images.GetImages())
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of images", false).Error())))
 		}
-
-		return response.GetErrorWithoutMessage()
+		return clitools.SuccessResponse(images.GetImages())
 	},
 }

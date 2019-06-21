@@ -28,8 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/enums/ExitCode"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/ExitCode"
 )
 
 // SSHCmd ssh command
@@ -60,30 +60,25 @@ var sshRun = cli.Command{
 			Usage: "timeout in minutes",
 		}},
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
-		} else {
-			timeout := utils.GetHostTimeout()
-			if c.IsSet("timeout") {
-				timeout = time.Duration(c.Float64("timeout")) * time.Minute
-			}
-			retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), client.DefaultConnectionTimeout, timeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
-			} else {
-				if retcode != 0 {
-					//msg := fmt.Sprintf("stdOut: %s ---- stdErr: %s", stdout, stderr)
-					_ = response.Failed(cli.NewExitError(stderr, retcode))
-				} else {
-					response.Succeeded(stdout)
-				}
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		return response.GetErrorWithoutMessage()
+		timeout := utils.GetHostTimeout()
+		if c.IsSet("timeout") {
+			timeout = time.Duration(c.Float64("timeout")) * time.Minute
+		}
+		retcode, stdout, stderr, err := client.New().Ssh.Run(c.Args().Get(0), c.String("c"), client.DefaultConnectionTimeout, timeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh run", false).Error())))
+		}
+		if retcode != 0 {
+			fmt.Printf(stderr)
+			return cli.NewExitError(stderr, retcode)
+		}
+		fmt.Printf(stdout)
+		return nil
 	},
 }
 
@@ -106,11 +101,9 @@ var sshCopy = cli.Command{
 			Usage: "timeout in minutes",
 		}},
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
-			return response.Failed(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
 		}
 
 		timeout := utils.GetHostTimeout()
@@ -119,13 +112,12 @@ var sshCopy = cli.Command{
 		}
 		retcode, _, _, err := client.New().Ssh.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), client.DefaultConnectionTimeout, timeout)
 		if err != nil {
-			return response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh copy", true).Error())))
 		}
 		if retcode != 0 {
-			return response.Failed(clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, system.SSHErrorString(retcode))))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(ExitCode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, system.SSHErrorString(retcode))))
 		}
-		response.Succeeded(nil)
-		return response.GetErrorWithoutMessage()
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -134,21 +126,15 @@ var sshConnect = cli.Command{
 	Usage:     "Connect to the host with interactive shell",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
-		} else {
-			err := client.New().Ssh.Connect(c.Args().Get(0), 0)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh connect", false).Error())))
-			} else {
-				response.Succeeded(nil)
-			}
+			return fmt.Errorf("missing mandatory argument <Host_name>")
 		}
-
-		return response.GetErrorWithoutMessage()
+		err := client.New().Ssh.Connect(c.Args().Get(0), 0)
+		if err != nil {
+			return clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh connect", false).Error()))
+		}
+		return nil
 	},
 }
 
@@ -174,34 +160,29 @@ var sshTunnel = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
-		} else {
-			localPort := c.Int("local")
-			if 0 > localPort || localPort > 65535 {
-				return response.Failed(clitools.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port\n", localPort)))
-			}
-
-			remotePort := c.Int("remote")
-			if 0 > localPort || localPort > 65535 {
-				return response.Failed(clitools.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port\n", remotePort)))
-			}
-
-			timeout := time.Duration(c.Float64("timeout")) * time.Minute
-
-			//c.GlobalInt("port") is the grpc port aka. 50051
-			err := client.New().Ssh.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh tunnel", false).Error())))
-			} else {
-				response.Succeeded(nil)
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		return response.GetErrorWithoutMessage()
+		localPort := c.Int("local")
+		if 0 > localPort || localPort > 65535 {
+			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port\n", localPort)))
+		}
+
+		remotePort := c.Int("remote")
+		if 0 > localPort || localPort > 65535 {
+			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port\n", remotePort)))
+		}
+
+		timeout := time.Duration(c.Float64("timeout")) * time.Minute
+
+		//c.GlobalInt("port") is the grpc port aka. 50051
+		err := client.New().Ssh.CreateTunnel(c.Args().Get(0), localPort, remotePort, timeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh tunnel", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -227,36 +208,31 @@ var sshClose = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			_ = response.Failed(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
-		} else {
-			strLocalPort := c.String("local")
-			if c.IsSet("local") {
-				localPort, err := strconv.Atoi(strLocalPort)
-				if err != nil || 0 > localPort || localPort > 65535 {
-					return response.Failed(clitools.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port\n", localPort)))
-				}
-			}
-			strRemotePort := c.String("remote")
-			if c.IsSet("remote") {
-				remotePort, err := strconv.Atoi(strRemotePort)
-				if err != nil || 0 > remotePort || remotePort > 65535 {
-					return response.Failed(clitools.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port\n", remotePort)))
-				}
-			}
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
+		}
 
-			timeout := time.Duration(c.Float64("timeout")) * time.Minute
-			err := client.New().Ssh.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
-			if err != nil {
-				_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh close", false).Error())))
-			} else {
-				response.Succeeded(nil)
+		strLocalPort := c.String("local")
+		if c.IsSet("local") {
+			localPort, err := strconv.Atoi(strLocalPort)
+			if err != nil || 0 > localPort || localPort > 65535 {
+				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("local port value is wrong, %d is not a valid port\n", localPort)))
+			}
+		}
+		strRemotePort := c.String("remote")
+		if c.IsSet("remote") {
+			remotePort, err := strconv.Atoi(strRemotePort)
+			if err != nil || 0 > remotePort || remotePort > 65535 {
+				return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("remote port value is wrong, %d is not a valid port\n", remotePort)))
 			}
 		}
 
-		return response.GetErrorWithoutMessage()
+		timeout := time.Duration(c.Float64("timeout")) * time.Minute
+		err := client.New().Ssh.CloseTunnels(c.Args().Get(0), strLocalPort, strRemotePort, timeout)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "ssh close", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }

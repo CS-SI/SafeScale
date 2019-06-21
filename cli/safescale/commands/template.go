@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
 // TemplateCmd command
@@ -43,15 +43,10 @@ var templateList = cli.Command{
 			Usage: "List all available templates in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
-		response := utils.NewCliResponse()
-
 		templates, err := client.New().Template.List(c.Bool("all"), client.DefaultExecutionTimeout)
 		if err != nil {
-			_ = response.Failed(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of templates", false).Error())))
-		} else {
-			response.Succeeded(templates.GetTemplates())
+			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "list of templates", false).Error())))
 		}
-
-		return response.GetErrorWithoutMessage()
+		return clitools.SuccessResponse(templates.GetTemplates())
 	},
 }
