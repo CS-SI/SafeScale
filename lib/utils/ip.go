@@ -1,10 +1,29 @@
+/*
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package utils
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 )
+
+var networks = map[string]*net.IPNet{}
 
 // CIDRToIPv4Range converts CIDR to IPv4 range
 func CIDRToIPv4Range(cidr string) (string, string, error) {
@@ -19,10 +38,14 @@ func CIDRToIPv4Range(cidr string) (string, string, error) {
 	return ipStart, ipEnd, nil
 }
 
-// CIDRToLongRange converts CIDR to IPv4 range
+// CIDRToLongRange converts CIDR to range of long values (representing IPv4 addresses)
 func CIDRToLongRange(cidr string) (uint32, uint32, error) {
 	if cidr == "" {
-		return 0, 0, fmt.Errorf("Invalid parameter 'cidr': can't be empty string")
+		return 0, 0, InvalidParameterError("cidr", "can't be empty string")
+	}
+	_, _, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return 0, 0, InvalidParameterError("cidr", "Not a valid CIDR")
 	}
 
 	var (
@@ -62,4 +85,30 @@ func IPv4ToLong(ip string) uint32 {
 // LongToIPv4 converts uint32 to IP
 func LongToIPv4(value uint32) string {
 	return fmt.Sprintf("%d.%d.%d.%d", value>>24, (value&0x00FFFFFF)>>16, (value&0x0000FFFF)>>8, value&0x000000FF)
+}
+
+// IsCIDRRoutable tells if the network is routable
+func IsCIDRRoutable(cidr string) (bool, error) {
+	first, last, err := CIDRToIPv4Range(cidr)
+	if err != nil {
+		return false, err
+	}
+	splitted := strings.Split(cidr, "/")
+	firstIP, _, _ := net.ParseCIDR(first + "/" + splitted[1])
+	lastIP, _, _ := net.ParseCIDR(last + "/" + splitted[1])
+	for _, nr := range networks {
+		if nr.Contains(firstIP) && nr.Contains(lastIP) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func init() {
+	notRoutables := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
+
+	for _, n := range notRoutables {
+		_, ipnet, _ := net.ParseCIDR(n)
+		networks[n] = ipnet
+	}
 }
