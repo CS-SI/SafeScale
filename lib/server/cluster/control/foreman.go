@@ -789,6 +789,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		}
 		globalSystemRequirements = *result
 	}
+	params["reserved_CommonRequirements"] = globalSystemRequirements
 
 	var dnsServers []string
 	cfg, err := b.cluster.GetService(task).GetCfgOpts()
@@ -796,11 +797,13 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
 	identity := b.cluster.GetIdentity(task)
-	params["reserved_CommonRequirements"] = globalSystemRequirements
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
 	params["MasterIPs"] = b.cluster.ListMasterIPs(task)
 	params["CladmPassword"] = identity.AdminPassword
+	netCfg := b.cluster.GetNetworkConfig(task)
+	params["GatewayIP"] = netCfg.GatewayIP
+	params["PublicIP"] = netCfg.PublicIP
 
 	retcode, _, _, err := b.ExecuteScript(box, script, params, pbHost.Id)
 	if err != nil {

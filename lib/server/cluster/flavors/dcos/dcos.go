@@ -40,8 +40,6 @@ import (
 //go:generate rice embed-go
 
 const (
-	dcosVersion string = "1.11.6"
-
 	bootstrapHTTPPort = 10080
 
 	centos = "CentOS 7.3"
@@ -61,6 +59,7 @@ var (
 		DefaultMasterSizing:         masterSizing,
 		DefaultNodeSizing:           nodeSizing,
 		DefaultImage:                defaultImage,
+		ConfigureGateway:            configureGateway,
 		ConfigureMaster:             configureMaster,
 		ConfigureNode:               configureNode,
 		GetTemplateBox:              getTemplateBox,
@@ -105,7 +104,7 @@ func masterSizing(task concurrency.Task, foreman control.Foreman) resources.Host
 
 func nodeSizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
 	return resources.HostDefinition{
-		Cores:    4,
+		Cores:    2,
 		RAMSize:  15.0,
 		DiskSize: 100,
 	}
@@ -164,14 +163,10 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index int, ho
 }
 
 func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType NodeType.Enum) (string, map[string]interface{}) {
-	data := map[string]interface{}{
-		"DCOSVersion": dcosVersion,
-	}
+	data := map[string]interface{}{}
 
 	var script string
 	switch hostType {
-	case NodeType.Gateway:
-		script = "dcos_prepare_bootstrap.sh"
 	case NodeType.Master:
 		script = "dcos_install_master.sh"
 	case NodeType.Node:
@@ -219,7 +214,6 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 	return nil
 }
 
-// TODO: make templateBox an AtomicValue
 func getTemplateBox() (*rice.Box, error) {
 	anon := templateBox.Load()
 	if anon == nil {
