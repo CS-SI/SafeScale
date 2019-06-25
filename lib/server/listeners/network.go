@@ -116,7 +116,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 // Inspect returns infos on a network
 func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Network, error) {
 	log.Infof("Listeners: network inspect '%s' called'", in.Name)
-	defer log.Debugf("safescale.server.listeners.NetworkListener.Inspect(%s) done'", in.Name)
+	defer log.Debugf("lib.server.listeners.NetworkListener.Inspect(%s) done'", in.Name)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
