@@ -196,7 +196,8 @@ export -f sfRetry
 sfFirewall() {
 	[ $# -eq 0 ] && return 0
 	which firewall-cmd &>/dev/null || return 1
-	firewall-cmd "$@"
+	# sudo may be superfluous if executed as root, but won't harm
+	sudo firewall-cmd "$@"
 }
 export -f sfFirewall
 
@@ -210,7 +211,8 @@ export -f sfFirewallAdd
 # sfFirewallReload reloads firewall rules
 sfFirewallReload() {
 	which firewall-cmd &>/dev/null || return 1
-	firewall-cmd --reload
+	# sudo may be superfluous if executed as root, but won't harm
+	sudo firewall-cmd --reload
 }
 export -f sfFirewallReload
 
@@ -219,8 +221,8 @@ sfInstall() {
 	case $LINUX_KIND in
 		debian|ubuntu)
 			export DEBIAN_FRONTEND=noninteractive
-			sfRetry 5m 3 "sfWaitForApt && apt-get update"
-			apt-get install $1 -y || exit 194
+			sfRetry 5m 3 "sfApt update"
+			sfApt install $1 -y || exit 194
 			which $1 || exit 194
 			;;
 		centos|rhel)
