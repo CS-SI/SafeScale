@@ -285,8 +285,8 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 // Inspect an host
 func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host, error) {
 	log.Infof("Receiving 'host inspect %s'", in.Name)
-	log.Debugf(">>> safescale.server.listeners.HostListener::Inspect(%s)", in.Name)
-	defer log.Debugf("<<< safescale.server.listeners.HostListener::Inspect(%s)", in.Name)
+	log.Debugf(">>> lib.server.listeners.HostListener::Inspect(%s)", in.Name)
+	defer log.Debugf("<<< lib.server.listeners.HostListener::Inspect(%s)", in.Name)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -316,8 +316,8 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host,
 // Delete an host
 func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_protobuf.Empty, error) {
 	log.Infof("Receiving 'host delete %s'", in.Name)
-	log.Debugf(">>> safescale.server.listeners.HostListener::Delete(%s)", in.Name)
-	defer log.Debugf("<<< safescale.server.Listeners.HostListener::Delete(%s)", in.Name)
+	log.Debugf(">>> lib.server.listeners.HostListener::Delete(%s)", in.Name)
+	defer log.Debugf("<<< lib.server.Listeners.HostListener::Delete(%s)", in.Name)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -347,8 +347,8 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (*google_pr
 
 // SSH returns ssh parameters to access an host
 func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig, error) {
-	log.Debugf(">>> safescale.server.listeners.HostListener::SSH(%s)", in.Name)
-	defer log.Debugf("<<< safescale.server.listeners.HostListener::SSH(%s)", in.Name)
+	log.Debugf(">>> lib.server.listeners.HostListener::SSH(%s)", in.Name)
+	defer log.Debugf("<<< lib.server.listeners.HostListener::SSH(%s)", in.Name)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
