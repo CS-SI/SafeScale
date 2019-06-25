@@ -435,7 +435,7 @@ sfDetectFacts() {
 			else
 					[ -f /etc/redhat-release ] && {
 							LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
-							LINUX_KID=${LINUX_KIND,,}
+							LINUX_KIND=${LINUX_KIND,,}
 							VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
 					}
 			fi
