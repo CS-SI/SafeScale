@@ -23,10 +23,11 @@ package swarm
 import (
 	"bytes"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"strings"
 	"sync/atomic"
 	txttmpl "text/template"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
 
 	rice "github.com/GeertJohan/go.rice"
 	// log "github.com/sirupsen/logrus"
@@ -44,7 +45,7 @@ import (
 //go:generate rice embed-go
 
 const (
-	// tempFolder = "/opt/safescale/var/tmp/"
+// tempFolder = "/opt/safescale/var/tmp/"
 )
 
 var (
@@ -247,26 +248,26 @@ func getTemplateBox() (*rice.Box, error) {
 }
 
 // getGlobalSystemRequirements returns the string corresponding to the script swarm_install_requirements.sh
-// which installs common features (docker in particular)
-func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman) (*string, error) {
+// which installs common features
+func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman) (string, error) {
 	anon := globalSystemRequirementsContent.Load()
 	if anon == nil {
 		// find the rice.Box
 		box, err := getTemplateBox()
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 
 		// get file contents as string
 		tmplString, err := box.String("swarm_install_requirements.sh")
 		if err != nil {
-			return nil, fmt.Errorf("error loading script template: %s", err.Error())
+			return "", fmt.Errorf("error loading script template: %s", err.Error())
 		}
 
 		// parse then execute the template
 		tmplPrepared, err := txttmpl.New("install_requirements").Parse(tmplString)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+			return "", fmt.Errorf("error parsing script template: %s", err.Error())
 		}
 		dataBuffer := bytes.NewBufferString("")
 		cluster := foreman.Cluster()
@@ -279,13 +280,12 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		}
 		err = tmplPrepared.Execute(dataBuffer, data)
 		if err != nil {
-			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
+			return "", fmt.Errorf("error realizing script template: %s", err.Error())
 		}
-		result := dataBuffer.String()
-		globalSystemRequirementsContent.Store(&result)
+		globalSystemRequirementsContent.Store(dataBuffer.String())
 		anon = globalSystemRequirementsContent.Load()
 	}
-	return anon.(*string), nil
+	return anon.(string), nil
 }
 
 func unconfigureNode(task concurrency.Task, foreman control.Foreman, pbHost *pb.Host, selectedMaster string) error {

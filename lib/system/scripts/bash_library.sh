@@ -196,7 +196,8 @@ export -f sfRetry
 sfFirewall() {
 	[ $# -eq 0 ] && return 0
 	which firewall-cmd &>/dev/null || return 1
-	firewall-cmd "$@"
+	# sudo may be superfluous if executed as root, but won't harm
+	sudo firewall-cmd "$@"
 }
 export -f sfFirewall
 
@@ -210,7 +211,8 @@ export -f sfFirewallAdd
 # sfFirewallReload reloads firewall rules
 sfFirewallReload() {
 	which firewall-cmd &>/dev/null || return 1
-	firewall-cmd --reload
+	# sudo may be superfluous if executed as root, but won't harm
+	sudo firewall-cmd --reload
 }
 export -f sfFirewallReload
 
@@ -219,8 +221,8 @@ sfInstall() {
 	case $LINUX_KIND in
 		debian|ubuntu)
 			export DEBIAN_FRONTEND=noninteractive
-			sfRetry 5m 3 "sfWaitForApt && apt-get update"
-			apt-get install $1 -y || exit 194
+			sfRetry 5m 3 "sfApt update"
+			sfApt install $1 -y || exit 194
 			which $1 || exit 194
 			;;
 		centos|rhel)
@@ -409,9 +411,9 @@ sfService() {
 sfRandomString() {
 	local count=16
 	[ $# -ge 1 ] && count=$1
-	local characters="[:graph:]"
-	[ $# -ge 2 ] && characters="$2"
-	</dev/urandom tr -dc "$characters" | head -c${count}
+	local charset="[:graph:]"
+	[ $# -ge 2 ] && charset="$2"
+	</dev/urandom tr -dc "$charset" | head -c${count}
 }
 
 declare -A FACTS
@@ -433,7 +435,7 @@ sfDetectFacts() {
 			else
 					[ -f /etc/redhat-release ] && {
 							LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
-							LINUX_KID=${LINUX_KIND,,}
+							LINUX_KIND=${LINUX_KIND,,}
 							VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
 					}
 			fi

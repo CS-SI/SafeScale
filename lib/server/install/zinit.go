@@ -38,13 +38,14 @@ func init() {
 		proxycacheServerFeature(),
 		proxycacheClientFeature(),
 		apacheIgniteFeature(),
-		//		elasticSearchFeature(),
+		elasticsearchFeature(),
+		logstashFeature(),
 		metricbeatFeature(),
 		filebeatFeature(),
+		kibanaFeature(),
 		helmFeature(),
 		sparkFeature(),
 		keycloakFeature(),
-		kibanaFeature(),
 		elassandraFeature(),
 	}
 

@@ -164,25 +164,25 @@ func getTemplateBox() (*rice.Box, error) {
 	return anon.(*rice.Box), nil
 }
 
-func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman) (*string, error) {
+func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman) (string, error) {
 	anon := globalSystemRequirementsContent.Load()
 	if anon == nil {
 		// find the rice.Box
 		box, err := getTemplateBox()
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 
 		// get file contents as string
 		tmplString, err := box.String("ohpc_install_requirements.sh")
 		if err != nil {
-			return nil, fmt.Errorf("error loading script template: %s", err.Error())
+			return "", fmt.Errorf("error loading script template: %s", err.Error())
 		}
 
 		// parse then execute the template
 		tmplPrepared, err := txttmpl.New("install_requirements").Parse(tmplString)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+			return "", fmt.Errorf("error parsing script template: %s", err.Error())
 		}
 		dataBuffer := bytes.NewBufferString("")
 		cluster := foreman.Cluster()
@@ -194,11 +194,11 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 			"SSHPrivateKey": identity.Keypair.PrivateKey,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("error realizing script template: %s", err.Error())
+			return "", fmt.Errorf("error realizing script template: %s", err.Error())
 		}
 		result := dataBuffer.String()
 		globalSystemRequirementsContent.Store(&result)
 		anon = globalSystemRequirementsContent.Load()
 	}
-	return anon.(*string), nil
+	return anon.(string), nil
 }
