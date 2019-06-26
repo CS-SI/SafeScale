@@ -21,15 +21,16 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/boh"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/k8s"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/swarm"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
@@ -102,10 +103,7 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 	flavor := controller.GetIdentity(task).Flavor
 	switch flavor {
 	case Flavor.DCOS:
-		// err := controller.Restore(task, control.NewForeman(controller, dcos.Makers))
-		// if err != nil {
-		// 	return err
-		// }
+		controller.Restore(task, control.NewForeman(controller, dcos.Makers))
 	case Flavor.BOH:
 		controller.Restore(task, control.NewForeman(controller, boh.Makers))
 	// case Flavor.OHPC:
@@ -122,7 +120,7 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 
 // Create creates a cluster following the parameters of the request
 func Create(task concurrency.Task, req control.Request) (api.Cluster, error) {
-	log.Debugf(">>> safescale.server.cluster.factory::Create()")
+	log.Debugf(">>> lib.server.cluster.factory::Create()")
 	defer log.Debugf("<<< safescale.cluster.factory::Create()")
 
 	// Validates parameters
@@ -152,11 +150,11 @@ func Create(task concurrency.Task, req control.Request) (api.Cluster, error) {
 		if err != nil {
 			return nil, err
 		}
-	// case Flavor.DCOS:
-	// 	err = control.Create(task, req, control.NewForeman(controller, dcos.Makers))
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
+	case Flavor.DCOS:
+		err = controller.Create(task, req, control.NewForeman(controller, dcos.Makers))
+		if err != nil {
+			return nil, err
+		}
 	case Flavor.K8S:
 		err = controller.Create(task, req, control.NewForeman(controller, k8s.Makers))
 		if err != nil {

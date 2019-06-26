@@ -71,8 +71,8 @@ func (handler *NetworkHandler) Create(
 	cpu int, ram float32, disk int, theos string, gwname string,
 ) (*resources.Network, error) {
 
-	log.Debugf(">>> safescale.server.handlers.NetworkHandler::Create()")
-	defer log.Debugf("<<< safescale.server.handlers.NetworkHandler::Create()")
+	log.Debugf(">>> lib.server.handlers.NetworkHandler::Create()")
+	defer log.Debugf("<<< lib.server.handlers.NetworkHandler::Create()")
 
 	// Verify that the network doesn't exist first
 	_, err := handler.service.GetNetworkByName(name)
@@ -330,8 +330,8 @@ func (handler *NetworkHandler) Create(
 
 // List returns the network list
 func (handler *NetworkHandler) List(ctx context.Context, all bool) ([]*resources.Network, error) {
-	log.Debugf(">>> safescale.server.handlers.NetworkHandler::List(%v)", all)
-	defer log.Debugf("<<< safescale.server.handlers.NetworkHandler::List(%v)", all)
+	log.Debugf(">>> lib.server.handlers.NetworkHandler::List(%v)", all)
+	defer log.Debugf("<<< lib.server.handlers.NetworkHandler::List(%v)", all)
 
 	if all {
 		return handler.service.ListNetworks()
@@ -355,8 +355,8 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) ([]*resources
 
 // Inspect returns the network identified by ref, ref can be the name or the id
 func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (*resources.Network, error) {
-	defer log.Debugf("<<< safescale.server.handlers.NetworkHandler::Inspect(%s)", ref)
-	log.Debugf(">>> safescale.server.handlers.NetworkHandler::Inspect(%s)", ref)
+	defer log.Debugf("<<< lib.server.handlers.NetworkHandler::Inspect(%s)", ref)
+	log.Debugf(">>> lib.server.handlers.NetworkHandler::Inspect(%s)", ref)
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {
@@ -367,8 +367,8 @@ func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (*resour
 
 // Delete deletes network referenced by ref
 func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
-	log.Debugf(">>> safescale.server.handlers.NetworkHandler::Delete(%s)", ref)
-	defer log.Debugf("<<< safescale.server.handlers.NetworkHandler::Delete(%s)", ref)
+	log.Debugf(">>> lib.server.handlers.NetworkHandler::Delete(%s)", ref)
+	defer log.Debugf("<<< lib.server.handlers.NetworkHandler::Delete(%s)", ref)
 
 	mn, err := metadata.LoadNetwork(handler.service, ref)
 	if err != nil {

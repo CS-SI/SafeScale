@@ -19,14 +19,10 @@ feature:
     suitableFor:
         host: yes
         cluster: all
-    requirements:
-        features:
-            - elassandra
-            - kibana
     parameters:
         - ElasticsearchPort=9200
-        - ElasticsearchHost=localhost
-        - KibanaURL=http://localhost:5061/
+        - ElasticsearchHost={{ .HostIP }}
+        - KibanaURL=http://{{ .HostIP }}:5061/
 
     install:
         bash:
@@ -149,17 +145,17 @@ feature:
                             {{- if .ClusterFlavor }}
                               hosts:
                               {{- range .MasterIPs }}
-                                - "{{.}}"
+                                - "{{ . }}"
                               {{ end -}}
                             {{ else }}
                               hosts:
-                                - "{{.HostIP}}"
+                                - "{{ .ElasticsearchHost }}"
                             {{ end -}}
                               protocol: http
-                              port: {{.ElasticsearchPort}}
+                              port: {{ .ElasticsearchPort }}
 
-                            # xpack.monitoring:
-                            #   enabled: false
+                            xpack.monitoring:
+                              enabled: false
                             EOF
                             exit 0
 

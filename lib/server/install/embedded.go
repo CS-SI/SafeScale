@@ -150,9 +150,24 @@ func nexusFeature() *Feature {
 	}
 }
 
-// elasticSearchFeature ...
-func elasticSearchFeature() *Feature {
+// elasticsearchFeature ...
+func elasticsearchFeature() *Feature {
 	name := "elasticsearch"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// logstashFeature ...
+func logstashFeature() *Feature {
+	name := "logstash"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())

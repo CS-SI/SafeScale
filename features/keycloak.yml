@@ -750,7 +750,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            DB_PASSWORD=$(sfRandomString 16 "[:alnum:]")
+                            DB_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
 
                             {{ if .ClusterFlavor }}
                             IMAGE=keycloak4safescale
@@ -780,7 +780,7 @@ feature:
                                         timeout: 5s
                                         retries: 5
 
-                                keycloak:
+                                server:
                                     image: $IMAGE
                                     depends_on:
                                         db:
@@ -798,7 +798,6 @@ feature:
                                         # - ROOT_LOGLEVEL=DEBUG
                                     networks:
                                         ${KONG_PUB_NET}:
-                                        #${KONG_NET_PREFIX}svc_net:
                                         dbnet:
                                     ports:
                                         - '{{ .HostIP }}:8443:8443'
@@ -807,8 +806,6 @@ feature:
                             networks:
                                 ${KONG_PUB_NET}:
                                     external: true
-                                # ${KONG_NET_PREFIX}svc_net:
-                                #     external: true
                                 dbnet:
                                     internal: true
                             EOF
@@ -827,7 +824,7 @@ feature:
                             PREFIX=keycloak
                             {{ end }}
 
-                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_keycloak_1 | grep running
+                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep running
 
             remove:
                 pace: compose
