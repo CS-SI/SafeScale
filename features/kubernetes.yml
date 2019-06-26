@@ -21,34 +21,35 @@ feature:
         features:
             - docker
             - docker-compose
+        # "clusterSizing" not honored currently
         clusterSizing:
             dcos:
                 small:
-                    minPrivateNodes: 2
+                    nodes: "count >= 2, cpu >= 2"   # 1 master, 1 node
                 normal:
-                    minPrivateNodes: 4
+                    nodes: "count >= 4, cpu >= 2"   # 3 masters, 1 node
                 large:
-                    minPrivateNodes: 6
+                    nodes: "count >= 6, cpu >= 2 "  # 3 masters, 3 nodes
             boh:
                 small:
-                    minMasters: 1
-                    minPrivateNodes: 1
+                    masters: "count >= 1, cpu >= 2"
+                    nodes:   "count >= 1, cpu >= 2"
                 normal:
-                    minMasters: 3
-                    minPrivateNodes: 1
+                    masters: "count >= 3, cpu >= 2"
+                    nodes:   "count >= 1, cpu >= 2"
                 large:
-                    minMasters: 3
-                    minPrivateNodes: 3
+                    masters: "count >= 3, cpu >= 2"
+                    nodes:   "count >= 3, cpu >= 2"
             k8s:
                 small:
-                    minMasters: 1
-                    minPrivateNodes: 1
+                    masters: "cpu >= 2"
+                    nodes:   "cpu >= 2"
                 normal:
-                    minMasters: 3
-                    minPrivateNodes: 3
+                    masters: "count >= 3, cpu >= 2"
+                    nodes:   "count >= 3, cpu >= 2"
                 large:
-                    minMasters: 5
-                    minPrivateNodes: 8
+                    masters: "count >= 5, cpu >= 2"
+                    nodes:   "count >= 8, cpu >= 2"
     parameters:
         - AllowPodsOnMasters=false
         - CNI=flannel

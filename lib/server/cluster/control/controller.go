@@ -78,7 +78,7 @@ func (c *Controller) replace(task concurrency.Task, src *Controller) {
 // Restore restores full ability of a Cluster controller by binding with appropriate Foreman
 func (c *Controller) Restore(task concurrency.Task, foreman *foreman) {
 	if c == nil {
-		panic("Calling safescale.server.cluster.control.Controller::Restore() from nil pointer!")
+		panic("Calling lib.server.cluster.control.Controller::Restore() from nil pointer!")
 	}
 
 	c.Lock(task)
@@ -89,7 +89,7 @@ func (c *Controller) Restore(task concurrency.Task, foreman *foreman) {
 // Create creates the necessary infrastructure of the Cluster
 func (c *Controller) Create(task concurrency.Task, req Request, foreman *foreman) error {
 	if foreman == nil {
-		panic("Calling safescale.server.cluster.control.Controller::Create() from nil pointer!")
+		panic("Calling lib.server.cluster.control.Controller::Create() from nil pointer!")
 	}
 	if task == nil {
 		task = concurrency.RootTask()
@@ -126,7 +126,7 @@ func (c *Controller) GetService(task concurrency.Task) *iaas.Service {
 // GetIdentity returns the core data of a cluster
 func (c *Controller) GetIdentity(task concurrency.Task) identity.Identity {
 	if c == nil {
-		panic("Calling safescale.server.cluster.control.Controller::GetIdentity() from nil pointer!")
+		panic("Calling lib.server.cluster.control.Controller::GetIdentity() from nil pointer!")
 	}
 	c.RLock(task)
 	defer c.RUnlock(task)
@@ -136,7 +136,7 @@ func (c *Controller) GetIdentity(task concurrency.Task) identity.Identity {
 // GetProperties returns the properties of the cluster
 func (c *Controller) GetProperties(task concurrency.Task) *serialize.JSONProperties {
 	if c == nil {
-		panic("Calling safescale.server.cluster.control.Controller::GetProperties() from nil pointer!")
+		panic("Calling lib.server.cluster.control.Controller::GetProperties() from nil pointer!")
 	}
 	if task == nil {
 		task = concurrency.RootTask()
@@ -149,7 +149,7 @@ func (c *Controller) GetProperties(task concurrency.Task) *serialize.JSONPropert
 // GetNetworkConfig returns the network configuration of the cluster
 func (c *Controller) GetNetworkConfig(task concurrency.Task) (config clusterpropsv1.Network) {
 	if c == nil {
-		panic("Calling safescale.server.cluster.control.Controller::GetNetworkConfig() from nil pointer!")
+		panic("Calling lib.server.cluster.control.Controller::GetNetworkConfig() from nil pointer!")
 	}
 	if task == nil {
 		task = concurrency.RootTask()
@@ -387,8 +387,8 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 		task = concurrency.RootTask()
 	}
 
-	log.Debugf(">>>{task %s} safescale.server.cluster.control.Controller::UpdateMetadata()", task.ID())
-	defer log.Debugf("<<<{task %s} safescale.server.cluster.control.Controller::UpdateMetadata()", task.ID())
+	log.Debugf(">>>{task %s} lib.server.cluster.control.Controller::UpdateMetadata()", task.ID())
+	defer log.Debugf("<<<{task %s} lib.server.cluster.control.Controller::UpdateMetadata()", task.ID())
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -463,8 +463,8 @@ func (c *Controller) AddNode(task concurrency.Task, req *resources.HostDefinitio
 
 // AddNodes adds <count> nodes
 func (c *Controller) AddNodes(task concurrency.Task, count int, req *resources.HostDefinition) ([]string, error) {
-	log.Debugf(">>> safescale.server.cluster.control.Controller::AddNodes(%d)", count)
-	defer log.Debugf("<<< safescale.server.cluster.control.Controller::AddNodes(%d)", count)
+	log.Debugf(">>> lib.server.cluster.control.Controller::AddNodes(%d)", count)
+	defer log.Debugf("<<< lib.server.cluster.control.Controller::AddNodes(%d)", count)
 
 	if task == nil {
 		task = concurrency.RootTask()
@@ -756,11 +756,11 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 
 // deleteNode deletes the node specified by its ID
 func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node, selectedMaster string) error {
-	log.Debugf(">>> safescale.server.cluster.control.Controller::deleteNode(%s)", node.Name)
-	defer log.Debugf("<<< safescale.server.cluster.control.Controller::deleteNode(%s)", node.Name)
+	log.Debugf(">>> lib.server.cluster.control.Controller::deleteNode(%s)", node.Name)
+	defer log.Debugf("<<< lib.server.cluster.control.Controller::deleteNode(%s)", node.Name)
 
 	if c == nil {
-		panic("Calling safescale.server.cluster.control.Controller::deleteNode() from nil pointer!")
+		panic("Calling lib.server.cluster.control.Controller::deleteNode() from nil pointer!")
 	}
 	if node == nil {
 		panic("parameter 'node' is nil!")
@@ -834,7 +834,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 // Delete destroys everything related to the infrastructure built for the Cluster
 func (c *Controller) Delete(task concurrency.Task) error {
 	if c == nil {
-		panic("Calling safescale.server.cluster.control.Controller::Delete from nil pointer!")
+		panic("Calling lib.server.cluster.control.Controller::Delete from nil pointer!")
 	}
 
 	if task == nil {
