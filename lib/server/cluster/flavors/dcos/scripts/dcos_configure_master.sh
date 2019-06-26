@@ -17,11 +17,11 @@
 # Installs and configure a master node
 # This script must be executed on server to configure as master node
 
-# Redirects outputs to boh_configure_master.log
-rm -f /opt/safescale/var/log/boh_configure_master.log
+# Redirects outputs to dcos_configure_master.log
+rm -f /opt/safescale/var/log/dcos_configure_master.log
 exec 1<&-
 exec 2<&-
-exec 1<>/opt/safescale/var/log/boh_configure_master.log
+exec 1<>/opt/safescale/var/log/dcos_configure_master.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}
@@ -32,11 +32,10 @@ exec 2>&1
 
 # Get install script from Bootstrap server
 download_dcos_install() {
-    mkdir -p /usr/local/dcos
-    cd /usr/local/dcos
-    [ ! -f dcos_install.sh ] && {
+    mkdir -p ${SF_VARDIR}/dcos
+    [ ! -f ${SF_VARDIR}/dcos/dcos_install.sh ] && {
         local URL=http://{{ .BootstrapIP }}:{{ .BootstrapPort }}/dcos_install.sh
-        sfRetry 10m 5 curl -kqSsL -o dcos_install.sh $URL || exit $?
+        sfRetry 10m 5 curl -kqSsL -o ${SF_VARDIR}/dcos/dcos_install.sh $URL || exit $?
     }
     exit 0
 }
@@ -81,16 +80,22 @@ sfAsyncStart DKB 10m bash -c download_kubectl_binary
 echo "Waiting for DCOS Installer download..."
 sfAsyncWait DDI || exit 192
 
+# Needed modules for DCOS
+for i in raid1 dm_raid; do
+    echo $i >>/etc/modules
+    modprobe $i
+done
+
 # Launch DCOS installation
-cd /usr/local/dcos
-bash dcos_install.sh master || exit 193
+cd ${SF_VARDIR}/dcos
+bash ./dcos_install.sh master || exit 193
 
 # Sets the url of the dcos master
 echo "Waiting for DCOS cli download..."
 sfAsyncWait DDB || exit 194
 cat >>~cladm/.bashrc <<-EOF
 # Makes sure dcos is configured correctly
-dcos cluster setup https://localhost &>/dev/null
+dcos cluster setup http://master.mesos/ &>/dev/null
 EOF
 chown -R cladm:cladm ~cladm
 

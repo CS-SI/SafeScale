@@ -1,0 +1,187 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+    requirements:
+        features:
+            - docker
+            - docker-compose
+    parameters:
+        - ElasticsearchURL=http://localhost:9200/
+
+    install:
+        bash:
+            check:
+                pace: present
+                steps:
+                    present:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            [ -d ${SF_ETCDIR}/logstash ] || exit 192
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'logstash:7.1.1' &>/dev/null || exit 193
+                            exit 0
+
+            add:
+                pace: image,config,start,ready
+                steps:
+                    image:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            docker pull logstash:7.1.1
+
+                    config:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/logstash/pipeline
+
+                            {{ if .ClusterFlavor }}
+                            ES_URL="{{- range .MasterIPs }}'{{.}}:9200',{{ end -}}"
+                            ES_URL=${ES_URL%,}
+                            {{ else }}
+                            ES_URL="'{{ .ElasticsearchURL }}'"
+                            {{end}}
+
+                            cat >${SF_ETCDIR}/logstash/pipeline/rsyslog.conf <<-EOF
+                            input {
+                                # rsyslog
+                                tcp {
+                                    port => 5000
+                                    type => syslog
+                                }
+                                udp {
+                                    port => 5000
+                                    type => syslog
+                                }
+                            }
+                            filter {
+                                if [type] == "syslog" {
+                                    grok {
+                                        match => { "message" => "%{SYSLOGTIMESTAMP:syslog_timestamp} %{SYSLOGHOST:syslog_hostname} %{DATA:syslog_program}(?:\[%{POSINT:syslog_pid}\])?: %{GREEDYDATA:syslog_message}" }
+                                        add_field => [ "received_at", "%{@timestamp}" ]
+                                        add_field => [ "received_from", "%{host}" ]
+                                    }
+                                    date {
+                                        match => [ "syslog_timestamp", "MMM  d HH:mm:ss", "MMM dd HH:mm:ss" ]
+                                    }
+                                }
+                            }
+                            output {
+                                elasticsearch { hosts => [ ${ES_URL} ] }
+                                stdout { codec => rubydebug }
+                            }
+                            EOF
+
+                            cat >${SF_ETCDIR}/logstash/pipeline/gelf.conf <<-EOF
+                            input {
+                                # Gelf
+                                tcp {
+                                    port => 12201
+                                    type => gelf
+                                }
+                            }
+                            output {
+                                elasticsearch { hosts => [ ${ES_URL} ] }
+                                stdout { codec => rubydebug }
+                            }
+                            EOF
+
+                            HOSTNAME_PREFIX=logstash
+                            {{ if .ClusterFlavor }}
+                            HOSTNAME_PREFIX="${HOSTNAME_PREFIX}4safescale"
+                            {{ end }}
+
+                            cat >${SF_ETCDIR}/logstash/docker-compose.yml <<-EOF
+                            version: '2.1'
+
+                            services:
+                                server:
+                                    image: logstash:7.1.1
+                                    ports:
+                                        - "{{ .HostIP }}:5000:5000"
+                                        - "{{ .HostIP }}:5000:5000/udp"
+                                        - "{{ .HostIP }}:12201:12201/udp"
+                                    volumes:
+                                        - ${SF_ETCDIR}/logstash/pipeline/:/usr/share/logstash/pipeline/:ro
+                                    restart: always
+                            EOF
+                            exit 0
+
+                    start:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            {{ if .ClusterFlavor }}
+                            OPTIONS="-p logstash4safescale"
+                            {{ else }}
+                            OPTIONS=
+                            {{ end }}
+                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d
+
+                    ready:
+                        targets:
+                            hosts: yes
+                            masters: any
+                            nodes: no
+                        run: |
+                            {{ if .ClusterFlavor }}
+                            PREFIX="logstash4safescale"
+                            {{ else }}
+                            PREFIX="logstash"
+                            {{ end }}
+                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running
+
+            remove:
+                pace: stop,remove
+                steps:
+                    stop:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            {{ if .ClusterFlavor }}
+                            OPTIONS="-p logstash4safescale"
+                            {{ else }}
+                            OPTIONS=
+                            {{ end }}
+                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force || exit 192
+
+                    remove:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            docker image rm -f logstash:7.1.1
+                            rm -rf ${SF_ETCDIR}/logstash
+                            exit 0
+
+...

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils"
 
 	log "github.com/sirupsen/logrus"
 
@@ -119,11 +120,12 @@ func (w *worker) ConcernCluster() bool {
 // CanProceed tells if the combination Feature/Target can work
 func (w *worker) CanProceed(s Settings) error {
 	if w.cluster != nil {
-		err := w.validateContextForCluster()
-		if err == nil && !s.SkipSizingRequirements {
-			err = w.validateClusterSizing()
-		}
-		return err
+		// err := w.validateContextForCluster()
+		// if err == nil && !s.SkipSizingRequirements {
+		// 	err = w.validateClusterSizing()
+		// }
+		// return err
+		return nil
 	}
 	return w.validateContextForHost()
 }
@@ -583,23 +585,38 @@ func (w *worker) validateClusterSizing() error {
 	if !w.feature.specs.IsSet(yamlKey) {
 		return nil
 	}
+
 	sizing := w.feature.specs.GetStringMap(yamlKey)
-	if anon, ok := sizing["minMasters"]; ok {
-		minMasters := anon.(int)
+	if anon, ok := sizing["masters"]; ok {
+		request := anon.(string)
+		count, _, _, err := w.parseClusterSizingRequest(request)
+		if err != nil {
+			return err
+		}
 		curMasters := len(w.cluster.ListMasterIDs(w.feature.task))
-		if curMasters < minMasters {
-			return fmt.Errorf("cluster doesn't meet the minimum number of masters (%d < %d)", curMasters, minMasters)
+		if curMasters < count {
+			return fmt.Errorf("cluster doesn't meet the minimum number of masters (%d < %d)", curMasters, count)
 		}
 	}
-	if anon, ok := sizing["minNodes"]; ok {
-		minNodes := anon.(int)
+	if anon, ok := sizing["nodes"]; ok {
+		request := anon.(string)
+		count, _, _, err := w.parseClusterSizingRequest(request)
+		if err != nil {
+			return err
+		}
 		curNodes := len(w.cluster.ListNodeIDs(w.feature.task))
-		if curNodes < minNodes {
-			return fmt.Errorf("cluster doesn't meet the minimum number of nodes (%d < %d)", curNodes, minNodes)
+		if curNodes < count {
+			return fmt.Errorf("cluster doesn't meet the minimum number of nodes (%d < %d)", curNodes, count)
 		}
 	}
 
 	return nil
+}
+
+// parseClusterSizingRequest returns count, cpu and ram components of request
+func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, error) {
+	
+	return 0, 0, 0.0, utils.NotImplementedError("parseClusterSizingRequest() not yet implemented")
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)

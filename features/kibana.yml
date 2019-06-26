@@ -21,7 +21,7 @@ feature:
         cluster: all
     requirements:
         features:
-            - elassandra
+            - elasticsearch
     parameters:
         - KibanaPort=5601
         - KibanaHost={{.HostIP}}
@@ -69,12 +69,13 @@ feature:
                                         - {{.HostIP}}:{{.KibanaPort}}:5601
                                     environment:
                                     {{ if .ClusterFlavor }}
-                                        - KIBANA_ELASTICSEARCH_URL="https://{{.GatewayIP}}/services/elasticsearch/
+                                        - KIBANA_ELASTICSEARCH_URL="https://{{.GatewayIP}}/services/elasticsearch/"
                                     {{ else }}
                                         - KIBANA_ELASTICSEARCH_URL="{{ .ElasticsearchURL }}
                                     {{ end }}
                                     volumes:
                                         - ${SF_VARDIR}/kibana:/bitnami
+                                    restart: always
                             EOF
                             exit 0
 

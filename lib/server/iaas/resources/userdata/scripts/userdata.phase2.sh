@@ -585,8 +585,21 @@ install_drivers_nvidia() {
 early_packages_update() {
     ensure_network_connectivity
 
+    # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
+    cat >/etc/gai.conf <<-EOF
+precedence ::ffff:0:0/96 100
+scopev4 ::ffff:169.254.0.0/112  2
+scopev4 ::ffff:127.0.0.0/104    2
+scopev4 ::ffff:0.0.0.0/96       14
+EOF
+
     case $LINUX_KIND in
         debian)
+            # Disable interactive installations
+            export DEBIAN_FRONTEND=noninteractive
+            # # Force use of IPv4 addresses when installing packages
+            # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
+
             sfApt update
             # Force update of systemd, pciutils
             sfApt install -qy systemd pciutils || fail 211
@@ -595,6 +608,11 @@ early_packages_update() {
             ;;
 
         ubuntu)
+            # Disable interactive installations
+            export DEBIAN_FRONTEND=noninteractive
+            # # Force use of IPv4 addresses when installing packages
+            # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
+
             sfApt update
             # Force update of systemd, pciutils and netplan
             if dpkg --compare-versions $(sfGetFact "linux version") ge 17.10; then
@@ -610,6 +628,9 @@ early_packages_update() {
             ;;
 
         redhat|centos)
+            # # Force use of IPv4 addresses when installing packages
+            # echo "ip_resolve=4" >>/etc/yum.conf
+
             # Force update of systemd and pciutils
             yum install -qy systemd pciutils yum-utils || fail 211
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
@@ -666,8 +687,6 @@ configure_locale() {
 }
 
 # ---- Main
-
-export DEBIAN_FRONTEND=noninteractive
 
 configure_locale
 configure_dns

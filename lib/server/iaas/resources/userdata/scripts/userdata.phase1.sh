@@ -183,19 +183,19 @@ disable_cloudinit_network_autoconf
 
 case $LINUX_KIND in
 	debian|ubuntu)
-		systemctl stop apt-daily.service &>/dev/null
+		sfService stop apt-daily.service &>/dev/null
 		systemctl kill --kill-who=all apt-daily.service &>/dev/null
 
-		systemctl status firewalld &>/dev/null || {
-			sfWaitForApt && apt install -qy ufw &>/dev/null
-			systemctl enable ufw
-			systemctl start ufw
-		}
-		ufw reset
-		ufw default deny incoming
-		ufw default allow outgoing
-		ufw allow OpenSSH
-		ufw enable
+		# systemctl status firewalld &>/dev/null || {
+		# 	sfApt install -qy ufw &>/dev/null
+		# 	systemctl enable ufw
+		# 	systemctl start ufw
+		# }
+		# ufw reset
+		# ufw default deny incoming
+		# ufw default allow outgoing
+		# ufw allow OpenSSH
+		# ufw enable
 		;;
 
 esac
