@@ -411,9 +411,9 @@ sfService() {
 sfRandomString() {
 	local count=16
 	[ $# -ge 1 ] && count=$1
-	local characters="[:graph:]"
-	[ $# -ge 2 ] && characters="$2"
-	</dev/urandom tr -dc "$characters" | head -c${count}
+	local charset="[:graph:]"
+	[ $# -ge 2 ] && charset="$2"
+	</dev/urandom tr -dc "$charset" | head -c${count}
 }
 
 declare -A FACTS
