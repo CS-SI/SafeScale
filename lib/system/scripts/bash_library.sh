@@ -35,7 +35,7 @@ export -f sfWaitForApt
 # sfApt does exactly what apt does, but we call sfWaitForApt first
 sfApt() {
 	sfWaitForApt
-	apt $@
+	DEBIAN_FRONTEND=noninteractive apt $@
 }
 export -f sfApt
 
@@ -371,7 +371,7 @@ sfService() {
 	[ $# -ne 2 ] && return 1
 
 	# Preventively run daemon-reload in case of changes
-	[ "$(sfGetFact 'use systemd')" = "1"] && systemctl daemon-reload
+	[ "$(sfGetFact 'use systemd')" = "1" ] && systemctl daemon-reload
 
 	case $1 in
 		enable)
