@@ -347,19 +347,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 
 	masterCount, privateNodeCount, _ := b.determineRequiredNodes(task)
 	var (
-		// gatewayCh          chan error
-		// mastersCh          chan error
-		// privateNodesCh     chan error
-		// publicNodesCh      chan error
 		gatewayStatus      error
 		mastersStatus      error
 		privateNodesStatus error
-		// publicNodesStatus  error
 	)
 
-	// Step 1: starts gateway installation and masters and nodes creation
-	// gatewayCh = make(chan error)
-	// go b.taskInstallGateway(pbutils.ToPBHost(gw), gatewayCh)
+	// Step 1: starts gateway installation plus masters creation plus nodes creation
 	gatewayTask := concurrency.NewTask(task, b.taskInstallGateway)
 	gatewayTask.Start(pbutils.ToPBHost(gw))
 
@@ -376,8 +369,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		"nodeDef": pbNodeDef,
 	})
 
-	// Step 2: awaits master creations and gateway installation finish
-	// gatewayStatus = <-gatewayCh
+	// Step 2: awaits gateway installation end and masters installation end
 	gatewayTask.Wait()
 	gatewayStatus = gatewayTask.GetError()
 	mastersTask.Wait()
@@ -393,17 +385,20 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		}
 	}()
 
+	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
 	if gatewayStatus == nil && mastersStatus == nil {
+		// Configure Gateway and waits for the result
 		gatewayTask = concurrency.NewTask(task, b.taskConfigureGateway)
 		gatewayStatus = gatewayTask.Run(pbutils.ToPBHost(gw))
 	}
 
-	// Step 5: configure masters
+	// Step 4: configure masters (if masters created successfully and gateway configure successfully)
 	if gatewayStatus == nil && mastersStatus == nil {
 		mastersTask = concurrency.NewTask(task, b.taskConfigureMasters)
 		mastersStatus = mastersTask.Run(nil)
 	}
 
+	// Step 5: awaits nodes creation
 	privateNodesTask.Wait()
 	privateNodesStatus = privateNodesTask.GetError()
 
@@ -421,20 +416,9 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 
 	// Step 6: Starts nodes configuration, if all masters and nodes
 	// have been created and gateway has been configured with success
-	if gatewayStatus == nil && mastersStatus == nil {
-		if privateNodesStatus == nil {
-			// privateNodesCh = make(chan error)
-			// go b.taskConfigureNodes(false, privateNodesCh)
-			privateNodesTask = concurrency.NewTask(task, b.taskConfigureNodes)
-			privateNodesTask.Start(false)
-		}
-
-		if privateNodesStatus == nil {
-			// privateNodesStatus = <-privateNodesCh
-			privateNodesTask.Wait()
-			privateNodesStatus = privateNodesTask.GetError()
-		}
-
+	if gatewayStatus == nil && mastersStatus == nil && privateNodesStatus == nil {
+		privateNodesTask = concurrency.NewTask(task, b.taskConfigureNodes)
+		privateNodesStatus = privateNodesTask.Run(nil)
 	}
 
 	if gatewayStatus != nil {
@@ -1312,15 +1296,10 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 // taskConfigureNodes ...
 // func (b *Foreman) taskConfigureNodes(public bool, done chan error) {
 func (b *foreman) taskConfigureNodes(tr concurrency.TaskRunner, params interface{}) {
-	// Convert parameters
-	public := params.(bool)
+	log.Debugf(">>> safescale.cluster.controller.Foreman::taskConfigureNodes()")
+	defer log.Debugf("<<< safescale.cluster.controller.Foreman::taskConfigureNodes()")
 
-	log.Debugf(">>> safescale.cluster.controller.Foreman::taskConfigureNodes(%v)", public)
-	defer log.Debugf("<<< safescale.cluster.controller.Foreman::taskConfigureNodes(%v)", public)
-
-	var (
-		err error
-	)
+	var err error
 
 	// defer task end based on err
 	defer func() {
