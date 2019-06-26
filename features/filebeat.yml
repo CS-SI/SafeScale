@@ -19,14 +19,10 @@ feature:
     suitableFor:
         host: yes
         cluster: all
-    requirements:
-        features:
-            - elassandra
-            - kibana
     parameters:
         - ElasticsearchPort=9200
-        - ElasticsearchHost=localhost
-        - KibanaURL=http://localhost:5601/
+        - ElasticsearchHost={{ .HostIP }}
+        - KibanaURL=http://{{ .HostIP }}:5601/
     
     install:
         bash:
@@ -90,7 +86,8 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            mkdir -p /etc/filebeat/modules.d
+                            mkdir -p /etc/filebeat/modules.d /var/log/filebeat
+
                             cat >/etc/filebeat/filebeat.yml <<-EOF
                             setup.dashboards:
                               enabled: true
@@ -116,14 +113,14 @@ feature:
                             {{- if .ClusterFlavor }}
                               hosts:
                               {{- range .MasterIPs }}
-                                - "{{.}}"
+                                - "{{ . }}"
                               {{ end -}}
                             {{ else }}
                               hosts:
-                                - "{{.HostIP}}"
+                                - "{{ .ElasticsearchHost }}"
                             {{ end -}}
                               protocol: http
-                              port: {{.ElasticsearchPort}}
+                              port: {{ .ElasticsearchPort }}
 
                             tags: ["safescale"]
 

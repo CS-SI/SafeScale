@@ -83,7 +83,7 @@ feature:
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/kong/konga.userdb.data
 
-                            DB_PASSWORD=$(sfRandomString 16 "[:alnum:]")
+                            DB_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
 
                             {{ if .ClusterFlavor }}
                             IMAGE=kong4safescale
@@ -149,7 +149,6 @@ feature:
                                     networks:
                                         ${KONG_PUB_NET}:
                                         dbnet:
-                                        #svc_net:
                                     ports:
                                         - "443:443"
                                         - "127.0.0.1:8444:8444"
@@ -195,9 +194,6 @@ feature:
                                 dbnet:
                                     name: "${IMAGE}_dbnet"
                                     internal: true
-                                # svc_net:
-                                #     name: "${NET_PREFIX}_svc_net"
-                                #     internal: true
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/kong/docker-compose.yml
 
@@ -213,8 +209,8 @@ feature:
                             OPTIONS=
                             {{ end }}
                             docker network create --driver bridge --opt "com.docker.network.bridge.name=${KONG_BRIDGE}" ${KONG_PUB_NET}
-                            docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS up -d
-                            sfRetry 5m 5 "docker ps --all | grep ${IMAGE}_migration_1 | grep Exited" || exit 
+                            docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS up -d || exit 192
+                            sfRetry 5m 5 "docker ps --all | grep ${IMAGE}_migration_1 | grep Exited" || exit 193
                             exit 0
 
                     firewall:
