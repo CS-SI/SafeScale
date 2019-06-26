@@ -1,4 +1,4 @@
-GO?=go
+include ../../common.mk
 
 ifeq ($(OS),Windows_NT)
 	EXEC:=scanner.exe
@@ -27,7 +27,7 @@ gensrc:
 	@($(RM) -f $(VERSIONFILE) || true)
 	@echo "package main" > $(VERSIONFILE)
 	@echo "const (" >> $(VERSIONFILE)
-	@echo "  VERSION = \"19.06.0-alpha\"" >> $(VERSIONFILE)
+	@echo "  VERSION = \"$(VERSION)\"" >> $(VERSIONFILE)
 	@echo "  BUILD_DATE = \"$(BUILD_DATE)\"" >> $(VERSIONFILE)
 	@echo "  REV = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
