@@ -117,7 +117,7 @@ func (s *DataListener) Get(ctx context.Context, in *pb.File) (*google_protobuf.E
 	return &google_protobuf.Empty{}, nil
 }
 
-// Dlete remove a file from one or several ObjectStorages
+// Delete remove a file from one or several ObjectStorages
 func (s *DataListener) Delete(ctx context.Context, in *pb.File) (*google_protobuf.Empty, error) {
 	log.Infof("safescaled receiving 'data delete %s'", in.GetName())
 	log.Debugf(">>> listeners.DataListener::Delete(%s)", in.GetName())

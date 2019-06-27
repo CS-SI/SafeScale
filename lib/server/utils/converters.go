@@ -19,10 +19,10 @@ package utils
 import (
 	"math"
 
+	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/system"
 )
 
@@ -267,4 +267,17 @@ func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, f
 		files = append(files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i], Buckets: fileBuckets[i]})
 	}
 	return &pb.FileList{Files: files}
+}
+
+// FromPBHostSizing converts a protobug HostSizing message to resources.SizingRequirements
+func FromPBHostSizing(src *pb.HostSizing) *resources.SizingRequirements {
+	return &resources.SizingRequirements{
+		MinCores:    int(src.MinCpuCount),
+		MaxCores:    int(src.MaxCpuCount),
+		MinFreq:     src.MinCpuFreq,
+		MinGPU:      int(src.GpuCount),
+		MinRAMSize:  src.MinRamSize,
+		MaxRAMSize:  src.MaxRamSize,
+		MinDiskSize: int(src.MinDiskSize),
+	}
 }
