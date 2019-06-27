@@ -133,6 +133,16 @@ var networkCreate = cli.Command{
 			Value: "",
 			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
 		},
+		cli.StringFlag{
+			Name: "S, sizing",
+			Usage: `Describe sizing in format "<component><operator><value>[,...]" where:
+	<component> can be cpu, cpufreq, ram, disk
+	<operator> can be =,<=,>= (except for disk where valid operators are only = or >=)
+	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"
+	examples:
+		--sizing "cpu<=4,ram <= 10.0,disk = 100"
+		-S "cpu = [4-8], ram = [14-32]"`,
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
@@ -140,16 +150,21 @@ var networkCreate = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
+		def, err := constructPBHostDefinitionFromCLI(c)
+		if err != nil {
+			return err
+		}
 		netdef := pb.NetworkDefinition{
 			Cidr: c.String("cidr"),
 			Name: c.Args().Get(0),
 			Gateway: &pb.GatewayDefinition{
-				Cpu:  int32(c.Int("cpu")),
-				Disk: int32(c.Int("disk")),
-				Ram:  float32(c.Float64("ram")),
+				// Cpu:  int32(c.Int("cpu")),
+				// Disk: int32(c.Int("disk")),
+				// Ram:  float32(c.Float64("ram")),
 				// CpuFreq: ??,
 				ImageId: c.String("os"),
 				Name:    c.String("gwname"),
+				Sizing:  def.Sizing,
 			},
 		}
 		network, err := client.New().Network.Create(netdef, client.DefaultExecutionTimeout)

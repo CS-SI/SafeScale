@@ -19,6 +19,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -224,6 +225,16 @@ var hostCreate = cli.Command{
 			Name:  "f, force",
 			Usage: "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
 		},
+		cli.StringFlag{
+			Name: "S, sizing",
+			Usage: `Describe sizing in format "<component><operator><value>[,...]" where:
+			<component> can be cpu, cpufreq, gpu, ram, disk
+			<operator> can be =,<=,>= (except for disk where valid operators are only = or >=)
+			<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"
+			examples:
+		-S "cpu < 5, ram < 10, disk = 100"
+		-S "cpu = [4-8], ram = [14-32], gpu = 1"`,
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
@@ -242,19 +253,11 @@ var hostCreate = cli.Command{
 			}
 		}
 
-		def := pb.HostDefinition{
-			Name:     c.Args().First(),
-			CpuCount: int32(c.Int("cpu")),
-			Disk:     int32(c.Float64("disk")),
-			ImageId:  c.String("os"),
-			Network:  c.String("net"),
-			Public:   c.Bool("public"),
-			Ram:      float32(c.Float64("ram")),
-			GpuCount: askedGpus,
-			CpuFreq:  float32(c.Float64("cpu-freq")),
-			Force:    c.Bool("force"),
+		def, err := constructPBHostDefinitionFromCLI(c)
+		if err != nil {
+			return err
 		}
-		resp, err := client.New().Host.Create(def, client.DefaultExecutionTimeout)
+		resp, err := client.New().Host.Create(*def, client.DefaultExecutionTimeout)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 		}
@@ -588,4 +591,95 @@ var hostDeleteFeatureCommand = cli.Command{
 		}
 		return clitools.SuccessResponse(nil)
 	},
+}
+
+// constructPBHostDefinitionFromCLI ...
+func constructPBHostDefinitionFromCLI(c *cli.Context) (*pb.HostDefinition, error) {
+	var sizing string
+	if c.IsSet("sizing") {
+		if c.IsSet("cpu") || c.IsSet("cpufreq") || c.IsSet("gpu") || c.IsSet("ram") || c.IsSet("disk") {
+			return nil, clitools.FailureResponse(clitools.ExitOnInvalidArgument("can't use simultaneously --sizing and --cpu|--cpufreq|--gpu|--ram|--disk"))
+		}
+		sizing = c.String("sizing")
+	} else {
+		if c.IsSet("cpu") {
+			sizing = fmt.Sprintf("cpu = %d,", c.Int("cpu"))
+		}
+		if c.IsSet("cpufreq") {
+			sizing += fmt.Sprintf("cpufreq = %.01f,", c.Float64("cpufreq"))
+		}
+		if c.IsSet("gpu") {
+			sizing += fmt.Sprintf("gpu = %d,", c.Int("gpu"))
+		}
+		if c.IsSet("ram") {
+			sizing += fmt.Sprintf("ram = %.01f,", c.Float64("ram"))
+		}
+		if c.IsSet("disk") {
+			sizing += fmt.Sprintf("disk = %.01f,", c.Float64("disk"))
+		}
+	}
+	tokens, err := clitools.ParseParameter(sizing)
+	if err != nil {
+		return nil, clitools.FailureResponse(clitools.ExitOnInvalidArgument(err.Error()))
+	}
+
+	def := pb.HostDefinition{
+		Name:    c.Args().First(),
+		ImageId: c.String("os"),
+		Network: c.String("net"),
+		Public:  c.Bool("public"),
+		Force:   c.Bool("force"),
+		Sizing:  &pb.HostSizing{},
+	}
+	if t, ok := tokens["cpu"]; ok {
+		min, max, err := t.Validate()
+		if err != nil {
+			return nil, clitools.FailureResponse(clitools.ExitOnInvalidArgument(err.Error()))
+		}
+		if min != "" {
+			val, _ := strconv.ParseFloat(min, 64)
+			def.Sizing.MinCpuCount = int32(val)
+		}
+		if max != "" {
+			val, _ := strconv.Atoi(max)
+			def.Sizing.MaxCpuCount = int32(val)
+		}
+	}
+	if t, ok := tokens["cpufreq"]; ok {
+		min, _, err := t.Validate()
+		if err != nil {
+			return nil, clitools.FailureResponse(clitools.ExitOnInvalidArgument(err.Error()))
+		}
+		if min != "" {
+			val, _ := strconv.ParseFloat(min, 64)
+			def.Sizing.MinCpuFreq = float32(val)
+		}
+	}
+	if t, ok := tokens["gpu"]; ok {
+		min, _, err := t.Validate()
+		if err != nil {
+			return nil, clitools.FailureResponse(clitools.ExitOnInvalidArgument(err.Error()))
+		}
+		if min != "" {
+			val, _ := strconv.Atoi(min)
+			def.Sizing.GpuCount = int32(val)
+		}
+	} else {
+		def.Sizing.GpuCount = -1
+	}
+	if t, ok := tokens["ram"]; ok {
+		min, max, err := t.Validate()
+		if err != nil {
+			return nil, clitools.FailureResponse(clitools.ExitOnInvalidArgument(err.Error()))
+		}
+		if min != "" {
+			val, _ := strconv.ParseFloat(min, 64)
+			def.Sizing.MinRamSize = float32(val)
+		}
+		if max != "" {
+			val, _ := strconv.ParseFloat(max, 64)
+			def.Sizing.MaxRamSize = float32(val)
+		}
+	}
+	return &def, nil
 }
