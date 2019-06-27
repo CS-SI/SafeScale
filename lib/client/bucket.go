@@ -21,11 +21,10 @@ import (
 	"sync"
 	"time"
 
-	google_protobuf "github.com/golang/protobuf/ptypes/empty"
-
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // bucket is the part of the safescale client handling buckets

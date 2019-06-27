@@ -89,7 +89,9 @@ func createTenantFile() {
 		panic(err)
 	}
 
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	// write some text line-by-line to file
 	_, err = file.WriteString("[[tenants]]\nclient = \"hovehache\"\nname = \"TestOhvehache\"\n")
@@ -102,7 +104,7 @@ func createTenantFile() {
 	}
 
 	// save changes
-	file.Sync()
+	_ = file.Sync()
 }
 func createNoClientTenantFile() {
 	filename, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
@@ -111,7 +113,9 @@ func createNoClientTenantFile() {
 		panic(err)
 	}
 
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	// write some text line-by-line to file
 	_, err = file.WriteString("[[tenants]]\nname = \"TestOhvehache\"\n")
@@ -124,7 +128,7 @@ func createNoClientTenantFile() {
 	}
 
 	// save changes
-	file.Sync()
+	_ = file.Sync()
 }
 func createNoNameTenantFile() {
 	filename, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
@@ -133,7 +137,9 @@ func createNoNameTenantFile() {
 		panic(err)
 	}
 
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	// write some text line-by-line to file
 	_, err = file.WriteString("[[tenants]]\nclient = \"hovehache\"\n")
@@ -146,16 +152,16 @@ func createNoNameTenantFile() {
 	}
 
 	// save changes
-	file.Sync()
+	_ = file.Sync()
 }
 
 func deleteTenantFile() {
-	path, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
+	filepath, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	os.Remove(path)
+	_ = os.Remove(filepath)
 }
 
 func TestViper(t *testing.T) {
@@ -185,7 +191,7 @@ func hideTenantFiles() {
 		tenantFile := path.Join(utils.AbsPathify(p), "tenants.toml")
 		bakcupName := path.Join(utils.AbsPathify(p), "bak_tenants.toml")
 		if _, err := os.Stat(tenantFile); err == nil {
-			os.Rename(tenantFile, bakcupName)
+			_ = os.Rename(tenantFile, bakcupName)
 		}
 	}
 }
@@ -195,7 +201,7 @@ func unhideTenantFiles() {
 		tenantFile := path.Join(utils.AbsPathify(p), "tenants.toml")
 		bakcupName := path.Join(utils.AbsPathify(p), "bak_tenants.toml")
 		if _, err := os.Stat(bakcupName); err == nil {
-			os.Rename(bakcupName, tenantFile)
+			_ = os.Rename(bakcupName, tenantFile)
 		}
 	}
 }

@@ -19,10 +19,9 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"github.com/CS-SI/SafeScale/lib/client"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 

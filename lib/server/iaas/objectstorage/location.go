@@ -27,7 +27,7 @@ import (
 	"github.com/graymeta/stow"
 	// necessary for connect
 	// _ "github.com/graymeta/stow/azure"
-	// _ "github.com/graymeta/stow/google"
+	_ "github.com/graymeta/stow/google"
 	_ "github.com/graymeta/stow/s3"
 	_ "github.com/graymeta/stow/swift"
 )
@@ -63,20 +63,30 @@ func (l *location) getStowLocation() stow.Location {
 
 // Connect connects to an Object Storage Location
 func (l *location) connect() error {
-	// log.Debugln("objectstorage.Location.Connect() called")
-	// defer log.Debugln("objectstorage.Location.Connect() done")
+	log.Debugln("objectstorage.Location.Connect() called")
+	defer log.Debugln("objectstorage.Location.Connect() done")
 
-	config := stow.ConfigMap{
-		"access_key_id":   l.config.User,
-		"secret_key":      l.config.SecretKey,
-		"username":        l.config.User,
-		"key":             l.config.SecretKey,
-		"endpoint":        l.config.Endpoint,
-		"tenant_name":     l.config.Tenant,
-		"tenant_auth_url": l.config.AuthURL,
-		"region":          l.config.Region,
-		"domain":          l.config.TenantDomain,
-		"kind":            l.config.Type,
+	// FIXME GCP Google requires a custom cfg here..., this will require a refactoring based on stow.ConfigMap
+	var config stow.ConfigMap
+
+	if l.config.Type == "google" {
+		config = stow.ConfigMap{
+			"json":       l.config.Credentials,
+			"project_id": l.config.ProjectId,
+		}
+	} else {
+		config = stow.ConfigMap{
+			"access_key_id":   l.config.User,
+			"secret_key":      l.config.SecretKey,
+			"username":        l.config.User,
+			"key":             l.config.SecretKey,
+			"endpoint":        l.config.Endpoint,
+			"tenant_name":     l.config.Tenant,
+			"tenant_auth_url": l.config.AuthURL,
+			"region":          l.config.Region,
+			"domain":          l.config.TenantDomain,
+			"kind":            l.config.Type,
+		}
 	}
 	kind := l.config.Type
 

@@ -268,6 +268,19 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 		return nil, err
 	}
 
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		if cmdString != "" {
+			log.Debugf("[TRACE] %s", cmdString)
+		}
+		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", cfg.Host)), 0777)
+		partials := strings.Split(f.Name(), "/")
+		dumpName := utils.AbsPathify( fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", cfg.Host, partials[len(partials)-1] ))
+		err = ioutil.WriteFile(dumpName, []byte(cfg.GatewayConfig.PrivateKey), 0644)
+		if err != nil {
+			log.Warnf("[TRACE] Failure storing key in %s", dumpName)
+		}
+	}
+
 	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -493,10 +506,10 @@ func (sc *SSHCommand) RunWithTimeout(timeout time.Duration) (int, string, string
 			return retCode, string(msgOut[:]), fmt.Sprint(string(msgErr[:]), msgError), nil
 		}
 		if !issues {
-			log.Warnf("There have been issues running this command, please check daemon logs")
+			log.Warnf("There have been issues running this command [%s], please check daemon logs", sc.Display())
 		}
 	case <-time.After(timeout):
-		errMsg := fmt.Sprintf("Timeout of (%s) waiting for the command to end", timeout)
+		errMsg := fmt.Sprintf("Timeout of (%s) waiting for the command [%s] to end", timeout, sc.Display())
 		log.Warnf(errMsg)
 		return 0, "", "", fmt.Errorf(errMsg)
 	}
@@ -581,6 +594,19 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 		sshConfig.User,
 		sshConfig.Host,
 	)
+
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		if cmdString != "" {
+			log.Debugf("[TRACE] %s", cmdString)
+		}
+		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", sshConfig.Host)), 0777)
+		partials := strings.Split(f.Name(), "/")
+		dumpName := utils.AbsPathify( fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", sshConfig.Host, partials[len(partials)-1] ))
+		err = ioutil.WriteFile(dumpName, []byte(sshConfig.PrivateKey), 0644)
+		if err != nil {
+			log.Warnf("[TRACE] Failure storing key in %s", dumpName)
+		}
+	}
 
 	sudoOpt := ""
 	if withSudo {

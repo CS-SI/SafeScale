@@ -614,6 +614,11 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 		return nil, resources.ResourceNotFoundError("host", host.ID)
 	}
 	err = s.complementHost(host, server)
+
+	if !host.OK() {
+		log.Debugf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+	}
+
 	return host, err
 }
 

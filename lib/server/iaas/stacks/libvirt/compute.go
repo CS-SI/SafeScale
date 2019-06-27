@@ -27,6 +27,7 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 	"io/ioutil"
@@ -1019,6 +1020,10 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 
 	if err := s.complementHost(host, newHost); err != nil {
 		return nil, fmt.Errorf("Failed to complement the host : %s", err.Error())
+	}
+
+	if !host.OK() {
+		logrus.Debugf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 
 	return host, nil

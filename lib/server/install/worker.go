@@ -529,7 +529,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 			Serial:             serial,
 		}
 		results[k], err = step.Run(hostsList, w.variables, w.settings)
-		// If an error occured, don't do the remaining steps, fail immediately
+		// If an error occurred, don't do the remaining steps, fail immediately
 		if err != nil {
 			break
 		}
@@ -542,7 +542,7 @@ func (w *worker) Proceed(v Variables, s Settings) (Results, error) {
 
 // validateContextForCluster checks if the flavor of the cluster is listed in feature specification
 // 'feature.suitableFor.cluster'.
-// If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommanded)
+// If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommended)
 func (w *worker) validateContextForCluster() error {
 	clusterFlavor := w.cluster.GetIdentity(w.feature.task).Flavor
 

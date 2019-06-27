@@ -159,9 +159,13 @@ identify_nics() {
     if [ ! -z $PU_IP ]; then
         if is_ip_private $PU_IP; then
             PU_IF=
-            # Works with FlexibleEngine and potentially with AWS (not tested yet)
-            PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null)
-            [ -z $PU_IP ] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
+
+            NO404=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null | grep 404)
+            if [ -z $NO404 ]; then
+                # Works with FlexibleEngine and potentially with AWS (not tested yet)
+                PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null)
+                [ -z $PU_IP ] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
+            fi
         fi
     fi
     [ -z $PR_IFs ] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
@@ -175,7 +179,7 @@ identify_nics() {
 substring_diff() {
     read -a l1 <<<$1
     read -a l2 <<<$2
-    echo ${l1[@]} ${l2[@]} | tr ' ' '\n' | sort | uniq -u
+    echo "${l1[@]}" "${l2[@]}" | tr ' ' '\n' | sort | uniq -u
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
@@ -645,14 +649,11 @@ EOF
 
 install_packages() {
      case $LINUX_KIND in
-        ubuntu)
-            sfApt install -y -qq jq &>/dev/null || fail 213
-            ;;
-        debian)
-            sfApt install -y -qq jq time &>/dev/null || fail 214
+        ubuntu|debian)
+            sfApt install -y -qq jq zip time zip &>/dev/null || fail 213
             ;;
         redhat|centos)
-            yum install --enablerepo=epel -y -q wget jq time &>/dev/null || fail 215
+            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 214
             ;;
         *)
             echo "Unsupported Linux distribution '$LINUX_KIND'!"
@@ -690,8 +691,8 @@ configure_locale() {
 
 configure_locale
 configure_dns
-early_packages_update
 add_common_repos
+early_packages_update
 
 identify_nics
 configure_network

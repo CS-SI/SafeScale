@@ -1,12 +1,12 @@
 package model
 
 import (
-	log "github.com/sirupsen/logrus"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mssql"    //Import gorm mssql driver
 	_ "github.com/jinzhu/gorm/dialects/mysql"    //Import gorm mysql driver
 	_ "github.com/jinzhu/gorm/dialects/postgres" //Import gorm postgres driver
 	_ "github.com/jinzhu/gorm/dialects/sqlite"   //Import gorm sqlite driver
+	log "github.com/sirupsen/logrus"
 )
 
 //Service is a resource secured by the Gateway

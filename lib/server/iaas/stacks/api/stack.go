@@ -29,7 +29,7 @@ import (
 // It same interface has to be satisfied in Provider interface
 type Stack interface {
 	// ListAvailabilityZones lists the usable Availability Zones
-	ListAvailabilityZones(bool) (map[string]bool, error)
+	ListAvailabilityZones(all bool) (map[string]bool, error)
 
 	// ListRegions returns a list with the regions available
     ListRegions() ([]string, error)

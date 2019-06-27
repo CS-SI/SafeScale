@@ -40,13 +40,20 @@ func BuildMetadataBucketName(driver, region, domain, project string) (string, er
 	_, _ = hash.Write([]byte(sig))
 	hashed := hex.EncodeToString(hash.Sum(nil))
 	name := bucketNamePrefix + "-" + hashed
-	nameLen := len(name)
+
+		nameLen := len(name)
 	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
 		name += "." + suffix
 		if len(name) > maxBucketNameLength {
 			return "", fmt.Errorf("Suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
 		}
 	}
+
+	// FIXME GCP Just ugly
+	if driver == "gcp" {
+		name = strings.Replace(name, ".", "-", -1)
+	}
+
 	return strings.ToLower(name), nil
 }
 

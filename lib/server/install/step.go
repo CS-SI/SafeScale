@@ -308,6 +308,8 @@ func (is *step) taskRunOnHost(tr concurrency.TaskRunner, params interface{}) {
 		}
 	}
 
+	// FIXME Not so fast, validate first, save this elsewhere
+
 	// Uploads then executes command
 	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", srvutils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")

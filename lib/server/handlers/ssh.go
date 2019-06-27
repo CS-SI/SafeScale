@@ -121,6 +121,9 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	if err != nil {
 		return nil, err
 	}
+
+	sshConfig.Host = host.GetAccessIP()
+
 	return &sshConfig, nil
 }
 

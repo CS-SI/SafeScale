@@ -16,6 +16,8 @@
 
 package serialize
 
+//go:generate mockgen -destination=../mocks/mock_property.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/serialize Property
+
 // Property is the interface each Property must satisfy
 type Property interface {
 	// Content allows to access real data from property

@@ -27,20 +27,9 @@ fail() {
 	exit $1
 }
 
-mkdir -p /opt/safescale/etc &>/dev/null
-mkdir -p /opt/safescale/var/log &>/dev/null
-mkdir -p /opt/safescale/var/run /opt/safescale/var/state /opt/safescale/var/tmp &>/dev/null
-chmod -R 0640 /opt/safescale
-find /opt/safescale -type d -exec chmod ug+x {} \;
-
-exec 1<&-
-exec 2<&-
-exec 1<>/opt/safescale/var/log/user_data.phase1.log
-exec 2>&1
-set -x
-
 LINUX_KIND=
 VERSION_ID=
+export DEBIAN_FRONTEND=noninteractive
 
 sfDetectFacts() {
 	[ -f /etc/os-release ] && {
@@ -54,13 +43,12 @@ sfDetectFacts() {
 		} || {
 			[ -f /etc/redhat-release ] && {
 				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
-				LINUX_KID=${LINUX_KIND,,}
+				LINUX_KIND=${LINUX_KIND,,}
 				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
 			}
 		}
 	}
 }
-sfDetectFacts
 
 sfFinishPreviousInstall() {
 	local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
@@ -70,14 +58,14 @@ sfFinishPreviousInstall() {
 
 sfWaitForApt() {
 	sfFinishPreviousInstall || true
-	sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
+	sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/{lock/lock-frontend}
 }
 
 sfWaitLockfile() {
 	local ROUNDS=600
 	name=$1
 	shift
-	params=$@
+	params="$@"
 	echo "check $name lock"
 	echo ${params}
 	if fuser ${params} &>/dev/null; then
@@ -165,6 +153,7 @@ check_for_network() {
 put_hostname_in_hosts() {
 	HON=$(hostname)
 	ping -n -c1 -w5 $HON 2>/dev/null || echo "127.0.1.1 $HON" >>/etc/hosts
+	grep $HON /etc/hosts || echo "127.0.1.1 $HON" >>/etc/hosts #Make sure it's there
 }
 
 # Disable cloud-init automatic network configuration to be sure our configuration won't be replaced
@@ -174,35 +163,83 @@ disable_cloudinit_network_autoconf() {
 	echo "network: {config: disabled}" >$fname
 }
 
+enable_firewall() {
+    case $LINUX_KIND in
+        debian|ubuntu)
+            sfService stop apt-daily.service &>/dev/null
+            systemctl kill --kill-who=all apt-daily.service &>/dev/null
+
+            # systemctl status firewalld &>/dev/null || {
+            # 	sfApt install -qy ufw &>/dev/null
+            # 	systemctl enable ufw
+            # 	systemctl start ufw
+            # }
+            # ufw reset
+            # ufw default deny incoming
+            # ufw default allow outgoing
+            # ufw allow OpenSSH
+            # ufw enable
+            ;;
+
+    esac
+}
+
+# If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
+ensure_network_connectivity() {
+    route del -net default &>/dev/null
+    route add -net default gw {{ .GatewayIP }}
+}
+
+{{- if .IsGateway }}
+custom_gcp_gateway() {
+    sudo sysctl -w net.ipv4.ip_forward=1
+    sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+    sudo echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/20-natgw.conf
+    case $LINUX_KIND in
+        debian|ubuntu)
+            sudo DEBIAN_FRONTEND=noninteractive apt-get -yq install iptables-persistent
+            ;;
+    esac
+}
+
+if check_for_network; then
+    enable_firewall
+fi
+{{- else}}
+if check_for_network; then
+    enable_firewall
+fi
+{{- end}}
+
 # ---- Main
 
-export DEBIAN_FRONTEND=noninteractive
+if [[ -s "/opt/safescale/var/state/user_data.phase1.done" ]]; then
+    set -x
+    set +x
+else
+    mkdir -p /opt/safescale/etc &>/dev/null
+    mkdir -p /opt/safescale/var/log &>/dev/null
+    mkdir -p /opt/safescale/var/run /opt/safescale/var/state /opt/safescale/var/tmp &>/dev/null
+    chmod -R 0640 /opt/safescale
+    find /opt/safescale -type d -exec chmod ug+x {} \;
 
-put_hostname_in_hosts
-disable_cloudinit_network_autoconf
+    exec 1<&-
+    exec 2<&-
+    exec 1<>/opt/safescale/var/log/user_data.phase1.log
+    exec 2>&1
+    set -x
 
-case $LINUX_KIND in
-	debian|ubuntu)
-		sfService stop apt-daily.service &>/dev/null
-		systemctl kill --kill-who=all apt-daily.service &>/dev/null
+    sfDetectFacts
 
-		# systemctl status firewalld &>/dev/null || {
-		# 	sfApt install -qy ufw &>/dev/null
-		# 	systemctl enable ufw
-		# 	systemctl start ufw
-		# }
-		# ufw reset
-		# ufw default deny incoming
-		# ufw default allow outgoing
-		# ufw allow OpenSSH
-		# ufw enable
-		;;
+    put_hostname_in_hosts
+    disable_cloudinit_network_autoconf
 
-esac
-create_user
+    create_user
 
-touch /etc/cloud/cloud-init.disabled
+    touch /etc/cloud/cloud-init.disabled
 
-echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
-set +x
+    echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
+    set +x
+fi
+
 exit 0

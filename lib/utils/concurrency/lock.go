@@ -5,6 +5,8 @@ import (
 	"sync"
 )
 
+//go:generate mockgen -destination=../mocks/mock_taskedlock.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskedLock
+
 // TaskedLock ...
 type TaskedLock interface {
 	RLock(Task)

@@ -63,6 +63,18 @@ func NewNetwork() *Network {
 	}
 }
 
+func (n *Network) OK() bool {
+	result := true
+
+	result = result && (n.ID != "")
+	result = result && (n.Name != "")
+	result = result && (n.CIDR != "")
+	result = result && (n.GatewayID != "")
+	result = result && (n.Properties != nil)
+
+	return result
+}
+
 // Serialize serializes Host instance into bytes (output json code)
 func (n *Network) Serialize() ([]byte, error) {
 	return serialize.ToJSON(n)

@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"os"
 	"strings"
 	"text/template"
@@ -33,8 +35,20 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
+// FIXME Here is the missing piece
+
 const (
 	featureScriptTemplateContent = `
+#!/bin/bash
+
+set -u -o pipefail
+
+print_error() {
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"` + "`" + `sed "${line}q;d" "$file"` + "`" + `"}" >&2
+}
+trap print_error ERR
+
 set +x
 rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 1<&-
@@ -152,6 +166,18 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	if filename == "" {
 		panic("filename is empty!")
 	}
+
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
+		partials := strings.Split(filename, "/")
+		dumpName := utils.AbsPathify( fmt.Sprintf("$HOME/.safescale/forensics/%s/%s", host.Name, partials[len(partials)-1]))
+
+		err := ioutil.WriteFile(dumpName, []byte(content), 0644)
+		if err != nil {
+			logrus.Warnf("[TRACE] Forensics error creating %s", dumpName)
+		}
+	}
+
 	f, err := system.CreateTempFileFromString(content, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %s", err.Error())
@@ -268,6 +294,7 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return dataBuffer.String(), nil
 }
 

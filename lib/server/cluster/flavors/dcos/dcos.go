@@ -19,10 +19,9 @@ package dcos
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"sync/atomic"
 	txttmpl "text/template"
-
-	"github.com/CS-SI/SafeScale/lib/utils"
 
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
@@ -33,8 +32,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos/enums/ErrorCode"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
 //go:generate rice embed-go
@@ -51,6 +52,16 @@ var (
 
 	// globalSystemRequirementsContent contains the script to install/configure Core features
 	globalSystemRequirementsContent atomic.Value
+
+	// funcMap defines the custom functions to be used in templates
+	funcMap = txttmpl.FuncMap{
+		"errcode": func(msg string) int {
+			if code, ok := ErrorCode.StringMap[msg]; ok {
+				return int(code)
+			}
+			return 1023
+		},
+	}
 
 	// Makers initializes the control.Makers struct to construct a DCOS cluster
 	Makers = control.Makers{
@@ -122,7 +133,7 @@ func configureMaster(task concurrency.Task, foreman control.Foreman, index int, 
 
 	hostLabel := fmt.Sprintf("master #%d (%s)", index, host.Name)
 
-	retcode, _, _, err := foreman.ExecuteScript(box, "dcos_configure_master.sh", map[string]interface{}{
+	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_master.sh", map[string]interface{}{
 		"BootstrapIP":   foreman.Cluster().GetNetworkConfig(task).GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
 	}, host.Id)
@@ -131,6 +142,12 @@ func configureMaster(task concurrency.Task, foreman control.Foreman, index int, 
 		return err
 	}
 	if retcode != 0 {
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Debugf("[%s] configuration failed:\nretcode:%d (%s)", hostLabel, errcode, errcode.String())
+			return fmt.Errorf("scripted Master configuration failed with error code %d (%s)", errcode, errcode.String())
+		}
+
 		log.Debugf("[%s] configuration failed:\nretcode=%d", hostLabel, retcode)
 		return fmt.Errorf("scripted Master configuration failed with error code %d", retcode)
 	}
@@ -145,8 +162,7 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index int, ho
 	if err != nil {
 		return err
 	}
-
-	retcode, _, _, err := foreman.ExecuteScript(box, "dcos_configure_node.sh", map[string]interface{}{
+	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_configure_node.sh", map[string]interface{}{
 		"BootstrapIP":   foreman.Cluster().GetNetworkConfig(task).GatewayIP,
 		"BootstrapPort": bootstrapHTTPPort,
 	}, host.Id)
@@ -155,6 +171,11 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index int, ho
 		return err
 	}
 	if retcode != 0 {
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Debugf("[%s] configuration failed: retcode: %d (%s)", hostLabel, errcode, errcode.String())
+			return fmt.Errorf("scripted Agent configuration failed with error code %d (%s)", errcode, errcode.String())
+		}
 		log.Debugf("[%s] configuration failed: retcode=%d", hostLabel, retcode)
 		return fmt.Errorf("scripted Agent configuration failed with error code '%d'", retcode)
 	}
@@ -204,13 +225,18 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 		"SSHPrivateKey":               identity.Keypair.PrivateKey,
 		"SSHPublicKey":                identity.Keypair.PublicKey,
 	}
-
-	retcode, _, _, err := foreman.ExecuteScript(box, "dcos_prepare_bootstrap.sh", data, netCfg.GatewayID)
+	retcode, _, _, err := foreman.ExecuteScript(box, funcMap, "dcos_prepare_bootstrap.sh", data, netCfg.GatewayID)
 	if err != nil {
 		log.Errorf("[gateway] configuration failed: %s", err.Error())
 		return err
 	}
 	if retcode != 0 {
+		if retcode < int(ErrorCode.NextErrorCode) {
+			errcode := ErrorCode.Enum(retcode)
+			log.Errorf("[gateway] configuration failed:\nretcode=%d (%s)", errcode, errcode.String())
+			return fmt.Errorf("scripted gateway configuration failed with error code %d (%s)", errcode, errcode.String())
+		}
+
 		log.Errorf("[gateway] configuration failed:\nretcode=%d", retcode)
 		return fmt.Errorf("scripted gateway configuration failed with error code %d", retcode)
 	}
@@ -250,7 +276,7 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 		}
 
 		// parse then execute the template
-		tmplPrepared, err := txttmpl.New("install_requirements").Parse(tmplString)
+		tmplPrepared, err := txttmpl.New("install_requirements").Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
 		if err != nil {
 			return "", fmt.Errorf("error parsing script template: %s", err.Error())
 		}

@@ -124,6 +124,13 @@ func work() {
 		suffix = suffixCandidate
 	}
 
+	envVars := os.Environ()
+	for _, envVar := range envVars {
+		if strings.HasPrefix(envVar, "SAFESCALE") {
+			log.Infof("Using %s", envVar)
+		}
+	}
+
 	log.Infof("Starting server, listening at port: %d, using metadata suffix: [%s]", safescaledPort, suffix)
 
 	lis, err := net.Listen("tcp", ":"+strconv.Itoa(safescaledPort))

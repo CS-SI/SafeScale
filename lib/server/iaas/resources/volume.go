@@ -46,6 +46,15 @@ func NewVolume() *Volume {
 	}
 }
 
+func (v *Volume) OK() bool {
+	result := true
+	result = result && v.ID != ""
+	result = result && v.Name != ""
+	result = result && v.Size != 0
+	result = result && v.Properties != nil
+	return result
+}
+
 // Serialize serializes Host instance into bytes (output json code)
 func (v *Volume) Serialize() ([]byte, error) {
 	return serialize.ToJSON(v)

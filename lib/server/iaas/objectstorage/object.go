@@ -27,7 +27,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	// necessary for connect
 	// _ "github.com/graymeta/stow/azure"
-	// _ "github.com/graymeta/stow/google"
+	_ "github.com/graymeta/stow/google"
 	_ "github.com/graymeta/stow/s3"
 	_ "github.com/graymeta/stow/swift"
 )
