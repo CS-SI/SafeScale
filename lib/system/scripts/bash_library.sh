@@ -356,7 +356,7 @@ export -f sfMarathon
 sfProbeGPU() {
 	if which lspci &>/dev/null; then
 		val=$(lspci | grep nvidia 2>/dev/null)
-		[ ! -z "$val" ] && FACTS["nVidia GPU"]=$val
+		[ ! -z "$val" ] && FACTS["nVidia GPU"]=$val || true
 	fi
 }
 
