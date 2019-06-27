@@ -51,6 +51,9 @@ service ImageService{
     rpc List(ImageListRequest) returns (ImageList){}
 }
 
+
+// safescale data ...
+
 message File {
     string localPath = 1;
     string name = 2;
@@ -83,13 +86,14 @@ message NetworkDefinition{
 }
 
 message GatewayDefinition{
-    int32 cpu = 1;
-    float ram = 2;
-    int32 disk = 3;
+    int32 cpu = 1;  // Deprecated: replaced by sizing field
+    float ram = 2;  // Deprecated: replaced by sizing field
+    int32 disk = 3; // Deprecated: replaced by sizing field
     string image_id = 5;
     string name = 6;
-    int32 gpu_count = 7;
-    string gpu_type = 8;
+    int32 gpu_count = 7;    // Deprecated: replaced by sizing field
+    string gpu_type = 8;    // Deprecated: replaced by sizing field
+    HostSizing sizing = 9;
 }
 
 message Network{
@@ -119,17 +123,29 @@ service NetworkService{
 // safescale host inspect host1
 // safescale host create host2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
 
+
+message HostSizing{
+    int32 min_cpu_count = 1;
+    int32 max_cpu_count = 2;
+    float min_ram_size = 3;
+    float max_ram_size = 4;
+    int32 min_disk_size = 5;
+    int32 gpu_count = 6;
+    float min_cpu_freq = 7;
+}
+
 message HostDefinition{
     string name = 2;
     string network = 3;
-    int32 cpu_count = 4;
-    float ram = 6;
-    int32 disk = 7;
+    int32 cpu_count = 4;    // Deprecated: replaced by sizing field
+    float ram = 6;          // Deprecated: replaced by sizing field
+    int32 disk = 7;         // Deprecated: replaced by sizing field
     string image_id = 9;
     bool public = 10;
-    int32 gpu_count = 11;
-    float cpu_freq = 12;
+    int32 gpu_count = 11;   // Deprecated: replaced by sizing field
+    float cpu_freq = 12;    // Deprecated: replaced by sizing field
     bool force = 13;
+    HostSizing sizing = 14;
 }
 
 enum HostState {
