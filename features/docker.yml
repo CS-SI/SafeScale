@@ -131,8 +131,10 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            # Makes sure dbus is running...
+                            # Makes sure firewalld is running, starting first its dependency dbus...
                             sfService start dbus
+                            # then firewalld  itself
+                            sfService restart firewalld
                             sfFirewallAdd --zone=trusted --add-interface=docker0
                             sfFirewallAdd --zone=trusted --add-service docker-swarm
                             sfFirewallReload
