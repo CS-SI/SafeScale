@@ -18,6 +18,7 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"text/scanner"
 
@@ -45,7 +46,7 @@ func (t *Token) Push(item string) error {
 	}
 
 	item = strings.ToLower(item)
-	t.members = append(t.members, item)
+	t.members[t.pos] = item
 	t.pos++
 	return nil
 }
@@ -84,33 +85,140 @@ func (t *Token) String() string {
 	return strings.Join(t.members, " ")
 }
 
-// Tokenize transforms a string to a list of tokens
-func Tokenize(request string) ([]*Token, error) {
+// Validate validates value in relation with operator, and returns min and max values if validated
+func (t *Token) Validate() (string, string, error) {
+	if !t.IsFull() {
+		return "", "", utils.InvalidRequestError("token isn't complete")
+	}
+
+	keyword := t.members[0]
+	operator := t.members[1]
+	value := t.members[2]
+	switch operator {
+	case "=":
+		if value[0] == '[' && value[len(value)-1] == ']' {
+			value = value[1 : len(value)-1]
+			splitted := strings.Split(value, "-")
+			if len(splitted) != 2 {
+				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of '%s' token isn't a valid interval", value, keyword))
+			}
+			min := splitted[0]
+			_, err := strconv.ParseFloat(min, 64)
+			if err != nil {
+				return "", "", utils.InvalidRequestError(fmt.Sprintf("first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error()))
+			}
+			max := splitted[1]
+			_, err = strconv.ParseFloat(max, 64)
+			if err != nil {
+				return "", "", utils.InvalidRequestError(fmt.Sprintf("second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error()))
+			}
+			return min, max, nil
+		}
+		_, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+		}
+		return value, value, nil
+
+	case "lt":
+		fallthrough
+	case "<":
+		_, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+		}
+		return "", value, nil
+
+	case "le":
+		fallthrough
+	case "<=":
+		_, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+		}
+		return "", value, nil
+
+	case "gt":
+		fallthrough
+	case ">":
+		_, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+		}
+		return value, "", nil
+
+	case "ge":
+		fallthrough
+	case ">=":
+		_, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+		}
+		return value, "", nil
+	}
+
+	return "", "", utils.InvalidRequestError(fmt.Sprintf("operator '%s' of token '%s' is not supported", operator, keyword))
+}
+
+// ParseParameter transforms a string to a list of tokens
+func ParseParameter(request string) (map[string]*Token, error) {
 	var (
-		s      scanner.Scanner
-		tokens []*Token
-		token  *Token
+		s       scanner.Scanner
+		tokens  = map[string]*Token{}
+		mytoken *Token
 	)
 	s.Init(strings.NewReader(request))
-	s.Mode = scanner.ScanInts | scanner.ScanFloats | scanner.ScanChars | scanner.ScanRawStrings
+	// s.Mode = scanner.ScanInts | scanner.ScanFloats | scanner.ScanChars | scanner.ScanRawStrings
 
 	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
 		t := s.TokenText()
 		if t == "," {
-			if token != nil {
-				tokens = append(tokens, token)
+			if mytoken == nil {
+				continue
 			}
-			token = NewToken()
-		} else {
-			err := token.Push(t)
-			if err != nil {
-				p := s.Pos()
-				return nil, fmt.Errorf("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
+			p := s.Pos()
+			return nil, fmt.Errorf("misplace separator ',' at line %d, column %d", p.Line, p.Column)
+		}
+
+		if mytoken == nil {
+			mytoken = NewToken()
+		}
+
+		// Manages value in the form [a-b]
+		if t == "[" {
+			for tok = s.Scan(); tok != scanner.EOF; tok = s.Scan() {
+				if s.TokenText() == "]" {
+					t += "]"
+					break
+				}
+				t += s.TokenText()
 			}
-			if token.IsFull() {
-				tokens = append(tokens, token)
-				token = NewToken()
+		}
+
+		err := mytoken.Push(t)
+		if err != nil {
+			p := s.Pos()
+			return nil, fmt.Errorf("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
+		}
+
+		// handles the cases >= or <=
+		if val, err := mytoken.GetOperator(); err == nil && (val == ">" || val == "<") {
+			if tok = s.Scan(); tok != scanner.EOF {
+				if s.TokenText() == "=" {
+					mytoken.members[mytoken.pos-1] += "="
+				} else {
+					err = mytoken.Push(s.TokenText())
+					if err != nil {
+						p := s.Pos()
+						return nil, fmt.Errorf("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
+					}
+				}
 			}
+		}
+		if mytoken.IsFull() {
+			name, _ := mytoken.GetKeyword()
+			tokens[name] = mytoken
+			mytoken = nil
 		}
 	}
 	return tokens, nil

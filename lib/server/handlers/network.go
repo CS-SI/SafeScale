@@ -45,7 +45,7 @@ import (
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(context.Context, string, string, IPVersion.Enum, int, float32, int, string, string) (*resources.Network, error)
+	Create(context.Context, string, string, IPVersion.Enum, resources.SizingRequirements, string, string) (*resources.Network, error)
 	List(context.Context, bool) ([]*resources.Network, error)
 	Inspect(context.Context, string) (*resources.Network, error)
 	Delete(context.Context, string) error
@@ -68,7 +68,7 @@ func NewNetworkHandler(svc *iaas.Service) NetworkAPI {
 func (handler *NetworkHandler) Create(
 	ctx context.Context,
 	name string, cidr string, ipVersion IPVersion.Enum,
-	cpu int, ram float32, disk int, theos string, gwname string,
+	sizing resources.SizingRequirements, theos string, gwname string,
 ) (*resources.Network, error) {
 
 	log.Debugf(">>> lib.server.handlers.NetworkHandler::Create()")
@@ -140,15 +140,8 @@ func (handler *NetworkHandler) Create(
 	log.Debugf("Creating compute resource '%s' ...", gwname)
 
 	// Create a gateway
-
 	var template resources.HostTemplate
-	tpls, err := handler.service.SelectTemplatesBySize(resources.SizingRequirements{
-		MinCores:    cpu,
-		MinRAMSize:  ram,
-		MinDiskSize: disk,
-		MinGPU:      -1,
-		MinFreq:     0,
-	}, false)
+	tpls, err := handler.service.SelectTemplatesBySize(sizing, false)
 	if err != nil {
 		return nil, infraErrf(err, "Error creating network: Error selecting template")
 	}
@@ -168,7 +161,7 @@ func (handler *NetworkHandler) Create(
 		msg += ")"
 		log.Infof(msg)
 	} else {
-		return nil, logicErr(fmt.Errorf("Error creating network: No template found for %v cpu, %v GB of ram, %v GB of system disk", cpu, ram, disk))
+		return nil, logicErr(fmt.Errorf("Error creating network: no host template corresponding to requirements for gateway"))
 	}
 	img, err := handler.service.SearchImage(theos)
 	if err != nil {
@@ -220,9 +213,11 @@ func (handler *NetworkHandler) Create(
 	err = gw.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
 		gwSizingV1 := v.(*propsv1.HostSizing)
 		gwSizingV1.RequestedSize = &propsv1.HostSize{
-			Cores:    cpu,
-			RAMSize:  ram,
-			DiskSize: disk,
+			Cores:     sizing.MinCores,
+			RAMSize:   sizing.MinRAMSize,
+			DiskSize:  sizing.MinDiskSize,
+			GPUNumber: sizing.MinGPU,
+			CPUFreq:   sizing.MinFreq,
 		}
 		return nil
 	})
@@ -465,16 +460,26 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	select {
 	case <-ctx.Done():
 		log.Warnf("Network delete cancelled by user")
-		hostSizing := propsv1.NewHostSizing()
+		hostSizingV1 := propsv1.NewHostSizing()
 		err := metadataHost.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
-			hostSizing = v.(*propsv1.HostSizing)
+			hostSizingV1 = v.(*propsv1.HostSizing)
 			return nil
 		})
 		if err != nil {
 			return fmt.Errorf("Failed to get gateway sizingV1")
 		}
+
 		//os name of the gw is not stored in metadatas so we used ubuntu 16.04 by default
-		networkBis, err := handler.Create(context.Background(), network.Name, network.CIDR, network.IPVersion, hostSizing.AllocatedSize.Cores, hostSizing.AllocatedSize.RAMSize, hostSizing.AllocatedSize.DiskSize, "Ubuntu 16.04", metadataHost.Name)
+		sizing := resources.SizingRequirements{
+			MinCores:    hostSizingV1.AllocatedSize.Cores,
+			MaxCores:    hostSizingV1.AllocatedSize.Cores,
+			MinFreq:     hostSizingV1.AllocatedSize.CPUFreq,
+			MinGPU:      hostSizingV1.AllocatedSize.GPUNumber,
+			MinRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
+			MaxRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
+			MinDiskSize: hostSizingV1.AllocatedSize.DiskSize,
+		}
+		networkBis, err := handler.Create(context.Background(), network.Name, network.CIDR, network.IPVersion, sizing, "Ubuntu 18.04", metadataHost.Name)
 		if err != nil {
 			return fmt.Errorf("Failed to stop network deletion")
 		}

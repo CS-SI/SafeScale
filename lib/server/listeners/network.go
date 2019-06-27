@@ -27,11 +27,13 @@ import (
 
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // NetworkHandler ...
@@ -62,14 +64,27 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create network: no tenant set")
 	}
 
+	var sizing *resources.SizingRequirements
+	if in.Gateway.Sizing == nil {
+		sizing = &resources.SizingRequirements{
+			MinCores:    int(in.Gateway.Sizing.MinCpuCount),
+			MaxCores:    int(in.Gateway.Sizing.MaxCpuCount),
+			MinRAMSize:  in.Gateway.Sizing.MinRamSize,
+			MaxRAMSize:  in.Gateway.Sizing.MaxRamSize,
+			MinDiskSize: int(in.Gateway.Sizing.MinDiskSize),
+			MinGPU:      int(in.Gateway.Sizing.GpuCount),
+			MinFreq:     in.Gateway.Sizing.MinCpuFreq,
+		}
+	} else {
+		sizing = srvutils.FromPBHostSizing(in.Gateway.Sizing)
+	}
+
 	handler := NetworkHandler(tenant.Service)
 	network, err := handler.Create(ctx,
 		in.GetName(),
 		in.GetCidr(),
 		IPVersion.IPv4,
-		int(in.Gateway.GetCpu()),
-		in.GetGateway().GetRam(),
-		int(in.GetGateway().GetDisk()),
+		*sizing,
 		in.GetGateway().GetImageId(),
 		in.GetGateway().GetName(),
 	)

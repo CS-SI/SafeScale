@@ -28,8 +28,9 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	conv "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // HostHandler ...
@@ -175,7 +176,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (*pb.Ho
 	// Map resources.Host to pb.Host
 	var pbhost []*pb.Host
 	for _, host := range hosts {
-		pbhost = append(pbhost, conv.ToPBHost(host))
+		pbhost = append(pbhost, srvutils.ToPBHost(host))
 	}
 	rv := &pb.HostList{Hosts: pbhost}
 	return rv, nil
@@ -198,24 +199,47 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 		return nil, grpc.Errorf(codes.FailedPrecondition, "can't create host: no tenant set")
 	}
 
+	var sizing *resources.SizingRequirements
+	if in.Sizing == nil {
+		sizing = &resources.SizingRequirements{
+			MinCores:    int(in.GetCpuCount()),
+			MaxCores:    int(in.GetCpuCount()),
+			MinRAMSize:  in.GetRam(),
+			MaxRAMSize:  in.GetRam(),
+			MinDiskSize: int(in.GetDisk()),
+			MinGPU:      int(in.GetGpuCount()),
+			MinFreq:     in.GetCpuFreq(),
+		}
+	} else {
+		sizing = srvutils.FromPBHostSizing(in.Sizing)
+	}
+
 	handler := HostHandler(tenant.Service)
 	host, err := handler.Create(ctx,
 		in.GetName(),
 		in.GetNetwork(),
-		int(in.GetCpuCount()),
-		in.GetRam(),
-		int(in.GetDisk()),
 		in.GetImageId(),
 		in.GetPublic(),
-		int(in.GetGpuCount()),
-		float32(in.GetCpuFreq()),
+		sizing,
 		in.Force,
 	)
+	// host, err := handler.Create(ctx,
+	// 	in.GetName(),
+	// 	in.GetNetwork(),
+	// 	int(in.GetCpuCount()),
+	// 	in.GetRam(),
+	// 	int(in.GetDisk()),
+	// 	in.GetImageId(),
+	// 	in.GetPublic(),
+	// 	int(in.GetGpuCount()),
+	// 	float32(in.GetCpuFreq()),
+	// 	in.Force,
+	// )
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 	log.Infof("Host '%s' created", in.GetName())
-	return conv.ToPBHost(host), nil
+	return srvutils.ToPBHost(host), nil
 
 }
 
@@ -249,7 +273,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (*pb.H
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
 	log.Infof("Host '%s' resized", in.GetName())
-	return conv.ToPBHost(host), nil
+	return srvutils.ToPBHost(host), nil
 }
 
 // Status of a host
@@ -279,7 +303,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (*pb.HostSt
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
-	return conv.ToHostStatus(host), nil
+	return srvutils.ToHostStatus(host), nil
 }
 
 // Inspect an host
@@ -310,7 +334,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (*pb.Host,
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, fmt.Sprintf("can't inspect host: %v", err))
 	}
-	return conv.ToPBHost(host), nil
+	return srvutils.ToPBHost(host), nil
 }
 
 // Delete an host
@@ -372,5 +396,5 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (*pb.SshConfig
 	if err != nil {
 		return nil, err
 	}
-	return conv.ToPBSshConfig(sshConfig), nil
+	return srvutils.ToPBSshConfig(sshConfig), nil
 }
