@@ -219,7 +219,7 @@ help: with_git
 	@printf "%b" "  $(GOLD_COLOR)all          - Builds all binaries$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)";
 	@echo '  help         - Prints this help message'
-	@echo '  docs         - Runs godoc in background at port 6060.'
+	@echo '  godocs       - Runs godoc in background at port 6060.'
 	@echo '                 Go to (http://localhost:6060/pkg/github.com/CS-SI/)'
 	@echo '  install      - Copies all binaries to $(GOBIN)'
 	@echo ''
