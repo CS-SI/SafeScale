@@ -329,6 +329,8 @@ func (s *StackGcp) CreateHost(request resources.HostRequest) (host *resources.Ho
 	// --- query provider for host creation ---
 
 	logrus.Debugf("requesting host resource creation...")
+	var desistError error
+
 	// Retry creation until success, for 10 minutes
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
@@ -351,9 +353,18 @@ func (s *StackGcp) CreateHost(request resources.HostRequest) (host *resources.Ho
 						return errors.Wrap(err, killErr.Error())
 					}
 				}
+
+				if gerr, ok := err.(*googleapi.Error); ok {
+					if gerr.Code == 403 {
+						desistError = err
+						return nil
+					}
+				}
+
 				logrus.Warnf("error creating host: %+v", err)
 				return err
 			}
+
 			if server == nil {
 				return fmt.Errorf("failed to create server")
 			}
@@ -378,6 +389,11 @@ func (s *StackGcp) CreateHost(request resources.HostRequest) (host *resources.Ho
 		logrus.Debugf("Error creating host: timeout: %+v", err)
 		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
+	if desistError != nil {
+		logrus.Debugf("Error creating host: %+v", err)
+		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating host"))
+	}
+
 	logrus.Debugf("host resource created.")
 
 	// Starting from here, delete host if exiting with error
