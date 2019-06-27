@@ -399,7 +399,7 @@ sfService() {
 			[ "$(sfGetFact 'use systemd')" = "1" ] && service $2 reload && return $?
 			;;
 		*)
-			echo "sfService(): unhandle command '$1'"
+			echo "sfService(): unhandled command '$1'"
 			;;
 	esac
 	return 1
