@@ -27,7 +27,7 @@ import (
 	conv "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 
-	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
 // var sshCfgCache = cache.NewMapCache()

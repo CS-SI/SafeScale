@@ -23,7 +23,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	google_protobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
