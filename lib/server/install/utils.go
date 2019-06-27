@@ -38,8 +38,7 @@ import (
 // FIXME Here is the missing piece
 
 const (
-	featureScriptTemplateContent = `
-#!/bin/bash
+	featureScriptTemplateContent = `#!/bin/bash -x
 
 set -u -o pipefail
 
@@ -55,6 +54,7 @@ exec 1<&-
 exec 2<&-
 exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 2>&1
+set -x
 
 {{ .reserved_BashLibrary }}
 
