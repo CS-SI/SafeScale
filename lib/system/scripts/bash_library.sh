@@ -35,7 +35,7 @@ export -f sfWaitForApt
 # sfApt does exactly what apt does, but we call sfWaitForApt first
 sfApt() {
 	sfWaitForApt
-	DEBIAN_FRONTEND=noninteractive apt $@
+	DEBIAN_FRONTEND=noninteractive apt "$@"
 }
 export -f sfApt
 
@@ -43,7 +43,7 @@ sfWaitLockfile() {
 	local ROUNDS=600
 	name=$1
 	shift
-	params=$@
+	params="$@"
 	echo "check $name lock"
 	echo ${params}
 	if fuser ${params} &>/dev/null; then
@@ -280,7 +280,7 @@ __create_dropzone() {
 
 sfDownloadInDropzone() {
 	__create_dropzone &>/dev/null
-	( cd ~cladm/.dropzone && sfDownload $@)
+	( cd ~cladm/.dropzone && sfDownload "$@")
 }
 export -f sfDownloadInDropzone
 
@@ -339,17 +339,17 @@ sfRemoteExec() {
 export -f sfRemoteExec
 
 sfKubectl() {
-	sudo -u cladm -i kubectl $@
+	sudo -u cladm -i kubectl "$@"
 }
 export -f sfKubectl
 
 sfDcos() {
-	sudo -u cladm -i dcos $@
+	sudo -u cladm -i dcos "$@"
 }
 export -f sfDcos
 
 sfMarathon() {
-	sudo -u cladm -i marathon $@
+	sudo -u cladm -i marathon "$@"
 }
 export -f sfMarathon
 

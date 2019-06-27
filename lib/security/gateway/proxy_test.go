@@ -23,13 +23,17 @@ import (
 
 func Clean() {
 	db := model.NewDataAccess("sqlite3", "/tmp/safe-security.db").Get()
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 	db.DropTableIfExists(&model.Service{}, &model.Role{}, &model.AccessPermission{}, &model.User{})
 }
 func runTestService() {
 	da := model.NewDataAccess("sqlite3", "/tmp/safe-security.db")
 	db := da.Get().Debug()
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 	db.AutoMigrate(&model.Service{}, &model.Role{}, &model.AccessPermission{}, &model.User{})
 
 	srv1 := model.Service{
@@ -108,11 +112,13 @@ func runTestService() {
 				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			}
 			go func() {
-				defer conn.Close()
+				defer func() {
+					_ = conn.Close()
+				}()
 				for i := 0; i < 10; i++ {
 					now := time.Now()
 					text, _ := now.MarshalText()
-					conn.WriteMessage(websocket.TextMessage, text)
+					_ = conn.WriteMessage(websocket.TextMessage, text)
 					time.Sleep(utils.GetMinDelay())
 				}
 
@@ -126,9 +132,9 @@ func runTestService() {
 		}
 
 		fmt.Printf("%s", dump)
-		w.Write(text)
+		_, _ = w.Write(text)
 	})
-	http.ListenAndServe(":10000", mux)
+	_ = http.ListenAndServe(":10000", mux)
 
 }
 
@@ -161,7 +167,14 @@ func getUserToken() string {
 func TestGateway(t *testing.T) {
 	Clean()
 
-	go gateway.Start(":4443")
+	beauty := make(chan bool)
+	go gateway.Start(":4443", beauty)
+	failed := <- beauty
+
+	if failed {
+		t.Skip()
+	}
+
 	go runTestService()
 	time.Sleep(2 * time.Second)
 	resp, err := http.Get("http://localhost:10000/date")
@@ -198,5 +211,5 @@ func TestGateway(t *testing.T) {
 		assert.Nil(t, err)
 		println(string(buffer))
 	}
-	ws.Close()
+	_ = ws.Close()
 }

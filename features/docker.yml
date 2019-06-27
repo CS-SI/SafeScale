@@ -90,7 +90,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            mkdir /etc/docker
+                            mkdir -p /etc/docker
                             # if [ "$(sfGetFact 'use systemd')" = "1" ]; then
                             #     DRIVER=systemd
                             # else

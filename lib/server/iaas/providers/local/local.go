@@ -31,7 +31,7 @@ import (
 	libStack "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 )
 
-// provider is the providerementation of the local provider
+// provider is the provider implementation of the local provider
 type provider struct {
 	*libStack.Stack
 }

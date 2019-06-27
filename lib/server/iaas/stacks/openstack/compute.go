@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"strings"
 	"time"
 
@@ -472,6 +473,11 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if !host.OK() {
+		log.Debugf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+	}
+
 	return host, nil
 }
 

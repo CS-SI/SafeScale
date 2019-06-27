@@ -17,7 +17,9 @@
 package iaas
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 	log "github.com/sirupsen/logrus"
 
@@ -168,6 +170,7 @@ func UseService(tenantName string) (*Service, error) {
 			metadataCryptKey *crypt.Key
 		)
 		if tenantMetadataFound || tenantObjectStorageFound {
+			// FIXME This requires tunning too
 			metadataLocationConfig, err := initMetadataLocationConfig(tenant)
 			if err != nil {
 				return nil, err
@@ -293,6 +296,33 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 		config.AvailabilityZone, _ = compute["AvailabilityZone"].(string)
 	}
 
+	if config.Type == "google" {
+		if config.ProjectId, ok = identity["project_id"].(string); !ok {
+			return config, fmt.Errorf("Problem parsing project_id")
+		}
+
+		// FIXME Add google stuff
+		googleCfg := stacks.GCPConfiguration{
+			Type: "service_account",
+			ProjectId: identity["project_id"].(string),
+			PrivateKeyId: identity["private_key_id"].(string),
+			PrivateKey: identity["private_key"].(string),
+			ClientEmail: identity["client_email"].(string),
+			ClientId: identity["client_id"].(string),
+			AuthUri: identity["auth_uri"].(string),
+			TokenUri: identity["token_uri"].(string),
+			AuthProvider: identity["auth_provider_x509_cert_url"].(string),
+			ClientCert: identity["client_x509_cert_url"].(string),
+		}
+
+		d1, err := json.MarshalIndent(googleCfg, "", "  ")
+		if err != nil {
+			return config, err
+		}
+
+		// FIXME Here is the problem with google stuff...
+		config.Credentials = string(d1)
+	}
 	return config, nil
 }
 
@@ -413,6 +443,34 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 		if config.AvailabilityZone, ok = objectstorage["AvailabilityZone"].(string); !ok {
 			config.AvailabilityZone, _ = compute["AvailabilityZone"].(string)
 		}
+	}
+
+	if config.Type == "google" {
+		if config.ProjectId, ok = identity["project_id"].(string); !ok {
+			return config, fmt.Errorf("Problem parsing project_id")
+		}
+
+		// FIXME Add google stuff
+		googleCfg := stacks.GCPConfiguration{
+			Type: "service_account",
+			ProjectId: identity["project_id"].(string),
+			PrivateKeyId: identity["private_key_id"].(string),
+			PrivateKey: identity["private_key"].(string),
+			ClientEmail: identity["client_email"].(string),
+			ClientId: identity["client_id"].(string),
+			AuthUri: identity["auth_uri"].(string),
+			TokenUri: identity["token_uri"].(string),
+			AuthProvider: identity["auth_provider_x509_cert_url"].(string),
+			ClientCert: identity["client_x509_cert_url"].(string),
+		}
+
+		d1, err := json.MarshalIndent(googleCfg, "", "  ")
+		if err != nil {
+			return config, err
+		}
+
+		// FIXME Here is the problem with google stuff...
+		config.Credentials = string(d1)
 	}
 
 	return config, nil

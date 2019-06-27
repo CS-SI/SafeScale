@@ -287,6 +287,12 @@ func Test_GetImage(t *testing.T) {
 func Test_GetTemplate(t *testing.T) {
 	// TODO Implement Test
 
+	cli, err := getTester()
+	if err != nil {
+		t.Skip(err)
+	}
+	require.Nil(t, err)
+	cli.GetTemplate(t)
 }
 
 // ListTemplates lists available host templates

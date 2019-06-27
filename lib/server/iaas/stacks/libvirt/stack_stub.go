@@ -24,134 +24,141 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
 )
 
 var errorStr = "Libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"
 
 // Client is the implementation of the local driver regarding to the api.ClientAPI
-// provider is the providerementation of the OVH provider
-type provider struct {
+
+type Stack struct {
 }
 
-func (provider *provider) ListAvailabilityZones(bool) (map[string]bool, error) {
-	return nil, fmt.Errorf(errorStr)
-}
-
-func (provider *provider) ListImages(all bool) ([]resources.Image, error) {
+func (s *Stack) ListAvailabilityZones(bool) (map[string]bool, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
-func (provider *provider) GetImage(id string) (*resources.Image, error) {
+func (s *Stack) ListRegions() ([]string, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
-func (provider *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
+func (s *Stack) ListImages(all bool) ([]resources.Image, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
-func (provider *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (s *Stack) GetImage(id string) (*resources.Image, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateKeyPair(name string) (*resources.KeyPair, error) {
+func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetKeyPair(id string) (*resources.KeyPair, error) {
+
+func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListKeyPairs() ([]resources.KeyPair, error) {
+
+func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) DeleteKeyPair(id string) error {
+func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
+	return nil, fmt.Errorf(errorStr)
+}
+func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
+	return nil, fmt.Errorf(errorStr)
+}
+func (s *Stack) DeleteKeyPair(id string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetNetwork(id string) (*resources.Network, error) {
+func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetNetworkByName(name string) (*resources.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListNetworks() ([]*resources.Network, error) {
+func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) DeleteNetwork(id string) error {
-	return fmt.Errorf(errorStr)
-}
-func (provider *provider) CreateGateway(req resources.GatewayRequest) (*resources.Host, error) {
-	return nil, fmt.Errorf(errorStr)
-}
-func (provider *provider) DeleteGateway(string) error {
+func (s *Stack) DeleteNetwork(id string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateHost(request resources.HostRequest) (*resources.Host, error) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
+	return nil, nil, fmt.Errorf(errorStr)
+}
+
+func (s *Stack) DeleteGateway(string) error {
+	return fmt.Errorf(errorStr)
+}
+
+func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
+	return nil, nil, fmt.Errorf(errorStr)
+}
+func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
+func (s *Stack) InspectHost(interface{}) (*resources.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) InspectHost(interface{}) (*resources.Host, error) {
+func (s *Stack) GetHostByName(string) (*resources.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetHostByName(string) (*resources.Host, error) {
-	return nil, fmt.Errorf(errorStr)
-}
-func (provider *provider) GetHostState(interface{}) (HostState.Enum, error) {
+func (s *Stack) GetHostState(interface{}) (HostState.Enum, error) {
 	return HostState.ERROR, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListHosts() ([]*resources.Host, error) {
+func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) DeleteHost(id string) error {
+func (s *Stack) DeleteHost(id string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) StartHost(id string) error {
+func (s *Stack) StartHost(id string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) StopHost(id string) error {
+func (s *Stack) StopHost(id string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) RebootHost(id string) error {
+func (s *Stack) RebootHost(id string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
+func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetVolume(id string) (*resources.Volume, error) {
+func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListVolumes() ([]resources.Volume, error) {
+func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) DeleteVolume(id string) error {
+func (s *Stack) DeleteVolume(id string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
 	return "", fmt.Errorf(errorStr)
 }
-func (provider *provider) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) DeleteVolumeAttachment(serverID, id string) error {
+func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 	return fmt.Errorf(errorStr)
 }
 
 // GetConfigurationOptions ...
-func GetConfigurationOptions() stacks.ConfigurationOptions {
+func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
 	return stacks.ConfigurationOptions{}
 }
 
 // GetAuthenticationOptions ...
-func GetAuthenticationOptions() stacks.AuthenticationOptions {
+func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 	return stacks.AuthenticationOptions{}
 }

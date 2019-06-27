@@ -19,6 +19,11 @@ package tests
 // TODO NOTICE Side-effects imports here
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
+	local "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"testing"
 	"time"
@@ -42,6 +47,7 @@ import (
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialize tenant local
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekoms
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/ovh"            // Imported to initialize tenant ovh
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/gcp"            // Imported to initialize tenant gcp
 )
 
 // ServiceTester helper class to test clients
@@ -49,19 +55,17 @@ type ServiceTester struct {
 	Service *iaas.Service
 }
 
-/*
+// Check at compile that initialized tenants are valid stacks
 func (tester *ServiceTester) VerifyStacks(t *testing.T) {
-	var stack stacks.Stack
+	var stack api.Stack
 
 	stack = &local.Stack{}
 	stack = &huaweicloud.Stack{}
-	stack = &erbc.StackErbc{}
 	stack = &openstack.Stack{}
-	stack = &aws.Stack{}
+	stack = &gcp.StackGcp{}
 
 	_ = stack
 }
-*/
 
 //ListImages test
 func (tester *ServiceTester) ListImages(t *testing.T) {
@@ -104,7 +108,9 @@ func (tester *ServiceTester) ListHostTemplates(t *testing.T) {
 func (tester *ServiceTester) CreateKeyPair(t *testing.T) {
 	kp, err := tester.Service.CreateKeyPair("kp")
 	assert.Nil(t, err)
-	defer tester.Service.DeleteKeyPair(kp.ID)
+	defer func() {
+		_ = tester.Service.DeleteKeyPair(kp.ID)
+	}()
 	assert.NotEqual(t, kp.ID, "")
 	assert.NotEqual(t, kp.Name, "")
 	assert.NotEqual(t, kp.PrivateKey, "")
@@ -137,7 +143,9 @@ func (tester *ServiceTester) GetKeyPair(t *testing.T) {
 	_, err = tester.Service.GetKeyPair("notfound")
 	assert.NotNil(t, err)
 
-	defer tester.Service.DeleteKeyPair("unit_test_kp")
+	defer func() {
+		_ = tester.Service.DeleteKeyPair("unit_test_kp")
+	}()
 }
 
 //ListKeyPairs test
@@ -147,10 +155,14 @@ func (tester *ServiceTester) ListKeyPairs(t *testing.T) {
 	nbKP := len(lst)
 	kp, err := tester.Service.CreateKeyPair("kp")
 	assert.Nil(t, err)
-	defer tester.Service.DeleteKeyPair("kp")
+	defer func() {
+		_ = tester.Service.DeleteKeyPair("kp")
+	}()
 	kp2, err := tester.Service.CreateKeyPair("kp2")
 	assert.Nil(t, err)
-	defer tester.Service.DeleteKeyPair("kp2")
+	defer func() {
+		_ = tester.Service.DeleteKeyPair("kp2")
+	}()
 	lst, err = tester.Service.ListKeyPairs()
 	assert.Nil(t, err)
 	assert.EqualValues(t, nbKP+2, len(lst))
@@ -256,7 +268,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, network *resources.Network) 
 
 // CreateNetworkTest test
 func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
-	// Get inital number of networks
+	// Get initial number of networks
 	nets, err := tester.Service.ListNetworks()
 	require.Nil(t, err)
 	nbAllNetworks := len(nets)
@@ -285,13 +297,17 @@ func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
 	require.Nil(t, err)
 
 	require.True(t, networkFound)
-	defer tester.Service.DeleteKeyPair(kp1.ID)
-	defer tester.Service.DeleteNetwork(network1.ID)
+	defer func() {
+		_ = tester.Service.DeleteKeyPair(kp1.ID)
+	}()
+	defer func() {
+		_ = tester.Service.DeleteNetwork(network1.ID)
+	}()
 }
 
 //Networks test
 func (tester *ServiceTester) Networks(t *testing.T) {
-	// Get inital number of networks
+	// Get initial number of networks
 	nets, err := tester.Service.ListNetworks()
 	assert.Nil(t, err)
 	nbAllNetworks := len(nets)
@@ -302,8 +318,8 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	network1, gw1 := tester.CreateNetwork(t, net1Name, true, net1CIDR)
 	fmt.Println("unit_test_network1 created")
 	defer func() {
-		tester.Service.DeleteHost(gw1.ID)
-		tester.Service.DeleteNetwork(network1.ID)
+		_ = tester.Service.DeleteHost(gw1.ID)
+		_ = tester.Service.DeleteNetwork(network1.ID)
 	}()
 
 	assert.NotNil(t, network1)
@@ -331,7 +347,7 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	assert.Nil(t, gw2)
 
 	defer func() {
-		tester.Service.DeleteNetwork(network2.ID)
+		_ = tester.Service.DeleteNetwork(network2.ID)
 	}()
 
 	nets, err = tester.Service.ListNetworks()
@@ -364,11 +380,15 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 
 	// TODO: handle kp delete
 	network, gw := tester.CreateNetwork(t, "unit_test_network_3", false, "1.1.4.0/24")
-	defer tester.Service.DeleteNetwork(network.ID)
+	defer func() {
+		_ = tester.Service.DeleteNetwork(network.ID)
+	}()
 	assert.Nil(t, gw)
 	host1, _, err := tester.CreateHost(t, "host1", network, true)
 	assert.NoError(t, err)
-	defer tester.Service.DeleteHost(host1.ID)
+	defer func() {
+		_ = tester.Service.DeleteHost(host1.ID)
+	}()
 
 	// ssh, err := tester.Service.GetSSHConfig(host.ID)
 	// _, err = ssh.WaitServerReady("phase1", 1 * time.Minute)
@@ -396,10 +416,14 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	assert.Error(t, err)
 	err = tester.CreateGW(t, network)
 	assert.NoError(t, err)
-	defer tester.Service.DeleteGateway(network.GatewayID)
+	defer func() {
+		_ = tester.Service.DeleteGateway(network.GatewayID)
+	}()
 	host2, _, err := tester.CreateHost(t, "host2", network, false)
 	assert.NoError(t, err)
-	defer tester.Service.DeleteHost(host2.ID)
+	defer func() {
+		_ = tester.Service.DeleteHost(host2.ID)
+	}()
 
 	network, err = tester.Service.GetNetwork(network.ID)
 	assert.NoError(t, err)
@@ -430,8 +454,8 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 func (tester *ServiceTester) StartStopHost(t *testing.T) {
 	net, gw := tester.CreateNetwork(t, "unit_test_network_4", true, "1.1.5.0/24")
 	defer func() {
-		tester.Service.DeleteGateway(gw.ID)
-		tester.Service.DeleteNetwork(net.ID)
+		_ = tester.Service.DeleteGateway(gw.ID)
+		_ = tester.Service.DeleteNetwork(net.ID)
 	}()
 	host, err := tester.Service.GetHostByName("gw-" + net.Name)
 	require.Nil(t, err)
@@ -471,22 +495,30 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 		Speed: VolumeSpeed.HDD,
 	})
 	assert.Nil(t, err)
-	defer tester.Service.DeleteVolume(v1.ID)
+	defer func() {
+		_ = tester.Service.DeleteVolume(v1.ID)
+	}()
 
 	assert.Equal(t, "test_volume1", v1.Name)
 	assert.Equal(t, 25, v1.Size)
 	assert.Equal(t, VolumeSpeed.HDD, v1.Speed)
 
-	tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	assert.Nil(t, err)
+
 	v2, err := tester.Service.CreateVolume(resources.VolumeRequest{
 		Name:  "test_volume2",
 		Size:  35,
 		Speed: VolumeSpeed.HDD,
 	})
 	assert.Nil(t, err)
-	defer tester.Service.DeleteVolume(v2.ID)
+	defer func() {
+		_ = tester.Service.DeleteVolume(v2.ID)
+	}()
 
-	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	assert.Nil(t, err)
+
 	lst, err = tester.Service.ListVolumes()
 	assert.Nil(t, err)
 	assert.Equal(t, nbVolumes+2, len(lst))
@@ -511,16 +543,21 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	// TODO: handle kp delete
 	net, gw := tester.CreateNetwork(t, "unit_test_network_5", true, "1.1.6.0/24")
 
+	// FIXME Handle test errors
 	defer func() {
-		tester.Service.DeleteGateway(gw.ID)
-		defer tester.Service.DeleteNetwork(net.ID)
+		_ = tester.Service.DeleteGateway(gw.ID)
+		defer func() {
+			_ = tester.Service.DeleteNetwork(net.ID)
+		}()
 	}()
 
 	host, err := tester.Service.GetHostByName("gw-" + net.Name)
 	require.Nil(t, err)
 	require.NotNil(t, host)
 
-	defer tester.Service.DeleteHost(host.ID)
+	defer func() {
+		_ = tester.Service.DeleteHost(host.ID)
+	}()
 
 	v1, err := tester.Service.CreateVolume(resources.VolumeRequest{
 		Name:  "test_volume1",
@@ -528,8 +565,11 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 		Speed: VolumeSpeed.HDD,
 	})
 	assert.Nil(t, err)
-	defer tester.Service.DeleteVolume(v1.ID)
-	tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	defer func() {
+		_ = tester.Service.DeleteVolume(v1.ID)
+	}()
+	_, err = tester.Service.WaitVolumeState(v1.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(resources.VolumeRequest{
 		Name:  "test_volume2",
@@ -537,8 +577,12 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 		Speed: VolumeSpeed.HDD,
 	})
 	assert.Nil(t, err)
-	defer tester.Service.DeleteVolume(v2.ID)
-	tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	defer func() {
+		_ = tester.Service.DeleteVolume(v2.ID)
+	}()
+
+	_, err = tester.Service.WaitVolumeState(v2.ID, VolumeState.AVAILABLE, utils.GetBigDelay())
+	assert.Nil(t, err)
 
 	va1ID, err := tester.Service.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
 		Name:     "Attachment1",
@@ -547,7 +591,9 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, va1ID)
-	defer tester.Service.DeleteVolumeAttachment(host.ID, va1ID)
+	defer func() {
+		_ = tester.Service.DeleteVolumeAttachment(host.ID, va1ID)
+	}()
 
 	va2ID, err := tester.Service.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
 		Name:     "Attachment2",
@@ -556,7 +602,9 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, va2ID)
-	defer tester.Service.DeleteVolumeAttachment(host.ID, va2ID)
+	defer func() {
+		_ = tester.Service.DeleteVolumeAttachment(host.ID, va2ID)
+	}()
 
 	va1, err := tester.Service.GetVolumeAttachment(host.ID, v1.ID)
 	assert.Nil(t, err)
@@ -648,6 +696,11 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 
 // GetImage ...
 func (tester *ServiceTester) GetImage(t *testing.T) {
+	// TODO Implement this test
+}
+
+// GetImage ...
+func (tester *ServiceTester) GetTemplate(t *testing.T) {
 	// TODO Implement this test
 }
 

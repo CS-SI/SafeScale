@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -x
 #
 # Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
 #

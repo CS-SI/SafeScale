@@ -16,7 +16,19 @@
 
 package handlers
 
-/*
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"testing"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/mocks"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+)
+
 func TestNetworkHandler_List_with_safescaled_running(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -32,7 +44,6 @@ func TestNetworkHandler_List_with_safescaled_running(t *testing.T) {
 	mockClientAPI.EXPECT().ListNetworks().Return(nil, nil).Times(1)
 
 	result, daerr := ness.service.ListNetworks()
-
 	assert.Nil(t, daerr)
 
 	_ = result
@@ -63,9 +74,10 @@ func TestNetworkHandler_List_with_NO_safescaled_running(t *testing.T) {
 	mockClientAPI.EXPECT().ListNetworks().Return(nil, theError).Times(1)
 
 	result, daerr := ness.service.ListNetworks()
+	assert.NotNil(t, daerr)
 
-	assert.EqualError(t, daerr, "Failure")
+	assert.True(t, strings.Contains(daerr.Error(), "TransientFailure"))
 
 	assert.Nil(t, result)
 }
-*/
+

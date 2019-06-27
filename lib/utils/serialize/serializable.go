@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 )
 
+//go:generate mockgen -destination=../mocks/mock_serializable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/serialize Serializable
+
 // Serializable is the interface allowing the conversion of satisfying struct to []byte (Serialize())
 // and reverse operation (Unserialize())
 type Serializable interface {

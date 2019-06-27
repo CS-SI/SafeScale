@@ -23,6 +23,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 )
 
+//go:generate mockgen -destination=../mocks/mock_processmanager.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ProcessManagerAPI
+
 // ProcessManagerAPI defines API to manipulate process
 type ProcessManagerAPI interface {
 	List(ctx context.Context) (map[string]string, error)

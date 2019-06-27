@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package iaas
+package utils
 
 // TODO NOTICE Side-effects imports here
 
@@ -27,4 +27,5 @@ import (
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/openstack"      // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom"    // Imported to initialise tenants
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/ovh"            // Imported to initialise tenants
+	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/gcp"            // Imported to initialise tenants
 )

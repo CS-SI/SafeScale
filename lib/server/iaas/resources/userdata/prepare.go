@@ -21,6 +21,8 @@ package userdata
 import (
 	"bytes"
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"os"
 	"strings"
 	"text/template"
@@ -94,6 +96,7 @@ func (ud *Content) Prepare(
 		useLayer3Networking = true
 		dnsList             []string
 		operatorUsername    string
+		useNATService = false
 	)
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
@@ -111,6 +114,7 @@ func (ud *Content) Prepare(
 
 	// autoHostNetworkInterfaces = options.AutoHostNetworkInterfaces
 	useLayer3Networking = options.UseLayer3Networking
+	useNATService = options.UseNATService
 	operatorUsername = options.OperatorUsername
 	dnsList = options.DNSList
 	if len(dnsList) <= 0 {
@@ -137,13 +141,18 @@ func (ud *Content) Prepare(
 	ud.PrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
 	// ud.ConfIF = !autoHostNetworkInterfaces
 	ud.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking
-	ud.AddGateway = !request.PublicIP && !useLayer3Networking && ip != ""
+	ud.AddGateway = !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
 	ud.CIDR = cidr
 	ud.GatewayIP = ip
 	ud.Password = request.Password
 	ud.EmulatedPublicNet = defaultNetworkCIDR
-	//ud.HostName = request.Name
+
+	if request.HostName != "" {
+		ud.HostName = request.HostName
+	} else {
+		ud.HostName = request.ResourceName
+	}
 
 	return nil
 }
@@ -156,6 +165,14 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 		err    error
 	)
 
+	// DEV VAR
+	provider := ""
+	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPT_FLAVOR"); suffixCandidate != "" {
+		if suffixCandidate != "" {
+			provider = fmt.Sprintf(".%s", suffixCandidate)
+		}
+	}
+
 	switch phase {
 	case "phase1":
 		if userdataPhase1Template == nil {
@@ -164,7 +181,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 				return nil, err
 			}
 
-			tmplString, err := box.String("userdata.phase1.sh")
+			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", provider))
 			if err != nil {
 				return nil, fmt.Errorf("error loading script template: %s", err.Error())
 			}
@@ -186,7 +203,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 				return nil, err
 			}
 
-			tmplString, err := box.String("userdata.phase2.sh")
+			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase2.sh", provider))
 			if err != nil {
 				return nil, fmt.Errorf("error loading script template: %s", err.Error())
 			}
@@ -208,6 +225,15 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 		}
 	default:
 		return nil, fmt.Errorf("phase '%s' not managed", phase)
+	}
+
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", ud.HostName)), 0777)
+		dumpName := utils.AbsPathify( fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.sh", ud.HostName, phase))
+		err = ioutil.WriteFile(dumpName, []byte(result), 0644)
+		if err != nil {
+			logrus.Warnf("[TRACE] Failure writing step info into %s", dumpName)
+		}
 	}
 
 	return result, nil

@@ -11,6 +11,8 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+//go:generate mockgen -destination=../mocks/mock_taskrunner.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskRunner
+
 // TaskRunner ...
 type TaskRunner interface {
 	ID() string
@@ -85,6 +87,8 @@ const (
 
 // TaskFunc ...
 type TaskFunc func(tr TaskRunner, parameters interface{})
+
+//go:generate mockgen -destination=../mocks/mock_task.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency Task
 
 // Task ...
 type Task interface {

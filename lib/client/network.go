@@ -23,7 +23,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	clitools "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 // network is the part of safescale client handling Network

@@ -10,7 +10,9 @@ import (
 
 func Clean() {
 	db := model.NewDataAccess("sqlite3", "/tmp/test.db").Get()
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 	db.DropTableIfExists(&model.Service{}, &model.Role{}, &model.AccessPermission{}, &model.User{})
 }
 
@@ -18,7 +20,9 @@ func TestModel(t *testing.T) {
 	Clean()
 	da := model.NewDataAccess("sqlite3", "/tmp/test.db")
 	db := da.Get().Debug()
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 	db.AutoMigrate(&model.Service{}, &model.Role{}, &model.AccessPermission{}, &model.User{})
 
 	srv1 := model.Service{

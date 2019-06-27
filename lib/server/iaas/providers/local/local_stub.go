@@ -58,6 +58,11 @@ func (provider *provider) ListAvailabilityZones(bool) (map[string]bool, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
+// ListRegions returns a list with the regions available
+func (provider *provider) ListRegions() ([]string, error) {
+	return nil, fmt.Errorf(errorStr)
+}
+
 func (provider *provider) ListImages(all bool) ([]resources.Image, error) {
 	return nil, fmt.Errorf(errorStr)
 }

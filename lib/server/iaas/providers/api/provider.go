@@ -33,6 +33,9 @@ type Provider interface {
 	// ListAvailabilityZones lists the usable Availability Zones
 	ListAvailabilityZones(bool) (map[string]bool, error)
 
+	// List regions
+	ListRegions() ([]string, error)
+
 	// ListImages lists available OS images
 	ListImages(bool) ([]resources.Image, error)
 	// GetImage returns the Image referenced by id

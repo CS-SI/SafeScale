@@ -16,6 +16,8 @@
 
 package data
 
+//go:generate mockgen -destination=../mocks/mock_identifyable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Identifyable
+
 // Identifyable ...
 type Identifyable interface {
 	GetName() string

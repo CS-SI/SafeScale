@@ -75,6 +75,7 @@ type StoredCPUInfo struct {
 type Image struct {
 	ID   string `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
+	URL  string
 }
 
 // HostRequest represents requirements to create host
@@ -139,6 +140,16 @@ func NewHost() *Host {
 	return &Host{
 		Properties: serialize.NewJSONProperties("resources.host"),
 	}
+}
+
+func (h *Host) OK() bool {
+	result := true
+	result = result && h.ID != ""
+	result = result && h.Name != ""
+	result = result && h.PrivateKey != ""
+	result = result && h.Password != ""
+	result = result && h.Properties != nil
+	return result
 }
 
 // GetAccessIP returns the IP to reach the host
