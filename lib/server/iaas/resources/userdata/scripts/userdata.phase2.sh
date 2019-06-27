@@ -687,6 +687,16 @@ configure_locale() {
     export LANGUAGE=en_US.UTF-8 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 }
 
+force_dbus_restart() {
+    case $LINUX_KIND in
+        ubuntu)
+            sudo sed -i 's/^RefuseManualStart=.*$/RefuseManualStart=no/g' /lib/systemd/system/dbus.service
+            sudo systemctl daemon-reexec
+            sudo systemctl restart dbus.service
+            ;;
+    esac
+}
+
 # ---- Main
 
 configure_locale
@@ -708,6 +718,8 @@ ln -s /opt/safescale/var/state/user_data.phase2.done /var/tmp/user_data.done
 # !!! DON'T REMOVE !!! #insert_tag allows to add something just before exiting,
 #                      but after the template has been realized (cf. libvirt Stack)
 #insert_tag
+
+force_dbus_restart
 
 set +x
 exit 0
