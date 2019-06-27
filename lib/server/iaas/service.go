@@ -300,11 +300,31 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	log.Debugf(fmt.Sprintf(msg, coreMsg, ramMsg, diskMsg))
 
 	for _, template := range templates {
-		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f GB RAM, %d GB Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)
+		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %f RAM, and %d Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)
 		msg = msg + " %s"
 		if sizing.MinCores > 0 && template.Cores < sizing.MinCores {
 			log.Debugf(msg, "too few cores")
 			continue
+		}
+		if sizing.MaxCores > 0 && template.Cores > sizing.MaxCores {
+			log.Debugf(msg, "too many cores")
+			continue
+		}
+		if sizing.MinRAMSize > 0.0 && template.RAMSize < sizing.MinRAMSize {
+			log.Debugf(msg, "too few RAM")
+			continue
+		}
+		if sizing.MaxRAMSize > 0.0 && template.RAMSize > sizing.MaxRAMSize {
+			log.Debugf(msg, "too many RAM")
+			continue
+		}
+		if template.DiskSize > 0 && sizing.MinDiskSize > 0 && template.DiskSize < sizing.MinDiskSize {
+			log.Debugf(msg, "too few disk size")
+			continue
+		}
+
+		if _, ok := scannerTemplates[template.ID]; ok || !askedForSpecificScannerInfo {
+			selectedTpls = append(selectedTpls, template)
 		}
 	}
 

@@ -34,7 +34,9 @@ type KeyPair struct {
 // SizingRequirements represents host sizing requirements to fulfil
 type SizingRequirements struct {
 	MinCores    int     `json:"min_cores,omitempty"`
+	MaxCores    int     `json:"max_cores,omitempty"`
 	MinRAMSize  float32 `json:"min_ram_size,omitempty"`
+	MaxRAMSize  float32 `json:"max_ram_size,omitempty"`
 	MinDiskSize int     `json:"min_disk_size,omitempty"`
 	MinGPU      int     `json:"min_gpu,omitempty"`
 	MinFreq     float32 `json:"min_freq,omitempty"`
