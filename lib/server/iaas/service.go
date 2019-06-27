@@ -271,15 +271,40 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 		}
 	}
 
-	log.Debugf("Looking for machine with: %d cores, %f RAM, and %d Disk", sizing.MinCores, sizing.MinRAMSize, sizing.MinDiskSize)
+	msg := "Looking for machine with: %s cores, %s RAM%s"
+	coreMsg := ""
+	if sizing.MinCores > 0 {
+		if sizing.MaxCores > 0 {
+			coreMsg = fmt.Sprintf("between %d and %d", sizing.MinCores, sizing.MaxCores)
+		} else {
+			coreMsg = fmt.Sprintf("at least %d", sizing.MinCores)
+		}
+	} else {
+		coreMsg = fmt.Sprintf("at most %d", sizing.MaxCores)
+	}
+	ramMsg := ""
+	if sizing.MinRAMSize > 0 {
+		if sizing.MaxRAMSize > 0 {
+			ramMsg = fmt.Sprintf("between %.01f and %.01f", sizing.MinRAMSize, sizing.MaxRAMSize)
+		} else {
+			ramMsg = fmt.Sprintf("at least %.01f", sizing.MinRAMSize)
+		}
+	} else {
+		coreMsg = fmt.Sprintf("at most %.01f", sizing.MaxRAMSize)
+	}
+	diskMsg := ""
+	if sizing.MinDiskSize > 0 {
+		diskMsg = fmt.Sprintf(" and at least %d", sizing.MinDiskSize)
+	}
+
+	log.Debugf(fmt.Sprintf(msg, coreMsg, ramMsg, diskMsg))
 
 	for _, template := range templates {
-		if template.Cores >= sizing.MinCores && (template.DiskSize == 0 || template.DiskSize >= sizing.MinDiskSize) && template.RAMSize >= sizing.MinRAMSize {
-			if _, ok := scannerTemplates[template.ID]; ok || !askedForSpecificScannerInfo {
-				selectedTpls = append(selectedTpls, template)
-			}
-		} else {
-			log.Debugf("Discard machine template '%s' with : %d cores, %f RAM, and %d Disk", template.Name, template.Cores, template.RAMSize, template.DiskSize)
+		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f GB RAM, %d GB Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)
+		msg = msg + " %s"
+		if sizing.MinCores > 0 && template.Cores < sizing.MinCores {
+			log.Debugf(msg, "too few cores")
+			continue
 		}
 	}
 

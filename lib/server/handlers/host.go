@@ -48,7 +48,7 @@ import (
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
-	Create(ctx context.Context, name string, net string, cpu int, ram float32, disk int, os string, public bool, gpuNumber int, freq float32, force bool) (*resources.Host, error)
+	Create(ctx context.Context, name string, net string, os string, public bool, sizing *resources.SizingRequirements, force bool) (*resources.Host, error)
 	List(ctx context.Context, all bool) ([]*resources.Host, error)
 	ForceInspect(ctx context.Context, ref string) (*resources.Host, error)
 	Inspect(ctx context.Context, ref string) (*resources.Host, error)
@@ -204,10 +204,13 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 }
 
 // Create creates a host
+// func (handler *HostHandler) Create(
+// 	ctx context.Context,
+// 	name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32,
+// 	force bool,
 func (handler *HostHandler) Create(
 	ctx context.Context,
-	name string, net string, cpu int, ram float32, disk int, los string, public bool, gpuNumber int, freq float32,
-	force bool,
+	name string, net string, los string, public bool, sizing *resources.SizingRequirements, force bool,
 ) (*resources.Host, error) {
 
 	log.Debugf(">>> lib.server.handlers.HostHandler::Create(%s)", name)
@@ -253,14 +256,15 @@ func (handler *HostHandler) Create(
 		networks = append(networks, net)
 	}
 
-	templates, err := handler.service.SelectTemplatesBySize(
-		resources.SizingRequirements{
-			MinCores:    cpu,
-			MinRAMSize:  ram,
-			MinDiskSize: disk,
-			MinGPU:      gpuNumber,
-			MinFreq:     freq,
-		}, force)
+	// templates, err := handler.service.SelectTemplatesBySize(
+	// 	resources.SizingRequirements{
+	// 		MinCores:    cpu,
+	// 		MinRAMSize:  ram,
+	// 		MinDiskSize: disk,
+	// 		MinGPU:      gpuNumber,
+	// 		MinFreq:     freq,
+	// 	}, force)
+	templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
 	if err != nil {
 		return nil, infraErrf(err, "failed to find template corresponding to requested resources")
 	}
@@ -336,11 +340,11 @@ func (handler *HostHandler) Create(
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		hostSizingV1.Template = hostRequest.TemplateID
 		hostSizingV1.RequestedSize = &propsv1.HostSize{
-			Cores:     cpu,
-			RAMSize:   ram,
-			DiskSize:  disk,
-			GPUNumber: gpuNumber,
-			CPUFreq:   freq,
+			Cores:     sizing.MinCores,
+			RAMSize:   sizing.MinRAMSize,
+			DiskSize:  sizing.MinDiskSize,
+			GPUNumber: sizing.MinGPU,
+			CPUFreq:   sizing.MinFreq,
 		}
 		return nil
 	})
@@ -760,9 +764,18 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) error {
 			hostSizingV1 := v.(*propsv1.HostSizing)
 			return host.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 				hostNetworkV1 := v.(*propsv1.HostNetwork)
-				//host's os name is not stored in metadatas so we used ubuntu 16.04 by default
+				//FIXME: host's os name is not stored in metadatas so we used ubuntu 18.04 by default
 				var err3 error
-				hostBis, err3 = handler.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, hostSizingV1.AllocatedSize.Cores, hostSizingV1.AllocatedSize.RAMSize, hostSizingV1.AllocatedSize.DiskSize, "ubuntu 16.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, hostSizingV1.AllocatedSize.GPUNumber, hostSizingV1.AllocatedSize.CPUFreq, true)
+				sizing := resources.SizingRequirements{
+					MinCores:    hostSizingV1.AllocatedSize.Cores,
+					MaxCores:    hostSizingV1.AllocatedSize.Cores,
+					MinFreq:     hostSizingV1.AllocatedSize.CPUFreq,
+					MinGPU:      hostSizingV1.AllocatedSize.GPUNumber,
+					MinRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
+					MaxRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
+					MinDiskSize: hostSizingV1.AllocatedSize.DiskSize,
+				}
+				hostBis, err3 = handler.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, "ubuntu 18.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, &sizing, true)
 				if err3 != nil {
 					return fmt.Errorf("Failed to stop host deletion : %s", err3.Error())
 				}
