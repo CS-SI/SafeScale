@@ -131,6 +131,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
+                            # Makes sure dbus is running...
                             sfService start dbus
                             sfFirewallAdd --zone=trusted --add-interface=docker0
                             sfFirewallAdd --zone=trusted --add-service docker-swarm
