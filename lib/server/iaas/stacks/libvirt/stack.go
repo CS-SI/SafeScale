@@ -16,14 +16,6 @@ type Stack struct {
 	AuthOptions    *stacks.AuthenticationOptions
 }
 
-func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
-	return s.GetConfigurationOptions()
-}
-
-func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-	return s.GetAuthenticationOptions()
-}
-
 // Build Create and initialize a ClientAPI
 func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, cfg stacks.ConfigurationOptions) (*Stack, error) {
 	stack := &Stack{

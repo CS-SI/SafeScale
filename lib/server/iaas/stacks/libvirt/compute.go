@@ -27,6 +27,7 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"os"
 	"os/exec"
