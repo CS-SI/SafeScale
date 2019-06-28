@@ -4,26 +4,29 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
+// ValidStack ...
 type ValidStack WrappedStack
 
+// NewValidStack ...
 func NewValidStack(innerStack Stack, name string) *ValidStack {
 	return &ValidStack{InnerStack: innerStack, Name: name}
 }
 
-func (w ValidStack) ListAvailabilityZones(all bool) (map[string]bool, error) {
-	return w.InnerStack.ListAvailabilityZones(all)
+// ListAvailabilityZones ...
+func (w ValidStack) ListAvailabilityZones() (map[string]bool, error) {
+	return w.InnerStack.ListAvailabilityZones()
 }
 
+// ListRegions ...
 func (w ValidStack) ListRegions() ([]string, error) {
 	return w.InnerStack.ListRegions()
 }
 
-func (w ValidStack) ListImages(all bool) ([]resources.Image, error) {
-	return w.InnerStack.ListImages(all)
-}
+// func (w ValidStack) ListImages() ([]resources.Image, error) {
+// 	return w.InnerStack.ListImages()
+// }
 
 func (w ValidStack) GetImage(id string) (*resources.Image, error) {
 	return w.InnerStack.GetImage(id)
@@ -33,10 +36,10 @@ func (w ValidStack) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return w.InnerStack.GetTemplate(id)
 }
 
-func (w ValidStack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	hostTemplates, err := w.InnerStack.ListTemplates(all)
-	return hostTemplates, err
-}
+// func (w ValidStack) ListTemplates() ([]resources.HostTemplate, error) {
+// 	hostTemplates, err := w.InnerStack.ListTemplates()
+// 	return hostTemplates, err
+// }
 
 func (w ValidStack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	return w.InnerStack.CreateKeyPair(name)
@@ -154,10 +157,10 @@ func (w ValidStack) DeleteVolumeAttachment(serverID, id string) error {
 	return w.InnerStack.DeleteVolumeAttachment(serverID, id)
 }
 
-func (w ValidStack) GetConfigurationOptions() stacks.ConfigurationOptions {
-	return w.InnerStack.GetConfigurationOptions()
-}
+// func (w ValidStack) GetConfigurationOptions() stacks.ConfigurationOptions {
+// 	return w.InnerStack.GetConfigurationOptions()
+// }
 
-func (w ValidStack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-	return w.InnerStack.GetAuthenticationOptions()
-}
+// func (w ValidStack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+// 	return w.InnerStack.GetAuthenticationOptions()
+// }

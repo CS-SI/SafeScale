@@ -54,10 +54,6 @@ func (provider *provider) GetConfigurationOptions() (providers.Config, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
-func (provider *provider) ListRegions() ([]string, error) {
-	return nil, fmt.Errorf(errorStr)
-}
-
 func (provider *provider) ListAvailabilityZones() (map[string]bool, error) {
 	return nil, fmt.Errorf(errorStr)
 }

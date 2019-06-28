@@ -2,28 +2,31 @@ package gcp
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"google.golang.org/api/compute/v1"
 	"net/url"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"google.golang.org/api/compute/v1"
 )
 
+// OpContext ...
 type OpContext struct {
-	Operation *compute.Operation
-	ProjectId string
-	Service *compute.Service
+	Operation    *compute.Operation
+	ProjectId    string
+	Service      *compute.Service
 	DesiredState string
 }
 
-
+// Result ...
 type Result struct {
-	State  string
-	Error  error
-	Done   bool
+	State string
+	Error error
+	Done  bool
 }
 
+// RefreshResult ...
 func RefreshResult(oco OpContext) (res Result, err error) {
 	res = Result{}
 
@@ -66,16 +69,17 @@ func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, 
 	return err
 }
 
+// SelfLink ...
 type SelfLink = url.URL
 
+// IpInSubnet ...
 type IpInSubnet struct {
-	Subnet SelfLink
-	Name string
-	ID string
-	IP string
+	Subnet   SelfLink
+	Name     string
+	ID       string
+	IP       string
 	PublicIP string
 }
-
 
 func genUrl(urlCand string) SelfLink {
 	theUrl, err := url.Parse(urlCand)
@@ -85,20 +89,19 @@ func genUrl(urlCand string) SelfLink {
 	return *theUrl
 }
 
-
 func GetResourceNameFromSelfLink(link SelfLink) string {
 	stringRepr := link.String()
 	parts := strings.Split(stringRepr, "/")
 	return parts[len(parts)-1]
 }
 
-func indexOf(element string, data []string) (int) {
+func indexOf(element string, data []string) int {
 	for k, v := range data {
 		if element == v {
 			return k
 		}
 	}
-	return -1    //not found.
+	return -1 //not found.
 }
 
 func GetRegionFromSelfLink(link SelfLink) (string, error) {
@@ -108,7 +111,7 @@ func GetRegionFromSelfLink(link SelfLink) (string, error) {
 		regionPos := indexOf("regions", parts)
 		if regionPos != -1 {
 			if (regionPos + 1) < len(parts) {
-				return parts[regionPos + 1], nil
+				return parts[regionPos+1], nil
 			}
 		}
 		return "", fmt.Errorf("Not a region link")

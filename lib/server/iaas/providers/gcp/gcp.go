@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"fmt"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
@@ -25,13 +26,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 )
 
 // provider is the provider implementation of the Gcp provider
 type provider struct {
-	api.Stack
+	*gcp.Stack
 }
 
 // New creates a new instance of gcp provider
@@ -68,24 +68,23 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	zone, _ := computeCfg["Zone"].(string)
 
 	gcpConf := stacks.GCPConfiguration{
-		Type: "service_account",
-		ProjectId: projectId,
+		Type:         "service_account",
+		ProjectId:    projectId,
 		PrivateKeyId: privateKeyId,
-		PrivateKey: privateKey,
-		ClientEmail: clientEmail,
-		ClientId: clientId,
-		AuthUri: authUri,
-		TokenUri: tokenUri,
+		PrivateKey:   privateKey,
+		ClientEmail:  clientEmail,
+		ClientId:     clientId,
+		AuthUri:      authUri,
+		TokenUri:     tokenUri,
 		AuthProvider: authProvider,
-		ClientCert: clientCertUrl,
-		Region: region,
-		Zone: zone,
+		ClientCert:   clientCertUrl,
+		Region:       region,
+		Zone:         zone,
 	}
 
 	username, _ := identityCfg["Username"].(string)
 	password, _ := identityCfg["Password"].(string)
 	identityEndpoint, _ := identityCfg["auth_uri"].(string)
-
 
 	projectName, _ := computeCfg["ProjectName"].(string)
 	projectID, _ := computeCfg["ProjectID"].(string)
@@ -112,17 +111,17 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
-		DNSList:             []string{"8.8.8.8", "1.1.1.1"},
+		DNSList:                   []string{"8.8.8.8", "1.1.1.1"},
 		UseFloatingIP:             true,
 		AutoHostNetworkInterfaces: false,
 		VolumeSpeeds: map[string]VolumeSpeed.Enum{
 			"standard":   VolumeSpeed.COLD,
 			"performant": VolumeSpeed.HDD,
 		},
-		MetadataBucket: metadataBucketName,
+		MetadataBucket:   metadataBucketName,
 		DefaultImage:     defaultImage,
 		OperatorUsername: operatorUsername,
-		UseNATService: true,
+		UseNATService:    true,
 	}
 
 	stack, err := gcp.New(authOptions, gcpConf, cfgOptions)
@@ -130,16 +129,16 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		return nil, err
 	}
 
-	nlog := api.NewLoggedStack(stack, "gcp")
-
-	return &provider{nlog}, nil
+	// nlog := api.NewLoggedStack(stack, "gcp")
+	// return &provider{nlog}, nil
+	return &provider{stack}, nil
 }
 
-// GetAuthOpts returns the auth options
-func (p *provider) GetAuthOpts() (providers.Config, error) {
+// GetAuthenticationOptions returns the auth options
+func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.GetAuthenticationOptions()
+	opts := p.Stack.GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -148,11 +147,11 @@ func (p *provider) GetAuthOpts() (providers.Config, error) {
 	return cfg, nil
 }
 
-// GetCfgOpts return configuration parameters
-func (p *provider) GetCfgOpts() (providers.Config, error) {
+// GetConfigurationOptions return configuration parameters
+func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.GetConfigurationOptions()
+	opts := p.Stack.GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -165,6 +164,11 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 // GetName returns the providerName
 func (p *provider) GetName() string {
 	return "gcp"
+}
+
+// ListImages ...
+func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+	return p.Stack.ListImages()
 }
 
 func init() {
