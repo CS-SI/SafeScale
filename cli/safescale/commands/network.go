@@ -150,7 +150,7 @@ var networkCreate = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
 		}
 
-		def, err := constructPBHostDefinitionFromCLI(c)
+		def, err := constructPBHostDefinitionFromCLI(c, "sizing")
 		if err != nil {
 			return err
 		}

@@ -253,7 +253,7 @@ var hostCreate = cli.Command{
 			}
 		}
 
-		def, err := constructPBHostDefinitionFromCLI(c)
+		def, err := constructPBHostDefinitionFromCLI(c, "sizing")
 		if err != nil {
 			return err
 		}
@@ -594,28 +594,28 @@ var hostDeleteFeatureCommand = cli.Command{
 }
 
 // constructPBHostDefinitionFromCLI ...
-func constructPBHostDefinitionFromCLI(c *cli.Context) (*pb.HostDefinition, error) {
+func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*pb.HostDefinition, error) {
 	var sizing string
-	if c.IsSet("sizing") {
+	if c.IsSet(key) {
 		if c.IsSet("cpu") || c.IsSet("cpufreq") || c.IsSet("gpu") || c.IsSet("ram") || c.IsSet("disk") {
 			return nil, clitools.FailureResponse(clitools.ExitOnInvalidArgument("can't use simultaneously --sizing and --cpu|--cpufreq|--gpu|--ram|--disk"))
 		}
-		sizing = c.String("sizing")
+		sizing = c.String(key)
 	} else {
 		if c.IsSet("cpu") {
-			sizing = fmt.Sprintf("cpu = %d,", c.Int("cpu"))
+			sizing = fmt.Sprintf("cpu >= %d,", c.Int("cpu"))
 		}
 		if c.IsSet("cpufreq") {
-			sizing += fmt.Sprintf("cpufreq = %.01f,", c.Float64("cpufreq"))
+			sizing += fmt.Sprintf("cpufreq >= %.01f,", c.Float64("cpufreq"))
 		}
 		if c.IsSet("gpu") {
 			sizing += fmt.Sprintf("gpu = %d,", c.Int("gpu"))
 		}
 		if c.IsSet("ram") {
-			sizing += fmt.Sprintf("ram = %.01f,", c.Float64("ram"))
+			sizing += fmt.Sprintf("ram >= %.01f,", c.Float64("ram"))
 		}
 		if c.IsSet("disk") {
-			sizing += fmt.Sprintf("disk = %.01f,", c.Float64("disk"))
+			sizing += fmt.Sprintf("disk >= %.01f,", c.Float64("disk"))
 		}
 	}
 	tokens, err := clitools.ParseParameter(sizing)
