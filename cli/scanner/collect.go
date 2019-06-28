@@ -25,7 +25,7 @@ func collect(tenantName string) error {
 	if err != nil {
 		return err
 	}
-	authOpts, err := serviceProvider.GetAuthOpts()
+	authOpts, err := serviceProvider.GetAuthenticationOptions()
 	if err != nil {
 		return err
 	}

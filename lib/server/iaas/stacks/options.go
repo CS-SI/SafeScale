@@ -16,9 +16,13 @@
 
 package stacks
 
-import "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+import (
+	"regexp"
 
-const AlphanumericWithDashesAndUnderscores   string = "^[-a-zA-Z0-9-_]+$"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+)
+
+const AlphanumericWithDashesAndUnderscores string = "^[-a-zA-Z0-9-_]+$"
 
 // AuthenticationOptions fields are the union of those recognized by each identity implementation and provider
 // to be able to carry different but necessary information to stack implementations
@@ -115,5 +119,25 @@ type ConfigurationOptions struct {
 	//OperatorUsername contain the name of the safescale created user
 	OperatorUsername string
 
-	Customizations map[string]string
+	// Customizations map[string]string
+
+	// WhitelistTemplateRegexp contains the regexp string to white list host templates
+	WhitelistTemplateRegexp *regexp.Regexp
+	// BlacklistTemplateRegexp contains the regexp string to black list host templates
+	BlacklistTemplateRegexp *regexp.Regexp
+	// WhitelistImageRegexp contains the regexp string to white list images
+	WhitelistImageRegexp *regexp.Regexp
+	// BlacklistImageRegexp contains the regexp string to black list images
+	BlacklistImageRegexp *regexp.Regexp
+}
+
+// LocalConfiguration configuration options
+type LocalConfiguration struct {
+	ImagesJSONPath string
+	// Local Path of the json file defining the templates
+	TemplatesJSONPath string
+	// Local Path of the libvirt pool where all disks created by libvirt come from and are stored
+	LibvirtStorage string
+	// Connection identifier to the virtualisation device
+	URI string
 }

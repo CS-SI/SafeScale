@@ -30,7 +30,7 @@ import (
 )
 
 var tester *tests.ServiceTester
-var service *iaas.Service
+var service iaas.Service
 var provider providerapi.Provider
 
 func getTester() (*tests.ServiceTester, error) {
@@ -50,7 +50,7 @@ func getTester() (*tests.ServiceTester, error) {
 	return tester, nil
 }
 
-func getClient() (*iaas.Service, error) {
+func getClient() (iaas.Service, error) {
 	if service == nil {
 		tenant_name := ""
 		if tenant_override := os.Getenv("TEST_FLEXIBLE"); tenant_override != "" {

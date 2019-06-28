@@ -40,11 +40,11 @@ type BucketAPI interface {
 
 // BucketHandler bucket service
 type BucketHandler struct {
-	service *iaas.Service
+	service iaas.Service
 }
 
 // NewBucketHandler creates a Bucket service
-func NewBucketHandler(svc *iaas.Service) BucketAPI {
+func NewBucketHandler(svc iaas.Service) BucketAPI {
 	return &BucketHandler{service: svc}
 }
 
@@ -117,7 +117,7 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 		mountPoint = resources.DefaultBucketMountPoint + bucketName
 	}
 
-	authOpts, _ := handler.service.GetAuthOpts()
+	authOpts, _ := handler.service.GetAuthenticationOptions()
 	authurlCfg, _ := authOpts.Config("AuthUrl")
 	authurl := authurlCfg.(string)
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]

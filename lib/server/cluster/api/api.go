@@ -32,7 +32,7 @@ import (
 // Cluster is an interface of methods associated to Cluster-like structs
 type Cluster interface {
 	// GetService ...
-	GetService(task concurrency.Task) *iaas.Service
+	GetService(task concurrency.Task) iaas.Service
 	// GetIdentity returns the identity of the cluster (name, flavor, complexity)
 	GetIdentity(task concurrency.Task) identity.Identity
 	// GetNetworkConfig returns network configuration of the cluster

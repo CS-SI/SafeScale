@@ -308,7 +308,7 @@ var clusterCreateCommand = cli.Command{
 		},
 		cli.StringSliceFlag{
 			Name:  "disable",
-			Usage: "Allows to disable addition of default features",
+			Usage: "Allows to disable addition of default features (can be used several times to disable several features)",
 		},
 		cli.StringFlag{
 			Name:  "os",
@@ -325,6 +325,30 @@ var clusterCreateCommand = cli.Command{
 		cli.UintFlag{
 			Name:  "disk",
 			Usage: "Defines the size of system disk of masters and nodes (in GB)",
+		},
+		cli.StringFlag{
+			Name: "gw-sizing",
+			Usage: `Describe gateway sizing in format "<component><operator><value>[,...]" where:
+	<component> can be cpu, cpufreq, gpu, ram, disk
+	<operator> can be =,<=,>= (except for disk where valid operators are only = or >=)
+	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"
+	examples:
+		--gw-sizing "cpu <= 4, ram <= 10, disk = 100"
+		--gw-sizing "cpu = [4-8], ram = [14-32]"`,
+		},
+		cli.StringFlag{
+			Name: "master-sizing",
+			Usage: `Describe master sizing in format "<component><operator><value>[,...]" where:
+	<component> can be cpu, cpufreq, gpu, ram, disk
+	<operator> can be =,<=,>= (except for disk where valid operators are only = or >=)
+	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
+		},
+		cli.StringFlag{
+			Name: "node-sizing",
+			Usage: `Describe node sizing in format "<component><operator><value>[,...]" where:
+	<component> can be cpu, cpufreq, gpu, ram, disk, os
+	<operator> can be =,<,> (except for disk where valid operators are only = or >)
+	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
 		},
 	},
 

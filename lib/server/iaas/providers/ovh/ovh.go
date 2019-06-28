@@ -66,7 +66,7 @@ var (
 	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
 )
 
-//OVH api credentials
+// OVH api credentials
 var (
 	alternateAPIApplicationKey    string
 	alternateAPIApplicationSecret string
@@ -76,6 +76,7 @@ var (
 // provider is the providerementation of the OVH provider
 type provider struct {
 	*openstack.Stack
+
 	ExternalNetworkID string
 }
 
@@ -184,7 +185,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		}
 	}
 
-	validAvailabilityZones, err := stack.ListAvailabilityZones(true)
+	validAvailabilityZones, err := stack.ListAvailabilityZones()
 	if err != nil {
 		if len(validAvailabilityZones) != 0 {
 			return nil, err
@@ -215,8 +216,8 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	return newP, nil
 }
 
-// GetAuthOpts returns the auth options
-func (p *provider) GetAuthOpts() (providers.Config, error) {
+// GetAuthenticationOptions returns the auth options
+func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -232,8 +233,8 @@ func (p *provider) GetAuthOpts() (providers.Config, error) {
 	return cfg, nil
 }
 
-// GetCfgOpts return configuration parameters
-func (p *provider) GetCfgOpts() (providers.Config, error) {
+// GetConfigurationOptions return configuration parameters
+func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()
@@ -262,14 +263,14 @@ func addGPUCfg(tpl *resources.HostTemplate) {
 	}
 }
 
-// // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-// func (p *provider) ListImages(all bool) ([]resources.Image, error) {
-// 	return p.Stack.ListImages(all)
-// }
+// ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
+func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+	return p.Stack.ListImages()
+}
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	allTemplates, err := p.Stack.ListTemplates(all)
+	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
 	}
@@ -280,8 +281,8 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 		allTemplates = filters.FilterTemplates(allTemplates, filter)
 	}
 
-	//check flavor disponibilities through OVH-API
-	authOpts, err := p.GetAuthOpts()
+	// check flavor disponibilities through OVH-API
+	authOpts, err := p.GetAuthenticationOptions()
 	if err != nil {
 		log.Warn(fmt.Sprintf("Failed to get Authentication options, flavors availability won't be checked: %v", err))
 		return allTemplates, nil
@@ -298,21 +299,21 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 
 	flavorMap := map[string]map[string]interface{}{}
 	for _, flavor := range flavors.([]interface{}) {
-		// Elimination of all the unavailable features
+		// Removal of all the unavailable templates
 		if flavor.(map[string]interface{})["available"].(bool) {
 			flavorMap[flavor.(map[string]interface{})["id"].(string)] = flavor.(map[string]interface{})
 		}
 	}
 
-	listAvailableTeplates := []resources.HostTemplate{}
+	listAvailableTemplates := []resources.HostTemplate{}
 	for _, template := range allTemplates {
 		if _, ok := flavorMap[template.ID]; ok {
-			listAvailableTeplates = append(listAvailableTeplates, template)
+			listAvailableTemplates = append(listAvailableTemplates, template)
 		} else {
 			log.Debug(fmt.Sprintf("Flavor %s@%s is not available at the moment at is so ignored", template.Name, template.ID))
 		}
 	}
-	allTemplates = listAvailableTeplates
+	allTemplates = listAvailableTemplates
 
 	return allTemplates, nil
 }

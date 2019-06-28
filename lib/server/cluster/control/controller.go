@@ -46,7 +46,7 @@ type Controller struct {
 
 	foreman  *foreman
 	metadata *Metadata
-	service  *iaas.Service
+	service  iaas.Service
 
 	lastStateCollection time.Time
 
@@ -54,7 +54,7 @@ type Controller struct {
 }
 
 // NewController ...
-func NewController(svc *iaas.Service) *Controller {
+func NewController(svc iaas.Service) *Controller {
 	metadata, err := NewMetadata(svc)
 	if err != nil {
 		panic("failed to create metadata object")
@@ -114,7 +114,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, foreman *foreman
 }
 
 // GetService returns the service from the provider
-func (c *Controller) GetService(task concurrency.Task) *iaas.Service {
+func (c *Controller) GetService(task concurrency.Task) iaas.Service {
 	if c == nil {
 		panic("Calling Controller::GetService() from nil pointer!")
 	}

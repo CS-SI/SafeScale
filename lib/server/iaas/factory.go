@@ -19,7 +19,7 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"regexp"
 
 	log "github.com/sirupsen/logrus"
 
@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	allProviders = map[string]*Service{}
+	allProviders = map[string]Service{}
 	allTenants   = map[string]string{}
 )
 
@@ -43,7 +43,9 @@ func Register(name string, provider api.Provider) {
 	if _, ok := allProviders[name]; ok {
 		return
 	}
-	allProviders[name] = &Service{Provider: provider}
+	allProviders[name] = &service{
+		Provider: provider,
+	}
 }
 
 // GetTenantNames returns all known tenants names
@@ -77,7 +79,7 @@ func UseStorages(tenantNames []string) (*StorageServices, error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(tenantName string) (*Service, error) {
+func UseService(tenantName string) (Service, error) {
 	tenants, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
@@ -87,7 +89,7 @@ func UseService(tenantName string) (*Service, error) {
 		tenantInCfg = false
 		found       = false
 		name        string
-		svc         *Service
+		svc         Service
 		svcProvider = "__not_found__"
 	)
 
@@ -144,7 +146,7 @@ func UseService(tenantName string) (*Service, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
 		}
-		serviceCfg, err := providerInstance.GetCfgOpts()
+		serviceCfg, err := providerInstance.GetConfigurationOptions()
 		if err != nil {
 			return nil, err
 		}
@@ -207,18 +209,58 @@ func UseService(tenantName string) (*Service, error) {
 		}
 
 		// Service is ready
-		return &Service{
+		newS := &service{
 			Provider:       providerInstance,
 			Location:       objectStorageLocation,
-			MetadataBucket: metadataBucket,
-			MetadataKey:    metadataCryptKey,
-		}, nil
+			metadataBucket: metadataBucket,
+			metadataKey:    metadataCryptKey,
+		}
+		return newS, validateRegexps(newS, tenantClient)
 	}
 
 	if !tenantInCfg {
 		return nil, fmt.Errorf("Tenant '%s' not found in configuration", tenantName)
 	}
 	return nil, resources.ResourceNotFoundError("provider builder for", svcProvider)
+}
+
+// validatRegexps validates regexp values from tenants file
+func validateRegexps(svc *service, tenant map[string]interface{}) error {
+	compute := tenant["compute"].(map[string]interface{})
+
+	if reStr, ok := compute["WhitelistTemplateRegexp"].(string); ok {
+		// Validate regular expression
+		re, err := regexp.Compile(reStr)
+		if err != nil {
+			return fmt.Errorf("invalid value '%s' for field 'WhitelistTemplateRegexp': %s", reStr, err.Error())
+		}
+		svc.whitelistTemplateRE = re
+	}
+	if reStr, ok := compute["BlacklistTemplateRegexp"].(string); ok {
+		// Validate regular expression
+		re, err := regexp.Compile(reStr)
+		if err != nil {
+			return fmt.Errorf("invalid value '%s' for field 'BlacklistTemplateRegexp': %s", reStr, err.Error())
+		}
+		svc.blacklistTemplateRE = re
+	}
+	if reStr, ok := compute["WhitelistImageRegexp"].(string); ok {
+		// Validate regular expression
+		re, err := regexp.Compile(reStr)
+		if err != nil {
+			return fmt.Errorf("invalid value '%s' for field 'WhitelistImageRegexp': %s", reStr, err.Error())
+		}
+		svc.whitelistImageRE = re
+	}
+	if reStr, ok := compute["BlacklistImageRegexp"].(string); ok {
+		// Validate regular expression
+		re, err := regexp.Compile(reStr)
+		if err != nil {
+			return fmt.Errorf("invalid value '%s' for field 'BlacklistImageRegexp': %s", reStr, err.Error())
+		}
+		svc.blacklistImageRE = re
+	}
+	return nil
 }
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map

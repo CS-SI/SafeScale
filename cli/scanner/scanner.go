@@ -479,7 +479,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) error {
 	return nil
 }
 
-func dumpTemplates(service *iaas.Service, tenant string) error {
+func dumpTemplates(service iaas.Service, tenant string) error {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	type TemplateList struct {
@@ -509,7 +509,7 @@ func dumpTemplates(service *iaas.Service, tenant string) error {
 	return nil
 }
 
-func dumpImages(service *iaas.Service, tenant string) error {
+func dumpImages(service iaas.Service, tenant string) error {
 	_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 
 	type ImageList struct {

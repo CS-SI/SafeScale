@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"fmt"
+
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"
 
@@ -138,7 +139,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		}
 	}
 
-	validAvailabilityZones, err := stack.ListAvailabilityZones(true)
+	validAvailabilityZones, err := stack.ListAvailabilityZones()
 	if err != nil {
 		if len(validAvailabilityZones) != 0 {
 			return nil, err
@@ -164,8 +165,8 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	return newP, nil
 }
 
-// GetAuthOpts returns the auth options
-func (p *provider) GetAuthOpts() (providers.Config, error) {
+// GetAuthenticationOptions returns the auth options
+func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 
 	opts := p.Stack.GetAuthenticationOptions()
 	cfg := providers.ConfigMap{}
@@ -178,8 +179,8 @@ func (p *provider) GetAuthOpts() (providers.Config, error) {
 	return cfg, nil
 }
 
-// GetCfgOpts return configuration parameters
-func (p *provider) GetCfgOpts() (providers.Config, error) {
+// GetConfigurationOptions return configuration parameters
+func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()
@@ -197,7 +198,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 // ListTemplates ...
 // Value of all has no impact on the result
 func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	allTemplates, err := p.Stack.ListTemplates(all)
+	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +208,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 // ListImages ...
 // Value of all has no impact on the result
 func (p *provider) ListImages(all bool) ([]resources.Image, error) {
-	allImages, err := p.Stack.ListImages(all)
+	allImages, err := p.Stack.ListImages()
 	if err != nil {
 		return nil, err
 	}

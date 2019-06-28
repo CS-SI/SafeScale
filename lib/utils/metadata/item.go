@@ -37,7 +37,7 @@ type Item struct {
 type ItemDecoderCallback func([]byte) (serialize.Serializable, error)
 
 // NewItem creates a new item with 'name' and in 'path'
-func NewItem(svc *iaas.Service, path string) *Item {
+func NewItem(svc iaas.Service, path string) *Item {
 	return &Item{
 		folder:  NewFolder(svc, path),
 		payload: nil,
@@ -46,7 +46,7 @@ func NewItem(svc *iaas.Service, path string) *Item {
 }
 
 // GetService returns the service used by Item
-func (i *Item) GetService() *iaas.Service {
+func (i *Item) GetService() iaas.Service {
 	return i.folder.GetService()
 }
 

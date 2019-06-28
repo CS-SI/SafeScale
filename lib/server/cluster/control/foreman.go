@@ -789,7 +789,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	params["reserved_CommonRequirements"] = globalSystemRequirements
 
 	var dnsServers []string
-	cfg, err := b.cluster.GetService(task).GetCfgOpts()
+	cfg, err := b.cluster.GetService(task).GetConfigurationOptions()
 	if err == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}

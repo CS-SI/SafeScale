@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -41,7 +42,7 @@ type Host struct {
 }
 
 // NewHost creates an instance of api.Host
-func NewHost(svc *iaas.Service) *Host {
+func NewHost(svc iaas.Service) *Host {
 	return &Host{
 		item: metadata.NewItem(svc, hostsFolderName),
 	}
@@ -156,7 +157,7 @@ func (mh *Host) Browse(callback func(*resources.Host) error) error {
 }
 
 // SaveHost saves the Host definition in Object Storage
-func SaveHost(svc *iaas.Service, host *resources.Host) (*Host, error) {
+func SaveHost(svc iaas.Service, host *resources.Host) (*Host, error) {
 	mh := NewHost(svc)
 	err := mh.Carry(host).Write()
 	if err != nil {
@@ -184,7 +185,7 @@ func SaveHost(svc *iaas.Service, host *resources.Host) (*Host, error) {
 }
 
 // RemoveHost removes the host definition from Object Storage
-func RemoveHost(svc *iaas.Service, host *resources.Host) error {
+func RemoveHost(svc iaas.Service, host *resources.Host) error {
 	// // First, browse networks to delete links on the deleted host
 	// mn := NewNetwork(svc)
 	// mnb := NewNetwork(svc)
@@ -212,7 +213,7 @@ func RemoveHost(svc *iaas.Service, host *resources.Host) error {
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadHost(svc *iaas.Service, ref string) (*Host, error) {
+func LoadHost(svc iaas.Service, ref string) (*Host, error) {
 	// We first try looking for host by ID from metadata
 	mh := NewHost(svc)
 	var innerErr error

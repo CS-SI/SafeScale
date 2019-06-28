@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -40,7 +41,7 @@ type Share struct {
 }
 
 // NewShare creates an instance of metadata.Nas
-func NewShare(svc *iaas.Service) *Share {
+func NewShare(svc iaas.Service) *Share {
 	return &Share{
 		item: metadata.NewItem(svc, shareFolderName),
 	}
@@ -237,13 +238,13 @@ func (ms *Share) Release() {
 }
 
 // SaveShare saves the Nas definition in Object Storage
-func SaveShare(svc *iaas.Service, hostID, hostName, shareID, shareName string) (*Share, error) {
+func SaveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) (*Share, error) {
 	ms := NewShare(svc).Carry(hostID, hostName, shareID, shareName)
 	return ms, ms.Write()
 }
 
 // RemoveShare removes the share definition from Object Storage
-func RemoveShare(svc *iaas.Service, hostID, hostName, shareID, shareName string) error {
+func RemoveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) error {
 	return NewShare(svc).Carry(hostID, hostName, shareID, shareName).Delete()
 }
 
@@ -251,7 +252,7 @@ func RemoveShare(svc *iaas.Service, hostID, hostName, shareID, shareName string)
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadShare(svc *iaas.Service, ref string) (string, error) {
+func LoadShare(svc iaas.Service, ref string) (string, error) {
 	ms := NewShare(svc)
 	var innerErr error
 	err := retry.WhileUnsuccessfulDelay1Second(

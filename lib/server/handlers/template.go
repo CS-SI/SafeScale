@@ -34,11 +34,11 @@ type TemplateAPI interface {
 
 // TemplateHandler template service
 type TemplateHandler struct {
-	service *iaas.Service
+	service iaas.Service
 }
 
 // NewTemplateHandler creates a template service
-func NewTemplateHandler(svc *iaas.Service) TemplateAPI {
+func NewTemplateHandler(svc iaas.Service) TemplateAPI {
 	return &TemplateHandler{
 		service: svc,
 	}

@@ -34,7 +34,10 @@ feature:
                             hosts: yes
                             masters: all
                         run: |
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'remotedesktop:latest' &>/dev/null
+                            if ! docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'remotedesktop:latest' &>/dev/null; then
+                                exit 1
+                            fi
+                            exit 0
 
             add:
                 #pace: desktop+deps,tigervnc+guacamole,start

@@ -23,7 +23,7 @@ import (
 )
 
 func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, error) {
-	authOpts, err := p.GetAuthOpts()
+	authOpts, err := p.GetAuthenticationOptions()
 	if err != nil {
 		return nil, err
 	}

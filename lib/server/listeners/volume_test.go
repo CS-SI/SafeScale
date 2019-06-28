@@ -24,10 +24,10 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/listeners"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
+	"github.com/CS-SI/SafeScale/lib/server/listeners"
 )
 
 type MyMockedVolService struct {
@@ -66,7 +66,7 @@ func TestCreate(t *testing.T) {
 	old := listeners.VolumeHandler
 	defer func() { listeners.VolumeHandler = old }()
 
-	listeners.VolumeHandler = func(svc *iaas.Service) handlers.VolumeAPI {
+	listeners.VolumeHandler = func(svc iaas.Service) handlers.VolumeAPI {
 		return nil
 		// TODO Fix this test
 		// return myMockedVolService
@@ -76,7 +76,7 @@ func TestCreate(t *testing.T) {
 	oldGetCurrentTeant := listeners.GetCurrentTenant
 	defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
 	listeners.GetCurrentTenant = func() *listeners.Tenant {
-		return &listeners.Tenant{Service: &iaas.Service{}}
+		return &listeners.Tenant{}
 	}
 
 	underTest := &listeners.VolumeListener{}
@@ -106,7 +106,7 @@ func TestCreate_Err(t *testing.T) {
 	old := listeners.VolumeHandler
 	defer func() { listeners.VolumeHandler = old }()
 
-	listeners.VolumeHandler = func(api *iaas.Service) handlers.VolumeAPI {
+	listeners.VolumeHandler = func(api iaas.Service) handlers.VolumeAPI {
 		// TODO Fix this test
 		return nil
 		// return myMockedVolService
@@ -116,7 +116,7 @@ func TestCreate_Err(t *testing.T) {
 	oldGetCurrentTeant := listeners.GetCurrentTenant
 	defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
 	listeners.GetCurrentTenant = func() *listeners.Tenant {
-		return &listeners.Tenant{Service: &iaas.Service{}}
+		return &listeners.Tenant{}
 	}
 
 	underTest := &listeners.VolumeListener{}

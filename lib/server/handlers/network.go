@@ -53,12 +53,12 @@ type NetworkAPI interface {
 
 // NetworkHandler an implementation of NetworkAPI
 type NetworkHandler struct {
-	service   *iaas.Service
+	service   iaas.Service
 	ipVersion IPVersion.Enum
 }
 
 // NewNetworkHandler Creates new Network service
-func NewNetworkHandler(svc *iaas.Service) NetworkAPI {
+func NewNetworkHandler(svc iaas.Service) NetworkAPI {
 	return &NetworkHandler{
 		service: svc,
 	}

@@ -36,7 +36,7 @@ import (
 var mock_tester *tests.ServiceTester
 var gmci *mocks.MockProvider
 
-func GetMockService(t *testing.T, tenant string) (*iaas.Service, error) {
+func GetMockService(t *testing.T, tenant string) (iaas.Service, error) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 

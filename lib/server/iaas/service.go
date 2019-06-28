@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -29,24 +30,56 @@ import (
 	scribble "github.com/nanobox-io/golang-scribble"
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/xrash/smetrics"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	providers "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeState"
+	imagefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/images"
+	templatefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
-	"github.com/xrash/smetrics"
 )
 
-// Service ...
-type Service struct {
-	api.Provider
+//go:generate mockgen -destination=mocks/mock_serviceapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas Service
+
+// Service agglomerates Provider and ObjectStorage interfaces in a single interface
+// completed with higher-level methods
+type Service interface {
+	// --- from service ---
+
+	CreateHostWithKeyPair(resources.HostRequest) (*resources.Host, *userdata.Content, *resources.KeyPair, error)
+	FilterImages(string) ([]resources.Image, error)
+	GetMetadataKey() *crypt.Key
+	GetMetadataBucket() objectstorage.Bucket
+	ListHostsByName() (map[string]*resources.Host, error)
+	SearchImage(string) (*resources.Image, error)
+	SelectTemplatesBySize(resources.SizingRequirements, bool) ([]resources.HostTemplate, error)
+	WaitHostState(string, HostState.Enum, time.Duration) error
+	WaitVolumeState(string, VolumeState.Enum, time.Duration) (*resources.Volume, error)
+
+	// --- from interface iaas.Providers ---
+	providers.Provider
+
+	// --- from interface ObjectStorage ---
+
 	objectstorage.Location
-	MetadataBucket objectstorage.Bucket
-	MetadataKey    *crypt.Key
+}
+
+// Service ...
+type service struct {
+	providers.Provider
+	objectstorage.Location
+	metadataBucket objectstorage.Bucket
+	metadataKey    *crypt.Key
+
+	whitelistTemplateRE *regexp.Regexp
+	blacklistTemplateRE *regexp.Regexp
+	whitelistImageRE    *regexp.Regexp
+	blacklistImageRE    *regexp.Regexp
 }
 
 const (
@@ -74,32 +107,46 @@ func (a ByRankDRF) Len() int           { return len(a) }
 func (a ByRankDRF) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByRankDRF) Less(i, j int) bool { return RankDRF(&a[i]) < RankDRF(&a[j]) }
 
-// HostAccess an host and the SSH Key Pair
-type HostAccess struct {
-	Host    *resources.Host
-	Key     *resources.KeyPair
-	User    string
-	Gateway *HostAccess
+// // HostAccess an host and the SSH Key Pair
+// type HostAccess struct {
+// 	Host    *resources.Host
+// 	Key     *resources.KeyPair
+// 	User    string
+// 	Gateway *HostAccess
+// }
+
+// // GetAccessIP returns the access IP
+// func (access *HostAccess) GetAccessIP() string {
+// 	return access.Host.GetAccessIP()
+// }
+
+func (svc *service) GetMetadataBucket() objectstorage.Bucket {
+	return svc.metadataBucket
 }
 
-// GetAccessIP returns the access IP
-func (access *HostAccess) GetAccessIP() string {
-	return access.Host.GetAccessIP()
+func (svc *service) GetMetadataKey() *crypt.Key {
+	return svc.metadataKey
+}
+
+// SetProvider allows to change provider interface of service object (mainly for test purposes)
+func (svc *service) SetProvider(provider providers.Provider) {
+	svc.Provider = provider
 }
 
 // WaitHostState waits an host achieve state
-func (svc *Service) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) error {
+// If host in error state, returns utils.ErrNotAvailable
+// If timeout is reached, returns utils.ErrTimeout
+func (svc *service) WaitHostState(hostID string, state HostState.Enum, timeout time.Duration) error {
 	if svc == nil {
-		panic("Calling clt.WaitHostState with clt==nil!")
+		return utils.InvalidInstanceError()
 	}
 
 	var err error
 
 	timer := time.After(timeout)
-	next := true
 	host := resources.NewHost()
 	host.ID = hostID
-	for next {
+	for {
 		host, err = svc.InspectHost(host)
 		if err != nil {
 			return err
@@ -108,22 +155,22 @@ func (svc *Service) WaitHostState(hostID string, state HostState.Enum, timeout t
 			return nil
 		}
 		if host.LastState == HostState.ERROR {
-			return fmt.Errorf("host in error state")
+			return utils.NotAvailableError("host in error state")
 		}
 		select {
 		case <-timer:
-			return fmt.Errorf("timeout waiting host '%s' to reach state '%s'", host.Name, state.String())
+			return utils.TimeoutError("Wait volume state timeout")
 		default:
 			time.Sleep(1)
 		}
 	}
-	return err
 }
 
 // WaitVolumeState waits an host achieve state
-func (svc *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*resources.Volume, error) {
+// If timeout is reached, returns utils.ErrTimeout
+func (svc *service) WaitVolumeState(volumeID string, state VolumeState.Enum, timeout time.Duration) (*resources.Volume, error) {
 	if svc == nil {
-		panic("Calling clt.WaitVolumeState with clt==nil!")
+		return nil, utils.InvalidInstanceError()
 	}
 
 	cout := make(chan int)
@@ -135,11 +182,9 @@ func (svc *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 		select {
 		case res := <-cout:
 			if res == 0 {
-				//next <- false
 				return nil, fmt.Errorf("Error getting host state")
 			}
 			if res == 1 {
-				//next <- false
 				return <-vc, nil
 			}
 			if res == 2 {
@@ -147,16 +192,15 @@ func (svc *Service) WaitVolumeState(volumeID string, state VolumeState.Enum, tim
 			}
 		case <-time.After(timeout):
 			next <- false
-			return nil, &resources.ErrTimeout{Message: "Wait host state timeout"}
+			return nil, utils.TimeoutError("Wait host state timeout")
 		}
 	}
 }
 
-func pollVolume(svc *Service, volumeID string, state VolumeState.Enum, cout chan int, next chan bool, hostc chan *resources.Volume) {
+func pollVolume(svc *service, volumeID string, state VolumeState.Enum, cout chan int, next chan bool, hostc chan *resources.Volume) {
 	for {
 		v, err := svc.GetVolume(volumeID)
 		if err != nil {
-
 			cout <- 0
 			return
 		}
@@ -172,11 +216,55 @@ func pollVolume(svc *Service, volumeID string, state VolumeState.Enum, cout chan
 	}
 }
 
+// ListTemplates lists available host templates
+// Host templates are sorted using Dominant Resource Fairness Algorithm
+func (svc *service) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+	allTemplates, err := svc.Provider.ListTemplates(all)
+	if err != nil {
+		return nil, err
+	}
+	if all {
+		return allTemplates, nil
+	}
+	return svc.reduceTemplates(allTemplates), nil
+}
+
+func (svc *service) reduceTemplates(tpls []resources.HostTemplate) []resources.HostTemplate {
+	var finalFilter *templatefilters.Filter
+	if svc.whitelistTemplateRE != nil {
+		finalFilter = templatefilters.NewFilter(filterWhitelistedTemplates(svc.whitelistTemplateRE))
+	}
+	if svc.blacklistTemplateRE != nil {
+		blackFilter := templatefilters.NewFilter(filterWhitelistedTemplates(svc.blacklistTemplateRE))
+		if finalFilter == nil {
+			finalFilter = blackFilter.Not()
+		} else {
+			finalFilter = finalFilter.And(blackFilter.Not())
+		}
+	}
+	if finalFilter != nil {
+		return templatefilters.FilterTemplates(tpls, finalFilter)
+	}
+	return tpls
+}
+
+func filterWhitelistedTemplates(re *regexp.Regexp) templatefilters.Predicate {
+	return func(tpl resources.HostTemplate) bool {
+		return re.Match([]byte(tpl.Name))
+	}
+}
+
+func filterBlacklistedTemplates(re *regexp.Regexp) templatefilters.Predicate {
+	return func(tpl resources.HostTemplate) bool {
+		return re.Match([]byte(tpl.Name))
+	}
+}
+
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) ([]resources.HostTemplate, error) {
+func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) ([]resources.HostTemplate, error) {
 	if svc == nil {
-		panic("Calling svc.SelectTemplatesBySize with svc==nil!")
+		return nil, utils.InvalidInstanceError()
 	}
 
 	templates, err := svc.ListTemplates(false)
@@ -205,7 +293,7 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 				return nil, errors.New(noHostError)
 			}
 		} else {
-			authOpts, err := svc.GetAuthOpts()
+			authOpts, err := svc.GetAuthenticationOptions()
 			if err != nil {
 				return nil, err
 			}
@@ -224,7 +312,7 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 					if sizing.MinFreq <= 0 {
 						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs !, problem accessing Scanner database: %v", sizing.MinGPU, err)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinFreq, err)
 					}
 					log.Error(noHostError)
 					return nil, errors.New(noHostError)
@@ -256,9 +344,9 @@ func (svc *Service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 				if !force && (len(images) == 0) {
 					var noHostError string
 					if sizing.MinFreq <= 0 {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, no images matching requirements", sizing.MinGPU)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs !, no images matching requirements", sizing.MinGPU)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency, no images matching requirements", sizing.MinGPU, sizing.MinFreq)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, no images matching requirements", sizing.MinGPU, sizing.MinFreq)
 					}
 					log.Error(noHostError)
 					return nil, errors.New(noHostError)
@@ -344,15 +432,17 @@ func (a scoredImages) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a scoredImages) Less(i, j int) bool { return a[i].score < a[j].score }
 
 // FilterImages search an images corresponding to OS Name
-func (svc *Service) FilterImages(filter string) ([]resources.Image, error) {
+func (svc *service) FilterImages(filter string) ([]resources.Image, error) {
 	if svc == nil {
-		panic("Calling svc.FilterImages with svc==nil!")
+		return nil, utils.InvalidInstanceError()
 	}
 
 	imgs, err := svc.ListImages(false)
 	if err != nil {
 		return nil, err
 	}
+	imgs = svc.reduceImages(imgs)
+
 	if len(filter) == 0 {
 		return imgs, nil
 	}
@@ -381,16 +471,58 @@ func (svc *Service) FilterImages(filter string) ([]resources.Image, error) {
 
 }
 
+func (svc *service) reduceImages(imgs []resources.Image) []resources.Image {
+	var finalFilter *imagefilters.Filter
+	if svc.whitelistImageRE != nil {
+		finalFilter = imagefilters.NewFilter(filterWhitelistedImages(svc.whitelistImageRE))
+	}
+	if svc.blacklistImageRE != nil {
+		blackFilter := imagefilters.NewFilter(filterWhitelistedImages(svc.blacklistImageRE))
+		if finalFilter == nil {
+			finalFilter = blackFilter.Not()
+		} else {
+			finalFilter = finalFilter.And(blackFilter.Not())
+		}
+	}
+	if finalFilter != nil {
+		// templateFilter := templatefilters.NewFilter(finalFilter)
+		return imagefilters.FilterImages(imgs, finalFilter)
+	}
+	return imgs
+}
+
+func filterWhitelistedImages(re *regexp.Regexp) imagefilters.Predicate {
+	return func(img resources.Image) bool {
+		return re.Match([]byte(img.Name))
+	}
+}
+
+func filterBlacklistedImages(re *regexp.Regexp) imagefilters.Predicate {
+	return func(img resources.Image) bool {
+		return re.Match([]byte(img.Name))
+	}
+}
+
+// ListImages reduces the list of needed
+func (svc *service) ListImages(all bool) ([]resources.Image, error) {
+	imgs, err := svc.Provider.ListImages(all)
+	if err != nil {
+		return nil, err
+	}
+	return svc.reduceImages(imgs), nil
+}
+
 // SearchImage search an image corresponding to OS Name
-func (svc *Service) SearchImage(osname string) (*resources.Image, error) {
+func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 	if svc == nil {
-		panic("Calling svc.SearchImage with svc==nil!")
+		return nil, utils.InvalidInstanceError()
 	}
 
 	imgs, err := svc.ListImages(false)
 	if err != nil {
 		return nil, err
 	}
+
 	maxscore := 0.0
 	maxi := -1
 	//fields := strings.Split(strings.ToUpper(osname), " ")
@@ -416,9 +548,9 @@ func (svc *Service) SearchImage(osname string) (*resources.Image, error) {
 }
 
 // CreateHostWithKeyPair creates an host
-func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resources.Host, *userdata.Content, *resources.KeyPair, error) {
+func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (*resources.Host, *userdata.Content, *resources.KeyPair, error) {
 	if svc == nil {
-		panic("Calling svc.CreateHostWithKeyPair svc==nil!")
+		return nil, nil, nil, utils.InvalidInstanceError()
 	}
 
 	_, err := svc.GetHostByName(request.ResourceName)
@@ -463,9 +595,9 @@ func (svc *Service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 }
 
 // ListHostsByName list hosts by name
-func (svc *Service) ListHostsByName() (map[string]*resources.Host, error) {
+func (svc *service) ListHostsByName() (map[string]*resources.Host, error) {
 	if svc == nil {
-		panic("Calling svc.ListHostsByName() with svc==nil!")
+		return nil, utils.InvalidInstanceError()
 	}
 
 	hosts, err := svc.ListHosts()
@@ -580,8 +712,8 @@ func SimilarityScore(ref string, s string) float64 {
 }
 
 // InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
-func InitializeBucket(svc *Service, location objectstorage.Location) error {
-	cfg, err := svc.GetCfgOpts()
+func InitializeBucket(svc *service, location objectstorage.Location) error {
+	cfg, err := svc.Provider.GetConfigurationOptions()
 	if err != nil {
 		fmt.Printf("failed to get client options: %s\n", err.Error())
 	}

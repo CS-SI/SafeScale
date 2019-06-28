@@ -19,14 +19,10 @@ package tests
 // TODO NOTICE Side-effects imports here
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
-	local "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,7 +48,7 @@ import (
 
 // ServiceTester helper class to test clients
 type ServiceTester struct {
-	Service *iaas.Service
+	Service iaas.Service
 }
 
 // Check at compile that initialized tenants are valid stacks
@@ -67,7 +63,7 @@ func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	_ = stack
 }
 
-//ListImages test
+// ListImages test
 func (tester *ServiceTester) ListImages(t *testing.T) {
 
 	images, err := tester.Service.ListImages(false)

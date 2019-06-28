@@ -47,14 +47,18 @@ type CfgOptions struct {
 func (provider *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetAuthOpts() (providers.Config, error) {
+func (provider *provider) GetAuthenticationOptions() (providers.Config, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetCfgOpts() (providers.Config, error) {
+func (provider *provider) GetConfigurationOptions() (providers.Config, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
-func (provider *provider) ListAvailabilityZones(bool) (map[string]bool, error) {
+func (provider *provider) ListRegions() ([]string, error) {
+	return nil, fmt.Errorf(errorStr)
+}
+
+func (provider *provider) ListAvailabilityZones() (map[string]bool, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 

@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -41,7 +42,7 @@ type Volume struct {
 }
 
 // NewVolume creates an instance of metadata.Volume
-func NewVolume(svc *iaas.Service) *Volume {
+func NewVolume(svc iaas.Service) *Volume {
 	return &Volume{
 		item: metadata.NewItem(svc, volumesFolderName),
 		name: nil,
@@ -167,13 +168,13 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) error {
 }
 
 // SaveVolume saves the Volume definition in Object Storage
-func SaveVolume(svc *iaas.Service, volume *resources.Volume) (*Volume, error) {
+func SaveVolume(svc iaas.Service, volume *resources.Volume) (*Volume, error) {
 	mv := NewVolume(svc)
 	return mv, mv.Carry(volume).Write()
 }
 
 // RemoveVolume removes the Volume definition from Object Storage
-func RemoveVolume(svc *iaas.Service, volumeID string) error {
+func RemoveVolume(svc iaas.Service, volumeID string) error {
 	m, err := LoadVolume(svc, volumeID)
 	if err != nil {
 		return err
@@ -185,7 +186,7 @@ func RemoveVolume(svc *iaas.Service, volumeID string) error {
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadVolume(svc *iaas.Service, ref string) (*Volume, error) {
+func LoadVolume(svc iaas.Service, ref string) (*Volume, error) {
 	mv := NewVolume(svc)
 	var innerErr error
 	err := retry.WhileUnsuccessfulDelay1Second(

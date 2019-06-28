@@ -19,10 +19,11 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
@@ -50,11 +51,11 @@ type VolumeAPI interface {
 
 // VolumeHandler volume service
 type VolumeHandler struct {
-	service *iaas.Service
+	service iaas.Service
 }
 
 // NewVolumeHandler creates a Volume service
-func NewVolumeHandler(svc *iaas.Service) VolumeAPI {
+func NewVolumeHandler(svc iaas.Service) VolumeAPI {
 	return &VolumeHandler{
 		service: svc,
 	}
