@@ -35,7 +35,7 @@ var errorStr = "Libvirt Driver is not enabled, use the libvirt option while comp
 type Stack struct {
 }
 
-func (s *Stack) ListAvailabilityZones(bool) (map[string]bool, error) {
+func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 

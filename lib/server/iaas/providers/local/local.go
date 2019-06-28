@@ -135,14 +135,14 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 }
 
 // GetAuthOpts returns authentification options as a Config
-func (p *provider) GetAuthOpts() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := resources.ConfigMap{}
 	cfg.Set("Region", "Local")
 	return cfg, nil
 }
 
 // GetCfgOpts returns configuration options as a Config
-func (p *provider) GetCfgOpts() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	config := resources.ConfigMap{}
 
 	config.Set("AutoHostNetworkInterfaces", p.Config.AutoHostNetworkInterfaces)
@@ -156,6 +156,21 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 
 func (provider *provider) GetName() string {
 	return "local"
+}
+
+
+// ListImages ...
+func (provider *provider) ListImages(all bool) ([]resources.Image, error) {
+	return provider.Stack.ListImages()
+}
+
+// ListTemplates ...
+func (provider *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+	return provider.Stack.ListTemplates()
+}
+
+func (provider *provider) ListAvailabilityZones() (map[string]bool, error) {
+	return provider.Stack.ListAvailabilityZones()
 }
 
 func init() {

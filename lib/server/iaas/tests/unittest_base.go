@@ -40,7 +40,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 
-	//"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
+	libvirt "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
@@ -61,7 +61,7 @@ type ServiceTester struct {
 func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	var stack api.Stack
 
-	//stack = &libvirt.Stack{}
+	stack = &libvirt.Stack{}
 	stack = &huaweicloud.Stack{}
 	stack = &openstack.Stack{}
 	stack = &gcp.Stack{}
