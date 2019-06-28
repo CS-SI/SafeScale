@@ -33,11 +33,11 @@ type ProcessManagerAPI interface {
 
 // ProcessManagerHandler service
 type ProcessManagerHandler struct {
-	service *iaas.Service
+	service iaas.Service
 }
 
 // NewProcessManagerHandler creates a Volume service
-func NewProcessManagerHandler(svc *iaas.Service) ProcessManagerAPI {
+func NewProcessManagerHandler(svc iaas.Service) ProcessManagerAPI {
 	return &ProcessManagerHandler{
 		service: svc,
 	}

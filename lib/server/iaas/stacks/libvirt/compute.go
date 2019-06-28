@@ -27,9 +27,6 @@ import (
 	"encoding/pem"
 	"encoding/xml"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -37,6 +34,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
@@ -104,7 +104,7 @@ var defaultNetworkCIDR = "192.168.122.0/24"
 //-------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages(all bool) ([]resources.Image, error) {
+func (s *Stack) ListImages() ([]resources.Image, error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error())
@@ -182,7 +182,7 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s : %s", s.LibvirtConfig.TemplatesJSONPath, err.Error())
@@ -1166,7 +1166,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 //-------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *Stack) ListAvailabilityZones(all bool) (map[string]bool, error) {
+func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 	return map[string]bool{"local": true}, nil
 }
 

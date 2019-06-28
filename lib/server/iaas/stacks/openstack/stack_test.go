@@ -29,7 +29,7 @@ import (
 )
 
 var tester *tests.ServiceTester
-var service *iaas.Service
+var service iaas.Service
 
 func getTester() (*tests.ServiceTester, error) {
 	if tester == nil {
@@ -44,7 +44,7 @@ func getTester() (*tests.ServiceTester, error) {
 	return tester, nil
 }
 
-func getService() (*iaas.Service, error) {
+func getService() (iaas.Service, error) {
 	if service == nil {
 		tenant_name := "TestOpenstack"
 		if tenant_override := os.Getenv("TEST_OPENSTACK"); tenant_override != "" {

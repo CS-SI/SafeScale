@@ -26,23 +26,18 @@ import (
 //go:generate mockgen -destination=../mocks/mock_stack.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api Stack
 
 // Stack is the interface to cloud stack
-// It same interface has to be satisfied in Provider interface
 type Stack interface {
 	// ListAvailabilityZones lists the usable Availability Zones
-	ListAvailabilityZones(all bool) (map[string]bool, error)
+	ListAvailabilityZones() (map[string]bool, error)
 
 	// ListRegions returns a list with the regions available
-    ListRegions() ([]string, error)
+	ListRegions() ([]string, error)
 
-	// ListImages lists available OS images
-	ListImages(all bool) ([]resources.Image, error)
 	// GetImage returns the Image referenced by id
 	GetImage(id string) (*resources.Image, error)
 
 	// GetTemplate returns the Template referenced by id
 	GetTemplate(id string) (*resources.HostTemplate, error)
-	// ListTemplates lists available host templates
-	ListTemplates(all bool) ([]resources.HostTemplate, error)
 
 	// CreateKeyPair creates and import a key pair
 	CreateKeyPair(name string) (*resources.KeyPair, error)
@@ -106,6 +101,15 @@ type Stack interface {
 	ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error)
 	// DeleteVolumeAttachment deletes the volume attachment identifed by id
 	DeleteVolumeAttachment(serverID, id string) error
+}
+
+// Reserved is an interface about the methods only available to providers internally
+type Reserved interface {
+	// ListImages lists available OS images
+	ListImages() ([]resources.Image, error)
+
+	// ListTemplates lists available host templates
+	ListTemplates() ([]resources.HostTemplate, error)
 
 	// Returns a read-only struct containing configuration options
 	GetConfigurationOptions() stacks.ConfigurationOptions

@@ -18,9 +18,10 @@ package cloudwatt
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
-	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -29,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	stackapi "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 )
 
@@ -41,7 +41,7 @@ var (
 
 // provider is the providerementation of the Cloudwatt provider
 type provider struct {
-	stackapi.Stack
+	*openstack.Stack
 }
 
 // New creates a new instance of cloudwatt provider
@@ -136,7 +136,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		}
 	}
 
-	validAvailabilityZones, err := stack.ListAvailabilityZones(true)
+	validAvailabilityZones, err := stack.ListAvailabilityZones()
 	if err != nil {
 		if len(validAvailabilityZones) != 0 {
 			return nil, err
@@ -162,10 +162,8 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 	return &provider{Stack: stack}, nil
 }
 
-
-
-// GetAuthOpts returns the auth options
-func (p *provider) GetAuthOpts() (providers.Config, error) {
+// GetAuthenticationOptions returns the auth options
+func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -177,8 +175,8 @@ func (p *provider) GetAuthOpts() (providers.Config, error) {
 	return cfg, nil
 }
 
-// GetCfgOpts return configuration parameters
-func (p *provider) GetCfgOpts() (providers.Config, error) {
+// GetConfigurationOptions return configuration parameters
+func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()
@@ -194,7 +192,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 // ListTemplates ...
 // Value of all has no impact on the result
 func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	allTemplates, err := p.Stack.ListTemplates(all)
+	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +202,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 // ListImages ...
 // Value of all has no impact on the result
 func (p *provider) ListImages(all bool) ([]resources.Image, error) {
-	allImages, err := p.Stack.ListImages(all)
+	allImages, err := p.Stack.ListImages()
 	if err != nil {
 		return nil, err
 	}

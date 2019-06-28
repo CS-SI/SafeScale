@@ -36,11 +36,11 @@ type ImageAPI interface {
 
 // ImageHandler image service
 type ImageHandler struct {
-	service *iaas.Service
+	service iaas.Service
 }
 
 // NewImageHandler creates an host service
-func NewImageHandler(svc *iaas.Service) ImageAPI {
+func NewImageHandler(svc iaas.Service) ImageAPI {
 	return &ImageHandler{
 		service: svc,
 	}

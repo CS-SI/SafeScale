@@ -27,11 +27,11 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils"
 )
@@ -53,11 +53,11 @@ type ShareAPI interface {
 
 // ShareHandler nas service
 type ShareHandler struct {
-	service *iaas.Service
+	service iaas.Service
 }
 
 // NewShareHandler creates a ShareHandler
-func NewShareHandler(svc *iaas.Service) ShareAPI {
+func NewShareHandler(svc iaas.Service) ShareAPI {
 	return &ShareHandler{
 		service: svc,
 	}

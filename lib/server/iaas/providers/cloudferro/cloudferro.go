@@ -18,6 +18,8 @@ package cloudferro
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
@@ -25,11 +27,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/VolumeSpeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	stackapi "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
-    "github.com/asaskevich/govalidator"
-	"regexp"
 )
 
 var (
@@ -40,7 +40,7 @@ var (
 
 // provider is the providerementation of the CloudFerro provider
 type provider struct {
-	stackapi.Stack
+	*openstack.Stack
 }
 
 // New creates a new instance of cloudferro provider
@@ -146,7 +146,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		}
 	}
 
-	validAvailabilityZones, err := stack.ListAvailabilityZones(true)
+	validAvailabilityZones, err := stack.ListAvailabilityZones()
 	if err != nil {
 		if len(validAvailabilityZones) != 0 {
 			return nil, err
@@ -173,7 +173,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 }
 
 // GetAuthOpts returns the auth options
-func (p *provider) GetAuthOpts() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -186,7 +186,7 @@ func (p *provider) GetAuthOpts() (providers.Config, error) {
 }
 
 // GetCfgOpts return configuration parameters
-func (p *provider) GetCfgOpts() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()
@@ -202,7 +202,7 @@ func (p *provider) GetCfgOpts() (providers.Config, error) {
 // ListTemplates ...
 // Value of all has no impact on the result
 func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	allTemplates, err := p.Stack.ListTemplates(all)
+	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 // ListImages ...
 // Value of all has no impact on the result
 func (p *provider) ListImages(all bool) ([]resources.Image, error) {
-	allImages, err := p.Stack.ListImages(all)
+	allImages, err := p.Stack.ListImages()
 	if err != nil {
 		return nil, err
 	}

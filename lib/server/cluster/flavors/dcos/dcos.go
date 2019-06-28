@@ -76,6 +76,7 @@ var (
 		GetTemplateBox:              getTemplateBox,
 		GetGlobalSystemRequirements: getGlobalSystemRequirements,
 		GetNodeInstallationScript:   getNodeInstallationScript,
+		GetState:                    getState,
 	}
 )
 
@@ -208,7 +209,7 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 
 	var dnsServers []string
 	cluster := foreman.Cluster()
-	cfg, err := cluster.GetService(task).GetCfgOpts()
+	cfg, err := cluster.GetService(task).GetConfigurationOptions()
 	if err == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}

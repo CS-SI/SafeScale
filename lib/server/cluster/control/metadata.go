@@ -41,7 +41,7 @@ type Metadata struct {
 }
 
 // NewMetadata creates a new Cluster Controller metadata
-func NewMetadata(svc *iaas.Service) (*Metadata, error) {
+func NewMetadata(svc iaas.Service) (*Metadata, error) {
 	return &Metadata{
 		item: metadata.NewItem(svc, clusterFolderName),
 		// lock: &sync.Mutex{},
@@ -49,7 +49,7 @@ func NewMetadata(svc *iaas.Service) (*Metadata, error) {
 }
 
 // GetService returns the service used by metadata
-func (m *Metadata) GetService() *iaas.Service {
+func (m *Metadata) GetService() iaas.Service {
 	return m.item.GetService()
 }
 

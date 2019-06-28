@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -46,14 +47,14 @@ type Network struct {
 }
 
 // NewNetwork creates an instance of network.Metadata
-func NewNetwork(svc *iaas.Service) *Network {
+func NewNetwork(svc iaas.Service) *Network {
 	return &Network{
 		item: metadata.NewItem(svc, networksFolderName),
 	}
 }
 
 // GetService returns the provider service used
-func (m *Network) GetService() *iaas.Service {
+func (m *Network) GetService() iaas.Service {
 	return m.item.GetService()
 }
 
@@ -257,13 +258,13 @@ func (m *Network) Release() {
 }
 
 // SaveNetwork saves the Network definition in Object Storage
-func SaveNetwork(svc *iaas.Service, net *resources.Network) (*Network, error) {
+func SaveNetwork(svc iaas.Service, net *resources.Network) (*Network, error) {
 	mn := NewNetwork(svc)
 	return mn, mn.Carry(net).Write()
 }
 
 // RemoveNetwork removes the Network definition from Object Storage
-func RemoveNetwork(svc *iaas.Service, net *resources.Network) error {
+func RemoveNetwork(svc iaas.Service, net *resources.Network) error {
 	return NewNetwork(svc).Carry(net).Delete()
 }
 
@@ -271,7 +272,7 @@ func RemoveNetwork(svc *iaas.Service, net *resources.Network) error {
 // logic: Read by ID; if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
-func LoadNetwork(svc *iaas.Service, ref string) (*Network, error) {
+func LoadNetwork(svc iaas.Service, ref string) (*Network, error) {
 	mn := NewNetwork(svc)
 	var innerErr error
 	err := retry.WhileUnsuccessfulDelay1Second(
@@ -311,7 +312,7 @@ type Gateway struct {
 }
 
 // NewGateway creates an instance of metadata.Gateway
-func NewGateway(svc *iaas.Service, networkID string) (*Gateway, error) {
+func NewGateway(svc iaas.Service, networkID string) (*Gateway, error) {
 	network := NewNetwork(svc)
 	err := network.ReadByID(networkID)
 	if err != nil {
@@ -416,7 +417,7 @@ func (mg *Gateway) Release() {
 }
 
 // LoadGateway returns the metadata of the Gateway of a network
-func LoadGateway(svc *iaas.Service, networkID string) (*Gateway, error) {
+func LoadGateway(svc iaas.Service, networkID string) (*Gateway, error) {
 	mg, err := NewGateway(svc, networkID)
 	if err != nil {
 		return nil, err
@@ -447,7 +448,7 @@ func LoadGateway(svc *iaas.Service, networkID string) (*Gateway, error) {
 }
 
 // SaveGateway saves the metadata of a gateway
-func SaveGateway(svc *iaas.Service, host *resources.Host, networkID string) (*Gateway, error) {
+func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (*Gateway, error) {
 	mg, err := NewGateway(svc, networkID)
 	if err != nil {
 		return nil, err

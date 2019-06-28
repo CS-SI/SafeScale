@@ -62,11 +62,11 @@ type HostAPI interface {
 
 // HostHandler host service
 type HostHandler struct {
-	service *iaas.Service
+	service iaas.Service
 }
 
 // NewHostHandler ...
-func NewHostHandler(svc *iaas.Service) HostAPI {
+func NewHostHandler(svc iaas.Service) HostAPI {
 	return &HostHandler{
 		service: svc,
 	}

@@ -19,9 +19,10 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
 
 	//"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
@@ -53,11 +54,11 @@ type SSHAPI interface {
 
 // SSHHandler SSH service
 type SSHHandler struct {
-	service *iaas.Service
+	service iaas.Service
 }
 
 // NewSSHHandler ...
-func NewSSHHandler(svc *iaas.Service) *SSHHandler {
+func NewSSHHandler(svc iaas.Service) *SSHHandler {
 	return &SSHHandler{
 		service: svc,
 	}
@@ -80,7 +81,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 		panic("param must be a string or a *resources.Host!")
 	}
 
-	cfg, err := handler.service.GetCfgOpts()
+	cfg, err := handler.service.GetConfigurationOptions()
 	if err != nil {
 		return nil, infraErr(err)
 	}

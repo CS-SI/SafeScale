@@ -34,7 +34,7 @@ import (
 // Tenant structure to handle name and clientAPI for a tenant
 type Tenant struct {
 	name    string
-	Service *iaas.Service
+	Service iaas.Service
 }
 
 var (
