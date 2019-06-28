@@ -274,6 +274,7 @@ It defines the "driver" to communicate with the provider. Valid values are:
 > | `"flexibleengine"` |
 > | `"opentelekom"` |
 > | `"ovh"` |
+> | `"gcp"` |
 
 ### <a name="kw_AccessKey"></a> `AccessKey`: alias, see [`Username`](#kw_Username)
 
@@ -397,3 +398,59 @@ Is meaningful for some drivers only:
 > | --- |
 > | `flexibleengine` |
 > | `opentelekom` |
+
+
+### GCP
+
+Get project number from project settings:
+https://console.cloud.google.com/iam-admin/settings/project?project=<your-project-here>
+
+Get service account keys in json format from:
+https://console.developers.google.com/apis/credentials?project=<your-project-here>
+
+The file retrieved from there has the following format:
+
+```json
+{
+  "type": "service_account",
+  "project_id": "*****************",
+  "private_key_id": "*****************",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n*****************\n-----END PRIVATE KEY-----\n",
+  "client_email": "*****************",
+  "client_id": "*****************",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "*****************"
+}
+```
+
+The tenants.toml file contains the same fields as the service account json file AND the project number from the project settings page:
+
+```yaml
+[[tenants]]
+    client = "gcp"
+    name = "my-google-account-project-x"
+    
+    [tenants.identity]
+        User = "******@****"
+        Password = "**********"
+        ProjectNumber = "*****************"
+        project_id = "************"
+        private_key_id = "******************"
+        private_key = "-----BEGIN PRIVATE KEY-----\n**********************************\n-----END PRIVATE KEY-----\n"
+        client_email = "*****************************"
+        client_id = "******************"
+        auth_uri = "https://accounts.google.com/o/oauth2/auth"
+        token_uri = "https://oauth2.googleapis.com/token"
+        auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+        client_x509_cert_url = "*********************************************************"
+
+    [tenants.compute]
+        Region = "europe-west1"
+        Zone = "europe-west1-b"
+
+    [tenants.objectstorage]
+        Type        = "google"
+        Region      = "europe-west1-b"
+```
