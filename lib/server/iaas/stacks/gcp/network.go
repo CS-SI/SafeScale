@@ -19,6 +19,8 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
@@ -28,20 +30,18 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"strconv"
 
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 )
 
 // CreateNetwork creates a network named name
-func (s *StackGcp) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
 	// disable subnetwork auto-creation
 	ne := compute.Network{
-		Name: "safescale",
+		Name:                  "safescale",
 		AutoCreateSubnetworks: false,
 		ForceSendFields:       []string{"AutoCreateSubnetworks"},
 	}
-
 
 	compuService := s.ComputeService
 
@@ -231,7 +231,7 @@ func (s *StackGcp) CreateNetwork(req resources.NetworkRequest) (*resources.Netwo
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *StackGcp) GetNetwork(ref string) (*resources.Network, error) {
+func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
 	nets, err := s.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -246,7 +246,7 @@ func (s *StackGcp) GetNetwork(ref string) (*resources.Network, error) {
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *StackGcp) GetNetworkByName(ref string) (*resources.Network, error) {
+func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
 	nets, err := s.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -261,7 +261,7 @@ func (s *StackGcp) GetNetworkByName(ref string) (*resources.Network, error) {
 }
 
 // ListNetworks lists available networks
-func (s *StackGcp) ListNetworks() ([]*resources.Network, error) {
+func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	logrus.Debug(">>> stacks.gcp::ListNetworks() called")
 	defer logrus.Debug("<<< stacks.gcp::ListNetworks() done")
 
@@ -278,15 +278,15 @@ func (s *StackGcp) ListNetworks() ([]*resources.Network, error) {
 		resp, err := compuService.Networks.List(s.GcpConfig.ProjectId).PageToken(token).Do()
 		if err != nil {
 			return networks, fmt.Errorf("can't list networks ...: %s", err)
-		} else {
-			for _, nett := range resp.Items {
-				newNet := resources.NewNetwork()
-				newNet.Name = nett.Name
-				newNet.ID = strconv.FormatUint(nett.Id, 10)
-				newNet.CIDR = nett.IPv4Range
+		}
 
-				networks = append(networks, newNet)
-			}
+		for _, nett := range resp.Items {
+			newNet := resources.NewNetwork()
+			newNet.Name = nett.Name
+			newNet.ID = strconv.FormatUint(nett.Id, 10)
+			newNet.CIDR = nett.IPv4Range
+
+			networks = append(networks, newNet)
 		}
 		token := resp.NextPageToken
 		paginate = token != ""
@@ -297,15 +297,15 @@ func (s *StackGcp) ListNetworks() ([]*resources.Network, error) {
 		resp, err := compuService.Subnetworks.List(s.GcpConfig.ProjectId, s.GcpConfig.Region).PageToken(token).Do()
 		if err != nil {
 			return networks, fmt.Errorf("can't list subnetworks ...: %s", err)
-		} else {
-			for _, nett := range resp.Items {
-				newNet := resources.NewNetwork()
-				newNet.Name = nett.Name
-				newNet.ID = strconv.FormatUint(nett.Id, 10)
-				newNet.CIDR = nett.IpCidrRange
+		}
 
-				networks = append(networks, newNet)
-			}
+		for _, nett := range resp.Items {
+			newNet := resources.NewNetwork()
+			newNet.Name = nett.Name
+			newNet.ID = strconv.FormatUint(nett.Id, 10)
+			newNet.CIDR = nett.IpCidrRange
+
+			networks = append(networks, newNet)
 		}
 		token := resp.NextPageToken
 		paginate = token != ""
@@ -315,7 +315,7 @@ func (s *StackGcp) ListNetworks() ([]*resources.Network, error) {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s *StackGcp) DeleteNetwork(ref string) (err error) {
+func (s *Stack) DeleteNetwork(ref string) (err error) {
 	theNetwork, err := s.GetNetwork(ref)
 	if err != nil {
 		if gerr, ok := err.(*googleapi.Error); ok {
@@ -395,7 +395,7 @@ func (s *StackGcp) DeleteNetwork(ref string) (err error) {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *StackGcp) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
 	if req.Network == nil {
 		panic("req.Network is nil!")
 	}
@@ -437,6 +437,6 @@ func (s *StackGcp) CreateGateway(req resources.GatewayRequest) (*resources.Host,
 }
 
 // DeleteGateway delete the public gateway referenced by ref (id or name)
-func (s *StackGcp) DeleteGateway(ref string) error {
+func (s *Stack) DeleteGateway(ref string) error {
 	return s.DeleteHost(ref)
 }

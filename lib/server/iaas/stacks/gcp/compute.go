@@ -22,6 +22,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
@@ -38,14 +41,12 @@ import (
 	"golang.org/x/crypto/ssh"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
-	"strconv"
-	"time"
 )
 
 //-------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *StackGcp) ListImages(all bool) (images []resources.Image, err error) {
+func (s *Stack) ListImages() (images []resources.Image, err error) {
 	compuService := s.ComputeService
 
 	images = []resources.Image{}
@@ -77,8 +78,8 @@ func (s *StackGcp) ListImages(all bool) (images []resources.Image, err error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *StackGcp) GetImage(id string) (*resources.Image, error) {
-	images, err := s.ListImages(true)
+func (s *Stack) GetImage(id string) (*resources.Image, error) {
+	images, err := s.ListImages()
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +96,7 @@ func (s *StackGcp) GetImage(id string) (*resources.Image, error) {
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *StackGcp) ListTemplates(all bool) (templates []resources.HostTemplate, err error) {
+func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err error) {
 	compuService := s.ComputeService
 
 	templates = []resources.HostTemplate{}
@@ -131,7 +132,7 @@ func (s *StackGcp) ListTemplates(all bool) (templates []resources.HostTemplate, 
 }
 
 //GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
-func (s *StackGcp) GetTemplate(id string) (*resources.HostTemplate, error) {
+func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 	templates, err := s.ListTemplates(true)
 	if err != nil {
 		return nil, err
@@ -149,7 +150,7 @@ func (s *StackGcp) GetTemplate(id string) (*resources.HostTemplate, error) {
 //-------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
-func (s *StackGcp) CreateKeyPair(name string) (*resources.KeyPair, error) {
+func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := privateKey.PublicKey
 	pub, _ := ssh.NewPublicKey(&publicKey)
@@ -173,22 +174,22 @@ func (s *StackGcp) CreateKeyPair(name string) (*resources.KeyPair, error) {
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *StackGcp) GetKeyPair(id string) (*resources.KeyPair, error) {
+func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 	return nil, fmt.Errorf("Not implemented")
 }
 
 // ListKeyPairs lists available key pairs
-func (s *StackGcp) ListKeyPairs() ([]resources.KeyPair, error) {
+func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 	return nil, fmt.Errorf("Not implemented")
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s *StackGcp) DeleteKeyPair(id string) error {
+func (s *Stack) DeleteKeyPair(id string) error {
 	return fmt.Errorf("Not implemented")
 }
 
 // CreateHost creates an host satisfying request
-func (s *StackGcp) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
 	userData = userdata.NewContent()
 
 	resourceName := request.ResourceName
@@ -278,7 +279,7 @@ func (s *StackGcp) CreateHost(request resources.HostRequest) (host *resources.Ho
 
 	// Select usable availability zone, the first one in the list
 	if s.GcpConfig.Zone == "" {
-		azList, err := s.ListAvailabilityZones(false)
+		azList, err := s.ListAvailabilityZones()
 		if err != nil {
 			return nil, userData, err
 		}
@@ -412,7 +413,7 @@ func (s *StackGcp) CreateHost(request resources.HostRequest) (host *resources.Ho
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
-func (s *StackGcp) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
 	if s == nil {
 		panic("Calling s.WaitHostReady with s==nil!")
 	}
@@ -481,12 +482,12 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 	}
 
 	instance := &compute.Instance{
-		Name:        instanceName,
-		Description: "compute sample instance",
-		MachineType: prefix + "/zones/" + zone + "/machineTypes/" + tname,
+		Name:         instanceName,
+		Description:  "compute sample instance",
+		MachineType:  prefix + "/zones/" + zone + "/machineTypes/" + tname,
 		CanIpForward: isPublic,
 		Tags: &compute.Tags{
-			Items:           []string{tag},
+			Items: []string{tag},
 		},
 		Disks: []*compute.AttachedDisk{
 			{
@@ -502,8 +503,8 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 		NetworkInterfaces: []*compute.NetworkInterface{
 			{
 				AccessConfigs: publicAccess(isPublic),
-				Network:    prefix + "/global/networks/" + network,
-				Subnetwork: prefix + "/regions/europe-west1/subnetworks/" + subnetwork,
+				Network:       prefix + "/global/networks/" + network,
+				Subnetwork:    prefix + "/regions/europe-west1/subnetworks/" + subnetwork,
 			},
 		},
 		ServiceAccounts: []*compute.ServiceAccount{
@@ -561,8 +562,8 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 	return host, nil
 }
 
-// GetHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
-func (s *StackGcp) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
+// InspectHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
+func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
 	switch hostParam.(type) {
 	case string:
 		host = resources.NewHost()
@@ -607,8 +608,8 @@ func (s *StackGcp) InspectHost(hostParam interface{}) (host *resources.Host, err
 			}
 
 			subnets = append(subnets, IpInSubnet{
-				Subnet: snet,
-				IP:     nit.NetworkIP,
+				Subnet:   snet,
+				IP:       nit.NetworkIP,
 				PublicIP: pubIp,
 			})
 		}
@@ -620,16 +621,16 @@ func (s *StackGcp) InspectHost(hostParam interface{}) (host *resources.Host, err
 		if err != nil {
 			continue
 		}
-		psg, err := s.ComputeService.Subnetworks.Get(s.GcpConfig.ProjectId, region, GetResourceNameFromSelfLink(sn.Subnet) ).Do()
+		psg, err := s.ComputeService.Subnetworks.Get(s.GcpConfig.ProjectId, region, GetResourceNameFromSelfLink(sn.Subnet)).Do()
 		if err != nil {
 			continue
 		}
 
 		resouceNetworks = append(resouceNetworks, IpInSubnet{
-			Subnet: sn.Subnet,
-			Name:   psg.Name,
-			ID:     strconv.FormatUint(psg.Id, 10),
-			IP:     sn.IP,
+			Subnet:   sn.Subnet,
+			Name:     psg.Name,
+			ID:       strconv.FormatUint(psg.Id, 10),
+			IP:       sn.IP,
 			PublicIP: sn.PublicIP,
 		})
 	}
@@ -719,7 +720,7 @@ func stateConvert(gcpHostStatus string) HostState.Enum {
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *StackGcp) GetHostByName(name string) (*resources.Host, error) {
+func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 	if name == "" {
 		panic("name is empty!")
 	}
@@ -739,7 +740,7 @@ func (s *StackGcp) GetHostByName(name string) (*resources.Host, error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (s *StackGcp) DeleteHost(id string) (err error) {
+func (s *Stack) DeleteHost(id string) (err error) {
 	service := s.ComputeService
 	projectID := s.GcpConfig.ProjectId
 	zone := s.GcpConfig.Zone
@@ -756,9 +757,9 @@ func (s *StackGcp) DeleteHost(id string) (err error) {
 	}
 
 	oco := OpContext{
-		Operation: op,
-		ProjectId: projectID,
-		Service:   service,
+		Operation:    op,
+		ProjectId:    projectID,
+		Service:      service,
 		DesiredState: "DONE",
 	}
 
@@ -768,12 +769,12 @@ func (s *StackGcp) DeleteHost(id string) (err error) {
 }
 
 // ResizeHost change the template used by an host
-func (s *StackGcp) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
+func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
 	return nil, fmt.Errorf("not implemented yet")
 }
 
 // ListHosts lists available hosts
-func (s *StackGcp) ListHosts() ([]*resources.Host, error) {
+func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	compuService := s.ComputeService
 
 	var hostList []*resources.Host
@@ -783,16 +784,15 @@ func (s *StackGcp) ListHosts() ([]*resources.Host, error) {
 		resp, err := compuService.Instances.List(s.GcpConfig.ProjectId, s.GcpConfig.Zone).PageToken(token).Do()
 		if err != nil {
 			return hostList, fmt.Errorf("cannot list hosts: %v", err)
-		} else {
-			for _, instance := range resp.Items {
-				nhost := resources.NewHost()
-				nhost.ID = strconv.FormatUint(instance.Id, 10)
-				nhost.Name = instance.Name
-				nhost.LastState = stateConvert(instance.Status)
+		}
+		for _, instance := range resp.Items {
+			nhost := resources.NewHost()
+			nhost.ID = strconv.FormatUint(instance.Id, 10)
+			nhost.Name = instance.Name
+			nhost.LastState = stateConvert(instance.Status)
 
-				// FIXME Populate host, what's missing ?
-				hostList = append(hostList, nhost)
-			}
+			// FIXME Populate host, what's missing ?
+			hostList = append(hostList, nhost)
 		}
 		token := resp.NextPageToken
 		paginate = token != ""
@@ -802,7 +802,7 @@ func (s *StackGcp) ListHosts() ([]*resources.Host, error) {
 }
 
 // StopHost stops the host identified by id
-func (s *StackGcp) StopHost(id string) error {
+func (s *Stack) StopHost(id string) error {
 	service := s.ComputeService
 
 	op, err := service.Instances.Stop(s.GcpConfig.ProjectId, s.GcpConfig.Zone, id).Do()
@@ -811,9 +811,9 @@ func (s *StackGcp) StopHost(id string) error {
 	}
 
 	oco := OpContext{
-		Operation: op,
-		ProjectId: s.GcpConfig.ProjectId,
-		Service:   service,
+		Operation:    op,
+		ProjectId:    s.GcpConfig.ProjectId,
+		Service:      service,
 		DesiredState: "DONE",
 	}
 
@@ -822,7 +822,7 @@ func (s *StackGcp) StopHost(id string) error {
 }
 
 // StartHost starts the host identified by id
-func (s *StackGcp) StartHost(id string) error {
+func (s *Stack) StartHost(id string) error {
 	service := s.ComputeService
 
 	op, err := service.Instances.Start(s.GcpConfig.ProjectId, s.GcpConfig.Zone, id).Do()
@@ -831,9 +831,9 @@ func (s *StackGcp) StartHost(id string) error {
 	}
 
 	oco := OpContext{
-		Operation: op,
-		ProjectId: s.GcpConfig.ProjectId,
-		Service:   service,
+		Operation:    op,
+		ProjectId:    s.GcpConfig.ProjectId,
+		Service:      service,
 		DesiredState: "DONE",
 	}
 
@@ -842,7 +842,7 @@ func (s *StackGcp) StartHost(id string) error {
 }
 
 // RebootHost reboot the host identified by id
-func (s *StackGcp) RebootHost(id string) error {
+func (s *Stack) RebootHost(id string) error {
 	service := s.ComputeService
 
 	op, err := service.Instances.Stop(s.GcpConfig.ProjectId, s.GcpConfig.Zone, id).Do()
@@ -851,9 +851,9 @@ func (s *StackGcp) RebootHost(id string) error {
 	}
 
 	oco := OpContext{
-		Operation: op,
-		ProjectId: s.GcpConfig.ProjectId,
-		Service:   service,
+		Operation:    op,
+		ProjectId:    s.GcpConfig.ProjectId,
+		Service:      service,
 		DesiredState: "DONE",
 	}
 
@@ -868,9 +868,9 @@ func (s *StackGcp) RebootHost(id string) error {
 	}
 
 	oco = OpContext{
-		Operation: op,
-		ProjectId: s.GcpConfig.ProjectId,
-		Service:   service,
+		Operation:    op,
+		ProjectId:    s.GcpConfig.ProjectId,
+		Service:      service,
 		DesiredState: "DONE",
 	}
 
@@ -879,7 +879,7 @@ func (s *StackGcp) RebootHost(id string) error {
 }
 
 // GetHostState returns the host identified by id
-func (s *StackGcp) GetHostState(hostParam interface{}) (HostState.Enum, error) {
+func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 	host, err := s.InspectHost(hostParam)
 	if err != nil {
 		return HostState.ERROR, err
@@ -891,7 +891,7 @@ func (s *StackGcp) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 //-------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *StackGcp) ListAvailabilityZones(all bool) (map[string]bool, error) {
+func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 	regions := make(map[string]bool)
 
 	compuService := s.ComputeService
@@ -907,7 +907,8 @@ func (s *StackGcp) ListAvailabilityZones(all bool) (map[string]bool, error) {
 	return regions, nil
 }
 
-func (s *StackGcp) ListRegions() ([]string, error) {
+// ListRegions ...
+func (s *Stack) ListRegions() ([]string, error) {
 	// FIXME Implement this
 
 	var regions []string

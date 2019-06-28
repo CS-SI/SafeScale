@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 )
 
@@ -345,16 +346,16 @@ func initObjectStorageLocationConfig(tenant map[string]interface{}) (objectstora
 
 		// FIXME Add google stuff
 		googleCfg := stacks.GCPConfiguration{
-			Type: "service_account",
-			ProjectId: identity["project_id"].(string),
+			Type:         "service_account",
+			ProjectId:    identity["project_id"].(string),
 			PrivateKeyId: identity["private_key_id"].(string),
-			PrivateKey: identity["private_key"].(string),
-			ClientEmail: identity["client_email"].(string),
-			ClientId: identity["client_id"].(string),
-			AuthUri: identity["auth_uri"].(string),
-			TokenUri: identity["token_uri"].(string),
+			PrivateKey:   identity["private_key"].(string),
+			ClientEmail:  identity["client_email"].(string),
+			ClientId:     identity["client_id"].(string),
+			AuthUri:      identity["auth_uri"].(string),
+			TokenUri:     identity["token_uri"].(string),
 			AuthProvider: identity["auth_provider_x509_cert_url"].(string),
-			ClientCert: identity["client_x509_cert_url"].(string),
+			ClientCert:   identity["client_x509_cert_url"].(string),
 		}
 
 		d1, err := json.MarshalIndent(googleCfg, "", "  ")
@@ -494,16 +495,16 @@ func initMetadataLocationConfig(tenant map[string]interface{}) (objectstorage.Co
 
 		// FIXME Add google stuff
 		googleCfg := stacks.GCPConfiguration{
-			Type: "service_account",
-			ProjectId: identity["project_id"].(string),
+			Type:         "service_account",
+			ProjectId:    identity["project_id"].(string),
 			PrivateKeyId: identity["private_key_id"].(string),
-			PrivateKey: identity["private_key"].(string),
-			ClientEmail: identity["client_email"].(string),
-			ClientId: identity["client_id"].(string),
-			AuthUri: identity["auth_uri"].(string),
-			TokenUri: identity["token_uri"].(string),
+			PrivateKey:   identity["private_key"].(string),
+			ClientEmail:  identity["client_email"].(string),
+			ClientId:     identity["client_id"].(string),
+			AuthUri:      identity["auth_uri"].(string),
+			TokenUri:     identity["token_uri"].(string),
 			AuthProvider: identity["auth_provider_x509_cert_url"].(string),
-			ClientCert: identity["client_x509_cert_url"].(string),
+			ClientCert:   identity["client_x509_cert_url"].(string),
 		}
 
 		d1, err := json.MarshalIndent(googleCfg, "", "  ")
