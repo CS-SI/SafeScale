@@ -169,7 +169,17 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 	provider := ""
 	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPT_FLAVOR"); suffixCandidate != "" {
 		if suffixCandidate != "" {
-			provider = fmt.Sprintf(".%s", suffixCandidate)
+			problems := false
+			_, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", provider))
+			problems = err != nil
+			_, err = box.String(fmt.Sprintf("userdata%s.phase2.sh", provider))
+			problems = problems || (err != nil)
+
+			if !problems {
+				provider = fmt.Sprintf(".%s", suffixCandidate)
+			} else {
+				logrus.Warnf("Ignoring script flavor [%s]", suffixCandidate)
+			}
 		}
 	}
 
