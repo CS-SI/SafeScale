@@ -53,6 +53,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		return &provider{}, fmt.Errorf("Section compute not found in tenants.toml !!")
 	}
 
+	// FIXME Use the network to change default "safescale" network
 	// network, _ := params["network"].(map[string]interface{})
 
 	projectId, _ := identityCfg["project_id"].(string)
@@ -129,9 +130,8 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		return nil, err
 	}
 
-	// nlog := api.NewLoggedStack(stack, "gcp")
-	// return &provider{nlog}, nil
-	return &provider{stack}, nil
+	prov := apiprovider.NewLoggedProvider(&provider{stack}, "gcp")
+	return prov, nil
 }
 
 // GetAuthenticationOptions returns the auth options
