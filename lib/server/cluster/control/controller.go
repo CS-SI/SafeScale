@@ -453,7 +453,7 @@ func (c *Controller) Deserialize(buf []byte) error {
 }
 
 // AddNode adds one node
-func (c *Controller) AddNode(task concurrency.Task, req *resources.HostDefinition) (string, error) {
+func (c *Controller) AddNode(task concurrency.Task, req *pb.HostDefinition) (string, error) {
 	hosts, err := c.AddNodes(task, 1, req)
 	if err != nil {
 		return "", err
@@ -462,7 +462,7 @@ func (c *Controller) AddNode(task concurrency.Task, req *resources.HostDefinitio
 }
 
 // AddNodes adds <count> nodes
-func (c *Controller) AddNodes(task concurrency.Task, count int, req *resources.HostDefinition) ([]string, error) {
+func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefinition) ([]string, error) {
 	log.Debugf(">>> lib.server.cluster.control.Controller::AddNodes(%d)", count)
 	defer log.Debugf("<<< lib.server.cluster.control.Controller::AddNodes(%d)", count)
 
@@ -487,10 +487,10 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *resources.H
 		return nil, err
 	}
 
-	if req != nil {
-		nodeDef = complementHostDefinition(req, nodeDef)
-	}
 	pbNodeDef := pbutils.ToPBHostDefinition(&nodeDef)
+	if req != nil {
+		pbNodeDef = complementHostDefinition(req, *pbNodeDef)
+	}
 	if nodeDef.ImageID == "" {
 		pbNodeDef.ImageId = hostImage
 	}

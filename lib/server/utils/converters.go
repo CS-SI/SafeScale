@@ -199,12 +199,16 @@ func ToPBHost(in *resources.Host) *pb.Host {
 // ToPBHostDefinition ...
 func ToPBHostDefinition(in *resources.HostDefinition) *pb.HostDefinition {
 	return &pb.HostDefinition{
-		CpuCount: int32(in.Cores),
-		Ram:      in.RAMSize,
-		Disk:     int32(in.DiskSize),
-		GpuCount: int32(in.GPUNumber),
-		CpuFreq:  in.CPUFreq,
-		ImageId:  in.ImageID,
+		ImageId: in.ImageID,
+		Sizing: &pb.HostSizing{
+			MinCpuCount: int32(in.Cores),
+			MaxCpuCount: int32(in.Cores),
+			MinRamSize:  in.RAMSize,
+			MaxRamSize:  in.RAMSize,
+			MinDiskSize: int32(in.DiskSize),
+			GpuCount:    int32(in.GPUNumber),
+			MinCpuFreq:  in.CPUFreq,
+		},
 	}
 }
 
