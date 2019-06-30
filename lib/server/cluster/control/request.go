@@ -17,7 +17,7 @@
 package control
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
 )
@@ -38,8 +38,12 @@ type Request struct {
 	Tenant string
 	// KeepOnFailure is set to True to keep resources on cluster creation failure
 	KeepOnFailure bool
+	// GatewaysDef count
+	GatewaysDef *pb.HostDefinition
 	// NodesDef count
-	NodesDef *resources.HostDefinition
+	MastersDef *pb.HostDefinition
+	// NodesDef count
+	NodesDef *pb.HostDefinition
 	// DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
 	DisabledDefaultFeatures map[string]struct{}
 }
