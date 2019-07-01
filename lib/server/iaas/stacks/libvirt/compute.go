@@ -685,10 +685,13 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) er
 
 	err := host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		newHostNetworkV1 := propsv1.NewHostNetwork()
-		newHost.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		readlockErr := newHost.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 			newHostNetworkV1 = v.(*propsv1.HostNetwork)
 			return nil
 		})
+		if readlockErr != nil {
+			return readlockErr
+		}
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		hostNetworkV1.IPv4Addresses = newHostNetworkV1.IPv4Addresses
 		hostNetworkV1.IPv6Addresses = newHostNetworkV1.IPv6Addresses
@@ -702,10 +705,13 @@ func (s *Stack) complementHost(host *resources.Host, newHost *resources.Host) er
 
 	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
 		newHostSizingV1 := propsv1.NewHostSizing()
-		newHost.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		readLockErr := newHost.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
 			newHostSizingV1 = v.(*propsv1.HostSizing)
 			return nil
 		})
+		if readLockErr != nil {
+			return readLockErr
+		}
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		hostSizingV1.AllocatedSize.Cores = newHostSizingV1.AllocatedSize.Cores
 		hostSizingV1.AllocatedSize.RAMSize = newHostSizingV1.AllocatedSize.RAMSize

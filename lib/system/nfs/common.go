@@ -134,7 +134,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	}
 
 	k, uperr = sshconfig.SudoCommand("which scp")
-	if uperr != nil {
+	if uperr != nil && k != nil{
 		_, uptext, _, kerr := k.RunWithTimeout(utils.GetBigDelay())
 		if kerr == nil {
 			connected := strings.Contains(uptext, "/scp")
