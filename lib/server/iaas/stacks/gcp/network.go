@@ -327,6 +327,14 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 		}
 	}
 
+	if theNetwork == nil {
+		return fmt.Errorf("delete network failed: unexpected nil network when looking for [%s]", ref)
+	}
+
+	if !theNetwork.OK() {
+		logrus.Warnf("Invalid network: %v", theNetwork)
+	}
+
 	compuService := s.ComputeService
 	subnetwork, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectId, s.GcpConfig.Region, theNetwork.Name).Do()
 	if err != nil {

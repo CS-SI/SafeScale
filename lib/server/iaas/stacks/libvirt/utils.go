@@ -79,7 +79,7 @@ func GetInfoWaiter() (*VMInfoWaiterStruct, error) {
 		}
 		vmInfoWaiter.port = listener.Addr().(*net.TCPAddr).Port
 		vmInfoWaiter.listner = &listener
-		fmt.Println("InfoWaiter created on port %d", vmInfoWaiter.port)
+		fmt.Printf("InfoWaiter created on port %d", vmInfoWaiter.port)
 
 		go infoHandler()
 	}

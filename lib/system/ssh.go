@@ -560,9 +560,7 @@ func (ssh *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, error) {
 	var tunnels []*SSHTunnel
 	tunnel, err := recCreateTunnels(ssh, &tunnels)
 	if err != nil {
-		if err != nil {
-			return nil, nil, fmt.Errorf("Unable to create SSH Tunnels : %s", err.Error())
-		}
+		return nil, nil, fmt.Errorf("Unable to create SSH Tunnels : %s", err.Error())
 	}
 	sshConfig := *ssh
 	if tunnel == nil {
@@ -570,9 +568,6 @@ func (ssh *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, error) {
 	}
 
 	if ssh.GatewayConfig != nil {
-		if err != nil {
-			return nil, nil, fmt.Errorf("Unable to create SSH Tunnel : %s", err.Error())
-		}
 		sshConfig.Port = tunnel.port
 		sshConfig.Host = "127.0.0.1"
 	}

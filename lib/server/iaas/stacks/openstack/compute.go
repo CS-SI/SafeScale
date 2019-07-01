@@ -412,6 +412,9 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 		host.ID = hostParam.(string)
 	case *resources.Host:
 		host = hostParam.(*resources.Host)
+		if host == nil {
+			panic("openstack.Stack::InspectHost(): parameter 'hostParam' must be a string or a *resources.Host!")
+		}
 	default:
 		panic("openstack.Stack::InspectHost(): parameter 'hostParam' must be a string or a *resources.Host!")
 	}

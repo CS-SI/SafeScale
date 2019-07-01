@@ -65,6 +65,9 @@ func NewNetwork() *Network {
 
 func (n *Network) OK() bool {
 	result := true
+	if n == nil {
+		return false
+	}
 
 	result = result && (n.ID != "")
 	result = result && (n.Name != "")
