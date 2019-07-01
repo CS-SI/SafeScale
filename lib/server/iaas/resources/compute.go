@@ -99,6 +99,8 @@ type HostRequest struct {
 	KeyPair *KeyPair
 	// Password contains the safescale password useable on host console only
 	Password string
+	// DiskSize allows to ask for a specific size for system disk (in GB)
+	DiskSize int
 }
 
 // HostDefinition ...
