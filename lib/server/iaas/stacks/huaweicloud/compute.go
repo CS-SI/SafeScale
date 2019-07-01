@@ -338,15 +338,16 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	}
 
 	// Determines appropriate disk size
-	var diskSize int
-	if template.DiskSize > 0 {
-		diskSize = template.DiskSize
-	} else if template.Cores < 16 {
-		diskSize = 100
-	} else if template.Cores < 32 {
-		diskSize = 200
-	} else {
-		diskSize = 400
+	if request.DiskSize > template.DiskSize {
+		template.DiskSize = request.DiskSize
+	} else if template.DiskSize == 0 {
+		if template.Cores < 16 {
+			template.DiskSize = 100
+		} else if template.Cores < 32 {
+			template.DiskSize = 200
+		} else {
+			template.DiskSize = 400
+		}
 	}
 
 	// Select usable availability zone
@@ -363,7 +364,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		DeleteOnTermination: true,
 		UUID:                request.ImageID,
 		VolumeType:          "SSD",
-		VolumeSize:          diskSize,
+		VolumeSize:          template.DiskSize,
 	}
 	// Defines server
 	userDataPhase1, err := userData.Generate("phase1")
@@ -407,7 +408,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	}
 
 	// Adds Host property SizingV1
-	template.DiskSize = diskSize // Makes sure the size of disk is correctly saved
+	// template.DiskSize = diskSize // Makes sure the size of disk is correctly saved
 	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		// Note: from there, no idea what was the RequestedSize; caller will have to complement this information

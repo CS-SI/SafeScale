@@ -344,9 +344,9 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 				if !force && (len(images) == 0) {
 					var noHostError string
 					if sizing.MinFreq <= 0 {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs !, no images matching requirements", sizing.MinGPU)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, no images matching requirements", sizing.MinGPU)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%f' GHz clock frequency !, no images matching requirements", sizing.MinGPU, sizing.MinFreq)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f GHz', no images matching requirements", sizing.MinGPU, sizing.MinFreq)
 					}
 					log.Error(noHostError)
 					return nil, errors.New(noHostError)
@@ -359,33 +359,36 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 		}
 	}
 
-	msg := "Looking for machine with: %s cores, %s RAM%s"
-	coreMsg := ""
-	if sizing.MinCores > 0 {
-		if sizing.MaxCores > 0 {
-			coreMsg = fmt.Sprintf("between %d and %d", sizing.MinCores, sizing.MaxCores)
-		} else {
-			coreMsg = fmt.Sprintf("at least %d", sizing.MinCores)
-		}
+	if sizing.MinCores == 0 && sizing.MaxCores == 0 && sizing.MinRAMSize == 0 && sizing.MaxRAMSize == 0 {
+		log.Debugf("Looking for a host template as small as possible")
 	} else {
-		coreMsg = fmt.Sprintf("at most %d", sizing.MaxCores)
-	}
-	ramMsg := ""
-	if sizing.MinRAMSize > 0 {
-		if sizing.MaxRAMSize > 0 {
-			ramMsg = fmt.Sprintf("between %.01f and %.01f", sizing.MinRAMSize, sizing.MaxRAMSize)
+		coreMsg := ""
+		if sizing.MinCores > 0 {
+			if sizing.MaxCores > 0 {
+				coreMsg = fmt.Sprintf("between %d and %d", sizing.MinCores, sizing.MaxCores)
+			} else {
+				coreMsg = fmt.Sprintf("at least %d", sizing.MinCores)
+			}
 		} else {
-			ramMsg = fmt.Sprintf("at least %.01f", sizing.MinRAMSize)
+			coreMsg = fmt.Sprintf("at most %d", sizing.MaxCores)
 		}
-	} else {
-		coreMsg = fmt.Sprintf("at most %.01f", sizing.MaxRAMSize)
-	}
-	diskMsg := ""
-	if sizing.MinDiskSize > 0 {
-		diskMsg = fmt.Sprintf(" and at least %d", sizing.MinDiskSize)
-	}
+		ramMsg := ""
+		if sizing.MinRAMSize > 0 {
+			if sizing.MaxRAMSize > 0 {
+				ramMsg = fmt.Sprintf("between %.01f and %.01f", sizing.MinRAMSize, sizing.MaxRAMSize)
+			} else {
+				ramMsg = fmt.Sprintf("at least %.01f", sizing.MinRAMSize)
+			}
+		} else {
+			coreMsg = fmt.Sprintf("at most %.01f", sizing.MaxRAMSize)
+		}
+		diskMsg := ""
+		if sizing.MinDiskSize > 0 {
+			diskMsg = fmt.Sprintf(" and at least %d GB of disk", sizing.MinDiskSize)
+		}
 
-	log.Debugf(fmt.Sprintf(msg, coreMsg, ramMsg, diskMsg))
+		log.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM%s", coreMsg, ramMsg, diskMsg))
+	}
 
 	for _, template := range templates {
 		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f RAM, and %d Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)

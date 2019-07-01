@@ -111,9 +111,11 @@ func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err
 
 			for _, matype := range resp.Items {
 				ht := resources.HostTemplate{
-					Cores:    int(matype.GuestCpus),
-					RAMSize:  float32(matype.MemoryMb / 1024),
-					DiskSize: int(matype.ImageSpaceGb),
+					Cores:   int(matype.GuestCpus),
+					RAMSize: float32(matype.MemoryMb / 1024),
+					//VPL: GCP Template disk sizing is ridiculous at best, so fill it to 0 and let us size the disk ourselves
+					//DiskSize: int(matype.ImageSpaceGb),
+					DiskSize: 0,
 					ID:       strconv.FormatUint(matype.Id, 10),
 					Name:     string(matype.Name),
 				}
@@ -274,6 +276,23 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if err != nil {
 		return nil, userData, fmt.Errorf("failed to get image: %s", err)
 	}
+	if request.DiskSize > template.DiskSize {
+		template.DiskSize = request.DiskSize
+	} else if template.DiskSize == 0 {
+		// Determines appropriate disk size
+		if template.Cores < 16 {
+			template.DiskSize = 100
+		} else if template.Cores < 32 {
+			template.DiskSize = 200
+		} else {
+			template.DiskSize = 400
+		}
+	}
+
+	rim, err := s.GetImage(request.ImageID)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
 
@@ -336,17 +355,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 
-			template, err := s.GetTemplate(request.TemplateID)
-			if err != nil {
-				return err
-			}
-
-			rim, err := s.GetImage(request.ImageID)
-			if err != nil {
-				return err
-			}
-
-			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectId, request.ResourceName, rim.URL, s.GcpConfig.Zone, "safescale", defaultNetwork.Name, string(userDataPhase1), isGateway, template.Name)
+			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectId, request.ResourceName, rim.URL, s.GcpConfig.Zone, "safescale", defaultNetwork.Name, string(userDataPhase1), isGateway, template)
 			if err != nil {
 				if server != nil {
 					killErr := s.DeleteHost(server.ID)
@@ -471,7 +480,8 @@ func publicAccess(isPublic bool) []*compute.AccessConfig {
 	return []*compute.AccessConfig{}
 }
 
-func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageId string, zone string, network string, subnetwork string, userdata string, isPublic bool, tname string) (*resources.Host, error) {
+// buildGcpMachine ...
+func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageId string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *resources.HostTemplate) (*resources.Host, error) {
 	prefix := "https://www.googleapis.com/compute/v1/projects/" + projectID
 
 	imageURL := imageId
@@ -484,7 +494,7 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 	instance := &compute.Instance{
 		Name:         instanceName,
 		Description:  "compute sample instance",
-		MachineType:  prefix + "/zones/" + zone + "/machineTypes/" + tname,
+		MachineType:  prefix + "/zones/" + zone + "/machineTypes/" + template.Name,
 		CanIpForward: isPublic,
 		Tags: &compute.Tags{
 			Items: []string{tag},
@@ -497,6 +507,7 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 				InitializeParams: &compute.AttachedDiskInitializeParams{
 					DiskName:    fmt.Sprintf("%s-disk", instanceName),
 					SourceImage: imageURL,
+					DiskSizeGb:  int64(template.DiskSize),
 				},
 			},
 		},
