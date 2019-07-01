@@ -388,6 +388,9 @@ func (handler *DataHandler) Get(ctx context.Context, fileLocalPath string, fileN
 			if encryptedShards[j].Len() != 0 {
 				nonce := chunkGroup.GetNonce(chunkGroup.GetShardNum(i, j))
 				gcm, err := chunkGroup.GetGCM()
+				if err != nil {
+					return fmt.Errorf("Failed to get a GCM : %s", err.Error())
+				}
 				shards[j], err = gcm.Open(nil, nonce, encryptedShards[j].Bytes(), nil)
 				if err != nil {
 					return fmt.Errorf("Failed to decrypt shard : %s", err.Error())

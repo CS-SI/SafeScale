@@ -583,7 +583,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		hostRef = host.ID
 	}
 
-	if host == nil || common.IsEmpty(host) {
+	if common.IsEmpty(host) {
 		return nil, resources.ResourceNotFoundError("host", hostRef)
 	}
 

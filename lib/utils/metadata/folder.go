@@ -47,13 +47,13 @@ func NewFolder(svc iaas.Service, path string) *Folder {
 		panic("svc is nil!")
 	}
 	cryptKey := svc.GetMetadataKey()
-	crypt := cryptKey != nil && len(cryptKey) > 0
+	crypto := cryptKey != nil && len(cryptKey) > 0
 	f := &Folder{
 		path:    strings.Trim(path, "/"),
 		service: svc,
-		crypt:   crypt,
+		crypt:   crypto,
 	}
-	if crypt {
+	if crypto {
 		f.cryptKey = cryptKey
 	}
 	return f

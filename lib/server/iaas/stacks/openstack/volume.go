@@ -119,6 +119,9 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 			Size:             request.Size,
 			VolumeType:       s.getVolumeType(request.Speed),
 		}).Extract()
+		if vol == nil {
+			panic("Unexpected nil volume")
+		}
 		v = resources.Volume{
 			ID:    vol.ID,
 			Name:  vol.Name,
@@ -134,6 +137,9 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 			Size:             request.Size,
 			VolumeType:       s.getVolumeType(request.Speed),
 		}).Extract()
+		if vol == nil {
+			panic("Unexpected nil volume")
+		}
 		v = resources.Volume{
 			ID:    vol.ID,
 			Name:  vol.Name,
@@ -251,9 +257,7 @@ func (s *Stack) DeleteVolume(id string) error {
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			if err != nil {
-				return fmt.Errorf("timeout after %v to delete volume: %v", timeout, err)
-			}
+			return fmt.Errorf("timeout after %v to delete volume: %v", timeout, err)
 		}
 		log.Debugf("Error deleting volume: %+v", retryErr)
 		return errors.Wrap(retryErr, fmt.Sprintf("Error deleting volume: %v", retryErr))

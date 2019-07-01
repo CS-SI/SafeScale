@@ -141,7 +141,7 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, error) 
 			break
 		}
 	}
-	if !found {
+	if !found || router == nil {
 		return nil, fmt.Errorf("failed to find router associated to VPC '%s'", vpcName)
 	}
 

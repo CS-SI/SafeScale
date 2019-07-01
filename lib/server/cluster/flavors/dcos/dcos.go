@@ -324,7 +324,7 @@ func getState(task concurrency.Task, foreman control.Foreman) (ClusterState.Enum
 	}
 	_, err = sshCfg.WaitServerReady("ready", utils.GetContextTimeout())
 	if err == nil {
-		if err != nil {
+		if err != nil { // FIXME What ???
 			return ClusterState.Error, err
 		}
 		retcode, _, stderr, err = safescaleClt.Ssh.Run(masterID, cmd, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)

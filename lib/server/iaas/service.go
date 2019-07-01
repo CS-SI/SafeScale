@@ -715,7 +715,7 @@ func SimilarityScore(ref string, s string) float64 {
 func InitializeBucket(svc *service, location objectstorage.Location) error {
 	cfg, err := svc.Provider.GetConfigurationOptions()
 	if err != nil {
-		fmt.Printf("failed to get client options: %s\n", err.Error())
+		return fmt.Errorf("failed to get client options: %s\n", err.Error())
 	}
 	anon, found := cfg.Get("MetadataBucket")
 	if !found || anon.(string) == "" {

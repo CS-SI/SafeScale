@@ -455,8 +455,7 @@ func (handler *ShareHandler) Mount(ctx context.Context, shareName, hostName, pat
 
 			nfsClient, err := nfs.NewNFSClient(sshConfig)
 			if err != nil {
-				err = infraErr(err)
-				log.Warn(err.Error())
+				log.Warn(infraErr(err).Error())
 			}
 			err = nfsClient.Install()
 			if err != nil {

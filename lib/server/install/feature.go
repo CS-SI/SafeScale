@@ -484,6 +484,11 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) {
 		if hT != nil {
 			host = hT.host
 		}
+
+		if host == nil {
+			panic("nil host in feature")
+		}
+
 		v["Hostname"] = host.Name
 		v["HostIP"] = host.PrivateIp
 		gw := gatewayFromHost(host)

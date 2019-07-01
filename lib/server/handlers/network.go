@@ -413,6 +413,8 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 		return infraErr(err)
 	}
 
+	// FIXME Failure loading metadata not properly handled, if line 422 is true, then line 466 will panic
+
 	// 1st delete gateway
 	var metadataHost *resources.Host
 	if gwID != "" {

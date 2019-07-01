@@ -1005,8 +1005,12 @@ func (b *foreman) taskCreateMaster(tr concurrency.TaskRunner, params interface{}
 	pbHost, err := clientHost.Create(def, timeout)
 	if err != nil {
 		err = client.DecorateError(err, "creation of host resource", false)
-		log.Errorf("[%s] host resource creation failed: %s", hostLabel, err.Error())
-		err = fmt.Errorf("failed to create '%s': %s", hostLabel, err.Error())
+		if err != nil {
+			log.Errorf("[%s] host resource creation failed: %s", hostLabel, err.Error())
+		}
+		if err != nil {
+			err = fmt.Errorf("failed to create '%s': %s", hostLabel, err.Error())
+		}
 		return
 	}
 	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, pbHost.Name)
@@ -1251,7 +1255,9 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	pbHost, err := clientHost.Create(def, timeout)
 	if err != nil {
 		err = client.DecorateError(err, "creation of host resource", true)
-		log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
+		if err != nil {
+			log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
+		}
 		return
 	}
 	hostLabel = fmt.Sprintf("node #%d (%s)", index, pbHost.Name)

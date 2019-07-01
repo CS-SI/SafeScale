@@ -146,7 +146,7 @@ func (s *Stack) findVPCID() (*string, error) {
 			break
 		}
 	}
-	if found {
+	if found && router != nil{
 		return &router.ID, nil
 	}
 	return nil, nil
