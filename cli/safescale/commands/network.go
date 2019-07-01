@@ -108,21 +108,6 @@ var networkCreate = cli.Command{
 			Value: "192.168.0.0/24",
 			Usage: "cidr of the network",
 		},
-		cli.IntFlag{
-			Name:  "cpu",
-			Value: 1,
-			Usage: "Number of CPU for the gateway",
-		},
-		cli.Float64Flag{
-			Name:  "ram",
-			Value: 1,
-			Usage: "RAM for the gateway",
-		},
-		cli.IntFlag{
-			Name:  "disk",
-			Value: 16,
-			Usage: "Disk space for the gateway",
-		},
 		cli.StringFlag{
 			Name:  "os",
 			Value: "Ubuntu 18.04",
@@ -135,13 +120,38 @@ var networkCreate = cli.Command{
 		},
 		cli.StringFlag{
 			Name: "S, sizing",
-			Usage: `Describe sizing in format "<component><operator><value>[,...]" where:
-	<component> can be cpu, cpufreq, ram, disk
-	<operator> can be =,<=,>= (except for disk where valid operators are only = or >=)
-	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"
-	examples:
-		--sizing "cpu<=4,ram <= 10.0,disk = 100"
-		-S "cpu = [4-8], ram = [14-32]"`,
+			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
+			<component> can be cpu, cpufreq, gpu, ram, disk
+			<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
+				- = means exactly <value>
+				- ~ means between <value> and 2*<value>
+				- < means strictly lower than <value>
+				- <= means lower or equal to <value>
+				- > means strictly greater than <value>
+				- >= means greater or equal to <value>
+			<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]:"
+				- <cpu> is expecting an int as number of cpu cores, or an interval with minimum and maximum number of cpu cores
+				- <cpufreq> is expecting an int as minimum cpu frequency in MHz
+				- <gpu> is expecting an int as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
+				- <ram> is expecting a float as memory size in GB, or an interval with minimum and maximum mmory size
+				- <disk> is expecting an int as system disk size in GB
+			examples:
+				--sizing "cpu <= 4, ram <= 10, disk >= 100"
+				--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
+				--sizing "cpu <= 8, ram ~ 16"
+`,
+		},
+		cli.UintFlag{
+			Name:  "cpu",
+			Usage: "DEPRECATED! uses --sizing! Defines the number of cpu of masters and nodes in the cluster",
+		},
+		cli.Float64Flag{
+			Name:  "ram",
+			Usage: "DEPRECATED! uses --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
+		},
+		cli.UintFlag{
+			Name:  "disk",
+			Usage: "DEPRECATED! uses --sizing! Defines the size of system disk of masters and nodes (in GB)",
 		},
 	},
 	Action: func(c *cli.Context) error {

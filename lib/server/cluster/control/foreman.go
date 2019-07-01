@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
+	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
@@ -38,7 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	providermetadata "github.com/CS-SI/SafeScale/lib/server/metadata"
-	pbutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -176,68 +177,72 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	}
 
 	// Determine Gateway sizing
-	gatewaysDef := &pb.HostDefinition{
-		ImageId: imageID,
-		Sizing: &pb.HostSizing{
-			MinCpuCount: 2,
-			MaxCpuCount: 4,
-			MinRamSize:  7.0,
-			MaxRamSize:  16.0,
-			MinDiskSize: 60,
-			GpuCount:    -1,
-		},
-	}
+	var gatewaysDef *pb.HostDefinition
 	if b.makers.DefaultGatewaySizing != nil {
-		gatewaysDef = complementHostDefinition(gatewaysDef, b.makers.DefaultGatewaySizing(task, b))
+		gatewaysDef = complementHostDefinition(nil, b.makers.DefaultGatewaySizing(task, b))
+	} else {
+		gatewaysDef = &pb.HostDefinition{
+			Sizing: &pb.HostSizing{
+				MinCpuCount: 2,
+				MaxCpuCount: 4,
+				MinRamSize:  7.0,
+				MaxRamSize:  16.0,
+				MinDiskSize: 50,
+				GpuCount:    -1,
+			},
+		}
 	}
+	gatewaysDef.ImageId = imageID
 	gatewaysDef = complementHostDefinition(req.GatewaysDef, *gatewaysDef)
-	// pbGatewayDef := *pbutils.ToPBGatewayDefinition(&gatewayDef)
 
 	// Determine master sizing
-	mastersDef := &pb.HostDefinition{
-		ImageId: imageID,
-		Sizing: &pb.HostSizing{
-			MinCpuCount: 4,
-			MaxCpuCount: 8,
-			MinRamSize:  15.0,
-			MaxRamSize:  32.0,
-			MinDiskSize: 100,
-			GpuCount:    -1,
-		},
-	}
+	var mastersDef *pb.HostDefinition
 	if b.makers.DefaultMasterSizing != nil {
-		mastersDef = complementHostDefinition(mastersDef, b.makers.DefaultMasterSizing(task, b))
+		mastersDef = complementHostDefinition(nil, b.makers.DefaultMasterSizing(task, b))
+	} else {
+		mastersDef = &pb.HostDefinition{
+			Sizing: &pb.HostSizing{
+				MinCpuCount: 4,
+				MaxCpuCount: 8,
+				MinRamSize:  15.0,
+				MaxRamSize:  32.0,
+				MinDiskSize: 100,
+				GpuCount:    -1,
+			},
+		}
 	}
 	// Note: no way yet to define master sizing from cli...
+	mastersDef.ImageId = imageID
 	mastersDef = complementHostDefinition(req.MastersDef, *mastersDef)
-	// pbMasterDef := *pbutils.ToPBHostDefinition(&masterDef)
 
 	// Determine node sizing
-	nodesDef := &pb.HostDefinition{
-		ImageId: imageID,
-		Sizing: &pb.HostSizing{
-			MinCpuCount: 4,
-			MaxCpuCount: 8,
-			MinRamSize:  15.0,
-			MaxRamSize:  32.0,
-			MinDiskSize: 100,
-			GpuCount:    -1,
-		},
-	}
+	var nodesDef *pb.HostDefinition
 	if b.makers.DefaultNodeSizing != nil {
-		nodesDef = complementHostDefinition(nodesDef, b.makers.DefaultNodeSizing(task, b))
+		nodesDef = complementHostDefinition(nil, b.makers.DefaultNodeSizing(task, b))
+	} else {
+		nodesDef = &pb.HostDefinition{
+			Sizing: &pb.HostSizing{
+				MinCpuCount: 4,
+				MaxCpuCount: 8,
+				MinRamSize:  15.0,
+				MaxRamSize:  32.0,
+				MinDiskSize: 100,
+				GpuCount:    -1,
+			},
+		}
 	}
+	nodesDef.ImageId = imageID
 	nodesDef = complementHostDefinition(req.NodesDef, *nodesDef)
-	// pbNodeDef := *pbutils.ToPBHostDefinition(&nodeDef)
 
 	// Creates network
 	log.Debugf("[cluster %s] creating network 'net-%s'", req.Name, req.Name)
 	req.Name = strings.ToLower(req.Name)
 	networkName := "net-" + req.Name
+	sizing := srvutils.FromPBHostDefinitionToPBGatewayDefinition(*gatewaysDef)
 	def := pb.NetworkDefinition{
 		Name:    networkName,
 		Cidr:    req.CIDR,
-		Gateway: gatewaysDef,
+		Gateway: &sizing,
 	}
 	clientInstance := client.New()
 	clientNetwork := clientInstance.Network
@@ -318,12 +323,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 
 	// Saves Cluster metadata
 	err = b.cluster.UpdateMetadata(task, func() error {
-		err := b.cluster.GetProperties(task).LockForWrite(Property.DefaultsV1).ThenUse(func(v interface{}) error {
-			defaultsV1 := v.(*clusterpropsv1.Defaults)
-			defaultsV1.GatewaySizing = gatewaysDef
-			defaultsV1.MasterSizing = mastersDef
-			defaultsV1.NodeSizing = nodesDef
-			defaultsV1.Image = imageID
+		err := b.cluster.GetProperties(task).LockForWrite(Property.DefaultsV2).ThenUse(func(v interface{}) error {
+			defaultsV2 := v.(*clusterpropsv2.Defaults)
+			defaultsV2.GatewaySizing = srvutils.FromPBHostSizing(*gatewaysDef.Sizing)
+			defaultsV2.MasterSizing = srvutils.FromPBHostSizing(*mastersDef.Sizing)
+			defaultsV2.NodeSizing = srvutils.FromPBHostSizing(*nodesDef.Sizing)
+			defaultsV2.Image = imageID
 			return nil
 		})
 		if err != nil {
@@ -380,7 +385,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
 	gatewayTask := concurrency.NewTask(task, b.taskInstallGateway)
-	gatewayTask.Start(pbutils.ToPBHost(gw))
+	gatewayTask.Start(srvutils.ToPBHost(gw))
 
 	mastersTask := concurrency.NewTask(task, b.taskCreateMasters)
 	mastersTask.Start(map[string]interface{}{
@@ -415,7 +420,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	if gatewayStatus == nil && mastersStatus == nil {
 		// Configure Gateway and waits for the result
 		gatewayTask = concurrency.NewTask(task, b.taskConfigureGateway)
-		gatewayStatus = gatewayTask.Run(pbutils.ToPBHost(gw))
+		gatewayStatus = gatewayTask.Run(srvutils.ToPBHost(gw))
 	}
 
 	// Step 4: configure masters (if masters created successfully and gateway configure successfully)
@@ -648,7 +653,7 @@ func uploadTemplateToFile(
 		return "", fmt.Errorf("failed to realize template: %s", err.Error())
 	}
 	cmd := dataBuffer.String()
-	remotePath := pbutils.TempFolder + "/" + fileName
+	remotePath := srvutils.TempFolder + "/" + fileName
 
 	err = install.UploadStringToRemoteFile(cmd, host, remotePath, "", "", "")
 	if err != nil {
@@ -657,7 +662,7 @@ func uploadTemplateToFile(
 	return remotePath, nil
 }
 
-// configureNodesFromList ...
+// configureNodesFromList configures nodes from a list
 func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) error {
 	log.Debugf("Configuring nodes...")
 
@@ -701,7 +706,7 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 	return nil
 }
 
-// joinNodesFromList ...
+// joinNodesFromList makes nodes from a list join the cluster
 func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error {
 	if b.makers.JoinNodeToCluster == nil {
 		// configure what has to be done cluster-wide
@@ -729,7 +734,7 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 	return nil
 }
 
-// leaveMastersFromList ...
+// leaveMastersFromList makes masters from a list leave the cluster
 func (b *foreman) leaveMastersFromList(task concurrency.Task, public bool, hosts []string) error {
 	if b.makers.LeaveMasterFromCluster == nil {
 		return nil
@@ -754,7 +759,7 @@ func (b *foreman) leaveMastersFromList(task concurrency.Task, public bool, hosts
 	return nil
 }
 
-// leaveNodesFromList ...
+// leaveNodesFromList makes nodes from a list leave the cluster
 func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, selectedMasterID string) error {
 	if b.makers.LeaveNodeFromCluster == nil {
 		return nil
@@ -851,9 +856,8 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType Node
 	return "", map[string]interface{}{}
 }
 
-// taskInstallGateway installs necessary components on the gateway
-// Designed to work in goroutine
-// func (b *Foreman) taskInstallGateway(pbGateway *pb.Host, done chan error) {
+// taskInstallGateway installs necessary components on one gateway
+// This function is intended to be call as a goroutine
 func (b *foreman) taskInstallGateway(tr concurrency.TaskRunner, params interface{}) {
 	pbGateway := params.(*pb.Host)
 	// log.Debugf(">>> lib.server.cluster.control.foreman::taskInstallGateway(%s)", pbGateway.Name)
@@ -901,9 +905,8 @@ func (b *foreman) taskInstallGateway(tr concurrency.TaskRunner, params interface
 	log.Debugf("[%s] preparation successful", hostLabel)
 }
 
-// taskConfigureGateway prepares the gateway
-// Designed to work in goroutine
-// func (b *Foreman) taskConfigureGateway(gw *pb.Host, done chan error) {
+// taskConfigureGateway prepares one gateway
+// This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureGateway(tr concurrency.TaskRunner, params interface{}) {
 	// Convert parameters
 	gw := params.(*pb.Host)
@@ -933,14 +936,13 @@ func (b *foreman) taskConfigureGateway(tr concurrency.TaskRunner, params interfa
 	log.Debugf("[gateway] configuration successful.")
 }
 
-// taskCreateMasters ...
-// Intended to be used as goroutine
-// func (b *Foreman) taskCreateMasters(count int, def pb.HostDefinition, done chan error) {
+// taskCreateMasters creates masters
+// This function is intended to be call as a goroutine
 func (b *foreman) taskCreateMasters(tr concurrency.TaskRunner, params interface{}) {
 	// Convert parameters
 	p := params.(map[string]interface{})
 	count := p["count"].(int)
-	def := p["masterDef"].(pb.HostDefinition)
+	def := p["masterDef"].(*pb.HostDefinition)
 
 	log.Debugf(">>> lib.server.cluster.control.foreman::taskCreateMasters(%d)", count)
 	defer log.Debugf(">>> lib.server.cluster.control.foreman::taskCreateMasters(%d)", count)
@@ -993,13 +995,13 @@ func (b *foreman) taskCreateMasters(tr concurrency.TaskRunner, params interface{
 	log.Debugf("[cluster %s] masters creation successful.", clusterName)
 }
 
-// taskCreateMaster adds a master node
-// func (b *Foreman) taskCreateMaster(index int, def pb.HostDefinition, timeout time.Duration, done chan error) {
+// taskCreateMaster creates one master
+// This function is intended to be call as a goroutine
 func (b *foreman) taskCreateMaster(tr concurrency.TaskRunner, params interface{}) {
 	// Convert parameters
 	p := params.(map[string]interface{})
 	index := p["index"].(int)
-	def := p["masterDef"].(pb.HostDefinition)
+	def := p["masterDef"].(*pb.HostDefinition)
 	timeout := p["timeout"].(time.Duration)
 
 	log.Debugf(">>>{task %s} safescale.cluster.controller.foreman::taskCreateMaster(%d)", tr.ID(), index)
@@ -1029,7 +1031,7 @@ func (b *foreman) taskCreateMaster(tr concurrency.TaskRunner, params interface{}
 	def.Public = false
 	def.Name = name
 	clientHost := client.New().Host
-	pbHost, err := clientHost.Create(def, timeout)
+	pbHost, err := clientHost.Create(*def, timeout)
 	if err != nil {
 		err = client.DecorateError(err, "creation of host resource", false)
 		if err != nil {
@@ -1088,7 +1090,7 @@ func (b *foreman) taskCreateMaster(tr concurrency.TaskRunner, params interface{}
 }
 
 // taskConfigureMasters configure masters
-// func (b *Foreman) taskConfigureMasters(done chan error) {
+// This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMasters(tr concurrency.TaskRunner, params interface{}) {
 	log.Debugf(">>> lib.server.cluster.control.Foreman::taskConfigureMasters()")
 	defer log.Debugf("<<< lib.server.cluster.control.Foreman::taskConfigureMasters()")
@@ -1142,8 +1144,8 @@ func (b *foreman) taskConfigureMasters(tr concurrency.TaskRunner, params interfa
 	log.Debugf("[cluster %s] Masters configuration successful.", b.cluster.Name)
 }
 
-// taskConfigureMaster configures master
-// func (b *Foreman) taskConfigureMaster(index int, pbHost *pb.Host, done chan error) {
+// taskConfigureMaster configures one master
+// This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMaster(tr concurrency.TaskRunner, params interface{}) {
 	// Convert params
 	p := params.(map[string]interface{})
@@ -1180,13 +1182,14 @@ func (b *foreman) taskConfigureMaster(tr concurrency.TaskRunner, params interfac
 	log.Debugf("[%s] configuration successful.", hostLabel)
 }
 
-// func (b *Foreman) taskCreateNodes(count int, public bool, def pb.HostDefinition, done chan error) {
+// taskCreateNodes creates nodes
+// This function is intended to be call as a goroutine
 func (b *foreman) taskCreateNodes(tr concurrency.TaskRunner, params interface{}) {
 	// Convert params
 	p := params.(map[string]interface{})
 	count := p["count"].(int)
 	public := p["public"].(bool)
-	def := p["nodeDef"].(pb.HostDefinition)
+	def := p["nodeDef"].(*pb.HostDefinition)
 
 	log.Debugf(">>> lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public)
 	defer log.Debugf("<<< lib.server.cluster.control.Foreman::taskCreateNodes(%d, %v)", count, public)
@@ -1244,7 +1247,7 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	// Convert parameters
 	p := params.(map[string]interface{})
 	index := p["index"].(int)
-	def := p["nodeDef"].(pb.HostDefinition)
+	def := p["nodeDef"].(*pb.HostDefinition)
 	timeout := p["timeout"].(time.Duration)
 
 	log.Debugf(">>> lib.server.cluster.control.Foreman::taskCreateNode(%d)", index)
@@ -1279,7 +1282,7 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	}
 
 	clientHost := client.New().Host
-	pbHost, err := clientHost.Create(def, timeout)
+	pbHost, err := clientHost.Create(*def, timeout)
 	if err != nil {
 		err = client.DecorateError(err, "creation of host resource", true)
 		if err != nil {
@@ -1340,8 +1343,8 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	log.Debugf("[%s] host resource creation successful.", hostLabel)
 }
 
-// taskConfigureNodes ...
-// func (b *Foreman) taskConfigureNodes(public bool, done chan error) {
+// taskConfigureNodes configures nodes
+// This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureNodes(tr concurrency.TaskRunner, params interface{}) {
 	log.Debugf(">>> safescale.cluster.controller.Foreman::taskConfigureNodes()")
 	defer log.Debugf("<<< safescale.cluster.controller.Foreman::taskConfigureNodes()")
@@ -1406,11 +1409,8 @@ func (b *foreman) taskConfigureNodes(tr concurrency.TaskRunner, params interface
 	log.Debugf("[cluster %s] nodes configuration successful.", clusterName)
 }
 
-// taskConfigureNode ...
-// func (b *Foreman) taskConfigureNode(
-// 	index int, pbHost *pb.Host, nodeType NodeType.Enum, nodeTypeStr string,
-// 	done chan error,
-// ) {
+// taskConfigureNode configure one node
+// This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureNode(tr concurrency.TaskRunner, params interface{}) {
 	// Convert parameters
 	p := params.(map[string]interface{})

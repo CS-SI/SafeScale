@@ -103,7 +103,7 @@ func extractClusterArgument(c *cli.Context) error {
 		if clusterName == "" {
 			return cli.NewExitError("Invalid argument CLUSTERNAME", int(ExitCode.InvalidArgument))
 		}
-		clusterInstance, err = cluster.Get(concurrency.RootTask(), clusterName)
+		clusterInstance, err = cluster.Load(concurrency.RootTask(), clusterName)
 		if err != nil {
 			if _, ok := err.(resources.ErrResourceNotFound); ok {
 				msg := fmt.Sprintf("Cluster '%s' not found\n", clusterName)

@@ -26,13 +26,14 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
+	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	pbutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -471,15 +472,32 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	}
 
 	var (
-		nodeDef   resources.HostDefinition
+		nodeDef   *pb.HostDefinition
 		hostImage string
 	)
 
 	c.RLock(task)
-	err := c.Properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
-		defaultsV1 := v.(*clusterpropsv1.Defaults)
-		nodeDef = defaultsV1.NodeSizing
-		hostImage = defaultsV1.Image
+	properties := c.GetProperties(concurrency.RootTask())
+	if !properties.Lookup(Property.DefaultsV2) {
+		err := properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
+			defaultsV1 := v.(*clusterpropsv1.Defaults)
+			return c.UpdateMetadata(task, func() error {
+				return properties.LockForWrite(Property.DefaultsV2).ThenUse(func(v interface{}) error {
+					defaultsV2 := v.(*clusterpropsv2.Defaults)
+					convertDefaultsV1ToDefaultsV2(defaultsV1, defaultsV2)
+					return nil
+				})
+			})
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	err := properties.LockForRead(Property.DefaultsV2).ThenUse(func(v interface{}) error {
+		defaultsV2 := v.(*clusterpropsv2.Defaults)
+		sizing := srvutils.ToPBHostSizing(defaultsV2.NodeSizing)
+		nodeDef.Sizing = &sizing
+		hostImage = defaultsV2.Image
 		return nil
 	})
 	c.RUnlock(task)
@@ -487,19 +505,19 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 		return nil, err
 	}
 
-	pbNodeDef := pbutils.ToPBHostDefinition(&nodeDef)
+	// pbNodeDef := pbutils.ToPBHostDefinition(&nodeDef)
 	if req != nil {
-		pbNodeDef = complementHostDefinition(req, *pbNodeDef)
+		nodeDef = complementHostDefinition(req, *nodeDef)
 	}
-	if nodeDef.ImageID == "" {
-		pbNodeDef.ImageId = hostImage
+	if nodeDef.ImageId == "" {
+		nodeDef.ImageId = hostImage
 	}
 
 	var (
 		nodeType    NodeType.Enum
 		nodeTypeStr string
 	)
-	pbNodeDef.Network = c.GetNetworkConfig(task).NetworkID
+	nodeDef.Network = c.GetNetworkConfig(task).NetworkID
 
 	var (
 		hosts  []string
@@ -512,7 +530,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 		subtask := concurrency.NewTask(task, c.foreman.taskCreateNode).Start(map[string]interface{}{
 			"index":   i + 1,
 			"type":    nodeType,
-			"nodeDef": *pbNodeDef,
+			"nodeDef": *nodeDef,
 			"timeout": timeout,
 		})
 		subtasks = append(subtasks, subtask)
@@ -560,6 +578,26 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	}
 
 	return hosts, nil
+}
+
+func convertDefaultsV1ToDefaultsV2(defaultsV1 *clusterpropsv1.Defaults, defaultsV2 *clusterpropsv2.Defaults) {
+	defaultsV2.Image = defaultsV1.Image
+	defaultsV2.MasterSizing = resources.SizingRequirements{
+		MinCores:    defaultsV1.MasterSizing.Cores,
+		MinFreq:     defaultsV1.MasterSizing.CPUFreq,
+		MinGPU:      defaultsV1.MasterSizing.GPUNumber,
+		MinRAMSize:  defaultsV1.MasterSizing.RAMSize,
+		MinDiskSize: defaultsV1.MasterSizing.DiskSize,
+		Replaceable: defaultsV1.MasterSizing.Replaceable,
+	}
+	defaultsV2.NodeSizing = resources.SizingRequirements{
+		MinCores:    defaultsV1.NodeSizing.Cores,
+		MinFreq:     defaultsV1.NodeSizing.CPUFreq,
+		MinGPU:      defaultsV1.NodeSizing.GPUNumber,
+		MinRAMSize:  defaultsV1.NodeSizing.RAMSize,
+		MinDiskSize: defaultsV1.NodeSizing.DiskSize,
+		Replaceable: defaultsV1.NodeSizing.Replaceable,
+	}
 }
 
 // GetState returns the current state of the Cluster

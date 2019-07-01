@@ -187,21 +187,6 @@ var hostCreate = cli.Command{
 			Value: "",
 			Usage: "network name or network id",
 		},
-		cli.IntFlag{
-			Name:  "cpu",
-			Value: 1,
-			Usage: "Number of CPU for the host",
-		},
-		cli.Float64Flag{
-			Name:  "ram",
-			Value: 1,
-			Usage: "RAM for the host (GB)",
-		},
-		cli.IntFlag{
-			Name:  "disk",
-			Value: 16,
-			Usage: "Disk space for the host (GB)",
-		},
 		cli.StringFlag{
 			Name:  "os",
 			Value: "Ubuntu 18.04",
@@ -211,29 +196,54 @@ var hostCreate = cli.Command{
 			Name:  "public",
 			Usage: "Create with public IP",
 		},
-		cli.IntFlag{
-			Name:  "gpu",
-			Value: -1,
-			Usage: "Number of GPU for the host (by default NO GPUs)",
-		},
-		cli.Float64Flag{
-			Name:  "cpu-freq, cpufreq",
-			Value: 0,
-			Usage: "Minimum cpu frequency required for the host (GHz)",
-		},
 		cli.BoolFlag{
 			Name:  "f, force",
 			Usage: "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
 		},
 		cli.StringFlag{
 			Name: "S, sizing",
-			Usage: `Describe sizing in format "<component><operator><value>[,...]" where:
+			Usage: `Describe sizing of host in format "<component><operator><value>[,...]" where:
 			<component> can be cpu, cpufreq, gpu, ram, disk
-			<operator> can be =,<=,>= (except for disk where valid operators are only = or >=)
-			<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"
+			<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
+				- = means exactly <value>
+				- ~ means between <value> and 2*<value>
+				- < means strictly lower than <value>
+				- <= means lower or equal to <value>
+				- > means strictly greater than <value>
+				- >= means greater or equal to <value>
+			<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]:"
+				- <cpu> is expecting an int as number of cpu cores, or an interval with minimum and maximum number of cpu cores
+				- <cpufreq> is expecting an int as minimum cpu frequency in MHz
+				- <gpu> is expecting an int as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
+				- <ram> is expecting a float as memory size in GB, or an interval with minimum and maximum mmory size
+				- <disk> is expecting an int as system disk size in GB
 			examples:
-		-S "cpu < 5, ram < 10, disk = 100"
-		-S "cpu = [4-8], ram = [14-32], gpu = 1"`,
+				--sizing "cpu <= 4, ram <= 10, disk >= 100"
+				--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
+				--sizing "cpu <= 8, ram ~ 16"
+`,
+		},
+		cli.UintFlag{
+			Name:  "cpu",
+			Usage: "DEPRECATED! uses --sizing! Defines the number of cpu of masters and nodes in the cluster",
+		},
+		cli.Float64Flag{
+			Name:  "cpu-freq, cpufreq",
+			Value: 0,
+			Usage: "DEPRECATED! uses --sizing! Minimum cpu frequency required for the host (GHz)",
+		},
+		cli.IntFlag{
+			Name:  "gpu",
+			Value: -1,
+			Usage: "DEPRECATED! uses --sizing! Number of GPU for the host (by default NO GPUs)",
+		},
+		cli.Float64Flag{
+			Name:  "ram",
+			Usage: "DEPRECATED! uses --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
+		},
+		cli.UintFlag{
+			Name:  "disk",
+			Usage: "DEPRECATED! uses --sizing! Defines the size of system disk of masters and nodes (in GB)",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -603,7 +613,7 @@ func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*pb.HostDefin
 		sizing = c.String(key)
 	} else {
 		if c.IsSet("cpu") {
-			sizing = fmt.Sprintf("cpu >= %d,", c.Int("cpu"))
+			sizing = fmt.Sprintf("cpu ~ %d,", c.Int("cpu"))
 		}
 		if c.IsSet("cpufreq") {
 			sizing += fmt.Sprintf("cpufreq >= %.01f,", c.Float64("cpufreq"))
@@ -612,7 +622,7 @@ func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*pb.HostDefin
 			sizing += fmt.Sprintf("gpu = %d,", c.Int("gpu"))
 		}
 		if c.IsSet("ram") {
-			sizing += fmt.Sprintf("ram >= %.01f,", c.Float64("ram"))
+			sizing += fmt.Sprintf("ram ~ %.01f,", c.Float64("ram"))
 		}
 		if c.IsSet("disk") {
 			sizing += fmt.Sprintf("disk >= %.01f,", c.Float64("disk"))
@@ -679,6 +689,16 @@ func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*pb.HostDefin
 		if max != "" {
 			val, _ := strconv.ParseFloat(max, 64)
 			def.Sizing.MaxRamSize = float32(val)
+		}
+	}
+	if t, ok := tokens["disk"]; ok {
+		min, _, err := t.Validate()
+		if err != nil {
+			return nil, clitools.FailureResponse(clitools.ExitOnInvalidArgument(err.Error()))
+		}
+		if min != "" {
+			val, _ := strconv.Atoi(min)
+			def.Sizing.MinDiskSize = int32(val)
 		}
 	}
 	return &def, nil

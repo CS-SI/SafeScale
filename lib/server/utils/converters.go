@@ -212,7 +212,7 @@ func ToPBHostDefinition(in *resources.HostDefinition) *pb.HostDefinition {
 	}
 }
 
-// ToPBGatewayDefinition ...
+// ToPBGatewayDefinition converts a resources.HostDefinition tp .GatewayDefinition
 func ToPBGatewayDefinition(in *resources.HostDefinition) *pb.GatewayDefinition {
 	return &pb.GatewayDefinition{
 		Cpu:      int32(in.Cores),
@@ -222,6 +222,21 @@ func ToPBGatewayDefinition(in *resources.HostDefinition) *pb.GatewayDefinition {
 		GpuCount: int32(in.GPUNumber),
 		GpuType:  in.GPUType,
 	}
+}
+
+// FromPBHostDefinitionToPBGatewayDefinition converts a pb.HostDefinition to pb.GatewayDefinition
+func FromPBHostDefinitionToPBGatewayDefinition(in pb.HostDefinition) pb.GatewayDefinition {
+	def := pb.GatewayDefinition{
+		Name:     in.Name,
+		ImageId:  in.ImageId,
+		Cpu:      in.CpuCount,
+		Ram:      in.Ram,
+		Disk:     in.Disk,
+		GpuCount: in.GpuCount,
+		Sizing:   &pb.HostSizing{},
+	}
+	*def.Sizing = *in.Sizing
+	return def
 }
 
 // ToHostStatus ...
@@ -273,9 +288,22 @@ func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, f
 	return &pb.FileList{Files: files}
 }
 
-// FromPBHostSizing converts a protobug HostSizing message to resources.SizingRequirements
-func FromPBHostSizing(src *pb.HostSizing) *resources.SizingRequirements {
-	return &resources.SizingRequirements{
+// ToPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
+func ToPBHostSizing(src resources.SizingRequirements) pb.HostSizing {
+	return pb.HostSizing{
+		MinCpuCount: int32(src.MinCores),
+		MaxCpuCount: int32(src.MaxCores),
+		MinCpuFreq:  src.MinFreq,
+		GpuCount:    int32(src.MinGPU),
+		MinRamSize:  src.MinRAMSize,
+		MaxRamSize:  src.MaxRAMSize,
+		MinDiskSize: int32(src.MinDiskSize),
+	}
+}
+
+// FromPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
+func FromPBHostSizing(src pb.HostSizing) resources.SizingRequirements {
+	return resources.SizingRequirements{
 		MinCores:    int(src.MinCpuCount),
 		MaxCores:    int(src.MaxCpuCount),
 		MinFreq:     src.MinCpuFreq,
