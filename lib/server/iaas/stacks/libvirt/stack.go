@@ -24,11 +24,11 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, 
 		AuthOptions:   &auth,
 	}
 
-	libvirt, err := libvirt.NewConnect(stack.LibvirtConfig.URI)
+	libvirtConnection, err := libvirt.NewConnect(stack.LibvirtConfig.URI)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to connect to libvirt : %s", err.Error())
 	}
-	stack.LibvirtService = libvirt
+	stack.LibvirtService = libvirtConnection
 
 	if stack.LibvirtConfig.LibvirtStorage != "" {
 		err := stack.CreatePoolIfUnexistant(stack.LibvirtConfig.LibvirtStorage)

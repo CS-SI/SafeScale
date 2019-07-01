@@ -121,12 +121,12 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		}
 	}()
 
-	net := resources.NewNetwork()
-	net.ID = network.ID
-	net.Name = network.Name
-	net.CIDR = subnet.Mask
-	net.IPVersion = subnet.IPVersion
-	return net, nil
+	newNet := resources.NewNetwork()
+	newNet.ID = network.ID
+	newNet.Name = network.Name
+	newNet.CIDR = subnet.Mask
+	newNet.IPVersion = subnet.IPVersion
+	return newNet, nil
 }
 
 // GetNetworkByName ...
@@ -193,13 +193,13 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 		// if err != nil {
 		// 	return nil, fmt.Errorf("Bad configuration, no gateway associated to this network")
 		// }
-		net := resources.NewNetwork()
-		net.ID = network.ID
-		net.Name = network.Name
-		net.CIDR = sn.Mask
-		net.IPVersion = sn.IPVersion
+		newNet := resources.NewNetwork()
+		newNet.ID = network.ID
+		newNet.Name = network.Name
+		newNet.CIDR = sn.Mask
+		newNet.IPVersion = sn.IPVersion
 		//net.GatewayID = network.GatewayId
-		return net, nil
+		return newNet, nil
 	}
 
 	// At this point, no network has been found with given reference
@@ -239,13 +239,13 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 				}
 				sn := sns[0]
 
-				net := resources.NewNetwork()
-				net.ID = n.ID
-				net.Name = n.Name
-				net.CIDR = sn.Mask
-				net.IPVersion = sn.IPVersion
+				newNet := resources.NewNetwork()
+				newNet.ID = n.ID
+				newNet.Name = n.Name
+				newNet.CIDR = sn.Mask
+				newNet.IPVersion = sn.IPVersion
 				// GatewayID: gwID,
-				netList = append(netList, net)
+				netList = append(netList, newNet)
 			}
 			return true, nil
 		},

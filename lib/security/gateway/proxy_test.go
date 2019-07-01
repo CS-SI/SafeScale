@@ -139,10 +139,7 @@ func runTestService() {
 }
 
 func getUserToken() string {
-	provider, err := oidc.NewProvider(context.Background(), "http://localhost:8080/auth/realms/master")
-	if err != nil {
-		// handle error
-	}
+	provider, _ := oidc.NewProvider(context.Background(), "http://localhost:8080/auth/realms/master")
 
 	// Configure an OpenID Connect aware OAuth2 client.
 	oauth2Config := oauth2.Config{

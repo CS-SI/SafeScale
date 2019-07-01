@@ -52,7 +52,7 @@ func TestGetService(t *testing.T) {
 	iaas.Register("cloudwatt", cloudwatt.New())
 	iaas.Register("flexibleEngine", flexibleengine.New())
 	iaas.Register("opentelekom", opentelekom.New())
-	ovh, err := iaas.UseService("TestOvh")
+	ovhService, err := iaas.UseService("TestOvh")
 	if err != nil {
 		t.Skip(err)
 	}
@@ -79,7 +79,7 @@ func TestGetService(t *testing.T) {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	imgs, err := ovh.ListImages(true)
+	imgs, err := ovhService.ListImages(true)
 	require.Nil(t, err)
 	require.True(t, len(imgs) > 3)
 	//_, err = providers.GetService("TestCloudwatt")

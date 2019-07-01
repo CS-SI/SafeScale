@@ -30,11 +30,11 @@ func GeneratePassword(length uint8) (string, error) {
 		panic("length under 12!")
 	}
 	numsym := int(length) % 3
-	password, err := generator.Generate(int(length), numsym, numsym, false, true)
+	pass, err := generator.Generate(int(length), numsym, numsym, false, true)
 	if err != nil {
 		return "", err
 	}
-	return password, nil
+	return pass, nil
 }
 
 func init() {
