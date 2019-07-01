@@ -156,12 +156,12 @@ func createNoNameTenantFile() {
 }
 
 func deleteTenantFile() {
-	filepath, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
+	filePath, err := filepath.Abs(filepath.Join(".", "tenants.toml"))
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	_ = os.Remove(filepath)
+	_ = os.Remove(filePath)
 }
 
 func TestViper(t *testing.T) {

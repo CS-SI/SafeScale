@@ -685,9 +685,9 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 	if r.Err != nil {
 		return nil, fmt.Errorf("failed to get data of host '%s': %v", name, r.Err)
 	}
-	servers, found := r.Body.(map[string]interface{})["servers"].([]interface{})
-	if found && len(servers) > 0 {
-		for _, anon := range servers {
+	serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
+	if found && len(serverList) > 0 {
+		for _, anon := range serverList {
 			entry := anon.(map[string]interface{})
 			if entry["name"].(string) == name {
 				host := resources.NewHost()
@@ -794,7 +794,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	}
 
 	// Select useable availability zone, the first one in the list
-	az, err := s.SelectedAvailabilityZone()
+	azone, err := s.SelectedAvailabilityZone()
 	if err != nil {
 		return nil, userData, err
 	}
@@ -811,7 +811,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		FlavorRef:        request.TemplateID,
 		ImageRef:         request.ImageID,
 		UserData:         userDataPhase1,
-		AvailabilityZone: az,
+		AvailabilityZone: azone,
 	}
 
 	// --- Initializes resources.Host ---
@@ -955,11 +955,11 @@ func (s *Stack) SelectedAvailabilityZone() (string, error) {
 			if err != nil {
 				return "", err
 			}
-			var az string
-			for az = range azList {
+			var azone string
+			for azone = range azList {
 				break
 			}
-			s.selectedAvailabilityZone = az
+			s.selectedAvailabilityZone = azone
 		}
 		log.Debugf("Selected Availability Zone: '%s'", s.selectedAvailabilityZone)
 	}

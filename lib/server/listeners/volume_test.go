@@ -82,19 +82,29 @@ func TestCreate(t *testing.T) {
 	underTest := &listeners.VolumeListener{}
 
 	// ACT
-	underTest.Create(nil, &pb.VolumeDefinition{
+	_, err := underTest.Create(nil, &pb.VolumeDefinition{
 		Speed: pb.VolumeSpeed_SSD,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	// ASSERT
 	myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, VolumeSpeed.SSD)
 
-	underTest.Create(nil, &pb.VolumeDefinition{
+	_, err = underTest.Create(nil, &pb.VolumeDefinition{
 		Speed: pb.VolumeSpeed_HDD,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, VolumeSpeed.HDD)
-	underTest.Create(nil, &pb.VolumeDefinition{
+	_, err = underTest.Create(nil, &pb.VolumeDefinition{
 		Speed: pb.VolumeSpeed_COLD,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, VolumeSpeed.COLD)
 }
 

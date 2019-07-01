@@ -281,12 +281,12 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	)
 
 	priKey := string(priKeyPem)
-	uuid, err := uuid.NewV4()
+	newUuid, err := uuid.NewV4()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to generate uuid key : %s", err.Error())
 	}
 	return &resources.KeyPair{
-		ID:         uuid.String(),
+		ID:         newUuid.String(),
 		Name:       name,
 		PublicKey:  pubKey,
 		PrivateKey: priKey,

@@ -46,11 +46,11 @@ import (
 
 //Generate a random AES password
 func generateAesPassword(withSymbols bool) (string, error) {
-	password, err := password.Generate(64, 10, map[bool]int{true: 10, false: 0}[withSymbols], false, true)
+	pass, err := password.Generate(64, 10, map[bool]int{true: 10, false: 0}[withSymbols], false, true)
 	if err != nil {
 		return "", fmt.Errorf("Failed to generate the AES password : %s", err.Error())
 	}
-	return password, nil
+	return pass, nil
 }
 
 //Load the RSA-2048 key stored into the file given in parameters (stored with x509.MarshalPKCS1PrivateKey)
@@ -245,7 +245,7 @@ type ChunkGroup struct {
 
 // NewChunkGroup return a chunk group initialized with a new random aesPassword, buckets, and file infos
 func NewChunkGroup(fileName string, fileSize int64, bucketNames []string) (*ChunkGroup, error) {
-	password, err := generateAesPassword(true)
+	pass, err := generateAesPassword(true)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to generate the AES password : %s", err.Error())
 	}
@@ -254,7 +254,7 @@ func NewChunkGroup(fileName string, fileSize int64, bucketNames []string) (*Chun
 		FileName:    fileName,
 		FileSize:    fileSize,
 		Date:        time.Now().Format(time.UnixDate),
-		AesPassword: password,
+		AesPassword: pass,
 		BucketNames: bucketNames,
 	}
 
@@ -496,12 +496,12 @@ type KeyInfo struct {
 
 // NewKeyInfo retrurn a keyInfo struct with a random AES password generated
 func NewKeyInfo() (*KeyInfo, error) {
-	password, err := generateAesPassword(true)
+	pass, err := generateAesPassword(true)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to generate AES password : %s", err.Error())
 	}
 	ki := KeyInfo{
-		AesPassword: password,
+		AesPassword: pass,
 	}
 	return &ki, nil
 }
