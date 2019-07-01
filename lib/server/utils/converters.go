@@ -227,7 +227,6 @@ func ToPBGatewayDefinition(in *resources.HostDefinition) *pb.GatewayDefinition {
 // FromPBHostDefinitionToPBGatewayDefinition converts a pb.HostDefinition to pb.GatewayDefinition
 func FromPBHostDefinitionToPBGatewayDefinition(in pb.HostDefinition) pb.GatewayDefinition {
 	def := pb.GatewayDefinition{
-		Name:     in.Name,
 		ImageId:  in.ImageId,
 		Cpu:      in.CpuCount,
 		Ram:      in.Ram,
