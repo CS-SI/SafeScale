@@ -22,6 +22,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/cluster"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
@@ -35,7 +36,7 @@ func Run() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	clusterName := "test-cluster"
-	instance, err := cluster.Get(concurrency.RootTask(), clusterName)
+	instance, err := cluster.Load(concurrency.RootTask(), clusterName)
 	if err != nil {
 		if _, ok := err.(resources.ErrResourceNotFound); ok {
 			logrus.Warnf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
@@ -65,10 +66,14 @@ func Run() {
 	fmt.Printf("Cluster state: %s\n", state.String())
 
 	// Creates a Private Agent Node
-	_, err = instance.AddNode(concurrency.RootTask(), &resources.HostDefinition{
-		Cores:    2,
-		RAMSize:  7.0,
-		DiskSize: 60,
+	_, err = instance.AddNode(concurrency.RootTask(), &pb.HostDefinition{
+		Sizing: &pb.HostSizing{
+			MinCpuCount: 2,
+			MaxCpuCount: 4,
+			MinRamSize:  7.0,
+			MaxRamSize:  16.0,
+			MinDiskSize: 60,
+		},
 	})
 	if err != nil {
 		fmt.Printf("Failed to create Private Agent Node: %s\n", err.Error())

@@ -211,7 +211,8 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (*pb.H
 			MinFreq:     in.GetCpuFreq(),
 		}
 	} else {
-		sizing = srvutils.FromPBHostSizing(in.Sizing)
+		s := srvutils.FromPBHostSizing(*in.Sizing)
+		sizing = &s
 	}
 
 	handler := HostHandler(tenant.Service)

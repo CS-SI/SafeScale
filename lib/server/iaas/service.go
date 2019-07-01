@@ -388,7 +388,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	log.Debugf(fmt.Sprintf(msg, coreMsg, ramMsg, diskMsg))
 
 	for _, template := range templates {
-		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %f RAM, and %d Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)
+		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f RAM, and %d Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)
 		msg = msg + " %s"
 		if sizing.MinCores > 0 && template.Cores < sizing.MinCores {
 			log.Debugf(msg, "too few cores")

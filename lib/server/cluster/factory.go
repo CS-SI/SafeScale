@@ -30,44 +30,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/k8s"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/swarm"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
-
-// Get returns the Cluster instance corresponding to the cluster named 'name'
-// TODO: rename to Inspect ?
-func Get(task concurrency.Task, name string) (api.Cluster, error) {
-	tenant, err := client.New().Tenant.Get(client.DefaultExecutionTimeout)
-	if err != nil {
-		return nil, err
-	}
-	svc, err := iaas.UseService(tenant.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	m, err := control.NewMetadata(svc)
-	if err != nil {
-		return nil, err
-	}
-	if task == nil {
-		task = concurrency.RootTask()
-	}
-	err = m.Read(task, name)
-	if err != nil {
-		if _, ok := err.(utils.ErrNotFound); ok {
-			return nil, resources.ResourceNotFoundError("cluster", name)
-		}
-		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
-	}
-	controller := m.Get()
-	err = setForeman(task, controller)
-	if err != nil {
-		return nil, err
-	}
-	return controller, nil
-}
 
 // Load ...
 func Load(task concurrency.Task, name string) (api.Cluster, error) {
@@ -180,7 +145,7 @@ func Create(task concurrency.Task, req control.Request) (api.Cluster, error) {
 
 // Delete deletes the infrastructure of the cluster named 'name'
 func Delete(task concurrency.Task, name string) error {
-	instance, err := Get(task, name)
+	instance, err := Load(task, name)
 	if err != nil {
 		return fmt.Errorf("failed to find a cluster named '%s': %s", name, err.Error())
 	}

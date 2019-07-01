@@ -31,10 +31,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
+	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Flavor"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
@@ -89,9 +89,9 @@ func extractClusterArgument(c *cli.Context) error {
 		}
 
 		var err error
-		clusterInstance, err = cluster.Get(concurrency.RootTask(), clusterName)
+		clusterInstance, err = cluster.Load(concurrency.RootTask(), clusterName)
 		if err != nil {
-			if _, ok := err.(resources.ErrResourceNotFound); ok {
+			if _, ok := err.(utils.ErrNotFound); ok {
 				if !c.Command.HasName("create") {
 					return clitools.ExitOnErrorWithMessage(ExitCode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
 				}
@@ -219,15 +219,31 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	result["gateway_ip"] = netCfg.GatewayIP
 	result["public_ip"] = netCfg.PublicIP
 
-	err = properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
-		defaultsV1 := v.(*clusterpropsv1.Defaults)
-		result["defaults"] = map[string]interface{}{
-			"image":  defaultsV1.Image,
-			"master": defaultsV1.MasterSizing,
-			"node":   defaultsV1.NodeSizing,
-		}
-		return nil
-	})
+	if !properties.Lookup(Property.DefaultsV2) {
+		err = properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
+			defaultsV1 := v.(*clusterpropsv1.Defaults)
+			result["defaults"] = map[string]interface{}{
+				"image":  defaultsV1.Image,
+				"master": defaultsV1.MasterSizing,
+				"node":   defaultsV1.NodeSizing,
+			}
+			return nil
+		})
+	} else {
+		err = properties.LockForRead(Property.DefaultsV2).ThenUse(func(v interface{}) error {
+			defaultsV2 := v.(*clusterpropsv2.Defaults)
+			result["defaults"] = map[string]interface{}{
+				"image":   defaultsV2.Image,
+				"gateway": defaultsV2.GatewaySizing,
+				"master":  defaultsV2.MasterSizing,
+				"node":    defaultsV2.NodeSizing,
+			}
+			return nil
+		})
+	}
+	if err != nil {
+		return nil, err
+	}
 
 	err = properties.LockForRead(Property.NodesV1).ThenUse(func(v interface{}) error {
 		nodesV1 := v.(*clusterpropsv1.Nodes)
@@ -285,7 +301,7 @@ var clusterCreateCommand = cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a cluster",
-	ArgsUsage: "CLUSTERNAME: name of the cluster to create",
+	ArgsUsage: "CLUSTERNAME",
 
 	Flags: []cli.Flag{
 		cli.StringFlag{
@@ -319,39 +335,37 @@ var clusterCreateCommand = cli.Command{
 			Name: "sizing",
 			Usage: `Describe sizing for any type of host in format "<component><operator><value>[,...]" where:
 	<component> can be cpu, cpufreq, gpu, ram, disk
-	<operator> can be =,<=,>= (except for disk where valid operators are only = or >=)
+	<operator> can be =,~,<,<=,>,>= (except for disk where valid operators are only = or >=):
+		- = means exactly <value>
+		- ~ means between <value> and 2*<value>
+		- < means strictly lower than <value>
+		- <= means lower or equal to <value>
+		- > means strictly greater than <value>
+		- >= means greater or equal to <value>
 	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]:"
-		- <cpu> is expected an int as number of cpu cores, or an interval with minimum and maximum number of cpu cores
+		- <cpu> is expecting an int as number of cpu cores, or an interval with minimum and maximum number of cpu cores
 		- <cpufreq> is expecting an int as minimum cpu frequency in MHz
 		- <gpu> is expecting an int as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
 		- <ram> is expecting a float as memory size in GB, or an interval with minimum and maximum mmory size
 		- <disk> is expecting an int as system disk size in GB
 	examples:
-		--gw-sizing "cpu <= 4, ram <= 10, disk = 100"
-		--gw-sizing "cpu = [4-8], ram = [14-32]"
-	Can be used with --gw-sizing and friends to set a global host sizing and specialize for a particular type of host.
-	A component neither defined in --sizing not in --gw-sizing (for example) will lead to default value for the component.`,
+		--sizing "cpu <= 4, ram <= 10, disk = 100"
+		--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
+		--sizing "cpu <= 8, ram ~ 16"
+	Can be used with --gw-sizing and friends to set a global host sizing and refine for a particular type of host.
+`,
 		},
 		cli.StringFlag{
-			Name: "gw-sizing",
-			Usage: `Describe gateway sizing in format "<component><operator><value>[,...]" where:
-	<component> can be cpu, cpufreq, gpu, ram, disk
-	<operator> can be =,<=,>= (except for disk where valid operators are only = or >=)
-	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
+			Name:  "gw-sizing",
+			Usage: `Describe gateway sizing in format "<component><operator><value>[,...] (cf. --sizing for details)`,
 		},
 		cli.StringFlag{
-			Name: "master-sizing",
-			Usage: `Describe master sizing in format "<component><operator><value>[,...]" where:
-	<component> can be cpu, cpufreq, gpu, ram, disk
-	<operator> can be =,<=,>= (except for disk where valid operators are only = or >=)
-	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
+			Name:  "master-sizing",
+			Usage: `Describe master sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
 		},
 		cli.StringFlag{
-			Name: "node-sizing",
-			Usage: `Describe node sizing in format "<component><operator><value>[,...]" where:
-	<component> can be cpu, cpufreq, gpu, ram, disk, os
-	<operator> can be =,<,> (except for disk where valid operators are only = or >)
-	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
+			Name:  "node-sizing",
+			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
 		},
 		cli.UintFlag{
 			Name:  "cpu",
@@ -409,7 +423,7 @@ var clusterCreateCommand = cli.Command{
 			nodesDef    *pb.HostDefinition
 		)
 		if c.IsSet("sizing") {
-			nodesDef, err := constructPBHostDefinitionFromCLI(c, "sizing")
+			nodesDef, err = constructPBHostDefinitionFromCLI(c, "sizing")
 			if err != nil {
 				return err
 			}
@@ -417,19 +431,19 @@ var clusterCreateCommand = cli.Command{
 			mastersDef = nodesDef
 		}
 		if c.IsSet("gw-sizing") {
-			gatewaysDef, err := constructPBHostDefinitionFromCLI(c, "gw-sizing")
+			gatewaysDef, err = constructPBHostDefinitionFromCLI(c, "gw-sizing")
 			if err != nil {
 				return err
 			}
 		}
 		if c.IsSet("master-sizing") {
-			mastersDef, err := constructPBHostDefinitionFromCLI(c, "master-sizing")
+			mastersDef, err = constructPBHostDefinitionFromCLI(c, "master-sizing")
 			if err != nil {
 				return err
 			}
 		}
 		if c.IsSet("node-sizing") {
-			nodesDef, err := constructPBHostDefinitionFromCLI(c, "node-sizing")
+			nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
 			if err != nil {
 				return err
 			}
@@ -680,6 +694,13 @@ var clusterExpandCommand = cli.Command{
 			Usage:  "Ask for gpu capable host; default: no",
 			Hidden: true,
 		},
+		cli.StringFlag{
+			Name: "node-sizing",
+			Usage: `Describe node sizing in format "<component><operator><value>[,...]" where:
+	<component> can be cpu, cpufreq, gpu, ram, disk, os
+	<operator> can be =,<,> (except for disk where valid operators are only = or >)
+	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
+		},
 	},
 	Action: func(c *cli.Context) error {
 		err := extractClusterArgument(c)
@@ -692,24 +713,37 @@ var clusterExpandCommand = cli.Command{
 			count = 1
 		}
 		los := c.String("os")
-		cpu := int32(c.Uint("cpu"))
-		ram := float32(c.Float64("ram"))
-		disk := int32(c.Uint("disk"))
-		//gpu := c.Bool("gpu")
-		_ = c.Bool("gpu")
 
-		// err := createNodes(clusterName, public, count, los, cpu, ram, disk)
-		var nodeRequest *resources.HostDefinition
-		if los != "" || cpu > 0 || ram > 0.0 || disk > 0 {
-			nodeRequest = &resources.HostDefinition{
-				Cores:     int(cpu),
-				RAMSize:   ram,
-				DiskSize:  int(disk),
-				ImageID:   los,
-				GPUNumber: -1, // Clusters currently don't take gpus into account
+		var nodesDef *pb.HostDefinition
+		if c.IsSet("node-sizing") {
+			nodesDef, err = constructPBHostDefinitionFromCLI(c, "node-sizing")
+			if err != nil {
+				return err
 			}
 		}
-		hosts, err := clusterInstance.AddNodes(concurrency.RootTask(), count, nodeRequest)
+
+		if nodesDef == nil {
+			cpu := int32(c.Uint("cpu"))
+			ram := float32(c.Float64("ram"))
+			disk := int32(c.Uint("disk"))
+			gpu := int32(c.Uint("gpu"))
+
+			if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
+				nodesDef = &pb.HostDefinition{
+					ImageId: los,
+					Sizing: &pb.HostSizing{
+						MinCpuCount: int32(cpu),
+						MaxCpuCount: int32(cpu) * 2,
+						MinRamSize:  ram,
+						MaxRamSize:  ram * 2.0,
+						MinDiskSize: int32(disk),
+						GpuCount:    int32(gpu),
+					},
+				}
+			}
+		}
+
+		hosts, err := clusterInstance.AddNodes(concurrency.RootTask(), count, nodesDef)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}

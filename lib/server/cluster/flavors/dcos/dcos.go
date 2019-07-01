@@ -19,9 +19,10 @@ package dcos
 import (
 	"bytes"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"sync/atomic"
 	txttmpl "text/template"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
 
 	rice "github.com/GeertJohan/go.rice"
 	log "github.com/sirupsen/logrus"
@@ -33,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/dcos/enums/ErrorCode"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
@@ -98,27 +98,39 @@ func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int
 	return masterCount, privateNodeCount, 0
 }
 
-func gatewaySizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
-	return resources.HostDefinition{
-		Cores:    2,
-		RAMSize:  15.0,
-		DiskSize: 60,
+func gatewaySizing(task concurrency.Task, foreman control.Foreman) pb.HostDefinition {
+	return pb.HostDefinition{
+		Sizing: &pb.HostSizing{
+			MinCpuCount: 2,
+			MaxCpuCount: 4,
+			MinRamSize:  15.0,
+			MaxRamSize:  32.0,
+			MinDiskSize: 50,
+		},
 	}
 }
 
-func masterSizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
-	return resources.HostDefinition{
-		Cores:    4,
-		RAMSize:  15.0,
-		DiskSize: 100,
+func masterSizing(task concurrency.Task, foreman control.Foreman) pb.HostDefinition {
+	return pb.HostDefinition{
+		Sizing: &pb.HostSizing{
+			MinCpuCount: 4,
+			MaxCpuCount: 8,
+			MinRamSize:  15.0,
+			MaxRamSize:  32.0,
+			MinDiskSize: 800,
+		},
 	}
 }
 
-func nodeSizing(task concurrency.Task, foreman control.Foreman) resources.HostDefinition {
-	return resources.HostDefinition{
-		Cores:    2,
-		RAMSize:  15.0,
-		DiskSize: 100,
+func nodeSizing(task concurrency.Task, foreman control.Foreman) pb.HostDefinition {
+	return pb.HostDefinition{
+		Sizing: &pb.HostSizing{
+			MinCpuCount: 2,
+			MaxCpuCount: 4,
+			MinRamSize:  15.0,
+			MaxRamSize:  32.0,
+			MinDiskSize: 80,
+		},
 	}
 }
 

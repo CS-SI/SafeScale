@@ -95,6 +95,17 @@ func (t *Token) Validate() (string, string, error) {
 	operator := t.members[1]
 	value := t.members[2]
 	switch operator {
+	case "~":
+		// "~" means "[<value>-<value*2>]"
+		vali, err := strconv.Atoi(value)
+		if err != nil {
+			valf, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			}
+			return fmt.Sprintf("%.01f", valf), fmt.Sprintf("%.01f", 2*valf), nil
+		}
+		return fmt.Sprintf("%d", vali), fmt.Sprintf("%d", 2*vali), nil
 	case "=":
 		if value[0] == '[' && value[len(value)-1] == ']' {
 			value = value[1 : len(value)-1]
@@ -114,45 +125,62 @@ func (t *Token) Validate() (string, string, error) {
 			}
 			return min, max, nil
 		}
-		_, err := strconv.ParseFloat(value, 64)
+		_, err := strconv.Atoi(value)
 		if err != nil {
-			return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			_, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			}
 		}
 		return value, value, nil
 
 	case "lt":
 		fallthrough
 	case "<":
-		_, err := strconv.ParseFloat(value, 64)
+		vali, err := strconv.Atoi(value)
 		if err != nil {
-			return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			valf, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			}
+			return "", fmt.Sprintf("%.01f", valf-0.1), nil
 		}
-		return "", value, nil
+		return "", fmt.Sprintf("%d", vali-1), nil
 
 	case "le":
 		fallthrough
 	case "<=":
-		_, err := strconv.ParseFloat(value, 64)
+		_, err := strconv.Atoi(value)
 		if err != nil {
-			return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			_, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			}
 		}
 		return "", value, nil
 
 	case "gt":
 		fallthrough
 	case ">":
-		_, err := strconv.ParseFloat(value, 64)
+		vali, err := strconv.Atoi(value)
 		if err != nil {
-			return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			valf, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			}
+			return fmt.Sprintf("%.01f", valf+0.1), "", nil
 		}
-		return value, "", nil
+		return fmt.Sprintf("%d", vali+1), "", nil
 
 	case "ge":
 		fallthrough
 	case ">=":
-		_, err := strconv.ParseFloat(value, 64)
+		_, err := strconv.Atoi(value)
 		if err != nil {
-			return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			_, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return "", "", utils.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
+			}
 		}
 		return value, "", nil
 	}

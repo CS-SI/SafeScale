@@ -161,7 +161,8 @@ func (handler *NetworkHandler) Create(
 		msg += ")"
 		log.Infof(msg)
 	} else {
-		return nil, logicErr(fmt.Errorf("Error creating network: no host template corresponding to requirements for gateway"))
+		err = logicErr(fmt.Errorf("Error creating network: no host template matching requirements for gateway"))
+		return nil, err
 	}
 	img, err := handler.service.SearchImage(theos)
 	if err != nil {
@@ -416,13 +417,13 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 	// FIXME Failure loading metadata not properly handled, if line 422 is true, then line 466 will panic
 
 	// 1st delete gateway
-	var metadataHost *resources.Host
+	// var metadataHost *resources.Host
 	if gwID != "" {
 		mh, err := metadata.LoadHost(handler.service, gwID)
 		if err != nil {
 			_ = infraErr(err)
 		} else {
-			metadataHost = mh.Get()
+			// metadataHost := mh.Get()
 
 			err = handler.service.DeleteGateway(gwID)
 			// allow no gateway, but log it
@@ -434,7 +435,6 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 				return infraErr(err)
 			}
 		}
-
 	}
 
 	// 2nd delete network, with tolerance
@@ -459,39 +459,39 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) error {
 		return infraErr(err)
 	}
 
-	select {
-	case <-ctx.Done():
-		log.Warnf("Network delete cancelled by user")
-		hostSizingV1 := propsv1.NewHostSizing()
-		err := metadataHost.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
-			hostSizingV1 = v.(*propsv1.HostSizing)
-			return nil
-		})
-		if err != nil {
-			return fmt.Errorf("Failed to get gateway sizingV1")
-		}
+	// select {
+	// case <-ctx.Done():
+	// 	log.Warnf("Network delete cancelled by user")
+	// 	hostSizingV1 := propsv1.NewHostSizing()
+	// 	err := metadataHost.Properties.LockForRead(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+	// 		hostSizingV1 = v.(*propsv1.HostSizing)
+	// 		return nil
+	// 	})
+	// 	if err != nil {
+	// 		return fmt.Errorf("Failed to get gateway sizingV1")
+	// 	}
 
-		//os name of the gw is not stored in metadatas so we used ubuntu 16.04 by default
-		sizing := resources.SizingRequirements{
-			MinCores:    hostSizingV1.AllocatedSize.Cores,
-			MaxCores:    hostSizingV1.AllocatedSize.Cores,
-			MinFreq:     hostSizingV1.AllocatedSize.CPUFreq,
-			MinGPU:      hostSizingV1.AllocatedSize.GPUNumber,
-			MinRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
-			MaxRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
-			MinDiskSize: hostSizingV1.AllocatedSize.DiskSize,
-		}
-		networkBis, err := handler.Create(context.Background(), network.Name, network.CIDR, network.IPVersion, sizing, "Ubuntu 18.04", metadataHost.Name)
-		if err != nil {
-			return fmt.Errorf("Failed to stop network deletion")
-		}
-		buf, err := networkBis.Serialize()
-		if err != nil {
-			return fmt.Errorf("Deleted Network recreated by safescale")
-		}
-		return fmt.Errorf("Deleted Network recreated by safescale : %s", buf)
-	default:
-	}
+	// 	//os name of the gw is not stored in metadatas so we used ubuntu 16.04 by default
+	// 	sizing := resources.SizingRequirements{
+	// 		MinCores:    hostSizingV1.AllocatedSize.Cores,
+	// 		MaxCores:    hostSizingV1.AllocatedSize.Cores,
+	// 		MinFreq:     hostSizingV1.AllocatedSize.CPUFreq,
+	// 		MinGPU:      hostSizingV1.AllocatedSize.GPUNumber,
+	// 		MinRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
+	// 		MaxRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
+	// 		MinDiskSize: hostSizingV1.AllocatedSize.DiskSize,
+	// 	}
+	// 	networkBis, err := handler.Create(context.Background(), network.Name, network.CIDR, network.IPVersion, sizing, "Ubuntu 18.04", metadataHost.Name)
+	// 	if err != nil {
+	// 		return fmt.Errorf("Failed to stop network deletion")
+	// 	}
+	// 	buf, err := networkBis.Serialize()
+	// 	if err != nil {
+	// 		return fmt.Errorf("Deleted Network recreated by safescale")
+	// 	}
+	// 	return fmt.Errorf("Deleted Network recreated by safescale : %s", buf)
+	// default:
+	// }
 
 	return nil
 }

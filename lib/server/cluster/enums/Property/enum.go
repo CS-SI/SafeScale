@@ -20,6 +20,7 @@ const (
 	// DescriptionV1 contains optional additional info describing cluster (purpose, ...)
 	DescriptionV1 = "1"
 	// DefaultsV1 contains additional info about default settings (node sizing, default image, ...)
+	// Deprecated by DefaultsV2 (but kept for compatibility)
 	DefaultsV1 = "2"
 	// CompositeV1 contains optional additional info about the composite build of the cluster (multi-tenant)
 	CompositeV1 = "3"
@@ -33,4 +34,6 @@ const (
 	StateV1 = "7"
 	// NetworkV1 contains optional additional info about network of the cluster
 	NetworkV1 = "8"
+	// DefaultsV2 contains optional additional info about network of the cluster
+	DefaultsV2 = "9"
 )
