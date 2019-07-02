@@ -1032,6 +1032,29 @@ func (b *foreman) taskCreateMaster(tr concurrency.TaskRunner, params interface{}
 	def.Name = name
 	clientHost := client.New().Host
 	pbHost, err := clientHost.Create(*def, timeout)
+	if pbHost != nil {
+		// Updates cluster metadata to keep track of created host, before testing if an error occured during the creation
+		mErr := b.cluster.UpdateMetadata(tr.Task(), func() error {
+			// Locks for write the NodesV1 extension...
+			return b.cluster.GetProperties(tr.Task()).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+				nodesV1 := v.(*clusterpropsv1.Nodes)
+				// Update swarmCluster definition in Object Storage
+				node := &clusterpropsv1.Node{
+					ID:        pbHost.Id,
+					Name:      pbHost.Name,
+					PrivateIP: pbHost.PrivateIp,
+					PublicIP:  pbHost.PublicIp,
+				}
+				nodesV1.Masters = append(nodesV1.Masters, node)
+				return nil
+			})
+		})
+		if mErr != nil {
+			log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
+			err = fmt.Errorf("failed to update Cluster metadata: %s", err.Error())
+			return
+		}
+	}
 	if err != nil {
 		err = client.DecorateError(err, "creation of host resource", false)
 		if err != nil {
@@ -1045,35 +1068,26 @@ func (b *foreman) taskCreateMaster(tr concurrency.TaskRunner, params interface{}
 	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, pbHost.Name)
 	log.Debugf("[%s] host resource creation successful", hostLabel)
 
-	defer func() {
-		if err != nil {
-			derr := clientHost.Delete([]string{pbHost.Id}, timeout)
-			if derr != nil {
-				log.Errorf("failed to delete master after failure")
-			}
-		}
-	}()
-
-	err = b.cluster.UpdateMetadata(tr.Task(), func() error {
-		// Locks for write the NodesV1 extension...
-		return b.cluster.GetProperties(tr.Task()).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-			nodesV1 := v.(*clusterpropsv1.Nodes)
-			// Update swarmCluster definition in Object Storage
-			node := &clusterpropsv1.Node{
-				ID:        pbHost.Id,
-				Name:      pbHost.Name,
-				PrivateIP: pbHost.PrivateIp,
-				PublicIP:  pbHost.PublicIp,
-			}
-			nodesV1.Masters = append(nodesV1.Masters, node)
-			return nil
-		})
-	})
-	if err != nil {
-		log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
-		err = fmt.Errorf("failed to update Cluster metadata: %s", err.Error())
-		return
-	}
+	// err = b.cluster.UpdateMetadata(tr.Task(), func() error {
+	// 	// Locks for write the NodesV1 extension...
+	// 	return b.cluster.GetProperties(tr.Task()).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+	// 		nodesV1 := v.(*clusterpropsv1.Nodes)
+	// 		// Update swarmCluster definition in Object Storage
+	// 		node := &clusterpropsv1.Node{
+	// 			ID:        pbHost.Id,
+	// 			Name:      pbHost.Name,
+	// 			PrivateIP: pbHost.PrivateIp,
+	// 			PublicIP:  pbHost.PublicIp,
+	// 		}
+	// 		nodesV1.Masters = append(nodesV1.Masters, node)
+	// 		return nil
+	// 	})
+	// })
+	// if err != nil {
+	// 	log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
+	// 	err = fmt.Errorf("failed to update Cluster metadata: %s", err.Error())
+	// 	return
+	// }
 
 	err = b.installProxyCacheClient(tr.Task(), pbHost, hostLabel)
 	if err != nil {
@@ -1282,7 +1296,34 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	}
 
 	clientHost := client.New().Host
+	var node *clusterpropsv1.Node
 	pbHost, err := clientHost.Create(*def, timeout)
+	if pbHost != nil {
+		mErr := b.cluster.UpdateMetadata(tr.Task(), func() error {
+			// Locks for write the NodesV1 extension...
+			return b.cluster.GetProperties(tr.Task()).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+				nodesV1 := v.(*clusterpropsv1.Nodes)
+				// Registers the new Agent in the swarmCluster struct
+				node = &clusterpropsv1.Node{
+					ID:        pbHost.Id,
+					Name:      pbHost.Name,
+					PrivateIP: pbHost.PrivateIp,
+					PublicIP:  pbHost.PublicIp,
+				}
+				nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
+				return nil
+			})
+		})
+		if mErr != nil {
+			derr := clientHost.Delete([]string{pbHost.Id}, utils.GetLongOperationTimeout())
+			if derr != nil {
+				log.Errorf("failed to delete node after failure")
+			}
+			log.Errorf("[%s] creation failed: %s", hostLabel, mErr.Error())
+			err = fmt.Errorf("failed to create node: %s", mErr.Error())
+			return
+		}
+	}
 	if err != nil {
 		err = client.DecorateError(err, "creation of host resource", true)
 		if err != nil {
@@ -1293,41 +1334,30 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	hostLabel = fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
 	log.Debugf("[%s] host resource creation successful.", hostLabel)
 
-	var node *clusterpropsv1.Node
-	err = b.cluster.UpdateMetadata(tr.Task(), func() error {
-		// Locks for write the NodesV1 extension...
-		return b.cluster.GetProperties(tr.Task()).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
-			nodesV1 := v.(*clusterpropsv1.Nodes)
-			// Registers the new Agent in the swarmCluster struct
-			node = &clusterpropsv1.Node{
-				ID:        pbHost.Id,
-				Name:      pbHost.Name,
-				PrivateIP: pbHost.PrivateIp,
-				PublicIP:  pbHost.PublicIp,
-			}
-			nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
-			return nil
-		})
-	})
-	if err != nil {
-		derr := clientHost.Delete([]string{pbHost.Id}, utils.GetLongOperationTimeout())
-		if derr != nil {
-			log.Errorf("failed to delete node after failure")
-		}
-		log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
-		err = fmt.Errorf("failed to create node: %s", err.Error())
-		return
-	}
-
-	// Starting from here, delete node from cluster if exiting with error
-	defer func() {
-		if err != nil {
-			derr := b.cluster.deleteNode(tr.Task(), node, "")
-			if derr != nil {
-				log.Errorf("failed to delete node after failure")
-			}
-		}
-	}()
+	// err = b.cluster.UpdateMetadata(tr.Task(), func() error {
+	// 	// Locks for write the NodesV1 extension...
+	// 	return b.cluster.GetProperties(tr.Task()).LockForWrite(Property.NodesV1).ThenUse(func(v interface{}) error {
+	// 		nodesV1 := v.(*clusterpropsv1.Nodes)
+	// 		// Registers the new Agent in the swarmCluster struct
+	// 		node = &clusterpropsv1.Node{
+	// 			ID:        pbHost.Id,
+	// 			Name:      pbHost.Name,
+	// 			PrivateIP: pbHost.PrivateIp,
+	// 			PublicIP:  pbHost.PublicIp,
+	// 		}
+	// 		nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
+	// 		return nil
+	// 	})
+	// })
+	// if err != nil {
+	// 	derr := clientHost.Delete([]string{pbHost.Id}, utils.GetLongOperationTimeout())
+	// 	if derr != nil {
+	// 		log.Errorf("failed to delete node after failure")
+	// 	}
+	// 	log.Errorf("[%s] creation failed: %s", hostLabel, err.Error())
+	// 	err = fmt.Errorf("failed to create node: %s", err.Error())
+	// 	return
+	// }
 
 	err = b.installProxyCacheClient(tr.Task(), pbHost, hostLabel)
 	if err != nil {
