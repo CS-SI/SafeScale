@@ -365,8 +365,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				}
 
 				if gerr, ok := err.(*googleapi.Error); ok {
+					logrus.Warnf("Received GCP errorcode: %d", gerr.Code)
 					if gerr.Code == 403 {
-						desistError = err
+						desistError = gerr
 						return nil
 					}
 				}
@@ -396,12 +397,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		common.GetLongOperationTimeout(),
 	)
 	if err != nil {
-		logrus.Debugf("Error creating host: timeout: %+v", err)
 		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
 	if desistError != nil {
-		logrus.Debugf("Error creating host: %+v", err)
-		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating host"))
+		return nil, userData, resources.ResourceAccessDeniedError(request.ResourceName, fmt.Sprintf("Error creating host: %s", desistError.Error()) )
 	}
 
 	logrus.Debugf("host resource created.")
@@ -416,6 +415,14 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			}
 		}
 	}()
+
+	if host == nil {
+		panic("Unexpected nil host")
+	}
+
+	if !host.OK() {
+		logrus.Warnf("Missing data in host: %v", host)
+	}
 
 	return host, userData, nil
 }
@@ -659,8 +666,6 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 			ipv4 = rn.PublicIP
 		}
 	}
-
-	// FIXME Replicate "iaas/stacks/openstack/compute.go:498"
 
 	err = host.Properties.LockForWrite(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
 		hostNetworkV1 := v.(*propsv1.HostNetwork)

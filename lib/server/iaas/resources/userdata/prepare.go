@@ -172,14 +172,14 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 			problems := false
 
 			box, err = rice.FindBox("../userdata/scripts")
-			if err != nil {
+			if err != nil || box == nil{
 				problems = true
 			}
 
 			if !problems && box != nil {
-				_, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", provider))
+				_, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", suffixCandidate))
 				problems = err != nil
-				_, err = box.String(fmt.Sprintf("userdata%s.phase2.sh", provider))
+				_, err = box.String(fmt.Sprintf("userdata%s.phase2.sh", suffixCandidate))
 				problems = problems || (err != nil)
 
 				if !problems {
@@ -203,11 +203,11 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 
 			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", provider))
 			if err != nil {
-				return nil, fmt.Errorf("error loading script template: %s", err.Error())
+				return nil, fmt.Errorf("error loading script template for phase1 : %s", err.Error())
 			}
 			userdataPhase1Template, err = template.New("userdata.phase1").Parse(tmplString)
 			if err != nil {
-				return nil, fmt.Errorf("error parsing script template: %s", err.Error())
+				return nil, fmt.Errorf("error parsing script template for phase 1 : %s", err.Error())
 			}
 		}
 		buf := bytes.NewBufferString("")

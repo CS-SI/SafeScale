@@ -332,7 +332,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	}
 
 	if !theNetwork.OK() {
-		logrus.Warnf("Invalid network: %v", theNetwork)
+		logrus.Warnf("Missing data in network: %v", theNetwork)
 	}
 
 	compuService := s.ComputeService

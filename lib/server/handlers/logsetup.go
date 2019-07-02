@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"io"
 	"os"
 
@@ -66,10 +67,39 @@ func infraErr(err error) error {
 	return tbr
 }
 
+func isKnownErr(err error) bool {
+	known := true
+
+	switch err.(type) {
+	case resources.ErrResourceNotFound:
+		known = true
+	case resources.ErrResourceDuplicate:
+		known = true
+	case resources.ErrResourceAccessDenied:
+		known = true
+	case resources.ErrResourceInvalidRequest:
+		known = true
+	case resources.ErrResourceNotAvailable:
+		known = true
+	case resources.ErrTimeout:
+		known = true
+	default:
+		known = false
+	}
+
+	return known
+}
+
 // infraErrf throws error with stack trace and adds message
 func infraErrf(err error, message string, a ...interface{}) error {
 	if err == nil {
 		return nil
+	}
+
+	if isKnownErr(errors.Cause(err)) {
+		log.Error(err)
+		// knownErr := errors.WithMessage(err, fmt.Sprintf(message, a...))
+		return err
 	}
 
 	tbr := errors.WithStack(err)
@@ -93,6 +123,13 @@ func logicErrf(err error, message string, a ...interface{}) error {
 	if err == nil {
 		return nil
 	}
+
+	if isKnownErr(errors.Cause(err)) {
+		log.Error(err)
+		// knownErr := errors.WithMessage(err, fmt.Sprintf(message, a...))
+		return err
+	}
+
 	tbr := errors.Wrap(err, fmt.Sprintf(message, a...))
 	log.Errorf("%+v", tbr)
 	return tbr
