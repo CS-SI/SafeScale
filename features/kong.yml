@@ -65,7 +65,7 @@ feature:
                             {{ else }}
                             TAG=kong
                             {{ end }}
-                            docker build -t $TAG ${SF_ETCDIR}/kong 
+                            docker build -t $TAG ${SF_ETCDIR}/kong
 
                             cat >${SF_ETCDIR}/kong/konga.userdb.data <<-EOF
                             module.exports = [
@@ -164,29 +164,29 @@ feature:
                                         interval: 5s
                                         retries: 10
 
-                                gui:
-                                    image: pantsel/konga
-                                    volumes:
-                                        - ${SF_ETCDIR}/kong/konga.userdb.data:/usr/local/etc/userdb.data:ro
-                                    environment:
-                                        - TOKEN_SECRET="$(sfRandomString 32 [:alnum:])"
-                                        - DB_ADAPTER=postgres
-                                        - DB_DATABASE=kong-gui
-                                        - DB_USER=kong
-                                        - DB_PASSWORD="${DB_PASSWORD}"
-                                        - NODE_ENV=production
-                                        - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
-                                    networks:
-                                        ${KONG_PUB_NET}:
-                                        dbnet:
-                                    ports:
-                                        - "{{.HostIP}}:1337:1337"
-                                    restart: always
-                                    depends_on:
-                                        db:
-                                            condition: service_healthy
-                                        proxy:
-                                            condition: service_started
+                                # gui:
+                                #     image: pantsel/konga
+                                #     volumes:
+                                #         - ${SF_ETCDIR}/kong/konga.userdb.data:/usr/local/etc/userdb.data:ro
+                                #     environment:
+                                #         - TOKEN_SECRET="$(sfRandomString 32 [:alnum:])"
+                                #         - DB_ADAPTER=postgres
+                                #         - DB_DATABASE=kong-gui
+                                #         - DB_USER=kong
+                                #         - DB_PASSWORD="${DB_PASSWORD}"
+                                #         - NODE_ENV=production
+                                #         - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
+                                #     networks:
+                                #         ${KONG_PUB_NET}:
+                                #         dbnet:
+                                #     ports:
+                                #         - "{{.HostIP}}:1337:1337"
+                                #     restart: always
+                                #     depends_on:
+                                #         db:
+                                #             condition: service_healthy
+                                #         proxy:
+                                #             condition: service_started
 
                             networks:
                                 ${KONG_PUB_NET}:
