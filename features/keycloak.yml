@@ -40,7 +40,7 @@ feature:
                             curl -Ssl -I -k https://{{ .HostIP }}:8443/auth/ 2>&1 | grep "HTTP/2 200" &>/dev/null
 
             add:
-                pace: config,build,compose,ready
+                pace: config,build,network,compose,ready
                 steps:
                     config:
                         timeout: 10
@@ -755,9 +755,13 @@ feature:
                             {{ if .ClusterFlavor }}
                             IMAGE=keycloak4safescale
                             KONG_PUB_NET=kong4safescale_pubnet
+                            KEYCLOAK_DB_NET=keycloak4safescale_dbnet
+                            KEYCLOAK_DB_BRIDGE=br_kc4s_db
                             {{ else }}
                             IMAGE=keycloak
                             KONG_PUB_NET=kong_pubnet
+                            KEYCLOAK_DB_NET=keycloak_dbnet
+                            KEYCLOAK_DB_BRIDGE=br_kc_db
                             {{ end }}
 
                             cat >${SF_ETCDIR}/keycloak/docker-compose.yml <<-EOF
@@ -772,7 +776,7 @@ feature:
                                     volumes:
                                         - ${SF_VARDIR}/keycloak/postgresql:/var/lib/postgresql/data
                                     networks:
-                                        dbnet:
+                                        ${KEYCLOAK_DB_NET}:
                                     restart: always
                                     healthcheck:
                                         test: ["CMD", "pg_isready", "-U", "keycloak"]
@@ -798,7 +802,7 @@ feature:
                                         # - ROOT_LOGLEVEL=DEBUG
                                     networks:
                                         ${KONG_PUB_NET}:
-                                        dbnet:
+                                        ${KEYCLOAK_DB_NET}:
                                     ports:
                                         - '{{ .HostIP }}:8443:8443'
                                     restart: always
@@ -806,10 +810,31 @@ feature:
                             networks:
                                 ${KONG_PUB_NET}:
                                     external: true
-                                dbnet:
-                                    internal: true
+                                ${KEYCLOAK_DB_NET}:
+                                    external: true
                             EOF
-                            docker-compose -f ${SF_ETCDIR}/keycloak/docker-compose.yml -p ${IMAGE} up -d
+
+                    network:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            {{ if .ClusterFlavor }}
+                            IMAGE=keycloak4safescale
+                            KEYCLOAK_DB_BRIDGE=br_kc4s_db
+                            {{ else }}
+                            IMAGE=keycloak
+                            KEYCLOAK_DB_BRIDGE=br_kc_db
+                            {{ end}}
+                            KEYCLOAK_DB_NET="${IMAGE}_dbnet"
+
+                            docker network create --driver bridge --attachable --internal --opt "com.docker.network.bridge.name=${KEYCLOAK_DB_BRIDGE}" ${KEYCLOAK_DB_NET} || exit 193
+
+                            sfFirewallAdd --zone=trusted --add-interface=${KEYCLOAK_DB_BRIDGE} && \
+                            sfFirewallReload
+                            exit 0
 
                     ready:
                         targets:
@@ -824,10 +849,12 @@ feature:
                             PREFIX=keycloak
                             {{ end }}
 
-                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep running
+                            docker-compose -f ${SF_ETCDIR}/keycloak/docker-compose.yml -p ${PREFIX} up -d || exit 194
+
+                            sfRetry 5m 5 "docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep running"
 
             remove:
-                pace: compose
+                pace: compose,network,cleanup
                 steps:
                     compose:
                         targets:
@@ -842,6 +869,35 @@ feature:
                             OPTIONS=
                             {{ end }}
                             docker-compose -f ${SF_ETCDIR}/keycloak/docker-compose.yml $OPTIONS rm --stop -v --force || exit 192
+
+                    network:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            {{ if .ClusterFlavor }}
+                            IMAGE=keycloak4safescale
+                            KEYCLOAK_DB_BRIDGE=br_kc4s_db
+                            {{ else }}
+                            IMAGE=keycloak
+                            KEYCLOAK_DB_BRIDGE=br_kc_db
+                            {{ end}}
+                            KEYCLOAK_DB_NET="${IMAGE}_dbnet"
+
+                            sfFirewallAdd --zone=trusted --rm-interface=${KEYCLOAK_DB_BRIDGE} && \
+                            sfFirewallReload
+
+                            docker network rm ${KEYCLOAK_DB_NET}
+
+                    cleanup:
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
                             rm -drf ${SF_ETCDIR}/keycloak ${SF_VARDIR}/keycloak
 
     proxy:

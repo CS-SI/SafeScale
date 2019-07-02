@@ -31,7 +31,7 @@ feature:
                 steps:
                     curl:
                         targets:
-                            hosts: no
+                            hosts: yes
                             gateways: all
                             masters: no
                             nodes: no
@@ -39,12 +39,12 @@ feature:
                             curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep "HTTP/1.1 200 OK" &>/dev/null
 
             add:
-                pace: compose,firewall
+                pace: config,networks,start
                 steps:
-                    compose:
+                    config:
                         timeout: 10
                         targets:
-                            hosts: no
+                            hosts: yes
                             gateways: all
                             masters: no
                             nodes: no
@@ -87,12 +87,15 @@ feature:
 
                             {{ if .ClusterFlavor }}
                             IMAGE=kong4safescale
-                            KONG_BRIDGE=br_kong4s
+                            KONG_PUB_BRIDGE=br_k4s_pub
+                            KONG_DB_BRIDGE=br_k4s_db
                             {{ else }}
                             IMAGE=kong
-                            KONG_BRIDGE=br_kong
+                            KONG_PUB_BRIDGE=br_k_pub
+                            KONG_BRIDGE=br_k_db
                             {{ end}}
                             KONG_PUB_NET="${IMAGE}_pubnet"
+                            KONG_DB_NET="${IMAGE}_dbnet"
 
                             cat >${SF_ETCDIR}/kong/docker-compose.yml <<-EOF
                             version: '2.1'
@@ -106,7 +109,7 @@ feature:
                                     volumes:
                                         - ${SF_VARDIR}/kong/postgresql:/var/lib/postgresql/data
                                     networks:
-                                        dbnet:
+                                        ${KONG_DB_NET}:
                                     restart: always
                                     healthcheck:
                                         test: ["CMD", "pg_isready", "-U", "kong"]
@@ -123,7 +126,7 @@ feature:
                                         - KONG_PG_PASSWORD="${DB_PASSWORD}"
                                     command: kong migrations bootstrap # up
                                     networks:
-                                        dbnet:
+                                        ${KONG_DB_NET}:
                                     depends_on:
                                         db:
                                             condition: service_healthy
@@ -148,7 +151,7 @@ feature:
                                         - ${SF_ETCDIR}/kong/includes:/etc/kong/includes:ro
                                     networks:
                                         ${KONG_PUB_NET}:
-                                        dbnet:
+                                        ${KONG_DB_NET}:
                                     ports:
                                         - "443:443"
                                         - "127.0.0.1:8444:8444"
@@ -178,7 +181,7 @@ feature:
                                 #         - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
                                 #     networks:
                                 #         ${KONG_PUB_NET}:
-                                #         dbnet:
+                                #         ${KONG_DB_NET}:
                                 #     ports:
                                 #         - "{{.HostIP}}:1337:1337"
                                 #     restart: always
@@ -191,9 +194,8 @@ feature:
                             networks:
                                 ${KONG_PUB_NET}:
                                     external: true
-                                dbnet:
-                                    name: "${IMAGE}_dbnet"
-                                    internal: true
+                                ${KONG_DB_NET}:
+                                    external: true
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/kong/docker-compose.yml
 
@@ -203,17 +205,7 @@ feature:
                             anonymous_reports = off
                             EOF
 
-                            {{ if .ClusterFlavor }}
-                            OPTIONS="-p ${IMAGE}"
-                            {{ else }}
-                            OPTIONS=
-                            {{ end }}
-                            docker network create --driver bridge --opt "com.docker.network.bridge.name=${KONG_BRIDGE}" ${KONG_PUB_NET}
-                            docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS up -d || exit 192
-                            sfRetry 5m 5 "docker ps --all | grep ${IMAGE}_migration_1 | grep Exited" || exit 193
-                            exit 0
-
-                    firewall:
+                    networks:
                         targets:
                             hosts: yes
                             gateways: all
@@ -221,54 +213,84 @@ feature:
                             nodes: no
                         run: |
                             {{ if .ClusterFlavor }}
-                            BRIDGE=br_kong4s
+                            IMAGE=kong4safescale
+                            KONG_PUB_BRIDGE=br_k4s_pub
+                            KONG_DB_BRIDGE=br_k4s_db
                             {{ else }}
-                            BRIDGE=br_kong
+                            IMAGE=kong
+                            KONG_PUB_BRIDGE=br_k_pub
+                            KONG_DB_BRIDGE=br_k_db
                             {{ end}}
-                            sfFirewallAdd --zone=trusted --add-interface=${BRIDGE} && \
+                            KONG_PUB_NET="${IMAGE}_pubnet"
+                            KONG_DB_NET="${IMAGE}_dbnet"
+
+                            docker network create --driver bridge --attachable --opt "com.docker.network.bridge.name=${KONG_PUB_BRIDGE}" ${KONG_PUB_NET}
+                            docker network create --driver bridge --attachable --internal --opt "com.docker.network.bridge.name=${KONG_DB_BRIDGE}" ${KONG_DB_NET}
+
+                            sfFirewallAdd --zone=trusted --add-interface=${KONG_PUB_BRIDGE} && \
+                            sfFirewallAdd --zone=trusted --add-interface=${KONG_DB_BRIDGE} && \
                             sfFirewallAdd --zone=public --add-service=https && \
                             sfFirewallReload
 
-            remove:
-                pace: firewall,compose,network
-                steps:
-                    firewall:
+                    start:
                         targets:
                             hosts: yes
+                            gateways: all
+                            masters: no
+                            nodes: no
                         run: |
                             {{ if .ClusterFlavor }}
-                            BRIDGE=br_kong4s
+                            IMAGE=kong4safescale
+                            OPTIONS="-p ${IMAGE}"
                             {{ else }}
-                            BRIDGE=br_kong
+                            IMAGE=kong
+                            OPTIONS=
                             {{ end}}
-                            sfFirewallAdd --zone=public --remove-service=https && \
-                            sfFirewallAdd --zone=trusted --remove-interface=${BRIDGE} && \
-                            sfFirewallReload
 
+                            docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS up -d || exit 192
+                            sfRetry 5m 5 "docker ps --all | grep ${IMAGE}_migration_1 | grep Exited" || exit 193
+                            exit 0
+
+            remove:
+                pace: compose,networks
+                steps:
                     compose:
                         targets:
                             hosts: yes
+                            gateways: all
+                            masters: no
+                            nodes: no
                         run: |
                             {{ if .ClusterFlavor }}
-                            OPTIONS="-p long4safescale"
-                            NET_PREFIX=kong4safescale
+                            OPTIONS="-p kong4safescale"
                             {{ else }}
                             OPTIONS=
-                            NET_PREFIX=kong
                             {{ end }}
                             docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml $OPTIONS rm --stop -v --force || exit 192
-                            docker network rm ${NET_PREFIX}_external_net
                             rm -rf ${SF_ETCDIR}/kong/docker-compose.yml ${SF_VARDIR}/kong
 
-                    network:
+                    networks:
                         targets:
                             hosts: yes
+                            gateways: all
+                            masters: no
+                            nodes: no
                         run: |
                             {{ if .ClusterFlavor }}
-                            NET_PREFIX=kong4safescale
+                            KONG_PUB_BRIDGE=br_k4s_pub
+                            KONG_DB_BRIDGE=br_k4s_db
                             {{ else }}
-                            NET_PREFIX=kong
-                            {{ end }}
-                            docker network rm ${NET_PREFIX}_external_net
+                            KONG_PUB_BRIDGE=br_k_pub
+                            KONG_BRIDGE=br_k_db
+                            {{ end}}
+
+                            sfFirewallAdd --zone=public --remove-service=https && \
+                            sfFirewallAdd --zone=trusted --remove-interface=${KONG_PUB_BRIDGE} && \
+                            sfFirewallAdd --zone=trusted --remove-interface=${KONG_DB_BRIDGE} && \
+                            sfFirewallReload
+
+                            docker network rm ${KONG_PUB_BRIDGE}
+                            docker network rm ${KONG_DB_BRIDGE}
+                            exit 0
 
 ...
