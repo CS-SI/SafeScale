@@ -130,7 +130,8 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		return nil, err
 	}
 
-	prov := apiprovider.NewLoggedProvider(&provider{stack}, "gcp")
+	etrace := apiprovider.NewErrorTraceProvider(&provider{stack}, "gcp")
+	prov := apiprovider.NewLoggedProvider(etrace, "gcp")
 	return prov, nil
 }
 
