@@ -99,9 +99,10 @@ func gatewaySizing(task concurrency.Task, foreman control.Foreman) pb.HostDefini
 		Sizing: &pb.HostSizing{
 			MinCpuCount: 2,
 			MaxCpuCount: 4,
-			MinRamSize:  15.0,
-			MaxRamSize:  32.0,
+			MinRamSize:  7.0,
+			MaxRamSize:  16.0,
 			MinDiskSize: 50,
+			GpuCount:    -1,
 		},
 	}
 }
@@ -111,9 +112,10 @@ func nodeSizing(task concurrency.Task, foreman control.Foreman) pb.HostDefinitio
 		Sizing: &pb.HostSizing{
 			MinCpuCount: 4,
 			MaxCpuCount: 8,
-			MinRamSize:  15.0,
-			MaxRamSize:  32.0,
+			MinRamSize:  7.0,
+			MaxRamSize:  16.0,
 			MinDiskSize: 80,
+			GpuCount:    -1,
 		},
 	}
 }

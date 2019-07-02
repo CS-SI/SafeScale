@@ -177,11 +177,11 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	}
 
 	// Determine Gateway sizing
-	var gatewaysDef *pb.HostDefinition
+	var gatewaysDefault *pb.HostDefinition
 	if b.makers.DefaultGatewaySizing != nil {
-		gatewaysDef = complementHostDefinition(nil, b.makers.DefaultGatewaySizing(task, b))
+		gatewaysDefault = complementHostDefinition(nil, b.makers.DefaultGatewaySizing(task, b))
 	} else {
-		gatewaysDef = &pb.HostDefinition{
+		gatewaysDefault = &pb.HostDefinition{
 			Sizing: &pb.HostSizing{
 				MinCpuCount: 2,
 				MaxCpuCount: 4,
@@ -192,15 +192,15 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 			},
 		}
 	}
-	gatewaysDef.ImageId = imageID
-	gatewaysDef = complementHostDefinition(req.GatewaysDef, *gatewaysDef)
+	gatewaysDefault.ImageId = imageID
+	gatewaysDef := complementHostDefinition(req.GatewaysDef, *gatewaysDefault)
 
 	// Determine master sizing
-	var mastersDef *pb.HostDefinition
+	var mastersDefault *pb.HostDefinition
 	if b.makers.DefaultMasterSizing != nil {
-		mastersDef = complementHostDefinition(nil, b.makers.DefaultMasterSizing(task, b))
+		mastersDefault = complementHostDefinition(nil, b.makers.DefaultMasterSizing(task, b))
 	} else {
-		mastersDef = &pb.HostDefinition{
+		mastersDefault = &pb.HostDefinition{
 			Sizing: &pb.HostSizing{
 				MinCpuCount: 4,
 				MaxCpuCount: 8,
@@ -212,15 +212,15 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		}
 	}
 	// Note: no way yet to define master sizing from cli...
-	mastersDef.ImageId = imageID
-	mastersDef = complementHostDefinition(req.MastersDef, *mastersDef)
+	mastersDefault.ImageId = imageID
+	mastersDef := complementHostDefinition(req.MastersDef, *mastersDefault)
 
 	// Determine node sizing
-	var nodesDef *pb.HostDefinition
+	var nodesDefault *pb.HostDefinition
 	if b.makers.DefaultNodeSizing != nil {
-		nodesDef = complementHostDefinition(nil, b.makers.DefaultNodeSizing(task, b))
+		nodesDefault = complementHostDefinition(nil, b.makers.DefaultNodeSizing(task, b))
 	} else {
-		nodesDef = &pb.HostDefinition{
+		nodesDefault = &pb.HostDefinition{
 			Sizing: &pb.HostSizing{
 				MinCpuCount: 4,
 				MaxCpuCount: 8,
@@ -231,8 +231,8 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 			},
 		}
 	}
-	nodesDef.ImageId = imageID
-	nodesDef = complementHostDefinition(req.NodesDef, *nodesDef)
+	nodesDefault.ImageId = imageID
+	nodesDef := complementHostDefinition(req.NodesDef, *nodesDefault)
 
 	// Creates network
 	log.Debugf("[cluster %s] creating network 'net-%s'", req.Name, req.Name)
@@ -490,19 +490,19 @@ func complementHostDefinition(req *pb.HostDefinition, def pb.HostDefinition) *pb
 		finalDef.Sizing = &pb.HostSizing{}
 		*finalDef.Sizing = *req.Sizing
 
-		if finalDef.Sizing.MinCpuCount <= 0 && def.Sizing.MinCpuCount > 0 {
+		if def.Sizing.MinCpuCount > 0 && finalDef.Sizing.MinCpuCount == 0 {
 			finalDef.Sizing.MinCpuCount = def.Sizing.MinCpuCount
 		}
-		if finalDef.Sizing.MaxCpuCount <= 0 && def.Sizing.MaxCpuCount > 0 {
+		if def.Sizing.MaxCpuCount > 0 && finalDef.Sizing.MaxCpuCount == 0 {
 			finalDef.Sizing.MaxCpuCount = def.Sizing.MaxCpuCount
 		}
-		if finalDef.Sizing.MinRamSize <= 0.0 && def.Sizing.MinRamSize > 0.0 {
+		if def.Sizing.MinRamSize > 0.0 && finalDef.Sizing.MinRamSize == 0.0 {
 			finalDef.Sizing.MinRamSize = def.Sizing.MinRamSize
 		}
-		if finalDef.Sizing.MaxRamSize <= 0.0 && def.Sizing.MaxRamSize > 0.0 {
+		if def.Sizing.MaxRamSize > 0.0 && finalDef.Sizing.MaxRamSize == 0.0 {
 			finalDef.Sizing.MaxRamSize = def.Sizing.MaxRamSize
 		}
-		if finalDef.Sizing.MinDiskSize <= 0 && def.Sizing.MinDiskSize > 0 {
+		if def.Sizing.MinDiskSize > 0 && finalDef.Sizing.MinDiskSize == 0 {
 			finalDef.Sizing.MinDiskSize = def.Sizing.MinDiskSize
 		}
 		if finalDef.Sizing.GpuCount <= 0 && def.Sizing.GpuCount > 0 {
@@ -528,7 +528,7 @@ func complementHostDefinition(req *pb.HostDefinition, def pb.HostDefinition) *pb
 			finalDef.Sizing.MaxRamSize = 16.0
 		}
 		if finalDef.Sizing.MinDiskSize <= 0 {
-			finalDef.Sizing.MinDiskSize = 100
+			finalDef.Sizing.MinDiskSize = 50
 		}
 	}
 
