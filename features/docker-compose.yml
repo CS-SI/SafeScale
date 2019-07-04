@@ -36,11 +36,14 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu|centos|rhel|fedora)
-                                    docker-compose -v &>/dev/null
+                                    if ! file $(which docker-compose) 2>/dev/null | grep x86-64 &>/dev/null; then
+                                        exit 1
+                                    fi
+                                    exit 0
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 1
+                                    exit 2
                                     ;;
                             esac
 
@@ -72,4 +75,5 @@ feature:
                             nodes: all
                         run: |
                             rm /usr/bin/docker-compose || rm -f /usr/local/bin/docker-compose
+                            exit 0
 ...
