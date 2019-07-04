@@ -308,7 +308,7 @@ sfDropzonePop() {
 	local file="$2"
 	__create_dropzone &>/dev/null
 	mkdir -p "$dest" &>/dev/null
-	if [ $# -eq 1 ]; then 
+	if [ $# -eq 1 ]; then
 		mv -f ~cladm/.dropzone/* "$dest"
 	else
 		mv -f ~cladm/.dropzone/"$file" "$dest"
@@ -454,7 +454,11 @@ sfDetectFacts() {
 			FACTS["debian like"]=1
 			;;
 	esac
-	[[ $(systemctl) =~ -\.mount ]] && FACTS["use systemd"]=1 || FACTS["use systemd"]=0
+	if systemctl | grep '\-.mount' &>/dev/null; then
+		FACTS["use systemd"]=1
+	else
+		FACTS["use systemd"]=0
+	fi
 
 	# Some facts about hardware
 	val=$(LANG=C lscpu | grep "Socket(s)" | cut -d: -f2 | sed 's/"//g')
