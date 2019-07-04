@@ -24,9 +24,10 @@ feature:
             - docker
             - docker-compose
     parameters:
+        - Version=7.2.0
         - KeepDataOnRemoval=yes
         - ClusterName=safescale
-    
+
     install:
         bash:
             check:
@@ -38,8 +39,8 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            [ -d ${SF_ETC_DIR}/elasticsearch ] || exit 192
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'elasticsearch-oss:7' &>/dev/null || exit 193
+                            [ -d ${SF_ETCDIR}/elasticsearch ] || exit 192
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'elasticsearch:{{ .Version }}' &>/dev/null || exit 193
                             exit 0
 
             add:
@@ -51,7 +52,8 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            docker pull elasticsearch-oss:7
+                            docker pull elasticsearch:{{ .Version }} || exit 192
+                            exit 0
 
                     config:
                         targets:
@@ -62,48 +64,58 @@ feature:
                             mkdir -p ${SF_ETCDIR}/elasticsearch ${SF_VARDIR}/elasticsearch
 
                             {{ if .ClusterFlavor }}
-                            seeds="{{- range .MasterIPs }}{{.}},{{ end -}}"
+                            HOSTNAME_PREFIX=elasticsearch4safescale
+                            SEEDS="{{- range .MasterIPs }}{{.}},{{ end -}}"
                             {{ else }}
-                            seeds="{{.HostIP}}"
-                            {{ end }}
-                            seeds=${seeds%,}
-
                             HOSTNAME_PREFIX=elasticsearch
-                            {{ if .ClusterFlavor }}
-                            HOSTNAME_PREFIX="${HOSTNAME_PREFIX}4safescale"
+                            SEEDS="{{.HostIP}}"
                             {{ end }}
+                            SEEDS=${SEEDS%,}
+
                             cat >${SF_ETCDIR}/elasticsearch/docker-compose.yml <<-EOF
-                            version: '2.1'
+                            version: '3.7'
 
                             services:
                                 server:
-                                    image: elasticsearch-oss:7
+                                    image: docker.elastic.co/elasticsearch:{{ .ElasticsearchVersion }}
                                     environment:
                                         - cluster.name={{ .ClusterName }}
-                                        - node.name=${HOSTNAME_PREFIX}-{{.Hostname}}
-                                        - discovery.seed_hosts=${seeds}
-                                        - cluster.initial_master_nodes=${seeds}
-                                        - bootstrap.memory_lock=true
+                                        - node.name=${HOSTNAME_PREFIX}-{{ .Hostname }}
+                                {{ if .ClusterFlavor}}
+                                    {{ if eq (len .MasterIPs) 1 }}
+                                        - discovery.type=single-node
+                                    {{ else }}
+                                        - discovery.seed_hosts="${SEEDS}"
+                                        - cluster.initial_master_nodes="${SEEDS}"
+                                        - discovery.zen.ping.unicast.hosts="${SEEDS}"
+                                    {{ end }}
+                                {{ else }}
+                                        - discovery.type=single-node
+                                {{ end }}
+                                        - bootstrap.memory_lock=false
                                         - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
                                     ports:
                                         - {{.HostIP}}:9200:9200
                                         #- {{.HostIP}}:9300:9300
                                     volumes:
                                         - ${SF_VARDIR}/elasticsearch:/var/lib/elasticsearch
-                                    restart: always
-
-                                logstash:
-                                    logstash:
-                                        image: logstash:7
-                                    ports:
-                                        - "{{ .HostIP }}:5000:5000"
-                                        - "{{ .HostIP }}:5000:5000/udp"
-                                        - "{{ .HostIP }}:12201:12201/udp"
-                                    volumes:
-                                        - ${SF_ETCDIR}/elasticsearch/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
-                                    restart: always
-                                    command: [ "-f", "${SF_ETCDIR}/elasticsearch/logstach/" ]
+                                    ulimits:
+                                        nproc: 65535
+                                        memlock:
+                                            soft: -1
+                                            hard: -1
+                                        cap_add:
+                                            - ALL
+                                    deploy:
+                                        restart_policy:
+                                            condition: always
                             EOF
+
+                            cat >/etc/sysctl.d/20-elasticsearch.conf <<-EOF
+                            vm.max_map_count=262144
+                            EOF
+                            sysctl -p || exit 193
+
                             exit 0
 
                     start:
@@ -117,7 +129,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d
+                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d || exit 194
+                            exit 0
 
                     ready:
                         targets:
@@ -130,7 +143,7 @@ feature:
                             {{ else }}
                             PREFIX="elasticsearch"
                             {{ end }}
-                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running
+                            sfRetry 5m 5 "docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running"
 
             remove:
                 pace: stop,remove
@@ -139,23 +152,24 @@ feature:
                         targets:
                             hosts: yes
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             {{ if .ClusterFlavor }}
                             OPTIONS="-p elasticsearch4safescale"
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || exit 192
+                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || exit 195
+                            exit 0
 
                     remove:
                         targets:
                             hosts: yes
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
-                            docker image rm -f elasticsearch:7
-                            purge={{.KeepDataOnRemoval}}
+                            docker image rm -f docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }}
+                            purge={{ .KeepDataOnRemoval }}
                             purge=${purge,,}
                             [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/elasticsearch ${SF_VARDIR}/elasticsearch
                             exit 0
@@ -169,8 +183,8 @@ feature:
                   masters: all
               content: |
                   {
-                      "name": "elasticsearch_http_{{.Hostname}}",
-                      "url": "http://{{.HostIP}}:9200/"
+                      "name": "elasticsearch_http_{{ .Hostname }}",
+                      "url": "http://{{ .HostIP }}:9200/"
                   }
 
             # - name: elasticsearch_transport_svc
@@ -180,8 +194,8 @@ feature:
             #       masters: all
             #   content: |
             #       {
-            #           "name": "elasticsearch_transport_{{.Hostname}}",
-            #           "url": "http://{{.HostIP}}:9300/"
+            #           "name": "elasticsearch_transport_{{ .Hostname }}",
+            #           "url": "http://{{ .HostIP }}:9300/"
             #       }
 
             - name: elasticsearch_http_route
@@ -191,8 +205,9 @@ feature:
                   masters: all
               content: |
                   {
+                      "sources": [ { "ip": "{{ .CIDR }}" }, { "ip": "127.0.0.1" } ],
                       "paths": ["/monitoring/elasticsearch/"],
-                      "service": { "id": "{{.elasticsearch_http_svc}}" }
+                      "service": { "id": "{{ .elasticsearch_http_svc }}" }
                   }
 
 ...
