@@ -265,7 +265,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 			results[k] = s.GetResult().(stepResult)
 
 			if !results[k].Successful() {
-				log.Debugf("%s(%s):step(%s)@%s: fail", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				log.Debugf("%s(%s):step(%s)@%s: fail: %s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k, results.ErrorMessages())
 			} else {
 				log.Debugf("%s(%s):step(%s)@%s: done", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
 			}
