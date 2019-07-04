@@ -58,7 +58,7 @@ feature:
                                     yum makecache fast && \
                                     yum groupinstall -y -t "X Window system" && \
                                     yum groupinstall -y -t Xfce && \
-                                    yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || exit $?
+                                    yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || exit 192
                                     ;;
                                 debian|ubuntu)
                                     sfApt update && apt-mark hold xscreensaver
@@ -66,7 +66,7 @@ feature:
                                     ;;
                                 *)
                                     echo "unsupported OS type '$LINUX_KIND'"
-                                    exit 1
+                                    exit 193
                                     ;;
                             esac
                             exit 0
@@ -78,13 +78,13 @@ feature:
                         timeout: 15
                         run: |
                             URL="https://bintray.com/tigervnc/stable/download_file?file_path=tigervnc-1.9.0.x86_64.tar.gz"
-                            sfDownload "$URL" tigervnc.tgz 3m 5 || exit 192
-                            tar --strip-components=1 -zxvf tigervnc.tgz -C / || exit 193
-                            rm -rf tigervnc.tgz
+                            sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || exit 194
+                            tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || exit 195
+                            rm -rf ${SF_TMPDIR}/tigervnc.tgz
 
                             if [ ! -d ~{{.Username}} ]; then
                                 echo "Homedir of user {{.Username}} not found"
-                                exit 194
+                                exit 196
                             fi
 
                             # Configurations
@@ -249,13 +249,13 @@ feature:
                             EOF
                             cat ${SF_TMPDIR}/xfce_conf.encoded | base64 -d - | tar -Jxvf - -C ~{{.Username}} && \
                             rm -f ${SF_TMPDIR}/xfce_conf.encoded
-                            chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 195
+                            chown -R {{.Username}}:{{.Username}} ~{{.Username}} || exit 197
 
                             systemctl daemon-reload && \
                             systemctl enable vncserver\@:0.service && \
                             systemctl enable vncconfig\@:0.service && \
-                            systemctl restart vncserver\@:0.service || exit 196
-                            systemctl restart vncconfig\@:0.service || exit 197
+                            systemctl restart vncserver\@:0.service || exit 198
+                            systemctl restart vncconfig\@:0.service || exit 199
                             exit 0
 
                     deps:
@@ -263,13 +263,13 @@ feature:
                             hosts: yes
                             masters: all
                         run: |
-                            mkdir -p ${SF_TMPDIR}/remotedesktop.image
-                            cd ${SF_TMPDIR}/remotedesktop.image
+                            mkdir -p ${SF_ETCDIR}/remotedesktop/image
+                            cd ${SF_ETCDIR}/remotedesktop/image
 
                             VERSION=1.0.0
                             APACHE="http://apache.org/dyn/closer.cgi?action=download&filename=guacamole/${VERSION}"
-                            sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || exit 192
-                            sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || exit 193
+                            sfDownload "$APACHE/source/guacamole-server-${VERSION}.tar.gz" guacamole.tgz 3m 5 || exit 200
+                            sfDownload "$APACHE/binary/guacamole-${VERSION}.war" guacamole.war 3m 5 || exit 201
                             exit 0
 
                     guacamole:
@@ -278,7 +278,7 @@ feature:
                             masters: all
                         timeout: 10
                         run: |
-                            cd ${SF_TMPDIR}/remotedesktop.image
+                            cd ${SF_ETCDIR}/remotedesktop/image
 
                             cat >supervisord.conf <<-'EOF'
                             [supervisord]
@@ -474,10 +474,9 @@ feature:
                             ENTRYPOINT ["/opt/safescale/startup.sh"]
                             EOF
 
-                            ls -la
                             # build image
-                            docker build -t remotedesktop:latest --network=host . || exit 192
-                            cd ${SF_TMPDIR} && rm -rf remotedesktop.image
+                            docker build -t remotedesktop:latest --network=host . || exit 202
+                            rm -rf ${SF_ETCDIR}/remotedesktop/image
                             exit 0
 
                     start:
@@ -486,12 +485,25 @@ feature:
                             masters: all
                         run: |
                             # Guacd need sshd to authorize password authentication...
-                            cat >>/etc/ssh/sshd_config <<-'EOF'
+                            DOCKER0_SUBNET=$(docker network inspect bridge {{ "--format '{{json .}}'" }} | jq .IPAM.Config[0].Subnet)
+                            cat >>/etc/ssh/sshd_config <<-EOF
                             # Allow Password Authentication from user {{.Username}} for guacd to work
-                            Match User {{.Username}} Address 172.17.0.0/16
+                            Match User {{.Username}} Address ${DOCKER0_SUBNET}
                                 PasswordAuthentication yes
                             EOF
                             systemctl reload sshd
+
+                            cat >${SF_ETCDIR}/remotedesktop/docker-compose.yml <<-'EOF'
+                            version: '2.1'
+
+                            services:
+                                server:
+                                    image: remotedesktop
+                                    ports:
+                                        - {{ .HostIP }}:9080:8080
+                                        - {{ .HostIP }}:9009:8009
+                                    restart: always
+                            EOF
 
                             # Allow only gateway to connect to port 9080
                             sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source not address="{{.GatewayIP}}" port protocol="tcp" port="9080" reject'
@@ -499,7 +511,7 @@ feature:
                             ###########################################################
                             # Starts remotedesktop container                          #
                             ###########################################################
-                            docker run -d --hostname remotedesktop --name remotedesktop -p "9080:8080" -p "9009:8009" remotedesktop:latest
+                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d || exit 203
                             exit 0
 
             remove:

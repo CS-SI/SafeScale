@@ -1,0 +1,189 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+    parameters:
+        - ElasticsearchPort=9200
+        - ElasticsearchHost={{ .HostIP }}
+        - KibanaURL=http://{{ .HostIP }}:5601/
+
+    install:
+        bash:
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            sfService status packetbeat
+
+            add:
+                pace: install,config,start
+                steps:
+                    install:
+                        serial: true
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    if [ ! -f /etc/apt/sources.list.d/elastic-7.list ]; then
+                                        wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+                                        sfApt install -qy apt-transport-https
+                                        echo "deb https://artifacts.elastic.co/packages/oss-7.x/apt stable main" >/etc/apt/sources.list.d/elastic-7.list
+                                    fi
+                                    sfApt update
+                                    sfApt install -y filebeat || exit 192
+                                    ;;
+                                centos|rhel)
+                                    if [ ! -f /etc/yum.repos.d/elastic-7.repo ]; then
+                                        cat >/etc/yum.repos.d/elastic-7.repo <<-'EOF'
+                            [elastic-7.x]
+                            name=Elastic repository for 7.x OSS packages
+                            baseurl=https://artifacts.elastic.co/packages/oss-7.x/yum
+                            gpgcheck=1
+                            gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+                            enabled=1
+                            autorefresh=1
+                            type=rpm-md
+                            EOF
+                                        rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
+                                    fi
+                                    yum install -y filebeat || exit 192
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 193
+                                    ;;
+                            esac
+                            exit 0
+
+                    config:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            mkdir -p /etc/filebeat/modules.d /var/log/filebeat
+
+                            cat >/etc/filebeat/filebeat.yml <<-EOF
+                            setup.dashboards:
+                              enabled: true
+                            setup.kibana:
+                            {{- if .ClusterFlavor }}
+                                host: "https://{{.GatewayIP}/services/kibana/"
+                            {{ else }}
+                                host: "http://{{.KibanaUrl}}"
+                            {{ end -}}
+
+                            filebeat.config.modules:
+                              path: ${path.config}/modules.d/*.yml
+                              reload.enabled: true
+                              reload.period: 10s
+
+                            filebeat.inputs:
+                              - type: log
+                                paths:
+                                  - /var/log/*.log
+                                  - /var/log/*/*.log
+
+                            output.elasticsearch:
+                            {{- if .ClusterFlavor }}
+                              hosts:
+                              {{- range .MasterIPs }}
+                                - "{{ . }}"
+                              {{ end -}}
+                            {{ else }}
+                              hosts:
+                                - "{{ .ElasticsearchHost }}"
+                            {{ end -}}
+                              protocol: http
+                              port: {{ .ElasticsearchPort }}
+
+                            tags: ["safescale"]
+
+                            logging.to_files: true
+                            logging.files:
+                              path: /var/log/filebeat
+                              name: filebeat.log
+                            logging.selectors: ["*"]
+                            logging.to_syslog: false
+                            EOF
+                            exit 0
+
+                    start:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            sfService enable filebeat
+                            sfService start filebeat || exit 196
+                            exit 0
+
+            remove:
+                pace: stop,remove
+                steps:
+                    stop:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            sfService stop filebeat
+                            sfService disable filebeat
+
+                    remove:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfApt remove -y filebeat
+                                    sfApt purge -y filebeat
+                                    ;;
+                                centos|rhel)
+                                    yum remove -y filebeat
+                                    ;;
+                                *)
+                                    echo "Unsupported operating system '$LINUX_KIND'"
+                                    exit 4224
+                                    ;;
+                            esac
+                            rm -rf /etc/filebeat
+
+    service:
+        start: |
+            sfService start filebeat
+
+        stop: |
+            sfService stop filebeat
+
+        state: |
+            sfService status filebeat
+
+...

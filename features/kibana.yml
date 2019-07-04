@@ -23,9 +23,10 @@ feature:
         features:
             - elasticsearch
     parameters:
+        - KibanaVersion=7.2.0
         - KibanaPort=5601
         - KibanaHost={{.HostIP}}
-        - ElasticsearchURL=http://localhost:9200/
+        - ElasticsearchURL=http://{{.HostIP}}:9200/
 
     install:
         bash:
@@ -38,7 +39,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'bitnami/kibana:7' &>/dev/null
+                            docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'docker.elastic.co/kibana/kibana:{{ .KibanaVersion }}' &>/dev/null
 
             add:
                 pace: image,config,start
@@ -49,7 +50,8 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            docker pull bitnami/kibana:7
+                            docker pull docker.elastic.co/kibana/kibana:{{ .KibanaVersion }} || exit 192
+                            exit 0
 
                     config:
                         targets:
@@ -59,22 +61,31 @@ feature:
                         run: |
                             mkdir -p ${SF_ETCDIR}/kibana ${SF_VARDIR}/kibana
 
-                            cat >${SF_ETCDIR}/kibana/docker-compose.yml <<EOF
-                            version: '2'
+                            cat >${SF_ETCDIR}/kibana/kibana.yml <<-EOF
+                            server.name: {{.Hostname}}
+                            console.enabled: true
+                            elasticsearch:
+                            {{- if .ClusterFlavor }}
+                                hosts:
+                              {{- range .MasterIPs }}
+                                    - "{{ . }}"
+                              {{ end -}}
+                            {{ else }}
+                                hosts:
+                                    - "{{ .ElasticsearchHost }}"
+                            {{ end -}}
+                            EOF
+
+                            cat >${SF_ETCDIR}/kibana/docker-compose.yml <<-EOF
+                            version: '2.1'
 
                             services:
                                 server:
-                                    image: 'bitnami/kibana:7'
+                                    image: docker.elastic.co/kibana/kibana:{{ .KibanaVersion }}
                                     ports:
-                                        - {{.HostIP}}:{{.KibanaPort}}:5601
-                                    environment:
-                                    {{ if .ClusterFlavor }}
-                                        - KIBANA_ELASTICSEARCH_URL="https://{{.GatewayIP}}/services/elasticsearch/"
-                                    {{ else }}
-                                        - KIBANA_ELASTICSEARCH_URL="{{ .ElasticsearchURL }}
-                                    {{ end }}
+                                        - {{.HostIP}}:{{ .KibanaPort}}:5601
                                     volumes:
-                                        - ${SF_VARDIR}/kibana:/bitnami
+                                        - ${SF_ETCDIR}/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
                                     restart: always
                             EOF
                             exit 0
@@ -90,7 +101,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d
+                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d || exit 193
+                            exit 0
 
             remove:
                 pace: stop,remove
@@ -106,7 +118,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d
+                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force || exit 194
+                            exit 0
 
                     remove:
                         targets:
@@ -114,7 +127,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            docker image rm -f bitnami/kibana:7
+                            docker image rm -f docker.elastic.co/kibana/kibana:{{ .KibanaVersion }}
                             rm -rf ${SF_ETCDIR}/kibana ${SF_VARDIR}/kibana
                             exit 0
 
@@ -138,6 +151,7 @@ feature:
                   masters: all
               content: |
                   {
+                      "sources": [ { "ip": "{{ .CIDR }}" }, { "ip": "127.0.0.1" } ],
                       "paths": ["/monitoring/kibana/"],
                       "service": { "id": "{{.kibana_svc}}" }
                   }
