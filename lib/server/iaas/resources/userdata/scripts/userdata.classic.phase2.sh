@@ -687,6 +687,27 @@ configure_locale() {
     export LANGUAGE=en_US.UTF-8 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 }
 
+
+force_dbus_restart() {
+    case $LINUX_KIND in
+        ubuntu)
+            sudo sed -i 's/^RefuseManualStart=.*$/RefuseManualStart=no/g' /lib/systemd/system/dbus.service
+            sudo systemctl daemon-reexec
+            sudo systemctl restart dbus.service
+            ;;
+    esac
+}
+
+# Kernel settings considered necessary
+update_kernel_settings() {
+    cat >/etc/sysctl.d/20-safescale.conf <<-EOF
+vm.max_map_count=262144
+
+net.ipv4.ip_nonlocal_bind=1
+EOF
+    sysctl -p
+}
+
 # ---- Main
 
 configure_locale
@@ -697,9 +718,10 @@ add_common_repos
 identify_nics
 configure_network
 
-
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
+
+update_kernel_settings || fail 216
 
 echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 # For compatibility with previous user_data implementation (until v19.03.x)...
@@ -708,6 +730,8 @@ ln -s /opt/safescale/var/state/user_data.phase2.done /var/tmp/user_data.done
 # !!! DON'T REMOVE !!! #insert_tag allows to add something just before exiting,
 #                      but after the template has been realized (cf. libvirt Stack)
 #insert_tag
+
+force_dbus_restart
 
 set +x
 exit 0
