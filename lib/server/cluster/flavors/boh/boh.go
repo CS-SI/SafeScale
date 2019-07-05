@@ -73,16 +73,22 @@ var (
 )
 
 func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int, int, int) {
-	var privateNodeCount int
+	var (
+		privateNodeCount int
+		masterNodeCount  int
+	)
 	switch foreman.Cluster().GetIdentity(task).Complexity {
 	case Complexity.Small:
 		privateNodeCount = 1
+		masterNodeCount = 1
 	case Complexity.Normal:
 		privateNodeCount = 3
+		masterNodeCount = 2
 	case Complexity.Large:
 		privateNodeCount = 7
+		masterNodeCount = 3
 	}
-	return 1, privateNodeCount, 0
+	return masterNodeCount, privateNodeCount, 0
 }
 
 func gatewaySizing(task concurrency.Task, foreman control.Foreman) pb.HostDefinition {
