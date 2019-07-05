@@ -1020,18 +1020,18 @@ func (b *foreman) taskCreateMaster(tr concurrency.TaskRunner, params interface{}
 	hostLabel := fmt.Sprintf("master #%d", index)
 	log.Debugf("[%s] starting host resource creation...\n", hostLabel)
 
-	name, err := b.buildHostname(tr.Task(), "master", NodeType.Master)
+	hostDef := *def
+	hostDef.Name, err = b.buildHostname(tr.Task(), "master", NodeType.Master)
 	if err != nil {
 		log.Errorf("[%s] creation failed: %s\n", hostLabel, err.Error())
 		err = fmt.Errorf("failed to create '%s': %s", hostLabel, err.Error())
 		return
 	}
 
-	def.Network = b.cluster.GetNetworkConfig(tr.Task()).NetworkID
-	def.Public = false
-	def.Name = name
+	hostDef.Network = b.cluster.GetNetworkConfig(tr.Task()).NetworkID
+	hostDef.Public = false
 	clientHost := client.New().Host
-	pbHost, err := clientHost.Create(*def, timeout)
+	pbHost, err := clientHost.Create(hostDef, timeout)
 	if pbHost != nil {
 		// Updates cluster metadata to keep track of created host, before testing if an error occured during the creation
 		mErr := b.cluster.UpdateMetadata(tr.Task(), func() error {
@@ -1285,19 +1285,20 @@ func (b *foreman) taskCreateNode(tr concurrency.TaskRunner, params interface{}) 
 	log.Debugf("[%s] starting host resource creation...", hostLabel)
 
 	// Create the host
-	def.Name, err = b.buildHostname(tr.Task(), "node", NodeType.Node)
+	hostDef := *def
+	hostDef.Name, err = b.buildHostname(tr.Task(), "node", NodeType.Node)
 	if err != nil {
 		log.Errorf("[%s] host resource creation failed: %s", hostLabel, err.Error())
 		return
 	}
-	def.Network = b.cluster.GetNetworkConfig(tr.Task()).NetworkID
+	hostDef.Network = b.cluster.GetNetworkConfig(tr.Task()).NetworkID
 	if timeout < utils.GetLongOperationTimeout() {
 		timeout = utils.GetLongOperationTimeout()
 	}
 
 	clientHost := client.New().Host
 	var node *clusterpropsv1.Node
-	pbHost, err := clientHost.Create(*def, timeout)
+	pbHost, err := clientHost.Create(hostDef, timeout)
 	if pbHost != nil {
 		mErr := b.cluster.UpdateMetadata(tr.Task(), func() error {
 			// Locks for write the NodesV1 extension...
