@@ -697,6 +697,17 @@ force_dbus_restart() {
     esac
 }
 
+update_kernel_settings() {
+    cat >/etc/sysctl.d/20-safescale.conf <<-EOF
+vm.max_map_count=262144
+
+# To allow to bring up an interface with an IP that is not considered local (not part of the /etc/network/interfaces|/etc/sysconfig/network-scripts)
+# In other words, to allow Virtual IP
+net.ipv4.ip_nonlocal_bind=1
+EOF
+    sysctl -p
+}
+
 # ---- Main
 
 configure_locale
@@ -707,9 +718,10 @@ early_packages_update
 identify_nics
 configure_network
 
-
 install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
+
+update_kernel_settings || fail 216
 
 echo -n "0,linux,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 # For compatibility with previous user_data implementation (until v19.03.x)...
