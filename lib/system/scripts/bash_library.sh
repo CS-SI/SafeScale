@@ -405,6 +405,30 @@ sfService() {
 	return 1
 }
 
+# tells if a container with this image (and optionnaly name) is running
+sfDoesDockerRun() {
+	[ $# -eq 0 ] && return 1
+	local IMAGE=$1
+	shift
+	local NAME=$1
+
+	local LIST=$(docker container ls --format '{{.Image}}:{{.Names}}:{{.Status}}')
+	if [ -z "$LIST" ]; then
+		return 1
+	fi
+	if [ "$IMAGE" != "$(echo "$LIST" | cut -d\: -f1)" ]; then
+		return 1
+	fi
+	if [ ! -z "$NAME" -a "$NAME" = "$(echo "$LIST" | cut -d\: -f2)" ]; then
+		return 1
+	fi
+	if ! echo $LIST | cu -d\: -f3 | grep -i "^up"; then
+		return 1
+	fi
+	return 0
+}
+
+# Removes unnamed images (prune removes also not running images, not )
 # echoes a random string
 # $1 is the size of the result (optional)
 # $2 is the characters to choose from (optional); use preferably [:xxx:] notation (like [:alnum:] for all letters and digits)
