@@ -38,7 +38,7 @@ import (
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
 	// disable subnetwork auto-creation
 	ne := compute.Network{
-		Name:                  "safescale",
+		Name: s.GcpConfig.NetworkName,
 		AutoCreateSubnetworks: false,
 		ForceSendFields:       []string{"AutoCreateSubnetworks"},
 	}
@@ -96,7 +96,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	subnetReq := compute.Subnetwork{
 		IpCidrRange: req.CIDR,
 		Name:        req.Name,
-		Network:     fmt.Sprintf("projects/%s/global/networks/%s", s.GcpConfig.ProjectId, "safescale"),
+		Network:     fmt.Sprintf("projects/%s/global/networks/%s", s.GcpConfig.ProjectId, s.GcpConfig.NetworkName),
 		Region:      theRegion,
 	}
 
@@ -130,7 +130,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	subnet.IPVersion = IPVersion.IPv4
 
 	buildNewRule := true
-	firewallRuleName := fmt.Sprintf("%s-%s-all-in", "safescale", gcpSubNet.Name)
+	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, gcpSubNet.Name)
 
 	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectId, firewallRuleName).Do()
 	if fws != nil && err == nil {
@@ -148,7 +148,6 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	}
 
 	if buildNewRule {
-		// FIXME Create more firewall rules
 		fiw := compute.Firewall{
 			Allowed: []*compute.FirewallAllowed{
 				{
@@ -158,7 +157,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 			Direction:    "INGRESS",
 			Disabled:     false,
 			Name:         firewallRuleName,
-			Network:      fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectId, "safescale"),
+			Network:      fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectId, s.GcpConfig.NetworkName),
 			Priority:     999,
 			SourceRanges: []string{"0.0.0.0/0"},
 		}
@@ -182,7 +181,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	// FIXME Replace project name "safescale", use network name from configuration
 	buildNewNATRule := true
-	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", "safescale", gcpSubNet.Name)
+	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, gcpSubNet.Name)
 
 	rfs, err := compuService.Routes.Get(s.GcpConfig.ProjectId, natRuleName).Do()
 	if rfs != nil && err == nil {
@@ -203,7 +202,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		route := &compute.Route{
 			DestRange:       "0.0.0.0/0",
 			Name:            natRuleName,
-			Network:         fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectId, "safescale"),
+			Network:         fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectId, s.GcpConfig.NetworkName),
 			NextHopInstance: fmt.Sprintf("projects/%s/zones/%s/instances/gw-%s", s.GcpConfig.ProjectId, s.GcpConfig.Zone, req.Name),
 			Priority:        800,
 			Tags:            []string{fmt.Sprintf("no-ip-%s", gcpSubNet.Name)},
@@ -262,13 +261,6 @@ func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
 
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
-	logrus.Debug(">>> stacks.gcp::ListNetworks() called")
-	defer logrus.Debug("<<< stacks.gcp::ListNetworks() done")
-
-	if s == nil {
-		panic("Calling s.ListNetworks with s==nil!")
-	}
-
 	var networks []*resources.Network
 
 	compuService := s.ComputeService
@@ -359,7 +351,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	}
 
 	// Delete routes and firewall
-	firewallRuleName := fmt.Sprintf("%s-%s-all-in", "safescale", subnetwork.Name)
+	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, subnetwork.Name)
 	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectId, firewallRuleName).Do()
 	if fws != nil && err == nil {
 		opp, err := compuService.Firewalls.Delete(s.GcpConfig.ProjectId, firewallRuleName).Do()
@@ -379,7 +371,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 		logrus.Warn(err)
 	}
 
-	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", "safescale", subnetwork.Name)
+	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, subnetwork.Name)
 	nws, err := compuService.Routes.Get(s.GcpConfig.ProjectId, natRuleName).Do()
 	if nws != nil && err == nil {
 		opp, err := compuService.Routes.Delete(s.GcpConfig.ProjectId, natRuleName).Do()
