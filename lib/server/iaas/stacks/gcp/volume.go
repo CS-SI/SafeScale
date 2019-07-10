@@ -40,11 +40,11 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	}
 
 	newDisk := &compute.Disk{
-		Name:                        request.Name,
-		Region:                      s.GcpConfig.Region,
-		SizeGb:                      int64(request.Size),
-		Type:                        selectedType,
-		Zone:                        s.GcpConfig.Zone,
+		Name:   request.Name,
+		Region: s.GcpConfig.Region,
+		SizeGb: int64(request.Size),
+		Type:   selectedType,
+		Zone:   s.GcpConfig.Zone,
 	}
 
 	service := s.ComputeService
@@ -55,9 +55,9 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	}
 
 	oco := OpContext{
-		Operation: op,
-		ProjectId: s.GcpConfig.ProjectId,
-		Service:   service,
+		Operation:    op,
+		ProjectId:    s.GcpConfig.ProjectId,
+		Service:      service,
 		DesiredState: "DONE",
 	}
 
@@ -123,7 +123,6 @@ func volumeStateConvert(gcpDriveStatus string) VolumeState.Enum {
 	}
 }
 
-
 //ListVolumes return the list of all volume known on the current tenant
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	var volumes []resources.Volume
@@ -166,9 +165,9 @@ func (s *Stack) DeleteVolume(ref string) error {
 	}
 
 	oco := OpContext{
-		Operation: op,
-		ProjectId: s.GcpConfig.ProjectId,
-		Service:   service,
+		Operation:    op,
+		ProjectId:    s.GcpConfig.ProjectId,
+		Service:      service,
 		DesiredState: "DONE",
 	}
 
@@ -194,8 +193,8 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	}
 
 	cad := &compute.AttachedDisk{
-		DeviceName:        gcpDisk.Name,
-		Source:            gcpDisk.SelfLink,
+		DeviceName: gcpDisk.Name,
+		Source:     gcpDisk.SelfLink,
 	}
 
 	op, err := s.ComputeService.Instances.AttachDisk(s.GcpConfig.ProjectId, s.GcpConfig.Zone, gcpInstance.Name, cad).Do()
@@ -204,9 +203,9 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	}
 
 	oco := OpContext{
-		Operation: op,
-		ProjectId: s.GcpConfig.ProjectId,
-		Service:   service,
+		Operation:    op,
+		ProjectId:    s.GcpConfig.ProjectId,
+		Service:      service,
 		DesiredState: "DONE",
 	}
 
@@ -233,10 +232,10 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 		if disk != nil {
 			if disk.DeviceName == favoriteSlave {
 				vat := &resources.VolumeAttachment{
-					ID:         id,
-					Name:       dat.diskName,
-					VolumeID:   dat.diskName,
-					ServerID:   dat.hostName,
+					ID:       id,
+					Name:     dat.diskName,
+					VolumeID: dat.diskName,
+					ServerID: dat.hostName,
 				}
 				return vat, nil
 			}
@@ -267,9 +266,9 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 	}
 
 	oco := OpContext{
-		Operation: op,
-		ProjectId: s.GcpConfig.ProjectId,
-		Service:   service,
+		Operation:    op,
+		ProjectId:    s.GcpConfig.ProjectId,
+		Service:      service,
 		DesiredState: "DONE",
 	}
 
@@ -293,10 +292,10 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 	for _, disk := range gcpInstance.Disks {
 		if disk != nil {
 			vat := resources.VolumeAttachment{
-				ID:         newGcpDiskAttachment(gcpInstance.Name, disk.DeviceName).attachmentId,
-				Name:       disk.DeviceName,
-				VolumeID:   disk.DeviceName,
-				ServerID:   serverID,
+				ID:       newGcpDiskAttachment(gcpInstance.Name, disk.DeviceName).attachmentId,
+				Name:     disk.DeviceName,
+				VolumeID: disk.DeviceName,
+				ServerID: serverID,
 			}
 			vats = append(vats, vat)
 		}
@@ -307,8 +306,8 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 
 type gcpDiskAttachment struct {
 	attachmentId string
-	hostName string
-	diskName string
+	hostName     string
+	diskName     string
 }
 
 func newGcpDiskAttachment(hostName string, diskName string) *gcpDiskAttachment {

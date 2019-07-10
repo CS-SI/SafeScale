@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -45,16 +46,25 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
-		return &provider{}, fmt.Errorf("Section identity not found in tenants.toml !!")
+		return &provider{}, fmt.Errorf("section identity not found in tenants.toml !!")
 	}
 
 	computeCfg, ok := params["compute"].(map[string]interface{})
 	if !ok {
-		return &provider{}, fmt.Errorf("Section compute not found in tenants.toml !!")
+		return &provider{}, fmt.Errorf("section compute not found in tenants.toml !!")
 	}
 
-	// FIXME Use the network to change default "safescale" network
-	// network, _ := params["network"].(map[string]interface{})
+	networkName := "safescale"
+
+	networkCfg, ok := params["network"].(map[string]interface{})
+	if !ok {
+		logrus.Warnf("section network not found in tenants.toml !!")
+	} else {
+		newNetworkName, _ := networkCfg["ProviderNetwork"].(string)
+		if newNetworkName != "" {
+			networkName = newNetworkName
+		}
+	}
 
 	projectId, _ := identityCfg["project_id"].(string)
 	privateKeyId, _ := identityCfg["private_key_id"].(string)
@@ -81,6 +91,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		ClientCert:   clientCertUrl,
 		Region:       region,
 		Zone:         zone,
+		NetworkName:  networkName,
 	}
 
 	username, _ := identityCfg["Username"].(string)
@@ -130,8 +141,11 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		return nil, err
 	}
 
-	etrace := apiprovider.NewErrorTraceProvider(&provider{stack}, "gcp")
-	prov := apiprovider.NewLoggedProvider(etrace, "gcp")
+	providerName := "gcp"
+
+	// evalid := apiprovider.NewValidatedProvider(&provider{stack}, providerName)
+	etrace := apiprovider.NewErrorTraceProvider(&provider{stack}, providerName)
+	prov := apiprovider.NewLoggedProvider(etrace, providerName)
 	return prov, nil
 }
 
