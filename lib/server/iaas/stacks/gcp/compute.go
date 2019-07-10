@@ -177,17 +177,17 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	return nil, fmt.Errorf("Not implemented")
+	return nil, fmt.Errorf("not implemented")
 }
 
 // ListKeyPairs lists available key pairs
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	return nil, fmt.Errorf("Not implemented")
+	return nil, fmt.Errorf("not implemented")
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	return fmt.Errorf("Not implemented")
+	return fmt.Errorf("not implemented")
 }
 
 // CreateHost creates an host satisfying request
@@ -355,7 +355,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	err = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 
-			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectId, request.ResourceName, rim.URL, s.GcpConfig.Zone, "safescale", defaultNetwork.Name, string(userDataPhase1), isGateway, template)
+			server, err := buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectId, request.ResourceName, rim.URL, s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template)
 			if err != nil {
 				if server != nil {
 					killErr := s.DeleteHost(server.ID)
@@ -400,7 +400,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error creating host: timeout"))
 	}
 	if desistError != nil {
-		return nil, userData, resources.ResourceAccessDeniedError(request.ResourceName, fmt.Sprintf("Error creating host: %s", desistError.Error()) )
+		return nil, userData, resources.ResourceAccessDeniedError(request.ResourceName, fmt.Sprintf("Error creating host: %s", desistError.Error()))
 	}
 
 	logrus.Debugf("host resource created.")
@@ -679,7 +679,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to update HostProperty.NetworkV1 : %s", err.Error())
+		return nil, fmt.Errorf("failed to update HostProperty.NetworkV1 : %s", err.Error())
 	}
 
 	allocated := fromMachineTypeToAllocatedSize(gcpHost.MachineType)
@@ -692,7 +692,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to update HostProperty.SizingV1 : %s", err.Error())
+		return nil, fmt.Errorf("failed to update HostProperty.SizingV1 : %s", err.Error())
 	}
 
 	if !host.OK() {
@@ -908,7 +908,24 @@ func (s *Stack) GetHostState(hostParam interface{}) (HostState.Enum, error) {
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
-	regions := make(map[string]bool)
+	zones := make(map[string]bool)
+
+	compuService := s.ComputeService
+
+	resp, err := compuService.Zones.List(s.GcpConfig.ProjectId).Do()
+	if err != nil {
+		return zones, err
+	}
+	for _, region := range resp.Items {
+		zones[region.Name] = region.Status == "UP"
+	}
+
+	return zones, nil
+}
+
+// ListRegions ...
+func (s *Stack) ListRegions() ([]string, error) {
+	var regions []string
 
 	compuService := s.ComputeService
 
@@ -917,17 +934,8 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 		return regions, err
 	}
 	for _, region := range resp.Items {
-		regions[region.Name] = region.Status == "UP"
+		regions = append(regions, region.Name)
 	}
-
-	return regions, nil
-}
-
-// ListRegions ...
-func (s *Stack) ListRegions() ([]string, error) {
-	// FIXME Implement this
-
-	var regions []string
 
 	return regions, nil
 }
