@@ -44,6 +44,9 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// VPL: SSH ControlMaster options: -oControlMaster=auto -oControlPath=~/.ssh/sockets/socket-%C -oControlPersist=5m
+//      Quick tries not very successful...
+//      Should not be used for interactive ssh connection...
 const sshOptions = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 
 var (
@@ -274,7 +277,7 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 		}
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", cfg.Host)), 0777)
 		partials := strings.Split(f.Name(), "/")
-		dumpName := utils.AbsPathify( fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", cfg.Host, partials[len(partials)-1] ))
+		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", cfg.Host, partials[len(partials)-1]))
 		err = ioutil.WriteFile(dumpName, []byte(cfg.GatewayConfig.PrivateKey), 0644)
 		if err != nil {
 			log.Warnf("[TRACE] Failure storing key in %s", dumpName)
@@ -596,7 +599,7 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString string, withSudo bool) (string
 		}
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", sshConfig.Host)), 0777)
 		partials := strings.Split(f.Name(), "/")
-		dumpName := utils.AbsPathify( fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", sshConfig.Host, partials[len(partials)-1] ))
+		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", sshConfig.Host, partials[len(partials)-1]))
 		err = ioutil.WriteFile(dumpName, []byte(sshConfig.PrivateKey), 0644)
 		if err != nil {
 			log.Warnf("[TRACE] Failure storing key in %s", dumpName)
