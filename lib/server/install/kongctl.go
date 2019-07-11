@@ -51,22 +51,22 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 	}
 
 	// Check if reverseproxy feature is installed on host
-	rp, err := NewEmbeddedFeature(concurrency.VoidTask(), "kong")
+	rp, err := NewEmbeddedFeature(concurrency.VoidTask(), "kong4gateway")
 	if err != nil {
-		return nil, fmt.Errorf("failed to find a feature called 'kong'")
+		return nil, fmt.Errorf("failed to find a feature called 'kong4gateway'")
 	}
 	present := false
 	if anon, ok := kongProxyCheckedCache.Get(host.Name); ok {
 		present = anon.(bool)
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(host.Name, func() (interface{}, error) {
-			target := NewHostTarget(host)
+			target := NewNodeTarget(host)
 			if err != nil {
 				return nil, err
 			}
 			results, err := rp.Check(target, Variables{}, Settings{})
 			if err != nil {
-				return nil, fmt.Errorf("failed to check if feature 'kong' is installed on gateway: %s", err.Error())
+				return nil, fmt.Errorf("failed to check if feature 'kong4gateway' is installed on gateway: %s", err.Error())
 			}
 			return results.Successful(), nil
 		})
@@ -76,7 +76,7 @@ func NewKongController(host *pb.Host) (*KongController, error) {
 		present = true
 	}
 	if !present {
-		return nil, fmt.Errorf("'kong' feature isn't installed on gateway")
+		return nil, fmt.Errorf("'kong4gateway' feature isn't installed on gateway")
 	}
 
 	return &KongController{
@@ -96,62 +96,99 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 		return err
 	}
 
+	var sourceControl map[string]interface{}
+
 	// Analyzes the rule...
 	var url string
 	switch ruleType {
 	case "service":
 		url = "services/"
 
-	case "route":
-		url = "routes/"
 		unjsoned := map[string]interface{}{}
-		err := json.Unmarshal([]byte(content), &unjsoned)
+		err = json.Unmarshal([]byte(content), &unjsoned)
 		if err != nil {
 			return fmt.Errorf("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
-		unjsoned["protocols"] = []string{"https"}
+		if _, ok := unjsoned["source-control"]; ok {
+			sourceControl = unjsoned["source-control"].(map[string]interface{})
+			delete(unjsoned, "source-control")
+		}
+		unjsoned["name"] = ruleName
 		jsoned, _ := json.Marshal(&unjsoned)
 		content = string(jsoned)
 
-	case "upstream":
-		url = "upstreams/"
-		// Create upstream if it doesn't exist
+		response, err := k.post(ruleName, url, content, values, true)
+		if err != nil {
+			log.Debugf("")
+			return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
+		}
+		return k.addSourceControl(ruleName, url, response["id"].(string), sourceControl, values)
+
+	case "route":
+		url = "routes/"
+
+		// Check if route already exist (a route doesn't have to be create multiple times)
+		response, err := k.get(ruleName, url+ruleName)
+		if err == nil {
+			return nil
+		}
+		if _, ok := err.(utils.ErrNotFound); !ok {
+			return fmt.Errorf("failed to check if a route with the name '%s' already exists", ruleName)
+		}
+
+		// Doesn't exist, create it
 		unjsoned := map[string]interface{}{}
-		err := json.Unmarshal([]byte(content), &unjsoned)
+		err = json.Unmarshal([]byte(content), &unjsoned)
 		if err != nil {
 			return fmt.Errorf("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
-		upstreamName := unjsoned["name"].(string)
-		url += upstreamName
-		response, err := k.get(ruleName, url)
-		if response == nil && err != nil {
-			return err
+		if _, ok := unjsoned["source-control"]; ok {
+			sourceControl = unjsoned["source-control"].(map[string]interface{})
+			delete(unjsoned, "source-control")
 		}
-		if msg, ok := response["message"]; ok {
-			if strings.ToLower(msg.(string)) == "not found" {
-				err := k.createUpstream(upstreamName, values)
-				if err != nil {
-					return err
-				}
+		unjsoned["name"] = ruleName // To name the route...
+		unjsoned["protocols"] = []string{"https"}
+		jsoned, _ := json.Marshal(&unjsoned)
+		content = string(jsoned)
+		response, err = k.post(ruleName, url, content, values, true)
+		if err != nil {
+			log.Debugf("")
+			return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
+		}
+		return k.addSourceControl(ruleName, url, response["id"].(string), sourceControl, values)
+
+	case "upstream":
+		url = "upstreams/"
+
+		// Create upstream if it doesn't exist
+		url += ruleName
+		create := false
+		_, err = k.get(ruleName, url)
+		if err != nil {
+			if _, ok := err.(utils.ErrNotFound); !ok {
+				return err
+			}
+			create = true
+		}
+		if create {
+			err = k.createUpstream(ruleName, values)
+			if err != nil {
+				return err
 			}
 		}
 
 		// Now ready to add target to upstream
-		delete(unjsoned, "name")
-		jsoned, _ := json.Marshal(&unjsoned)
-		content = string(jsoned)
 		url += "/targets"
+		_, err = k.post(ruleName, url, content, values, true)
+		if err != nil {
+			log.Debugf("")
+			return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
+		}
+		return nil
 
 	default:
 		return fmt.Errorf("syntax error in rule '%s': %s isn't a valid type", ruleName, ruleType)
 	}
-
-	_, err = k.post(ruleName, url, content, values)
-	if err != nil {
-		log.Debugf("")
-		return fmt.Errorf("failed to apply proxy rule '%s': %s", ruleName, err.Error())
-	}
-	return nil
 }
 
 func (k *KongController) realizeRuleData(content string, v Variables) (string, error) {
@@ -170,7 +207,7 @@ func (k *KongController) realizeRuleData(content string, v Variables) (string, e
 func (k *KongController) createUpstream(name string, v *Variables) error {
 	upstreamData := map[string]string{"name": name}
 	jsoned, _ := json.Marshal(&upstreamData)
-	response, err := k.post(name, "upstreams/", string(jsoned), v)
+	response, err := k.post(name, "upstreams/", string(jsoned), v, true)
 	if response == nil && err != nil {
 		return err
 	}
@@ -178,6 +215,33 @@ func (k *KongController) createUpstream(name string, v *Variables) error {
 		return fmt.Errorf("failed to create upstream: %s", msg)
 	}
 	return nil
+}
+
+func (k *KongController) addSourceControl(ruleName, url, resource string, sourceControl map[string]interface{}, v *Variables) error {
+	if sourceControl != nil {
+		data := map[string]interface{}{
+			"config": sourceControl,
+		}
+		data["name"] = "ip-restriction"
+		jsoned, _ := json.Marshal(&data)
+		url += fmt.Sprintf("%s/plugins", resource)
+		_, err := k.post(ruleName, url, string(jsoned), v, false)
+		if err != nil {
+			msg := fmt.Sprintf("failed to apply setting 'source-control' of proxy rule '%s': %s", ruleName, err.Error())
+			log.Debugf(utils.Capitalize(msg))
+			return fmt.Errorf(msg)
+		}
+	}
+	return nil
+}
+
+func (k *KongController) buildSourceControlContent(rules map[string]interface{}) string {
+	data := map[string]interface{}{
+		"config": rules,
+	}
+	data["name"] = "ip-restriction"
+	jsoned, _ := json.Marshal(&data)
+	return string(jsoned)
 }
 
 func (k *KongController) get(name, url string) (map[string]interface{}, error) {
@@ -196,16 +260,22 @@ func (k *KongController) get(name, url string) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if output[1] == "200" || output[1] == "201" {
+	switch output[1] {
+	case "200":
+		fallthrough
+	case "201":
 		return response, nil
+	case "404":
+		return nil, utils.NotFoundError("")
+	default:
+		if msg, ok := response["message"]; ok {
+			return response, fmt.Errorf("get failed: HTTP error code=%s: %s", output[1], msg.(string))
+		}
+		return response, fmt.Errorf("get failed with HTTP error code '%s'", output[1])
 	}
-	if msg, ok := response["message"]; ok {
-		return response, fmt.Errorf("get failed: HTTP error code=%s: %s", output[1], msg.(string))
-	}
-	return response, fmt.Errorf("get failed with HTTP error code '%s'", output[1])
 }
 
-func (k *KongController) post(name, url, data string, v *Variables) (map[string]interface{}, error) {
+func (k *KongController) post(name, url, data string, v *Variables, propagate bool) (map[string]interface{}, error) {
 	// Now apply the rule to Kong
 	cmd := fmt.Sprintf(curlPost, url, data)
 	retcode, stdout, stderr, err := safescale.New().Ssh.Run(k.host.Name, cmd, safescale.DefaultConnectionTimeout, safescale.DefaultExecutionTimeout)
@@ -217,19 +287,37 @@ func (k *KongController) post(name, url, data string, v *Variables) (map[string]
 		return nil, fmt.Errorf("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 	output := strings.Split(stdout, "\n")
+
 	var response map[string]interface{}
 	err = json.Unmarshal([]byte(output[0]), &response)
 	if err != nil {
 		return nil, err
 	}
-	if output[1] == "200" || output[1] == "201" {
-		if id, ok := response["id"]; ok {
-			(*v)[name] = id.(string)
+
+	switch output[1] {
+	case "200":
+		fallthrough
+	case "201":
+		if propagate {
+			if id, ok := response["id"]; ok {
+				(*v)[name] = id.(string)
+			}
 		}
 		return response, nil
+	case "404":
+		if msg, ok := response["message"]; ok {
+			return nil, utils.NotFoundError(msg.(string))
+		}
+		return nil, utils.NotFoundError("")
+	case "409":
+		if msg, ok := response["message"]; ok {
+			return nil, utils.DuplicateError(msg.(string))
+		}
+		return nil, utils.DuplicateError("")
+	default:
+		if msg, ok := response["message"]; ok {
+			return response, fmt.Errorf("post failed: HTTP error code=%s: %s", output[1], msg.(string))
+		}
+		return response, fmt.Errorf("post failed with HTTP error code '%s'", output[1])
 	}
-	if msg, ok := response["message"]; ok {
-		return response, fmt.Errorf("post failed: HTTP Error code %s: %s", output[1], msg.(string))
-	}
-	return response, fmt.Errorf("post failed: HTTP error code '%s'", output[1])
 }
