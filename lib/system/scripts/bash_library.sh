@@ -361,7 +361,7 @@ sfProbeGPU() {
 }
 
 sfReverseProxyReload() {
-	id=$(docker ps --filter "name=kong4safescale_proxy_1" {{ "--format '{{.ID}}'" }})
+	id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }})
 	[ ! -z "$id" ] && docker exec $id kong reload >/dev/null
 }
 export -f sfReverseProxyReload
@@ -404,29 +404,52 @@ sfService() {
 	esac
 	return 1
 }
+export -f sfService
 
-# tells if a container with this image (and optionnaly name) is running
+# tells if a container using a specific image (and optionnaly name) is running in standalone mode
 sfDoesDockerRun() {
+	[ $# -eq 0 ] && return 1
+	local IMAGE=$1
+	shift
+	local NAME=
+	[ $# -ge 1 ] && NAME=$1
+
+	local LIST=$(docker container ls {{ "--format '{{.Image}}|{{.Names}}|{{.Status}}'" }})
+	[ -z "$LIST" ] && return 1
+	[ "$IMAGE" != "$(echo "$LIST" | cut -d'|' -f1 | grep "$IMAGE" | uniq)" ] && return 1
+	[ ! -z "$NAME" -a "$NAME" != "$(echo "$LIST" | cut -d'|' -f2 | grep "$NAME" | uniq)" ] && return 1
+	echo $LIST | cut -d'|' -f3 | grep -i "^up" &>/dev/null || return 1
+	return 0
+}
+export -f sfDoesDockerRun
+
+# tells if a container using a specific image (and optionally name) is running in Swarm mode
+sfDoesDockerSwarmRun() {
 	[ $# -eq 0 ] && return 1
 	local IMAGE=$1
 	shift
 	local NAME=$1
 
-	local LIST=$(docker container ls --format '{{.Image}}:{{.Names}}:{{.Status}}')
+	local LIST=$(docker service ps $NAME {{ "--format '{{.Image}}|{{.Name}}|{{.CurrentState}}'" }})
 	if [ -z "$LIST" ]; then
 		return 1
 	fi
-	if [ "$IMAGE" != "$(echo "$LIST" | cut -d\: -f1)" ]; then
+	local RIMAGE=$(echo "$LIST" | cut -d'|' -f1)
+	if [ "$IMAGE" != "$RIMAGE" ]; then
 		return 1
 	fi
-	if [ ! -z "$NAME" -a "$NAME" = "$(echo "$LIST" | cut -d\: -f2)" ]; then
-		return 1
+	if [ ! -z "$NAME" ]; then
+		local RNAME=$(echo "$LIST" | cut -d'|' -f2)
+		if ! expr match "$RNAME" "^${NAME}\." &>/dev/null; then
+			return 1
+		fi
 	fi
-	if ! echo $LIST | cu -d\: -f3 | grep -i "^up"; then
+	if ! echo $LIST | cut -d'|' -f3 | grep -i "^running" >/dev/null; then
 		return 1
 	fi
 	return 0
 }
+export -f sfDoesDockerSwarmRun
 
 # Removes unnamed images (prune removes also not running images, not )
 # echoes a random string
@@ -439,6 +462,7 @@ sfRandomString() {
 	[ $# -ge 2 ] && charset="$2"
 	</dev/urandom tr -dc "$charset" | head -c${count}
 }
+export -f sfRandomString
 
 declare -A FACTS
 LINUX_KIND=
