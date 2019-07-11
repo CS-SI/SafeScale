@@ -112,14 +112,14 @@ func NotAvailableError(msg string) ErrNotAvailable {
 	}
 }
 
-// ErrAlreadyExists resource already exists error
-type ErrAlreadyExists struct {
+// ErrDuplicate already exists error
+type ErrDuplicate struct {
 	errCore
 }
 
-// AlreadyExistsError creates a ResourceAlreadyExists error
-func AlreadyExistsError(msg string) ErrAlreadyExists {
-	return ErrAlreadyExists{
+// DuplicateError creates a ErrDuplicate error
+func DuplicateError(msg string) ErrDuplicate {
+	return ErrDuplicate{
 		errCore: errCore{
 			message: msg,
 		},
