@@ -33,7 +33,9 @@ func init() {
 		ohpcSlurmMasterFeature(),
 		ohpcSlurmNodeFeature(),
 		remoteDesktopFeature(),
-		reverseProxyFeature(),
+		postgres4gatewayFeature(),
+		kong4gatewayFeature(),
+		keycloak4gatewayFeature(),
 		kubernetesFeature(),
 		proxycacheServerFeature(),
 		proxycacheClientFeature(),
@@ -45,7 +47,6 @@ func init() {
 		kibanaFeature(),
 		helmFeature(),
 		sparkFeature(),
-		keycloakFeature(),
 		elassandraFeature(),
 	}
 
