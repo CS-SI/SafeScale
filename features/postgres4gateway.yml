@@ -1,0 +1,162 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: no
+        cluster: yes
+    requirements:
+        features:
+            - docker
+            - docker-compose
+    parameters:
+        - PurgeOnRemoval=no
+
+    install:
+        bash:
+            check:
+                pace: docker
+                steps:
+                    docker:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            sfDoesDockerRun postgres:11-alpine postgres4gateway_postgres_1 || exit 192
+                            exit 0
+
+            add:
+                # pace: config,secret,network,start
+                pace: config,start
+                steps:
+                    config:
+                        timeout: 10
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/postgres4gateway ${SF_VARDIR}/postgres4gateway/
+
+                            POSTGRES_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
+                            echo -n "$POSTGRES_PASSWORD" >${SF_ETCDIR}/postgres4gateway/password
+
+                            cat >${SF_ETCDIR}/postgres4gateway/docker-compose.yml <<-EOF
+                            version: '3.7'
+                            services:
+                                postgres:
+                                    image: postgres:11-alpine
+                                    environment:
+                                        # - POSTGRES_DB=postgres
+                                        # - POSTGRES_USER=postgres
+                                        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+                                        # - POSTGRES_PASSWORD_FILE=/run/secrets/postgres4gateway
+                                    volumes:
+                                        - ${SF_VARDIR}/postgres4gateway:/var/lib/postgresql/data
+                                    # networks:
+                                    #     - safescale-gw
+                                    network_mode: "host"
+                                    ports:
+                                        - "{{ .HostIP }}:5432:5432"
+                                    restart: always
+                                    healthcheck:
+                                        test: ["CMD", "pg_isready", "-U", "postgres"]
+                                        interval: 10s
+                                        timeout: 5s
+                                        retries: 5
+                            #         secrets:
+                            #             - postgres4gateway
+
+                            # secrets:
+                            #     postgres4gateway:
+                            #         external: true
+                            # networks:
+                            #     safescale-gw:
+                            #         external: true
+                            EOF
+                            chmod go-rwx ${SF_ETCDIR}/postgres4gateway/docker-compose.yml
+                            exit 0
+
+                    # secret:
+                    #     targets:
+                    #         hosts: no
+                    #         gateways: any
+                    #         masters: no
+                    #         nodes: no
+                    #     run: |
+                    #         docker secret rm postgres4gateway &>/dev/null || true
+                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgres4gateway - || exit 192
+                    #         exit 0
+
+                    network:
+                        targets:
+                            hosts: no
+                            gateways: any
+                            masters: no
+                            nodes: no
+                        run: |
+                            # if ! docker network list --filter 'name=safescale-gw' {{ "--format '{{.Driver}}:{{.Scope}}'" }} | grep 'overlay:swarm'; then
+                            #     docker network create --attachable -d overlay --scope swarm safescale-gw || exit 192
+                            # fi
+                            if ! docker network list --filter 'name=safescale-gw' | grep safescale-gw; then
+                                docker network create --attachable -d bridge safescale-gw || exit 193
+                            fi
+                            exit 0
+
+                    start:
+                        targets:
+                            hosts: no
+                            gateways: any
+                            masters: no
+                            nodes: no
+                        run: |
+                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d || exit 194
+                            sfRetry 5m 5 "sfDoesDockerRun postgres:11-alpine postgres4gateway_postgres_1" || exit 195
+                            exit 0
+
+            remove:
+                pace: compose,cleanup
+                steps:
+                    compose:
+                        targets:
+                            hosts: no
+                            gateways: any
+                            masters: no
+                            nodes: no
+                        run: |
+                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force || exit 196
+                            docker image rm -f postgres:11-alpine
+                            # docker secret rm postgres4gateway &>/dev/null
+                            exit 0
+
+                    cleanup:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
+                            if [ "${PURGE_ON_REMOVAL,,}" = "yes" ]; then
+                                rm -rf ${SF_ETCDIR}/postgres4gateway ${SF_VARDIR}/postgres4gateway
+                            fi
+                            exit 0
+
+...
