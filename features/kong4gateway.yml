@@ -1,0 +1,311 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: no
+        cluster: all
+    requirements:
+        features:
+            - postgres4gateway
+
+    install:
+        bash:
+            check:
+                pace: curl
+                steps:
+                    curl:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep "HTTP/1.1 200 OK" &>/dev/null
+
+            add:
+#                pace: config,secret,networks,start
+                pace: config,networks,start
+                steps:
+                    config:
+                        timeout: 10
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/kong4gateway/includes
+
+                            KONG_PG_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
+                            ADMIN_PG_PASSWORD="$(cat ${SF_ETCDIR}/postgres4gateway/password)"
+
+                            cat >${SF_ETCDIR}/kong4gateway/my-docker-entrypoint.sh <<-'EOF'
+                            #!/bin/sh
+
+                            case $KONG_DATABASE in
+                                postgres) # gets passwords from docker secrets
+                                        #   ADMIN_PG_PASSWORD="$(cat /run/secrets/postgres4gateway)"
+                                        #   KONG_PG_PASSWORD="$(cat /run/secrets/kong4gateway)"
+                                        #   export KONG_PG_PASSWORD
+
+                                          # creates /root/.pgpass
+                                          cat >/root/.pgpass <<-EOF2
+                            *:5432:*:postgres:$ADMIN_PG_PASSWORD
+                            *:5432:kong4gateway:kong4gateway:$KONG_PG_PASSWORD
+                            EOF2
+                                          chmod 0600 /root/.pgpass && chown root:root /root/.pgpass
+
+                                          # wait for database server
+                                          while ! psql -h $KONG_PG_HOST -U postgres -c 'select 1' >/dev/null; do
+                                              sleep 5
+                                          done
+
+                                          # Create database if needed
+                                          if ! psql -h $KONG_PG_HOST -U postgres ${KONG_PG_DATABASE} -c '\q' &>/dev/null; then
+                                              psql -h $KONG_PG_HOST -U postgres <<-EOSQL
+                            CREATE DATABASE ${KONG_PG_DATABASE};
+                            CREATE USER ${KONG_PG_USER};
+                            #CREATE DATABASE ${KONG_PG_DATABASE}-gui;
+                            EOSQL
+                                          fi
+
+                                          # init/reset KONG_PG_USER password and db ownership
+                                          psql -h $KONG_PG_HOST -U postgres <<-EOSQL
+                            ALTER USER ${KONG_PG_USER} PASSWORD '${KONG_PG_PASSWORD}';
+                            ALTER DATABASE ${KONG_PG_DATABASE} OWNER TO ${KONG_PG_USER};
+                            #ALTER DATABASE ${KONG_PG_DATABASE}-gui OWNER TO ${KONG_PG_USER};
+                            EOSQL
+                                          ;;
+                            esac
+
+                            # 2nd kong migration
+                            /docker-entrypoint.sh kong migrations bootstrap >/dev/null
+                            /docker-entrypoint.sh kong migrations up >/dev/null
+                            /docker-entrypoint.sh kong migrations finish >/dev/null
+
+                            # 3nd starts kong
+                            exec /docker-entrypoint.sh $*
+                            EOF
+
+                            cat >${SF_ETCDIR}/kong4gateway/Dockerfile <<-EOF
+                            FROM kong:1.2
+                            RUN apk update && apk add git unzip postgresql-client
+                            RUN luarocks install kong-oidc \
+                             && luarocks install kong-prometheus-plugin
+                            RUN mkdir -p /etc/kong/includes
+                            RUN setcap CAP_NET_BIND_SERVICE=+ep /usr/local/openresty/nginx/sbin/nginx
+                            COPY my-docker-entrypoint.sh /
+                            RUN chmod a+rx /my-docker-entrypoint.sh
+                            ENTRYPOINT ["/my-docker-entrypoint.sh"]
+                            CMD ["kong", "docker-start"]
+                            EOF
+                            docker build -t kong4gateway:latest ${SF_ETCDIR}/kong4gateway
+
+                            # cat >${SF_ETCDIR}/kong4gateway/konga.userdb.data <<-EOF
+                            # module.exports = [
+                            #     {
+                            #         "username": "safescale",
+                            #         "email": "cladm@safescale",
+                            #         "firstName": "SafeScale",
+                            #         "lastName": "Administrator",
+                            #         "node_id": "https://127.0.0.1:8444",
+                            #         "admin": true,
+                            #         "active" : true,
+                            #         "password": "{{.Password}}"
+                            #     }
+                            # ]
+                            # EOF
+                            # chmod go-rwx ${SF_ETCDIR}/kong4gateway/konga.userdb.data
+
+                            cat >${SF_ETCDIR}/kong4gateway/docker-compose.yml <<-EOF
+                            version: '3.7'
+                            services:
+                                proxy:
+                                    image: kong4gateway
+                                    environment:
+                                        - KONG_DATABASE=postgres
+                                        - KONG_PG_HOST={{ .HostIP }}
+                                        - KONG_PG_DATABASE=kong4gateway
+                                        - KONG_PG_USER=kong4gateway
+                                        - KONG_PG_PASSWORD=${KONG_PG_PASSWORD}
+                                        - ADMIN_PG_PASSWORD=${ADMIN_PG_PASSWORD}
+                                        - KONG_PROXY_ACCESS_LOG=/dev/stdout
+                                        - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+                                        - KONG_PROXY_ERROR_LOG=/dev/stderr
+                                        - KONG_ADMIN_ERROR_LOG=/dev/stderr
+                                        - KONG_ADMIN_LISTEN=0.0.0.0:8444 ssl
+                                        - KONG_PROXY_LISTEN=0.0.0.0:443 ssl
+                                        - KONG_PLUGINS=oidc,prometheus,ip-restriction
+                                    volumes:
+                                        - ${SF_ETCDIR}/kong4gateway/kong.conf:/etc/kong/kong.conf:ro
+                                        - ${SF_ETCDIR}/kong4gateway/includes:/etc/kong/includes:ro
+                                    # networks:
+                                    #     - safescale-gw
+                                    network_mode: "bridge"
+                                    ports:
+                                        - "0.0.0.0:443:443"
+                                        - "{{ .HostIP }}:6443:6443"
+                                        - "127.0.0.1:8444:8444"
+                                    restart: always
+                                    healthcheck:
+                                        test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || exit 1"]
+                                        interval: 5s
+                                        retries: 10
+                            #         secrets:
+                            #             - postgres4gateway
+                            #             - kong4gateway
+
+                            # secrets:
+                            #     postgres4gateway:
+                            #         external: true
+                            #     kong4gateway:
+                            #         external: true
+
+                            # networks:
+                            #     safescale-gw:
+                            #         external: true
+                            EOF
+
+                                # gui:
+                                #     image: pantsel/konga
+                                #     volumes:
+                                #         - ${SF_ETCDIR}/kong4gateway/konga.userdb.data:/usr/local/etc/userdb.data:ro
+                                #     environment:
+                                #         - TOKEN_SECRET="$(sfRandomString 32 [:alnum:])"
+                                #         - DB_ADAPTER=postgres
+                                #         - DB_DATABASE=kong4gateway-gui
+                                #         - DB_USER=kong4gateway
+                                #         - DB_PASSWORD="${DB_PASSWORD}"
+                                #         - NODE_ENV=production
+                                #         - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
+                                #     network:
+                                #         - safescale-gw
+                                #     ports:
+                                #         - target: 1337
+                                #           published: 1337
+                                #           protocol: tcp
+                                #           mode: "host"
+                                #     deploy:
+                                #         mode: global
+                                #         placement:
+                                #             constraints:
+                                #                 - node.role == manager
+                                #         restart_policy:
+                                #             condition: on-failure
+                                #             delay: 5s
+                                #             max_attempts: 3
+                                #             window: 120s
+
+                            chmod go-rwx ${SF_ETCDIR}/kong4gateway/docker-compose.yml
+
+                            cat >${SF_ETCDIR}/kong4gateway/kong.conf <<-EOF
+                            trusted_ips=0.0.0.0/0,::/0
+                            real_ip_header=X-Forwarded-For
+                            real_ip_recursive=on
+                            stream_listen = 0.0.0.0:6442
+                            nginx_stream_include = /etc/kong/includes/*.conf
+                            anonymous_reports = off
+                            EOF
+
+                    # secret:
+                    #     targets:
+                    #         hosts: no
+                    #         gateways: any
+                    #         masters: no
+                    #         nodes: no
+                    #     run: |
+                    #         docker secret rm kong4gateway &>/dev/null || true
+                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create kong4gateway - &>/dev/null || exit 192
+                    #         exit 0
+
+                    networks:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            # {{ if .ClusterFlavor }}
+                            # IMAGE=kong4safescale
+                            # KONG_PUB_BRIDGE=br_k4s_pub
+                            # KONG_DB_BRIDGE=br_k4s_db
+                            # {{ else }}
+                            # IMAGE=kong
+                            # KONG_PUB_BRIDGE=br_k_pub
+                            # KONG_DB_BRIDGE=br_k_db
+                            # {{ end}}
+                            # KONG_PUB_NET="${IMAGE}_pubnet"
+                            # KONG_DB_NET="${IMAGE}_dbnet"
+
+                            # docker network create --driver bridge --attachable --opt "com.docker.network.bridge.name=${KONG_PUB_BRIDGE}" ${KONG_PUB_NET}
+                            # docker network create --driver bridge --attachable --internal --opt "com.docker.network.bridge.name=${KONG_DB_BRIDGE}" ${KONG_DB_NET}
+
+                            # sfFirewallAdd --zone=trusted --add-interface=${KONG_PUB_BRIDGE} && \
+                            # sfFirewallAdd --zone=trusted --add-interface=${KONG_DB_BRIDGE} && \
+                            sfFirewallAdd --zone=public --add-service=https && sfFirewallReload
+
+                    start:
+                        targets:
+                            hosts: no
+                            gateways: any
+                            masters: no
+                            nodes: no
+                        run: |
+                            docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway up -d || exit 193
+                            sfRetry 5m 5 "sfDoesDockerRun kong4gateway:latest kong4gateway_proxy_1" || exit 194
+                            exit 0
+
+            remove:
+                pace: compose,networks
+                steps:
+                    compose:
+                        targets:
+                            hosts: no
+                            gateways: any
+                            masters: no
+                            nodes: no
+                        run: |
+                            docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force || exit 195
+                            # docker secret rm kong4gateway &>/dev/null
+                            docker image rm -f kong4gateway:latest
+                            rm -rf ${SF_ETCDIR}/kong4gateway
+
+                    networks:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            # {{ if .ClusterFlavor }}
+                            # KONG_PUB_BRIDGE=br_k4s_pub
+                            # KONG_DB_BRIDGE=br_k4s_db
+                            # {{ else }}
+                            # KONG_PUB_BRIDGE=br_k_pub
+                            # KONG_BRIDGE=br_k_db
+                            # {{ end}}
+
+                            # sfFirewallAdd --zone=trusted --remove-interface=${KONG_PUB_BRIDGE} && \
+                            # sfFirewallAdd --zone=trusted --remove-interface=${KONG_DB_BRIDGE} && \
+                            sfFirewallAdd --zone=public --remove-service=https && sfFirewallReload
+
+                            # docker network rm ${KONG_PUB_BRIDGE}
+                            # docker network rm ${KONG_DB_BRIDGE}
+                            exit 0
+
+...
