@@ -890,6 +890,12 @@ func (b *foreman) taskInstallGateway(tr concurrency.TaskRunner, params interface
 		return
 	}
 
+	// Configure docker in Swarm mode
+//	err = b.configureDockerSwarm(tr.Task(), pbGateway, hostLabel)
+//	if err != nil {
+//		return
+//	}
+
 	// Installs proxycache server on gateway (if not disabled)
 	err = b.installProxyCacheServer(tr.Task(), pbGateway, hostLabel)
 	if err != nil {
@@ -904,6 +910,19 @@ func (b *foreman) taskInstallGateway(tr concurrency.TaskRunner, params interface
 
 	log.Debugf("[%s] preparation successful", hostLabel)
 }
+
+// configureDockerSwarm
+//func (b *foreman) configureDockerSwarm(task concurrency.Task, gw *pb.Host, hostLabel string) error {
+//	cmd := fmt.Sprintf("docker swarm init --advertise-addr %s", gw.GetPrivateIp())
+//	retcode, _, _, err := client.New().Ssh.Run(gw.Id, cmd, client.DefaultConnectionTimeout, 2*utils.GetLongOperationTimeout())
+//	if err != nil {
+//		return err
+//	}
+//	if retcode != 0 {
+//		return fmt.Errorf("failed to initialize docker swarm on '%s'", hostLabel)
+//	}
+//	return nil
+//}
 
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
@@ -1493,20 +1512,20 @@ func (b *foreman) installReverseProxy(task concurrency.Task) error {
 		return nil
 	})
 	if err != nil {
-		log.Errorf("[cluster %s] failed to install 'kong' feature: %v", clusterName, err)
+		log.Errorf("[cluster %s] failed to install  embedded feature 'kong4gateway': %v", clusterName, err)
 		return err
 	}
 	if !disabled {
-		log.Debugf("[cluster %s] adding feature 'kong'", clusterName)
-		feat, err := install.NewEmbeddedFeature(task, "kong")
+		log.Debugf("[cluster %s] adding feature 'kong4gateway'", clusterName)
+		feat, err := install.NewEmbeddedFeature(task, "kong4gateway")
 		if err != nil {
-			log.Errorf("[cluster %s] failed to instanciate feature 'kong': %s\n", clusterName, err.Error())
+			log.Errorf("[cluster %s] failed to instanciate embedded feature '%s': %s\n", clusterName, feat.DisplayName(), err.Error())
 			return err
 		}
 		target := install.NewClusterTarget(task, b.cluster)
 		results, err := feat.Add(target, install.Variables{}, install.Settings{})
 		if err != nil {
-			log.Errorf("[cluster %s] failed to add feature '%s': %s", clusterName, feat.DisplayName(), err.Error())
+			log.Errorf("[cluster %s] failed to add embedded feature '%s': %s", clusterName, feat.DisplayName(), err.Error())
 			return err
 		}
 		if !results.Successful() {
