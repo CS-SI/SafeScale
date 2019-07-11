@@ -210,21 +210,6 @@ func sparkFeature() *Feature {
 	}
 }
 
-// reverseProxyFeature ...
-func reverseProxyFeature() *Feature {
-	name := "kong"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
 // remoteDesktopFeature ...
 func remoteDesktopFeature() *Feature {
 	name := "remotedesktop"
@@ -375,9 +360,39 @@ func filebeatFeature() *Feature {
 	}
 }
 
-// keycloakFeature ...
-func keycloakFeature() *Feature {
-	name := "keycloak"
+// postgres4gatewayFeature ...
+func postgres4gatewayFeature() *Feature {
+	name := "postgres4gateway"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// kong4gatewayFeature ...
+func kong4gatewayFeature() *Feature {
+	name := "kong4gateway"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// keycloak4gatewayFeature ...
+func keycloak4gatewayFeature() *Feature {
+	name := "keycloak4gateway"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
