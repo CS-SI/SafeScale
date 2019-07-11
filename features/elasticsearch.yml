@@ -25,7 +25,7 @@ feature:
             - docker-compose
     parameters:
         - Version=7.2.0
-        - KeepDataOnRemoval=yes
+        - PurgeOnRemoval=no
         - ClusterName=safescale
 
     install:
@@ -186,12 +186,14 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            {{ if .ClusterFlavor }}
-                            OPTIONS="-p elasticsearch4safescale"
-                            {{ else }}
-                            OPTIONS=
-                            {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || exit 197
+                            if [ -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml ]; then
+                                {{ if .ClusterFlavor }}
+                                OPTIONS="-p elasticsearch4safescale"
+                                {{ else }}
+                                OPTIONS=
+                                {{ end }}
+                                docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || exit 197
+                            fi
                             exit 0
 
                     remove:
@@ -201,22 +203,48 @@ feature:
                             nodes: no
                         run: |
                             docker image rm -f docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }}
-                            purge={{ .KeepDataOnRemoval }}
+                            purge={{ .PurgeOnRemoval }}
                             purge=${purge,,}
                             [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/elasticsearch ${SF_VARDIR}/elasticsearch
                             exit 0
 
     proxy:
         rules:
-            - name: elasticsearch_http_svc
-              type: service
+            - name: elasticsearch_backend
+              type: upstream
               targets:
                   hosts: true
                   masters: all
               content: |
                   {
-                      "name": "elasticsearch_http_{{ .Hostname }}",
-                      "url": "http://{{ .HostIP }}:9200/"
+                      "target": "{{.HostIP}}:9200",
+                      "weight": 100
+                  }
+
+    #         - name: service
+    #           type: service
+    #           targets:
+    #               masters: one
+    #           content: |
+    #               {
+    #                   "protocol": "https",
+    #                   "name": "k8s-CPs-{{.ClusterName}}",
+    #                   "host": "k8s-CPs",
+    #                   "port": 6443
+    #               }
+
+            - name: elasticsearch_http_svc
+              type: service
+              targets:
+                  hosts: true
+                  masters: one
+              content: |
+                  {
+                      "protocol": "http",
+                      "host": "elasticsearch_backend",
+                      "source-control": {
+                          "whitelist": [ "{{ .CIDR }}", "{{.PublicIP}}" ]
+                      }
                   }
 
             # - name: elasticsearch_transport_svc
@@ -234,10 +262,10 @@ feature:
               type: route
               targets:
                   hosts: true
-                  masters: all
+                  masters: one
               content: |
                   {
-                      "paths": ["/monitoring/elasticsearch/"],
+                      "paths": [ "/monitoring/elasticsearch/" ],
                       "service": { "id": "{{ .elasticsearch_http_svc }}" }
                   }
 
