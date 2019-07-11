@@ -119,15 +119,20 @@ func (w *worker) ConcernCluster() bool {
 
 // CanProceed tells if the combination Feature/Target can work
 func (w *worker) CanProceed(s Settings) error {
-	if w.cluster != nil {
+	switch w.target.Type() {
+	case "cluster":
 		// err := w.validateContextForCluster()
 		// if err == nil && !s.SkipSizingRequirements {
 		// 	err = w.validateClusterSizing()
 		// }
 		// return err
 		return nil
+	case "node":
+		return nil
+	case "host":
+		return w.validateContextForHost()
 	}
-	return w.validateContextForHost()
+	return nil
 }
 
 // identifyAvailableGateway finds a gateway available, and keep track of it
@@ -615,7 +620,7 @@ func (w *worker) validateClusterSizing() error {
 
 // parseClusterSizingRequest returns count, cpu and ram components of request
 func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, error) {
-	
+
 	return 0, 0, 0.0, utils.NotImplementedError("parseClusterSizingRequest() not yet implemented")
 }
 
@@ -634,7 +639,6 @@ func (w *worker) setReverseProxy() error {
 	gw, err = w.identifyAvailableGateway()
 	if err != nil {
 		return fmt.Errorf("failed to set reverse proxy: %s", err.Error())
-
 	}
 
 	kc, err := NewKongController(gw)
