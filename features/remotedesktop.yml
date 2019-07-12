@@ -485,7 +485,7 @@ feature:
                             masters: all
                         run: |
                             # Guacd need sshd to authorize password authentication...
-                            DOCKER0_SUBNET=$(docker network inspect bridge {{ "--format '{{json .}}'" }} | jq .IPAM.Config[0].Subnet)
+                            DOCKER0_SUBNET=$(docker network inspect bridge {{ "--format '{{json .}}'" }} | jq -r .IPAM.Config[0].Subnet)
                             cat >>/etc/ssh/sshd_config <<-EOF
                             # Allow Password Authentication from user {{.Username}} for guacd to work
                             Match User {{.Username}} Address ${DOCKER0_SUBNET}
@@ -499,6 +499,7 @@ feature:
                             services:
                                 server:
                                     image: remotedesktop
+                                    network_mode: "bridge"
                                     ports:
                                         - {{ .HostIP }}:9080:8080
                                         - {{ .HostIP }}:9009:8009
