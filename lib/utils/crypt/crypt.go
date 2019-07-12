@@ -25,8 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // Key ...
@@ -59,7 +57,6 @@ func NewEncryptionKey(text []byte) *Key {
 			key[i] = ' '
 		}
 	}
-	log.Debugf("key='%v'", key)
 	return &key
 }
 
