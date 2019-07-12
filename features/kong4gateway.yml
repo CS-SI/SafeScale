@@ -133,7 +133,7 @@ feature:
                             # chmod go-rwx ${SF_ETCDIR}/kong4gateway/konga.userdb.data
 
                             cat >${SF_ETCDIR}/kong4gateway/docker-compose.yml <<-EOF
-                            version: '3.7'
+                            version: '2.1'
                             services:
                                 proxy:
                                     image: kong4gateway
