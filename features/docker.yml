@@ -48,7 +48,6 @@ feature:
                 pace: docker-ce,config,firewall,ready
                 steps:
                     docker-ce:
-                        serial: true
                         targets:
                             hosts: yes
                             gateways: all

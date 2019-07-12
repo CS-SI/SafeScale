@@ -115,6 +115,7 @@ feature:
                                     image: docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }}
                                     environment:
                                         - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+                                    network_mode: "host"
                                     ports:
                                         - {{.HostIP}}:9200:9200
                                         - {{.HostIP}}:9300:9300
@@ -129,12 +130,10 @@ feature:
                                             hard: -1
                                     cap_add:
                                         - ALL
-                                    network_mode: "host"
                                     restart: always
                             EOF
                             chown safescale:safescale ${SF_ETCDIR}/elasticsearch/docker-compose.yml
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/elasticsearch/docker-compose.yml
-                            exit 0
 
                     start:
                         targets:
@@ -221,18 +220,6 @@ feature:
                       "weight": 100
                   }
 
-    #         - name: service
-    #           type: service
-    #           targets:
-    #               masters: one
-    #           content: |
-    #               {
-    #                   "protocol": "https",
-    #                   "name": "k8s-CPs-{{.ClusterName}}",
-    #                   "host": "k8s-CPs",
-    #                   "port": 6443
-    #               }
-
             - name: elasticsearch_http_svc
               type: service
               targets:
@@ -243,7 +230,7 @@ feature:
                       "protocol": "http",
                       "host": "elasticsearch_backend",
                       "source-control": {
-                          "whitelist": [ "{{ .CIDR }}", "{{.PublicIP}}" ]
+                          "whitelist": [ "{{ .CIDR }}", "127.0.0.1" ]
                       }
                   }
 
