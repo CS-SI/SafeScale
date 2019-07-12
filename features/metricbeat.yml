@@ -20,68 +20,28 @@ feature:
         host: yes
         cluster: all
     parameters:
-        - ElasticsearchPort=9200
-        - ElasticsearchHost={{ .HostIP }}
+        - Version=7.2.0
+        - ElasticsearchURL=http://{{ .HostIP }}:9200/
         - KibanaURL=http://{{ .HostIP }}:5061/
 
     install:
         bash:
             check:
-                pace: pkg
+                pace: docker
                 steps:
-                    pkg:
+                    docker:
                         targets:
                             gateways: all
                             hosts: yes
                             masters: all
                             nodes: all
                         run: |
-                            sfService status metricbeat
-
-            add:
-                pace: install,config,start
-                steps:
-                    install:
-                        serial: true
-                        targets:
-                            gateways: all
-                            hosts: yes
-                            masters: all
-                            nodes: all
-                        run: |
-                            case $LINUX_KIND in
-                                debian|ubuntu)
-                                    if [ ! -f /etc/apt/sources.list.d/elastic-7.list ]; then
-                                        wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
-                                        sfApt install -qy apt-transport-https
-                                        echo "deb https://artifacts.elastic.co/packages/oss-7.x/apt stable main" >/etc/apt/sources.list.d/elastic-7.list
-                                    fi
-                                    sfApt update
-                                    sfApt install -y metricbeat || exit 192
-                                    ;;
-                                centos|rhel)
-                                    if [ ! -f /etc/yum.repos.d/elastic-7.repo ]; then
-                                        cat >/etc/yum.repos.d/elastic-7.repo <<-'EOF'
-                            [elastic-7.x]
-                            name=Elastic repository for 7.x OSS packages
-                            baseurl=https://artifacts.elastic.co/packages/oss-7.x/yum
-                            gpgcheck=1
-                            gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
-                            enabled=1
-                            autorefresh=1
-                            type=rpm-md
-                            EOF
-                                        rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
-                                    fi
-                                    yum install -y metricbeat || exit 192
-                                    ;;
-                                *)
-                                    echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 193
-                                    ;;
-                            esac
+                            sfDoesDockerRun docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1 || exit 192
                             exit 0
 
+            add:
+                pace: config,compose,start
+                steps:
                     config:
                         targets:
                             gateways: all
@@ -89,75 +49,118 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            mkdir -p /etc/metricbeat/modules.d
-                            cat >/etc/metricbeat/metricbeat.yml <<-'EOF'
-                            #------------------------------ Global configuration --------------------------
-                            setup.dashboards:
-                              enabled: true
-                            setup.kibana:
-                              host: "{{.KibanaURL}}"
+                            mkdir -p ${SF_ETCDIR}/metricbeat4safescale/modules.d
 
-                            metricbeat.config.modules:
-                              path: ${path.config}/modules.d/*.yml
-                              reload.enabled: true
-                              reload.period: 10s
-                            #-------------------------------- Autodiscovery -------------------------------
-                            metricbeat.autodiscover:
-                              providers:
-                              - type: docker
-                                hints.enabled: true
-                            #------------------------------- System Module -------------------------------
-                            metricbeat.modules:
+                            cat >${SF_ETCDIR}/metricbeat4safescale/modules.d/system.yml <<-'EOF'
                             - module: system
+                              enabled: true
                               metricsets: ["cpu", "load", "memory", "network", "process", "process_summary", "core", "diskio", "socket"]
                               processes: ['.*']
                               process.include_top_n:
-                                by_cpu: 5
-                                by_memory: 5
+                                  by_cpu: 5
+                                  by_memory: 5
                               period: 10s
                               cpu.metrics:  ["percentages"]
                               core.metrics: ["percentages"]
 
                             - module: system
+                              enabled: true
                               period: 1m
                               metricsets:
-                                - filesystem
-                                - fsstat
+                                  - filesystem
+                                  - fsstat
                               processors:
-                              - drop_event.when.regexp:
-                                  system.filesystem.mount_point: '^/(sys|cgroup|proc|dev|etc|host|lib)($|/)'
+                                  - drop_event.when.regexp:
+                                        system.filesystem.mount_point: '^/(sys|cgroup|proc|dev|etc|host|lib)($|/)'
 
                             - module: system
+                              enabled: true
                               period: 15m
                               metricsets:
-                                - uptime
-                            #------------------------------- Docker Module -------------------------------
+                                  - uptime
+                            EOF
+
+                            cat >${SF_ETCDIR}/metricbeat4safescale/modules.d/docker.yml <<-'EOF'
                             - module: docker
                               metricsets: ["container", "cpu", "diskio", "healthcheck", "info", "memory", "network", "image"]
                               hosts: ["unix:///var/run/docker.sock"]
                               period: 10s
-                            #------------------------------- Processors -------------------------------
+                              enabled: true
+                            EOF
+
+                            cat >${SF_ETCDIR}/metricbeat4safescale/config.yml <<-'EOF'
+                            metricbeat:
+                                config:
+                                    modules:
+                                        path: ${path.config}/modules.d/*.yml
+                                        reload.enabled: true
+                                        reload.period: 10s
+                                autodiscover:
+                                    providers:
+                                        - type: docker
+                                          hints.enabled: true
+
+                            system.hostsfs: /hostfs
+
                             processors:
                             - add_docker_metadata: ~
                             - add_locale: ~
-                            #-------------------------- Elasticsearch output ------------------------------
-                            output.elasticsearch:
-                            {{- if .ClusterFlavor }}
-                              hosts:
-                              {{- range .MasterIPs }}
-                                - "{{ . }}"
-                              {{ end -}}
-                            {{ else }}
-                              hosts:
-                                - "{{ .ElasticsearchHost }}"
-                            {{ end -}}
-                              protocol: http
-                              port: {{ .ElasticsearchPort }}
 
-                            xpack.monitoring:
-                              enabled: false
+                            output.elasticsearch:
+                                hosts:
+                            {{- if .ClusterFlavor }}
+                                {{- range .MasterIPs }}
+                                    - "http://{{ . }}:9200/"
+                                {{ end -}}
+                            {{ else }}
+                                    - "{{ .ElasticsearchURL }}"
+                            {{ end -}}
+                            setup.dashboards:
+                                enabled: true
+                            setup.kibana:
+                            {{- if .ClusterFlavor }}
+                                host: "https://{{ .GatewayIP }}/monitoring/kibana/"
+                            {{ else }}
+                                host: "{{.KibanaURL}}"
+                            {{ end -}}
+
+                            xpack:
+                                monitoring.enabled: true
+                                ml.enabled: false
                             EOF
-                            exit 0
+                            chown -R safescale:safescale ${SF_ETCDIR}/metricbeat4safescale
+                            chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/metricbeat4safescale/config.yml
+
+                    compose:
+                        targets:
+                            gateways: all
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            cat >${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml <<-EOF
+                            version: '2.1'
+
+                            services:
+                                agent:
+                                    image: docker.elastic.co/beats/metricbeat:{{ .Version }}
+                                    command: "metricbeat -e -strict.perms=false"
+                                    volumes:
+                                        - ${SF_ETCDIR}/metricbeat4safescale/modules.d:/etc/beat/modules.d:ro
+                                        - ${SF_ETCDIR}/metricbeat4safescale/config.yml:/usr/share/metricbeat/metricbeat.yml:ro
+                                        - /var/run/docker.sock:/var/run/docker.sock:ro
+                                        - /:/hostfs:ro
+                                        - /proc:/hostfs/proc:ro
+                                        - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
+                                    network_mode: "host"
+                                    user: "0:0"
+                                    cap_add:
+                                        - sys_ptrace
+                                        - dac_read_search
+                                    restart: always
+                            EOF
+                            chown -R safescale:safescale ${SF_ETCDIR}/metricbeat4safescale
+                            chmod -R u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/metricbeat4safescale
 
                     start:
                         targets:
@@ -166,12 +169,12 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfService enable metricbeat
-                            sfService start metricbeat || exit 196
+                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale up -d || exit 193
+                            sfRetry 5m 5 "sfDoesDockerRun docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat4safescale_agent_1" || exit 194
                             exit 0
 
             remove:
-                pace: stop,remove
+                pace: stop,cleanup
                 steps:
                     stop:
                         targets:
@@ -180,39 +183,18 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfService stop metricbeat
-                            sfService disable metricbeat
+                            docker-compose -f ${SF_ETCDIR}/metricbeat4safescale/docker-compose.yml -p metricbeat4safescale rm --stop --force || exit 195
+                            exit 0
 
-                    remove:
+                    cleanup:
                         targets:
                             gateways: all
                             hosts: yes
                             masters: all
                             nodes: all
                         run: |
-                            case $LINUX_KIND in
-                                debian|ubuntu)
-                                    sfApt remove -y metricbeat
-                                    sfApt purge -y metricbeat
-                                    ;;
-                                centos|rhel)
-                                    yum remove -y metricbeat
-                                    ;;
-                                *)
-                                    echo "Unsupported operating system '$LINUX_KIND'"
-                                    exit 4224
-                                    ;;
-                            esac
-                            rm -rf /etc/metricbeat
-
-    service:
-        start: |
-            sfService start metricbeat
-
-        stop: |
-            sfService stop metricbeat
-
-        state: |
-            sfService status metricbeat
+                            docker image rm -f docker.elastic.co/beats/metricbeat:{{ .Version }}
+                            rm -rf ${SF_ETCDIR}/metricbeat4safescale
+                            exit 0
 
 ...

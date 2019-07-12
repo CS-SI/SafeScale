@@ -232,7 +232,7 @@ feature:
                             ADMIN_PG_PASSWORD="$(cat ${SF_ETCDIR}/postgres4gateway/password)"
 
                             cat >${SF_ETCDIR}/keycloak4gateway/docker-compose.yml <<-EOF
-                            version: '3.7'
+                            version: '2.1'
                             services:
                                 server:
                                     image: keycloak4gateway
@@ -251,16 +251,17 @@ feature:
                                     network_mode: "host"
                                     ports:
                                         - {{ .HostIP }}:8443:8443
-                                    deploy:
-                                        mode: global
-                                        placement:
-                                            constraints:
-                                                - node.role == manager
-                                        restart_policy:
-                                            condition: on-failure
-                                            delay: 5s
-                                            max_attempts: 3
-                                            window: 120s
+                                    restart: always
+                                    # deploy:
+                                    #     mode: global
+                                    #     placement:
+                                    #         constraints:
+                                    #             - node.role == manager
+                                    #     restart_policy:
+                                    #         condition: on-failure
+                                    #         delay: 5s
+                                    #         max_attempts: 3
+                                    #         window: 120s
                             #         secrets:
                             #             - postgres4gateway
                             #             - keycloak4gateway-db
