@@ -19,12 +19,14 @@ package install
 import (
 	"bytes"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/sirupsen/logrus"
+
 	// log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -170,7 +172,7 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
 		partials := strings.Split(filename, "/")
-		dumpName := utils.AbsPathify( fmt.Sprintf("$HOME/.safescale/forensics/%s/%s", host.Name, partials[len(partials)-1]))
+		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s", host.Name, partials[len(partials)-1]))
 
 		err := ioutil.WriteFile(dumpName, []byte(content), 0644)
 		if err != nil {
@@ -296,6 +298,28 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 	}
 
 	return dataBuffer.String(), nil
+}
+
+// realizeVariables replaces in every variable any template
+func realizeVariables(variables Variables) (Variables, error) {
+	cloneV := variables.Clone()
+
+	for k, v := range cloneV {
+		if variable, ok := v.(string); ok {
+			varTemplate, err := template.New("realize_var").Parse(variable)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing variable '%s': %s", k, err.Error())
+			}
+			buffer := bytes.NewBufferString("")
+			err = varTemplate.Execute(buffer, variables)
+			if err != nil {
+				return nil, err
+			}
+			cloneV[k] = buffer.String()
+		}
+	}
+
+	return cloneV, nil
 }
 
 func replaceVariablesInString(text string, v Variables) (string, error) {
