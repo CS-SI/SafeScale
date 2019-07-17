@@ -228,17 +228,23 @@ type step struct {
 func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, error) {
 	log.Debugf("running step '%s' on %d hosts...", is.Name, len(hosts))
 
+	var err error
 	results := stepResults{}
 
 	if is.Serial || s.Serialize {
 		subtask := concurrency.NewTask(is.Worker.feature.task, is.taskRunOnHost)
+
 		for _, h := range hosts {
 			log.Debugf("%s(%s):step(%s)@%s: starting\n", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
 
-			variables := v.Clone()
-			variables["HostIP"] = h.PrivateIp
-			variables["Hostname"] = h.Name
-			_ = subtask.Run(map[string]interface{}{"host": h, "variables": variables})
+			cloneV := v.Clone()
+			cloneV["HostIP"] = h.PrivateIp
+			cloneV["Hostname"] = h.Name
+			cloneV, err = realizeVariables(cloneV)
+			if err != nil {
+				return nil, err
+			}
+			_ = subtask.Run(map[string]interface{}{"host": h, "variables": cloneV})
 			results[h.Name] = subtask.GetResult().(stepResult)
 			subtask.Reset()
 			// if !results[h.Name].Successful() {
@@ -251,12 +257,16 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (stepResults, err
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
 			log.Debugf("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
-			variables := v.Clone()
-			variables["HostIP"] = h.PrivateIp
-			variables["Hostname"] = h.Name
+			cloneV := v.Clone()
+			cloneV["HostIP"] = h.PrivateIp
+			cloneV["Hostname"] = h.Name
+			cloneV, err = realizeVariables(cloneV)
+			if err != nil {
+				return nil, err
+			}
 			subtask := concurrency.NewTask(is.Worker.feature.task, is.taskRunOnHost).Start(map[string]interface{}{
 				"host":      h,
-				"variables": variables,
+				"variables": cloneV,
 			})
 			subtasks[h.Name] = subtask
 		}
