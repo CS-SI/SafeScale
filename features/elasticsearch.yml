@@ -65,13 +65,6 @@ feature:
                             {{ end }}
                             SEEDS=${SEEDS%,}
 
-                            # determine if processor supports SSE4.2
-                            if grep sse4_2 /proc/cpuinfo &>/dev/null; then
-                                MACHINE_LEARNING=true
-                            else
-                                MACHINE_LEARNING=false
-                            fi
-
                             cat >${SF_ETCDIR}/elasticsearch/config.yml <<-EOF
                             cluster.name: {{ .ClusterName }}
                             node.name: ${HOSTNAME_PREFIX}-{{ .Hostname }}
@@ -98,11 +91,11 @@ feature:
                             xpack:
                                 license.self_generated.type: basic
                                 security.enabled: false
-                                ml.enabled: ${MACHINE_LEARNING}
+                                ml.enabled: false
                                 monitoring:
                                     collection.enabled: true
                                     elasticsearch.collection.enabled: true
-                            node.ml: ${MACHINE_LEARNING}
+                            node.ml: false
                             EOF
                             chown 1000:safescale ${SF_ETCDIR}/elasticsearch/config.yml
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/elasticsearch/config.yml
