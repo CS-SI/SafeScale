@@ -44,9 +44,10 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// VPL: SSH ControlMaster options: -oControlMaster=auto -oControlPath=~/.ssh/sockets/socket-%C -oControlPersist=5m
-//      Quick tries not very successful...
-//      Should not be used for interactive ssh connection...
+// VPL: SSH ControlMaster options: -oControlMaster=auto -oControlPath=/tmp/safescale-%C -oControlPersist=5m
+//      To make profit of this multiplexing functionality, we have to change the way we manage ports for tunnels: we have to always
+//      use the same port for all access to a same host (not the case currently)
+//      May not be used for interactive ssh connection...
 const sshOptions = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 
 var (
