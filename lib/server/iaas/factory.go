@@ -64,7 +64,7 @@ func GetTenants() ([]interface{}, error) {
 	return tenants, err
 }
 
-//UseStorages return the storageService build around storages referenced in tenantNames
+// UseStorages return the storageService build around storages referenced in tenantNames
 func UseStorages(tenantNames []string) (*StorageServices, error) {
 	storageServices := NewStorageService()
 
@@ -122,28 +122,40 @@ func UseService(tenantName string) (Service, error) {
 			continue
 		}
 
-		tenantIdentity, found := tenant["identity"].(map[string]interface{})
+		// tenantIdentity, found := tenant["identity"].(map[string]interface{})
+		// if !found {
+		// 	log.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
+		// }
+		// tenantCompute, found := tenant["compute"].(map[string]interface{})
+		// if !found {
+		// 	log.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
+		// }
+		// tenantNetwork, found := tenant["network"].(map[string]interface{})
+		// if !found {
+		// 	log.Debugf("No section 'network' found in tenant '%s', continuing.", name)
+		// }
+		_, found = tenant["identity"].(map[string]interface{})
 		if !found {
 			log.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
 		}
-		tenantCompute, found := tenant["compute"].(map[string]interface{})
+		_, found = tenant["compute"].(map[string]interface{})
 		if !found {
 			log.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
 		}
-		tenantNetwork, found := tenant["network"].(map[string]interface{})
+		_, found = tenant["network"].(map[string]interface{})
 		if !found {
 			log.Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		}
-		tenantClient := map[string]interface{}{
-			"identity": tenantIdentity,
-			"compute":  tenantCompute,
-			"network":  tenantNetwork,
-		}
+		// tenantClient := map[string]interface{}{
+		// 	"identity": tenantIdentity,
+		// 	"compute":  tenantCompute,
+		// 	"network":  tenantNetwork,
+		// }
 		_, tenantObjectStorageFound := tenant["objectstorage"]
 		_, tenantMetadataFound := tenant["metadata"]
 
 		// Initializes Provider
-		providerInstance, err := svc.Build(tenantClient)
+		providerInstance, err := svc.Build( /*tenantClient*/ tenant)
 		if err != nil {
 			return nil, fmt.Errorf("Error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
 		}
@@ -216,7 +228,7 @@ func UseService(tenantName string) (Service, error) {
 			metadataBucket: metadataBucket,
 			metadataKey:    metadataCryptKey,
 		}
-		return newS, validateRegexps(newS, tenantClient)
+		return newS, validateRegexps(newS /*tenantClient*/, tenant)
 	}
 
 	if !tenantInCfg {

@@ -51,4 +51,7 @@ type Provider interface {
 
 	// GetName returns the providerName
 	GetName() string
+
+	// GetTenantParameters returns the tenant parameters as read
+	GetTenantParameters() map[string]interface{}
 }

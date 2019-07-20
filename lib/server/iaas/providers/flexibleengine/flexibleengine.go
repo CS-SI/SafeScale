@@ -67,6 +67,8 @@ type provider struct {
 	*huaweicloud.Stack
 
 	defaultSecurityGroupName string
+
+	tenantParameters map[string]interface{}
 }
 
 // New creates a new instance of flexibleengine provider
@@ -76,7 +78,6 @@ func New() providerapi.Provider {
 
 // Build initializes a new FlexibleEngine instance from parameters
 func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
-
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	network, _ := params["network"].(map[string]interface{})
@@ -196,7 +197,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		}
 	}
 
-	return &provider{Stack: stack}, nil
+	newP := &provider{
+		Stack:            stack,
+		tenantParameters: params,
+	}
+	return newP, nil
 }
 
 func addGPUCfg(tpl *resources.HostTemplate) {
@@ -337,6 +342,11 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 // GetName returns the providerName
 func (p *provider) GetName() string {
 	return "flexibleengine"
+}
+
+// GetTenantParameters returns the tenant parameters as-is
+func (p *provider) GetTenantParameters() map[string]interface{} {
+	return p.tenantParameters
 }
 
 func init() {

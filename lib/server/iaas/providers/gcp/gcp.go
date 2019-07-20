@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -33,6 +34,8 @@ import (
 // provider is the provider implementation of the Gcp provider
 type provider struct {
 	*gcp.Stack
+
+	tenantParameters map[string]interface{}
 }
 
 // New creates a new instance of gcp provider
@@ -140,11 +143,15 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	if err != nil {
 		return nil, err
 	}
+	newP := &provider{
+		Stack:            stack,
+		tenantParameters: params,
+	}
 
 	providerName := "gcp"
 
-	// evalid := apiprovider.NewValidatedProvider(&provider{stack}, providerName)
-	etrace := apiprovider.NewErrorTraceProvider(&provider{stack}, providerName)
+	// evalid := apiprovider.NewValidatedProvider(p, providerName)
+	etrace := apiprovider.NewErrorTraceProvider(newP, providerName)
 	prov := apiprovider.NewLoggedProvider(etrace, providerName)
 	return prov, nil
 }
@@ -184,6 +191,11 @@ func (p *provider) GetName() string {
 // ListImages ...
 func (p *provider) ListImages(all bool) ([]resources.Image, error) {
 	return p.Stack.ListImages()
+}
+
+// GetTenantParameters returns the tenant parameters as-is
+func (p *provider) GetTenantParameters() map[string]interface{} {
+	return p.tenantParameters
 }
 
 func init() {

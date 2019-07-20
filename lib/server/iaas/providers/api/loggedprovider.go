@@ -1,8 +1,9 @@
 package api
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
@@ -43,6 +44,11 @@ func (w LoggedProvider) GetConfigurationOptions() (providers.Config, error) {
 func (w LoggedProvider) GetName() string {
 	defer w.prepare(w.trace("GetName"))
 	return w.InnerProvider.GetName()
+}
+
+func (w LoggedProvider) GetTenantParameters() map[string]interface{} {
+	defer w.prepare(w.trace("GetTenantParameters"))
+	return w.InnerProvider.GetTenantParameters()
 }
 
 // Stack specific functions

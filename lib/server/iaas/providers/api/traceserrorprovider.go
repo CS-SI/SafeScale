@@ -63,8 +63,11 @@ func (w ErrorTraceProvider) GetName() string {
 	return w.InnerProvider.GetName()
 }
 
-// Stack specific functions
+func (w ErrorTraceProvider) GetTenantParameters() map[string]interface{} {
+	return w.InnerProvider.GetTenantParameters()
+}
 
+// Stack specific functions
 
 // NewErrorTraceProvider ...
 func NewErrorTraceProvider(InnerProvider Provider, name string) *ErrorTraceProvider {

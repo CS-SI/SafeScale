@@ -42,6 +42,8 @@ var (
 // provider is the providerementation of the Cloudwatt provider
 type provider struct {
 	*openstack.Stack
+
+	tenantParameters map[string]interface{}
 }
 
 // New creates a new instance of cloudwatt provider
@@ -51,7 +53,6 @@ func New() providerapi.Provider {
 
 // Build build a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
-
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 
@@ -159,7 +160,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		}
 	}
 
-	return &provider{Stack: stack}, nil
+	newP := &provider{
+		Stack:            stack,
+		tenantParameters: params,
+	}
+	return newP, nil
 }
 
 // GetAuthenticationOptions returns the auth options
@@ -212,6 +217,11 @@ func (p *provider) ListImages(all bool) ([]resources.Image, error) {
 // GetName returns the providerName
 func (p *provider) GetName() string {
 	return "cloudwatt"
+}
+
+// GetTenantParameters returns the tenant parameters as-is
+func (p *provider) GetTenantParameters() map[string]interface{} {
+	return p.tenantParameters
 }
 
 func init() {
