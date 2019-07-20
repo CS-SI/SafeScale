@@ -545,6 +545,7 @@ feature:
                   masters: all
               content: |
                   {
+                      "name": "remotedesktop-{{.Hostname}}",
                       "paths": ["/remotedesktop/{{.Hostname}}"],
                       "service": { "id": "{{.guacamole}}" }
                   }
