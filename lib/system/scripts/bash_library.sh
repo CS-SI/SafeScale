@@ -251,7 +251,7 @@ sfDownload() {
 		$fn() {
 			while true; do
 				#wget -q -nc -O "$filename" "$url"
-				curl -L -k -SsL -o "$filename" "$url"
+				curl -L -k -SsL "$url" >"$filename"
 				rc=\$?
 				# if $filename exists, remove it and restart without delay
 				[ \$rc -eq 1 ] && rm -f $filename && continue
@@ -407,7 +407,7 @@ sfService() {
 export -f sfService
 
 # tells if a container using a specific image (and optionnaly name) is running in standalone mode
-sfDoesDockerRun() {
+sfDoesDockerRunContainer() {
 	[ $# -eq 0 ] && return 1
 	local IMAGE=$1
 	shift
@@ -421,14 +421,13 @@ sfDoesDockerRun() {
 	echo $LIST | cut -d'|' -f3 | grep -i "^up" &>/dev/null || return 1
 	return 0
 }
-export -f sfDoesDockerRun
+export -f sfDoesDockerRunContainer
 
-# tells if a container using a specific image (and optionally name) is running in Swarm mode
-sfDoesDockerSwarmRun() {
-	[ $# -eq 0 ] && return 1
+# tells if a container using a specific image and name is running in Swarm mode
+sfDoesDockerRunService() {
+	[  $# -ne 2 ] && return 1
 	local IMAGE=$1
-	shift
-	local NAME=$1
+	local NAME=$2
 
 	local LIST=$(docker service ps $NAME {{ "--format '{{.Image}}|{{.Name}}|{{.CurrentState}}'" }})
 	if [ -z "$LIST" ]; then
@@ -438,18 +437,46 @@ sfDoesDockerSwarmRun() {
 	if [ "$IMAGE" != "$RIMAGE" ]; then
 		return 1
 	fi
-	if [ ! -z "$NAME" ]; then
-		local RNAME=$(echo "$LIST" | cut -d'|' -f2)
-		if ! expr match "$RNAME" "^${NAME}\." &>/dev/null; then
-			return 1
-		fi
+	local RNAME=$(echo "$LIST" | cut -d'|' -f2)
+	if ! expr match "$RNAME" "^${NAME}\." &>/dev/null; then
+		return 1
 	fi
 	if ! echo $LIST | cut -d'|' -f3 | grep -i "^running" >/dev/null; then
 		return 1
 	fi
 	return 0
 }
-export -f sfDoesDockerSwarmRun
+export -f sfDoesDockerRunService
+
+# tells if a stack is running in Swarm mode
+sfDoesDockerRunStack() {
+	[  $# -ne 1 ] && return 1
+	local NAME=$1
+
+	local LIST=$(docker stack ps $NAME {{ "--format '{{.CurrentState}}'" }} | grep -i running)
+	[ -z "$LIST" ] && return 1
+	return 0
+}
+export -f sfDoesDockerRunService
+
+sfRemoveDockerImage() {
+	local list=$(docker image ls {{ "--format '{{.Repository}}:{{.Tag}}|{{.ID}}'" }} | grep "^$1")
+	if [ ! -z "$list" ]; then
+		local i image id repo
+		for i in $list; do
+			image=$(echo $i | cut -d'|' -f1)
+			repo=$(echo $image | cut -d: -f1)
+			if [ "$image" = "$1" -o "$repo" = "$1" ]; then
+				id=$(echo $i | cut -d'|' -f2)
+				if [ ! -z "$id" ]; then
+					docker image rm -f $id || return $?
+				fi
+			fi
+		done
+	fi
+	return 0
+}
+export -f sfRemoveDockerImage
 
 # Removes unnamed images (prune removes also not running images, not )
 # echoes a random string
