@@ -40,7 +40,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            sfDoesDockerRun docker.elastic.co/kibana/kibana:{{ .Version }} || exit 192
+                            sfDoesDockerRunContainer docker.elastic.co/kibana/kibana:{{ .Version }} || exit 192
 
             add:
                 pace: config,start
@@ -108,12 +108,14 @@ feature:
                             masters: all
                             nodes: no
                         run: |
+                            if [ -f ${SF_ETCDIR}/kibana/docker-compose.yml ]; then
                             {{ if .ClusterFlavor }}
-                            OPTIONS="-p kibana4safescale"
+                                OPTIONS="-p kibana4safescale"
                             {{ else }}
-                            OPTIONS=
+                                OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force || exit 194
+                                docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force || exit 194
+                            fi
                             exit 0
 
                     remove:
@@ -147,7 +149,7 @@ feature:
               content: |
                   {
                       "protocol": "http",
-                      "host": "kibana_backend"
+                      "host": "kibana_backend",
                       "source-control": {
                           "whitelist": [ "{{ .CIDR }}", "{{ .GatewayIP }}", "127.0.0.1" ]
                       }
@@ -161,7 +163,7 @@ feature:
               content: |
                   {
                       "paths": [ "/monitoring/kibana/" ],
-                      "service": { "id": "{{.kibana_svc}}" },
+                      "service": { "id": "{{.kibana_svc}}" }
                   }
 
 ...
