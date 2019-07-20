@@ -18,6 +18,7 @@ package control
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -820,6 +821,21 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	}
 	params["reserved_CommonRequirements"] = globalSystemRequirements
 
+	if nodeType == NodeType.Master {
+		tp := b.cluster.GetService(task).GetTenantParameters()
+		content := map[string]interface{}{
+			"tenants": []map[string]interface{}{
+				tp,
+			},
+		}
+		jsoned, err := json.MarshalIndent(content, "", "    ")
+		if err != nil {
+			log.Errorf("[%s] tenant parameters convert to JSON failed: %v", hostLabel, err)
+			return err
+		}
+		params["reserved_TenantJSON"] = string(jsoned)
+	}
+
 	var dnsServers []string
 	cfg, err := b.cluster.GetService(task).GetConfigurationOptions()
 	if err == nil {
@@ -891,10 +907,10 @@ func (b *foreman) taskInstallGateway(tr concurrency.TaskRunner, params interface
 	}
 
 	// Configure docker in Swarm mode
-//	err = b.configureDockerSwarm(tr.Task(), pbGateway, hostLabel)
-//	if err != nil {
-//		return
-//	}
+	//	err = b.configureDockerSwarm(tr.Task(), pbGateway, hostLabel)
+	//	if err != nil {
+	//		return
+	//	}
 
 	// Installs proxycache server on gateway (if not disabled)
 	err = b.installProxyCacheServer(tr.Task(), pbGateway, hostLabel)
