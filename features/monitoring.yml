@@ -1,0 +1,712 @@
+#
+# Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: no
+        cluster: swarm
+
+    requirements:
+        features:
+            - docker
+            - docker-compose
+            - consul
+
+    parameters:
+        - PrometheusVersion=v2.11.1
+        - NodeExporterVersion=v0.18.1
+        - AlertmanagerVersion=v0.18.0
+        - GrafanaVersion=6.2.5
+        - PurgeOnRemoval=no
+
+    install:
+        bash:
+            check:
+                pace: stack
+                steps:
+                    stack:
+                        targets:
+                            hosts: yes
+                            masters: any
+                            nodes: no
+                        run: |
+                            sfDoesDockerRunStack monitoring4safescale || exit 192
+                            exit 0
+
+            add:
+                pace: prometheus,am-executor,alertmanager,grafana,portainer,stack,secrets,network,start,running
+                steps:
+                    prometheus:
+                        targets:
+                            hosts: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/monitoring4safescale/prometheus/rules
+                            mkdir -p ${SF_VARDIR}/monitoring4safescale/prometheus
+
+                            cat >${SF_ETCDIR}/monitoring4safescale/prometheus/config.yml <<-EOF
+                            global:
+                                scrape_interval:     15s
+                                evaluation_interval: 15s
+
+                                external_labels:
+                                    monitor: 'monitoring4safescale'
+
+                            #rule_files:
+                            #    - "swarm_node.rules.yml"
+                            #    - "swarm_task.rules.yml"
+
+                            alerting:
+                                alertmanagers:
+                                    - static_configs:
+                                        - targets:
+                                            - alertmanager:9093
+
+                            scrape_configs:
+                                - job_name: 'prometheus'
+                                  static_configs:
+                                      - targets: ['localhost:9090']
+
+                                - job_name: consul
+                                  consul_sd_configs:
+                                      - server: 'tasks.consul-server:8500'
+                                  relabel_configs:
+                                      - source_labels: [__meta_consul_tags]
+                                        regex: .*,monitor,.*
+                                        action: keep
+                                      - source_labels: [__meta_consul_service]
+                                        target_label: service
+
+                                - job_name: 'cadvisor'
+                                  dns_sd_configs:
+                                      - names:
+                                          - 'tasks.cadvisor'
+                                        type: 'A'
+                                        port: 8080
+                            EOF
+
+                            cat >${SF_ETCDIR}/monitoring4safescale/prometheus/rules/swarm_node.yml <<-'EOF'
+                            groups:
+                                - name: /safescale/prometheus/rules/swarm_node.yml
+                                  rules:
+                                      - alert: node_cpu_usage
+                                        expr: 100 - (avg(irate(node_cpu_seconds_total{mode="idle"}[1m]) * ON(instance) GROUP_LEFT(node_name)
+                                              node_meta * 100) BY (node_name)) > 50
+                                        for: 1m
+                                        labels:
+                                            severity: warning
+                                        annotations:
+                                            description: Swarm node {{ "{{ $labels.node_name }}" }} CPU usage is at {{ "{{ humanize $value}}" }}%.
+                                            summary: CPU alert for Swarm node '{{ "{{ $labels.node_name }}" }}'
+                                      - alert: node_memory_usage
+                                        expr: sum(((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes)
+                                              * ON(instance) GROUP_LEFT(node_name) node_meta * 100) BY (node_name) > 80
+                                        for: 1m
+                                        labels:
+                                            severity: warning
+                                        annotations:
+                                            description: Swarm node {{ "{{ $labels.node_name }}" }} memory usage is at {{ "{{ humanize $value}}" }}%.
+                                            summary: Memory alert for Swarm node '{{ "{{ $labels.node_name }}" }}'
+                                      - alert: node_disk_usage
+                                        expr: ((node_filesystem_size_bytes{mountpoint="/rootfs"} - node_filesystem_free_bytes{mountpoint="/rootfs"})
+                                              * 100 / node_filesystem_size_bytes{mountpoint="/rootfs"}) * ON(instance) GROUP_LEFT(node_name)
+                                              node_meta > 85
+                                        for: 1m
+                                        labels:
+                                            severity: warning
+                                        annotations:
+                                            description: Swarm node {{ "{{ $labels.node_name }}" }} disk usage is at {{ "{{ humanize $value}}" }}%.
+                                            summary: Disk alert for Swarm node '{{ "{{ $labels.node_name }}" }}'
+                                      - alert: node_disk_fill_rate_6h
+                                        expr: predict_linear(node_filesystem_free_bytes{mountpoint="/rootfs"}[1h], 6 * 3600) * ON(instance)
+                                              GROUP_LEFT(node_name) node_meta < 0
+                                        for: 1h
+                                        labels:
+                                            severity: critical
+                                        annotations:
+                                            description: Swarm node {{ "{{ $labels.node_name }}" }} disk is going to fill up in 6h.
+                                            summary: Disk fill alert for Swarm node '{{ "{{ $labels.node_name }}" }}'
+                            EOF
+
+                            cat >${SF_ETCDIR}/monitoring4safescale/prometheus/rules/swarm_task.yml <<-'EOF'
+                            groups:
+                                - name: /safescale/prometheus/rules/swarm_task.yml
+                                  rules:
+                                      - alert: task_high_cpu_usage_50
+                                        expr: sum(rate(container_cpu_usage_seconds_total{container_label_com_docker_swarm_task_name=~".+"}[1m]))
+                                              BY (container_label_com_docker_swarm_task_name, container_label_com_docker_swarm_node_id)  * 100 > 50
+                                        for: 1m
+                                        annotations:
+                                            description: '{{ "{{ $labels.container_label_com_docker_swarm_task_name }}" }} on
+                                                         ''{{ "{{ $labels.container_label_com_docker_swarm_node_id }}" }}'' CPU usage is at
+                                                         {{ "{{ humanize $value}}" }}%.'
+                                            summary: CPU alert for Swarm task '{{ "{{ $labels.container_label_com_docker_swarm_task_name }}" }}'
+                                                     on '{{ "{{ $labels.container_label_com_docker_swarm_node_id }}" }}'
+
+                                      - alert: task_high_memory_usage_1g
+                                        expr: sum(container_memory_rss{container_label_com_docker_swarm_task_name=~".+"})
+                                              BY (container_label_com_docker_swarm_task_name, container_label_com_docker_swarm_node_id) > 1e+09
+                                        for: 1m
+                                        annotations:
+                                            description: '{{ "{{ $labels.container_label_com_docker_swarm_task_name }}" }} on
+                                                         ''{{ "{{ $labels.container_label_com_docker_swarm_node_id }}" }}'' memory usage is
+                                                         {{ "{{ humanize $$value}}" }}.'
+                                            summary: Memory alert for Swarm task '{{ "{{ $labels.container_label_com_docker_swarm_task_name }}" }}'
+                                                     on '{{ "{{ $labels.container_label_com_docker_swarm_node_id }}" }}'
+                            EOF
+                            chown -R nobody:safescale ${SF_ETCDIR}/monitoring4safescale/prometheus ${SF_VARDIR}/monitoring4safescale/prometheus
+                            chmod -R u+rwx,g+rx-w,o-rwx ${SF_ETCDIR}/monitoring4safescale/prometheus ${SF_VARDIR}/monitoring4safescale/prometheus
+                            exit 0
+
+                    am-executor:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/monitoring4safescale/am-executor/scripts
+
+                            cat >${SF_ETCDIR}/monitoring4safescale/am-executor/scripts/execute.sh <<-'EOF'
+                            #!/usr/bin/env bash
+                            set -euo pipefail
+
+                            [ "$AMX_STATUS" != "firing" ] && exit 0
+
+                            restart_host() {
+                                safescaled &
+                                safescale host reboot $hostname
+                                retcode=$?
+                                killall safescaled
+                                return $retcode
+                            }
+
+                            for i in $(seq 1 "$AMX_ALERT_LEN"); do
+                                ref="AMX_ALERT_${i}_LABEL_instance"
+
+                                case $1 in
+                                    RestartHost)
+                                        echo '"RestartHost" command received (but do nothing yet).'
+                                        # restart_host "$(echo "${!ref}" | cut -d: -f1)"
+                                        exit 0
+                                        ;;
+                                    *)
+                                        echo "Unknown command '$1' received."
+                                        exit 1
+                                        ;;
+                                esac
+                            done
+
+                            exit 0
+                            EOF
+
+                            cat >${SF_ETCDIR}/monitoring4safescale/am-executor/promhttp.patch <<-'EOF'
+                            --- main.go.orig        2019-07-18 17:22:18.694776179 +0200
+                            +++ main.go     2019-07-18 17:29:33.638347043 +0200
+                            @@ -14,6 +14,7 @@
+
+                                    "github.com/prometheus/alertmanager/template"
+                                    "github.com/prometheus/client_golang/prometheus"
+                            +       "github.com/prometheus/client_golang/prometheus/promhttp"
+                             )
+
+                             var (
+                            @@ -169,7 +170,7 @@
+                                    }
+                                    http.HandleFunc("/", handleWebhook)
+                                    http.HandleFunc("/_health", handleHealth)
+                            -       http.Handle("/metrics", prometheus.Handler())
+                            +       http.Handle("/metrics", promhttp.Handler())
+                                    log.Println("Listening on", *listenAddr, "and running", command)
+                                    log.Fatal(http.ListenAndServe(*listenAddr, nil))
+                             }
+                            EOF
+
+                            cat >${SF_ETCDIR}/monitoring4safescale/am-executor/Dockerfile <<-'EOF'
+                            FROM golang:alpine as builder
+                            RUN apk --no-cache add git patch \
+                             && go get -d github.com/imgix/prometheus-am-executor/... \
+                             && go get -u github.com/prometheus/alertmanager/... \
+                             && go get -u github.com/prometheus/client_golang/...
+                            WORKDIR /go/src/github.com/imgix/prometheus-am-executor
+                            COPY promhttp.patch ./
+                            RUN patch -l <./promhttp.patch \
+                             && CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -a -installsuffix cgo -ldflags '-s -w -extld ld -extldflags -static'
+
+                            FROM alpine
+                            WORKDIR /
+                            RUN apk --no-cache add bash \
+                             && mkdir -p /scripts /etc/safescale
+                            COPY --from=builder /go/src/github.com/imgix/prometheus-am-executor/prometheus-am-executor .
+                            ENTRYPOINT ["/prometheus-am-executor"]
+                            EOF
+
+                            docker build --network host -t am-executor:latest ${SF_ETCDIR}/monitoring4safescale/am-executor || exit 193
+                            exit 0
+
+                    alertmanager:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/monitoring4safescale/alertmanager/templates ${SF_VARDIR}/monitoring4safescale/alertmanager
+                            chown -R nobody:safescale ${SF_VARDIR}/monitoring4safescale/alertmanager
+                            chmod 0750 ${SF_VARDIR}/monitoring4safescale/alertmanager
+
+                            cat >${SF_ETCDIR}/monitoring4safescale/alertmanager/config.yml <<-EOF
+                            global:
+                                smtp_smarthost: 'not.defined:587'
+                                smtp_hello: '{{.HostIP}}'
+                                smtp_from: 'alertmanager@{{.Hostname}}'
+
+                            templates:
+                                - /etc/alertmanager/templates/*.tmpl
+
+                            route:
+                                receiver: 'default'
+
+                                routes:
+                                    - receiver: 'executor'
+                                      match:
+                                          alertname: GatewayNotResponding
+
+                            receivers:
+                                - name: 'default'
+                                  email_configs:
+                                      - to: ops@example.com
+
+                                - name: 'executor'
+                                  webhook_configs:
+                                      - url: http://stacks.am-executor:8080
+
+                            inhibit_rules:
+                                - source_match:
+                                      severity: 'critical'
+                                  target_match:
+                                      severity: 'warning'
+                                  # Apply inhibition if the alertname is the same.
+                                  equal: ['alertname']
+                            EOF
+
+                    grafana:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/monitoring4safescale/grafana/provisioning/datasources
+                            mkdir -p ${SF_ETCDIR}/monitoring4safescale/grafana/provisioning/dashboards
+                            mkdir -p ${SF_ETCDIR}/monitoring4safescale/grafana/dashboards
+                            mkdir -p ${SF_LOGDIR}/monitoring4safescale/grafana
+                            mkdir -p ${SF_VARDIR}/monitoring4safescale/grafana/plugins
+
+                            cat >${SF_ETCDIR}/monitoring4safescale/grafana/provisioning/datasources/prometheus.yml <<-EOF
+                            apiVersion: 1
+
+                            deleteDatasources:
+                                - name: Prometheus
+
+                            datasources:
+                                - name: Prometheus
+                                  type: prometheus
+                                  access: proxy
+                                  url: http://tasks.prometheus:9090
+                                  isDefault: true
+                                  version: 1
+                                  editable: true
+                            EOF
+
+                            cat >${SF_ETCDIR}/monitoring4safescale/grafana/config.ini <<-'EOF'
+                            EOF
+
+                            chown -R 472:safescale ${SF_VARDIR}/monitoring4safescale/grafana ${SF_LOGDIR}/monitoring4safescale/grafana
+                            chmod 0750 ${SF_VARDIR}/monitoring4safescale/grafana ${SF_LOGDIR}/monitoring4safescale/grafana
+                            exit 0
+
+                    portainer:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_VARDIR}/monitoring4safescale/portainer
+                            exit 0
+
+                    stack:
+                        targets:
+                            hosts: no
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            cat >${SF_ETCDIR}/monitoring4safescale/stack.yml <<-EOF
+                            version: '3.3'
+
+                            networks:
+                                monitoring4safescale-net:
+                                    external: true
+
+                            configs:
+                                node_rules:
+                                    file: ${SF_ETCDIR}/monitoring4safescale/prometheus/rules/swarm_node.yml
+                                task_rules:
+                                    file: ${SF_ETCDIR}/monitoring4safescale/prometheus/rules/swarm_task.yml
+
+                            secrets:
+                                safescale.portainer-ui.admin_password:
+                                    external: true
+
+                            services:
+                                cadvisor:
+                                    image: google/cadvisor
+                                    command: -logtostderr -docker_only
+                                    networks:
+                                        - monitoring4safescale-net
+                                    volumes:
+                                        - /var/run/docker.sock:/var/run/docker.sock:ro
+                                        - /:/rootfs:ro
+                                        - /var/run:/var/run
+                                        - /sys:/sys:ro
+                                        - /var/lib/docker/:/var/lib/docker:ro
+                                    deploy:
+                                        mode: global
+                                        resources:
+                                            limits:
+                                                memory: 128M
+                                            reservations:
+                                                memory: 64M
+
+                                grafana:
+                                    image: grafana/grafana:{{ .GrafanaVersion }}
+                                    networks:
+                                        - monitoring4safescale-net
+                                    ports:
+                                        - published: 3000
+                                          target: 3000
+                                          mode: host
+                                    environment:
+                                        - GF_SECURITY_ADMIN_USER=admin
+                                        - GF_SECURITY_ADMIN_PASSWORD=admin
+                                        #- GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/admin_password
+                                        - GF_USERS_ALLOW_SIGN_UP=false
+                                    volumes:
+                                        - ${SF_ETCDIR}/monitoring4safescale/grafana/config.ini:/etc/grafana/gradana.ini
+                                        - ${SF_ETCDIR}/monitoring4safescale/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+                                        - ${SF_ETCDIR}/monitoring4safescale/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+                                        - ${SF_ETCDIR}/monitoring4safescale/grafana/dashboards:/etc/grafana/dashboards
+                                        - ${SF_VARDIR}/monitoring4safescale/grafana:/var/lib/grafana
+                                        - ${SF_LOGDIR}/monitoring4safescale/grafana:/var/log/grafana
+                                    deploy:
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 128M
+                                            reservations:
+                                                memory: 64M
+
+                                am-executor:
+                                    image: am-executor:latest
+                                    command:
+                                        - /scripts/execute.sh
+                                    volumes:
+                                        - /etc/safescale/tenants.json:/etc/safescale/tenants.json:ro
+                                        - ${SF_ETCDIR}/monitoring4safescale/am-executor/scripts:/scripts:ro
+                                        - /usr/local/bin/safescaled:/usr/local/bin/safescaled:ro
+                                        - /usr/local/bin/safescale:/usr/local/bin/safescale:ro
+                                    networks:
+                                        - monitoring4safescale-net
+                                    deploy:
+                                        mode: replicated
+                                        replicas: 1
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 128M
+                                            reservations:
+                                                memory: 64M
+
+                                alertmanager:
+                                    image: prom/alertmanager:{{ .AlertmanagerVersion }}
+                                    networks:
+                                        - monitoring4safescale-net
+                                    command:
+                                        - '--config.file=/etc/alertmanager/alertmanager.yml'
+                                        - '--storage.path=/alertmanager'
+                                    volumes:
+                                        - ${SF_ETCDIR}/monitoring4safescale/alertmanager/config.yml:/etc/alertmanager/alertmanager.yml:ro
+                                        - ${SF_ETCDIR}/monitoring4safescale/alertmanager/templates:/etc/alertmanager/templates:ro
+                                        - ${SF_VARDIR}/monitoring4safescale/alertmanager:/alertmanager
+                                    deploy:
+                                        mode: replicated
+                                        replicas: 1
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 128M
+                                            reservations:
+                                                memory: 64M
+
+                                unsee:
+                                    image: cloudflare/unsee:v0.8.0
+                                    networks:
+                                        - monitoring4safescale-net
+                                    environment:
+                                        - "ALERTMANAGER_URIS=default:http://alertmanager:9093"
+                                    deploy:
+                                        mode: replicated
+                                        replicas: 1
+                                        resources:
+                                            limits:
+                                                memory: 128M
+                                            reservations:
+                                                memory: 64M
+
+                                node-exporter:
+                                    image: prom/node-exporter:{{ .NodeExporterVersion}}
+                                    networks:
+                                        - monitoring4safescale-net
+                                    ports:
+                                        - published: 9100
+                                          target: 9100
+                                          mode: host
+                                    volumes:
+                                        - /proc:/host/proc:ro
+                                        - /sys:/host/sys:ro
+                                        - /:/rootfs:ro
+                                        - /etc/hostname:/etc/nodename
+                                    command:
+                                        - '--path.sysfs=/host/sys'
+                                        - '--path.procfs=/host/proc'
+                                        - '--collector.textfile.directory=/etc/node-exporter/'
+                                        - '{{ "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)" }}'
+                                        - '--no-collector.ipvs'
+                                    deploy:
+                                        mode: global
+                                        resources:
+                                            limits:
+                                                memory: 128M
+                                            reservations:
+                                                memory: 64M
+
+                                prometheus:
+                                    image: prom/prometheus:{{.PrometheusVersion}}
+                                    networks:
+                                        - monitoring4safescale-net
+                                    command:
+                                        - '--config.file=/etc/prometheus/prometheus.yml'
+                                        - '--storage.tsdb.path=/prometheus'
+                                        - '--storage.tsdb.retention=24h'
+                                    volumes:
+                                        - ${SF_ETCDIR}/monitoring4safescale/prometheus/config.yml:/etc/prometheus/prometheus.yml
+                                        - ${SF_VARDIR}/monitoring4safescale/prometheus:/prometheus
+                                    configs:
+                                        - source: node_rules
+                                          target: /etc/prometheus/swarm_node.rules.yml
+                                        - source: task_rules
+                                          target: /etc/prometheus/swarm_task.rules.yml
+                                    deploy:
+                                        mode: replicated
+                                        replicas: 1
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 2048M
+                                            reservations:
+                                                memory: 128M
+
+                                portainer-agent:
+                                    image: portainer/agent
+                                    environment:
+                                        # REQUIRED: Should be equal to the service name prefixed by "tasks." when
+                                        # deployed inside an overlay network
+                                        AGENT_CLUSTER_ADDR: tasks.portainer-agent
+                                        # AGENT_PORT: 9001
+                                        # LOG_LEVEL: debug
+                                    volumes:
+                                        - /var/run/docker.sock:/var/run/docker.sock
+                                        - /var/lib/docker/volumes:/var/lib/docker/volumes
+                                    networks:
+                                        - monitoring4safescale-net
+                                    deploy:
+                                        mode: global
+                                        placement:
+                                            constraints:
+                                                - node.platform.os == linux
+                                        resources:
+                                            limits:
+                                                memory: 128M
+                                            reservations:
+                                                memory: 64M
+
+                                portainer-ui:
+                                    image: portainer/portainer
+                                    command:
+                                        - -H tcp://tasks.portainer-agent:9001
+                                        - --tlsskipverify
+                                        - --admin-password-file /run/secrets/admin_password
+                                    networks:
+                                        - monitoring4safescale-net
+                                    ports:
+                                        - published: 9000
+                                          target: 9000
+                                          mode: host
+                                    volumes:
+                                        - ${SF_VARDIR}/monitoring4safescale:/data
+                                    deploy:
+                                        mode: replicated
+                                        replicas: 1
+                                        placement:
+                                            constraints:
+                                                - node.role == manager
+                                        resources:
+                                            limits:
+                                                memory: 128M
+                                            reservations:
+                                                memory: 64M
+                                    secrets:
+                                        - source: safescale.portainer-ui.admin_password
+                                          target: admin_password
+                            EOF
+
+                    network:
+                        targets:
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^monitoring4safescale-net"; then
+                                docker network create -d overlay monitoring4safescale-net || exit 194
+                            fi
+                            exit 0
+
+                    secrets:
+                        targets:
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            echo "{{.ClusterAdminPassword}}" | docker secret create safescale.portainer-ui.admin_password -
+                            exit 0
+
+                    start:
+                        targets:
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            docker stack deploy -c ${SF_ETCDIR}/monitoring4safescale/stack.yml monitoring4safescale || exit 195
+                            exit 0
+
+                    running:
+                        targets:
+                            hosts: no
+                            masters: any
+                            nodes: no
+                        run: |
+                            sfRetry 5m 5 "sfDoesDockerRunService prom/prometheus:{{ .PrometheusVersion }} monitoring4safescale_prometheus" || exit 196
+                            exit 0
+
+            remove:
+                pace: stop,cleanup
+                steps:
+                    stop:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            if [ -f ${SF_ETCDIR}/monitoring4safescale/stack.yml ]; then
+                                docker stack rm monitoring4safescale || exit 197
+                            fi
+                            exit 0
+
+                    cleanup:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            sfRemoveDockerImage prom/prometheus:{{ .PrometheusVersion }}
+                            sfRemoveDockerImage prom/node-exporter:{{ .NodeExporterVersion }}
+                            sfRemoveDockerImage prom/alertmanager:{{ .AlertmanagerVersion }}
+                            sfRemoveDockerImage grafana/grafana:{{ .GrafanaVersion }}
+                            sfRemoveDockerImage portainer/agent
+                            sfRemoveDockerImage portainer/portainer
+                            sfRemoveDockerImage cloudflare/unsee:v0.8.0
+                            sfRemoveDockerImage google/cadvisor
+
+                            docker network rm monitoring4safescale-net
+
+                            purge={{ .PurgeOnRemoval }}
+                            purge=${purge,,}
+                            [ "$purge" = "yes" ] && rm -rf ${SF_ETCDIR}/monitoring4safescale ${SF_VARDIR}/monitoring4safescale
+                            exit 0
+
+    proxy:
+        rules:
+            - name: grafana_http_backend
+              type: upstream
+              targets:
+                  hosts: no
+                  masters: all
+              content: |
+                  {
+                      "target": "{{.HostIP}}:9500",
+                      "weight": 100
+                  }
+
+
+            - name: grafana_http_svc
+              type: service
+              targets:
+                  hosts: true
+                  masters: one
+              content: |
+                  {
+                      "protocol": "http",
+                      "host": "grafana_http_backend"
+                  }
+
+            - name: grafana_http_route
+              type: route
+              targets:
+                  hosts: true
+                  masters: one
+              content: |
+                  {
+                      "paths": [ "/monitoring/grafana/" ],
+                      "service": { "id": "{{ .grafana_http_svc }}" },
+                      "source-control": {
+                          "whitelist": [ "{{ .CIDR }}", "{{ .PublicIP }}", "127.0.0.1" ]
+                      }
+                  }
+
+...
