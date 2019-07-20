@@ -31,9 +31,9 @@ import (
 
 var errorStr = "Libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"
 
-// Client is the implementation of the local driver regarding to the api.ClientAPI
-// provider is the providerementation of the OVH provider
+// provider is the implementation of the local driver regarding to the api.Provider
 type provider struct {
+	tenantParameters map[string]interface{}
 }
 
 //AuthOptions fields are the union of those recognized by each identity implementation and provider.
@@ -45,6 +45,7 @@ type CfgOptions struct {
 }
 
 func (provider *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
+	provider.tenantParameters = map[string]interface{}{}
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) GetAuthenticationOptions() (providers.Config, error) {
@@ -169,7 +170,10 @@ func (provider *provider) DeleteVolumeAttachment(serverID, id string) error {
 	return fmt.Errorf(errorStr)
 }
 func (provider *provider) GetName() string {
-	return "local_disbled"
+	return "local_disabled"
+}
+func (provider *provider) GetTenantParameters() map[string]interface{} {
+	return nil
 }
 
 func init() {

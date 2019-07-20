@@ -41,6 +41,8 @@ var (
 // provider is the providerementation of the CloudFerro provider
 type provider struct {
 	*openstack.Stack
+
+	tenantParameters map[string]interface{}
 }
 
 // New creates a new instance of cloudferro provider
@@ -169,7 +171,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		}
 	}
 
-	return &provider{Stack: stack}, nil
+	newP := &provider{
+		Stack:            stack,
+		tenantParameters: params,
+	}
+	return newP, nil
 }
 
 // GetAuthOpts returns the auth options
@@ -222,6 +228,11 @@ func (p *provider) ListImages(all bool) ([]resources.Image, error) {
 // GetName returns the providerName
 func (p *provider) GetName() string {
 	return "cloudferro"
+}
+
+// GetTenantParameters returns the tenant parameters as-is
+func (p *provider) GetTenantParameters() map[string]interface{} {
+	return p.tenantParameters
 }
 
 func init() {

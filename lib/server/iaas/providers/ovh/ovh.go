@@ -78,6 +78,8 @@ type provider struct {
 	*openstack.Stack
 
 	ExternalNetworkID string
+
+	tenantParameters map[string]interface{}
 }
 
 // New creates a new instance of cloudferro provider
@@ -208,7 +210,10 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		}
 	}
 
-	newP := &provider{Stack: stack}
+	newP := &provider{
+		Stack:            stack,
+		tenantParameters: params,
+	}
 	err = stack.InitDefaultSecurityGroup()
 	if err != nil {
 		return nil, err
@@ -338,6 +343,10 @@ func (p *provider) CreateNetwork(req resources.NetworkRequest) (*resources.Netwo
 
 func (p *provider) GetName() string {
 	return "ovh"
+}
+
+func (p *provider) GetTenantParameters() map[string]interface{} {
+	return p.tenantParameters
 }
 
 func init() {

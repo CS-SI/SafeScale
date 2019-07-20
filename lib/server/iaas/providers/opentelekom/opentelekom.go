@@ -40,6 +40,8 @@ const (
 // provider is the providerementation of the OpenTelekom provider
 type provider struct {
 	*huaweicloud.Stack
+
+	tenantParameters map[string]interface{}
 }
 
 // New creates a new instance of opentelekom provider
@@ -166,7 +168,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		}
 	}
 
-	return &provider{Stack: stack}, nil
+	newP := provider{
+		Stack:            stack,
+		tenantParameters: params,
+	}
+	return &newP, nil
 }
 
 // ListTemplates ...
@@ -220,6 +226,10 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 
 func (p *provider) GetName() string {
 	return "opentelekom"
+}
+
+func (p *provider) GetTenantParameters() map[string]interface{} {
+	return p.tenantParameters
 }
 
 // init registers the opentelekom provider
