@@ -26,26 +26,16 @@ feature:
     install:
         bash:
             check:
-                pace: server,agent
+                pace: stack
                 steps:
-                    server:
+                    stack:
                         targets:
                             gateways: no
                             hosts: no
-                            masters: all
+                            masters: any
                             nodes: no
                         run: |
-                            sfDoesDockerSwarmRun consul consul4safescale_server || exit 192
-                            exit 0
-
-                    agent:
-                        targets:
-                            gateways: no
-                            hosts: no
-                            masters: no
-                            nodes: all
-                        run: |
-                            sfDoesDockerSwarmRun consul consul4safescale_agent || exit 192
+                            sfDoesDockerRunStack consul4safescale || exit 192
                             exit 0
 
             add:
@@ -59,15 +49,7 @@ feature:
                             nodes: all
                         run: |
                             mkdir -p ${SF_ETCDIR}/consul/consul.d ${SF_VARDIR}/consul
-                            exit 0
 
-                    config-server:
-                        targets:
-                            gateways: no
-                            hosts: yes
-                            masters: all
-                            nodes: no
-                        run: |
                             cat >${SF_ETCDIR}/consul/consul.d/node-exporter.json <<-EOF
                             {
                                 "service": {
@@ -77,7 +59,15 @@ feature:
                                 }
                             }
                             EOF
+                            exit 0
 
+                    config-server:
+                        targets:
+                            gateways: no
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
                             cat >${SF_ETCDIR}/consul/config.json <<-EOF
                             {
                                 "advertise_addr" : "{{ "{{ GetInterfaceIP \\\"eth0\\\" }}" }}",
@@ -89,7 +79,7 @@ feature:
                                 "retry_join" : [
                                     "consul.server"
                                 ],
-                                "node_name": "{{ .Hostname }}",
+                                "node_name": "{{ .HostIP }}",
                                 "server_name" : "server.{{ .Hostname }}.consul",
                                 "skip_leave_on_interrupt" : true,
                             {{- if gt (len .MasterIPs) 1 }}
@@ -127,8 +117,7 @@ feature:
                                 "retry_join" : [
                                     "consul.server"
                                 ],
-                                "server_name" : "agent.{{ .Hostname }}.consul",
-                                "node_name": "{{ .Hostname }}",
+                                "node_name": "{{ .HostIP }}",
                                 "leave_on_terminate" : true,
                                 "skip_leave_on_interrupt" : false,
                                 "server" : false,
@@ -190,7 +179,7 @@ feature:
 
                                 agent:
                                     image: consul:{{ .Version }}
-                                    command: "agent -config-file /consul/config/config.json"
+                                    command: "agent -config-file /consul/config/config.json -config-dir /consul/config/consul.d"
                                     networks:
                                         consul-net:
                                             aliases:
@@ -201,6 +190,7 @@ feature:
                                           mode: host
                                     volumes:
                                         - ${SF_ETCDIR}/consul/config.json:/consul/config/config.json:ro
+                                        - ${SF_ETCDIR}/consul/consul.d:/consul/config/consul.d
                                         - ${SF_VARDIR}/consul:/consul/data
                                     deploy:
                                         mode: global
@@ -229,9 +219,9 @@ feature:
                             nodes: no
                         run: |
                             if ! docker network ls {{ "--format '{{.Name}}'" }} | grep "^consul-net"; then
-                                docker network create -d overlay consul-net || exit 193
+                                docker network create -d overlay consul-net || exit 194
                             fi
-                            docker stack deploy -c ${SF_ETCDIR}/consul/docker-compose.yml consul4safescale || exit 194
+                            docker stack deploy -c ${SF_ETCDIR}/consul/docker-compose.yml consul4safescale || exit 195
                             exit 0
 
                     server-started:
@@ -241,7 +231,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "sfDoesDockerSwarmRun consul consul4safescale_server" || exit 195
+                            sfRetry 5m 5 "sfDoesDockerRunService consul consul4safescale_server" || exit 196
                             exit 0
 
                     agent-started:
@@ -251,7 +241,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry 5m 5 "sfDoesDockerSwarmRun consul consul4safescale_agent" || exit 196
+                            sfRetry 5m 5 "sfDoesDockerRunService consul consul4safescale_agent" || exit 197
                             exit 0
 
             remove:
@@ -264,7 +254,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack rm consul4safescale || exit 197
+                            docker stack rm consul4safescale || exit 198
                             exit 0
 
                     cleanup:
