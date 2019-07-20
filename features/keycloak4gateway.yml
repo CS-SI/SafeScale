@@ -288,7 +288,7 @@ feature:
                             nodes: no
                         run: |
                             docker-compose -f ${SF_ETCDIR}/keycloak4gateway/docker-compose.yml -p keycloak4gateway up -d || exit 194
-                            sfRetry 5m 5 "sfDoesDockerRun keycloak4gateway:latest keycloak4gateway_server_1" || exit 195
+                            sfRetry 5m 5 "sfDoesDockerRunContainer keycloak4gateway:latest keycloak4gateway_server_1" || exit 195
                             exit 0
 
             remove:

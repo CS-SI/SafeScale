@@ -38,7 +38,7 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            sfDoesDockerRun postgres:11-alpine postgres4gateway_postgres_1 || exit 192
+                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || exit 192
                             exit 0
 
             add:
@@ -128,7 +128,7 @@ feature:
                             nodes: no
                         run: |
                             docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d || exit 194
-                            sfRetry 5m 5 "sfDoesDockerRun postgres:11-alpine postgres4gateway_postgres_1" || exit 195
+                            sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || exit 195
                             exit 0
 
             remove:

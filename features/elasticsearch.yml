@@ -39,7 +39,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            sfDoesDockerRun docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} || exit 192
+                            sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} || exit 192
                             exit 0
 
             add:
@@ -153,7 +153,7 @@ feature:
                             {{ else }}
                             PREFIX="elasticsearch"
                             {{ end }}
-                            sfRetry 5m 5 "sfDoesDockerRun docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} ${PREFIX}_server_1"
+                            sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} ${PREFIX}_server_1"
 
                     ready:
                         targets:
