@@ -267,7 +267,7 @@ feature:
                             nodes: no
                         run: |
                             docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway up -d || exit 193
-                            sfRetry 5m 5 "sfDoesDockerRun kong4gateway:latest kong4gateway_proxy_1" || exit 194
+                            sfRetry 5m 5 "sfDoesDockerRunContainer kong4gateway:latest kong4gateway_proxy_1" || exit 194
                             exit 0
 
             remove:
