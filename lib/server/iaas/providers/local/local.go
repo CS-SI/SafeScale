@@ -20,6 +20,7 @@ package local
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -34,6 +35,8 @@ import (
 // provider is the provider implementation of the local provider
 type provider struct {
 	*libStack.Stack
+
+	tenantParameters map[string]interface{}
 }
 
 // New creates a new instance of local provider
@@ -129,7 +132,10 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		return nil, fmt.Errorf("Failed to create a new libvirt Stack : %v", err)
 	}
 
-	localProvider := &provider{Stack: libvirtStack}
+	localProvider := &provider{
+		Stack:            libvirtStack,
+		tenantParameters: params,
+	}
 
 	return localProvider, nil
 }
@@ -158,7 +164,6 @@ func (provider *provider) GetName() string {
 	return "local"
 }
 
-
 // ListImages ...
 func (provider *provider) ListImages(all bool) ([]resources.Image, error) {
 	return provider.Stack.ListImages()
@@ -171,6 +176,11 @@ func (provider *provider) ListTemplates(all bool) ([]resources.HostTemplate, err
 
 func (provider *provider) ListAvailabilityZones() (map[string]bool, error) {
 	return provider.Stack.ListAvailabilityZones()
+}
+
+// GetTenantParameters returns the tenant parameters as-is
+func (p *provider) GetTenantParameters() map[string]interface{} {
+	return p.tenantParameters
 }
 
 func init() {
