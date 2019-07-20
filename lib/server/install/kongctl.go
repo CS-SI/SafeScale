@@ -115,7 +115,9 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 			sourceControl = unjsoned["source-control"].(map[string]interface{})
 			delete(unjsoned, "source-control")
 		}
-		unjsoned["name"] = ruleName
+		if _, ok := unjsoned["name"]; !ok {
+			unjsoned["name"] = ruleName
+		}
 		jsoned, _ := json.Marshal(&unjsoned)
 		content = string(jsoned)
 
@@ -138,7 +140,9 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *Variabl
 			sourceControl = unjsoned["source-control"].(map[string]interface{})
 			delete(unjsoned, "source-control")
 		}
-		unjsoned["name"] = ruleName // To name the route...
+		if _, ok := unjsoned["name"]; !ok {
+			unjsoned["name"] = ruleName
+		}
 		unjsoned["protocols"] = []string{"https"}
 		jsoned, _ := json.Marshal(&unjsoned)
 		content = string(jsoned)
