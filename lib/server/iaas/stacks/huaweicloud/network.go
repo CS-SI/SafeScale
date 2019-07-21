@@ -18,12 +18,13 @@ package huaweicloud
 
 import (
 	"fmt"
+	"net"
+	"strings"
+
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	log "github.com/sirupsen/logrus"
-	"net"
-	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"

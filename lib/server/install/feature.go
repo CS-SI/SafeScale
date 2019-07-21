@@ -465,8 +465,17 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) {
 		v["ClusterComplexity"] = strings.ToLower(identity.Complexity.String())
 		v["ClusterFlavor"] = strings.ToLower(identity.Flavor.String())
 		networkCfg := cluster.GetNetworkConfig(f.task)
-		v["GatewayIP"] = networkCfg.GatewayIP
-		v["PublicIP"] = networkCfg.PublicIP
+		// if networkCfg.VIP != nil {
+		// 	v["GatewayIP"] = networkCfg.VIP.PrivateIP // VPL: Should be replaced by the next entry
+		// 	v["DefaultRouteIP"] = networkCfg.VIP.PrivateIP
+		// 	v["PublicIP"] = networkCfg.VIP.PublicIP // VPL: Should be replaced by the next entry
+		// 	v["EndpointIP"] = networkCfg.VIP.PublicIP
+		// } else {
+		v["GatewayIP"] = networkCfg.GatewayIP // VPL: Should be replaced by the next entry
+		v["DefaultRouteIP"] = networkCfg.GatewayIP
+		v["PublicIP"] = networkCfg.PublicIP // VPL: Should be replaced by the next entry
+		v["EndpointIP"] = networkCfg.PublicIP
+		// }
 		v["MasterIDs"] = cluster.ListMasterIDs(f.task)
 		v["MasterIPs"] = cluster.ListMasterIPs(f.task)
 		if _, ok := v["Username"]; !ok {

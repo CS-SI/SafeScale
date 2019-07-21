@@ -186,7 +186,7 @@ substring_diff() {
 ensure_network_connectivity() {
     {{- if .AddGateway }}
         route del -net default &>/dev/null
-        route add -net default gw {{ .GatewayIP }}
+        route add -net default gw {{ .DefaultRouteIP }}
     {{- else }}
     :
     {{- end}}
@@ -232,6 +232,7 @@ configure_network() {
 
     {{- if .IsGateway }}
     configure_as_gateway
+    install_keepalived
     {{- end }}
 
     check_for_network || {
@@ -260,7 +261,7 @@ EOF
 auto ${IF}
 iface ${IF} inet dhcp
 {{- if .AddGateway }}
-  up route add -net default gw {{ .GatewayIP }} || true
+  up route add -net default gw {{ .DefaultRouteIP }} || true
 {{- end}}
 EOF
         fi
@@ -467,6 +468,57 @@ configure_as_gateway() {
     systemctl restart ssh
 
     echo done
+}
+
+
+install_keepalived() {
+    case $LINUX_KIND in
+        ubuntu|debian)
+            sfApt update && sfApt -y install keepalived || return 1
+            ;;
+
+        redhat|centos)
+            yum install -qy keepalived || return 1
+            ;;
+        *)
+            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            return 1
+            ;;
+    esac
+
+    cat >/etc/keepalived/keepalived.conf <<-EOF
+vrrp_instance vrrp_group_gws_internal {
+    state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
+    interface ${PR_IFs[0]}
+    virtual_router_id {{ if eq .IsPrimaryGateway true}}1{{ else }}2{{ end }}
+    priority 100
+    authentication {
+        auth_type PASS
+        auth_pass password
+    }
+    virtual_ipaddress {
+        {{ .PrivateVIP }}
+    }
+}
+
+# vrrp_instance vrrp_group_gws_external {
+#     state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
+#     interface ${PU_IF}
+#     virtual_router_id {{ if eq .IsPrimaryGateway true }}3{{ else }}4{{ end }}
+#     priority 100
+#     authentication {
+#         auth_type PASS
+#         auth_pass password
+#     }
+#     virtual_ipaddress {
+#         {{ .PublicVIP }}
+#     }
+# }
+EOF
+
+    sfService enable keepalived
+    sfService restart keepalived || return 1
+    return 0
 }
 
 configure_dns_legacy() {

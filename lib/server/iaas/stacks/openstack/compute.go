@@ -22,9 +22,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"strings"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 
@@ -54,6 +55,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
+// ListRegions ...
 func (s *Stack) ListRegions() ([]string, error) {
 	log.Debug(">>> openstack.Client.ListRegions()")
 	defer log.Debug("<<< openstack.Client.ListRegions()")
@@ -425,6 +427,23 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	log.Debugf(">>> stacks.openstack::InspectHost(%s)", hostRef)
 	defer log.Debugf("<<< stacks.openstack::InspectHost(%s)", hostRef)
 
+	server, err := s.queryServer(host.ID)
+	if err != nil {
+		return nil, err
+	}
+	err = s.complementHost(host, server)
+	if err != nil {
+		return nil, err
+	}
+
+	if !host.OK() {
+		log.Debugf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+	}
+
+	return host, nil
+}
+
+func (s *Stack) queryServer(id string) (*servers.Server, error) {
 	var (
 		server   *servers.Server
 		err      error
@@ -432,10 +451,9 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	)
 
 	timeout := 2 * utils.GetBigDelay()
-
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			server, err = servers.Get(s.ComputeClient, host.ID).Extract()
+			server, err = servers.Get(s.ComputeClient, id).Extract()
 			if err != nil {
 				switch err.(type) {
 				case gc.ErrDefault404:
@@ -449,11 +467,11 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 					return err
 				}
 				// Any other error stops the retry
-				err = fmt.Errorf("Error getting host '%s': %s", host.ID, ProviderErrorToString(err))
+				err = fmt.Errorf("Error getting host '%s': %s", id, ProviderErrorToString(err))
 				return nil
 			}
 			if server.Status != "ERROR" && server.Status != "CREATING" {
-				host.LastState = toHostState(server.Status)
+				// host.LastState = toHostState(server.Status)
 				return nil
 			}
 			return fmt.Errorf("server not ready yet")
@@ -463,25 +481,16 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	)
 	if retryErr != nil {
 		if _, ok := err.(retry.ErrTimeout); ok {
-			return nil, fmt.Errorf("failed to get host '%s' information after %v: %s", host.ID, timeout, retryErr.Error())
+			return nil, fmt.Errorf("failed to get host '%s' information after %v: %s", id, timeout, retryErr.Error())
 		}
 	}
 	if err != nil {
 		return nil, err
 	}
 	if notFound {
-		return nil, resources.ResourceNotFoundError("host", host.ID)
+		return nil, resources.ResourceNotFoundError("host", id)
 	}
-	err = s.complementHost(host, server)
-	if err != nil {
-		return nil, err
-	}
-
-	if !host.OK() {
-		log.Debugf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
-	}
-
-	return host, nil
+	return server, nil
 }
 
 // interpretAddresses converts adresses returned by the OpenStack driver
@@ -724,17 +733,17 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 	defaultGateway := request.DefaultGateway
 	isGateway := (defaultGateway == nil && defaultNetwork.Name != resources.SingleHostNetworkName)
 	defaultGatewayID := ""
-	defaultGatewayPrivateIP := ""
+	// defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
-		err := defaultGateway.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
-			hostNetworkV1 := v.(*propsv1.HostNetwork)
-			defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
-			defaultGatewayID = defaultGateway.ID
-			return nil
-		})
-		if err != nil {
-			return nil, userData, errors.Wrap(err, "")
-		}
+		// err := defaultGateway.Properties.LockForRead(HostProperty.NetworkV1).ThenUse(func(v interface{}) error {
+		// 	hostNetworkV1 := v.(*propsv1.HostNetwork)
+		// defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
+		defaultGatewayID = defaultGateway.ID
+		// 	return nil
+		// })
+		// if err != nil {
+		// 	return nil, userData, errors.Wrap(err, "")
+		// }
 	}
 
 	var nets []servers.Network
@@ -824,7 +833,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		hostNetworkV1 := v.(*propsv1.HostNetwork)
 		hostNetworkV1.DefaultNetworkID = defaultNetworkID
 		hostNetworkV1.DefaultGatewayID = defaultGatewayID
-		hostNetworkV1.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
+		hostNetworkV1.DefaultGatewayPrivateIP = request.DefaultRouteIP
 		hostNetworkV1.IsGateway = isGateway
 		return nil
 	})
