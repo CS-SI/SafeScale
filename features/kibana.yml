@@ -151,7 +151,7 @@ feature:
                       "protocol": "http",
                       "host": "kibana_backend",
                       "source-control": {
-                          "whitelist": [ "{{ .CIDR }}", "{{ .GatewayIP }}", "127.0.0.1" ]
+                          "whitelist": [ "{{ .CIDR }}", "{{ .DefaultRouteIP }}", "127.0.0.1" ]
                       }
                   }
 
