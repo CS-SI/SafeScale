@@ -41,22 +41,22 @@ feature:
                             hosts: yes
                         run: |
                             cat >>/etc/environment <<-'EOF'
-                            http_proxy="http://{{.GatewayIP}}:3128/"
-                            HTTP_PROXY="http://{{.GatewayIP}}:3128/"
-                            https_proxy="http://{{.GatewayIP}}:3128/"
-                            HTTPS_PROXY="http://{{.GatewayIP}}:3128/"
-                            ftp_proxy="http://{{.GatewayIP}}:3128/"
-                            FTP_PROXY="http://{{.GatewayIP}}:3128/"
-                            no_proxy={{.GatewayIP}},{{.HostIP}},localhost
-                            NO_PROXY={{.GatewayIP}},{{.HostIP}},localhost
+                            http_proxy="http://{{.DefaultRouteIP}}:3128/"
+                            HTTP_PROXY="http://{{.DefaultRouteIP}}:3128/"
+                            https_proxy="http://{{.DefaultRouteIP}}:3128/"
+                            HTTPS_PROXY="http://{{.DefaultRouteIP}}:3128/"
+                            ftp_proxy="http://{{.DefaultRouteIP}}:3128/"
+                            FTP_PROXY="http://{{.DefaultRouteIP}}:3128/"
+                            no_proxy={{.DefaultRouteIP}},{{.HostIP}},localhost
+                            NO_PROXY={{.DefaultRouteIP}},{{.HostIP}},localhost
                             EOF
 
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    echo "Acquire::http::Proxy http://{{.GatewayIP}}:3128/;" >/etc/apt/02proxy
+                                    echo "Acquire::http::Proxy http://{{.DefaultRouteIP}}:3128/;" >/etc/apt/02proxy
                                     ;;
                                 redhat|centos)
-                                    echo "proxy=http://{{.GatewayIP}}:3128/" >>/etc/yum.conf
+                                    echo "proxy=http://{{.DefaultRouteIP}}:3128/" >>/etc/yum.conf
                                     ;;
                                 *)
                                     echo "Unmanaged OS '$LINUX_KIND'. Aborting."
@@ -70,7 +70,7 @@ feature:
                             # Update proxy for dockerd preventively
                             mkdir -p /etc/systemd/system/docker.service.d
                             cat >/etc/systemd/system/docker.service.d/proxy.conf <<-'EOF'
-                            Environment="HTTP_PROXY=http://{{.GatewayIP}}:3128/"
+                            Environment="HTTP_PROXY=http://{{.DefaultRouteIP}}:3128/"
                             EOF
                             systemctl daemon-reload || :
 

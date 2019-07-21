@@ -248,7 +248,7 @@ feature:
                                     grep -v "$s" /etc/fstab >>/etc/fstab.new && mv /etc/fstab.new /etc/fstab
                                 done
                             fi
-                            exit 
+                            exit 0
 
                     reverseproxy:
                         targets:
@@ -257,12 +257,12 @@ feature:
                             cat >${SF_ETCDIR}/kong/includes/kubernetes.conf <<-'EOF'
                             upstream kubernetes-api-cluster {
                                 {{range .MasterIPs}}server {{.}}:6443;
-                                {{end}} 
+                                {{end}}
                             }
 
-                            server { 
+                            server {
                                 listen 6443;
-                                proxy_pass kubernetes-api-cluster; 
+                                proxy_pass kubernetes-api-cluster;
                             }
                             EOF
                             sfReverseProxyReload
@@ -279,7 +279,7 @@ feature:
                             apiVersion: kubeadm.k8s.io/v1beta1
                             kind: ClusterConfiguration
                             kubernetesVersion: stable
-                            controlPlaneEndpoint: "{{.GatewayIP}}:6443"
+                            controlPlaneEndpoint: "{{.DefaultRouteIP}}:6443"
                             networking:
                                 podSubnet: 10.244.0.0/16
                             EOF
@@ -502,7 +502,7 @@ feature:
     #           content: |
     #               {
     #                   "protocols": ["https"],
-    #                   "hosts": [ "{{.GatewayIP}}"],
+    #                   "hosts": [ "{{.DefaultRouteIP}}"],
     #                   "paths": ["/"],
     #                   "service": { "id": "{{.service}}" }
     #               }

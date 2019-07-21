@@ -507,7 +507,7 @@ feature:
                             EOF
 
                             # Allow only gateway to connect to port 9080
-                            sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source not address="{{.GatewayIP}}" port protocol="tcp" port="9080" reject'
+                            sfFirewallAdd --zone=trusted --add-rich-rule='rule family="ipv4" source not address="{{.DefaultRouteIP}}" port protocol="tcp" port="9080" reject'
                             sfFirewallReload
                             ###########################################################
                             # Starts remotedesktop container                          #
