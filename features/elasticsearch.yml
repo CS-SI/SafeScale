@@ -162,7 +162,7 @@ feature:
                             nodes: no
                         run: |
                             {{ if .ClusterFlavor }}
-                            URL="https://{{.GatewayIP}}/monitoring/elasticsearch/_cat/health"
+                            URL="https://{{.DefaultRouteIP}}/monitoring/elasticsearch/_cat/health"
                             {{ else }}
                             URL="http://{{.HostIP}}:9200/_cat/health"
                             {{ end }}
