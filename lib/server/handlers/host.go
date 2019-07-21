@@ -225,29 +225,49 @@ func (handler *HostHandler) Create(
 		return nil, logicErr(fmt.Errorf("failed to create host '%s': name is already used", name))
 	}
 
-	var networks []*resources.Network
-	var gw *resources.Host
-	if len(net) != 0 {
+	var (
+		networks       []*resources.Network
+		defaultNetwork *resources.Network
+		primaryGateway *resources.Host
+		// secondaryGateway *resources.Host
+		defaultRouteIP string
+	)
+	if net != "" {
 		networkHandler := NewNetworkHandler(handler.service)
-		n, err := networkHandler.Inspect(ctx, net)
+		defaultNetwork, err = networkHandler.Inspect(ctx, net)
 		if err != nil {
 			if _, ok := err.(resources.ErrResourceNotFound); ok {
 				return nil, infraErr(err)
 			}
 			return nil, infraErrf(err, "failed to get network resource data: '%s'", net)
 		}
-		if n == nil {
+		if defaultNetwork == nil {
 			return nil, logicErr(fmt.Errorf("failed to find network '%s'", net))
 		}
-		networks = append(networks, n)
-		mgw, err := metadata.LoadHost(handler.service, n.GatewayID)
+		networks = append(networks, defaultNetwork)
+
+		mgw, err := metadata.LoadHost(handler.service, defaultNetwork.GatewayID)
 		if err != nil {
 			return nil, infraErr(err)
 		}
 		if mgw == nil {
 			return nil, logicErr(fmt.Errorf("failed to find gateway of network '%s'", net))
 		}
-		gw = mgw.Get()
+		primaryGateway = mgw.Get()
+		if defaultNetwork.VIP != nil {
+			// mgw, err = metadata.LoadHost(handler.service, defaultNetwork.SecondaryGatewayID)
+			// if err != nil {
+			// 	return nil, infraErr(err)
+			// }
+			// if mgw == nil {
+			// 	return nil, logicErr(fmt.Errorf("failed to find secondary gateway of network '%s'", net))
+			// }
+			// secondaryGateway = mgw.Get()
+
+			defaultRouteIP = defaultNetwork.VIP.PrivateIP
+		} else {
+			defaultRouteIP = primaryGateway.GetPrivateIP()
+		}
 	} else {
 		net, err := handler.getOrCreateDefaultNetwork()
 		if err != nil {
@@ -308,7 +328,8 @@ func (handler *HostHandler) Create(
 		TemplateID:     template.ID,
 		PublicIP:       public,
 		Networks:       networks,
-		DefaultGateway: gw,
+		DefaultRouteIP: defaultRouteIP,
+		DefaultGateway: primaryGateway,
 	}
 
 	var userData *userdata.Content
