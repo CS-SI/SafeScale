@@ -61,9 +61,8 @@ func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, 
 		}
 		if !r.Done {
 			return fmt.Errorf("not finished yet")
-		} else {
-			return nil
 		}
+		return nil
 	}, poll, duration)
 
 	return err
