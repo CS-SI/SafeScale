@@ -24,8 +24,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostState"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 )
 
 var errorStr = "Libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"
@@ -91,8 +91,23 @@ func (s *Stack) DeleteNetwork(id string) error {
 func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
 	return nil, nil, fmt.Errorf(errorStr)
 }
-
 func (s *Stack) DeleteGateway(string) error {
+	return fmt.Errorf(errorStr)
+}
+
+func (s *Stack) CreateVIP(networkID string, description string) (*resources.VIP, error) {
+	return nil, fmt.Errorf(errorStr)
+}
+func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
+	return fmt.Errorf(errorStr)
+}
+func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+	return fmt.Errorf(errorStr)
+}
+func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+	return fmt.Errorf(errorStr)
+}
+func (s *Stack) DeleteVIP(vip *resources.VIP) error {
 	return fmt.Errorf(errorStr)
 }
 

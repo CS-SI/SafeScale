@@ -18,15 +18,16 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
+
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
@@ -746,17 +747,116 @@ func (s *Stack) addSubnetToRouter(routerID string, subnetID string) error {
 	return nil
 }
 
-// removeSubnetFromRouter detachesa subnet from router interface
+// removeSubnetFromRouter detaches a subnet from router interface
 func (s *Stack) removeSubnetFromRouter(routerID string, subnetID string) error {
 	r := routers.RemoveInterface(s.NetworkClient, routerID, routers.RemoveInterfaceOpts{
 		SubnetID: subnetID,
 	})
 	_, err := r.Extract()
 	if err != nil {
-		spew.Dump(r)
 		msg := fmt.Sprintf("failed to remove subnet '%s' from router '%s': %s", subnetID, routerID, ProviderErrorToString(err))
 		log.Debug(msg)
 		return errors.Wrap(err, msg)
 	}
 	return nil
+}
+
+// listPorts lists all ports available
+func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
+	allPages, err := ports.List(s.NetworkClient, options).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	return ports.ExtractPorts(allPages)
+}
+
+// CreateVIP creates a private virtual IP
+// If public is set to true,
+func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error) {
+	asu := true
+	options := ports.CreateOpts{
+		NetworkID:    networkID,
+		AdminStateUp: &asu,
+		Name:         name,
+	}
+	port, err := ports.Create(s.NetworkClient, options).Extract()
+	if err != nil {
+		return nil, err
+	}
+	vip := resources.VIP{
+		ID:        port.ID,
+		PrivateIP: port.FixedIPs[0].IPAddress,
+	}
+	return &vip, nil
+}
+
+// AddPublicIPToVIP adds a public IP to VIP
+func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
+	return utils.NotImplementedError("AddPublicIPToVIP() not implemented yet")
+}
+
+// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
+func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
+	if err != nil {
+		return err
+	}
+	hostPorts, err := s.listPorts(ports.ListOpts{
+		DeviceID:  host.ID,
+		NetworkID: vip.NetworkID,
+	})
+	if err != nil {
+		return err
+	}
+	addressPair := ports.AddressPair{
+		MACAddress: vipPort.MACAddress,
+		IPAddress:  vip.PrivateIP,
+	}
+	for _, p := range hostPorts {
+		p.AllowedAddressPairs = append(p.AllowedAddressPairs, addressPair)
+		_, err = ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs}).Extract()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// UnbindHostFromVIP removes the bind between the VIP and a host
+func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
+	if err != nil {
+		return err
+	}
+	hostPorts, err := s.listPorts(ports.ListOpts{
+		DeviceID:  host.ID,
+		NetworkID: vip.NetworkID,
+	})
+	if err != nil {
+		return err
+	}
+	for _, p := range hostPorts {
+		newAllowedAddressPairs := []ports.AddressPair{}
+		for _, a := range p.AllowedAddressPairs {
+			if a.MACAddress != vipPort.MACAddress {
+				newAllowedAddressPairs = append(newAllowedAddressPairs, a)
+			}
+		}
+		_, err = ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &newAllowedAddressPairs}).Extract()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DeleteVIP deletes the port corresponding to the VIP
+func (s *Stack) DeleteVIP(vip *resources.VIP) error {
+	for _, h := range vip.Hosts {
+		err := s.UnbindHostFromVIP(vip, h)
+		if err != nil {
+			return err
+		}
+	}
+	return ports.Delete(s.NetworkClient, vip.ID).ExtractErr()
 }

@@ -204,7 +204,7 @@ enable_firewall() {
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
     route del -net default &>/dev/null
-    route add -net default gw {{ .GatewayIP }}
+    route add -net default gw {{ .DefaultRouteIP }}
 }
 
 

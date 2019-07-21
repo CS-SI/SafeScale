@@ -31,12 +31,6 @@ type Provider interface {
 
 	stacks.Stack
 
-	// // ListAvailabilityZones lists the usable Availability Zones
-	// ListAvailabilityZones(bool) (map[string]bool, error)
-
-	// // List regions
-	// ListRegions() ([]string, error)
-
 	// ListImages lists available OS images
 	ListImages(all bool) ([]resources.Image, error)
 
@@ -49,7 +43,7 @@ type Provider interface {
 	// GetConfigurationfgOpts returns configuration options as a Config
 	GetConfigurationOptions() (providers.Config, error)
 
-	// GetName returns the providerName
+	// GetName returns the provider name
 	GetName() string
 
 	// GetTenantParameters returns the tenant parameters as read

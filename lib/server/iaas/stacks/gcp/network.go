@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	timeouts "github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -38,7 +39,7 @@ import (
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
 	// disable subnetwork auto-creation
 	ne := compute.Network{
-		Name: s.GcpConfig.NetworkName,
+		Name:                  s.GcpConfig.NetworkName,
 		AutoCreateSubnetworks: false,
 		ForceSendFields:       []string{"AutoCreateSubnetworks"},
 	}
@@ -439,4 +440,30 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 // DeleteGateway delete the public gateway referenced by ref (id or name)
 func (s *Stack) DeleteGateway(ref string) error {
 	return s.DeleteHost(ref)
+}
+
+// CreateVIP creates a private virtual IP
+// If public is set to true,
+func (s *Stack) CreateVIP(networkID string, description string) (*resources.VIP, error) {
+	return nil, utils.NotImplementedError("CreateVIP() not implemented yet")
+}
+
+// AddPublicIPToVIP adds a public IP to VIP
+func (s *Stack) AddPublicIPToVIP(vip *resources.VIP) error {
+	return utils.NotImplementedError("AddPublicIPToVIP() not implemented yet")
+}
+
+// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
+func (s *Stack) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+	return utils.NotImplementedError("BindHostToVIP() not implemented yet")
+}
+
+// UnbindHostFromVIP removes the bind between the VIP and a host
+func (s *Stack) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+	return utils.NotImplementedError("UnbindHostFromVIP() not implemented yet")
+}
+
+// DeleteVIP deletes the port corresponding to the VIP
+func (s *Stack) DeleteVIP(vip *resources.VIP) error {
+	return utils.NotImplementedError("DeleteVIP() not implemented yet")
 }
