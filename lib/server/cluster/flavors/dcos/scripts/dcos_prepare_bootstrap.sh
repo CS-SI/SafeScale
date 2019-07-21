@@ -119,7 +119,7 @@ CLUSTER_ADMIN_UID=$(id -u cladm)
 PEM_ENCODED_PUBLIC_KEY="$(openssl rsa -in ${SF_VARDIR}/dcos/genconf/private_ssh_key -pubout 2>/dev/null | awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}')"
 
 cat >${SF_VARDIR}/dcos/genconf/config.yaml <<-EOF
-bootstrap_url: http://{{.GatewayIP}}:10080
+bootstrap_url: http://{{.HostIP}}:10080
 cluster_name: {{ .ClusterName }}
 exhibitor_storage_backend: static
 master_discovery: static
@@ -170,7 +170,7 @@ services:
         volumes:
             - ${SF_VARDIR}/dcos/genconf/serve:/usr/share/nginx/html:ro
         ports:
-            - {{ .GatewayIP }}:10080:80
+            - {{ .HostIP }}:10080:80
         restart: always
 EOF
 docker-compose -f ${SF_ETCDIR}/dcos/nginx.docker-compose.yml -p dcos4safescale up -d
