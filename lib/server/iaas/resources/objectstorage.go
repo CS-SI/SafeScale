@@ -65,10 +65,11 @@ func NewRange(from, to int) Range {
 	return Range{&from, &to}
 }
 
-func (v *Range) OK() bool {
+// OK ...
+func (r *Range) OK() bool {
 	result := true
-	result = result && v.From != nil
-	result = result && v.To != nil
+	result = result && r.From != nil
+	result = result && r.To != nil
 	return result
 }
 
