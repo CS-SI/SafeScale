@@ -112,6 +112,21 @@ func (provider *provider) CreateGateway(req resources.GatewayRequest) (*resource
 func (provider *provider) DeleteGateway(string) error {
 	return fmt.Errorf(errorStr)
 }
+func (provider *provider) CreateVIP(networkID string, description string) (*resources.VIP, error) {
+	return nil, fmt.Errorf(errorStr)
+}
+func (provider *provider) AddPublicIPToVIP(vip *resources.VIP) error {
+	return fmt.Errorf(errorStr)
+}
+func (provider *provider) BindHostToVIP(vip *resources.VIP, host *resources.Host) error {
+	return fmt.Errorf(errorStr)
+}
+func (provider *provider) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) error {
+	return fmt.Errorf(errorStr)
+}
+func (provider *provider) DeleteVIP(vip *resources.VIP) error {
+	return fmt.Errorf(errorStr)
+}
 
 func (provider *provider) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
 	return nil, nil, fmt.Errorf(errorStr)

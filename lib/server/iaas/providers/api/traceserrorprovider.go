@@ -224,6 +224,56 @@ func (w ErrorTraceProvider) DeleteGateway(networkID string) (err error) {
 	return w.InnerProvider.DeleteGateway(networkID)
 }
 
+// CreateVIP ...
+func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *resources.VIP, err error) {
+	defer func() {
+		if err != nil {
+			logrus.Tracef("Intercepted error: %v", err)
+		}
+	}()
+	return w.InnerProvider.CreateVIP(networkID, description)
+}
+
+// AddPublicIPToVIP adds a public IP to VIP
+func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VIP) (err error) {
+	defer func() {
+		if err != nil {
+			logrus.Tracef("Intercepted error: %v", err)
+		}
+	}()
+	return w.InnerProvider.AddPublicIPToVIP(vip)
+}
+
+// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
+func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VIP, host *resources.Host) (err error) {
+	defer func() {
+		if err != nil {
+			logrus.Tracef("Intercepted error: %v", err)
+		}
+	}()
+	return w.InnerProvider.BindHostToVIP(vip, host)
+}
+
+// UnbindHostFromVIP removes the bind between the VIP and a host
+func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VIP, host *resources.Host) (err error) {
+	defer func() {
+		if err != nil {
+			logrus.Tracef("Intercepted error: %v", err)
+		}
+	}()
+	return w.InnerProvider.UnbindHostFromVIP(vip, host)
+}
+
+// DeleteVIP deletes the port corresponding to the VIP
+func (w ErrorTraceProvider) DeleteVIP(vip *resources.VIP) (err error) {
+	defer func() {
+		if err != nil {
+			logrus.Tracef("Intercepted error: %v", err)
+		}
+	}()
+	return w.InnerProvider.DeleteVIP(vip)
+}
+
 // CreateHost ...
 func (w ErrorTraceProvider) CreateHost(request resources.HostRequest) (_ *resources.Host, _ *userdata.Content, err error) {
 	defer func() {

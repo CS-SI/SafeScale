@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	libvirt "github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 )
@@ -331,4 +332,30 @@ func (s *Stack) DeleteGateway(ref string) error {
 	defer log.Debug("local.Client.DeleteGateway() done")
 
 	return s.DeleteHost(ref)
+}
+
+// CreateVIP creates a private virtual IP
+// If public is set to true,
+func (s *Stack) CreateVIP(networkID string, description string) (*VIP, error) {
+	return utils.NotImplementedError("CreateVIP() not implemented yet")
+}
+
+// AddPublicIPToVIP adds a public IP to VIP
+func (s *Stack) AddPublicIPToVIP(vip *VIP) error {
+	return utils.NotImplementedError("AddPublicIPToVIP() not implemented yet")
+}
+
+// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
+func (s *Stack) BindHostToVIP(vip *VIP, host *resources.Host) error {
+	return utils.NotImplementedError("BindHostToVIP() not implemented yet")
+}
+
+// UnbindHostFromVIP removes the bind between the VIP and a host
+func (s *Stack) UnbindHostFromVIP(vip *VIP, host *resources.Host) error {
+	return utils.NotImplementedError("UnbindHostFromVIP() not implemented yet")
+}
+
+// DeleteVIP deletes the port corresponding to the VIP
+func (s *Stack) DeleteVIP(vip *VIP) error {
+	return utils.NotImplementedError("DeleteVIP() not implemented yet")
 }

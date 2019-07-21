@@ -80,6 +80,8 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		sizing = &s
 	}
 
+	//ha is not manage yet, but the idea is to create 2 gateways with a VIP when ha == true
+	ha := true
 	handler := NetworkHandler(tenant.Service)
 	network, err := handler.Create(ctx,
 		in.GetName(),
@@ -88,6 +90,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		*sizing,
 		in.GetGateway().GetImageId(),
 		in.GetGateway().GetName(),
+		ha,
 	)
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, err.Error())

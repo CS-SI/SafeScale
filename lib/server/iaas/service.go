@@ -586,6 +586,7 @@ func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 		KeyPair:        kp,
 		PublicIP:       request.PublicIP,
 		Networks:       request.Networks,
+		DefaultRouteIP: request.DefaultRouteIP,
 		DefaultGateway: request.DefaultGateway,
 		TemplateID:     request.TemplateID,
 		Password:       password,

@@ -87,6 +87,8 @@ type HostRequest struct {
 	HostName string
 	// Networks lists the networks the host must be connected to
 	Networks []*Network
+	// DefaultRouteIP is the IP used as default route
+	DefaultRouteIP string
 	// DefaultGateway is the host used as default gateway
 	DefaultGateway *Host
 	// PublicIP a flag telling if the host must have a public IP
@@ -145,6 +147,7 @@ func NewHost() *Host {
 	}
 }
 
+// OK ...
 func (h *Host) OK() bool {
 	result := true
 	result = result && h.ID != ""
