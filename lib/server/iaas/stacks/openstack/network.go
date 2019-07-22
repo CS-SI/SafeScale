@@ -774,10 +774,12 @@ func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
 // If public is set to true,
 func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error) {
 	asu := true
+	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
-		NetworkID:    networkID,
-		AdminStateUp: &asu,
-		Name:         name,
+		NetworkID:      networkID,
+		AdminStateUp:   &asu,
+		Name:           name,
+		SecurityGroups: &sg,
 	}
 	port, err := ports.Create(s.NetworkClient, options).Extract()
 	if err != nil {
