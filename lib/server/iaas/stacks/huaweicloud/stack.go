@@ -23,7 +23,6 @@ import (
 	gc "github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
-	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
@@ -41,10 +40,6 @@ type Stack struct {
 	cfgOpts stacks.ConfigurationOptions
 	// Instance of the VPC
 	vpc *VPC
-	// defaultSecurityGroup contains the name of the default security group for the VPC
-	defaultSecurityGroupName string
-	// SecurityGroup is an instance of the default security group
-	SecurityGroup *secgroups.SecGroup
 }
 
 // New authenticates and return interface Stack
@@ -146,7 +141,7 @@ func (s *Stack) findVPCID() (*string, error) {
 			break
 		}
 	}
-	if found && router != nil{
+	if found && router != nil {
 		return &router.ID, nil
 	}
 	return nil, nil
