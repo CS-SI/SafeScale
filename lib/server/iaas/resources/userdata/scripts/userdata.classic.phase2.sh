@@ -318,7 +318,7 @@ network:
         use-routes: false
       routes:
       - to: 0.0.0.0/0
-        via: {{ .GatewayIP }}
+        via: {{ .DefaultRouteIP }}
         scope: global
         on-link: true
 {{- else }}
@@ -399,7 +399,7 @@ EOF
     configure_dhclient
 
     {{- if .AddGateway }}
-    echo "GATEWAY={{ .GatewayIP }}" >/etc/sysconfig/network
+    echo "GATEWAY={{ .DefaultRouteIP }}" >/etc/sysconfig/network
     {{- end }}
 
     enable_svc network
@@ -490,12 +490,26 @@ install_keepalived() {
 vrrp_instance vrrp_group_gws_internal {
     state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
     interface ${PR_IFs[0]}
-    virtual_router_id {{ if eq .IsPrimaryGateway true}}1{{ else }}2{{ end }}
-    priority 100
+    virtual_router_id 1
+    priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
+    advert_int 2
     authentication {
         auth_type PASS
         auth_pass password
     }
+{{ if eq .IsPrimaryGateway true }}
+    # Unicast specific option, this is the IP of the interface keepalived listens on
+    unicast_src_ip {{ .PrimaryGatewayPrivateIP }}
+    # Unicast specific option, this is the IP of the peer instance
+    unicast_peer {
+        {{ .SecondaryGatewayPrivateIP }}
+    }
+{{ else }}
+    unicast_src_ip {{ .SecondaryGatewayPrivateIP }}
+    unicast_peer {
+        {{ .PrimaryGatewayPrivateIP }}
+    }
+{{ end }}
     virtual_ipaddress {
         {{ .PrivateVIP }}
     }
@@ -504,8 +518,9 @@ vrrp_instance vrrp_group_gws_internal {
 # vrrp_instance vrrp_group_gws_external {
 #     state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
 #     interface ${PU_IF}
-#     virtual_router_id {{ if eq .IsPrimaryGateway true }}3{{ else }}4{{ end }}
-#     priority 100
+#     virtual_router_id 2
+#     priority {{ if eq .IsPrimaryGateway }}151{{ else }}100{{ end }}
+#     advert_int 2
 #     authentication {
 #         auth_type PASS
 #         auth_pass password
@@ -513,8 +528,7 @@ vrrp_instance vrrp_group_gws_internal {
 #     virtual_ipaddress {
 #         {{ .PublicVIP }}
 #     }
-# }
-EOF
+# }EOF
 
     sfService enable keepalived
     sfService restart keepalived || return 1
@@ -573,7 +587,7 @@ EOF
 configure_dns_systemd_resolved() {
     echo "Configuring systemd-resolved..."
 
-{{- if not .GatewayIP }}
+{{- if not .DefaultRouteIP }}
     rm -f /etc/resolv.conf
     ln -s /run/systemd/resolve/resolv.conf /etc
 {{- end }}
