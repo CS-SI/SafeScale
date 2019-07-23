@@ -18,7 +18,7 @@ package api
 
 import (
 	pb "github.com/CS-SI/SafeScale/lib"
-	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
+	propsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -35,7 +35,7 @@ type Cluster interface {
 	// GetIdentity returns the identity of the cluster (name, flavor, complexity)
 	GetIdentity(task concurrency.Task) identity.Identity
 	// GetNetworkConfig returns network configuration of the cluster
-	GetNetworkConfig(concurrency.Task) clusterpropsv1.Network
+	GetNetworkConfig(concurrency.Task) propsv2.Network
 	// GetProperties returns the extension of the cluster
 	GetProperties(concurrency.Task) *serialize.JSONProperties
 
