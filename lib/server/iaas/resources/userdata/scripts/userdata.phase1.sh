@@ -187,14 +187,14 @@ enable_firewall() {
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
     route del -net default &>/dev/null
-    route add -net default gw {{ .PrimaryGatewayPrivateIP }}
+    route add -net default gw {{ .DefaultRouteIP }}
 }
 
 {{- if .IsGateway }}
 custom_gcp_gateway() {
     sudo sysctl -w net.ipv4.ip_forward=1
     sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-    sudo echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/20-natgw.conf
+    # sudo echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/20-natgw.conf
     case $LINUX_KIND in
         debian|ubuntu)
             sudo DEBIAN_FRONTEND=noninteractive apt-get -yq install iptables-persistent

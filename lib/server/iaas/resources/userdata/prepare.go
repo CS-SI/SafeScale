@@ -59,7 +59,7 @@ type Content struct {
 	// DNSServers contains the list of DNS servers to use
 	// Used only if IsGateway is true
 	DNSServers []string
-	//CIDR contains the cidr of the network
+	// CIDR contains the cidr of the network
 	CIDR string
 	// DefaultRouteIP is the IP of the gateway or the VIP if gateway HA is enabled
 	DefaultRouteIP string
