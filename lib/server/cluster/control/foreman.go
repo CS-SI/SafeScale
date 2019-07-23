@@ -34,6 +34,7 @@ import (
 	clusterpropsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	clusterpropsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/NodeType"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/Property"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -240,10 +241,18 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	req.Name = strings.ToLower(req.Name)
 	networkName := "net-" + req.Name
 	sizing := srvutils.FromPBHostDefinitionToPBGatewayDefinition(*gatewaysDef)
+	haDisabled := false
+	for k := range req.DisabledDefaultFeatures {
+		if k == "gateway-ha" {
+			haDisabled = true
+			break
+		}
+	}
 	def := pb.NetworkDefinition{
 		Name:    networkName,
 		Cidr:    req.CIDR,
 		Gateway: &sizing,
+		Ha:      (!haDisabled && req.Complexity != Complexity.Small),
 	}
 	clientInstance := client.New()
 	clientNetwork := clientInstance.Network
@@ -270,7 +279,6 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		kp     *resources.KeyPair
 		kpName string
 		gw     *resources.Host
-		m      *providermetadata.Gateway
 	)
 
 	tenant, err := clientInstance.Tenant.Get(client.DefaultExecutionTimeout)
@@ -283,11 +291,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 	}
 
 	// Loads gateway metadata
-	m, err = providermetadata.NewGateway(svc, req.NetworkID)
+	primaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.GatewayId)
 	if err != nil {
 		return err
 	}
-	err = m.Read()
 	if err != nil {
 		if _, ok := err.(utils.ErrNotFound); ok {
 			if !ok {
@@ -298,13 +305,34 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 		}
 		return err
 	}
-	gw = m.Get()
-
-	err = clientInstance.Ssh.WaitReady(gw.ID, client.DefaultExecutionTimeout)
+	primaryGateway := primaryGatewayMetadata.Get()
+	err = clientInstance.Ssh.WaitReady(primaryGateway.ID, client.DefaultExecutionTimeout)
 	if err != nil {
 		return client.DecorateError(err, "wait for remote ssh service to be ready", false)
 	}
 
+	var secondaryGateway *resources.Host
+	if network.Vip != nil {
+		primaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.GatewayId)
+		if err != nil {
+			return err
+		}
+		if err != nil {
+			if _, ok := err.(utils.ErrNotFound); ok {
+				if !ok {
+					msg := fmt.Sprintf("failed to load gateway metadata of network '%s'", networkName)
+					log.Errorf("[cluster %s] %s", req.Name, msg)
+					return fmt.Errorf(msg)
+				}
+			}
+			return err
+		}
+		primaryGateway := primaryGatewayMetadata.Get()
+		err = clientInstance.Ssh.WaitReady(primaryGateway.ID, client.DefaultExecutionTimeout)
+		if err != nil {
+			return client.DecorateError(err, "wait for remote ssh service to be ready", false)
+		}
+	}
 	// Create a KeyPair for the user cladm
 	kpName = "cluster_" + req.Name + "_cladm_key"
 	kp, err = svc.CreateKeyPair(kpName)
@@ -352,13 +380,21 @@ func (b *foreman) construct(task concurrency.Task, req Request) error {
 			return err
 		}
 
-		return b.cluster.GetProperties(task).LockForWrite(Property.NetworkV1).ThenUse(func(v interface{}) error {
-			networkV1 := v.(*clusterpropsv1.Network)
-			networkV1.NetworkID = req.NetworkID
-			networkV1.GatewayID = gw.ID
-			networkV1.GatewayIP = gw.GetPrivateIP()
-			networkV1.PublicIP = gw.GetPublicIP()
-			networkV1.CIDR = req.CIDR
+		return b.cluster.GetProperties(task).LockForWrite(Property.NetworkV2).ThenUse(func(v interface{}) error {
+			networkV2 := v.(*clusterpropsv2.Network)
+			networkV2.NetworkID = req.NetworkID
+			networkV2.CIDR = req.CIDR
+			networkV2.GatewayID = primaryGateway.ID
+			networkV2.GatewayIP = primaryGateway.GetPrivateIP()
+			if network.Vip != nil {
+				networkV2.SecondaryGatewayID = secondaryGateway.ID
+				networkV2.SecondaryGatewayIP = secondaryGateway.GetPrivateIP()
+				networkV2.DefaultRouteIP = network.Vip.PrivateIp
+				networkV2.EndpointIP = network.Vip.PublicIp
+			} else {
+				networkV2.DefaultRouteIP = primaryGateway.GetPublicIP()
+				networkV2.EndpointIP = primaryGateway.GetPrivateIP()
+			}
 			return nil
 		})
 	})
@@ -847,8 +883,8 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType NodeTy
 	params["MasterIPs"] = b.cluster.ListMasterIPs(task)
 	params["CladmPassword"] = identity.AdminPassword
 	netCfg := b.cluster.GetNetworkConfig(task)
-	params["GatewayIP"] = netCfg.GatewayIP
-	params["PublicIP"] = netCfg.PublicIP
+	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
+	params["EndpointIP"] = netCfg.EndpointIP
 
 	retcode, _, _, err := b.ExecuteScript(box, funcMap, script, params, pbHost.Id)
 	if err != nil {

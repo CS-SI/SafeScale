@@ -148,7 +148,7 @@ func (c *Controller) GetProperties(task concurrency.Task) *serialize.JSONPropert
 }
 
 // GetNetworkConfig returns the network configuration of the cluster
-func (c *Controller) GetNetworkConfig(task concurrency.Task) (config clusterpropsv1.Network) {
+func (c *Controller) GetNetworkConfig(task concurrency.Task) (config clusterpropsv2.Network) {
 	if c == nil {
 		panic("Calling lib.server.cluster.control.Controller::GetNetworkConfig() from nil pointer!")
 	}
@@ -157,10 +157,25 @@ func (c *Controller) GetNetworkConfig(task concurrency.Task) (config clusterprop
 	}
 
 	c.RLock(task)
-	_ = c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
-		config = *(v.(*clusterpropsv1.Network))
-		return nil
-	})
+	if c.Properties.Lookup(Property.NetworkV2) {
+		_ = c.Properties.LockForRead(Property.NetworkV2).ThenUse(func(v interface{}) error {
+			config = *(v.(*clusterpropsv2.Network))
+			return nil
+		})
+	} else {
+		_ = c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
+			networkV1 := v.(*clusterpropsv1.Network)
+			config = clusterpropsv2.Network{
+				NetworkID:      networkV1.NetworkID,
+				CIDR:           networkV1.CIDR,
+				GatewayID:      networkV1.GatewayID,
+				GatewayIP:      networkV1.GatewayIP,
+				DefaultRouteIP: networkV1.GatewayIP,
+				EndpointIP:     networkV1.PublicIP,
+			}
+			return nil
+		})
+	}
 	c.RUnlock(task)
 	return config
 }
@@ -930,10 +945,17 @@ func (c *Controller) Delete(task concurrency.Task) error {
 	// Deletes the network and gateway
 	c.RLock(task)
 	networkID := ""
-	err = c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
-		networkID = v.(*clusterpropsv1.Network).NetworkID
-		return nil
-	})
+	if c.Properties.Lookup(Property.NetworkV2) {
+		err = c.Properties.LockForRead(Property.NetworkV2).ThenUse(func(v interface{}) error {
+			networkID = v.(*clusterpropsv1.Network).NetworkID
+			return nil
+		})
+	} else {
+		err = c.Properties.LockForRead(Property.NetworkV1).ThenUse(func(v interface{}) error {
+			networkID = v.(*clusterpropsv1.Network).NetworkID
+			return nil
+		})
+	}
 	c.RUnlock(task)
 	if err != nil {
 		return err
