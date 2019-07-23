@@ -470,12 +470,10 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) {
 		// 	v["DefaultRouteIP"] = networkCfg.VIP.PrivateIP
 		// 	v["PublicIP"] = networkCfg.VIP.PublicIP // VPL: Should be replaced by the next entry
 		// 	v["EndpointIP"] = networkCfg.VIP.PublicIP
-		// } else {
-		v["GatewayIP"] = networkCfg.GatewayIP // VPL: Should be replaced by the next entry
+		v["GatewayIP"] = networkCfg.GatewayIP
+		v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
 		v["DefaultRouteIP"] = networkCfg.GatewayIP
-		v["PublicIP"] = networkCfg.PublicIP // VPL: Should be replaced by the next entry
-		v["EndpointIP"] = networkCfg.PublicIP
-		// }
+		v["EndpointIP"] = networkCfg.EndpointIP
 		v["MasterIDs"] = cluster.ListMasterIDs(f.task)
 		v["MasterIPs"] = cluster.ListMasterIPs(f.task)
 		if _, ok := v["Username"]; !ok {

@@ -542,7 +542,7 @@ func (handler *HostHandler) Create(
 	select {
 	case <-ctx.Done():
 		log.Warnf("Host creation cancelled by safescale")
-		err = fmt.Errorf("Host creation canceld by safescale")
+		err = fmt.Errorf("Host creation cancelled by safescale")
 		return nil, err
 	default:
 	}
