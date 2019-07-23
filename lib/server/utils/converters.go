@@ -312,3 +312,18 @@ func FromPBHostSizing(src pb.HostSizing) resources.SizingRequirements {
 		MinDiskSize: int(src.MinDiskSize),
 	}
 }
+
+// ToPBVirtualIp converts a resources.VIP to a pb.VirtualIp
+func ToPBVirtualIp(src resources.VIP) pb.VirtualIp {
+	dest := pb.VirtualIp{
+		Id:        src.ID,
+		NetworkId: src.NetworkID,
+		PrivateIp: src.PrivateIP,
+		PublicIp:  src.PublicIP,
+		Hosts:     []*pb.Host{},
+	}
+	for _, i := range src.Hosts {
+		dest.Hosts = append(dest.Hosts, ToPBHost(i))
+	}
+	return dest
+}
