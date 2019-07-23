@@ -420,7 +420,8 @@ check_for_ip() {
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
 check_for_network() {
-    ping -n -c1 -w30 -i5 www.google.com || return 1
+    #ping -n -c1 -w30 -i5 www.google.com || return 1
+    wget -T 30 -O /dev/null www.google.com &>/dev/null || return 1
     [ ! -z "$PU_IF" ] && {
         check_for_ip $PU_IF || return 1
     }
@@ -439,8 +440,14 @@ configure_as_gateway() {
             grep -v "net.ipv4.ip_forward=" $i >${i}.new
             mv -f ${i}.new ${i}
         done
-        echo "net.ipv4.ip_forward=1" >/etc/sysctl.d/98-forward.conf
-        systemctl restart systemd-sysctl
+        cat >/etc/sysctl.d/21-gateway.conf <<-EOF
+net.ipv4.ip_forward=1
+net.ipv4.ip_nonlocal_bind=1
+EOF
+        case $LINUX_KIND in
+            ubuntu) systemctl restart systemd-sysctl;;
+            *)      sysctl -p;;
+        esac
     fi
 
     [ ! -z $PU_IF ] && {
@@ -485,6 +492,8 @@ install_keepalived() {
             ;;
     esac
 
+    NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
+
     cat >/etc/keepalived/keepalived.conf <<-EOF
 vrrp_instance vrrp_group_gws_internal {
     state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
@@ -510,7 +519,7 @@ vrrp_instance vrrp_group_gws_internal {
     }
 {{ end }}
     virtual_ipaddress {
-        {{ .PrivateVIP }}
+        {{ .PrivateVIP }}/${NETMASK}
     }
 }
 
@@ -518,14 +527,14 @@ vrrp_instance vrrp_group_gws_internal {
 #     state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
 #     interface ${PU_IF}
 #     virtual_router_id 2
-#     priority {{ if eq .IsPrimaryGateway }}151{{ else }}100{{ end }}
+#     priority {{ if eq .IsPrimaryGateway true }}151{{ else }}100{{ end }}
 #     advert_int 2
 #     authentication {
 #         auth_type PASS
 #         auth_pass password
 #     }
 #     virtual_ipaddress {
-#         {{ .PublicVIP }}
+#         {{ .PublicVIP }}/${NETMASK}
 #     }
 # }
 EOF
@@ -766,12 +775,11 @@ force_dbus_restart() {
 update_kernel_settings() {
     cat >/etc/sysctl.d/20-safescale.conf <<-EOF
 vm.max_map_count=262144
-
-# To allow to bring up an interface with an IP that is not considered local (not part of the /etc/network/interfaces|/etc/sysconfig/network-scripts)
-# In other words, to allow Virtual IP
-net.ipv4.ip_nonlocal_bind=1
 EOF
-    sysctl -p
+    case $LINUX_KIND in
+        ubuntu) systemctl restart systemd-sysctl;;
+        *)      sysctl -p;;
+    esac
 }
 
 # ---- Main
