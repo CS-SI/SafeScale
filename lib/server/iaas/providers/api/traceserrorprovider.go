@@ -453,3 +453,8 @@ func (w ErrorTraceProvider) DeleteVolumeAttachment(serverID, id string) (err err
 	}()
 	return w.InnerProvider.DeleteVolumeAttachment(serverID, id)
 }
+
+// GetCapabilities ...
+func (w ErrorTraceProvider) GetCapabilities() providers.Capabilities {
+	return w.InnerProvider.GetCapabilities()
+}

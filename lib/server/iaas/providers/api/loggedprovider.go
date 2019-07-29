@@ -296,3 +296,9 @@ func (w LoggedProvider) DeleteVolumeAttachment(serverID, id string) error {
 	defer w.prepare(w.trace("DeleteVolumeAttachment"))
 	return w.InnerProvider.DeleteVolumeAttachment(serverID, id)
 }
+
+// GetCapabilities returns the capabilities of the provider
+func (w LoggedProvider) GetCapabilities() providers.Capabilities {
+	defer w.prepare(w.trace("Getcapabilities"))
+	return w.InnerProvider.GetCapabilities()
+}

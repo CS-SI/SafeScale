@@ -183,6 +183,11 @@ func (p *provider) GetTenantParameters() map[string]interface{} {
 	return p.tenantParameters
 }
 
+// GetCapabilities returns the capabilities of the provider
+func (p *provider) GetCapabilities() providers.Capabilities {
+	return providers.Capabilities{}
+}
+
 func init() {
 	// log.Debug("Registering local provider")
 	iaas.Register("local", &provider{})

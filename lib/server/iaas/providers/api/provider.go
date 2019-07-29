@@ -46,6 +46,9 @@ type Provider interface {
 	// GetName returns the provider name
 	GetName() string
 
+	// GetCapabilities returns the capabilities of the provider
+	GetCapabilities() providers.Capabilities
+
 	// GetTenantParameters returns the tenant parameters as read
 	GetTenantParameters() map[string]interface{}
 }

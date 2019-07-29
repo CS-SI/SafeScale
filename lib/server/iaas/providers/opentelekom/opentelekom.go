@@ -232,6 +232,13 @@ func (p *provider) GetTenantParameters() map[string]interface{} {
 	return p.tenantParameters
 }
 
+// GetCapabilities returns the capabilities of the provider
+func (p *provider) GetCapabilities() providers.Capabilities {
+	return providers.Capabilities{
+		PrivateVirtualIp: true,
+	}
+}
+
 // init registers the opentelekom provider
 func init() {
 	iaas.Register("opentelekom", &provider{})
