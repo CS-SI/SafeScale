@@ -216,8 +216,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	netCfg := c.GetNetworkConfig(concurrency.RootTask())
 	result["network_id"] = netCfg.NetworkID
 	result["cidr"] = netCfg.CIDR
-	result["gateway_ip"] = netCfg.GatewayIP
-	result["public_ip"] = netCfg.PublicIP
+	result["gateway_ip"] = netCfg.DefaultRouteIP
+	result["public_ip"] = netCfg.EndpointIP
 
 	if !properties.Lookup(Property.DefaultsV2) {
 		err = properties.LockForRead(Property.DefaultsV1).ThenUse(func(v interface{}) error {
@@ -280,13 +280,13 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	if _, ok := result["features"].(*clusterpropsv1.Features).Disabled["remotedesktop"]; !ok {
 		remoteDesktops := []string{}
 		clientHost := client.New().Host
-		gwPublicIP := netCfg.PublicIP
+		endpointIP := netCfg.EndpointIP
 		for _, id := range c.ListMasterIDs(concurrency.RootTask()) {
 			host, err := clientHost.Inspect(id, client.DefaultExecutionTimeout)
 			if err != nil {
 				return nil, err
 			}
-			remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s/", gwPublicIP, host.Name))
+			remoteDesktops = append(remoteDesktops, fmt.Sprintf("https://%s/remotedesktop/%s/", endpointIP, host.Name))
 		}
 		result["remote_desktop"] = remoteDesktops
 	} else {
