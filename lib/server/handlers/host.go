@@ -357,6 +357,24 @@ func (handler *HostHandler) Create(
 		return nil, throwErrf("error populating host properties: host.Properties is nil !")
 	}
 
+	// Updates host metadata
+	mh := metadata.NewHost(handler.service)
+	err = mh.Carry(host).Write()
+	if err != nil {
+		return nil, infraErrf(err, "Metadata creation failed")
+	}
+	log.Infof("Compute resource created: '%s'", host.Name)
+
+	// Starting from here, remove metadata if exiting with error
+	defer func() {
+		if err != nil {
+			derr := mh.Delete()
+			if derr != nil {
+				log.Errorf("failed to remove host metadata after host creation failure")
+			}
+		}
+	}()
+
 	err = host.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
 		hostSizingV1 := v.(*propsv1.HostSizing)
 		hostSizingV1.Template = hostRequest.TemplateID
@@ -432,22 +450,11 @@ func (handler *HostHandler) Create(
 	}
 
 	// Updates host metadata
-	mh := metadata.NewHost(handler.service)
-	err = mh.Carry(host).Write()
+	err = mh.Write()
 	if err != nil {
 		return nil, infraErrf(err, "Metadata creation failed")
 	}
 	log.Infof("Compute resource created: '%s'", host.Name)
-
-	// Starting from here, remove metadata if exiting with error
-	defer func() {
-		if err != nil {
-			derr := mh.Delete()
-			if derr != nil {
-				log.Errorf("failed to remove host metadata after host creation failure")
-			}
-		}
-	}()
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
@@ -463,16 +470,18 @@ func (handler *HostHandler) Create(
 
 	_, err = sshCfg.WaitServerReady("phase1", sshDefaultTimeout)
 	if err != nil {
-		if client.IsTimeoutError(err) {
-			return nil, infraErrf(err, "Timeout creating a host")
+		derr := err
+		err = nil
+		if client.IsTimeoutError(derr) {
+			return nil, infraErrf(derr, "Timeout waiting host '%s' to become ready", host.Name)
 		}
 
-		if client.IsProvisioningError(err) {
-			log.Errorf("%+v", err)
-			return nil, fmt.Errorf("Error creating the host [%s], error provisioning the new host, please check safescaled logs", host.Name)
+		if client.IsProvisioningError(derr) {
+			log.Errorf("%+v", derr)
+			return nil, fmt.Errorf("failed to provision host '%s', please check safescaled logs", host.Name)
 		}
 
-		return nil, infraErr(err)
+		return nil, infraErrf(derr, "failed to wait host '%s' to become ready", host.Name)
 	}
 
 	// Updates host link with networks
@@ -527,12 +536,12 @@ func (handler *HostHandler) Create(
 	_, err = sshCfg.WaitServerReady("ready", sshDefaultTimeout)
 	if err != nil {
 		if client.IsTimeoutError(err) {
-			return nil, infraErrf(err, "Timeout creating a host")
+			return nil, infraErrf(err, "Timeout creating host '%s'", host.Name)
 		}
 
 		if client.IsProvisioningError(err) {
 			log.Errorf("%+v", err)
-			return nil, fmt.Errorf("Error creating the host [%s], error provisioning the new host, please check safescaled logs", host.Name)
+			return nil, fmt.Errorf("Error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name)
 		}
 
 		return nil, infraErr(err)
