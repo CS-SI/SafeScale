@@ -671,6 +671,8 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VIP, error)
 	}
 	vip := resources.VIP{
 		ID:        port.ID,
+		Name:      name,
+		NetworkID: networkID,
 		PrivateIP: port.FixedIPs[0].IPAddress,
 	}
 	return &vip, nil
