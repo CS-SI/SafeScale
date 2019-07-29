@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync/atomic"
 	"text/template"
 
 	"github.com/sirupsen/logrus"
@@ -44,6 +45,8 @@ type Content struct {
 	Header string
 	// User is the name of the default user (api.DefaultUser)
 	User string
+	// Password for the user safescale (for troubleshoot use, useable only in console)
+	Password string
 	// PublicKey is the public key used to create the Host
 	PublicKey string
 	// PrivateKey is the private key used to create the Host
@@ -71,8 +74,6 @@ type Content struct {
 	SecondaryGatewayPrivateIP string
 	// SecondaryGatewayPublicIP is the public IP of the secondary gateway
 	SecondaryGatewayPublicIP string
-	// Password for the user safescale (for troubleshoot use, useable only in console)
-	Password string
 	// EmulatedPublicNet is a private network which is used to emulate a public one
 	EmulatedPublicNet string
 	// HostName contains the name wanted as host name (default == name of the Cloud resource)
@@ -88,8 +89,8 @@ type Content struct {
 }
 
 var (
-	userdataPhase1Template *template.Template
-	userdataPhase2Template *template.Template
+	userdataPhase1Template atomic.Value //*template.Template
+	userdataPhase2Template atomic.Value //*template.Template
 )
 
 // NewContent ...
@@ -121,7 +122,7 @@ func (ud *Content) Prepare(
 		request.Password = password
 	}
 
-	// Determine Gateway IP
+	// Determine default route IP
 	ip := ""
 	if request.DefaultRouteIP != "" {
 		ip = request.DefaultRouteIP
@@ -210,29 +211,34 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 
 	switch phase {
 	case "phase1":
-		if userdataPhase1Template == nil {
+		anon := userdataPhase1Template.Load()
+		if anon == nil {
 			box, err = rice.FindBox("../userdata/scripts")
 			if err != nil {
 				return nil, err
 			}
-
 			tmplString, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", provider))
 			if err != nil {
 				return nil, fmt.Errorf("error loading script template for phase1 : %s", err.Error())
 			}
-			userdataPhase1Template, err = template.New("userdata.phase1").Parse(tmplString)
+			tmpl, err := template.New("userdata.phase1").Parse(tmplString)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing script template for phase 1 : %s", err.Error())
 			}
+			userdataPhase1Template.Store(tmpl)
+			anon = userdataPhase1Template.Load()
 		}
+		tmpl := anon.(*template.Template)
 		buf := bytes.NewBufferString("")
-		err = userdataPhase1Template.Execute(buf, ud)
+		err := tmpl.Execute(buf, ud)
 		if err != nil {
 			return nil, err
 		}
 		result = buf.Bytes()
+
 	case "phase2":
-		if userdataPhase2Template == nil {
+		anon := userdataPhase2Template.Load()
+		if anon == nil {
 			box, err = rice.FindBox("../userdata/scripts")
 			if err != nil {
 				return nil, err
@@ -242,13 +248,16 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 			if err != nil {
 				return nil, fmt.Errorf("error loading script template: %s", err.Error())
 			}
-			userdataPhase2Template, err = template.New("userdata.phase2").Parse(tmplString)
+			tmpl, err := template.New("userdata.phase2").Parse(tmplString)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing script template: %s", err.Error())
 			}
+			userdataPhase2Template.Store(tmpl)
+			anon = userdataPhase2Template.Load()
 		}
+		tmpl := anon.(*template.Template)
 		buf := bytes.NewBufferString("")
-		err = userdataPhase2Template.Execute(buf, ud)
+		err = tmpl.Execute(buf, ud)
 		if err != nil {
 			return nil, err
 		}
@@ -258,6 +267,7 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 				bytes.Replace(result, []byte("#"+tagname), []byte(str+"\n\n#"+tagname), 1)
 			}
 		}
+
 	default:
 		return nil, fmt.Errorf("phase '%s' not managed", phase)
 	}
