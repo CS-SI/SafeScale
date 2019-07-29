@@ -269,11 +269,16 @@ func ToPBImage(in *resources.Image) *pb.Image {
 
 // ToPBNetwork convert a network from api to protocolbuffer format
 func ToPBNetwork(in *resources.Network) *pb.Network {
+	var pbVIP pb.VirtualIp
+	if in.VIP != nil {
+		pbVIP = ToPBVirtualIp(*in.VIP)
+	}
 	return &pb.Network{
 		Id:        in.ID,
 		Name:      in.Name,
 		Cidr:      in.CIDR,
 		GatewayId: in.GatewayID,
+		VirtualIp: &pbVIP,
 	}
 }
 
