@@ -157,11 +157,6 @@ EOF
 	echo done
 }
 
-check_for_network() {
-	ping -n -c1 -w5 www.google.com || return 1
-	return 0
-}
-
 put_hostname_in_hosts() {
 	HON=$(hostname)
 	ping -n -c1 -w5 $HON 2>/dev/null || echo "127.0.1.1 $HON" >>/etc/hosts
@@ -174,44 +169,22 @@ disable_cloudinit_network_autoconf() {
 	echo "network: {config: disabled}" >$fname
 }
 
+disable_services() {
+    case $LINUX_KIND in
+        debian|ubuntu)
+            sfService stop apt-daily.service &>/dev/null
+            systemctl kill --kill-who=all apt-daily.service &>/dev/null
+            ;;
+    esac
+}
+
 # ---- Main
 
 export DEBIAN_FRONTEND=noninteractive
 
 put_hostname_in_hosts
 disable_cloudinit_network_autoconf
-
-enable_firewall() {
-    case $LINUX_KIND in
-        debian|ubuntu)
-            sfService stop apt-daily.service &>/dev/null
-            systemctl kill --kill-who=all apt-daily.service &>/dev/null
-
-            # systemctl status firewalld &>/dev/null || {
-            # 	sfApt install -qy ufw &>/dev/null
-            # 	systemctl enable ufw
-            # 	systemctl start ufw
-            # }
-            # ufw reset
-            # ufw default deny incoming
-            # ufw default allow outgoing
-            # ufw allow OpenSSH
-            # ufw enable
-            ;;
-    esac
-}
-
-# If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
-ensure_network_connectivity() {
-    route del -net default &>/dev/null
-    route add -net default gw {{ .DefaultRouteIP }}
-}
-
-
-if check_for_network; then
-    enable_firewall
-fi
-
+disable_services
 create_user
 
 touch /etc/cloud/cloud-init.disabled
