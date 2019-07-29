@@ -119,6 +119,7 @@ func (n *Network) Deserialize(buf []byte) error {
 // VIP is a structure containint information needed to manage VIP (virtual IP)
 type VIP struct {
 	ID        string
+	Name      string
 	NetworkID string
 	PrivateIP string
 	PublicIP  string
