@@ -36,6 +36,7 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -403,8 +404,8 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 		task = concurrency.RootTask()
 	}
 
-	log.Debugf(">>>{task %s} lib.server.cluster.control.Controller::UpdateMetadata()", task.ID())
-	defer log.Debugf("<<<{task %s} lib.server.cluster.control.Controller::UpdateMetadata()", task.ID())
+	log.Debugf(">>>{task %s} lib.server.cluster.control.Controller::UpdateMetadata()", task.GetID())
+	defer log.Debugf("<<<{task %s} lib.server.cluster.control.Controller::UpdateMetadata()", task.GetID())
 
 	c.Lock(task)
 	defer c.Unlock(task)
@@ -542,7 +543,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 
 	var subtasks []concurrency.Task
 	for i := 0; i < count; i++ {
-		subtask := concurrency.NewTask(task, c.foreman.taskCreateNode).Start(map[string]interface{}{
+		subtask := task.New().Start(c.foreman.taskCreateNode, data.Map{
 			"index":   i + 1,
 			"type":    nodeType,
 			"nodeDef": *nodeDef,
@@ -551,14 +552,14 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 		subtasks = append(subtasks, subtask)
 	}
 	for _, s := range subtasks {
-		s.Wait()
-		hostName := s.GetResult().(string)
-		if hostName != "" {
-			hosts = append(hosts, hostName)
-		}
-		err := s.GetError()
+		result, err := s.Wait()
 		if err != nil {
 			errors = append(errors, err.Error())
+		} else {
+			hostName := result.(string)
+			if hostName != "" {
+				hosts = append(hosts, hostName)
+			}
 		}
 	}
 	hostClt := client.New().Host
@@ -905,13 +906,13 @@ func (c *Controller) Delete(task concurrency.Task) error {
 		return err
 	}
 
-	deleteNodeFunc := func(tr concurrency.TaskRunner, params interface{}) {
-		defer tr.Done()
-		_ = c.DeleteSpecificNode(tr.Task(), params.(string), "")
+	deleteNodeFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+		_ = c.DeleteSpecificNode(t, params.(string), "")
+		return nil, nil
 	}
-	deleteMasterFunc := func(tr concurrency.TaskRunner, params interface{}) {
-		defer tr.Done()
-		_ = c.deleteMaster(tr.Task(), params.(string))
+	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+		_ = c.deleteMaster(t, params.(string))
+		return nil, nil
 	}
 
 	// Deletes the nodes
@@ -920,11 +921,11 @@ func (c *Controller) Delete(task concurrency.Task) error {
 	if length > 0 {
 		var subtasks []concurrency.Task
 		for i := 0; i < length; i++ {
-			subtask := concurrency.NewTask(task, deleteNodeFunc).Start(list[i])
+			subtask := task.New().Start(deleteNodeFunc, list[i])
 			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			s.Wait()
+			_, _ = s.Wait()
 		}
 	}
 
@@ -934,11 +935,11 @@ func (c *Controller) Delete(task concurrency.Task) error {
 	if len(list) > 0 {
 		var subtasks []concurrency.Task
 		for i := 0; i < length; i++ {
-			subtask := concurrency.NewTask(task, deleteMasterFunc).Start(list[i])
+			subtask := task.New().Start(deleteMasterFunc, list[i])
 			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			s.Wait()
+			_, _ = s.Wait()
 		}
 	}
 
@@ -947,7 +948,7 @@ func (c *Controller) Delete(task concurrency.Task) error {
 	networkID := ""
 	if c.Properties.Lookup(Property.NetworkV2) {
 		err = c.Properties.LockForRead(Property.NetworkV2).ThenUse(func(v interface{}) error {
-			networkID = v.(*clusterpropsv1.Network).NetworkID
+			networkID = v.(*clusterpropsv2.Network).NetworkID
 			return nil
 		})
 	} else {
