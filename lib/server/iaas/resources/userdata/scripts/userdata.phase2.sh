@@ -450,19 +450,19 @@ EOF
         esac
     fi
 
-    [ ! -z $PU_IF ] && {
+    if [ ! -z $PU_IF ]; then
         # Dedicated public interface available...
 
         # Allows ping
         sfFirewallAdd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
-        # Allow smasquerading on public zone
+        # Allows masquerading on public zone
         sfFirewallAdd --zone=public --add-masquerade
-    } || {
+    else
         # No dedicated public interface...
 
         # Enables masquerading on trusted zone
         sfFirewallAdd --zone=trusted --add-masquerade
-    }
+    fi
 
     # Allows default services on public zone
     sfFirewallAdd --zone=public --add-service=ssh 2>/dev/null

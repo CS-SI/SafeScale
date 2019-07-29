@@ -391,10 +391,10 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	}
 
 	for _, template := range templates {
-		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f RAM, and %d Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)
+		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", template.Name, template.Cores, template.RAMSize, template.DiskSize)
 		msg = msg + " %s"
 		if sizing.MinCores > 0 && template.Cores < sizing.MinCores {
-			log.Debugf(msg, "too few cores")
+			log.Debugf(msg, "not enough cores")
 			continue
 		}
 		if sizing.MaxCores > 0 && template.Cores > sizing.MaxCores {
@@ -402,7 +402,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 			continue
 		}
 		if sizing.MinRAMSize > 0.0 && template.RAMSize < sizing.MinRAMSize {
-			log.Debugf(msg, "too few RAM")
+			log.Debugf(msg, "not enough RAM")
 			continue
 		}
 		if sizing.MaxRAMSize > 0.0 && template.RAMSize > sizing.MaxRAMSize {
@@ -410,7 +410,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 			continue
 		}
 		if template.DiskSize > 0 && sizing.MinDiskSize > 0 && template.DiskSize < sizing.MinDiskSize {
-			log.Debugf(msg, "too few disk size")
+			log.Debugf(msg, "not enough disk")
 			continue
 		}
 
@@ -573,11 +573,6 @@ func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 		return nil, nil, nil, err
 	}
 
-	password, err := utils.GeneratePassword(16)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to generate password: %s", err.Error())
-	}
-
 	// Create host
 	hostReq := resources.HostRequest{
 		ResourceName:   request.ResourceName,
@@ -589,7 +584,6 @@ func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (*resou
 		DefaultRouteIP: request.DefaultRouteIP,
 		DefaultGateway: request.DefaultGateway,
 		TemplateID:     request.TemplateID,
-		Password:       password,
 	}
 	host, userData, err := svc.CreateHost(hostReq)
 	if err != nil {

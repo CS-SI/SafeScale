@@ -648,7 +648,10 @@ func (w *worker) setReverseProxy() error {
 
 	// Sets the values useable in any cases
 	w.variables["PublicIP"] = gw.PublicIp
-	w.variables["GatewayIP"] = gw.PrivateIp
+	w.variables["HostIP"] = gw.PrivateIp
+	// VPL: FIXME: use Property.NetworkV2 for VIP awareness
+	// w.variables["EndpointIP"] = vip.PublicIP
+	// w.variables["DefaultRouteIP"] = vip.PrivateIP
 
 	// Now submits all the rules to reverse proxy
 	for _, r := range rules {
