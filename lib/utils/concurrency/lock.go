@@ -1,8 +1,26 @@
+/*
+ * Copyright 2018-2019, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package concurrency
 
 import (
 	"fmt"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 //go:generate mockgen -destination=../mocks/mock_taskedlock.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskedLock
@@ -39,9 +57,11 @@ func NewTaskedLock() TaskedLock {
 // 1. registers the lock for read only if a lock for write is already registered in the context
 // 2. registers the lock for read AND effectively lock for read otherwise
 func (tm *taskedLock) RLock(task Task) {
-	tid := task.ID()
-	// log.Debugf(">>> utils.concurrency.TaskedLock::RLock(%s)", tid)
-	// defer log.Debugf("<<< utils.concurrency.TaskedLock::RLock(%s)", tid)
+	tid := task.GetID()
+	if Trace.Locks {
+		log.Debugf(">>>{task %s} utils.concurrency.TaskedLock::RLock()", tid)
+		defer log.Debugf("<<<{task %s} utils.concurrency.TaskedLock::RLock()", tid)
+	}
 
 	tm.lock.Lock()
 
@@ -52,21 +72,27 @@ func (tm *taskedLock) RLock(task Task) {
 	}
 	tm.readLocks[tid] = 1
 	if _, ok := tm.writeLocks[tid]; !ok {
-		// log.Debugf("RLock(%s): really RLocking...", tid)
+		if Trace.Locks {
+			log.Debugf("RLock(%s): really RLocking...", tid)
+		}
 		tm.lock.Unlock()
 		tm.rwmutex.RLock()
 		return
 	}
 	tm.lock.Unlock()
-	// log.Debugf("RLock(%s): using running write lock...", tid)
+	if Trace.Locks {
+		log.Debugf("RLock(%s): using running write lock...", tid)
+	}
 }
 
 // RUnlock unregisters the lock for read for the context and unlock for read
 // only if no lock for write is registered for the context
 func (tm *taskedLock) RUnlock(task Task) {
-	tid := task.ID()
-	// log.Debugf(">>> utils.concurrency.lock.TaskedLock::RUnlock(%s)", tid)
-	// defer log.Debugf("<<< utils.concurrency.lock.TaskedLock::RUnlock(%s)", tid)
+	tid := task.GetID()
+	if Trace.Locks {
+		log.Debugf(">>>{task %s} utils.concurrency.lock.TaskedLock::RUnlock()", tid)
+		defer log.Debugf("<<<{task %s} utils.concurrency.lock.TaskedLock::RUnlock()", tid)
+	}
 
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
@@ -78,19 +104,26 @@ func (tm *taskedLock) RUnlock(task Task) {
 	if tm.readLocks[tid] == 0 {
 		delete(tm.readLocks, tid)
 		// If not locked for write, actively unlock for read the RWMutex
-		if _, ok := tm.writeLocks[tid]; !ok {
-			// log.Debugf("RUnlock(%s): really RUnlocking...", tid)
+		if _, ok := tm.writeLocks[tid]; ok {
+			if Trace.Locks {
+				log.Debugf("RUnlock(%s): in running write lock, doing nothing", tid)
+			}
+		} else {
+			if Trace.Locks {
+				log.Debugf("RUnlock(%s): really RUnlocking...", tid)
+			}
 			tm.rwmutex.RUnlock()
 		}
-		// log.Debugf("RUnlock(%s): in running write lock, doing nothing", tid)
 	}
 }
 
 // Lock ...
 func (tm *taskedLock) Lock(task Task) {
-	tid := task.ID()
-	// log.Debugf(">>> utils.concurrency.TaskedLock::Lock(%s)", tid)
-	// defer log.Debugf("<<< utils.concurrency.TaskedLock::Lock(%s)", tid)
+	tid := task.GetID()
+	if Trace.Locks {
+		log.Debugf(">>>{task %s} lib.utils.concurrency.TaskedLock::Lock()", tid)
+		defer log.Debugf("<<<{task %s} lib.utils.concurrency.TaskedLock::Lock()", tid)
+	}
 
 	tm.lock.Lock()
 
@@ -102,7 +135,7 @@ func (tm *taskedLock) Lock(task Task) {
 	}
 	// If already lock for read, panic
 	if _, ok := tm.readLocks[tid]; ok {
-		panic(fmt.Sprintf("can't Lock task '%s': already RLocked", task.ID()))
+		panic(fmt.Sprintf("can't Lock task '%s': already RLocked", task.GetID()))
 	}
 	// registers lock for read for the task and actively lock the RWMutex
 	tm.writeLocks[tid] = 1
@@ -112,9 +145,11 @@ func (tm *taskedLock) Lock(task Task) {
 
 // Unlock ...
 func (tm *taskedLock) Unlock(task Task) {
-	tid := task.ID()
-	// log.Debugf(">>> utils.concurrency.TaskedLock::Unlock(%s)", tid)
-	// defer log.Debugf("<<< utils.concurrency.TaskedLock::Unlock(%s)", tid)
+	tid := task.GetID()
+	if Trace.Locks {
+		log.Debugf(">>>{task %s} utils.concurrency.TaskedLock::Unlock()", tid)
+		defer log.Debugf("<<<{task %s} utils.concurrency.TaskedLock::Unlock()", tid)
+	}
 
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
@@ -125,7 +160,7 @@ func (tm *taskedLock) Unlock(task Task) {
 		panic(fmt.Sprintf("Can't Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid]))
 	}
 	if _, ok := tm.writeLocks[tid]; !ok {
-		panic(fmt.Sprintf("Can't Unlock task '%s': not Locked", task.ID()))
+		panic(fmt.Sprintf("Can't Unlock task '%s': not Locked", task.GetID()))
 	}
 	tm.writeLocks[tid]--
 	if tm.writeLocks[tid] == 0 {
@@ -136,12 +171,12 @@ func (tm *taskedLock) Unlock(task Task) {
 
 // IsRLocked tells of the facet locks for read
 func (tm *taskedLock) IsRLocked(task Task) bool {
-	_, ok := tm.readLocks[task.ID()]
+	_, ok := tm.readLocks[task.GetID()]
 	return ok
 }
 
 // IsLocked tells if the facet locks for write
 func (tm *taskedLock) IsLocked(task Task) bool {
-	_, ok := tm.writeLocks[task.ID()]
+	_, ok := tm.writeLocks[task.GetID()]
 	return ok
 }
