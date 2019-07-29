@@ -21,11 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/client"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-
 	log "github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/HostProperty"
@@ -37,7 +35,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	safescaleutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers NetworkAPI
@@ -70,14 +71,14 @@ func (handler *NetworkHandler) Create(
 	ctx context.Context,
 	name string, cidr string, ipVersion IPVersion.Enum,
 	sizing resources.SizingRequirements, theos string, gwname string,
-	ha bool,
+	failover bool,
 ) (*resources.Network, error) {
 
 	log.Debugf(">>> lib.server.handlers.NetworkHandler::Create()")
 	defer log.Debugf("<<< lib.server.handlers.NetworkHandler::Create()")
 
-	if gwname != "" && ha {
-		return nil, fmt.Errorf("can't name gateway when HA is requested")
+	if gwname != "" && failover {
+		return nil, fmt.Errorf("can't name gateway when failover is requested")
 	}
 
 	// Verify that the network doesn't exist first
@@ -123,8 +124,8 @@ func (handler *NetworkHandler) Create(
 		}
 	}()
 
-	// Creates VIP for gateways
-	if ha {
+	// Creates VIP for gateways if asked for
+	if failover {
 		network.VIP, err = handler.service.CreateVIP(network.ID, fmt.Sprintf("for gateways of network %s", network.Name))
 		if err != nil {
 			return nil, infraErrf(err, "failed to create VIP")
@@ -159,7 +160,6 @@ func (handler *NetworkHandler) Create(
 
 	log.Debugf("Creating compute resource '%s' ...", gwname)
 
-	// Create a gateway (if ha is true, it will be the Master gateway)
 	var template resources.HostTemplate
 	tpls, err := handler.service.SelectTemplatesBySize(sizing, false)
 	if err != nil {
@@ -190,16 +190,13 @@ func (handler *NetworkHandler) Create(
 		return nil, err
 	}
 
-	var (
-		primaryGatewayName, secondaryGatewayName string
-		secondaryGateway                         *resources.Host
-		secondaryUserdata                        *userdata.Content
-	)
-
-	if ha || gwname == "" {
+	var primaryGatewayName, secondaryGatewayName string
+	if failover || gwname == "" {
 		primaryGatewayName = "gw-" + network.Name
+	} else {
+		primaryGatewayName = gwname
 	}
-	if ha {
+	if failover {
 		secondaryGatewayName = "gw2-" + network.Name
 	}
 
@@ -209,238 +206,117 @@ func (handler *NetworkHandler) Create(
 		return nil, infraErr(err)
 	}
 
-	// Primary gateway
 	gwRequest := resources.GatewayRequest{
 		ImageID:    img.ID,
 		Network:    network,
 		KeyPair:    keypair,
 		TemplateID: template.ID,
-		Name:       gwname,
 		CIDR:       network.CIDR,
 	}
 
-	log.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", primaryGatewayName, template.Name, img.Name)
-	primaryGateway, primaryUserdata, err := handler.service.CreateGateway(gwRequest)
-	if err != nil {
-		return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", primaryGatewayName)
-	}
+	var (
+		primaryGateway, secondaryGateway   *resources.Host
+		primaryUserdata, secondaryUserdata *userdata.Content
+		secondaryTask                      concurrency.Task
+		primaryMetadata, secondaryMetadata *metadata.Gateway
+		secondaryErr                       error
+		secondaryResult                    concurrency.TaskResult
+	)
 
-	// Reloads the host to be sure all the properties are updated
-	primaryGateway, err = handler.service.InspectHost(primaryGateway)
-	if err != nil {
-		return nil, infraErr(err)
-	}
-
-	// Starting from here, deletes the gateway if exiting with error
-	defer func() {
-		if err != nil {
-			log.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", primaryGatewayName)
-			derr := handler.service.DeleteHost(primaryGateway.ID)
-			if derr != nil {
-				log.Errorf("failed to delete gateway '%s': %v", primaryGatewayName, derr)
-			}
-			log.Infof("Cleaning up on failure, gateway '%s' deleted", primaryGatewayName)
-		}
-	}()
-
-	// Binds gateway to VIP
-	if network.VIP != nil {
-		err = handler.service.BindHostToVIP(network.VIP, primaryGateway)
-		if err != nil {
-			return nil, infraErrf(err, "failed to bind host '%s' to VIP", primaryGatewayName)
-		}
-		primaryUserdata.PrivateVIP = network.VIP.PrivateIP
-		// primaryUserdata.DefaultRouteIP = network.VIP.PrivateIP
-		primaryUserdata.DefaultRouteIP = primaryGateway.GetPrivateIP()
-		// primaryUserdata.EndpointIP = network.VIP.PublicIP
-	} else {
-		primaryUserdata.DefaultRouteIP = primaryGateway.GetPrivateIP()
-	}
-	primaryUserdata.IsPrimaryGateway = true
-
-	defer func() {
-		if err != nil {
-			derr := handler.service.UnbindHostFromVIP(network.VIP, primaryGateway)
-			if derr != nil {
-				log.Debugf("Cleaning up on failure, failed to remove gateway bind from VIP: %v", derr)
-			} else {
-				log.Infof("Cleaning up on failure, gateway bind removed from VIP")
-			}
-		}
-	}()
-
-	// Updates requested sizing in gateway property propsv1.HostSizing
-	err = primaryGateway.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
-		gwSizingV1 := v.(*propsv1.HostSizing)
-		gwSizingV1.RequestedSize = &propsv1.HostSize{
-			Cores:     sizing.MinCores,
-			RAMSize:   sizing.MinRAMSize,
-			DiskSize:  sizing.MinDiskSize,
-			GPUNumber: sizing.MinGPU,
-			CPUFreq:   sizing.MinFreq,
-		}
-		return nil
+	// Starts primary gateway creation
+	primaryRequest := gwRequest
+	primaryRequest.Name = primaryGatewayName
+	primaryTask := concurrency.NewTaskWithContext(ctx).Start(handler.createGateway, data.Map{
+		"request": primaryRequest,
+		"sizing":  sizing,
 	})
-	if err != nil {
-		return nil, infraErrf(err, "error creating network")
+
+	// Starts secondary gateway creation if asked for
+	if failover {
+		secondaryRequest := gwRequest
+		secondaryRequest.Name = secondaryGatewayName
+		secondaryTask = concurrency.NewTaskWithContext(ctx).Start(handler.createGateway, data.Map{
+			"request": secondaryRequest,
+			"sizing":  sizing,
+		})
 	}
 
-	// Writes Gateway metadata
-	primaryGatewayMetadata, err := metadata.SaveGateway(handler.service, primaryGateway, network.ID)
-	if err != nil {
-		return nil, infraErrf(err, "failed to create gateway: failed to save metadata: %s", err.Error())
-	}
+	primaryResult, primaryErr := primaryTask.Wait()
+	if primaryErr == nil {
+		primaryGateway = primaryResult.(data.Map)["host"].(*resources.Host)
+		primaryUserdata = primaryResult.(data.Map)["userdata"].(*userdata.Content)
+		primaryMetadata = primaryResult.(data.Map)["metadata"].(*metadata.Gateway)
 
-	// Starting from here, delete primary gateway metadata if exits with error
-	defer func() {
-		if err != nil {
-			log.Warnf("Cleaning up on failure, deleting gateway '%s' metadata", primaryGatewayName)
-			derr := primaryGatewayMetadata.Delete()
-			if derr != nil {
-				log.Errorf("Cleaning up on failure, failed to delete gateway '%s' metadata: %+v", primaryGatewayName, derr)
+		// Starting from here, deletes the primary gateway if exiting with error
+		defer func() {
+			if err != nil {
+				handler.deleteGateway(primaryGateway)
+				handler.deleteGatewayMetadata(primaryMetadata)
+				if failover {
+					handler.unbindHostFromVIP(network.VIP, primaryGateway)
+				}
 			}
-		}
-	}()
+		}()
+	}
+	if failover && secondaryErr == nil {
+		secondaryResult, secondaryErr = secondaryTask.Wait()
+		if secondaryErr == nil {
+			secondaryGateway = secondaryResult.(data.Map)["host"].(*resources.Host)
+			secondaryUserdata = secondaryResult.(data.Map)["userdata"].(*userdata.Content)
+			secondaryMetadata = secondaryResult.(data.Map)["metadata"].(*metadata.Gateway)
 
-	// A host claimed ready by a Cloud provider is not necessarily ready
-	// to be used until ssh service is up and running. So we wait for it before
-	// claiming host is created
-	log.Infof("Waiting until gateway '%s' is available by SSH ...", primaryGatewayName)
-	sshHandler := NewSSHHandler(handler.service)
-	ssh, err := sshHandler.GetConfig(ctx, primaryGateway.ID)
-	if err != nil {
-		return nil, infraErrf(err, "error creating network: Error retrieving SSH config of gateway '%s'", primaryGatewayName)
+			// Starting from here, deletes the secondary gateway if exiting with error
+			defer func() {
+				if err != nil {
+					handler.deleteGateway(secondaryGateway)
+					handler.deleteGatewayMetadata(secondaryMetadata)
+					handler.unbindHostFromVIP(network.VIP, secondaryGateway)
+				}
+			}()
+		}
+	}
+	if primaryErr != nil {
+		err = primaryErr // Set to trigger defers
+		return nil, err
+	}
+	if secondaryErr != nil {
+		err = secondaryErr // set to trigger defers
+		return nil, err
 	}
 
-	sshDefaultTimeout := utils.GetHostTimeout()
-	_, err = ssh.WaitServerReady("phase1", sshDefaultTimeout) // FIXME Phase1
+	network.GatewayID = primaryGateway.ID
+	if secondaryGateway != nil {
+		network.SecondaryGatewayID = secondaryGateway.ID
+	}
+	err = mn.Write()
 	if err != nil {
-		if client.IsTimeoutError(err) {
-			return nil, infraErrf(err, "Timeout creating a gateway")
-		}
-		if client.IsProvisioningError(err) {
-			log.Errorf("%+v", err)
-			return nil, logicErr(fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", primaryGatewayName))
-		}
 		return nil, infraErr(err)
 	}
-	log.Infof("SSH service of gateway '%s' started.", primaryGatewayName)
 
-	// Secondary gateway if needed
-	if ha {
-		gwRequest.Name = secondaryGatewayName
-
-		log.Infof("Requesting the creation of the gateway '%s' using template '%s' with image '%s'", gwname, template.Name, img.Name)
-		secondaryGateway, secondaryUserdata, err = handler.service.CreateGateway(gwRequest)
-		if err != nil {
-			return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", gwname)
+	// Starts gateway(s) installation
+	primaryTask = primaryTask.Reset().Start(handler.waitForInstallPhase1OnGateway, primaryGateway)
+	if failover {
+		secondaryTask = secondaryTask.Reset().Start(handler.waitForInstallPhase1OnGateway, secondaryGateway)
+	}
+	_, primaryErr = primaryTask.Wait()
+	if primaryErr != nil {
+		// err = primaryErr // set to trigger defers
+		// return nil, err
+		return nil, primaryErr
+	}
+	if failover {
+		_, secondaryErr = secondaryTask.Wait()
+		if secondaryErr != nil {
+			// err = secondaryErr // set to trigger defers
+			// return nil, err
+			return nil, secondaryErr
 		}
-
-		// Reloads the host to be sure all the properties are updated
-		secondaryGateway, err = handler.service.InspectHost(secondaryGateway)
-		if err != nil {
-			return nil, infraErr(err)
-		}
-
-		// Starting from here, deletes the gateway if exiting with error
-		defer func() {
-			if err != nil {
-				log.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", secondaryGatewayName)
-				derr := handler.service.DeleteHost(secondaryGateway.ID)
-				if derr != nil {
-					log.Errorf("failed to delete gateway '%s': %v", secondaryGatewayName, derr)
-				}
-				log.Infof("Cleaning up on failure, gateway '%s' deleted", secondaryGatewayName)
-			}
-		}()
-
-		// Binds gateway to VIP
-		if network.VIP != nil {
-			err = handler.service.BindHostToVIP(network.VIP, secondaryGateway)
-			if err != nil {
-				return nil, infraErrf(err, "failed to bind host '%s' to VIP", secondaryGatewayName)
-			}
-			secondaryUserdata.PrivateVIP = network.VIP.PrivateIP
-			// secondaryUserdata.PublicVIP = network.VIP.PublicIP
-			secondaryUserdata.DefaultRouteIP = network.VIP.PrivateIP
-			// secondaryUserdata.EndpointIP = network.VIP.PublicIP
-		} else {
-			secondaryUserdata.DefaultRouteIP = secondaryGateway.GetPrivateIP()
-		}
-		secondaryUserdata.IsPrimaryGateway = false
-
-		defer func() {
-			if err != nil {
-				derr := handler.service.UnbindHostFromVIP(network.VIP, secondaryGateway)
-				if derr != nil {
-					log.Debugf("Cleaning up on failure, failed to remove gateway bind from VIP: %v", derr)
-				} else {
-					log.Infof("Cleaning up on failure, gateway bind removed from VIP")
-				}
-			}
-		}()
-
-		// Updates requested sizing in gateway property propsv1.HostSizing
-		err = secondaryGateway.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
-			gwSizingV1 := v.(*propsv1.HostSizing)
-			gwSizingV1.RequestedSize = &propsv1.HostSize{
-				Cores:     sizing.MinCores,
-				RAMSize:   sizing.MinRAMSize,
-				DiskSize:  sizing.MinDiskSize,
-				GPUNumber: sizing.MinGPU,
-				CPUFreq:   sizing.MinFreq,
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, infraErrf(err, "error creating network")
-		}
-
-		// Writes Gateway metadata
-		secondaryGatewayMetadata, err := metadata.SaveGateway(handler.service, secondaryGateway, network.ID)
-		if err != nil {
-			return nil, infraErrf(err, "failed to create gateway: failed to save metadata: %s", err.Error())
-		}
-
-		// Starting from here, delete gateway metadata if exits with error
-		defer func() {
-			if err != nil {
-				log.Warnf("Cleaning up on failure, deleting gateway '%s' metadata", secondaryGatewayName)
-				derr := secondaryGatewayMetadata.Delete()
-				if derr != nil {
-					log.Errorf("Failed to delete gateway '%s' metadata: %+v", secondaryGatewayName, derr)
-				}
-			}
-		}()
-
-		// A host claimed ready by a Cloud provider is not necessarily ready
-		// to be used until ssh service is up and running. So we wait for it before
-		// claiming host is created
-		log.Infof("Waiting until gateway '%s' is available by SSH ...", secondaryGatewayName)
-		sshHandler := NewSSHHandler(handler.service)
-		ssh, err := sshHandler.GetConfig(ctx, secondaryGateway.ID)
-		if err != nil {
-			return nil, infraErrf(err, "error creating network: Error retrieving SSH config of gateway '%s'", secondaryGatewayName)
-		}
-
-		sshDefaultTimeout := utils.GetHostTimeout()
-		_, err = ssh.WaitServerReady("phase1", sshDefaultTimeout) // FIXME Phase1
-		if err != nil {
-			if client.IsTimeoutError(err) {
-				return nil, infraErrf(err, "Timeout creating a gateway")
-			}
-			if client.IsProvisioningError(err) {
-				log.Errorf("%+v", err)
-				return nil, logicErr(fmt.Errorf("error creating network: failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", secondaryGatewayName))
-			}
-			return nil, infraErr(err)
-		}
-		log.Infof("SSH service of gateway '%s' started.", secondaryGatewayName)
 	}
 
+	// Complement userdata for gateway(s) with allocated IP
 	primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.GetPrivateIP()
 	primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.GetPublicIP()
-	if ha {
+	if failover {
 		primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.GetPrivateIP()
 		primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.GetPublicIP()
 		secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
@@ -449,99 +325,27 @@ func (handler *NetworkHandler) Create(
 		secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
 	}
 
-	// Executes userdata phase2 script to finalize host installation
-	log.Infof("Starting initial configuration of the gateway '%s'", primaryGatewayName)
-	primaryUserdataPhase2, err := primaryUserdata.Generate("phase2")
-	if err != nil {
+	// Starts gateway(s) installation
+	primaryTask = primaryTask.Reset().Start(handler.installPhase2OnGateway, data.Map{
+		"host":     primaryGateway,
+		"userdata": primaryUserdata,
+	})
+	if failover {
+		secondaryTask = secondaryTask.Reset().Start(handler.installPhase2OnGateway, data.Map{
+			"host":     secondaryGateway,
+			"userdata": secondaryUserdata,
+		})
+	}
+	_, primaryErr = primaryTask.Wait()
+	if primaryErr != nil {
+		err = primaryErr // Set to trigger defers
 		return nil, err
 	}
-	err = install.UploadStringToRemoteFile(string(primaryUserdataPhase2), safescaleutils.ToPBHost(primaryGateway), srvutils.TempFolder+"/user_data.phase2.sh", "", "", "")
-	if err != nil {
-		return nil, err
-	}
-	command := fmt.Sprintf("sudo bash %s/%s; exit $?", srvutils.TempFolder, "user_data.phase2.sh")
-	retcode, _, stderr, err := sshHandler.Run(ctx, primaryGatewayName, command)
-	if err != nil {
-		return nil, err
-	}
-	if retcode != 0 {
-		return nil, fmt.Errorf("failed to finalize host installation: %s", stderr)
-	}
-	log.Infof("Gateway '%s' successfully configured.", primaryGatewayName)
-
-	// Reboot gateway
-	log.Debugf("Rebooting gateway '%s'", primaryGatewayName)
-	command = "sudo systemctl reboot"
-	retcode, _, stderr, err = sshHandler.Run(ctx, primaryGatewayName, command)
-	if err != nil {
-		return nil, err
-	}
-
-	network.GatewayID = primaryGateway.ID
-	err = mn.Write()
-	if err != nil {
-		return nil, infraErr(err)
-	}
-
-	// TODO Test for failure with 15s !!!
-	_, err = ssh.WaitServerReady("ready", sshDefaultTimeout)
-	if err != nil {
-		if client.IsTimeoutError(err) {
-			return nil, infraErrf(err, "Timeout creating a gateway")
-		}
-		if client.IsProvisioningError(err) {
-			log.Errorf("%+v", err)
-			return nil, logicErr(fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", primaryGatewayName))
-		}
-		return nil, infraErr(err)
-	}
-
-	if ha {
-		// Executes userdata phase2 script to finalize host installation
-		log.Infof("Starting initial configuration of the gateway '%s'", secondaryGatewayName)
-		secondaryUserdataPhase2, err := secondaryUserdata.Generate("phase2")
-		if err != nil {
+	if failover {
+		_, secondaryErr = secondaryTask.Wait()
+		if secondaryErr != nil {
+			err = secondaryErr // set to trigger defers
 			return nil, err
-		}
-		err = install.UploadStringToRemoteFile(string(secondaryUserdataPhase2), safescaleutils.ToPBHost(secondaryGateway), srvutils.TempFolder+"/user_data.phase2.sh", "", "", "")
-		if err != nil {
-			return nil, err
-		}
-		command := fmt.Sprintf("sudo bash %s/%s; exit $?", srvutils.TempFolder, "user_data.phase2.sh")
-		retcode, _, stderr, err := sshHandler.Run(ctx, secondaryGatewayName, command)
-		if err != nil {
-			return nil, err
-		}
-		if retcode != 0 {
-			return nil, fmt.Errorf("failed to finalize host installation: %s", stderr)
-		}
-		log.Infof("Gateway '%s' successfully configured.", secondaryGatewayName)
-
-		// Reboot gateway
-		log.Debugf("Rebooting gateway '%s'", secondaryGatewayName)
-		command = "sudo systemctl reboot"
-		retcode, _, stderr, err = sshHandler.Run(ctx, secondaryGatewayName, command)
-		if err != nil {
-			return nil, err
-		}
-
-		// TODO Test for failure with 15s !!!
-		_, err = ssh.WaitServerReady("ready", sshDefaultTimeout)
-		if err != nil {
-			if client.IsTimeoutError(err) {
-				return nil, infraErrf(err, "Timeout creating a gateway")
-			}
-			if client.IsProvisioningError(err) {
-				log.Errorf("%+v", err)
-				return nil, logicErr(fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", secondaryGatewayName))
-			}
-			return nil, infraErr(err)
-		}
-
-		network.SecondaryGatewayID = secondaryGateway.ID
-		err = mn.Write()
-		if err != nil {
-			return nil, infraErr(err)
 		}
 	}
 
@@ -554,6 +358,205 @@ func (handler *NetworkHandler) Create(
 	}
 
 	return network, nil
+}
+
+func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+	var (
+		inputs data.Map
+		ok     bool
+	)
+	if inputs, ok = params.(data.Map); !ok {
+		return nil, utils.InvalidParameterError("params", "must be a data.Map")
+	}
+	// name := inputs["name"].(string)
+	request := inputs["request"].(resources.GatewayRequest)
+	sizing := inputs["sizing"].(resources.SizingRequirements)
+
+	log.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", request.Name, request.TemplateID, request.ImageID)
+	gw, userData, err := handler.service.CreateGateway(request)
+	if err != nil {
+		return nil, infraErrf(err, "Error creating network: Gateway creation with name '%s' failed", request.Name)
+	}
+
+	// Starting from here, deletes the primary gateway if exiting with error
+	defer func() {
+		if err != nil {
+			log.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", request.Name)
+			derr := handler.service.DeleteHost(gw.ID)
+			if derr != nil {
+				log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", request.Name, derr)
+			}
+			log.Infof("Cleaning up on failure, gateway '%s' deleted", request.Name)
+		}
+	}()
+
+	// Reloads the host to be sure all the properties are updated
+	gw, err = handler.service.InspectHost(gw)
+	if err != nil {
+		return nil, infraErr(err)
+	}
+
+	// Binds gateway to VIP
+	if request.Network.VIP != nil {
+		err = handler.service.BindHostToVIP(request.Network.VIP, gw)
+		if err != nil {
+			return nil, infraErrf(err, "failed to bind host '%s' to VIP", gw.Name)
+		}
+		userData.PrivateVIP = request.Network.VIP.PrivateIP
+		// userData.DefaultRouteIP = request.Network.VIP.PrivateIP
+		userData.DefaultRouteIP = gw.GetPrivateIP()
+		// userData.EndpointIP = request.Network.VIP.PublicIP
+	} else {
+		userData.DefaultRouteIP = gw.GetPrivateIP()
+	}
+	userData.IsPrimaryGateway = true
+
+	// Updates requested sizing in gateway property propsv1.HostSizing
+	err = gw.Properties.LockForWrite(HostProperty.SizingV1).ThenUse(func(v interface{}) error {
+		gwSizingV1 := v.(*propsv1.HostSizing)
+		gwSizingV1.RequestedSize = &propsv1.HostSize{
+			Cores:     sizing.MinCores,
+			RAMSize:   sizing.MinRAMSize,
+			DiskSize:  sizing.MinDiskSize,
+			GPUNumber: sizing.MinGPU,
+			CPUFreq:   sizing.MinFreq,
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, infraErr(err)
+	}
+
+	// Writes Gateway metadata
+	m, err := metadata.SaveGateway(handler.service, gw, request.Network.ID)
+	if err != nil {
+		return nil, infraErrf(err, "failed to create gateway '%s': failed to save metadata: %s", gw.Name, err.Error())
+	}
+	result := data.Map{
+		"host":     gw,
+		"userdata": userData,
+		"metadata": m,
+	}
+	return result, nil
+}
+
+func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (concurrency.TaskResult, error) {
+
+	gw := params.(*resources.Host)
+
+	// A host claimed ready by a Cloud provider is not necessarily ready
+	// to be used until ssh service is up and running. So we wait for it before
+	// claiming host is created
+	log.Infof("Waiting until gateway '%s' is available by SSH ...", gw.Name)
+	sshHandler := NewSSHHandler(handler.service)
+	ssh, err := sshHandler.GetConfig(task.GetContext(), gw.ID)
+	if err != nil {
+		return nil, infraErrf(err, "error creating network: Error retrieving SSH config of gateway '%s'", gw.Name)
+	}
+
+	sshDefaultTimeout := utils.GetHostTimeout()
+	_, err = ssh.WaitServerReady("phase1", sshDefaultTimeout) // FIXME Phase1
+	if err != nil {
+		if client.IsTimeoutError(err) {
+			return nil, infraErrf(err, "Timeout waiting gateway '%s' to become ready", gw.Name)
+		}
+		if client.IsProvisioningError(err) {
+			log.Errorf("%+v", err)
+			return nil, logicErr(fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name))
+		}
+		return nil, infraErrf(err, "failed to wait gateway '%s' to become ready", gw.Name)
+	}
+	log.Infof("SSH service of gateway '%s' started.", gw.Name)
+
+	return nil, nil
+}
+
+func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+	var (
+		gw       *resources.Host
+		userData *userdata.Content
+		ok       bool
+	)
+	if gw, ok = params.(data.Map)["host"].(*resources.Host); !ok {
+		return nil, utils.InvalidParameterError("params", "missing field 'host'")
+	}
+	if userData, ok = params.(data.Map)["userdata"].(*userdata.Content); !ok {
+		return nil, utils.InvalidParameterError("params", "missing field 'userdata'")
+	}
+
+	// Executes userdata phase2 script to finalize host installation
+	log.Infof("Starting configuration of the gateway '%s'", gw.Name)
+	content, err := userData.Generate("phase2")
+	if err != nil {
+		return nil, err
+	}
+	err = install.UploadStringToRemoteFile(string(content), safescaleutils.ToPBHost(gw), srvutils.TempFolder+"/user_data.phase2.sh", "", "", "")
+	if err != nil {
+		return nil, err
+	}
+	command := fmt.Sprintf("sudo bash %s/%s; exit $?", srvutils.TempFolder, "user_data.phase2.sh")
+	sshHandler := NewSSHHandler(handler.service)
+	retcode, _, stderr, err := sshHandler.Run(task.GetContext(), gw.Name, command)
+	if err != nil {
+		return nil, err
+	}
+	if retcode != 0 {
+		return nil, fmt.Errorf("failed to finalize gateway '%s' installation: %s", gw.Name, stderr)
+	}
+	log.Infof("Gateway '%s' successfully configured.", gw.Name)
+
+	// Reboot gateway
+	log.Debugf("Rebooting gateway '%s'", gw.Name)
+	command = "sudo systemctl reboot"
+	retcode, _, stderr, err = sshHandler.Run(task.GetContext(), gw.Name, command)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO Test for failure with 15s !!!
+	ssh, err := sshHandler.GetConfig(task.GetContext(), gw.ID)
+	sshDefaultTimeout := utils.GetHostTimeout()
+	_, err = ssh.WaitServerReady("ready", sshDefaultTimeout)
+	if err != nil {
+		if client.IsTimeoutError(err) {
+			return nil, infraErrf(err, "Timeout waiting gateway '%s' to become ready", gw.Name)
+		}
+		if client.IsProvisioningError(err) {
+			log.Errorf("%+v", err)
+			return nil, logicErr(fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH", gw.Name))
+		}
+		return nil, infraErrf(err, "failed to wait gateway '%s' to become ready", gw.Name)
+	}
+	return nil, nil
+}
+
+func (handler *NetworkHandler) deleteGateway(gw *resources.Host) {
+	log.Warnf("Cleaning up on failure, deleting gateway '%s'...", gw.Name)
+	derr := handler.service.DeleteHost(gw.ID)
+	if derr != nil {
+		log.Errorf("Cleaning up on failure, failed to delete gateway '%s': %v", gw.Name, derr)
+	}
+	log.Infof("Cleaning up on failure, gateway '%s' deleted", gw.Name)
+}
+
+func (handler *NetworkHandler) deleteGatewayMetadata(m *metadata.Gateway) {
+	name := m.Get().Name
+	log.Warnf("Cleaning up on failure, deleting gateway '%s' metadata", name)
+	derr := m.Delete()
+	if derr != nil {
+		log.Errorf("Cleaning up on failure, failed to delete gateway '%s' metadata: %+v", name, derr)
+	}
+}
+
+func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VIP, host *resources.Host) {
+	derr := handler.service.UnbindHostFromVIP(vip, host)
+	if derr != nil {
+		log.Debugf("Cleaning up on failure, failed to remove gateway bind from VIP: %v", derr)
+	} else {
+		log.Infof("Cleaning up on failure, host '%s' bind removed from VIP", host.Name)
+	}
 }
 
 // List returns the network list
