@@ -155,40 +155,45 @@ func (provider *provider) StartHost(id string) error {
 func (provider *provider) StopHost(id string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) RebootHost(id string) error {
+func (p *provider) RebootHost(id string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
+func (p *provider) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetVolume(id string) (*resources.Volume, error) {
+func (p *provider) GetVolume(id string) (*resources.Volume, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListVolumes() ([]resources.Volume, error) {
+func (p *provider) ListVolumes() ([]resources.Volume, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) DeleteVolume(id string) error {
+func (p *provider) DeleteVolume(id string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+func (p *provider) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
 	return "", fmt.Errorf(errorStr)
 }
-func (provider *provider) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
+func (p *provider) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
+func (p *provider) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) DeleteVolumeAttachment(serverID, id string) error {
+func (p *provider) DeleteVolumeAttachment(serverID, id string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) GetName() string {
+func (p *provider) GetName() string {
 	return "local_disabled"
 }
-func (provider *provider) GetTenantParameters() map[string]interface{} {
+func (p *provider) GetTenantParameters() map[string]interface{} {
 	return nil
+}
+
+// GetCapabilities returns the capabilities of the provider
+func (p *provider) GetCapabilities() providers.Capabilities {
+	return providers.Capabilities{}
 }
 
 func init() {
