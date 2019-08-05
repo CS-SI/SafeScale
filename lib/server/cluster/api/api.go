@@ -18,6 +18,7 @@ package api
 
 import (
 	pb "github.com/CS-SI/SafeScale/lib"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v1"
 	propsv2 "github.com/CS-SI/SafeScale/lib/server/cluster/control/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/ClusterState"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
@@ -53,12 +54,20 @@ type Cluster interface {
 	DeleteLastNode(concurrency.Task, string) error
 	// DeleteSpecificNode deletes a node identified by its ID
 	DeleteSpecificNode(concurrency.Task, string, string) error
+	// ListMasters lists the masters (if there is such masters in the flavor...)
+	ListMasters(concurrency.Task) []*propsv1.Node
+	// ListMasterNames lists the names of masters (if there is such masters in the flavor...)
+	ListMasterNames(concurrency.Task) []string
 	// ListMasterIDs lists the IDs of masters (if there is such masters in the flavor...)
 	ListMasterIDs(concurrency.Task) []string
 	// ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
 	ListMasterIPs(concurrency.Task) []string
 	// FindAvailableMaster returns ID of the first master available to execute order
 	FindAvailableMaster(concurrency.Task) (string, error)
+	// ListNodes lists Nodes in the cluster
+	ListNodes(concurrency.Task) []*propsv1.Node
+	// ListNodeNames lists IDs of the nodes in the cluster
+	ListNodeNames(concurrency.Task) []string
 	// ListNodeIDs lists IDs of the nodes in the cluster
 	ListNodeIDs(concurrency.Task) []string
 	// ListNodeIPs lists the IPs of the nodes in the cluster
