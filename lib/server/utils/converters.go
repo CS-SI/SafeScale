@@ -274,11 +274,13 @@ func ToPBNetwork(in *resources.Network) *pb.Network {
 		pbVIP = ToPBVirtualIp(*in.VIP)
 	}
 	return &pb.Network{
-		Id:        in.ID,
-		Name:      in.Name,
-		Cidr:      in.CIDR,
-		GatewayId: in.GatewayID,
-		VirtualIp: &pbVIP,
+		Id:                 in.ID,
+		Name:               in.Name,
+		Cidr:               in.CIDR,
+		GatewayId:          in.GatewayID,
+		SecondaryGatewayId: in.SecondaryGatewayID,
+		VirtualIp:          &pbVIP,
+		Failover:           in.SecondaryGatewayID != "",
 	}
 }
 
