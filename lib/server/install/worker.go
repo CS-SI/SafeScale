@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 
 	log "github.com/sirupsen/logrus"
@@ -133,24 +134,6 @@ func (w *worker) CanProceed(s Settings) error {
 		return w.validateContextForHost()
 	}
 	return nil
-}
-
-// identifyAvailableGateway finds a gateway available, and keep track of it
-// for all the life of the action (prevent to request too often)
-// For now, only one gateway is allowed, but in the future we may have 2 for High Availability
-func (w *worker) identifyAvailableGateway() (*pb.Host, error) {
-	if w.cluster == nil {
-		return gatewayFromHost(w.host), nil
-	}
-	if w.availableGateway == nil {
-		var err error
-		netCfg := w.cluster.GetNetworkConfig(w.feature.task)
-		w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, client.DefaultExecutionTimeout)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return w.availableGateway, nil
 }
 
 // identifyAvailableMaster finds a master available, and keep track of it
@@ -311,6 +294,24 @@ func (w *worker) identifyAllNodes() ([]*pb.Host, error) {
 	return w.allNodes, nil
 }
 
+// identifyAvailableGateway finds a gateway available, and keep track of it
+// for all the life of the action (prevent to request too often)
+// For now, only one gateway is allowed, but in the future we may have 2 for High Availability
+func (w *worker) identifyAvailableGateway() (*pb.Host, error) {
+	if w.cluster == nil {
+		return gatewayFromHost(w.host), nil
+	}
+	if w.availableGateway == nil {
+		var err error
+		netCfg := w.cluster.GetNetworkConfig(w.feature.task)
+		w.availableGateway, err = client.New().Host.Inspect(netCfg.GatewayID, client.DefaultExecutionTimeout)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return w.availableGateway, nil
+}
+
 // identifyConcernedGateways returns a list of all the hosts acting as gateway that can accept the action
 //  and keep this list during all the install session
 func (w *worker) identifyConcernedGateways() ([]*pb.Host, error) {
@@ -335,15 +336,33 @@ func (w *worker) identifyConcernedGateways() ([]*pb.Host, error) {
 	return w.concernedGateways, nil
 }
 
-// identifyAllGateways returns a list of all the hosts acting as gatewaysand keep this list
+// identifyAllGateways returns a list of all the hosts acting as gateways and keep this list
 // during all the install session
-// For now, it's exactly the same than identifyAvailableGateway(), there is only one gateway authorized
 func (w *worker) identifyAllGateways() ([]*pb.Host, error) {
-	host, err := w.identifyAvailableGateway()
+	if w.allGateways != nil {
+		return w.allGateways, nil
+	}
+
+	var (
+		err     error
+		results []*pb.Host
+	)
+
+	netCfg := w.cluster.GetNetworkConfig(w.feature.task)
+	gw, err := client.New().Host.Inspect(netCfg.GatewayID, client.DefaultExecutionTimeout)
 	if err != nil {
 		return nil, err
 	}
-	return []*pb.Host{host}, nil
+	results = append(w.allGateways, gw)
+	if netCfg.SecondaryGatewayID != "" {
+		gw, err = client.New().Host.Inspect(netCfg.SecondaryGatewayID, client.DefaultExecutionTimeout)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, gw)
+	}
+	w.allGateways = results
+	return results, nil
 }
 
 // Proceed executes the action
@@ -631,27 +650,17 @@ func (w *worker) setReverseProxy() error {
 		return nil
 	}
 
-	var (
-		err error
-		gw  *pb.Host
-	)
-
-	gw, err = w.identifyAvailableGateway()
+	svc := w.cluster.GetService(w.feature.task)
+	netprops := w.cluster.GetNetworkConfig(w.feature.task)
+	mn, err := metadata.LoadNetwork(svc, netprops.NetworkID)
 	if err != nil {
-		return fmt.Errorf("failed to set reverse proxy: %s", err.Error())
+		return err
 	}
-
-	kc, err := NewKongController(gw)
+	network := mn.Get()
+	kc, err := NewKongController(svc, network)
 	if err != nil {
 		return fmt.Errorf("failed to apply reverse proxy rules: %s", err.Error())
 	}
-
-	// Sets the values useable in any cases
-	w.variables["PublicIP"] = gw.PublicIp
-	w.variables["HostIP"] = gw.PrivateIp
-	// VPL: FIXME: use Property.NetworkV2 for VIP awareness
-	// w.variables["EndpointIP"] = vip.PublicIP
-	// w.variables["DefaultRouteIP"] = vip.PrivateIP
 
 	// Now submits all the rules to reverse proxy
 	for _, r := range rules {
@@ -663,15 +672,15 @@ func (w *worker) setReverseProxy() error {
 			if w.cluster != nil {
 				continue
 			}
-			targets[targetHosts] = "true"
+			targets[targetHosts] = "yes"
 		} else {
 			for i, j := range anon {
 				switch j.(type) {
 				case bool:
 					if j.(bool) {
-						targets[i.(string)] = "true"
+						targets[i.(string)] = "yes"
 					} else {
-						targets[i.(string)] = "false"
+						targets[i.(string)] = "no"
 					}
 				case string:
 					targets[i.(string)] = j.(string)
