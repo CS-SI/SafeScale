@@ -31,13 +31,14 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/IPVersion"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
-	_ "github.com/CS-SI/SafeScale/lib/server/utils" // Imported to initialise tenants
 	"github.com/CS-SI/SafeScale/lib/utils"
+
+	_ "github.com/CS-SI/SafeScale/lib/server" // Imported to initialise tenants
 )
 
 const cmdNumberOfCPU string = "lscpu | grep 'CPU(s):' | grep -v 'NUMA' | tr -d '[:space:]' | cut -d: -f2"
