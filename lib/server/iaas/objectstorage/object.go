@@ -23,10 +23,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/graymeta/stow"
 	log "github.com/sirupsen/logrus"
+
 	// necessary for connect
-	// _ "github.com/graymeta/stow/azure"
+	_ "github.com/graymeta/stow/azure"
 	_ "github.com/graymeta/stow/google"
 	_ "github.com/graymeta/stow/s3"
 	_ "github.com/graymeta/stow/swift"
@@ -65,18 +68,11 @@ func newObject(bucket *bucket, objectName string) (*object, error) {
 
 // newObjectFromStow ...
 func newObjectFromStow(bucket *bucket, item stow.Item) *object {
-	if bucket == nil {
-		panic("bucket is nil!")
-	}
-	if item == nil {
-		panic("item is nil!")
-	}
-
 	return &object{
 		bucket:   bucket,
 		item:     item,
 		Name:     item.Name(),
-		Metadata: map[string]interface{}{},
+		Metadata: ObjectMetadata{},
 	}
 }
 
@@ -87,6 +83,13 @@ func (o *object) Stored() bool {
 
 // Reload reloads the data of the Object from the Object Storage
 func (o *object) Reload() error {
+	if o == nil {
+		return utils.InvalidInstanceError()
+	}
+
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), "").In()
+	defer tracer.Out()
+
 	item, err := o.bucket.container.Item(o.Name)
 	if err != nil {
 		return err
@@ -107,9 +110,16 @@ func (o *object) reloadFromItem(item stow.Item) error {
 
 // Read reads the content of the object from Object Storage and writes it in 'target'
 func (o *object) Read(target io.Writer, from, to int64) error {
-	if from > to {
-		panic("from is greater than to!")
+	if target == nil {
+		return utils.InvalidInstanceError()
 	}
+	if from > to {
+		return utils.InvalidParameterError("from", "can't be greater than 'to'")
+	}
+
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%d, %d)", from, to)).In()
+	defer tracer.Out()
+
 	var seekTo int64
 	var length int64
 
@@ -173,10 +183,19 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 func (o *object) Write(source io.Reader, sourceSize int64) error {
 	// log.Debugf("objectstorage.object<%s:%s>.Write() called", o.bucket.Name, o.Name)
 	// defer log.Debugf("objectstorage.object<%s:%s>.Write() done", o.bucket.Name, o.Name)
-
-	if o.bucket == nil {
-		panic("o.bucket == nil!")
+	if o == nil {
+		return utils.InvalidInstanceError()
 	}
+	if source == nil {
+		return utils.InvalidParameterError("source", "can't be nil")
+	}
+	if o.bucket == nil {
+		return utils.InvalidParameterError("o.bucket", "can't be nil")
+	}
+
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%d)", sourceSize)).In()
+	defer tracer.Out()
+
 	item, err := o.bucket.container.Put(o.Name, source, sourceSize, o.GetMetadata())
 	if err != nil {
 		return err
@@ -187,8 +206,12 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 // WriteMultiPart writes big data to Object, by parts (also called chunks)
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
 func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) error {
-	// log.Debugf("objectstorage.object<%s,%s>.WriteMultiPart() called", o.bucket.Name, o.Name)
-	// defer log.Debugf("objectstorage.object<%s,%s>.WriteMultiPart() done", o.bucket.Name, o.Name)
+	if o == nil {
+		return utils.InvalidInstanceError()
+	}
+
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), fmt.Sprintf("(%d, %d)", sourceSize, chunkSize)).In()
+	defer tracer.Out()
 
 	metadataCopy := o.GetMetadata().Clone()
 
@@ -241,8 +264,12 @@ func writeChunk(
 // Delete deletes the object from Object Storage
 func (o *object) Delete() error {
 	if o.item == nil {
-		panic("o.item is nil!")
+		return utils.InvalidInstanceError()
 	}
+
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), "").In()
+	defer tracer.Out()
+
 	err := o.bucket.container.RemoveItem(o.Name)
 	if err != nil {
 		return err
@@ -253,6 +280,9 @@ func (o *object) Delete() error {
 
 // ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
 func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) {
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), "").In()
+	defer tracer.Out()
+
 	for k, v := range newMetadata {
 		o.Metadata[k] = v
 	}
@@ -260,6 +290,9 @@ func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) {
 
 // AddMetadata adds missing entries in object metadata
 func (o *object) AddMetadata(newMetadata ObjectMetadata) {
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), "").In()
+	defer tracer.Out()
+
 	for k, v := range newMetadata {
 		_, found := o.Metadata[k]
 		if !found {
@@ -270,6 +303,9 @@ func (o *object) AddMetadata(newMetadata ObjectMetadata) {
 
 // ReplaceMetadata replaces object metadata with the ones provided in parameter
 func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) {
+	tracer := concurrency.NewTracer(false /*Trace.Controller*/, concurrency.VoidTask(), "").In()
+	defer tracer.Out()
+
 	o.Metadata = newMetadata
 }
 
@@ -280,6 +316,10 @@ func (o *object) GetName() string {
 
 // GetLastUpdate returns the date of last update
 func (o *object) GetLastUpdate() (time.Time, error) {
+	if o == nil {
+		return time.Time{}, utils.InvalidInstanceError()
+	}
+
 	if o.item != nil {
 		return o.item.LastMod()
 	}
